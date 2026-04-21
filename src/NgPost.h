@@ -131,6 +131,7 @@ public:
         RAR_PASS,
         RAR_NO_ROOT_FOLDER,
         AUTO_CLOSE_TABS,
+        KEEP_NFO_EXTENSION,
         AUTO_COMPRESS,
         GROUP_POLICY,
         LOG_IN_FILE,
@@ -290,6 +291,7 @@ private:
     bool _removeAccentsOnNzbFileName;
     bool _autoCloseTabs;
     bool _rarNoRootFolder;
+    bool _keepNfoExtension; //!< when obfuscating file names, keep the .nfo extension visible
 
     bool _tryResumePostWhenConnectionLost;
     ushort _waitDurationBeforeAutoResume;

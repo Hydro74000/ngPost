@@ -73,6 +73,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::NZB_POST_CMD,   "nzb_post_cmd"},
     {Opt::NZB_RM_ACCENTS, "nzb_rm_accents"},
     {Opt::AUTO_CLOSE_TABS,"auto_close_tabs"},
+    {Opt::KEEP_NFO_EXTENSION, "keep_nfo_extension"},
     {Opt::RAR_NO_ROOT_FOLDER, "rar_no_root_folder"},
     {Opt::LOG_IN_FILE,     "log_in_file"},
 
@@ -282,6 +283,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _removeAccentsOnNzbFileName(false),
     _autoCloseTabs(false),
     _rarNoRootFolder(false),
+    _keepNfoExtension(false),
     _tryResumePostWhenConnectionLost(true),
     _waitDurationBeforeAutoResume(sDefaultResumeWaitInSec),
     _nzbPostCmd(), _preparePacking(false),
@@ -1981,6 +1983,12 @@ QString NgPost::_parseConfig(const QString &configPath)
                         if (val == "true" || val == "on" || val == "1")
                             _autoCloseTabs = true;
                     }
+                    else if (opt == sOptionNames[Opt::KEEP_NFO_EXTENSION])
+                    {
+                        val = val.toLower();
+                        if (val == "true" || val == "on" || val == "1")
+                            _keepNfoExtension = true;
+                    }
                     else if (opt == sOptionNames[Opt::LOG_IN_FILE] && useHMI())
                     {
                         val = val.toLower();
@@ -2637,6 +2645,9 @@ void NgPost::saveConfig()
                << "\n"
                << tr("## close Quick Post Tabs when posted successfully (for the GUI)") << "\n"
                << (_autoCloseTabs  ? "" : "#") << "AUTO_CLOSE_TABS = true\n"
+               << "\n"
+               << tr("## when obfuscating file names, keep the .nfo extension visible") << "\n"
+               << (_keepNfoExtension ? "" : "#") << "KEEP_NFO_EXTENSION = true\n"
                << "\n"
                << "\n"
                << tr("## Time to wait (seconds) before trying to resume a Post automatically in case of loss of Network (min: %1)").arg(

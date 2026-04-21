@@ -1048,8 +1048,11 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
     if (_obfuscateFileName) {
         _files.clear();
         for (const QFileInfo &fileInfo : _originalFiles) {
-            QString obfuscatedName = QString("%1/%2").arg(fileInfo.absolutePath(),
-                                                          _ngPost->randomPass(_ngPost->_lengthName)),
+            QString randomBase = _ngPost->randomPass(_ngPost->_lengthName);
+            if (_ngPost->_keepNfoExtension
+                && fileInfo.suffix().compare("nfo", Qt::CaseInsensitive) == 0)
+                randomBase += ".nfo";
+            QString obfuscatedName = QString("%1/%2").arg(fileInfo.absolutePath(), randomBase),
                     fileName = fileInfo.absoluteFilePath();
 
             if (QFile::rename(fileName, obfuscatedName)) {

@@ -457,6 +457,7 @@ void MainWindow::_initPostingBox()
 
     _ui->obfuscateMsgIdCB->setChecked(_ngPost->_obfuscateArticles);
     _ui->obfuscateFileNameCB->setChecked(_ngPost->_obfuscateFileName);
+    _ui->keepNfoExtensionCB->setChecked(_ngPost->_keepNfoExtension);
 
     _ui->articleSizeEdit->setText(QString::number(_ngPost->articleSize()));
     _ui->articleSizeEdit->setValidator(new QIntValidator(100000, 10000000, _ui->articleSizeEdit));
@@ -534,6 +535,7 @@ void MainWindow::updateParams()
 
     _ngPost->_obfuscateArticles = _ui->obfuscateMsgIdCB->isChecked();
     _ngPost->_obfuscateFileName = _ui->obfuscateFileNameCB->isChecked();
+    _ngPost->_keepNfoExtension  = _ui->keepNfoExtensionCB->isChecked();
 
     bool ok = false;
     uint articleSize = _ui->articleSizeEdit->text().toUInt(&ok);
