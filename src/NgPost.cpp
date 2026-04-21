@@ -315,6 +315,17 @@ NgPost::NgPost(int &argc, char *argv[]):
     if (fi.exists() && fi.isFile() && fi.isExecutable())
         _par2Path = par2Embedded;
 
+    // check if an embedded rar is available (windows or appImage)
+    QString rarEmbedded;
+#if defined(WIN32) || defined(__MINGW64__)
+    rarEmbedded = QString("%1/rar.exe").arg(qApp->applicationDirPath());
+#else
+    rarEmbedded = QString("%1/rar").arg(qApp->applicationDirPath());
+#endif
+    QFileInfo rarFi(rarEmbedded);
+    if (rarFi.exists() && rarFi.isFile() && rarFi.isExecutable())
+        _rarPath = rarEmbedded;
+
     connect(this, &NgPost::log,   this, &NgPost::onLog,   Qt::QueuedConnection);
     connect(this, &NgPost::error, this, &NgPost::onError, Qt::QueuedConnection);
 
