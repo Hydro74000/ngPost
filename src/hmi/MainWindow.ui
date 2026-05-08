@@ -357,16 +357,6 @@
             </widget>
            </item>
            <item>
-            <widget class="QCheckBox" name="keepNfoExtensionCB">
-             <property name="toolTip">
-              <string>When obfuscating file names, keep the .nfo extension visible (even with compression/password enabled)</string>
-             </property>
-             <property name="text">
-              <string>keep nfo extension visible</string>
-             </property>
-            </widget>
-           </item>
-           <item>
             <spacer name="horizontalSpacer">
              <property name="orientation">
               <enum>Qt::Orientation::Horizontal</enum>
@@ -398,6 +388,33 @@
               <string>Auto Close Tabs</string>
              </property>
             </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_keepNfo">
+           <item>
+            <widget class="QCheckBox" name="keepNfoExtensionCB">
+             <property name="toolTip">
+              <string>Keep .nfo file(s) visible on the post: the nfo stays inside the rar AND is posted alongside (named like the archive)</string>
+             </property>
+             <property name="text">
+              <string>keep nfo visible</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_keepNfo">
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
            </item>
           </layout>
          </item>

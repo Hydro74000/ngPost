@@ -384,6 +384,33 @@ void PostingJob::_postFiles()
         _originalDirectory = fileDir.absolutePath();
     }
 
+    // keep nfo visible: copy any .nfo file into the archive folder so it is
+    // posted alongside the rar volumes (named after the archive)
+    if (_ngPost->_keepNfoExtension && _compressDir && _doCompress) {
+        int nfoCount = 0;
+        for (const QFileInfo &origFi : _originalFiles) {
+            if (origFi.suffix().compare("nfo", Qt::CaseInsensitive) != 0)
+                continue;
+            QString srcPath = origFi.absoluteFilePath();
+            if (!QFileInfo::exists(srcPath)) {
+                for (auto it = _obfuscatedFileNames.cbegin(); it != _obfuscatedFileNames.cend(); ++it) {
+                    if (it.value() == origFi.absoluteFilePath()) {
+                        srcPath = it.key();
+                        break;
+                    }
+                }
+            }
+            QString destName = (nfoCount == 0)
+                    ? QString("%1.nfo").arg(_rarName)
+                    : QString("%1_%2.nfo").arg(_rarName).arg(nfoCount);
+            QString destPath = _compressDir->filePath(destName);
+            if (QFile::copy(srcPath, destPath))
+                ++nfoCount;
+            else
+                _error(tr("Couldn't copy nfo %1 to %2").arg(srcPath, destPath));
+        }
+    }
+
     if (_doCompress) {
         QStringList archiveNames;
         _files.clear();
