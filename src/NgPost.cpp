@@ -2652,7 +2652,7 @@ void NgPost::saveConfig()
                << (_autoCloseTabs  ? "" : "#") << "AUTO_CLOSE_TABS = true\n"
                << "\n"
                << tr("## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)") << "\n"
-               << (_checkForUpdates ? "" : "#") << "CHECK_FOR_UPDATES = true\n"
+               << "CHECK_FOR_UPDATES = " << (_checkForUpdates ? "true" : "false") << "\n"
                << tr("## (internal) last update check timestamp, epoch seconds \xe2\x80\x94 managed automatically") << "\n"
                << "LAST_UPDATE_CHECK = " << _lastUpdateCheckEpoch << "\n"
                << "\n"
