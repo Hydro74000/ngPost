@@ -4,6 +4,6 @@ Name=ngPost
 Exec=ngPost %F
 Icon=ngPost
 Comment=Edit this default file
-Terminal=true
+Terminal=false
 Categories=Network;
 X-AppImage-Version=
