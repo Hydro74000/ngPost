@@ -177,37 +177,30 @@ jobs:
         run: |
           wget -q -O linuxdeployqt https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
           chmod +x linuxdeployqt
-      - name: Sanity checks before linuxdeployqt
+      - name: Download linuxdeploy + Qt plugin
         run: |
-          echo "=== qmake ==="
-          which qmake
-          qmake -query QT_VERSION
-          qmake -query QT_INSTALL_LIBS
-          echo "=== ngPost binary ==="
-          file AppDir/usr/bin/ngPost
-          test -x AppDir/usr/bin/ngPost || { echo "ERROR: ngPost not executable"; exit 1; }
-          echo "=== ldd on ngPost (Qt libs must resolve) ==="
-          ldd AppDir/usr/bin/ngPost | head -40
-          echo "=== desktop file ==="
-          cat AppDir/usr/share/applications/ngPost.desktop
-          echo "=== patchelf ==="
-          which patchelf && patchelf --version
+          wget -q -O linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q -O linuxdeploy-plugin-qt https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy linuxdeploy-plugin-qt
       - name: Build AppImage
         env:
-          # linuxdeployqt walks LD_LIBRARY_PATH; only keep Qt's lib dir to avoid
-          # accidentally pulling in Python or tool-cache libs.
-          LD_LIBRARY_PATH: ${{ env.QT_ROOT_DIR }}/lib
+          # Qt 6 dlopen plugins that linuxdeploy-plugin-qt won't pick up automatically
+          EXTRA_QT_PLUGINS: "tls;networkinformation"
+          LDAI_OUTPUT: ngPost-${{ inputs.version }}-x86_64.AppImage
         run: |
-          export VERSION="${{ inputs.version }}"
-          ./linuxdeployqt AppDir/usr/share/applications/ngPost.desktop \
-            -appimage \
-            -verbose=2 \
-            -qmake="$(which qmake)" \
-            -executable=AppDir/usr/bin/par2 \
-            -executable="${{ steps.openssl.outputs.ssl }}" \
-            -executable="${{ steps.openssl.outputs.crypto }}" \
-            -extra-plugins=iconengines,imageformats,platformthemes,platforms,styles,tls,networkinformation \
-            -unsupported-allow-new-glibc
+          # QT_ROOT_DIR is exported by jurplel/install-qt-action — resolve in shell, not in env:
+          export QMAKE="$QT_ROOT_DIR/bin/qmake"
+          # Restrict to Qt's lib dir so unrelated tool-cache libs aren't candidates
+          export LD_LIBRARY_PATH="$QT_ROOT_DIR/lib"
+          ./linuxdeploy \
+            --appdir AppDir \
+            --plugin qt \
+            --output appimage \
+            --library "${{ steps.openssl.outputs.ssl }}" \
+            --library "${{ steps.openssl.outputs.crypto }}" \
+            --executable AppDir/usr/bin/par2 \
+            --desktop-file AppDir/usr/share/applications/ngPost.desktop \
+            --icon-file AppDir/ngPost.png
           mkdir -p dist
           mv *.AppImage dist/
           ls -la dist/
