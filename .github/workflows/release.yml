@@ -187,6 +187,11 @@ jobs:
           # Qt 6 dlopen plugins that linuxdeploy-plugin-qt won't pick up automatically
           EXTRA_QT_PLUGINS: "tls;networkinformation"
           LDAI_OUTPUT: ngPost-${{ inputs.version }}-x86_64.AppImage
+          # Embed update info into the ELF + emit a .zsync file alongside the AppImage.
+          # Format: gh-releases-zsync|<user>|<repo>|<tag>|<glob>
+          # Using "latest" => AppImageUpdate fetches the latest GitHub release each check.
+          UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|ngPost-*-x86_64.AppImage.zsync"
+          LDAI_UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|ngPost-*-x86_64.AppImage.zsync"
         run: |
           # QT_ROOT_DIR is exported by jurplel/install-qt-action — resolve in shell, not in env:
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
@@ -202,22 +207,34 @@ jobs:
             --desktop-file AppDir/usr/share/applications/ngPost.desktop \
             --icon-file AppDir/ngPost.png
           mkdir -p dist
-          mv *.AppImage dist/
+          mv *.AppImage *.AppImage.zsync dist/
           ls -la dist/
-      - name: Verify AppImage is self-contained
+          # Hard fail if zsync file wasn't generated (means UPDATE_INFORMATION wasn't picked up)
+          test -f dist/*.AppImage.zsync || { echo "ERROR: .zsync file not generated"; exit 1; }
+      - name: Verify AppImage is self-contained & update-info embedded
         run: |
           cd dist
-          ./*.AppImage --appimage-extract >/dev/null
+          APPIMAGE=$(ls *.AppImage)
+          ./"$APPIMAGE" --appimage-extract >/dev/null
           test -f squashfs-root/usr/lib/libssl.so.3    || { echo "ERROR: libssl.so.3 not bundled";    exit 1; }
           test -f squashfs-root/usr/lib/libcrypto.so.3 || { echo "ERROR: libcrypto.so.3 not bundled"; exit 1; }
           ls squashfs-root/usr/plugins/tls/ 2>/dev/null || { echo "ERROR: Qt TLS plugins not bundled"; exit 1; }
+          # Check the update-information string is embedded in the ELF
+          if ! strings "$APPIMAGE" | grep -q "gh-releases-zsync|Hydro74000|ngPost|"; then
+            echo "ERROR: UPDATE_INFORMATION not embedded in AppImage ELF"; exit 1
+          fi
+          # Check .zsync file is present and references the AppImage
+          test -f "$APPIMAGE.zsync" || { echo "ERROR: zsync file missing"; exit 1; }
+          grep -q "^Filename: $APPIMAGE" "$APPIMAGE.zsync" || { echo "ERROR: zsync does not reference $APPIMAGE"; exit 1; }
           rm -rf squashfs-root
-          echo "AppImage is self-contained."
+          echo "AppImage is self-contained, update-info embedded, zsync file present."
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
           name: appimage-linux
-          path: dist/*.AppImage
+          path: |
+            dist/*.AppImage
+            dist/*.AppImage.zsync
 
   release:
     name: Create Release
