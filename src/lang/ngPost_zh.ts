@@ -1206,12 +1206,12 @@ Are you sure you want to quit?</source>
         <translation type="vanished">&lt;br/&gt;最新版本为&lt;b&gt;v%1&lt;/b&gt;</translation>
     </message>
     <message>
-        <source>&lt;br/&gt;&lt;br/&gt;You can download it from the &lt;a href=&apos;https://github.com/disinclination/ngPost/releases/tag/v%1&apos;&gt;release directory&lt;/a&gt;</source>
-        <translation type="vanished">&lt;br/&gt;&lt;br/&gt;您可以从&lt;a href=&apos;https://github.com/disinclination/ngPost/releases/tag/v%1&apos;&gt;发行目录&lt;/a&gt;下载</translation>
+        <source>&lt;br/&gt;&lt;br/&gt;You can download it from the &lt;a href=&apos;https://github.com/Hydro74000/ngPost/releases/tag/v%1&apos;&gt;release directory&lt;/a&gt;</source>
+        <translation type="vanished">&lt;br/&gt;&lt;br/&gt;您可以从&lt;a href=&apos;https://github.com/Hydro74000/ngPost/releases/tag/v%1&apos;&gt;发行目录&lt;/a&gt;下载</translation>
     </message>
     <message>
-        <source>&lt;br/&gt;&lt;br/&gt;Here are the full &lt;a href=&apos;https://github.com/disinclination/ngPost/blob/master/release_notes.txt&apos;&gt;release_notes&lt;/a&gt;</source>
-        <translation type="vanished">&lt;br/&gt;&lt;br/&gt;在此您可以找到完整的 &lt;a href=&apos;https://github.com/disinclination/ngPost/blob/master/release_notes.txt&apos;&gt;发行说明&lt;/a&gt;</translation>
+        <source>&lt;br/&gt;&lt;br/&gt;Here are the full &lt;a href=&apos;https://github.com/Hydro74000/ngPost/blob/master/release_notes.txt&apos;&gt;release_notes&lt;/a&gt;</source>
+        <translation type="vanished">&lt;br/&gt;&lt;br/&gt;在此您可以找到完整的 &lt;a href=&apos;https://github.com/Hydro74000/ngPost/blob/master/release_notes.txt&apos;&gt;发行说明&lt;/a&gt;</translation>
     </message>
     <message>
         <source>New version available</source>

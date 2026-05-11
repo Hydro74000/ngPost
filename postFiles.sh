@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Script to upload a file on Usenet using ngPost (https://github.com/mbruel/ngPost)
+# Script to upload a file on Usenet using ngPost (https://github.com/Hydro74000/ngPost)
 # it's goal it's to do the split and the par2 generation in a temp folder prior to upload it
 #
 

@@ -1199,12 +1199,12 @@ Weet je zeker dat je wilt stoppen?</translation>
         <translation type="vanished">&lt;br/&gt; De laatste release is nu &lt;b&gt; v%1&lt;/b&gt;</translation>
     </message>
     <message>
-        <source>&lt;br/&gt;&lt;br/&gt;You can download it from the &lt;a href=&apos;https://github.com/disinclination/ngPost/releases/tag/v%1&apos;&gt;release directory&lt;/a&gt;</source>
-        <translation type="vanished">&lt;br/&gt; &lt;br/&gt; Je kunt het downloaden van &lt;a href=&apos;https://github.com/disinclination/ngPost/releases/tag/v%1&apos;&gt; release directory &lt;/a&gt;</translation>
+        <source>&lt;br/&gt;&lt;br/&gt;You can download it from the &lt;a href=&apos;https://github.com/Hydro74000/ngPost/releases/tag/v%1&apos;&gt;release directory&lt;/a&gt;</source>
+        <translation type="vanished">&lt;br/&gt; &lt;br/&gt; Je kunt het downloaden van &lt;a href=&apos;https://github.com/Hydro74000/ngPost/releases/tag/v%1&apos;&gt; release directory &lt;/a&gt;</translation>
     </message>
     <message>
-        <source>&lt;br/&gt;&lt;br/&gt;Here are the full &lt;a href=&apos;https://github.com/disinclination/ngPost/blob/master/release_notes.txt&apos;&gt;release_notes&lt;/a&gt;</source>
-        <translation type="vanished">&lt;br/&gt; &lt;br/&gt; Hier zijn de volledige &lt;a href=&apos;https://github.com/disinclination/ngPost/blob/master/release_notes.txt&apos;&gt; release_notes &lt;/a&gt;</translation>
+        <source>&lt;br/&gt;&lt;br/&gt;Here are the full &lt;a href=&apos;https://github.com/Hydro74000/ngPost/blob/master/release_notes.txt&apos;&gt;release_notes&lt;/a&gt;</source>
+        <translation type="vanished">&lt;br/&gt; &lt;br/&gt; Hier zijn de volledige &lt;a href=&apos;https://github.com/Hydro74000/ngPost/blob/master/release_notes.txt&apos;&gt; release_notes &lt;/a&gt;</translation>
     </message>
     <message>
         <source>New version available</source>

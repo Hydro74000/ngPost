@@ -1,7 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
-// This file is a part of ngPost : https://github.com/disinclination/ngPost
+// This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 // Copyright (C) 2015-2018 David Emanuel Santiago and NewsUP contributors
 // Code derived from NewsUP project
 //

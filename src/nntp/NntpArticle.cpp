@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
- * Copyright (c) 2025 disinclination
  * Licensed under the GNU General Public License v3.0
  */
 

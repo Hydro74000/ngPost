@@ -1,4 +1,4 @@
-<img align="left" width="80" height="80" src="https://raw.githubusercontent.com/mbruel/ngPost/master/src/resources/icons/ngPost.png" alt="ngPost">
+<img align="left" width="80" height="80" src="https://raw.githubusercontent.com/Hydro74000/ngPost/master/src/resources/icons/ngPost.png" alt="ngPost">
 
 # ngPost v4.16
 
@@ -18,15 +18,15 @@ Voici la liste des principales fonctionnalités et atouts de ngPost:
   - multi-langues (Français, Allemand, Anglais, Chinois, Espagnol, Néerlandais, Portugais)
   - ...
 
-![ngPost_v4.3](https://raw.githubusercontent.com/mbruel/ngPost/master/pics/ngPost_v4.3.png)
+![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3.png)
 
 
-[Les versions pour chacun des OS sont disponibles ici](https://github.com/mbruel/ngPost/releases/tag/v4.16), pour: Linux 64bit, Windows (32bit et 64bit), MacOS et Raspbian (RPI 4). Bientôt pour Android et iOS...
+[Les versions pour chacun des OS sont disponibles ici](https://github.com/Hydro74000/ngPost/releases/tag/v4.16), pour: Linux 64bit, Windows (32bit et 64bit), MacOS et Raspbian (RPI 4). Bientôt pour Android et iOS...
 
 
 ### Fichier de configuration
 
-Tout d'abord il vous faut éditer le fichier de configuration, basez vous [sur cette version FR](https://github.com/mbruel/ngPost/blob/master/ngPost_fr.conf).
+Tout d'abord il vous faut éditer le fichier de configuration, basez vous [sur cette version FR](https://github.com/Hydro74000/ngPost/blob/master/ngPost_fr.conf).
   - sous Windows: il est dans le dossier d'installation de ngPost: ngPost.conf (remplacez la version anglaise par la française ci-dessus)
   - sous Linux et MacOS: $HOME/.ngPost (sans extension)
 
@@ -143,7 +143,7 @@ Puis il suffit de cliquer sur **Poster Fichiers**
 
 #### le mode auto:
 
-![ngPost_v4.3](https://raw.githubusercontent.com/mbruel/ngPost/master/pics/ngPost_v4.3_auto_fr.png)
+![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3_auto_fr.png)
 
 - choisissez le **Dossier auto** (par défaut, c'est le inputDir du fichier de configuration)
 - cliquez sur **Scanner**
@@ -159,7 +159,7 @@ L'interface graphique sautera sur le Post Rapide courant.<br/>
 
 #### le mode surveillance:
 
-![ngPost_v4.3](https://raw.githubusercontent.com/mbruel/ngPost/master/pics/ngPost_v4.3_monitor_fr.png)
+![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3_monitor_fr.png)
 
 - choisissez le **Dossier auto** (par défaut, c'est le inputDir du fichier de configuration)
 - choisissez le **filtre sur les extensions** (ex: mp4,mkv,avi sans espaces) et si vous voulez poster les dossiers
@@ -192,19 +192,19 @@ Une alternative pour compiler est [d'installer QT](https://www.qt.io/download) e
 
 
 ### version Linux portable: AppImage compilée avec Qt v5.12.6, GLIBC 2.24
-- téléchargez [ngPost_v4.16-x86_64.AppImage](https://github.com/mbruel/ngPost/releases/download/v4.16/ngPost_v4.16-x86_64.AppImage)
+- téléchargez [ngPost_v4.16-x86_64.AppImage](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16-x86_64.AppImage)
 - chmod 755 ngPost_v4.16-x86_64.AppImage
 - si vous le lancez sans paramètres, l'interface graphique s'ouvrira, sinon c'est en mode ligne de commande. (cf ngPost --help -l fr)
-- pour le fichier de configuration, éditez le fichier **~/.ngPost** et copiez [ce modèle](https://raw.githubusercontent.com/mbruel/ngPost/master/ngPost_fr.conf) (ne pas mettre l'extension .conf!)
+- pour le fichier de configuration, éditez le fichier **~/.ngPost** et copiez [ce modèle](https://raw.githubusercontent.com/Hydro74000/ngPost/master/ngPost_fr.conf) (ne pas mettre l'extension .conf!)
 
-PS: pour des systèmes plus vieux GLIBC < 2.24, voici une version compilée sous Debian8 avec GLIBC 2.19 et Qt v5.8.0: [ngPost_v4.16-x86_64_debian8.AppImage](https://github.com/mbruel/ngPost/releases/download/v4.16/ngPost_v4.16-x86_64_debian8.AppImage)
+PS: pour des systèmes plus vieux GLIBC < 2.24, voici une version compilée sous Debian8 avec GLIBC 2.19 et Qt v5.8.0: [ngPost_v4.16-x86_64_debian8.AppImage](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16-x86_64_debian8.AppImage)
 
 
 ### version Raspbian portable (armhf pour Raspberry PI)
-- téléchargez [ngPost_v4.16-armhf.AppImage](https://github.com/mbruel/ngPost/releases/download/v4.16/ngPost_v4.16-armhf.AppImage)
+- téléchargez [ngPost_v4.16-armhf.AppImage](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16-armhf.AppImage)
 - chmod 755 ngPost_v4.16-armhf.AppImage
 - si vous le lancez sans paramètres, l'interface graphique s'ouvrira, sinon c'est en mode ligne de commande. (cf ngPost --help -l fr)
-- pour le fichier de configuration, éditez le fichier **~/.ngPost** et copiez [ce modèle](https://raw.githubusercontent.com/mbruel/ngPost/master/ngPost_fr.conf) (ne pas mettre l'extension .conf!)
+- pour le fichier de configuration, éditez le fichier **~/.ngPost** et copiez [ce modèle](https://raw.githubusercontent.com/Hydro74000/ngPost/master/ngPost_fr.conf) (ne pas mettre l'extension .conf!)
 
 **Comme rar n'est pas disponible sur RPI, le support de 7zip a été ajouté.** Faites pointer RAR_PATH sur 7z et si besoin (pas utile) utilisez RAR_EXTRA pour les options de 7z. Vous devriez avoir ceci:
 <pre>
@@ -223,7 +223,7 @@ RAR_EXTRA = -mx0 -mhe=on
 </pre>
 
 ### Windows installer
-- Utilisez l'installeur [ngPost_v4.16_x64_setup.exe](https://github.com/mbruel/ngPost/releases/download/v4.16/ngPost_v4.16_x64_setup.exe) ou [ngPost_v4.16_x86_setup.exe](https://github.com/mbruel/ngPost/releases/download/v4.16/ngPost_v4.16_x86_setup.exe) pour la version 32bit
+- Utilisez l'installeur [ngPost_v4.16_x64_setup.exe](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16_x64_setup.exe) ou [ngPost_v4.16_x86_setup.exe](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16_x86_setup.exe) pour la version 32bit
 - lancez l'application **ngPost.exe**, l'interface graphique s'ouvrira. Changez tous vos paramètres dont la langue puis cliquez sur **sauver**
 - vous pouvez bien sûr ensuite l'utiliser en ligne de commande. cf ngPost --help
 
@@ -231,9 +231,9 @@ RAR_EXTRA = -mx0 -mhe=on
 
 
 ### MacOS release built on High Sierra (v10.13)
-- téléchargez [ngPost_v4.16.dmg](https://github.com/mbruel/ngPost/releases/download/v4.16/ngPost_v4.16.dmg)
+- téléchargez [ngPost_v4.16.dmg](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16.dmg)
 - si vous le lancez sans paramètres, l'interface graphique s'ouvrira, sinon c'est en mode ligne de commande. (cf ngPost --help -l fr)
-- pour le fichier de configuration, éditez le fichier **~/.ngPost** et copiez [ce modèle](https://raw.githubusercontent.com/mbruel/ngPost/master/ngPost_fr.conf) (ne pas mettre l'extension .conf!)
+- pour le fichier de configuration, éditez le fichier **~/.ngPost** et copiez [ce modèle](https://raw.githubusercontent.com/Hydro74000/ngPost/master/ngPost_fr.conf) (ne pas mettre l'extension .conf!)
 
 
 ### Alternatives
@@ -248,7 +248,7 @@ Voici une liste des posteurs alternatif sur le [github de Nyuu](https://github.c
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
-// This file is a part of ngPost : https://github.com/mbruel/ngPost
+// This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -297,5 +297,5 @@ Je suis Freelance (auto-entrepreneur) depuis fin 2019, travaillant sur plusieurs
 <br/>
 <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=W2C236U6JNTUA&item_name=ngPost&currency_code=EUR"><img align="left" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="ex0days"></a>
  ou en Bitcoin à cette adresse: **3BGbnvnnBCCqrGuq1ytRqUMciAyMXjXAv6**
-<img align="right" align="bottom" width="120" height="120" src="https://raw.githubusercontent.com/mbruel/ngPost/master/pics/btc_qr.gif" alt="ngPost_QR">
+<img align="right" align="bottom" width="120" height="120" src="https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/btc_qr.gif" alt="ngPost_QR">
 
