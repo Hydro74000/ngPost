@@ -13,9 +13,10 @@ permissions:
 
 jobs:
   build-linux:
+    name: Build Linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y build-essential
       - name: Install Qt
@@ -23,21 +24,32 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
-      - name: Build Project on Linux
+      - name: Build Project
         run: |
           cd src
-          qmake ngPost.pro
-          make
-      - name: Upload Linux Binary
+          qmake ngPost.pro CONFIG+=release
+          make -j$(nproc)
+      - name: Package
+        run: |
+          VERSION="${{ inputs.version }}"
+          PKG="ngPost-${VERSION}-linux-x86_64"
+          mkdir -p "dist/${PKG}"
+          cp src/ngPost "dist/${PKG}/"
+          cp ngPost.conf release_notes.txt README* "dist/${PKG}/" 2>/dev/null || true
+          tar -C dist -czf "dist/${PKG}.tar.gz" "${PKG}"
+          rm -rf "dist/${PKG}"
+          ls -la dist/
+      - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
         with:
           name: binary-linux
-          path: src/ngPost
+          path: dist/*.tar.gz
 
   build-windows:
+    name: Build Windows
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Enable Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1.13.0
       - name: Install Qt
@@ -49,28 +61,43 @@ jobs:
           target: 'desktop'
           arch: 'win64_msvc2022_64'
       - name: Build Project on Windows with MSVC
+        shell: pwsh
         run: |
           cd src
-          del Makefile*
-          qmake ngPost.pro -spec win32-msvc CONFIG+="qtquickcompiler release use_hmi" DEFINES+="UNICODE _UNICODE WIN32 APP_VERSION=5.0 __USE_CONNECTION_TIMEOUT__ __COMPUTE_IMMEDIATE_SPEED__ __USE_TMP_RAM__ __RELEASE_ARTICLES_WHEN_CON_FAILS__"
+          Remove-Item -Force Makefile* -ErrorAction SilentlyContinue
+          $appVersion = "${{ inputs.version }}".TrimStart('v')
+          qmake ngPost.pro -spec win32-msvc CONFIG+="qtquickcompiler release use_hmi" DEFINES+="UNICODE _UNICODE WIN32 APP_VERSION=$appVersion __USE_CONNECTION_TIMEOUT__ __COMPUTE_IMMEDIATE_SPEED__ __USE_TMP_RAM__ __RELEASE_ARTICLES_WHEN_CON_FAILS__"
           nmake
       - name: Deploy Qt DLLs with windeployqt
-        run: |
-          windeployqt src/release/ngPost.exe --release --qmldir src --compiler-runtime
+        run: windeployqt src/release/ngPost.exe --release --qmldir src --compiler-runtime
       - name: Clean Build Artifacts
+        shell: pwsh
         run: |
           cd src/release
-          Remove-Item -Force *.obj, *.cpp, *.rc, *.res, *.h, *.qrc
-      - name: Upload Windows Binary
+          Remove-Item -Force *.obj, *.cpp, *.rc, *.res, *.h, *.qrc -ErrorAction SilentlyContinue
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          $pkg = "ngPost-$version-windows-x86_64"
+          New-Item -ItemType Directory -Force -Path "dist/$pkg" | Out-Null
+          Copy-Item -Recurse src/release/* "dist/$pkg/"
+          Copy-Item ngPost.conf, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
+          Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "dist/$pkg" -DestinationPath "dist/$pkg.zip"
+          Remove-Item -Recurse -Force "dist/$pkg"
+          Get-ChildItem dist
+      - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: binary-windows
-          path: src/release/**
+          path: dist/*.zip
 
   build-macos:
+    name: Build macOS
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
@@ -79,94 +106,126 @@ jobs:
       - name: Build Project on macOS
         run: |
           cd src
-          qmake ngPost.pro
-          make
-      - name: Upload macOS Binary
+          qmake ngPost.pro CONFIG+=release
+          make -j$(sysctl -n hw.ncpu)
+      - name: Bundle Qt frameworks into .app
+        run: macdeployqt src/ngPost.app
+      - name: Package
+        run: |
+          VERSION="${{ inputs.version }}"
+          PKG="ngPost-${VERSION}-macos"
+          mkdir -p dist
+          cd src
+          zip -qr "../dist/${PKG}.zip" ngPost.app
+          cd ..
+          ls -la dist/
+      - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
         with:
           name: binary-macos
-          path: src/ngPost.app/Contents/MacOS/ngPost
+          path: dist/*.zip
 
-  collect-and-upload-binaries:
-    name: Collect and Upload All Final Binaries
-    runs-on: ubuntu-latest
-    needs: [build-linux, build-windows, build-macos]
+  build-appimage:
+    name: Build Linux AppImage
+    runs-on: ubuntu-22.04
     steps:
-      - name: Download All Binaries
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - name: Install build & runtime dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            build-essential libfuse2 wget file \
+            libssl3 openssl \
+            par2 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 \
+            libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
         with:
-          name: binary-linux
-          path: all-binaries/linux
-      - name: Download All Binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-windows
-          path: all-binaries/windows
-      - name: Download All Binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: binary-macos
-          path: all-binaries/macos
-
-      - name: Upload Final Packed Binaries
+          version: '6.8.2'
+          arch: 'linux_gcc_64'
+      - name: Build Project
+        run: |
+          cd src
+          qmake ngPost.pro CONFIG+=release
+          make -j$(nproc)
+      - name: Prepare AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          cp src/ngPost AppDir/usr/bin/
+          cp "$(which par2)" AppDir/usr/bin/par2
+          if [ -x tools/rar ]; then
+            cp tools/rar AppDir/usr/bin/rar
+          fi
+          cp ngPost.desktop AppDir/usr/share/applications/
+          cp src/resources/icons/ngPost.png AppDir/usr/share/icons/hicolor/256x256/apps/
+          cp src/resources/icons/ngPost.png AppDir/
+          cp ngPost.desktop AppDir/
+          cp ngPost.conf release_notes.txt README* AppDir/ || true
+      - name: Locate OpenSSL libraries
+        id: openssl
+        run: |
+          SSL=$(find /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu -maxdepth 1 -name 'libssl.so.3' 2>/dev/null | head -1)
+          CRYPTO=$(find /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu -maxdepth 1 -name 'libcrypto.so.3' 2>/dev/null | head -1)
+          test -n "$SSL" && test -n "$CRYPTO" || { echo "OpenSSL libs not found"; exit 1; }
+          echo "ssl=$SSL"       >> $GITHUB_OUTPUT
+          echo "crypto=$CRYPTO" >> $GITHUB_OUTPUT
+      - name: Download linuxdeployqt
+        run: |
+          wget -q -O linuxdeployqt https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+          chmod +x linuxdeployqt
+      - name: Build AppImage
+        run: |
+          export VERSION="${{ inputs.version }}"
+          ./linuxdeployqt AppDir/usr/share/applications/ngPost.desktop \
+            -appimage \
+            -qmake="$(which qmake)" \
+            -executable=AppDir/usr/bin/par2 \
+            -executable="${{ steps.openssl.outputs.ssl }}" \
+            -executable="${{ steps.openssl.outputs.crypto }}" \
+            -extra-plugins=iconengines,imageformats,platformthemes,platforms,styles,tls,networkinformation \
+            -unsupported-allow-new-glibc
+          mkdir -p dist
+          mv *.AppImage dist/
+          ls -la dist/
+      - name: Verify AppImage is self-contained
+        run: |
+          cd dist
+          ./*.AppImage --appimage-extract >/dev/null
+          test -f squashfs-root/usr/lib/libssl.so.3    || { echo "ERROR: libssl.so.3 not bundled";    exit 1; }
+          test -f squashfs-root/usr/lib/libcrypto.so.3 || { echo "ERROR: libcrypto.so.3 not bundled"; exit 1; }
+          ls squashfs-root/usr/plugins/tls/ 2>/dev/null || { echo "ERROR: Qt TLS plugins not bundled"; exit 1; }
+          rm -rf squashfs-root
+          echo "AppImage is self-contained."
+      - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: compiled-binaries
-          path: all-binaries/
+          name: appimage-linux
+          path: dist/*.AppImage
 
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [collect-and-upload-binaries]
-
+    needs: [build-linux, build-windows, build-macos, build-appimage]
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Download Compiled Binaries
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: compiled-binaries
-          path: binaries
-
-      - name: List downloaded files
-        run: ls -R binaries
-
-      - name: Upload Linux Binary to Release
+          path: artifacts
+          merge-multiple: true
+      - name: List artifacts
+        run: ls -la artifacts/
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.version }}
-          release_name: Release ${{ github.event.inputs.version }}
+          tag_name: ${{ inputs.version }}
+          name: Release ${{ inputs.version }}
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: |
-            binaries/linux/binary-linux-${{ github.event.inputs.version }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Windows Binary to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.version }}
-          release_name: Release ${{ github.event.inputs.version }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          files: |
-            binaries/windows/binary-windows-${{ github.event.inputs.version }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload macOS Binary to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.version }}
-          release_name: Release ${{ github.event.inputs.version }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          files: |
-            binaries/macos/binary-macos-${{ github.event.inputs.version }}
+          files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
