@@ -132,6 +132,7 @@ public:
         RAR_NO_ROOT_FOLDER,
         AUTO_CLOSE_TABS,
         KEEP_NFO_EXTENSION,
+        NZB_COPY_NFO,
         AUTO_COMPRESS,
         GROUP_POLICY,
         LOG_IN_FILE,
@@ -292,6 +293,7 @@ private:
     bool _autoCloseTabs;
     bool _rarNoRootFolder;
     bool _keepNfoExtension; //!< when obfuscating file names, keep the .nfo extension visible
+    bool _copyNfoWithNzb;   //!< copy the .nfo from the original files next to the generated nzb
 
     bool _tryResumePostWhenConnectionLost;
     ushort _waitDurationBeforeAutoResume;

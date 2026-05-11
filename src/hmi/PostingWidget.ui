@@ -462,6 +462,33 @@
     </layout>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="nzbCopyNfoLayout">
+     <item>
+      <widget class="QCheckBox" name="copyNfoWithNzbCB">
+       <property name="toolTip">
+        <string>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</string>
+       </property>
+       <property name="text">
+        <string>Copy NFO alongside the nzb file (if available)</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_nzbCopyNfo">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="postLayout">
      <item>
       <spacer name="horizontalSpacer_14">

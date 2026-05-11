@@ -282,6 +282,8 @@ private:
 
     void _delOriginalFiles();
 
+    void _copyNfoNextToNzb();
+
     inline NntpFile *_getNextFile();
 
     void _initPosting();

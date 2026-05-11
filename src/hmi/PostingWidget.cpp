@@ -430,6 +430,8 @@ void PostingWidget::init()
     _ui->passLengthSB->setRange(5, 50);
     _ui->passLengthSB->setValue(static_cast<int>(_ngPost->_lengthPass));
 
+    _ui->copyNfoWithNzbCB->setChecked(_ngPost->_copyNfoWithNzb);
+
     _ui->filesList->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
     connect(_ui->selectFilesButton, &QAbstractButton::clicked, this, &PostingWidget::onSelectFilesClicked);
@@ -525,6 +527,8 @@ void PostingWidget::udatePostingParams()
         _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
 
     _ngPost->_keepRar = _ui->keepRarCB->isChecked();
+
+    _ngPost->_copyNfoWithNzb = _ui->copyNfoWithNzbCB->isChecked();
 }
 
 void PostingWidget::retranslate()
