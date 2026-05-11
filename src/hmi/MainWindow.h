@@ -22,6 +22,7 @@
 
 #include <QMainWindow>
 #include <QFileInfoList>
+#include <QUrl>
 class NgPost;
 struct NntpServerParams;
 class NntpFile;
@@ -115,6 +116,7 @@ protected:
 
 public slots:
     void onSetProgressBarRange(int nbArticles);
+    void onNewVersionAvailable(const QString &tag, const QString &notes, const QUrl &releasePage);
 
 
 private slots:

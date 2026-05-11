@@ -35,6 +35,7 @@ class FoldersMonitorForNewFiles;
 class QStorageInfo;
 #endif
 class NzbCheck;
+class UpdateChecker;
 
 #define NB_ARTICLES_TO_PREPARE_PER_CONNECTION 3
 
@@ -64,6 +65,7 @@ class NgPost : public QObject, public CmdOrGuiApp
     friend class PostingWidget;
     friend class AutoPostWidget;
     friend class PostingJob;
+    friend class UpdateChecker;
 
 public:
     enum class Opt {
@@ -144,7 +146,9 @@ public:
         PASS,
         CONNECTION,
         ENABLED,
-        NZBCHECK
+        NZBCHECK,
+        CHECK_FOR_UPDATES,
+        LAST_UPDATE_CHECK
     };
 
 private:
@@ -282,6 +286,7 @@ private:
     QMap<QString, QTranslator *> _translators;
 
     QNetworkAccessManager _netMgr;
+    UpdateChecker        *_updateChecker;
     QUrl *_urlNzbUpload;
     QString _urlNzbUploadStr;
 
@@ -291,6 +296,8 @@ private:
 
     bool _removeAccentsOnNzbFileName;
     bool _autoCloseTabs;
+    bool _checkForUpdates;
+    qint64 _lastUpdateCheckEpoch;
     bool _rarNoRootFolder;
     bool _keepNfoExtension; //!< when obfuscating file names, keep the .nfo extension visible
     bool _copyNfoWithNzb;   //!< copy the .nfo from the original files next to the generated nzb
@@ -321,7 +328,6 @@ private:
 
     static const char *sAppName;
     static const QString sVersion;
-    static const QString sProFileURL;
 
     static const QList<QCommandLineOption> sCmdOptions;
     static const QStringList sDefaultGroups;
@@ -432,6 +438,8 @@ public:
 
     void saveConfig();
 
+    UpdateChecker *updateChecker() const { return _updateChecker; }
+
     void setDelFilesAfterPosted(bool delFiles);
     void addMonitoringFolder(const QString &dirPath);
 
@@ -474,8 +482,6 @@ signals:
     void error(QString msg);             //!< in case we signal from another thread
 
 public slots:
-    void onCheckForNewVersion();
-
     void onPostingJobStarted();
     void onPackingDone();
     void onPostingJobFinished();
@@ -530,7 +536,6 @@ public:
     inline static qint64 articleSize();
     inline static const std::string &aticleSignature();
 
-    inline static const QString &proFileUrl();
     inline static const QString &donationURL();
     inline static const QString &asciiArt();
     inline static QString asciiArtWithVersion();
@@ -665,10 +670,6 @@ bool NgPost::removeNntpServer(NntpServerParams *server)
     return _nntpServers.removeOne(server);
 }
 
-const QString &NgPost::proFileUrl()
-{
-    return sProFileURL;
-}
 const QString &NgPost::donationURL()
 {
     return sDonationURL;
@@ -882,9 +883,9 @@ QString NgPost::desc(bool useHTML)
         .arg("...")
         .arg(tr("for more details, cf %1")
                  .arg(useHTML ? "<a "
-                                "href=\"https://github.com/disinclination/ngPost/\">https://github.com/"
-                                "mbruel/ngPost</a>"
-                              : "https://github.com/disinclination/ngPost"))
+                                "href=\"https://github.com/Hydro74000/ngPost/\">https://github.com/"
+                                "Hydro74000/ngPost</a>"
+                              : "https://github.com/Hydro74000/ngPost"))
         .arg(tr("If you'd like to translate ngPost in your language, it's easy, please contact me "
                 "at Matthieu.Bruel@gmail.com"));
 }

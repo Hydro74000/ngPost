@@ -1,6 +1,7 @@
 QT += core network
 
-DEFINES += "APP_VERSION=\"5.0\""
+VERSION = 5.2.2
+DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 INCLUDEPATH += $$PWD
 TARGET = ngPost
@@ -87,6 +88,7 @@ SOURCES += \
         nntp/NntpArticle.cpp \
         nntp/NntpFile.cpp \
         utils/CmdOrGuiApp.cpp \
+        utils/UpdateChecker.cpp \
         utils/Yenc.cpp
 
 
@@ -112,6 +114,7 @@ HEADERS += \
     utils/CmdOrGuiApp.h \
     utils/Macros.h \
     utils/PureStaticClass.h \
+    utils/UpdateChecker.h \
     utils/Yenc.h
 
 

@@ -12,6 +12,7 @@
 #include "nntp/NntpServerParams.h"
 #include "FileUploader.h"
 #include "NzbCheck.h"
+#include "utils/UpdateChecker.h"
 #ifdef __USE_HMI__
   #include "hmi/MainWindow.h"
   #include "hmi/PostingWidget.h"
@@ -30,6 +31,7 @@
 #include <QCommandLineParser>
 #include <QDebug>
 #include <iostream>
+#include <QDateTime>
 #include <QNetworkReply>
 #include <QRegularExpression>
 #include <QDir>
@@ -41,8 +43,10 @@
 #endif
 
 const char *NgPost::sAppName          = "ngPost";
-const QString NgPost::sVersion        = "5.2";
-const QString NgPost::sProFileURL     = "https://raw.githubusercontent.com/disinclination/ngPost/master/src/ngPost.pri";
+#ifndef APP_VERSION
+#  define APP_VERSION "0.0.0"
+#endif
+const QString NgPost::sVersion        = APP_VERSION;
 
 const QString NgPost::sMainThreadName     = "MainThread";
 const char *NgPost::sFolderMonitoringName = QT_TRANSLATE_NOOP("NgPost", "Auto Posting");
@@ -146,6 +150,9 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::CONNECTION,   "connection"},
     {Opt::ENABLED,      "enabled"},
     {Opt::NZBCHECK,     "nzbcheck"},
+
+    {Opt::CHECK_FOR_UPDATES, "check_for_updates"},
+    {Opt::LAST_UPDATE_CHECK, "last_update_check"},
 };
 
 const QList<QCommandLineOption> NgPost::sCmdOptions = {
@@ -272,7 +279,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _monitor_nzb_folders(false), _monitorExtensions(), _monitorIgnoreDir(false), _monitorSecDelayScan(1),
     _keepRar(false), _packAuto(false), _packAutoKeywords(),
     _lang("en"), _translators(),
-    _netMgr(), _urlNzbUpload(nullptr), _urlNzbUploadStr(),
+    _netMgr(), _updateChecker(nullptr), _urlNzbUpload(nullptr), _urlNzbUploadStr(),
     _doShutdownWhenDone(false), _shutdownProc(nullptr),
 #if defined(WIN32) || defined(__MINGW64__)
     _shutdownCmd(sDefaultShutdownCmdWindows),
@@ -283,6 +290,8 @@ NgPost::NgPost(int &argc, char *argv[]):
 #endif
     _removeAccentsOnNzbFileName(false),
     _autoCloseTabs(false),
+    _checkForUpdates(true),
+    _lastUpdateCheckEpoch(0),
     _rarNoRootFolder(false),
     _keepNfoExtension(false),
     _copyNfoWithNzb(false),
@@ -330,6 +339,8 @@ NgPost::NgPost(int &argc, char *argv[]):
 
     connect(this, &NgPost::log,   this, &NgPost::onLog,   Qt::QueuedConnection);
     connect(this, &NgPost::error, this, &NgPost::onError, Qt::QueuedConnection);
+
+    _updateChecker = new UpdateChecker(this, &_netMgr, this);
 
     _loadTanslators();
 
@@ -478,6 +489,12 @@ int NgPost::startHMI()
     _hmi->init(this);
     _hmi->show();
     changeLanguage(_lang); // reforce lang set up...
+
+    connect(_updateChecker, &UpdateChecker::newVersionAvailable,
+            _hmi,           &MainWindow::onNewVersionAvailable);
+
+    // run after parseDefaultConfig so CHECK_FOR_UPDATES + LAST_UPDATE_CHECK are loaded
+    checkForNewVersion();
 
     return _app->exec();
 }
@@ -636,12 +653,14 @@ void NgPost::changeLanguage(const QString &lang)
 
 void NgPost::checkForNewVersion()
 {
-    QUrl proFileURL(NgPost::proFileUrl());
-    QNetworkRequest req(proFileURL);
-    req.setRawHeader( "User-Agent" , "ngPost C++ app" );
-
-    QNetworkReply *reply = _netMgr.get(req);
-    QObject::connect(reply, &QNetworkReply::finished, this, &NgPost::onCheckForNewVersion);
+    if (!_checkForUpdates)
+        return;
+    if (UpdateChecker::isAppImage())
+        return; // handled by zsync embedded update info
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    if (_lastUpdateCheckEpoch > 0 && (now - _lastUpdateCheckEpoch) < 86400)
+        return; // once per day
+    _updateChecker->checkLatestRelease();
 }
 
 bool NgPost::checkSupportSSL()
@@ -822,48 +841,6 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
 }
 
 
-
-void NgPost::onCheckForNewVersion()
-{
-    QNetworkReply      *reply = static_cast<QNetworkReply*>(sender());
-    QRegularExpression appVersionRegExp("^DEFINES \\+= \"APP_VERSION=\\\\\"((\\d+)\\.(\\d+))\\\\\"\"$");
-    QStringList v = sVersion.split(".");
-    int currentMajor = v.at(0).toInt(), currentMinor = v.at(1).toInt();
-    while (!reply->atEnd())
-    {
-        QString line = reply->readLine().trimmed();
-        QRegularExpressionMatch match = appVersionRegExp.match(line);
-        if (match.hasMatch())
-        {
-            QString lastRealease = match.captured(1);
-            int lastMajor = match.captured(2).toInt(), lastMinor = match.captured(3).toInt();
-            qDebug() << "lastMajor: " << lastMajor << ", lastMinor: " << lastMinor
-                     << " (currentMajor: " << currentMajor << ", currentMinor: " << currentMinor << ")";
-
-            if (lastMajor > currentMajor ||
-                    (lastMajor == currentMajor && lastMinor > currentMinor) )
-            {
-#ifdef __USE_HMI__
-                if (_hmi)
-                {
-                    QString msg = tr("<center><h3>New version available on GitHUB</h3></center>");
-                    msg += tr("<br/>The last release is now <b>v%1</b>").arg(lastRealease);
-                    msg += tr("<br/><br/>You can download it from the <a href='https://github.com/disinclination/ngPost/releases/tag/v%1'>release directory</a>").arg(lastRealease);
-                    msg += tr("<br/><br/>Here are the full <a href='https://github.com/disinclination/ngPost/blob/master/release_notes.txt'>release_notes</a>");
-
-                    QMessageBox::information(_hmi, tr("New version available"), msg);
-                }
-                else
-#endif
-                    qCritical() << "There is a new version available on GitHUB: v" << lastRealease
-                                << " (visit https://github.com/disinclination/ngPost/ to get it)";
-            }
-
-            break; // no need to continue to parse the page
-        }
-    }
-    reply->deleteLater();
-}
 
 void NgPost::onPostingJobStarted()
 {
@@ -1996,6 +1973,15 @@ QString NgPost::_parseConfig(const QString &configPath)
                         if (val == "true" || val == "on" || val == "1")
                             _autoCloseTabs = true;
                     }
+                    else if (opt == sOptionNames[Opt::CHECK_FOR_UPDATES])
+                    {
+                        val = val.toLower();
+                        _checkForUpdates = (val == "true" || val == "on" || val == "1");
+                    }
+                    else if (opt == sOptionNames[Opt::LAST_UPDATE_CHECK])
+                    {
+                        _lastUpdateCheckEpoch = val.toLongLong();
+                    }
                     else if (opt == sOptionNames[Opt::KEEP_NFO_EXTENSION])
                     {
                         val = val.toLower();
@@ -2664,6 +2650,11 @@ void NgPost::saveConfig()
                << "\n"
                << tr("## close Quick Post Tabs when posted successfully (for the GUI)") << "\n"
                << (_autoCloseTabs  ? "" : "#") << "AUTO_CLOSE_TABS = true\n"
+               << "\n"
+               << tr("## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)") << "\n"
+               << (_checkForUpdates ? "" : "#") << "CHECK_FOR_UPDATES = true\n"
+               << tr("## (internal) last update check timestamp, epoch seconds \xe2\x80\x94 managed automatically") << "\n"
+               << "LAST_UPDATE_CHECK = " << _lastUpdateCheckEpoch << "\n"
                << "\n"
                << tr("## when obfuscating file names, keep the .nfo extension visible") << "\n"
                << (_keepNfoExtension ? "" : "#") << "KEEP_NFO_EXTENSION = true\n"

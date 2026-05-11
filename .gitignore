@@ -598,3 +598,9 @@ FodyWeavers.xsd
 
 # End of https://www.toptal.com/developers/gitignore/api/clion+all,qt,qtcreator,cmake,visualstudio
 src/build/
+src/qmake_qmake_immediate.qrc
+.claude/settings.local.json
+src/.qmake.stash
+src/ngPost
+src/qmake_qmake_immediate_rc.py
+src/resources/resources_rc.py

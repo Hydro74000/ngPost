@@ -57,7 +57,6 @@ int main(int argc, char* argv[])
 
     //    qDebug() << "argc: " << argc;
     app = new NgPost(argc, argv);
-    app->checkForNewVersion();
 
     int exitCode = 0;
 #ifdef __USE_HMI__

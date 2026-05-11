@@ -27,9 +27,12 @@
 
 #include <QDebug>
 #include <QProgressBar>
+#include <QProgressDialog>
 #include <QLabel>
 #include <QScreen>
 #include <QMessageBox>
+#include <QPushButton>
+#include "utils/UpdateChecker.h"
 
 
 const QColor  MainWindow::sPostingColor = QColor(255,162, 0); // gold (#FFA200)
@@ -400,6 +403,64 @@ void MainWindow::onSetProgressBarRange(int nbArticles)
     _ui->progressBar->setRange(0, nbArticles);
 }
 
+void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes, const QUrl &releasePage)
+{
+    UpdateChecker *uc = _ngPost->updateChecker();
+    if (!uc)
+        return;
+
+    QString notesPreview = notes.left(800);
+    if (notes.size() > 800)
+        notesPreview += "...";
+    notesPreview.replace('<', "&lt;").replace('>', "&gt;").replace('\n', "<br/>");
+
+    QString body = tr("<h3>New version available: <b>ngPost %1</b></h3>"
+                      "<p>Current: v%2</p>"
+                      "<p><a href=\"%3\">View release on GitHub</a></p>")
+                       .arg(tag, NgPost::sVersion, releasePage.toString());
+    if (!notesPreview.isEmpty())
+        body += "<hr/><div style='font-size:small'>" + notesPreview + "</div>";
+
+    QMessageBox box(this);
+    box.setWindowTitle(tr("New version available"));
+    box.setTextFormat(Qt::RichText);
+    box.setTextInteractionFlags(Qt::TextBrowserInteraction);
+    box.setText(body);
+    QPushButton *install = box.addButton(tr("Install and Restart"), QMessageBox::AcceptRole);
+    box.addButton(tr("Later"), QMessageBox::RejectRole);
+    box.setDefaultButton(install);
+    box.exec();
+    if (box.clickedButton() != install)
+        return;
+
+    auto *progress = new QProgressDialog(tr("Downloading update..."), tr("Cancel"), 0, 100, this);
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setAttribute(Qt::WA_DeleteOnClose);
+    progress->setMinimumDuration(0);
+    progress->setValue(0);
+
+    connect(uc, &UpdateChecker::downloadProgress, progress,
+            [progress](qint64 received, qint64 total) {
+                if (total > 0)
+                {
+                    progress->setMaximum(static_cast<int>(total));
+                    progress->setValue(static_cast<int>(received));
+                }
+            });
+    connect(uc, &UpdateChecker::installStarting, progress, &QProgressDialog::close);
+    connect(uc, &UpdateChecker::downloadFailed, this,
+            [this, progress](const QString &msg) {
+                progress->close();
+                QMessageBox::warning(this, tr("Update failed"), msg);
+            });
+    connect(progress, &QProgressDialog::canceled, uc, [uc]() {
+        // Nothing wires this to abort the QNetworkReply for now; close the dialog is enough.
+        Q_UNUSED(uc);
+    });
+
+    uc->startDownloadAndInstall();
+}
+
 
 void MainWindow::_initServerBox()
 {
@@ -454,6 +515,7 @@ void MainWindow::_initPostingBox()
 
     _ui->autoCompressCB->setChecked(_ngPost->_packAuto);
     _ui->autoCloseCB->setChecked(_ngPost->_autoCloseTabs);
+    _ui->checkForUpdatesCB->setChecked(_ngPost->_checkForUpdates);
 
     _ui->obfuscateMsgIdCB->setChecked(_ngPost->_obfuscateArticles);
     _ui->obfuscateFileNameCB->setChecked(_ngPost->_obfuscateFileName);
@@ -529,7 +591,8 @@ void MainWindow::updateParams()
     }
 
     _ngPost->enableAutoPacking(_ui->autoCompressCB->isChecked());
-    _ngPost->_autoCloseTabs = _ui->autoCloseCB->isChecked();
+    _ngPost->_autoCloseTabs   = _ui->autoCloseCB->isChecked();
+    _ngPost->_checkForUpdates = _ui->checkForUpdatesCB->isChecked();
 
     _ngPost->updateGroups(_ui->groupsEdit->toPlainText());
 

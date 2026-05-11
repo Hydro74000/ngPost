@@ -84,8 +84,7 @@ jobs:
         run: |
           cd src
           Remove-Item -Force Makefile* -ErrorAction SilentlyContinue
-          $appVersion = "${{ inputs.version }}".TrimStart('v')
-          qmake ngPost.pro -spec win32-msvc CONFIG+="qtquickcompiler release use_hmi" DEFINES+="UNICODE _UNICODE WIN32 APP_VERSION=$appVersion __USE_CONNECTION_TIMEOUT__ __COMPUTE_IMMEDIATE_SPEED__ __USE_TMP_RAM__ __RELEASE_ARTICLES_WHEN_CON_FAILS__"
+          qmake ngPost.pro -spec win32-msvc CONFIG+="qtquickcompiler release use_hmi" DEFINES+="UNICODE _UNICODE WIN32 __USE_CONNECTION_TIMEOUT__ __COMPUTE_IMMEDIATE_SPEED__ __USE_TMP_RAM__ __RELEASE_ARTICLES_WHEN_CON_FAILS__"
           nmake
       - name: Deploy Qt DLLs with windeployqt
         run: windeployqt src/release/ngPost.exe --release --qmldir src --compiler-runtime
