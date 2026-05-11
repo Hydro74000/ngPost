@@ -130,6 +130,8 @@ private:
     AtomicBool _delFilesAfterPost;
     const QFileInfoList _originalFiles;
 
+    QString _nfoSrcToCopy; //!< absolute path of the .nfo to copy next to the nzb (resolved at job start, copied on success)
+
     QMutex _secureDiskAccess;
 
     QVector<Poster *> _posters;
@@ -282,6 +284,7 @@ private:
 
     void _delOriginalFiles();
 
+    void _resolveNfoSource();
     void _copyNfoNextToNzb();
 
     inline NntpFile *_getNextFile();

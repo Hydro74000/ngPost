@@ -24,6 +24,15 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+      - name: Compile translations (.ts -> .qm)
+        run: |
+          cd src
+          mkdir -p resources/lang
+          for ts in lang/ngPost_*.ts; do
+            base=$(basename "$ts" .ts)
+            lrelease "$ts" -qm "resources/lang/${base}.qm"
+          done
+          ls -la resources/lang/
       - name: Build Project
         run: |
           cd src
@@ -60,6 +69,16 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
+      - name: Compile translations (.ts -> .qm)
+        shell: pwsh
+        run: |
+          cd src
+          New-Item -ItemType Directory -Force -Path resources/lang | Out-Null
+          Get-ChildItem lang/ngPost_*.ts | ForEach-Object {
+            $qm = "resources/lang/$($_.BaseName).qm"
+            lrelease $_.FullName -qm $qm
+          }
+          Get-ChildItem resources/lang/
       - name: Build Project on Windows with MSVC
         shell: pwsh
         run: |
@@ -103,6 +122,15 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'clang_64'
+      - name: Compile translations (.ts -> .qm)
+        run: |
+          cd src
+          mkdir -p resources/lang
+          for ts in lang/ngPost_*.ts; do
+            base=$(basename "$ts" .ts)
+            lrelease "$ts" -qm "resources/lang/${base}.qm"
+          done
+          ls -la resources/lang/
       - name: Build Project on macOS
         run: |
           cd src
@@ -145,6 +173,15 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+      - name: Compile translations (.ts -> .qm)
+        run: |
+          cd src
+          mkdir -p resources/lang
+          for ts in lang/ngPost_*.ts; do
+            base=$(basename "$ts" .ts)
+            lrelease "$ts" -qm "resources/lang/${base}.qm"
+          done
+          ls -la resources/lang/
       - name: Build Project
         run: |
           cd src

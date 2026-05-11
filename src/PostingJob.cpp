@@ -313,10 +313,10 @@ void PostingJob::onStartPosting(bool isActiveJob)
 #endif
         _log(QString("\n\n[%1] %2: %3").arg(timestamp()).arg(tr("Start posting")).arg(_nzbName));
 
-    // Copy the .nfo (if any) found in the original input files next to the generated nzb.
-    // Must run BEFORE compression/obfuscation so the original .nfo file is still on disk.
+    // Resolve the .nfo source path NOW (before compression/obfuscation mutates _files),
+    // but defer the actual copy until the post finishes successfully (_finishPosting).
     if (_ngPost->_copyNfoWithNzb && !_nzbFilePath.isEmpty())
-        _copyNfoNextToNzb();
+        _resolveNfoSource();
 
     if (_doCompress) {
 #ifdef __USE_TMP_RAM__
@@ -712,39 +712,47 @@ void PostingJob::_preparePostersArticles()
     }
 }
 
-void PostingJob::_copyNfoNextToNzb()
+void PostingJob::_resolveNfoSource()
 {
-    QFileInfo nfoSrc;
+    _nfoSrcToCopy.clear();
     for (const QFileInfo &fi : _files) {
         if (fi.isFile() && fi.suffix().compare("nfo", Qt::CaseInsensitive) == 0) {
-            nfoSrc = fi;
-            break;
+            _nfoSrcToCopy = fi.absoluteFilePath();
+            return;
         }
         if (fi.isDir()) {
             QDir dir(fi.absoluteFilePath());
             const QFileInfoList entries = dir.entryInfoList(QDir::Files);
             for (const QFileInfo &candidate : entries) {
                 if (candidate.suffix().compare("nfo", Qt::CaseInsensitive) == 0) {
-                    nfoSrc = candidate;
-                    break;
+                    _nfoSrcToCopy = candidate.absoluteFilePath();
+                    return;
                 }
             }
-            if (nfoSrc.isFile())
-                break;
         }
     }
+}
 
-    if (!nfoSrc.isFile())
+void PostingJob::_copyNfoNextToNzb()
+{
+    if (_nfoSrcToCopy.isEmpty() || !QFile::exists(_nfoSrcToCopy))
         return;
 
     QFileInfo nzbFi(_nzbFilePath);
-    QString destPath = QString("%1/%2.nfo").arg(nzbFi.absolutePath(), nzbFi.completeBaseName());
+    QString destDir  = nzbFi.absolutePath();
+    QString destPath = QString("%1/%2.nfo").arg(destDir, nzbFi.completeBaseName());
+
+    QDir dir;
+    if (!dir.exists(destDir) && !dir.mkpath(destDir)) {
+        _error(tr("Couldn't copy nfo %1 to %2").arg(_nfoSrcToCopy, destPath));
+        return;
+    }
     if (QFile::exists(destPath))
         QFile::remove(destPath);
-    if (QFile::copy(nfoSrc.absoluteFilePath(), destPath))
-        _log(tr("Copied nfo file %1 next to the nzb: %2").arg(nfoSrc.absoluteFilePath(), destPath));
+    if (QFile::copy(_nfoSrcToCopy, destPath))
+        _log(tr("Copied nfo file %1 next to the nzb: %2").arg(_nfoSrcToCopy, destPath));
     else
-        _error(tr("Couldn't copy nfo %1 to %2").arg(nfoSrc.absoluteFilePath(), destPath));
+        _error(tr("Couldn't copy nfo %1 to %2").arg(_nfoSrcToCopy, destPath));
 }
 
 void PostingJob::_delOriginalFiles()
@@ -964,8 +972,12 @@ void PostingJob::_finishPosting()
         }
         _error(
             tr("you can try to repost only those and concatenate the nzb with the current one ;)"));
-    } else if (_postFinished && MB_LoadAtomic(_delFilesAfterPost))
-        _delOriginalFiles();
+    } else if (_postFinished) {
+        if (!_nfoSrcToCopy.isEmpty())
+            _copyNfoNextToNzb();
+        if (MB_LoadAtomic(_delFilesAfterPost))
+            _delOriginalFiles();
+    }
 }
 
 void PostingJob::_closeNzb()
