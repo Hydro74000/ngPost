@@ -392,33 +392,6 @@
           </layout>
          </item>
          <item>
-          <layout class="QHBoxLayout" name="horizontalLayout_checkUpdate">
-           <item>
-            <widget class="QCheckBox" name="checkForUpdatesCB">
-             <property name="toolTip">
-              <string>Check once a day for a new ngPost release on GitHub</string>
-             </property>
-             <property name="text">
-              <string>Check for updates</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <spacer name="horizontalSpacer_checkUpdate">
-             <property name="orientation">
-              <enum>Qt::Orientation::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>40</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-          </layout>
-         </item>
-         <item>
           <layout class="QHBoxLayout" name="horizontalLayout_keepNfo">
            <item>
             <widget class="QCheckBox" name="keepNfoExtensionCB">
@@ -442,6 +415,16 @@
               </size>
              </property>
             </spacer>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="checkForUpdatesCB">
+             <property name="toolTip">
+              <string>Check once a day for a new ngPost release on GitHub</string>
+             </property>
+             <property name="text">
+              <string>Check for updates</string>
+             </property>
+            </widget>
            </item>
           </layout>
          </item>
