@@ -134,7 +134,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y \
-            build-essential libfuse2 wget file \
+            build-essential libfuse2 wget file patchelf desktop-file-utils \
             libssl3 openssl \
             par2 \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
@@ -177,11 +177,31 @@ jobs:
         run: |
           wget -q -O linuxdeployqt https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
           chmod +x linuxdeployqt
+      - name: Sanity checks before linuxdeployqt
+        run: |
+          echo "=== qmake ==="
+          which qmake
+          qmake -query QT_VERSION
+          qmake -query QT_INSTALL_LIBS
+          echo "=== ngPost binary ==="
+          file AppDir/usr/bin/ngPost
+          test -x AppDir/usr/bin/ngPost || { echo "ERROR: ngPost not executable"; exit 1; }
+          echo "=== ldd on ngPost (Qt libs must resolve) ==="
+          ldd AppDir/usr/bin/ngPost | head -40
+          echo "=== desktop file ==="
+          cat AppDir/usr/share/applications/ngPost.desktop
+          echo "=== patchelf ==="
+          which patchelf && patchelf --version
       - name: Build AppImage
+        env:
+          # linuxdeployqt walks LD_LIBRARY_PATH; only keep Qt's lib dir to avoid
+          # accidentally pulling in Python or tool-cache libs.
+          LD_LIBRARY_PATH: ${{ env.QT_ROOT_DIR }}/lib
         run: |
           export VERSION="${{ inputs.version }}"
           ./linuxdeployqt AppDir/usr/share/applications/ngPost.desktop \
             -appimage \
+            -verbose=2 \
             -qmake="$(which qmake)" \
             -executable=AppDir/usr/bin/par2 \
             -executable="${{ steps.openssl.outputs.ssl }}" \
