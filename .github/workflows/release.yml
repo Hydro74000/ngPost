@@ -221,12 +221,24 @@ jobs:
           sudo apt update
           sudo apt install -y \
             build-essential libfuse2 wget file patchelf desktop-file-utils \
+            golang-go \
             libssl3 openssl \
             par2 \
             openvpn wireguard-tools wireguard-go \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 \
             libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
+      - name: Build wireguard-go fallback
+        run: |
+          if command -v wireguard-go >/dev/null 2>&1; then
+            wireguard-go --version || true
+            exit 0
+          fi
+
+          git clone --depth=1 https://git.zx2c4.com/wireguard-go /tmp/wireguard-go
+          make -C /tmp/wireguard-go
+          sudo install -m 755 /tmp/wireguard-go/wireguard-go /usr/local/bin/wireguard-go
+          wireguard-go --version || true
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
@@ -260,7 +272,8 @@ jobs:
               fi
             done
 
-            find /usr /bin -type f -name "$label" -perm -111 2>/dev/null | head -1
+            find /usr/local/bin /usr/local/sbin /usr/bin /usr/sbin /bin /sbin \
+              -maxdepth 1 -type f -name "$label" -perm -111 2>/dev/null | head -1
           }
 
           install_bin() {
