@@ -248,22 +248,53 @@ jobs:
           make -j$(nproc)
       - name: Prepare AppDir
         run: |
+          resolve_bin() {
+            local label="$1"
+            shift
+
+            local candidate
+            for candidate in "$@"; do
+              if command -v "$candidate" >/dev/null 2>&1; then
+                command -v "$candidate"
+                return 0
+              fi
+            done
+
+            find /usr /bin -type f -name "$label" -perm -111 2>/dev/null | head -1
+          }
+
+          install_bin() {
+            local label="$1"
+            local target="$2"
+            shift 2
+
+            local source
+            source="$(resolve_bin "$label" "$@")"
+            if [ -z "$source" ]; then
+              echo "ERROR: unable to find required binary '$label' (tried: $*)" >&2
+              exit 1
+            fi
+
+            echo "Bundling $label from $source"
+            cp "$source" "$target"
+            chmod 755 "$target"
+          }
+
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/bin/vpn
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           cp src/ngPost AppDir/usr/bin/
-          cp "$(which par2)" AppDir/usr/bin/par2
+          install_bin par2 AppDir/usr/bin/par2 par2 par2create par2repair
           if [ -x tools/rar ]; then
             cp tools/rar AppDir/usr/bin/rar
           fi
           # Bundle VPN binaries next to ngPost. Code path: applicationDirPath()/vpn/<bin>
           # On AppImage, applicationDirPath = $APPDIR/usr/bin so this lands at
           # /usr/bin/vpn/{openvpn,wireguard-go,wg} inside the squashfs.
-          cp "$(which openvpn)"       AppDir/usr/bin/vpn/openvpn
-          cp "$(which wireguard-go)"  AppDir/usr/bin/vpn/wireguard-go
-          cp "$(which wg)"            AppDir/usr/bin/vpn/wg
-          chmod 755 AppDir/usr/bin/vpn/*
+          install_bin openvpn AppDir/usr/bin/vpn/openvpn openvpn
+          install_bin wireguard-go AppDir/usr/bin/vpn/wireguard-go wireguard-go
+          install_bin wg AppDir/usr/bin/vpn/wg wg
           # VPN runtime: helper + install/uninstall scripts + polkit rule
           # template. All next to the ngPost binary so the user-mode dialog
           # can locate them via applicationDirPath() and pass them to pkexec
