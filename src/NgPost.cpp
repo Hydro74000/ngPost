@@ -1912,6 +1912,17 @@ QString NgPost::_parseConfig(const QString &configPath)
     if (!fileInfo.exists() || !fileInfo.isFile() || !fileInfo.isReadable())
         err = tr("The config file '%1' is not readable...").arg(configPath);
 
+    // CRITICAL: while we are LOADING a config, the VpnManager setters
+    // (setConfigPath / setAutoConnect / setBackend) would emit configChanged,
+    // and our NgPost handler connects that to saveConfig(). If we let those
+    // fire during parse, saveConfig() writes the in-memory state mid-parse
+    // — *before* the [server] blocks have been loaded — and silently wipes
+    // the user's servers from the file on disk.
+    // Block VpnManager signals only for the duration of the parse.
+    bool vpnSignalsWereBlocked = false;
+    if (_vpnManager)
+        vpnSignalsWereBlocked = _vpnManager->blockSignals(true);
+
     QFile file(fileInfo.absoluteFilePath());
     if (file.open(QIODevice::ReadOnly))
     {
@@ -2451,6 +2462,11 @@ QString NgPost::_parseConfig(const QString &configPath)
             file.close();
         }
     }
+
+    // Restore VpnManager signal emission. From here on, setters can validly
+    // notify NgPost::saveConfig().
+    if (_vpnManager)
+        _vpnManager->blockSignals(vpnSignalsWereBlocked);
 
     return err;
 }

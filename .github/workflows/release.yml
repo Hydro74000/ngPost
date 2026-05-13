@@ -28,6 +28,7 @@ jobs:
       release_name: ${{ steps.metadata.outputs.release_name }}
       prerelease: ${{ steps.metadata.outputs.prerelease }}
       channel: ${{ steps.metadata.outputs.channel }}
+      appimage_update_glob: ${{ steps.metadata.outputs.appimage_update_glob }}
     steps:
       - uses: actions/checkout@v4
       - name: Compute release identity
@@ -43,6 +44,7 @@ jobs:
             release_name="Release $RELEASE_INPUT"
             prerelease="false"
             channel="stable"
+            appimage_update_glob="ngPost-*-x86_64.AppImage.zsync"
           else
             base_version="$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*([0-9]+(\.[0-9]+){1,2}).*/\1/p' src/ngPost.pri | head -1)"
             if [ -z "$base_version" ]; then
@@ -57,6 +59,7 @@ jobs:
             release_name="Unstable $tag"
             prerelease="true"
             channel="unstable"
+            appimage_update_glob="ngPost-v*-unstable.*-x86_64.AppImage.zsync"
           fi
 
           {
@@ -65,6 +68,7 @@ jobs:
             echo "release_name=$release_name"
             echo "prerelease=$prerelease"
             echo "channel=$channel"
+            echo "appimage_update_glob=$appimage_update_glob"
           } >> "$GITHUB_OUTPUT"
 
   build-linux:
@@ -402,8 +406,9 @@ jobs:
           # Embed update info into the ELF + emit a .zsync file alongside the AppImage.
           # Format: gh-releases-zsync|<user>|<repo>|<tag>|<glob>
           # Using "latest" => AppImageUpdate fetches the latest GitHub release each check.
-          UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|ngPost-*-x86_64.AppImage.zsync"
-          LDAI_UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|ngPost-*-x86_64.AppImage.zsync"
+          # The filename glob is channel-aware so unstable builds only follow unstable assets.
+          UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|${{ needs.release-metadata.outputs.appimage_update_glob }}"
+          LDAI_UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|${{ needs.release-metadata.outputs.appimage_update_glob }}"
         run: |
           # QT_ROOT_DIR is exported by jurplel/install-qt-action — resolve in shell, not in env:
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
@@ -427,6 +432,8 @@ jobs:
           # Hard fail if zsync file wasn't generated (means UPDATE_INFORMATION wasn't picked up)
           test -f dist/*.AppImage.zsync || { echo "ERROR: .zsync file not generated"; exit 1; }
       - name: Verify AppImage is self-contained & update-info embedded
+        env:
+          APPIMAGE_UPDATE_GLOB: ${{ needs.release-metadata.outputs.appimage_update_glob }}
         run: |
           cd dist
           APPIMAGE=$(ls *.AppImage)
@@ -444,7 +451,8 @@ jobs:
           test -x squashfs-root/usr/bin/ngpost-vpn-uninstall.sh || { echo "ERROR: uninstall script not bundled"; exit 1; }
           test -f squashfs-root/usr/bin/49-ngpost-vpn.rules.in  || { echo "ERROR: polkit rule template not bundled"; exit 1; }
           # Check the update-information string is embedded in the ELF
-          if ! strings "$APPIMAGE" | grep -q "gh-releases-zsync|Hydro74000|ngPost|"; then
+          expected_update_info="gh-releases-zsync|Hydro74000|ngPost|latest|$APPIMAGE_UPDATE_GLOB"
+          if ! strings "$APPIMAGE" | grep -Fq "$expected_update_info"; then
             echo "ERROR: UPDATE_INFORMATION not embedded in AppImage ELF"; exit 1
           fi
           # Check .zsync file is present and references the AppImage
