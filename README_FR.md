@@ -1,8 +1,8 @@
 <img align="left" width="80" height="80" src="https://raw.githubusercontent.com/Hydro74000/ngPost/master/src/resources/icons/ngPost.png" alt="ngPost">
 
-# ngPost v4.16
+# ngPost v5.2.2
 
-ngPost est un posteur pour Usenet en ligne de commande ou via une interface graphique développé en C++11/Qt5.<br/>
+ngPost est un posteur pour Usenet en ligne de commande ou via une interface graphique développé en C++17/Qt6.<br/>
 Il a été conçu pour être le plus rapide possible et offrir toutes les fonctionnalités utiles pour poster facilement et en toute sécurité.<br/>
 <br/>
 Voici la liste des principales fonctionnalités et atouts de ngPost:
@@ -15,13 +15,14 @@ Voici la liste des principales fonctionnalités et atouts de ngPost:
   - **mode invisible**: obfuscation complète des Articles : impossible de (re)trouver un post sans avoir le fichier nzb
   - **exécution d'une commande ou un script une fois les nzb générés**
   - possibilité **d'éteindre l'ordinateur** lorsque tous les posts sont finis
+  - tunnel **VPN Linux intégré** pour les connexions NNTP de ngPost uniquement, avec OpenVPN ou WireGuard et activation par serveur
   - multi-langues (Français, Allemand, Anglais, Chinois, Espagnol, Néerlandais, Portugais)
   - ...
 
 ![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3.png)
 
 
-[Les versions pour chacun des OS sont disponibles ici](https://github.com/Hydro74000/ngPost/releases/tag/v4.16), pour: Linux 64bit, Windows (32bit et 64bit), MacOS et Raspbian (RPI 4). Bientôt pour Android et iOS...
+[Les versions pour chacun des OS sont disponibles ici](https://github.com/Hydro74000/ngPost/releases), pour: Linux 64bit et Windows 64bit. Le support MacOS et Raspbian pourra être réévalué dans le futur.
 
 
 ### Fichier de configuration
@@ -39,6 +40,8 @@ Sinon vous pouvez éditer le fichier à la main. Il vous faut remplir:
   - groups (liste des groupes sur lesquels vous postez)
   - TMP_DIR (dossier temporaire pour les archives et par2)
   - RAR_PATH (chemin d'accès complet de l'éxécutable RAR ou 7zip)
+  - VPN_AUTO_CONNECT, VPN_BACKEND et VPN_CONFIG_PATH si vous utilisez le tunnel VPN intégré
+  - useVpn dans chaque section Server pour indiquer si ce serveur doit passer par le VPN
   - la ou les sections Server
 
 
@@ -128,6 +131,30 @@ Une fois les parties Serveurs et Paramètres remplies, on remarque un système d
 L'onglet **Nouveau** permet de créer d'autres Post Rapides.<br />
 À noter que vous pouvez faire un click droit sur les onglets et vous avez l'option **Fermer tous les onglets des Posts finis**<br/>
 
+#### le tunnel VPN intégré (Linux):
+
+Le bouton **VPN...** ouvre les paramètres du tunnel VPN. Cette fonctionnalité est prévue pour Linux et permet de faire passer seulement les connexions NNTP de ngPost par un tunnel OpenVPN ou WireGuard, sans modifier la route par défaut du système et sans impacter les autres applications.<br/>
+
+La première utilisation nécessite l'installation du helper privilégié via **Install**. L'installation passe par `pkexec`/Polkit, installe les scripts dans `/var/lib/ngpost` et crée une règle Polkit limitée à l'utilisateur courant et au helper VPN de ngPost. Une fois installé, les boutons **Connect** et **Disconnect** ne redemandent plus le mot de passe.<br/>
+
+Ensuite:
+  - choisissez le backend **OpenVPN** ou **WireGuard**
+  - sélectionnez le fichier de configuration VPN (`.ovpn`, `.conf`, ...)
+  - cochez **Use VPN** uniquement sur les serveurs NNTP qui doivent passer par le tunnel
+  - cochez **Auto-connect VPN when a job starts** si vous voulez que ngPost démarre le tunnel automatiquement au lancement d'un post
+
+Quand un serveur est marqué **Use VPN**, ngPost lie ses sockets NNTP à l'adresse IP du tunnel. Si le VPN est requis mais indisponible, ngPost refuse de poster ou de vérifier les articles via ce serveur plutôt que de sortir hors VPN. Le tunnel démarré automatiquement est arrêté après un court délai lorsque la file de posts est vide.<br/>
+
+Les clefs de configuration correspondantes sont:
+<pre>
+VPN_AUTO_CONNECT = false
+VPN_BACKEND = openvpn
+VPN_CONFIG_PATH = /chemin/vers/vpn.ovpn
+
+[server]
+useVpn = true
+</pre>
+
 
 #### le Post Rapide:
 
@@ -174,9 +201,9 @@ Vous pouvez faire des Post Rapides durant la phase de Surveillance<br/>
 ### Comment compiler ngPost
 #### les dépendances:
 - build-essential (compilateur C++, libstdc++, make,...)
-- qt5-default (librairies Qt5 et headers)
-- qt5-qmake (pour générer les fichiers moc et créer le Makefile)
+- Qt 6.8.2 (librairies, headers, qmake et lrelease)
 - libssl (v1.0.2 or v1.1) mais devrait déjà être installée sur votre système
+- openvpn, wireguard-tools et wireguard-go (optionnels, utiles pour le tunnel VPN Linux et le packaging AppImage avec VPN)
 
 #### Compilation:
 - allez dans le dossier **src** ou copiez le en **bin**
@@ -298,4 +325,3 @@ Je suis Freelance (auto-entrepreneur) depuis fin 2019, travaillant sur plusieurs
 <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=W2C236U6JNTUA&item_name=ngPost&currency_code=EUR"><img align="left" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="ex0days"></a>
  ou en Bitcoin à cette adresse: **3BGbnvnnBCCqrGuq1ytRqUMciAyMXjXAv6**
 <img align="right" align="bottom" width="120" height="120" src="https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/btc_qr.gif" alt="ngPost_QR">
-

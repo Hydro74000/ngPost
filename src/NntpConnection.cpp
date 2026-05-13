@@ -24,6 +24,7 @@
 #include "nntp/NntpArticle.h"
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
+#include "vpn/VpnManager.h"
 
 #include <QAbstractSocket>
 #include <QByteArray>
@@ -114,6 +115,29 @@ void NntpConnection::onStartConnection()
     _socket->setSocketOption(QAbstractSocket::KeepAliveOption, true);
     _socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
     _socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, NgPost::articleSize());
+
+    // VPN binding is now decided PER SERVER (Phase 3): only sockets owned by
+    // a server marked `useVpn` route through the tunnel. Other servers connect
+    // directly via the system default route.
+    // Fail-closed: if this server requires VPN but the tunnel is not ready,
+    // refuse the connection rather than leaking traffic in the clear.
+    if (_srvParams.useVpn) {
+        VpnManager *vpn = _ngPost->vpnManager();
+        if (!vpn || !vpn->isConnected() || vpn->tunIp().isNull()) {
+            _error(tr("Server '%1' is marked Use VPN but the VPN tunnel is not connected")
+                       .arg(_srvParams.host));
+            deleteSocket();
+            emit disconnected(this);
+            return;
+        }
+        if (!_socket->bind(vpn->tunIp(), 0, QAbstractSocket::DefaultForPlatform)) {
+            _error(tr("VPN bind failed on %1: %2")
+                       .arg(vpn->tunIp().toString(), _socket->errorString()));
+            deleteSocket();
+            emit disconnected(this);
+            return;
+        }
+    }
 
     connect(_socket,
             &QAbstractSocket::connected,

@@ -89,13 +89,30 @@ SOURCES += \
         nntp/NntpFile.cpp \
         utils/CmdOrGuiApp.cpp \
         utils/UpdateChecker.cpp \
-        utils/Yenc.cpp
+        utils/Yenc.cpp \
+        vpn/OpenVpnBackend.cpp \
+        vpn/VpnManager.cpp \
+        vpn/WireGuardBackend.cpp
 
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+# Runtime VPN resources: helper + install/uninstall scripts + polkit rule
+# template. Installed under /var/lib/ngpost/ which is writable on traditional
+# AND atomic distros (Bazzite/Silverblue/Kinoite/SteamOS, where /usr is RO).
+# Files are root-owned 755 by the install command — this is what makes the
+# strict-path polkit rule safe.
+unix:!android:!macx {
+    vpn_runtime.files = $$PWD/vpn/scripts/ngpost-vpn-helper.sh \
+                        $$PWD/vpn/scripts/ngpost-vpn-install.sh \
+                        $$PWD/vpn/scripts/ngpost-vpn-uninstall.sh \
+                        $$PWD/vpn/polkit/49-ngpost-vpn.rules.in
+    vpn_runtime.path  = /var/lib/ngpost
+    INSTALLS += vpn_runtime
+}
 
 HEADERS += \
     ArticleBuilder.h \
@@ -115,7 +132,11 @@ HEADERS += \
     utils/Macros.h \
     utils/PureStaticClass.h \
     utils/UpdateChecker.h \
-    utils/Yenc.h
+    utils/Yenc.h \
+    vpn/OpenVpnBackend.h \
+    vpn/VpnBackend.h \
+    vpn/VpnManager.h \
+    vpn/WireGuardBackend.h
 
 
 

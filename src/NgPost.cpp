@@ -12,6 +12,7 @@
 #include "FileUploader.h"
 #include "NzbCheck.h"
 #include "utils/UpdateChecker.h"
+#include "vpn/VpnManager.h"
 #ifdef __USE_HMI__
   #include "hmi/MainWindow.h"
   #include "hmi/PostingWidget.h"
@@ -152,6 +153,11 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 
     {Opt::CHECK_FOR_UPDATES, "check_for_updates"},
     {Opt::LAST_UPDATE_CHECK, "last_update_check"},
+
+    {Opt::VPN_AUTO_CONNECT, "vpn_auto_connect"},
+    {Opt::VPN_BACKEND,      "vpn_backend"},
+    {Opt::VPN_CONFIG_PATH,  "vpn_config_path"},
+    {Opt::SERVER_USE_VPN,   "useVpn"},
 };
 
 const QList<QCommandLineOption> NgPost::sCmdOptions = {
@@ -300,6 +306,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _groupPolicy(GROUP_POLICY::ALL),
     _nzbCheck(nullptr), _quiet(false),
     _proxySocks5(QNetworkProxy::NoProxy), _proxyUrl(),
+    _vpnManager(nullptr),
     _logFile(nullptr), _logStream(nullptr)
 {
     QThread::currentThread()->setObjectName(sMainThreadName);
@@ -340,6 +347,31 @@ NgPost::NgPost(int &argc, char *argv[]):
     connect(this, &NgPost::error, this, &NgPost::onError, Qt::QueuedConnection);
 
     _updateChecker = new UpdateChecker(this, &_netMgr, this);
+    _vpnManager    = new VpnManager(this);
+    // Best-effort sweep of any stale VPN state from a previous crashed run.
+    // No-op (and no prompt) if the VPN helper hasn't been installed yet.
+    _vpnManager->runStartupCleanup();
+    // Phase 3 — auto-persist VPN preferences as they change so the user
+    // doesn't have to click "Save Config" after every tweak.
+    connect(_vpnManager, &VpnManager::configChanged,
+            this, [this]() { saveConfig(); });
+    // Phase 3 — mirror VPN events into the main post log so the user sees
+    // tunnel events (connect, disconnect, auto-disconnect countdown) alongside
+    // the upload progress, not only inside the VPN dialog.
+    connect(_vpnManager, &VpnManager::logLine,
+            this, [this](QString const &line) {
+        emit log(QStringLiteral("[VPN] ") + line, true);
+    });
+    // Phase 3 — when the VPN reaches Connected, flush any job that was
+    // parked waiting for the tunnel.
+    connect(_vpnManager, &VpnManager::stateChanged,
+            this, [this](VpnManager::State s) {
+        if (s != VpnManager::State::Connected) return;
+        if (_activeJob || _pendingJobs.isEmpty()) return;
+        _vpnManager->retainForJob();
+        _activeJob = _pendingJobs.dequeue();
+        emit _activeJob->startPosting(true);
+    });
 
     _loadTanslators();
 
@@ -950,9 +982,25 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
         _activeJob->deleteLater();
         _activeJob = nullptr;
 
+        if (_vpnManager)
+            _vpnManager->releaseForJob();
+
         if (_pendingJobs.size())
         {
+            // The next job may itself need (or not) the VPN. Re-admit it so
+            // we either dequeue normally, defer (Wait), or refuse to activate
+            // it now if the VPN can't come up.
+            VpnManager::Admission nextAdm = VpnManager::Admission::Proceed;
+            if (_vpnManager)
+                nextAdm = _vpnManager->admitJob(_nntpServers);
+            if (nextAdm != VpnManager::Admission::Proceed) {
+                // Leave it in pending; the stateChanged(Connected) hook (or
+                // a Blocked->fixed user action) will eventually flush.
+                return;
+            }
             _activeJob = _pendingJobs.dequeue();
+            if (_vpnManager)
+                _vpnManager->retainForJob();
 
 #ifdef __USE_HMI__
             if (_hmi)
@@ -977,6 +1025,18 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
                     }
                     // otherwise it will be triggered automatically when the packing is finished
                     // as it is now the active job ;)
+                }
+                else if (_packingJob == nullptr)
+                {
+                    // Recovery path: the previous active job was cancelled
+                    // while still mid-packing, so _prepareNextPacking() had
+                    // not yet pre-packed the now-dequeued job. Start it
+                    // normally (its own packing happens as part of postFiles)
+                    // and schedule pre-pack of whatever comes after.
+                    if (debugFull())
+                        _log(tr("Recovering: starting next job that wasn't pre-packed"));
+                    emit _activeJob->startPosting(true);
+                    _prepareNextPacking();
                 }
                 else
                     _error("next active job different to the packing one..."); // should never happen...
@@ -1981,6 +2041,24 @@ QString NgPost::_parseConfig(const QString &configPath)
                     {
                         _lastUpdateCheckEpoch = val.toLongLong();
                     }
+                    else if (opt == sOptionNames[Opt::VPN_AUTO_CONNECT])
+                    {
+                        val = val.toLower();
+                        _vpnManager->setAutoConnect(val == "true" || val == "on" || val == "1");
+                    }
+                    else if (opt == sOptionNames[Opt::VPN_BACKEND])
+                    {
+                        bool ok = false;
+                        VpnManager::Backend b = VpnManager::backendFromString(val, &ok);
+                        if (ok)
+                            _vpnManager->setBackend(b);
+                        else
+                            err += tr("Invalid VPN_BACKEND value: %1 (expected 'openvpn' or 'wireguard')\n").arg(val);
+                    }
+                    else if (opt == sOptionNames[Opt::VPN_CONFIG_PATH])
+                    {
+                        _vpnManager->setConfigPath(val);
+                    }
                     else if (opt == sOptionNames[Opt::KEEP_NFO_EXTENSION])
                     {
                         val = val.toLower();
@@ -2327,6 +2405,12 @@ QString NgPost::_parseConfig(const QString &configPath)
                         else
                             serverParams->nzbCheck = false;
                     }
+                    else if (opt == sOptionNames[Opt::SERVER_USE_VPN])
+                    {
+                        val = val.toLower();
+                        serverParams->useVpn =
+                            (val == "true" || val == "on" || val == "1");
+                    }
                     else if (opt == sOptionNames[Opt::USER])
                     {
                         serverParams->user = val.toStdString();
@@ -2444,6 +2528,28 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
     }
 #endif
 
+    // VPN gate (Phase 3): ask the VpnManager whether this job can run NOW.
+    //   Proceed: the job activates (or queues behind another active job)
+    //   Wait   : the VPN is being brought up; we queue the job, retain a
+    //            slot in the VpnManager, and the Connected signal will
+    //            flush the queue below
+    //   Blocked: cannot start the VPN; queue the job, popup shown. Activation
+    //            will only happen after the user fixes the situation AND
+    //            another action re-triggers a queue advance (typically the
+    //            stateChanged(Connected) listener).
+    VpnManager::Admission adm = VpnManager::Admission::Proceed;
+    if (_vpnManager)
+        adm = _vpnManager->admitJob(_nntpServers);
+
+    if (adm == VpnManager::Admission::Blocked
+        || adm == VpnManager::Admission::Wait) {
+        // Job parked in the queue. retainForJob is deferred to the moment
+        // the job actually activates (via the stateChanged(Connected) flush
+        // or a subsequent startPostingJob attempt).
+        _pendingJobs << job;
+        return false;
+    }
+
     if (_activeJob)
     {
         _pendingJobs << job;
@@ -2456,6 +2562,8 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
     }
     else
     {
+        if (_vpnManager)
+            _vpnManager->retainForJob();
         _activeJob = job;
         emit job->startPosting(true);
         return true;
@@ -2655,6 +2763,12 @@ void NgPost::saveConfig()
                << tr("## (internal) last update check timestamp, epoch seconds \xe2\x80\x94 managed automatically") << "\n"
                << "LAST_UPDATE_CHECK = " << _lastUpdateCheckEpoch << "\n"
                << "\n"
+               << tr("## tunnel ngPost connections through an embedded VPN (Linux v1)") << "\n"
+               << tr("## the VPN affects ngPost only; the rest of the system is unchanged") << "\n"
+               << "VPN_AUTO_CONNECT = " << (_vpnManager && _vpnManager->autoConnect() ? "true" : "false") << "\n"
+               << "VPN_BACKEND = " << (_vpnManager ? VpnManager::backendToString(_vpnManager->backend()) : QStringLiteral("openvpn")) << "\n"
+               << "VPN_CONFIG_PATH = " << (_vpnManager ? _vpnManager->configPath() : QString()) << "\n"
+               << "\n"
                << tr("## when obfuscating file names, keep the .nfo extension visible") << "\n"
                << (_keepNfoExtension ? "" : "#") << "KEEP_NFO_EXTENSION = true\n"
                << "\n"
@@ -2802,6 +2916,7 @@ void NgPost::saveConfig()
                    << "connection = " << param->nbCons << "\n"
                    << "enabled = " << (param->enabled ? "true":"false") << "\n"
                    << "nzbCheck = " << (param->nzbCheck ? "true":"false") << "\n"
+                   << "useVpn = " << (param->useVpn ? "true":"false") << "\n"
                    << "\n\n";
         }
         stream << tr("## You can add as many server if you have several providers by adding other \"server\" sections") << "\n"

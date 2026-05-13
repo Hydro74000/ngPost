@@ -164,6 +164,7 @@ jobs:
             build-essential libfuse2 wget file patchelf desktop-file-utils \
             libssl3 openssl \
             par2 \
+            openvpn wireguard-tools wireguard-go \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 \
             libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
@@ -189,6 +190,7 @@ jobs:
       - name: Prepare AppDir
         run: |
           mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/bin/vpn
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           cp src/ngPost AppDir/usr/bin/
@@ -196,6 +198,23 @@ jobs:
           if [ -x tools/rar ]; then
             cp tools/rar AppDir/usr/bin/rar
           fi
+          # Bundle VPN binaries next to ngPost. Code path: applicationDirPath()/vpn/<bin>
+          # On AppImage, applicationDirPath = $APPDIR/usr/bin so this lands at
+          # /usr/bin/vpn/{openvpn,wireguard-go,wg} inside the squashfs.
+          cp "$(which openvpn)"       AppDir/usr/bin/vpn/openvpn
+          cp "$(which wireguard-go)"  AppDir/usr/bin/vpn/wireguard-go
+          cp "$(which wg)"            AppDir/usr/bin/vpn/wg
+          chmod 755 AppDir/usr/bin/vpn/*
+          # VPN runtime: helper + install/uninstall scripts + polkit rule
+          # template. All next to the ngPost binary so the user-mode dialog
+          # can locate them via applicationDirPath() and pass them to pkexec
+          # for the one-time install.
+          cp src/vpn/scripts/ngpost-vpn-helper.sh    AppDir/usr/bin/
+          cp src/vpn/scripts/ngpost-vpn-install.sh   AppDir/usr/bin/
+          cp src/vpn/scripts/ngpost-vpn-uninstall.sh AppDir/usr/bin/
+          cp src/vpn/polkit/49-ngpost-vpn.rules.in   AppDir/usr/bin/
+          chmod 755 AppDir/usr/bin/ngpost-vpn-*.sh
+          chmod 644 AppDir/usr/bin/49-ngpost-vpn.rules.in
           cp ngPost.desktop AppDir/usr/share/applications/
           cp src/resources/icons/ngPost.png AppDir/usr/share/icons/hicolor/256x256/apps/
           cp src/resources/icons/ngPost.png AppDir/
@@ -240,6 +259,9 @@ jobs:
             --library "${{ steps.openssl.outputs.ssl }}" \
             --library "${{ steps.openssl.outputs.crypto }}" \
             --executable AppDir/usr/bin/par2 \
+            --executable AppDir/usr/bin/vpn/openvpn \
+            --executable AppDir/usr/bin/vpn/wireguard-go \
+            --executable AppDir/usr/bin/vpn/wg \
             --desktop-file AppDir/usr/share/applications/ngPost.desktop \
             --icon-file AppDir/ngPost.png
           mkdir -p dist
@@ -255,6 +277,15 @@ jobs:
           test -f squashfs-root/usr/lib/libssl.so.3    || { echo "ERROR: libssl.so.3 not bundled";    exit 1; }
           test -f squashfs-root/usr/lib/libcrypto.so.3 || { echo "ERROR: libcrypto.so.3 not bundled"; exit 1; }
           ls squashfs-root/usr/plugins/tls/ 2>/dev/null || { echo "ERROR: Qt TLS plugins not bundled"; exit 1; }
+          # VPN binaries must be present at the path my code looks up first
+          test -x squashfs-root/usr/bin/vpn/openvpn      || { echo "ERROR: openvpn not bundled";      exit 1; }
+          test -x squashfs-root/usr/bin/vpn/wireguard-go || { echo "ERROR: wireguard-go not bundled"; exit 1; }
+          test -x squashfs-root/usr/bin/vpn/wg           || { echo "ERROR: wg not bundled";           exit 1; }
+          # Privileged helper + install/uninstall + polkit rule template
+          test -x squashfs-root/usr/bin/ngpost-vpn-helper.sh    || { echo "ERROR: helper script not bundled";    exit 1; }
+          test -x squashfs-root/usr/bin/ngpost-vpn-install.sh   || { echo "ERROR: install script not bundled";   exit 1; }
+          test -x squashfs-root/usr/bin/ngpost-vpn-uninstall.sh || { echo "ERROR: uninstall script not bundled"; exit 1; }
+          test -f squashfs-root/usr/bin/49-ngpost-vpn.rules.in  || { echo "ERROR: polkit rule template not bundled"; exit 1; }
           # Check the update-information string is embedded in the ELF
           if ! strings "$APPIMAGE" | grep -q "gh-releases-zsync|Hydro74000|ngPost|"; then
             echo "ERROR: UPDATE_INFORMATION not embedded in AppImage ELF"; exit 1

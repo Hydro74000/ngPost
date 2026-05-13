@@ -19,17 +19,20 @@ SOURCES += \
     hmi/CheckBoxCenterWidget.cpp \
     hmi/PostingWidget.cpp \
     hmi/SignedListWidget.cpp \
-    hmi/MainWindow.cpp
+    hmi/MainWindow.cpp \
+    hmi/VpnSettingsDialog.cpp
 
 HEADERS += \
     hmi/AutoPostWidget.h \
     hmi/CheckBoxCenterWidget.h \
     hmi/PostingWidget.h \
     hmi/SignedListWidget.h \
-    hmi/MainWindow.h
+    hmi/MainWindow.h \
+    hmi/VpnSettingsDialog.h
 
 FORMS += \
     hmi/AutoPostWidget.ui \
     hmi/MainWindow.ui \
-    hmi/PostingWidget.ui
+    hmi/PostingWidget.ui \
+    hmi/VpnSettingsDialog.ui
 }

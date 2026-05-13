@@ -21,6 +21,7 @@
 #include <QSslSocket>
 #include "NzbCheck.h"
 #include "nntp/Nntp.h"
+#include "vpn/VpnManager.h"
 
 NntpCheckCon::NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &srvParams)
     : QObject()
@@ -65,6 +66,27 @@ void NntpCheckCon::onStartConnection()
 
     _socket->setSocketOption(QAbstractSocket::KeepAliveOption, true);
     _socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+
+    // Per-server VPN bind (Phase 3): only tunnel if this server has useVpn.
+    if (_srvParams.useVpn) {
+        VpnManager *vpn = VpnManager::instance();
+        if (!vpn || !vpn->isConnected() || vpn->tunIp().isNull()) {
+            _nzbCheck->error(tr("Server '%1' is marked Use VPN but the VPN tunnel is not connected")
+                                 .arg(_srvParams.host));
+            _socket->deleteLater();
+            _socket = nullptr;
+            emit disconnected(this);
+            return;
+        }
+        if (!_socket->bind(vpn->tunIp(), 0, QAbstractSocket::DefaultForPlatform)) {
+            _nzbCheck->error(tr("VPN bind failed on %1: %2")
+                                 .arg(vpn->tunIp().toString(), _socket->errorString()));
+            _socket->deleteLater();
+            _socket = nullptr;
+            emit disconnected(this);
+            return;
+        }
+    }
 
     connect(_socket,
             &QAbstractSocket::connected,

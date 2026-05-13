@@ -20,6 +20,8 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "vpn/VpnManager.h"
+
 #include <QMainWindow>
 #include <QFileInfoList>
 #include <QUrl>
@@ -154,6 +156,9 @@ private slots:
     void onShutdownToggled(bool checked);
 
     void onPauseClicked();
+
+    void onVpnSettingsClicked();
+    void onVpnStateChanged(VpnManager::State newState);
 
 private:
     void _initServerBox();
