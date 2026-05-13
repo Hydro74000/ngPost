@@ -150,6 +150,9 @@ jobs:
         run: |
           cd src/release
           Remove-Item -Force *.obj, *.cpp, *.rc, *.res, *.h, *.qrc -ErrorAction SilentlyContinue
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
       - name: Package
         shell: pwsh
         run: |
@@ -160,13 +163,61 @@ jobs:
           Copy-Item ngPost.conf, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
           Compress-Archive -Path "dist/$pkg" -DestinationPath "dist/$pkg.zip"
+          Get-ChildItem dist
+      - name: Build Windows Setup
+        shell: pwsh
+        run: |
+          $version = "${{ needs.release-metadata.outputs.package_version }}"
+          $pkg = "ngPost-$version-windows-x86_64"
+          $source = (Resolve-Path "dist/$pkg").Path
+          $output = (Resolve-Path "dist").Path
+          $icon = (Resolve-Path "src/ngPost.ico").Path
+          $iss = @"
+          [Setup]
+          AppId={{2E2A4868-85FE-4FC1-984A-0B051B78937D}
+          AppName=ngPost
+          AppVersion=$version
+          AppPublisher=Hydro74000
+          AppPublisherURL=https://github.com/Hydro74000/ngPost
+          AppSupportURL=https://github.com/Hydro74000/ngPost/issues
+          AppUpdatesURL=https://github.com/Hydro74000/ngPost/releases
+          DefaultDirName={autopf}\ngPost
+          DefaultGroupName=ngPost
+          DisableProgramGroupPage=yes
+          OutputDir=$output
+          OutputBaseFilename=$pkg-setup
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesAllowed=x64
+          ArchitecturesInstallIn64BitMode=x64
+          SetupIconFile=$icon
+          UninstallDisplayIcon={app}\ngPost.exe
+          WizardStyle=modern
+
+          [Tasks]
+          Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
+
+          [Files]
+          Source: "$source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{group}\ngPost"; Filename: "{app}\ngPost.exe"
+          Name: "{autodesktop}\ngPost"; Filename: "{app}\ngPost.exe"; Tasks: desktopicon
+
+          [Run]
+          Filename: "{app}\ngPost.exe"; Description: "Launch ngPost"; Flags: nowait postinstall skipifsilent
+          "@
+          Set-Content -Path installer.iss -Value $iss -Encoding ASCII
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
           Remove-Item -Recurse -Force "dist/$pkg"
           Get-ChildItem dist
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: binary-windows
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.exe
 
   build-macos:
     name: Build macOS
