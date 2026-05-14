@@ -78,7 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y build-essential cmake
+        run: sudo apt update && sudo apt install -y build-essential cmake libsecret-1-dev
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:

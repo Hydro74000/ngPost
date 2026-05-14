@@ -1,8 +1,18 @@
 QT += core network
 
 # Phase 4: cross-platform credential store (QtKeychain) for OpenVPN auth.
-# Packages: Fedora qtkeychain-qt6, Ubuntu libqt6keychain1-dev, brew qtkeychain,
-# vcpkg qtkeychain. Header is <qt6keychain/keychain.h>; needs DBus on Linux.
+# Packages: Fedora qtkeychain-qt6, Ubuntu libqt6keychain1-dev, brew qtkeychain.
+# Header is <qt6keychain/keychain.h>; needs DBus on Linux.
+#
+# In CI we build QtKeychain from source and install it into $QT_ROOT_DIR.
+# Add that to the search paths so the include / link resolves on macOS
+# (qmake doesn't auto-add $QT_ROOT_DIR/include to the include path the way
+# Linux distros place QtKeychain in /usr/include).
+QT_KEYCHAIN_PREFIX = $$(QT_ROOT_DIR)
+!isEmpty(QT_KEYCHAIN_PREFIX) {
+    INCLUDEPATH += $$QT_KEYCHAIN_PREFIX/include
+    LIBS        += -L$$QT_KEYCHAIN_PREFIX/lib
+}
 LIBS    += -lqt6keychain
 QT      += dbus
 

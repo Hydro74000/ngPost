@@ -555,16 +555,18 @@ bool VpnManager::runInstall()
 #ifdef Q_OS_WIN
     // On Windows, the prerequisites (OpenVPN Community + WireGuard for
     // Windows) are installed by ngPost's main setup wizard. There's nothing
-    // to install at runtime. If the user clicked Install in the dialog we
-    // just re-check and report.
-    bool ok = isHelperInstalled();
-    if (ok)
-        emit logLine(tr("VPN backend prerequisites detected (OpenVPN / WireGuard for Windows)."));
-    else
-        emit logLine(tr("Install OpenVPN Community and/or WireGuard for Windows, then re-check. "
-                        "These are normally bundled with the ngPost setup."));
-    emit installStateChanged(ok);
-    return ok;
+    // to install at runtime. Block-scope the local so it doesn't clash with
+    // the Linux path's `ok` below when MSVC parses the whole function.
+    {
+        bool ok = isHelperInstalled();
+        if (ok)
+            emit logLine(tr("VPN backend prerequisites detected (OpenVPN / WireGuard for Windows)."));
+        else
+            emit logLine(tr("Install OpenVPN Community and/or WireGuard for Windows, then re-check. "
+                            "These are normally bundled with the ngPost setup."));
+        emit installStateChanged(ok);
+        return ok;
+    }
 #endif
 
     QString const resDir = bundledResourcesDir();

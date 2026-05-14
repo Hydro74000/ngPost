@@ -10,7 +10,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y build-essential cmake
+        # libsecret-1-dev is the Linux backend QtKeychain uses (GNOME
+        # Secret Service / DBus). Without its headers the QtKeychain cmake
+        # bails out with "package libsecret-1 not found".
+        run: sudo apt update && sudo apt install -y build-essential cmake libsecret-1-dev
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
