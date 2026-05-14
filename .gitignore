@@ -600,6 +600,7 @@ FodyWeavers.xsd
 src/build/
 src/qmake_qmake_immediate.qrc
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 src/.qmake.stash
 src/ngPost
 src/qmake_qmake_immediate_rc.py
