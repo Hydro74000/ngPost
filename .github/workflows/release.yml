@@ -86,7 +86,7 @@ jobs:
           arch: 'linux_gcc_64'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
-          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
@@ -141,7 +141,7 @@ jobs:
       - name: Build QtKeychain from source (Phase 4 dependency)
         shell: pwsh
         run: |
-          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
           cd $env:TEMP\qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON `
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$env:QT_ROOT_DIR"
@@ -183,6 +183,10 @@ jobs:
           Copy-Item -Recurse src/release/* "dist/$pkg/"
           Copy-Item ngPost.conf, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
+          # Phase 5b: bundle PowerShell helpers for Windows-only WireGuard
+          # tunnel registration. They run under UAC via Start-Process RunAs.
+          New-Item -ItemType Directory -Force -Path "dist/$pkg/scripts/win" | Out-Null
+          Copy-Item src/vpn/scripts/win/*.ps1 "dist/$pkg/scripts/win/"
           Compress-Archive -Path "dist/$pkg" -DestinationPath "dist/$pkg.zip"
           Get-ChildItem dist
       - name: Build Windows Setup
@@ -273,7 +277,7 @@ jobs:
           arch: 'clang_64'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
-          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
@@ -350,7 +354,7 @@ jobs:
           arch: 'linux_gcc_64'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
-          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"

@@ -111,6 +111,15 @@ bool VpnManager::addProfile(VpnProfile const &p)
 {
     if (!p.isValid()) return false;
     if (findProfileIndex(p.name) >= 0) return false;
+#ifdef Q_OS_WIN
+    // Phase 5b: a WireGuard profile only makes sense on Windows if its
+    // tunnel service was registered (we need ACL grants for runtime start
+    // without UAC). Trigger the elevated PowerShell installer once here.
+    if (p.backend == Backend::WireGuard) {
+        if (!registerWindowsWireGuardTunnel(p.absoluteConfigPath()))
+            return false;
+    }
+#endif
     _profiles << p;
     if (_activeProfileName.isEmpty())
         _activeProfileName = p.name;
@@ -138,6 +147,15 @@ bool VpnManager::removeProfile(QString const &name)
     int idx = findProfileIndex(name);
     if (idx < 0) return false;
     VpnProfile victim = _profiles.takeAt(idx);
+
+#ifdef Q_OS_WIN
+    // Phase 5b: tear down the Windows service registered for a WG profile.
+    if (victim.backend == Backend::WireGuard) {
+        QString svc = QStringLiteral("WireGuardTunnel$")
+                      + QFileInfo(victim.configFileName).completeBaseName();
+        unregisterWindowsWireGuardTunnel(svc);
+    }
+#endif
 
     // Delete the .ovpn/.conf file we copied into vpn/ at import.
     QString f = victim.absoluteConfigPath();
@@ -618,6 +636,95 @@ bool VpnManager::runUninstall()
     emit installStateChanged(!ok ? true : false);
     return ok;
 }
+
+#ifdef Q_OS_WIN
+namespace {
+// Locate a bundled PowerShell script: scripts/win/<name> next to the binary
+// (Inno Setup deploys them as <appdir>\scripts\win\). Returns absolute
+// path or empty string if not found.
+QString findWinScript(QString const &name)
+{
+    QString dir = QCoreApplication::applicationDirPath();
+    QStringList candidates;
+    candidates << dir + "/scripts/win/" + name;
+    candidates << dir + "/vpn/scripts/win/" + name; // in-tree dev layout
+    for (QString const &p : candidates) {
+        if (QFileInfo::exists(p))
+            return p;
+    }
+    return QString();
+}
+
+// Run a PowerShell script elevated (UAC) via Start-Process -Verb RunAs.
+// Blocks until the elevated PS exits. Returns the inner exit code, or
+// negative on failure to even launch.
+int runElevatedPowerShell(QString const &script, QStringList const &args)
+{
+    // Quote each arg for inclusion in a single PowerShell ArgumentList.
+    auto quote = [](QString const &s) {
+        QString q = s;
+        q.replace("'", "''");
+        return "'" + q + "'";
+    };
+    QStringList psArgs;
+    psArgs << "-NoProfile" << "-ExecutionPolicy" << "Bypass"
+           << "-File" << script;
+    psArgs.append(args);
+    QStringList quoted;
+    for (QString const &a : psArgs)
+        quoted << quote(a);
+
+    QString innerArgList = quoted.join(",");
+    QString outerScript =
+        QStringLiteral("$p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList %1; exit $p.ExitCode")
+            .arg(innerArgList);
+
+    QProcess p;
+    p.start(QStringLiteral("powershell.exe"),
+            QStringList() << "-NoProfile" << "-ExecutionPolicy" << "Bypass"
+                          << "-Command" << outerScript);
+    if (!p.waitForFinished(120000))
+        return -1;
+    return p.exitCode();
+}
+} // namespace
+
+bool VpnManager::registerWindowsWireGuardTunnel(QString const &confAbsPath)
+{
+    QString script = findWinScript(QStringLiteral("install-wg-tunnel.ps1"));
+    if (script.isEmpty()) {
+        emit logLine(tr("install-wg-tunnel.ps1 not found in app bundle"));
+        return false;
+    }
+    QString user = QString::fromLocal8Bit(qgetenv("USERNAME"));
+    int code = runElevatedPowerShell(script,
+        { QStringLiteral("-ConfPath"), confAbsPath,
+          QStringLiteral("-InvokerUser"), user });
+    if (code != 0) {
+        emit logLine(tr("WireGuard tunnel install failed (exit %1)").arg(code));
+        return false;
+    }
+    emit logLine(tr("WireGuard tunnel service registered."));
+    return true;
+}
+
+bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
+{
+    QString script = findWinScript(QStringLiteral("uninstall-wg-tunnel.ps1"));
+    if (script.isEmpty()) {
+        emit logLine(tr("uninstall-wg-tunnel.ps1 not found in app bundle"));
+        return false;
+    }
+    int code = runElevatedPowerShell(script,
+        { QStringLiteral("-ServiceName"), serviceName });
+    if (code != 0) {
+        emit logLine(tr("WireGuard tunnel uninstall failed (exit %1)").arg(code));
+        return false;
+    }
+    emit logLine(tr("WireGuard tunnel service removed."));
+    return true;
+}
+#endif // Q_OS_WIN
 
 void VpnManager::runStartupCleanup()
 {

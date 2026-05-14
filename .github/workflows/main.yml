@@ -18,7 +18,7 @@ jobs:
           arch: 'linux_gcc_64'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
-          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
@@ -60,7 +60,7 @@ jobs:
       - name: Build QtKeychain from source (Phase 4 dependency)
         shell: pwsh
         run: |
-          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
           cd $env:TEMP\qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON `
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$env:QT_ROOT_DIR"
@@ -105,7 +105,7 @@ jobs:
           arch: 'clang_64'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
-          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"

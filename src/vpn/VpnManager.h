@@ -118,6 +118,16 @@ public:
     //! prompt) if the helper isn't installed.
     void runStartupCleanup();
 
+#ifdef Q_OS_WIN
+    //! Windows-only: register a WireGuard tunnel as a service via the
+    //! bundled install-wg-tunnel.ps1 (UAC prompted, runs once at profile
+    //! creation). Returns true on success.
+    bool registerWindowsWireGuardTunnel(QString const &confAbsPath);
+
+    //! Symmetric uninstall.
+    bool unregisterWindowsWireGuardTunnel(QString const &serviceName);
+#endif
+
     //! Phase 3 orchestration.
 
     //! Admission verdict for a starting job.
