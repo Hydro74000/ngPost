@@ -9,8 +9,16 @@ param(
 
 $ErrorActionPreference = "Continue"
 
-# Tunnel name = service name with the WireGuardTunnel$ prefix stripped.
-$tunnelName = $ServiceName -replace '^WireGuardTunnel\$', ''
+# Tunnel name = service name with the "WireGuardTunnel$" prefix stripped.
+# Using SubString instead of regex to avoid escaping the literal $ correctly.
+$prefix = 'WireGuardTunnel$'
+if ($ServiceName.StartsWith($prefix)) {
+    $tunnelName = $ServiceName.Substring($prefix.Length)
+} else {
+    $tunnelName = $ServiceName
+}
+
+Write-Host "Uninstalling tunnel: '$tunnelName' (service: '$ServiceName')"
 
 $candidates = @(
     "C:\Program Files\WireGuard\wireguard.exe",
@@ -21,13 +29,32 @@ foreach ($p in $candidates) {
     if (Test-Path $p) { $wg = $p; break }
 }
 
+$removed = $false
 if ($wg) {
     & $wg /uninstalltunnelservice $tunnelName
-} else {
-    # Fallback: delete the service by name via sc.exe. The tunnel will be torn
-    # down at next reboot if it was running; not ideal but better than leaking.
+    # Poll briefly for the service to actually disappear from SCM.
+    for ($i = 0; $i -lt 20; $i++) {
+        sc.exe query $ServiceName 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { $removed = $true; break }
+        Start-Sleep -Milliseconds 250
+    }
+}
+
+if (-not $removed) {
+    # Fallback: stop and delete the service ourselves.
     sc.exe stop   $ServiceName 2>$null | Out-Null
+    Start-Sleep -Seconds 1
     sc.exe delete $ServiceName 2>$null | Out-Null
+    for ($i = 0; $i -lt 20; $i++) {
+        sc.exe query $ServiceName 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { $removed = $true; break }
+        Start-Sleep -Milliseconds 250
+    }
+}
+
+if (-not $removed) {
+    Write-Error "Service $ServiceName still present after uninstall attempts"
+    exit 1
 }
 
 Write-Output "UNINSTALLED $ServiceName"
