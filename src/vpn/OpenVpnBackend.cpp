@@ -14,11 +14,28 @@
 #include <QFileInfo>
 #include <QHostAddress>
 
+#ifdef Q_OS_WIN
+#  include <QLocalSocket>
+#  include <QRegularExpression>
+#  include <QTcpSocket>
+#  include <QTimer>
+#endif
+
 OpenVpnBackend::OpenVpnBackend(QObject *parent)
     : VpnBackend(parent)
     , _proc(nullptr)
     , _stdoutBuffer()
     , _readySignaled(false)
+#ifdef Q_OS_WIN
+    , _winServicePipe(nullptr)
+    , _winMgmt(nullptr)
+    , _winMgmtBuffer()
+    , _winMgmtRetryTimer(nullptr)
+    , _winMgmtRetryCount(0)
+    , _winTunIface()
+    , _winTunIp()
+    , _winDnsIp()
+#endif
 {}
 
 OpenVpnBackend::~OpenVpnBackend()
@@ -36,13 +53,29 @@ OpenVpnBackend::~OpenVpnBackend()
 
 bool OpenVpnBackend::start(QString const &configPathPacked)
 {
-#if !defined(Q_OS_LINUX)
+#ifdef Q_OS_WIN
+    // Phase 5c: drive OpenVPN via the official interactive service on
+    // Windows. Block-scoped to keep the locals away from the Linux path
+    // below it (MSVC parses both branches as one function scope).
+    {
+        QString cfg = configPathPacked;
+        QString auth;
+        int nul = configPathPacked.indexOf(QChar(QChar::Null));
+        if (nul >= 0) {
+            cfg  = configPathPacked.left(nul);
+            auth = configPathPacked.mid(nul + 1);
+        }
+        QFileInfo fi(cfg);
+        if (!fi.exists() || !fi.isReadable()) {
+            emit failed(tr("Config file not found or unreadable: %1").arg(cfg));
+            return false;
+        }
+        return _startWindowsViaInteractiveService(fi.absoluteFilePath(), auth);
+    }
+#elif !defined(Q_OS_LINUX)
     Q_UNUSED(configPathPacked);
-    // Phase 5: Windows and macOS use a separately-installed system service
-    // (named pipe IPC on Windows, launchd helper on macOS) instead of the
-    // pkexec-launched helper script. Plumbing is planned in Phase 5b/c.
-    emit failed(tr("Native VPN integration is currently Linux-only. "
-                   "Windows / macOS support is in progress (Phase 5)."));
+    emit failed(tr("Native VPN integration is currently Linux/Windows-only. "
+                   "macOS support is in progress."));
     return false;
 #endif
 
@@ -110,6 +143,10 @@ bool OpenVpnBackend::start(QString const &configPathPacked)
 
 void OpenVpnBackend::stop()
 {
+#ifdef Q_OS_WIN
+    _stopWindows();
+    return;
+#endif
     if (!_proc) {
         emit stopped();
         return;
@@ -127,6 +164,10 @@ void OpenVpnBackend::stop()
 void OpenVpnBackend::stopAndWait(int timeoutMs)
 {
     stop();
+#ifdef Q_OS_WIN
+    Q_UNUSED(timeoutMs);
+    return;
+#endif
     if (_proc && _proc->state() != QProcess::NotRunning) {
         // Allow the privileged helper's EXIT trap to run cleanup before we
         // tear down the QProcess. Without this wait, the helper would be
@@ -139,6 +180,9 @@ void OpenVpnBackend::stopAndWait(int timeoutMs)
 
 bool OpenVpnBackend::isRunning() const
 {
+#ifdef Q_OS_WIN
+    return _winServicePipe != nullptr;
+#endif
     return _proc && _proc->state() != QProcess::NotRunning;
 }
 
@@ -202,3 +246,292 @@ void OpenVpnBackend::onProcessError(QProcess::ProcessError err)
     else if (err == QProcess::Crashed)
         emit failed(tr("helper process crashed"));
 }
+
+#ifdef Q_OS_WIN
+// ===========================================================================
+//  Windows backend — drive openvpn via OpenVPNServiceInteractive
+// ===========================================================================
+//
+// On Windows ngPost does NOT run pkexec / a custom service. It talks directly
+// to the named pipe \\.\pipe\openvpn\service exposed by OpenVPN Community's
+// "OpenVPNServiceInteractive" (installed by openvpn's MSI, runs as SYSTEM).
+// The service accepts a single startup message — a triple of UTF-16 wide
+// strings, NUL-separated:
+//
+//      <working_directory>\0<openvpn_command_line_options>\0<stdin_data>\0
+//
+// The service spawns openvpn.exe elevated, parses the options, and returns
+// an ack. Once openvpn is up we connect to its --management TCP port
+// (127.0.0.1:7505) and use the standard management protocol to track state
+// changes and signal a clean SIGTERM at disconnect.
+
+QString OpenVpnBackend::_buildOpenVpnOptions(QString const &configPath,
+                                              QString const &authFilePath) const
+{
+    // We need quoting around paths that may contain spaces.
+    auto q = [](QString const &s) -> QString {
+        return QStringLiteral("\"") + s + QStringLiteral("\"");
+    };
+
+    // --management-hold makes openvpn wait for the management interface to
+    // send "hold release" before it actually starts. This guarantees we
+    // never miss a state transition (we always connect mgmt first).
+    // --pull-filter ignore redirect-gateway prevents openvpn from setting
+    // a default route — we want ngPost-only isolation by socket bind, not
+    // a system-wide reroute.
+    QStringList parts;
+    parts << "--config" << q(configPath)
+          << "--management" << "127.0.0.1" << "7505"
+          << "--management-hold"
+          << "--management-query-passwords"
+          << "--pull-filter" << "ignore" << "redirect-gateway"
+          << "--pull-filter" << "ignore" << "block-outside-dns"
+          << "--verb" << "3";
+    if (!authFilePath.isEmpty())
+        parts << "--auth-user-pass" << q(authFilePath);
+    return parts.join(' ');
+}
+
+bool OpenVpnBackend::_startWindowsViaInteractiveService(QString const &configPath,
+                                                        QString const &authFilePath)
+{
+    if (_winServicePipe) {
+        emit logLine(tr("OpenVPN backend already running"));
+        return true;
+    }
+
+    _readySignaled = false;
+    _winMgmtBuffer.clear();
+    _winMgmtRetryCount = 0;
+    _winTunIface.clear();
+    _winTunIp.clear();
+    _winDnsIp.clear();
+
+    // Open the OpenVPNServiceInteractive named pipe.
+    _winServicePipe = new QLocalSocket(this);
+    connect(_winServicePipe, &QLocalSocket::readyRead,
+            this, &OpenVpnBackend::onWinPipeReadyRead);
+    connect(_winServicePipe, &QLocalSocket::disconnected,
+            this, &OpenVpnBackend::onWinPipeDisconnected);
+
+    _winServicePipe->connectToServer(QStringLiteral("openvpn\\service"));
+    if (!_winServicePipe->waitForConnected(3000)) {
+        emit failed(tr("Cannot reach OpenVPNServiceInteractive pipe. "
+                       "Is OpenVPN Community installed and the service running?"));
+        _winServicePipe->deleteLater();
+        _winServicePipe = nullptr;
+        return false;
+    }
+
+    QFileInfo fi(configPath);
+    QString workingDir = fi.absolutePath();
+    QString options    = _buildOpenVpnOptions(configPath, authFilePath);
+    QString stdInput;  // empty: auth comes from auth-user-pass file, not stdin
+
+    // Marshal the three UTF-16 LE strings, each NUL-terminated.
+    auto encode = [](QString const &s) {
+        QByteArray b((const char *)s.utf16(), (s.size() + 1) * 2);
+        return b;
+    };
+    QByteArray payload;
+    payload.append(encode(workingDir));
+    payload.append(encode(options));
+    payload.append(encode(stdInput));
+
+    emit logLine(tr("OpenVPN service: starting tunnel via %1 (mgmt on 127.0.0.1:7505)")
+                     .arg(QFileInfo(configPath).fileName()));
+
+    _winServicePipe->write(payload);
+    if (!_winServicePipe->waitForBytesWritten(3000)) {
+        emit failed(tr("Failed to send startup data to OpenVPN service pipe"));
+        _winServicePipe->deleteLater();
+        _winServicePipe = nullptr;
+        return false;
+    }
+
+    // The service replies with an ack on the pipe (handled in
+    // onWinPipeReadyRead). Meanwhile we set up the management socket
+    // reconnect-with-backoff loop: openvpn won't bind 127.0.0.1:7505 until
+    // it's been fully spawned, which can take a moment.
+    if (!_winMgmtRetryTimer) {
+        _winMgmtRetryTimer = new QTimer(this);
+        _winMgmtRetryTimer->setSingleShot(true);
+        connect(_winMgmtRetryTimer, &QTimer::timeout,
+                this, [this]() {
+            if (!_winMgmt) {
+                _winMgmt = new QTcpSocket(this);
+                connect(_winMgmt, &QTcpSocket::connected,
+                        this, &OpenVpnBackend::onWinMgmtConnected);
+                connect(_winMgmt, &QTcpSocket::readyRead,
+                        this, &OpenVpnBackend::onWinMgmtReadyRead);
+                connect(_winMgmt, &QTcpSocket::disconnected,
+                        this, &OpenVpnBackend::onWinMgmtDisconnected);
+            }
+            if (_winMgmt->state() != QAbstractSocket::ConnectedState
+                && _winMgmt->state() != QAbstractSocket::ConnectingState) {
+                _winMgmt->abort();
+                _winMgmt->connectToHost(QHostAddress::LocalHost, 7505);
+            }
+            // Re-arm the retry timer; we cancel it once management is up.
+            if (++_winMgmtRetryCount < 40) // ~20s
+                _winMgmtRetryTimer->start(500);
+            else if (!_readySignaled)
+                emit failed(tr("Could not connect to openvpn management on 127.0.0.1:7505"));
+        });
+    }
+    _winMgmtRetryCount = 0;
+    _winMgmtRetryTimer->start(500);
+    return true;
+}
+
+void OpenVpnBackend::onWinPipeReadyRead()
+{
+    if (!_winServicePipe) return;
+    QByteArray data = _winServicePipe->readAll();
+    // The service ack format is a small struct ending in a UTF-16 error
+    // string. We don't need to fully decode it — we mostly care that the
+    // service responded at all. Surface the bytes to the user log so a
+    // failed start is at least debuggable.
+    if (data.size() >= 4) {
+        quint32 errCode = static_cast<quint8>(data[0])
+                        | (static_cast<quint8>(data[1]) << 8)
+                        | (static_cast<quint8>(data[2]) << 16)
+                        | (static_cast<quint8>(data[3]) << 24);
+        if (errCode != 0) {
+            QString detail = QString::fromUtf16(
+                reinterpret_cast<const char16_t *>(data.constData() + 4),
+                (data.size() - 4) / 2);
+            emit failed(tr("OpenVPN service refused start (code 0x%1): %2")
+                            .arg(errCode, 8, 16, QChar('0')).arg(detail.trimmed()));
+            _stopWindows();
+            return;
+        }
+    }
+}
+
+void OpenVpnBackend::onWinPipeDisconnected()
+{
+    // The service drops the pipe once openvpn is spawned. That's expected;
+    // we keep going through the management socket.
+    if (_winServicePipe) {
+        _winServicePipe->deleteLater();
+        _winServicePipe = nullptr;
+    }
+}
+
+void OpenVpnBackend::onWinMgmtConnected()
+{
+    // We're talking to openvpn. Cancel the retry loop and subscribe to
+    // state changes, then release the management-hold so the tunnel can
+    // actually negotiate.
+    if (_winMgmtRetryTimer)
+        _winMgmtRetryTimer->stop();
+    emit logLine(tr("Connected to openvpn management socket"));
+    _winMgmt->write("state on\n");
+    _winMgmt->write("hold release\n");
+}
+
+void OpenVpnBackend::onWinMgmtReadyRead()
+{
+    if (!_winMgmt) return;
+    _winMgmtBuffer.append(_winMgmt->readAll());
+    int nl;
+    while ((nl = _winMgmtBuffer.indexOf('\n')) >= 0) {
+        QByteArray line = _winMgmtBuffer.left(nl).trimmed();
+        _winMgmtBuffer.remove(0, nl + 1);
+        if (!line.isEmpty())
+            _parseMgmtLine(QString::fromUtf8(line));
+    }
+}
+
+void OpenVpnBackend::_parseMgmtLine(QString const &line)
+{
+    // openvpn management protocol — state notifications are prefixed with '>'
+    // and follow:
+    //   >STATE:timestamp,STATE,description,localIp,serverIp,serverPort,localPort,tunIface
+    // We only care about CONNECTED for the ready signal.
+    if (line.startsWith(QLatin1String(">STATE:"))) {
+        QStringList f = line.mid(7).split(',');
+        if (f.size() >= 4 && f.at(1) == QLatin1String("CONNECTED")) {
+            QHostAddress ip(f.at(3));
+            QString iface = (f.size() >= 8) ? f.at(7) : QStringLiteral("openvpn");
+            if (!ip.isNull() && !_readySignaled) {
+                _readySignaled = true;
+                _winTunIp     = ip;
+                _winTunIface  = iface;
+                emit ready(iface, ip, _winDnsIp);
+            }
+        }
+        return;
+    }
+    if (line.startsWith(QLatin1String(">HOLD:"))) {
+        // openvpn is in management-hold — release it.
+        if (_winMgmt) _winMgmt->write("hold release\n");
+        return;
+    }
+    if (line.startsWith(QLatin1String(">LOG:"))) {
+        // >LOG:timestamp,flags,message
+        int comma = line.indexOf(',', line.indexOf(',', 5) + 1);
+        QString msg = (comma > 0) ? line.mid(comma + 1) : line;
+        // Try to capture a pushed DNS option from the log stream.
+        if (msg.contains(QLatin1String("PUSH_REPLY"))) {
+            QRegularExpression re(
+                QStringLiteral("dhcp-option DNS ([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)"));
+            QRegularExpressionMatch m = re.match(msg);
+            if (m.hasMatch())
+                _winDnsIp = QHostAddress(m.captured(1));
+        }
+        emit logLine(msg);
+        return;
+    }
+    if (line.startsWith(QLatin1String(">FATAL:"))) {
+        emit failed(line.mid(7));
+        _stopWindows();
+        return;
+    }
+    if (line.startsWith(QLatin1String(">"))) {
+        // other async event (PASSWORD, NEED-OK...) — ignore for now
+        emit logLine(line);
+        return;
+    }
+    // direct command response — surface unconditionally
+    emit logLine(line);
+}
+
+void OpenVpnBackend::onWinMgmtDisconnected()
+{
+    // openvpn exited. Tear everything down.
+    if (_winMgmt) {
+        _winMgmt->deleteLater();
+        _winMgmt = nullptr;
+    }
+    if (_winMgmtRetryTimer)
+        _winMgmtRetryTimer->stop();
+    if (_winServicePipe) {
+        _winServicePipe->deleteLater();
+        _winServicePipe = nullptr;
+    }
+    if (!_readySignaled) {
+        emit failed(tr("openvpn exited before the tunnel was ready"));
+    }
+    _readySignaled = false;
+    emit stopped();
+}
+
+void OpenVpnBackend::_stopWindows()
+{
+    if (_winMgmt && _winMgmt->state() == QAbstractSocket::ConnectedState) {
+        // openvpn handles signal SIGTERM cleanly and tears down the tunnel.
+        _winMgmt->write("signal SIGTERM\n");
+        _winMgmt->flush();
+    } else if (_winServicePipe) {
+        // Pipe still open but no management socket — nothing more we can do
+        // from here. The pipe will close when the service notices openvpn
+        // died, which onWinMgmtDisconnected handles.
+        _winServicePipe->disconnectFromServer();
+    } else {
+        // Nothing running.
+        emit stopped();
+    }
+}
+#endif // Q_OS_WIN
