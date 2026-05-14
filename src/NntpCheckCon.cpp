@@ -18,7 +18,10 @@
 //========================================================================
 
 #include "NntpCheckCon.h"
+#include <QDnsLookup>
+#include <QEventLoop>
 #include <QSslSocket>
+#include <QTimer>
 #include "NzbCheck.h"
 #include "nntp/Nntp.h"
 #include "vpn/VpnManager.h"
@@ -107,6 +110,30 @@ void NntpCheckCon::onStartConnection()
             SLOT(onErrors(QAbstractSocket::SocketError)),
             Qt::DirectConnection);
 
+    // Phase 4: DNS leak fix — resolve through the VPN DNS for useVpn servers.
+    if (_srvParams.useVpn) {
+        VpnManager *vpn = VpnManager::instance();
+        if (vpn && !vpn->dnsServer().isNull()) {
+            QDnsLookup lookup;
+            lookup.setType(QDnsLookup::A);
+            lookup.setName(_srvParams.host);
+            lookup.setNameserver(vpn->dnsServer());
+            QEventLoop loop;
+            QObject::connect(&lookup, &QDnsLookup::finished, &loop, &QEventLoop::quit);
+            QTimer::singleShot(3000, &loop, &QEventLoop::quit);
+            lookup.lookup();
+            loop.exec();
+            if (lookup.error() == QDnsLookup::NoError) {
+                auto const records = lookup.hostAddressRecords();
+                if (!records.isEmpty()) {
+                    _socket->connectToHost(records.first().value(), _srvParams.port);
+                    return;
+                }
+            }
+            _nzbCheck->error(tr("VPN DNS lookup failed for %1 (falling back to system DNS)")
+                                 .arg(_srvParams.host));
+        }
+    }
     _socket->connectToHost(_srvParams.host, _srvParams.port);
 }
 

@@ -20,6 +20,7 @@ SOURCES += \
     hmi/PostingWidget.cpp \
     hmi/SignedListWidget.cpp \
     hmi/MainWindow.cpp \
+    hmi/VpnProfileEditDialog.cpp \
     hmi/VpnSettingsDialog.cpp
 
 HEADERS += \
@@ -28,11 +29,13 @@ HEADERS += \
     hmi/PostingWidget.h \
     hmi/SignedListWidget.h \
     hmi/MainWindow.h \
+    hmi/VpnProfileEditDialog.h \
     hmi/VpnSettingsDialog.h
 
 FORMS += \
     hmi/AutoPostWidget.ui \
     hmi/MainWindow.ui \
     hmi/PostingWidget.ui \
+    hmi/VpnProfileEditDialog.ui \
     hmi/VpnSettingsDialog.ui
 }

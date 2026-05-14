@@ -11,12 +11,14 @@
 #define VPNMANAGER_H
 
 #include <QHostAddress>
+#include <QList>
 #include <QObject>
 #include <QString>
 
 class QTimer;
 class VpnBackend;
 struct NntpServerParams;
+struct VpnProfile;
 
 class VpnManager : public QObject
 {
@@ -44,17 +46,43 @@ public:
     bool          start();
     void          stop();
     State         state() const { return _state; }
-    Backend       backend() const { return _backend; }
     QHostAddress  tunIp() const { return _tunIp; }
     QString       tunInterface() const { return _tunIface; }
+    //! DNS server pushed by the VPN, populated from the helper READY message.
+    //! Used by NntpConnection to perform DNS resolution through the VPN.
+    QHostAddress  dnsServer() const { return _dnsServer; }
     //! Global "auto-connect on job start" preference.
     bool          autoConnect() const { return _autoConnect; }
     bool          isConnected() const { return _state == State::Connected; }
-    QString const &configPath() const { return _configPath; }
 
     void setAutoConnect(bool v);
-    void setBackend(Backend b);
-    void setConfigPath(QString const &p);
+
+    //! Convenience getters that read from the active profile, used by older
+    //! call sites awaiting the profile-aware UI rework. Return defaults if
+    //! no active profile is set.
+    Backend backend() const;
+    QString configPath() const;
+
+    //! Profile management (Phase 4).
+    QList<VpnProfile> const &profiles() const { return _profiles; }
+    VpnProfile const *activeProfile() const;
+    QString  activeProfileName() const { return _activeProfileName; }
+    void     setActiveProfileName(QString const &name); // emits configChanged
+    int      findProfileIndex(QString const &name) const;
+
+    //! Add a new profile. If `name` collides, returns false.
+    bool addProfile(VpnProfile const &p);
+    //! Update an existing profile by name. The profile's `name` may change;
+    //! `oldName` identifies the entry to replace.
+    bool updateProfile(QString const &oldName, VpnProfile const &p);
+    //! Remove a profile by name. Also deletes its config file from
+    //! <configDir>/vpn/ and removes credentials from the keychain.
+    bool removeProfile(QString const &name);
+
+    //! Used by the conf parser to bulk-load profiles at startup. Bypasses
+    //! configChanged emission.
+    void setProfilesFromConfig(QList<VpnProfile> const &profiles,
+                                QString const &activeName);
 
     static QString backendToString(Backend b);
     static Backend backendFromString(QString const &s, bool *ok = nullptr);
@@ -133,15 +161,19 @@ signals:
     void stateChanged(State newState);
     void logLine(QString const &line);
     void installStateChanged(bool installed);
-    //! VPN preferences changed (auto-connect, backend, config path). NgPost
-    //! listens to this to auto-persist the conf without manual Save.
+    //! VPN preferences changed (auto-connect, profiles, active profile).
+    //! NgPost listens to this to auto-persist the conf without manual Save.
     void configChanged();
+    //! Emitted whenever the profile list or active profile changes — the
+    //! VPN dialog uses this to refresh its selector.
+    void profilesChanged();
     //! A job is being held back because the VPN is required but unavailable.
     //! GUI catches this and shows a popup; the job stays in queue.
     void vpnRequiredButUnavailable(JobBlockReason reason, QString const &detail);
 
 private slots:
-    void onBackendReady(QString const &iface, QHostAddress const &ip);
+    void onBackendReady(QString const &iface, QHostAddress const &ip,
+                        QHostAddress const &dns);
     void onBackendFailed(QString const &reason);
     void onBackendStopped();
     void onAutoDisconnectTimeout();
@@ -150,15 +182,25 @@ private:
     void _setState(State s);
     void _instantiateBackend();
     void _destroyBackend();
+    //! Zero out + delete the short-lived auth-user-pass file we wrote for
+    //! the current openvpn invocation, if any.
+    void _shredRuntimeAuthFile();
     void _cancelAutoDisconnect();
 
     bool         _autoConnect;
-    Backend      _backend;
-    QString      _configPath;
     State        _state;
     QHostAddress _tunIp;
     QString      _tunIface;
+    QHostAddress _dnsServer;
     VpnBackend  *_currentBackend;
+
+    QList<VpnProfile> _profiles;
+    QString           _activeProfileName;
+
+    //! Path to the short-lived auth-user-pass file we created for the
+    //! currently-running openvpn invocation, if any. Empty otherwise.
+    //! Cleared (file shredded) when the backend stops.
+    QString _runtimeAuthFilePath;
 
     bool    _autoStartedByJob;
     int     _activeJobsNeedingVpn; //!< how many jobs hold the tunnel open

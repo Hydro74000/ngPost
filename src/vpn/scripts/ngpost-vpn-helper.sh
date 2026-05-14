@@ -10,17 +10,36 @@
 #  6. cleanly tear everything down
 #
 # Communication with ngPost on stdout (one record per line):
-#   READY <iface> <ip>
+#   READY <iface> <ip> [<dns_ip> | -]
 #   ERROR <reason>
 #   LOG <text>
 # The parent closes our stdin to ask us to stop.
 #
-# Args:  $1 = openvpn|wireguard      $2 = path to config file
+# Args:  $1 = openvpn|wireguard|cleanup    $2 = path to config file (n/a for cleanup)
+#        --auth-file <path>   optional, after the config: forwarded to openvpn
+#                             as `--auth-user-pass <path>` (no prompt mode).
 
 set -u
 
 BACKEND="${1:-}"
 CONFIG="${2:-}"
+shift 2 2>/dev/null || true
+
+# Parse optional flags after backend + config.
+AUTH_FILE=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --auth-file)
+            AUTH_FILE="${2:-}"
+            shift 2
+            ;;
+        *)
+            # Unknown flag — ignore (forward compat).
+            shift
+            ;;
+    esac
+done
+
 TABLE=4242
 PRIO=1042
 LOG_FILE=$(mktemp /tmp/ngpost-vpn-XXXXXX.log)
@@ -35,6 +54,7 @@ RUN_MARKER=/run/ngpost-vpn.running
 VPN_PID=""
 TUN_IFACE=""
 TUN_IP=""
+DNS_IP=""
 
 emit() { printf '%s\n' "$*"; }
 log()  { emit "LOG $*"; }
@@ -67,6 +87,14 @@ fi
 
 start_openvpn() {
     rm -f "$OVPN_PIDFILE"
+    # Optional auth file (--auth-user-pass <file>): forwarded from ngPost when
+    # the active profile has credentials in the keychain. openvpn-cli option
+    # overrides any matching directive in the .ovpn.
+    local extra_args=()
+    if [ -n "$AUTH_FILE" ] && [ -r "$AUTH_FILE" ]; then
+        extra_args+=(--auth-user-pass "$AUTH_FILE")
+    fi
+
     openvpn \
         --config "$CONFIG" \
         --route-nopull \
@@ -76,6 +104,7 @@ start_openvpn() {
         --management 127.0.0.1 7505 \
         --writepid "$OVPN_PIDFILE" \
         --verb 3 \
+        "${extra_args[@]}" \
         > "$LOG_FILE" 2>&1 &
     VPN_PID=$!
 
@@ -106,6 +135,12 @@ start_openvpn() {
         TUN_IP=$(grep -oE 'ifconfig [^ ]+ [0-9.]+' "$LOG_FILE" \
                  | head -1 | awk '{print $3}')
     fi
+
+    # Extract the DNS server pushed by the VPN (PUSH_REPLY ... dhcp-option DNS X.X.X.X).
+    # The user opted into --pull-filter ignore redirect-gateway/route so we
+    # don't touch the system, but the DNS push is just a string we parse here.
+    DNS_IP=$(grep -oE "PUSH_REPLY[^\\n]*dhcp-option DNS [0-9.]+" "$LOG_FILE" \
+             | head -1 | awk '{print $NF}')
 }
 
 start_wireguard() {
@@ -126,6 +161,11 @@ start_wireguard() {
              | grep -E '^[[:space:]]*Address' \
              | head -1 | awk -F= '{print $2}' | tr -d ' ' | cut -d/ -f1 | cut -d, -f1)
     [ -n "$TUN_IP" ] || fail "no IPv4 Address= in [Interface] section of $CONFIG"
+
+    # Optional DNS = X.X.X.X (first IP only) from the [Interface] section.
+    DNS_IP=$(sed -n '/^\[Interface\]/,/^\[/p' "$CONFIG" \
+             | grep -E '^[[:space:]]*DNS' \
+             | head -1 | awk -F= '{print $2}' | tr -d ' ' | cut -d, -f1)
 
     ip addr add "$TUN_IP/32" dev "$TUN_IFACE" || fail "ip addr add failed"
     ip link set "$TUN_IFACE" up                || fail "ip link set up failed"
@@ -240,7 +280,7 @@ ip route add default dev "$TUN_IFACE" table "$TABLE" \
 ip rule add from "$TUN_IP" table "$TABLE" priority "$PRIO" \
     || fail "ip rule add failed"
 
-emit "READY $TUN_IFACE $TUN_IP"
+emit "READY $TUN_IFACE $TUN_IP ${DNS_IP:--}"
 
 # Block until parent closes stdin (or sends 'stop').
 while IFS= read -r line; do

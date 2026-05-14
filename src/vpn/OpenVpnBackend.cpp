@@ -34,10 +34,32 @@ OpenVpnBackend::~OpenVpnBackend()
     }
 }
 
-bool OpenVpnBackend::start(QString const &configPath)
+bool OpenVpnBackend::start(QString const &configPathPacked)
 {
+#if !defined(Q_OS_LINUX)
+    Q_UNUSED(configPathPacked);
+    // Phase 5: Windows and macOS use a separately-installed system service
+    // (named pipe IPC on Windows, launchd helper on macOS) instead of the
+    // pkexec-launched helper script. Plumbing is planned in Phase 5b/c.
+    emit failed(tr("Native VPN integration is currently Linux-only. "
+                   "Windows / macOS support is in progress (Phase 5)."));
+    return false;
+#endif
+
     if (_proc && _proc->state() != QProcess::NotRunning)
         return true;
+
+    // The caller (VpnManager::start) may pack an optional --auth-user-pass
+    // file path after a NUL separator: "<configPath>\0<authFilePath>".
+    // This avoids changing the VpnBackend interface signature.
+    QString configPath, authFilePath;
+    int nulIdx = configPathPacked.indexOf(QChar(QChar::Null));
+    if (nulIdx >= 0) {
+        configPath   = configPathPacked.left(nulIdx);
+        authFilePath = configPathPacked.mid(nulIdx + 1);
+    } else {
+        configPath = configPathPacked;
+    }
 
     QFileInfo fi(configPath);
     if (!fi.exists() || !fi.isReadable()) {
@@ -48,7 +70,7 @@ bool OpenVpnBackend::start(QString const &configPath)
     QString helper = VpnManager::helperScriptPath();
     if (helper.isEmpty()) {
         emit failed(tr("Privileged helper script ngpost-vpn-helper.sh not found. "
-                       "Install it under /usr/lib/ngpost/ or run from the AppImage."));
+                       "Install it under /var/lib/ngpost/ or run from the AppImage."));
         return false;
     }
 
@@ -66,8 +88,16 @@ bool OpenVpnBackend::start(QString const &configPath)
 
     QStringList args;
     args << helper << "openvpn" << fi.absoluteFilePath();
+    if (!authFilePath.isEmpty())
+        args << "--auth-file" << authFilePath;
 
-    emit logLine(tr("Launching VPN helper: pkexec %1").arg(args.join(' ')));
+    // Avoid logging the auth-file path verbatim. The path goes to pkexec
+    // unchanged, but logs are user-visible.
+    QStringList safeArgs = args;
+    if (!authFilePath.isEmpty())
+        safeArgs.replace(safeArgs.size() - 1, QStringLiteral("<authfile>"));
+    emit logLine(tr("Launching VPN helper: pkexec %1").arg(safeArgs.join(' ')));
+
     _proc->start(QStringLiteral("pkexec"), args);
     if (!_proc->waitForStarted(5000)) {
         emit failed(tr("Failed to start pkexec/helper"));
@@ -130,13 +160,16 @@ void OpenVpnBackend::_handleLine(QString const &line)
     if (line.isEmpty())
         return;
     if (line.startsWith(QLatin1String("READY "))) {
-        // READY <iface> <ip>
+        // READY <iface> <ip> [<dns>]
         QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
         if (parts.size() >= 3) {
             QHostAddress ip(parts.at(2));
             if (!ip.isNull()) {
+                QHostAddress dns;
+                if (parts.size() >= 4 && parts.at(3) != QLatin1String("-"))
+                    dns = QHostAddress(parts.at(3));
                 _readySignaled = true;
-                emit ready(parts.at(1), ip);
+                emit ready(parts.at(1), ip, dns);
                 return;
             }
         }

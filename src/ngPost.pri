@@ -1,5 +1,11 @@
 QT += core network
 
+# Phase 4: cross-platform credential store (QtKeychain) for OpenVPN auth.
+# Packages: Fedora qtkeychain-qt6, Ubuntu libqt6keychain1-dev, brew qtkeychain,
+# vcpkg qtkeychain. Header is <qt6keychain/keychain.h>; needs DBus on Linux.
+LIBS    += -lqt6keychain
+QT      += dbus
+
 VERSION = 5.2.2
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
@@ -88,10 +94,12 @@ SOURCES += \
         nntp/NntpArticle.cpp \
         nntp/NntpFile.cpp \
         utils/CmdOrGuiApp.cpp \
+        utils/PathHelper.cpp \
         utils/UpdateChecker.cpp \
         utils/Yenc.cpp \
         vpn/OpenVpnBackend.cpp \
         vpn/VpnManager.cpp \
+        vpn/VpnProfile.cpp \
         vpn/WireGuardBackend.cpp
 
 
@@ -130,12 +138,14 @@ HEADERS += \
     nntp/NntpServerParams.h \
     utils/CmdOrGuiApp.h \
     utils/Macros.h \
+    utils/PathHelper.h \
     utils/PureStaticClass.h \
     utils/UpdateChecker.h \
     utils/Yenc.h \
     vpn/OpenVpnBackend.h \
     vpn/VpnBackend.h \
     vpn/VpnManager.h \
+    vpn/VpnProfile.h \
     vpn/WireGuardBackend.h
 
 

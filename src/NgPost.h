@@ -150,8 +150,13 @@ public:
         CHECK_FOR_UPDATES,
         LAST_UPDATE_CHECK,
         VPN_AUTO_CONNECT,
-        VPN_BACKEND,
-        VPN_CONFIG_PATH,
+        VPN_BACKEND,        //!< legacy, kept for migration only
+        VPN_CONFIG_PATH,    //!< legacy, kept for migration only
+        VPN_ACTIVE_PROFILE,
+        VPN_PROFILE_NAME,        //!< inside [vpn_profile] block
+        VPN_PROFILE_BACKEND,
+        VPN_PROFILE_CONFIG_FILE,
+        VPN_PROFILE_HAS_AUTH,
         SERVER_USE_VPN //!< per-server useVpn flag inside [server] block
     };
 

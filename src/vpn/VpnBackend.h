@@ -35,7 +35,11 @@ public:
     }
 
 signals:
-    void ready(QString const &tunInterface, QHostAddress const &tunIp);
+    //! Tunnel is up. `dnsServer` may be null if the backend couldn't capture
+    //! the DNS pushed by the VPN; in that case ngPost falls back to system DNS
+    //! and the user is warned of the leak risk.
+    void ready(QString const &tunInterface, QHostAddress const &tunIp,
+               QHostAddress const &dnsServer = QHostAddress());
     void failed(QString const &reason);
     void stopped();
     void logLine(QString const &line);

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>VpnProfileEditDialog</class>
+ <widget class="QDialog" name="VpnProfileEditDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>520</width>
+    <height>340</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>VPN profile</string>
+  </property>
+  <layout class="QVBoxLayout" name="rootLayout">
+   <item>
+    <widget class="QGroupBox" name="profileBox">
+     <property name="title">
+      <string>Profile</string>
+     </property>
+     <layout class="QFormLayout" name="formLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="nameLabel">
+        <property name="text">
+         <string>Name:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="nameEdit">
+        <property name="placeholderText">
+         <string>Surfshark NL, Mullvad SE, ...</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="backendLabel">
+        <property name="text">
+         <string>Backend:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QComboBox" name="backendCB">
+        <item>
+         <property name="text">
+          <string>OpenVPN</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>WireGuard</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="configLabel">
+        <property name="text">
+         <string>Config file:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <layout class="QHBoxLayout" name="configRow">
+        <item>
+         <widget class="QLineEdit" name="configPathEdit">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="placeholderText">
+           <string>Select a .ovpn or .conf to import</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="browseBtn">
+          <property name="text">
+           <string>Browse...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="authBox">
+     <property name="title">
+      <string>OpenVPN authentication (optional)</string>
+     </property>
+     <layout class="QFormLayout" name="authForm">
+      <item row="0" column="0">
+       <widget class="QLabel" name="userLabel">
+        <property name="text">
+         <string>Username:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="userEdit"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="passLabel">
+        <property name="text">
+         <string>Password:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="passEdit">
+        <property name="echoMode">
+         <enum>QLineEdit::Password</enum>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0" colspan="2">
+       <widget class="QLabel" name="authNoteLabel">
+        <property name="text">
+         <string>Credentials are stored in your system keychain (GNOME Keyring / KWallet / Windows Credential Vault / macOS Keychain). If the keychain is unavailable, ngPost will ask before falling back to writing credentials into the .ovpn copy (mode 600).</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

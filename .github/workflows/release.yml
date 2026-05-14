@@ -176,6 +176,18 @@ jobs:
           $source = (Resolve-Path "dist/$pkg").Path
           $output = (Resolve-Path "dist").Path
           $icon = (Resolve-Path "src/ngPost.ico").Path
+          # Phase 5 — chain-install the official OpenVPN Community and
+          # WireGuard for Windows binaries. Their signed installers are
+          # downloaded into a "deps" folder next to the setup output.
+          $deps = (Resolve-Path "dist").Path + "\deps"
+          New-Item -ItemType Directory -Force -Path $deps | Out-Null
+          $ovpnUrl = "https://swupdate.openvpn.org/community/releases/OpenVPN-2.6.14-I001-amd64.msi"
+          $wgUrl   = "https://download.wireguard.com/windows-client/wireguard-amd64-0.5.3.msi"
+          $ovpnMsi = "$deps\openvpn.msi"
+          $wgMsi   = "$deps\wireguard.msi"
+          Invoke-WebRequest -Uri $ovpnUrl -OutFile $ovpnMsi
+          Invoke-WebRequest -Uri $wgUrl   -OutFile $wgMsi
+
           $iss = @"
           [Setup]
           AppId={{2E2A4868-85FE-4FC1-984A-0B051B78937D}
@@ -200,15 +212,23 @@ jobs:
 
           [Tasks]
           Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
+          Name: "installopenvpn"; Description: "Install OpenVPN Community (required for OpenVPN profiles)"; GroupDescription: "VPN backends (recommended):"
+          Name: "installwireguard"; Description: "Install WireGuard for Windows (required for WireGuard profiles)"; GroupDescription: "VPN backends (recommended):"
 
           [Files]
           Source: "$source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "$ovpnMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installopenvpn
+          Source: "$wgMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installwireguard
 
           [Icons]
           Name: "{group}\ngPost"; Filename: "{app}\ngPost.exe"
           Name: "{autodesktop}\ngPost"; Filename: "{app}\ngPost.exe"; Tasks: desktopicon
 
           [Run]
+          ; Chain-install OpenVPN Community silently (with TAP-Windows driver + interactive service)
+          Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\openvpn.msi"" /qb! /norestart"; StatusMsg: "Installing OpenVPN Community..."; Tasks: installopenvpn
+          ; Chain-install WireGuard for Windows silently (with Wintun driver + manager service)
+          Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\wireguard.msi"" /qb! /norestart DO_NOT_LAUNCH=1"; StatusMsg: "Installing WireGuard for Windows..."; Tasks: installwireguard
           Filename: "{app}\ngPost.exe"; Description: "Launch ngPost"; Flags: nowait postinstall skipifsilent
           "@
           Set-Content -Path installer.iss -Value $iss -Encoding ASCII
@@ -279,6 +299,7 @@ jobs:
             libssl3t64 openssl \
             par2 \
             openvpn wireguard-tools wireguard-go \
+            qt6-keychain libqt6keychain1-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 \
             libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
@@ -389,6 +410,14 @@ jobs:
           test -n "$SSL" && test -n "$CRYPTO" || { echo "OpenSSL libs not found"; exit 1; }
           echo "ssl=$SSL"       >> $GITHUB_OUTPUT
           echo "crypto=$CRYPTO" >> $GITHUB_OUTPUT
+      - name: Locate QtKeychain library
+        id: qtkeychain
+        run: |
+          # Phase 4 dep: cross-platform credential store
+          KC=$(find /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu -maxdepth 1 \
+                  -name 'libqt6keychain.so*' 2>/dev/null | sort | head -1)
+          test -n "$KC" || { echo "libqt6keychain not found (install qt6-keychain)"; exit 1; }
+          echo "kc=$KC" >> $GITHUB_OUTPUT
       - name: Download linuxdeployqt
         run: |
           wget -q -O linuxdeployqt https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
@@ -420,6 +449,7 @@ jobs:
             --output appimage \
             --library "${{ steps.openssl.outputs.ssl }}" \
             --library "${{ steps.openssl.outputs.crypto }}" \
+            --library "${{ steps.qtkeychain.outputs.kc }}" \
             --executable AppDir/usr/bin/par2 \
             --executable AppDir/usr/bin/vpn/openvpn \
             --executable AppDir/usr/bin/vpn/wireguard-go \
@@ -440,6 +470,7 @@ jobs:
           ./"$APPIMAGE" --appimage-extract >/dev/null
           test -f squashfs-root/usr/lib/libssl.so.3    || { echo "ERROR: libssl.so.3 not bundled";    exit 1; }
           test -f squashfs-root/usr/lib/libcrypto.so.3 || { echo "ERROR: libcrypto.so.3 not bundled"; exit 1; }
+          ls squashfs-root/usr/lib/libqt6keychain.so* >/dev/null 2>&1 || { echo "ERROR: libqt6keychain not bundled"; exit 1; }
           ls squashfs-root/usr/plugins/tls/ 2>/dev/null || { echo "ERROR: Qt TLS plugins not bundled"; exit 1; }
           # VPN binaries must be present at the path my code looks up first
           test -x squashfs-root/usr/bin/vpn/openvpn      || { echo "ERROR: openvpn not bundled";      exit 1; }

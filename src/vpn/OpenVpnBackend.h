@@ -27,6 +27,7 @@ public:
     bool isRunning() const override;
 
 private slots:
+    // Linux helper-script protocol
     void onReadyReadStdout();
     void onProcessFinished(int exitCode, QProcess::ExitStatus status);
     void onProcessError(QProcess::ProcessError err);
@@ -34,7 +35,7 @@ private slots:
 private:
     void _handleLine(QString const &line);
 
-    QProcess *_proc;
+    QProcess  *_proc;            //!< Linux: the pkexec/helper subprocess.
     QByteArray _stdoutBuffer;
     bool       _readySignaled;
 };

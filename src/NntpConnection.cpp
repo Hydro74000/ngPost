@@ -28,6 +28,8 @@
 
 #include <QAbstractSocket>
 #include <QByteArray>
+#include <QDnsLookup>
+#include <QEventLoop>
 #include <QFile>
 #include <QSslCertificate>
 #include <QSslCipher>
@@ -158,7 +160,41 @@ void NntpConnection::onStartConnection()
             SLOT(onErrors(QAbstractSocket::SocketError)),
             Qt::DirectConnection);
 
+    // DNS leak fix (Phase 4): when this server uses the VPN AND the VpnManager
+    // captured a pushed DNS server, resolve the NNTP hostname against THAT DNS
+    // (via QDnsLookup) instead of letting QTcpSocket use the system resolver
+    // (which would normally hit /etc/resolv.conf — outside the tunnel).
+    //
+    // The lookup is blocking with a short timeout. Each NNTP connection runs
+    // on its own thread (Poster's QThread), so this does not freeze the GUI.
+    // Falls back to connectToHost(QString) on any failure (better connect
+    // than nothing — we already proved the policy routing tunnels the bytes;
+    // only the resolution itself leaks in fallback).
+    if (_srvParams.useVpn) {
+        VpnManager *vpn = _ngPost->vpnManager();
+        if (vpn && !vpn->dnsServer().isNull()) {
+            QDnsLookup lookup;
+            lookup.setType(QDnsLookup::A);
+            lookup.setName(_srvParams.host);
+            lookup.setNameserver(vpn->dnsServer());
+            QEventLoop loop;
+            QObject::connect(&lookup, &QDnsLookup::finished, &loop, &QEventLoop::quit);
+            QTimer::singleShot(3000, &loop, &QEventLoop::quit);
+            lookup.lookup();
+            loop.exec();
+            if (lookup.error() == QDnsLookup::NoError) {
+                auto const records = lookup.hostAddressRecords();
+                if (!records.isEmpty()) {
+                    _socket->connectToHost(records.first().value(), _srvParams.port);
+                    goto connect_done;
+                }
+            }
+            _error(tr("VPN DNS lookup failed for %1, falling back to system resolver "
+                      "(DNS may leak)").arg(_srvParams.host));
+        }
+    }
     _socket->connectToHost(_srvParams.host, _srvParams.port);
+connect_done:
 
 #ifdef __USE_CONNECTION_TIMEOUT__
     if (!_timeout) {

@@ -11,27 +11,46 @@
 
 #include "OpenVpnBackend.h"
 #include "VpnBackend.h"
+#include "VpnProfile.h"
 #include "WireGuardBackend.h"
 
 #include "nntp/NntpServerParams.h"
+#include "utils/PathHelper.h"
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QEventLoop>
+#include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QProcess>
+#include <QTemporaryFile>
 #include <QTimer>
+
+#include <qt6keychain/keychain.h>
+using QKeychain::ReadPasswordJob;
+using QKeychain::WritePasswordJob;
+using QKeychain::DeletePasswordJob;
+using QKeychain::Job;
+
+namespace {
+constexpr char kKeychainService[] = "ngPost-vpn";
+}
 
 VpnManager *VpnManager::sInstance = nullptr;
 
 VpnManager::VpnManager(QObject *parent)
     : QObject(parent)
     , _autoConnect(false)
-    , _backend(Backend::OpenVPN)
-    , _configPath()
     , _state(State::Disabled)
     , _tunIp()
     , _tunIface()
+    , _dnsServer()
     , _currentBackend(nullptr)
+    , _profiles()
+    , _activeProfileName()
+    , _runtimeAuthFilePath()
     , _autoStartedByJob(false)
     , _activeJobsNeedingVpn(0)
     , _autoDisconnectTimer(new QTimer(this))
@@ -52,18 +71,105 @@ void VpnManager::setAutoConnect(bool v)
     emit configChanged();
 }
 
-void VpnManager::setBackend(Backend b)
+VpnManager::Backend VpnManager::backend() const
 {
-    if (_backend == b) return;
-    _backend = b;
-    emit configChanged();
+    VpnProfile const *p = activeProfile();
+    return p ? p->backend : Backend::OpenVPN;
 }
 
-void VpnManager::setConfigPath(QString const &p)
+QString VpnManager::configPath() const
 {
-    if (_configPath == p) return;
-    _configPath = p;
+    VpnProfile const *p = activeProfile();
+    return p ? p->absoluteConfigPath() : QString();
+}
+
+// --- Profile management ---------------------------------------------------
+
+VpnProfile const *VpnManager::activeProfile() const
+{
+    int idx = findProfileIndex(_activeProfileName);
+    return idx >= 0 ? &_profiles.at(idx) : nullptr;
+}
+
+int VpnManager::findProfileIndex(QString const &name) const
+{
+    for (int i = 0; i < _profiles.size(); ++i)
+        if (_profiles.at(i).name == name)
+            return i;
+    return -1;
+}
+
+void VpnManager::setActiveProfileName(QString const &name)
+{
+    if (_activeProfileName == name) return;
+    _activeProfileName = name;
     emit configChanged();
+    emit profilesChanged();
+}
+
+bool VpnManager::addProfile(VpnProfile const &p)
+{
+    if (!p.isValid()) return false;
+    if (findProfileIndex(p.name) >= 0) return false;
+    _profiles << p;
+    if (_activeProfileName.isEmpty())
+        _activeProfileName = p.name;
+    emit configChanged();
+    emit profilesChanged();
+    return true;
+}
+
+bool VpnManager::updateProfile(QString const &oldName, VpnProfile const &p)
+{
+    int idx = findProfileIndex(oldName);
+    if (idx < 0 || !p.isValid()) return false;
+    // If renaming, ensure the new name doesn't collide with another profile.
+    if (p.name != oldName && findProfileIndex(p.name) >= 0) return false;
+    _profiles[idx] = p;
+    if (_activeProfileName == oldName)
+        _activeProfileName = p.name;
+    emit configChanged();
+    emit profilesChanged();
+    return true;
+}
+
+bool VpnManager::removeProfile(QString const &name)
+{
+    int idx = findProfileIndex(name);
+    if (idx < 0) return false;
+    VpnProfile victim = _profiles.takeAt(idx);
+
+    // Delete the .ovpn/.conf file we copied into vpn/ at import.
+    QString f = victim.absoluteConfigPath();
+    if (!f.isEmpty())
+        QFile::remove(f);
+
+    // Best-effort: drop credentials from the keychain. Async, fire-and-forget.
+    DeletePasswordJob *job = new DeletePasswordJob(QLatin1String(kKeychainService));
+    job->setAutoDelete(true);
+    job->setKey(victim.name);
+    job->start();
+
+    // If we removed the active one, pick another (or none).
+    if (_activeProfileName == name)
+        _activeProfileName = _profiles.isEmpty() ? QString() : _profiles.first().name;
+
+    emit configChanged();
+    emit profilesChanged();
+    return true;
+}
+
+void VpnManager::setProfilesFromConfig(QList<VpnProfile> const &profiles,
+                                       QString const &activeName)
+{
+    _profiles = profiles;
+    if (!activeName.isEmpty() && findProfileIndex(activeName) >= 0)
+        _activeProfileName = activeName;
+    else if (!_profiles.isEmpty())
+        _activeProfileName = _profiles.first().name;
+    else
+        _activeProfileName.clear();
+    emit profilesChanged();
 }
 
 VpnManager::~VpnManager()
@@ -83,13 +189,70 @@ VpnManager::~VpnManager()
         sInstance = nullptr;
 }
 
+// --- Credentials helpers --------------------------------------------------
+
+namespace {
+// Blocking keychain lookup so start() stays synchronous. The keychain APIs
+// are async but a local event loop walks them in <1s typically.
+bool readCredentialsBlocking(QString const &profileName, QString *user, QString *pass)
+{
+    // Brace-init to dodge C++ "most vexing parse" — without braces, the
+    // declaration is interpreted as a function prototype taking a QString.
+    ReadPasswordJob job{QString::fromLatin1(kKeychainService)};
+    job.setAutoDelete(false);
+    job.setKey(profileName);
+    QEventLoop loop;
+    QObject::connect(&job, &Job::finished, &loop, &QEventLoop::quit);
+    job.start();
+    loop.exec();
+    if (job.error() != QKeychain::NoError)
+        return false;
+    QJsonParseError err{};
+    QJsonDocument doc = QJsonDocument::fromJson(job.textData().toUtf8(), &err);
+    if (err.error != QJsonParseError::NoError || !doc.isObject())
+        return false;
+    QJsonObject o = doc.object();
+    *user = o.value("user").toString();
+    *pass = o.value("pass").toString();
+    return !user->isEmpty() && !pass->isEmpty();
+}
+
+// Write a freshly-allocated temp file containing "user\npass\n" with mode
+// 600 inside <vpn runtime dir>. Returns the absolute path or empty on error.
+QString writeAuthFile(QString const &user, QString const &pass)
+{
+    QString tmpl = PathHelper::vpnRuntimeDir() + "/auth-XXXXXX";
+    QTemporaryFile *tf = new QTemporaryFile(tmpl);
+    tf->setAutoRemove(false);
+    tf->setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    if (!tf->open()) {
+        delete tf;
+        return QString();
+    }
+    QByteArray data = user.toUtf8() + "\n" + pass.toUtf8() + "\n";
+    tf->write(data);
+    tf->close();
+    QString path = tf->fileName();
+    delete tf;
+    return path;
+}
+} // namespace
+
 bool VpnManager::start()
 {
     if (_state == State::Starting || _state == State::Connected)
         return true;
 
-    if (_configPath.isEmpty()) {
-        emit logLine(tr("VPN: no config file selected"));
+    VpnProfile const *p = activeProfile();
+    if (!p) {
+        emit logLine(tr("VPN: no active profile — nothing to start"));
+        _setState(State::Failed);
+        return false;
+    }
+
+    QString cfgPath = p->absoluteConfigPath();
+    if (cfgPath.isEmpty() || !QFile::exists(cfgPath)) {
+        emit logLine(tr("VPN: config file missing for profile '%1' (%2)").arg(p->name, cfgPath));
         _setState(State::Failed);
         return false;
     }
@@ -100,13 +263,55 @@ bool VpnManager::start()
         return false;
     }
 
+    // For OpenVPN profiles flagged hasAuth, look up credentials in the
+    // keychain. If found, write them to a short-lived auth file (chmod 600)
+    // under vpn runtime dir; pass its path to the backend so openvpn picks
+    // it up via --auth-user-pass. Cleaned up on stop / failure.
+    QString authFilePath;
+    if (p->backend == Backend::OpenVPN && p->hasAuth) {
+        QString user, pass;
+        if (readCredentialsBlocking(p->name, &user, &pass)) {
+            authFilePath = writeAuthFile(user, pass);
+            if (authFilePath.isEmpty())
+                emit logLine(tr("VPN: could not create auth file — openvpn will prompt"));
+        } else {
+            emit logLine(tr("VPN: no credentials in keychain for '%1' (relying on .ovpn inline)").arg(p->name));
+        }
+    }
+    _runtimeAuthFilePath = authFilePath;
+
     _setState(State::Starting);
-    if (!_currentBackend->start(_configPath)) {
+    // The backend interface accepts a single configPath today. To pass the
+    // auth-file path, we encode it after a NUL separator. OpenVpnBackend
+    // unpacks it and adds --auth-user-pass to the openvpn argv.
+    QString packed = cfgPath;
+    if (!authFilePath.isEmpty())
+        packed += QChar(QChar::Null) + authFilePath;
+
+    if (!_currentBackend->start(packed)) {
         _setState(State::Failed);
         _destroyBackend();
+        _shredRuntimeAuthFile();
         return false;
     }
     return true;
+}
+
+void VpnManager::_shredRuntimeAuthFile()
+{
+    if (_runtimeAuthFilePath.isEmpty())
+        return;
+    QFile f(_runtimeAuthFilePath);
+    if (f.exists()) {
+        // Overwrite with zeros before unlinking so traces don't sit on disk.
+        if (f.open(QIODevice::WriteOnly)) {
+            QByteArray zeros(static_cast<int>(f.size()), '\0');
+            f.write(zeros);
+            f.close();
+        }
+        f.remove();
+    }
+    _runtimeAuthFilePath.clear();
 }
 
 void VpnManager::stop()
@@ -121,11 +326,17 @@ void VpnManager::stop()
         _setState(State::Disabled);
 }
 
-void VpnManager::onBackendReady(QString const &iface, QHostAddress const &ip)
+void VpnManager::onBackendReady(QString const &iface, QHostAddress const &ip,
+                                QHostAddress const &dns)
 {
     _tunIface = iface;
     _tunIp    = ip;
+    _dnsServer = dns;
     emit logLine(tr("VPN: tunnel up on %1 (%2)").arg(iface, ip.toString()));
+    if (!_dnsServer.isNull())
+        emit logLine(tr("VPN: DNS server = %1").arg(_dnsServer.toString()));
+    else
+        emit logLine(tr("VPN: no DNS server captured — DNS may leak to system resolver"));
     // Policy routing is set up by the privileged helper script under the
     // same pkexec invocation that brought up the tunnel — nothing to do here.
     _setState(State::Connected);
@@ -136,8 +347,10 @@ void VpnManager::onBackendFailed(QString const &reason)
     emit logLine(tr("VPN: failed — %1").arg(reason));
     _tunIp = QHostAddress();
     _tunIface.clear();
+    _dnsServer = QHostAddress();
     _setState(State::Failed);
     _destroyBackend();
+    _shredRuntimeAuthFile();
 
     // If a job was waiting on us, surface the failure so the GUI can popup.
     if (_activeJobsNeedingVpn > 0) {
@@ -152,8 +365,10 @@ void VpnManager::onBackendStopped()
     emit logLine(tr("VPN: tunnel stopped"));
     _tunIp = QHostAddress();
     _tunIface.clear();
+    _dnsServer = QHostAddress();
     _setState(State::Disabled);
     _destroyBackend();
+    _shredRuntimeAuthFile();
     // Reaching Disabled clears the auto-started bookkeeping; a future job
     // will re-trigger via onJobStarted from scratch.
     _autoStartedByJob = false;
@@ -173,12 +388,24 @@ void VpnManager::_instantiateBackend()
 {
     _destroyBackend();
 
-#ifdef Q_OS_LINUX
-    if (_backend == Backend::OpenVPN)
+    VpnProfile const *p = activeProfile();
+    Backend backend = p ? p->backend : Backend::OpenVPN;
+
+#if defined(Q_OS_LINUX)
+    if (backend == Backend::OpenVPN)
+        _currentBackend = new OpenVpnBackend(this);
+    else
+        _currentBackend = new WireGuardBackend(this);
+#elif defined(Q_OS_WIN)
+    // Phase 5: Windows backend is implemented on top of a SYSTEM service
+    // exposing a named pipe IPC. The C++ backend classes are the same;
+    // their start()/stop() implementations differ per OS (see Phase 5 plan).
+    if (backend == Backend::OpenVPN)
         _currentBackend = new OpenVpnBackend(this);
     else
         _currentBackend = new WireGuardBackend(this);
 #else
+    Q_UNUSED(backend);
     emit logLine(tr("VPN: backend not supported on this platform yet"));
     _currentBackend = nullptr;
     return;
@@ -241,7 +468,35 @@ QString VpnManager::helperScriptPath()
 
 bool VpnManager::isHelperInstalled() const
 {
+#ifdef Q_OS_WIN
+    // Phase 5 Windows: there's no ngPost-owned helper to install. Instead
+    // we rely on the user having OpenVPN Community (provides openvpn.exe
+    // + OpenVPNServiceInteractive) and WireGuard for Windows (provides
+    // wireguard.exe). The setup installer chain-installs these.
+    //
+    // We consider the VPN feature "available" if EITHER:
+    //   - wireguard.exe is in a known location (WG support)
+    //   - OpenVPN Community is installed (OpenVPN support; pending Phase 5c)
+    QStringList wgCandidates = {
+        QStringLiteral("C:/Program Files/WireGuard/wireguard.exe"),
+        QStringLiteral("C:/Program Files (x86)/WireGuard/wireguard.exe"),
+    };
+    for (auto const &p : wgCandidates) {
+        if (QFileInfo::exists(p))
+            return true;
+    }
+    QStringList ovpnCandidates = {
+        QStringLiteral("C:/Program Files/OpenVPN/bin/openvpn.exe"),
+        QStringLiteral("C:/Program Files (x86)/OpenVPN/bin/openvpn.exe"),
+    };
+    for (auto const &p : ovpnCandidates) {
+        if (QFileInfo::exists(p))
+            return true;
+    }
+    return false;
+#else
     return QFileInfo::exists(QString::fromLatin1(kInstalledHelperPath));
+#endif
 }
 
 QString VpnManager::bundledResourcesDir() const
@@ -279,6 +534,21 @@ QString VpnManager::bundledResourcesDir() const
 
 bool VpnManager::runInstall()
 {
+#ifdef Q_OS_WIN
+    // On Windows, the prerequisites (OpenVPN Community + WireGuard for
+    // Windows) are installed by ngPost's main setup wizard. There's nothing
+    // to install at runtime. If the user clicked Install in the dialog we
+    // just re-check and report.
+    bool ok = isHelperInstalled();
+    if (ok)
+        emit logLine(tr("VPN backend prerequisites detected (OpenVPN / WireGuard for Windows)."));
+    else
+        emit logLine(tr("Install OpenVPN Community and/or WireGuard for Windows, then re-check. "
+                        "These are normally bundled with the ngPost setup."));
+    emit installStateChanged(ok);
+    return ok;
+#endif
+
     QString const resDir = bundledResourcesDir();
     QString const installer = resDir + QStringLiteral("/ngpost-vpn-install.sh");
     if (!QFileInfo::exists(installer)) {
@@ -309,6 +579,17 @@ bool VpnManager::runInstall()
 
 bool VpnManager::runUninstall()
 {
+#ifdef Q_OS_WIN
+    // The Windows prerequisites are owned by their respective vendors'
+    // installers. ngPost's uninstall doesn't touch them. The user can
+    // remove them via "Add or Remove Programs" if they want.
+    emit logLine(tr("On Windows, uninstall OpenVPN Community / WireGuard for "
+                    "Windows from \"Add or Remove Programs\" if you want to "
+                    "fully remove VPN support."));
+    emit installStateChanged(false);
+    return true;
+#endif
+
     QString const uninstaller = QStringLiteral("/var/lib/ngpost/ngpost-vpn-uninstall.sh");
     if (!QFileInfo::exists(uninstaller)) {
         emit logLine(tr("VPN: uninstall script not found at %1").arg(uninstaller));
@@ -380,19 +661,22 @@ VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
     // Diagnose blocking conditions.
     JobBlockReason reason = JobBlockReason::None;
     QString detail;
+    VpnProfile const *active = activeProfile();
+    QString activeCfgPath = active ? active->absoluteConfigPath() : QString();
+
     if (!isHelperInstalled()) {
         reason = JobBlockReason::HelperNotInstalled;
         detail = tr("The VPN helper is not installed. Open the VPN dialog "
                     "and click Install.");
-    } else if (_configPath.isEmpty()) {
+    } else if (!active || activeCfgPath.isEmpty()) {
         reason = JobBlockReason::NoConfigSelected;
-        detail = tr("No VPN configuration file is selected.");
+        detail = tr("No active VPN profile / configuration is selected.");
     } else {
-        QFileInfo cfg(_configPath);
+        QFileInfo cfg(activeCfgPath);
         if (!cfg.exists() || !cfg.isReadable()) {
             reason = JobBlockReason::ConfigUnreadable;
             detail = tr("The VPN configuration file is missing or unreadable: %1")
-                         .arg(_configPath);
+                         .arg(activeCfgPath);
         } else if (_state == State::Failed) {
             reason = JobBlockReason::VpnFailed;
             detail = tr("The last VPN attempt failed. Open the VPN dialog and try again.");

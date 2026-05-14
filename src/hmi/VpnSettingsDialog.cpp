@@ -8,65 +8,70 @@
 //========================================================================
 
 #include "VpnSettingsDialog.h"
+#include "VpnProfileEditDialog.h"
 #include "ui_VpnSettingsDialog.h"
 
 #include "vpn/VpnManager.h"
+#include "vpn/VpnProfile.h"
 
-#include <QFileDialog>
-#include <QFileInfo>
 #include <QMessageBox>
 
 VpnSettingsDialog::VpnSettingsDialog(VpnManager *manager, QWidget *parent)
     : QDialog(parent)
     , _ui(new Ui::VpnSettingsDialog)
     , _manager(manager)
+    , _populating(false)
 {
     _ui->setupUi(this);
 
-    _ui->backendCB->setCurrentIndex(
-        _manager->backend() == VpnManager::Backend::OpenVPN ? 0 : 1);
-    _ui->configPathEdit->setText(_manager->configPath());
-    _ui->enabledCB->setChecked(_manager->autoConnect());
+    _ui->autoConnectCB->setChecked(_manager->autoConnect());
 
-    connect(_ui->browseBtn,    &QPushButton::clicked, this, &VpnSettingsDialog::onBrowse);
-    connect(_ui->startBtn,     &QPushButton::clicked, this, &VpnSettingsDialog::onStart);
-    connect(_ui->stopBtn,      &QPushButton::clicked, this, &VpnSettingsDialog::onStop);
-    connect(_ui->installBtn,   &QPushButton::clicked, this, &VpnSettingsDialog::onInstall);
-    connect(_ui->uninstallBtn, &QPushButton::clicked, this, &VpnSettingsDialog::onUninstall);
-    connect(_ui->buttonBox,    &QDialogButtonBox::rejected, this, &QDialog::accept);
+    connect(_ui->startBtn,         &QPushButton::clicked, this, &VpnSettingsDialog::onStart);
+    connect(_ui->stopBtn,          &QPushButton::clicked, this, &VpnSettingsDialog::onStop);
+    connect(_ui->installBtn,       &QPushButton::clicked, this, &VpnSettingsDialog::onInstall);
+    connect(_ui->uninstallBtn,     &QPushButton::clicked, this, &VpnSettingsDialog::onUninstall);
+    connect(_ui->newProfileBtn,    &QPushButton::clicked, this, &VpnSettingsDialog::onNewProfile);
+    connect(_ui->editProfileBtn,   &QPushButton::clicked, this, &VpnSettingsDialog::onEditProfile);
+    connect(_ui->deleteProfileBtn, &QPushButton::clicked, this, &VpnSettingsDialog::onDeleteProfile);
+    connect(_ui->autoConnectCB,    &QCheckBox::toggled,   this, &VpnSettingsDialog::onAutoConnectToggled);
+    connect(_ui->profileCB,        QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, &VpnSettingsDialog::onActiveProfileChanged);
+    connect(_ui->buttonBox,        &QDialogButtonBox::rejected, this, &QDialog::accept);
 
     connect(_manager, &VpnManager::stateChanged,        this, &VpnSettingsDialog::onStateChanged);
     connect(_manager, &VpnManager::installStateChanged, this, &VpnSettingsDialog::onInstallStateChanged);
+    connect(_manager, &VpnManager::profilesChanged,     this, &VpnSettingsDialog::onProfilesChanged);
     connect(_manager, &VpnManager::logLine,             this, &VpnSettingsDialog::onLogLine);
 
     _refreshSetupUi();
+    _refreshProfilesUi();
     _refreshUi();
 }
 
 VpnSettingsDialog::~VpnSettingsDialog()
 {
-    _commitConfigToManager();
     delete _ui;
 }
 
-void VpnSettingsDialog::onBrowse()
+void VpnSettingsDialog::onAutoConnectToggled(bool checked)
 {
-    QString filter = (_ui->backendCB->currentIndex() == 0)
-                         ? tr("OpenVPN config (*.ovpn *.conf);;All files (*)")
-                         : tr("WireGuard config (*.conf);;All files (*)");
-    QString start = _ui->configPathEdit->text();
-    if (start.isEmpty())
-        start = QDir::homePath();
-    QString f = QFileDialog::getOpenFileName(this, tr("Select VPN config"), start, filter);
-    if (!f.isEmpty())
-        _ui->configPathEdit->setText(f);
+    _manager->setAutoConnect(checked);
+}
+
+void VpnSettingsDialog::onActiveProfileChanged(int idx)
+{
+    if (_populating || idx < 0)
+        return;
+    QString name = _ui->profileCB->itemData(idx).toString();
+    if (name.isEmpty())
+        name = _ui->profileCB->currentText();
+    _manager->setActiveProfileName(name);
 }
 
 void VpnSettingsDialog::onStart()
 {
-    _commitConfigToManager();
-    if (_manager->configPath().isEmpty()) {
-        onLogLine(tr("No config file selected."));
+    if (!_manager->activeProfile()) {
+        onLogLine(tr("No active VPN profile selected."));
         return;
     }
     _manager->start();
@@ -77,15 +82,46 @@ void VpnSettingsDialog::onStop()
     _manager->stop();
 }
 
+void VpnSettingsDialog::onNewProfile()
+{
+    VpnProfile fresh;
+    VpnProfileEditDialog dlg(_manager, QString(), fresh, this);
+    dlg.exec();
+}
+
+void VpnSettingsDialog::onEditProfile()
+{
+    VpnProfile const *p = _manager->activeProfile();
+    if (!p) {
+        QMessageBox::information(this, tr("No profile"),
+                                 tr("Select a profile to edit."));
+        return;
+    }
+    VpnProfileEditDialog dlg(_manager, p->name, *p, this);
+    dlg.exec();
+}
+
+void VpnSettingsDialog::onDeleteProfile()
+{
+    VpnProfile const *p = _manager->activeProfile();
+    if (!p) return;
+    QString name = p->name;
+    if (QMessageBox::question(this, tr("Delete VPN profile"),
+            tr("Delete profile '%1'?\n\nIts config file under <configDir>/vpn/ "
+               "and its credentials in the keychain will be removed.").arg(name),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+        return;
+    _manager->removeProfile(name);
+}
+
 void VpnSettingsDialog::onInstall()
 {
     setEnabled(false);
     bool ok = _manager->runInstall();
     setEnabled(true);
-    if (!ok) {
+    if (!ok)
         QMessageBox::warning(this, tr("VPN install"),
                              tr("VPN install failed. See the log for details."));
-    }
     _refreshSetupUi();
     _refreshUi();
 }
@@ -101,24 +137,27 @@ void VpnSettingsDialog::onUninstall()
     setEnabled(false);
     bool ok = _manager->runUninstall();
     setEnabled(true);
-    if (!ok) {
+    if (!ok)
         QMessageBox::warning(this, tr("VPN uninstall"),
                              tr("VPN uninstall failed. See the log for details."));
-    }
     _refreshSetupUi();
     _refreshUi();
 }
 
-void VpnSettingsDialog::onStateChanged(VpnManager::State newState)
+void VpnSettingsDialog::onStateChanged(VpnManager::State)
 {
-    Q_UNUSED(newState);
     _refreshUi();
 }
 
-void VpnSettingsDialog::onInstallStateChanged(bool installed)
+void VpnSettingsDialog::onInstallStateChanged(bool)
 {
-    Q_UNUSED(installed);
     _refreshSetupUi();
+    _refreshUi();
+}
+
+void VpnSettingsDialog::onProfilesChanged()
+{
+    _refreshProfilesUi();
     _refreshUi();
 }
 
@@ -137,12 +176,17 @@ void VpnSettingsDialog::_refreshUi()
     _ui->stateLabel->setText(text);
 
     bool installed = _manager->isHelperInstalled();
-    bool canStart = installed
-        && (s == VpnManager::State::Disabled || s == VpnManager::State::Failed);
-    bool canStop  = (s == VpnManager::State::Connected || s == VpnManager::State::Starting);
+    bool hasActive = (_manager->activeProfile() != nullptr);
+    bool canStart  = installed && hasActive
+                  && (s == VpnManager::State::Disabled || s == VpnManager::State::Failed);
+    bool canStop   = (s == VpnManager::State::Connected || s == VpnManager::State::Starting);
     _ui->startBtn->setEnabled(canStart);
     _ui->stopBtn->setEnabled(canStop);
-    _ui->configBox->setEnabled(installed);
+    _ui->profilesBox->setEnabled(installed);
+    _ui->optionsBox->setEnabled(installed);
+
+    _ui->editProfileBtn->setEnabled(hasActive);
+    _ui->deleteProfileBtn->setEnabled(hasActive);
 }
 
 void VpnSettingsDialog::_refreshSetupUi()
@@ -161,12 +205,21 @@ void VpnSettingsDialog::_refreshSetupUi()
     }
 }
 
-void VpnSettingsDialog::_commitConfigToManager()
+void VpnSettingsDialog::_refreshProfilesUi()
 {
-    // Each setter emits configChanged on actual change → NgPost auto-saves.
-    _manager->setBackend(_ui->backendCB->currentIndex() == 0
-                             ? VpnManager::Backend::OpenVPN
-                             : VpnManager::Backend::WireGuard);
-    _manager->setConfigPath(_ui->configPathEdit->text().trimmed());
-    _manager->setAutoConnect(_ui->enabledCB->isChecked());
+    _populating = true;
+    _ui->profileCB->clear();
+    QList<VpnProfile> const &profiles = _manager->profiles();
+    for (VpnProfile const &p : profiles) {
+        QString label = QString("%1 [%2]").arg(p.name,
+            VpnManager::backendToString(p.backend));
+        _ui->profileCB->addItem(label, p.name);
+    }
+    QString active = _manager->activeProfileName();
+    if (!active.isEmpty()) {
+        int idx = _manager->findProfileIndex(active);
+        if (idx >= 0)
+            _ui->profileCB->setCurrentIndex(idx);
+    }
+    _populating = false;
 }

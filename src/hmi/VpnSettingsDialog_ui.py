@@ -16,16 +16,15 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QCheckBox, QComboBox,
-    QDialog, QDialogButtonBox, QFormLayout, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
-    QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout,
-    QWidget)
+    QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout,
+    QLabel, QPlainTextEdit, QPushButton, QSizePolicy,
+    QSpacerItem, QVBoxLayout, QWidget)
 
 class Ui_VpnSettingsDialog(object):
     def setupUi(self, VpnSettingsDialog):
         if not VpnSettingsDialog.objectName():
             VpnSettingsDialog.setObjectName(u"VpnSettingsDialog")
-        VpnSettingsDialog.resize(560, 440)
+        VpnSettingsDialog.resize(620, 520)
         self.rootLayout = QVBoxLayout(VpnSettingsDialog)
         self.rootLayout.setObjectName(u"rootLayout")
         self.setupBox = QGroupBox(VpnSettingsDialog)
@@ -55,49 +54,54 @@ class Ui_VpnSettingsDialog(object):
 
         self.rootLayout.addWidget(self.setupBox)
 
-        self.configBox = QGroupBox(VpnSettingsDialog)
-        self.configBox.setObjectName(u"configBox")
-        self.formLayout = QFormLayout(self.configBox)
-        self.formLayout.setObjectName(u"formLayout")
-        self.backendLabel = QLabel(self.configBox)
-        self.backendLabel.setObjectName(u"backendLabel")
+        self.profilesBox = QGroupBox(VpnSettingsDialog)
+        self.profilesBox.setObjectName(u"profilesBox")
+        self.profilesLayout = QHBoxLayout(self.profilesBox)
+        self.profilesLayout.setObjectName(u"profilesLayout")
+        self.profileLabel = QLabel(self.profilesBox)
+        self.profileLabel.setObjectName(u"profileLabel")
 
-        self.formLayout.setWidget(0, QFormLayout.ItemRole.LabelRole, self.backendLabel)
+        self.profilesLayout.addWidget(self.profileLabel)
 
-        self.backendCB = QComboBox(self.configBox)
-        self.backendCB.addItem("")
-        self.backendCB.addItem("")
-        self.backendCB.setObjectName(u"backendCB")
+        self.profileCB = QComboBox(self.profilesBox)
+        self.profileCB.setObjectName(u"profileCB")
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(1)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.profileCB.sizePolicy().hasHeightForWidth())
+        self.profileCB.setSizePolicy(sizePolicy)
 
-        self.formLayout.setWidget(0, QFormLayout.ItemRole.FieldRole, self.backendCB)
+        self.profilesLayout.addWidget(self.profileCB)
 
-        self.configLabel = QLabel(self.configBox)
-        self.configLabel.setObjectName(u"configLabel")
+        self.newProfileBtn = QPushButton(self.profilesBox)
+        self.newProfileBtn.setObjectName(u"newProfileBtn")
 
-        self.formLayout.setWidget(1, QFormLayout.ItemRole.LabelRole, self.configLabel)
+        self.profilesLayout.addWidget(self.newProfileBtn)
 
-        self.configRow = QHBoxLayout()
-        self.configRow.setObjectName(u"configRow")
-        self.configPathEdit = QLineEdit(self.configBox)
-        self.configPathEdit.setObjectName(u"configPathEdit")
+        self.editProfileBtn = QPushButton(self.profilesBox)
+        self.editProfileBtn.setObjectName(u"editProfileBtn")
 
-        self.configRow.addWidget(self.configPathEdit)
+        self.profilesLayout.addWidget(self.editProfileBtn)
 
-        self.browseBtn = QPushButton(self.configBox)
-        self.browseBtn.setObjectName(u"browseBtn")
+        self.deleteProfileBtn = QPushButton(self.profilesBox)
+        self.deleteProfileBtn.setObjectName(u"deleteProfileBtn")
 
-        self.configRow.addWidget(self.browseBtn)
-
-
-        self.formLayout.setLayout(1, QFormLayout.ItemRole.FieldRole, self.configRow)
-
-        self.enabledCB = QCheckBox(self.configBox)
-        self.enabledCB.setObjectName(u"enabledCB")
-
-        self.formLayout.setWidget(2, QFormLayout.ItemRole.SpanningRole, self.enabledCB)
+        self.profilesLayout.addWidget(self.deleteProfileBtn)
 
 
-        self.rootLayout.addWidget(self.configBox)
+        self.rootLayout.addWidget(self.profilesBox)
+
+        self.optionsBox = QGroupBox(VpnSettingsDialog)
+        self.optionsBox.setObjectName(u"optionsBox")
+        self.optionsLayout = QVBoxLayout(self.optionsBox)
+        self.optionsLayout.setObjectName(u"optionsLayout")
+        self.autoConnectCB = QCheckBox(self.optionsBox)
+        self.autoConnectCB.setObjectName(u"autoConnectCB")
+
+        self.optionsLayout.addWidget(self.autoConnectCB)
+
+
+        self.rootLayout.addWidget(self.optionsBox)
 
         self.statusBox = QGroupBox(VpnSettingsDialog)
         self.statusBox.setObjectName(u"statusBox")
@@ -155,23 +159,16 @@ class Ui_VpnSettingsDialog(object):
         self.setupBox.setTitle(QCoreApplication.translate("VpnSettingsDialog", u"Setup", None))
         self.setupLabel.setText(QCoreApplication.translate("VpnSettingsDialog", u"VPN tunnel requires a one-time setup.", None))
         self.installBtn.setText(QCoreApplication.translate("VpnSettingsDialog", u"Install...", None))
-#if QT_CONFIG(tooltip)
-        self.installBtn.setToolTip(QCoreApplication.translate("VpnSettingsDialog", u"Install the privileged VPN helper. After this you won't be prompted for a password on Connect / Disconnect.", None))
-#endif // QT_CONFIG(tooltip)
         self.uninstallBtn.setText(QCoreApplication.translate("VpnSettingsDialog", u"Uninstall...", None))
+        self.profilesBox.setTitle(QCoreApplication.translate("VpnSettingsDialog", u"Profiles", None))
+        self.profileLabel.setText(QCoreApplication.translate("VpnSettingsDialog", u"Active profile:", None))
+        self.newProfileBtn.setText(QCoreApplication.translate("VpnSettingsDialog", u"New...", None))
+        self.editProfileBtn.setText(QCoreApplication.translate("VpnSettingsDialog", u"Edit...", None))
+        self.deleteProfileBtn.setText(QCoreApplication.translate("VpnSettingsDialog", u"Delete", None))
+        self.optionsBox.setTitle(QCoreApplication.translate("VpnSettingsDialog", u"Options", None))
+        self.autoConnectCB.setText(QCoreApplication.translate("VpnSettingsDialog", u"Auto-connect VPN when a job starts", None))
 #if QT_CONFIG(tooltip)
-        self.uninstallBtn.setToolTip(QCoreApplication.translate("VpnSettingsDialog", u"Remove the privileged VPN helper from the system.", None))
-#endif // QT_CONFIG(tooltip)
-        self.configBox.setTitle(QCoreApplication.translate("VpnSettingsDialog", u"Configuration", None))
-        self.backendLabel.setText(QCoreApplication.translate("VpnSettingsDialog", u"Backend:", None))
-        self.backendCB.setItemText(0, QCoreApplication.translate("VpnSettingsDialog", u"OpenVPN", None))
-        self.backendCB.setItemText(1, QCoreApplication.translate("VpnSettingsDialog", u"WireGuard", None))
-
-        self.configLabel.setText(QCoreApplication.translate("VpnSettingsDialog", u"Config file:", None))
-        self.browseBtn.setText(QCoreApplication.translate("VpnSettingsDialog", u"Browse...", None))
-        self.enabledCB.setText(QCoreApplication.translate("VpnSettingsDialog", u"Auto-connect VPN when a job starts", None))
-#if QT_CONFIG(tooltip)
-        self.enabledCB.setToolTip(QCoreApplication.translate("VpnSettingsDialog", u"When checked, ngPost will bring up the VPN tunnel automatically when any job starts, and disconnect 30 seconds after the queue is empty. Per-server \"Use VPN\" still controls which connections route through the tunnel.", None))
+        self.autoConnectCB.setToolTip(QCoreApplication.translate("VpnSettingsDialog", u"When checked, ngPost will bring up the VPN tunnel automatically when any job starts, and disconnect 30 seconds after the queue is empty. Per-server \"Use VPN\" still controls which connections route through the tunnel.", None))
 #endif // QT_CONFIG(tooltip)
         self.statusBox.setTitle(QCoreApplication.translate("VpnSettingsDialog", u"Status", None))
         self.stateLabel.setText(QCoreApplication.translate("VpnSettingsDialog", u"disabled", None))
@@ -179,3 +176,4 @@ class Ui_VpnSettingsDialog(object):
         self.stopBtn.setText(QCoreApplication.translate("VpnSettingsDialog", u"Disconnect", None))
         self.logBox.setTitle(QCoreApplication.translate("VpnSettingsDialog", u"Log", None))
     # retranslateUi
+

@@ -11,8 +11,10 @@
 #include "nntp/NntpServerParams.h"
 #include "FileUploader.h"
 #include "NzbCheck.h"
+#include "utils/PathHelper.h"
 #include "utils/UpdateChecker.h"
 #include "vpn/VpnManager.h"
+#include "vpn/VpnProfile.h"
 #ifdef __USE_HMI__
   #include "hmi/MainWindow.h"
   #include "hmi/PostingWidget.h"
@@ -154,10 +156,15 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::CHECK_FOR_UPDATES, "check_for_updates"},
     {Opt::LAST_UPDATE_CHECK, "last_update_check"},
 
-    {Opt::VPN_AUTO_CONNECT, "vpn_auto_connect"},
-    {Opt::VPN_BACKEND,      "vpn_backend"},
-    {Opt::VPN_CONFIG_PATH,  "vpn_config_path"},
-    {Opt::SERVER_USE_VPN,   "useVpn"},
+    {Opt::VPN_AUTO_CONNECT,        "vpn_auto_connect"},
+    {Opt::VPN_BACKEND,             "vpn_backend"},
+    {Opt::VPN_CONFIG_PATH,         "vpn_config_path"},
+    {Opt::VPN_ACTIVE_PROFILE,      "vpn_active_profile"},
+    {Opt::VPN_PROFILE_NAME,        "name"},
+    {Opt::VPN_PROFILE_BACKEND,     "backend"},
+    {Opt::VPN_PROFILE_CONFIG_FILE, "config_file"},
+    {Opt::VPN_PROFILE_HAS_AUTH,    "has_auth"},
+    {Opt::SERVER_USE_VPN,          "useVpn"},
 };
 
 const QList<QCommandLineOption> NgPost::sCmdOptions = {
@@ -1923,10 +1930,24 @@ QString NgPost::_parseConfig(const QString &configPath)
     if (_vpnManager)
         vpnSignalsWereBlocked = _vpnManager->blockSignals(true);
 
+    // Phase 4 — collected during parse, applied to VpnManager at end.
+    QList<VpnProfile> parsedVpnProfiles;
+    QString           parsedActiveVpnProfile;
+    QString           legacyVpnConfigPath;
+    QString           legacyVpnBackend;
+
     QFile file(fileInfo.absoluteFilePath());
     if (file.open(QIODevice::ReadOnly))
     {
         NntpServerParams *serverParams = nullptr;
+        VpnProfile        currentVpn;
+        bool              inVpnProfile = false;
+        auto flushVpnProfile = [&]() {
+            if (inVpnProfile && currentVpn.isValid())
+                parsedVpnProfiles << currentVpn;
+            currentVpn   = VpnProfile();
+            inVpnProfile = false;
+        };
         QTextStream stream(&file);
         while (!stream.atEnd())
         {
@@ -1935,8 +1956,16 @@ QString NgPost::_parseConfig(const QString &configPath)
                 continue;
             else if (line == "[server]")
             {
+                flushVpnProfile();
                 serverParams = new NntpServerParams();
                 _nntpServers << serverParams;
+            }
+            else if (line == "[vpn_profile]")
+            {
+                flushVpnProfile();
+                serverParams = nullptr;
+                inVpnProfile = true;
+                currentVpn   = VpnProfile();
             }
             else
             {
@@ -2057,18 +2086,41 @@ QString NgPost::_parseConfig(const QString &configPath)
                         val = val.toLower();
                         _vpnManager->setAutoConnect(val == "true" || val == "on" || val == "1");
                     }
+                    else if (opt == sOptionNames[Opt::VPN_ACTIVE_PROFILE])
+                    {
+                        parsedActiveVpnProfile = val;
+                    }
+                    // Legacy single-profile keys (kept for migration only).
                     else if (opt == sOptionNames[Opt::VPN_BACKEND])
+                    {
+                        legacyVpnBackend = val;
+                    }
+                    else if (opt == sOptionNames[Opt::VPN_CONFIG_PATH])
+                    {
+                        legacyVpnConfigPath = val;
+                    }
+                    // Inside [vpn_profile] block — these key names collide with
+                    // server fields but we know we're in a vpn_profile context.
+                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_NAME])
+                    {
+                        currentVpn.name = val;
+                    }
+                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_BACKEND])
                     {
                         bool ok = false;
                         VpnManager::Backend b = VpnManager::backendFromString(val, &ok);
                         if (ok)
-                            _vpnManager->setBackend(b);
-                        else
-                            err += tr("Invalid VPN_BACKEND value: %1 (expected 'openvpn' or 'wireguard')\n").arg(val);
+                            currentVpn.backend = b;
                     }
-                    else if (opt == sOptionNames[Opt::VPN_CONFIG_PATH])
+                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_CONFIG_FILE])
                     {
-                        _vpnManager->setConfigPath(val);
+                        currentVpn.configFileName = val;
+                    }
+                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_HAS_AUTH])
+                    {
+                        val = val.toLower();
+                        currentVpn.hasAuth =
+                            (val == "true" || val == "on" || val == "1");
                     }
                     else if (opt == sOptionNames[Opt::KEEP_NFO_EXTENSION])
                     {
@@ -2441,8 +2493,38 @@ QString NgPost::_parseConfig(const QString &configPath)
                 }
             }
         }
+        // Flush any trailing [vpn_profile] block (no [section] header after it).
+        flushVpnProfile();
         file.close();
     }
+
+    // Phase 4 — legacy single-profile config (VPN_BACKEND + VPN_CONFIG_PATH).
+    // Migrate it into a "Default" profile by copying the .ovpn/.conf into
+    // <configDir>/vpn/ if no [vpn_profile] block was found.
+    if (parsedVpnProfiles.isEmpty() && !legacyVpnConfigPath.isEmpty())
+    {
+        QFileInfo legacy(legacyVpnConfigPath);
+        if (legacy.exists() && legacy.isFile())
+        {
+            QString destName  = legacy.fileName();
+            QString destPath  = PathHelper::vpnDir() + "/" + destName;
+            if (!QFile::exists(destPath))
+                QFile::copy(legacyVpnConfigPath, destPath);
+            VpnProfile p;
+            p.name           = QStringLiteral("Default");
+            bool ok = false;
+            VpnManager::Backend b = VpnManager::backendFromString(legacyVpnBackend, &ok);
+            p.backend        = ok ? b : VpnManager::Backend::OpenVPN;
+            p.configFileName = destName;
+            p.hasAuth        = false; // legacy didn't track creds
+            parsedVpnProfiles << p;
+            parsedActiveVpnProfile = p.name;
+            _log(tr("VPN: migrated legacy VPN_CONFIG_PATH into profile 'Default'"));
+        }
+    }
+
+    if (_vpnManager)
+        _vpnManager->setProfilesFromConfig(parsedVpnProfiles, parsedActiveVpnProfile);
 
     if (err.isEmpty() && !_postHistoryFile.isEmpty())
     {
@@ -2510,11 +2592,11 @@ void NgPost::_syntax(char *appName)
 
 QString NgPost::parseDefaultConfig()
 {
-#if defined(WIN32) || defined(__MINGW64__)
-    QString conf = sDefaultConfig;
-#else
-    QString conf = QString("%1/%2").arg(getenv("HOME")).arg(sDefaultConfig);
-#endif
+    // Phase 4: cross-platform XDG config dir. Migrates legacy ~/.ngPost on
+    // first launch.
+    PathHelper::migrateLegacyConfigIfNeeded();
+    QString conf = PathHelper::configFilePath();
+
     QString err;
     QFileInfo defaultConf(conf);
     if (defaultConf.exists() && defaultConf.isFile())
@@ -2639,11 +2721,7 @@ void NgPost::_showVersionASCII() const
 
 void NgPost::saveConfig()
 {
-#if defined(WIN32) || defined(__MINGW64__)
-    QString conf = sDefaultConfig;
-#else
-    QString conf = QString("%1/%2").arg(getenv("HOME")).arg(sDefaultConfig);
-#endif
+    QString conf = PathHelper::configFilePath();
 
     QFile file(conf);
     if (file.open(QIODevice::WriteOnly|QIODevice::Text))
@@ -2782,8 +2860,7 @@ void NgPost::saveConfig()
                << tr("## tunnel ngPost connections through an embedded VPN (Linux v1)") << "\n"
                << tr("## the VPN affects ngPost only; the rest of the system is unchanged") << "\n"
                << "VPN_AUTO_CONNECT = " << (_vpnManager && _vpnManager->autoConnect() ? "true" : "false") << "\n"
-               << "VPN_BACKEND = " << (_vpnManager ? VpnManager::backendToString(_vpnManager->backend()) : QStringLiteral("openvpn")) << "\n"
-               << "VPN_CONFIG_PATH = " << (_vpnManager ? _vpnManager->configPath() : QString()) << "\n"
+               << "VPN_ACTIVE_PROFILE = " << (_vpnManager ? _vpnManager->activeProfileName() : QString()) << "\n"
                << "\n"
                << tr("## when obfuscating file names, keep the .nfo extension visible") << "\n"
                << (_keepNfoExtension ? "" : "#") << "KEEP_NFO_EXTENSION = true\n"
@@ -2947,6 +3024,19 @@ void NgPost::saveConfig()
                << "#nzbCheck = false\n"
                << "\n";
 
+        // Phase 4 — VPN profiles. The config files themselves live under
+        // <configDir>/vpn/; we only persist metadata here. Credentials are
+        // never saved in this file (keychain or inline-in-ovpn only).
+        if (_vpnManager) {
+            for (VpnProfile const &p : _vpnManager->profiles()) {
+                stream << "[vpn_profile]\n"
+                       << "name        = " << p.name << "\n"
+                       << "backend     = " << VpnManager::backendToString(p.backend) << "\n"
+                       << "config_file = " << p.configFileName << "\n"
+                       << "has_auth    = " << (p.hasAuth ? "true" : "false") << "\n"
+                       << "\n";
+            }
+        }
 
         _log(tr("the config '%1' file has been updated").arg(conf));
         file.close();
