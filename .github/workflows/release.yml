@@ -78,12 +78,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y build-essential
+        run: sudo apt update && sudo apt install -y build-essential cmake
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        run: |
+          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(nproc)
+          cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
           cd src
@@ -130,6 +138,15 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        shell: pwsh
+        run: |
+          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
+          cd $env:TEMP\qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON `
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$env:QT_ROOT_DIR"
+          cmake --build build --config Release
+          cmake --install build --config Release
       - name: Compile translations (.ts -> .qm)
         shell: pwsh
         run: |
@@ -254,6 +271,14 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'clang_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        run: |
+          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(sysctl -n hw.ncpu)
+          cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
           cd src
@@ -295,11 +320,11 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y \
-            build-essential libfuse2t64 wget file patchelf desktop-file-utils \
+            build-essential cmake libfuse2t64 wget file patchelf desktop-file-utils \
             libssl3t64 openssl \
             par2 \
             openvpn wireguard-tools wireguard-go \
-            qt6-keychain libqt6keychain1-dev \
+            libsecret-1-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 \
             libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
@@ -323,6 +348,14 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        run: |
+          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(nproc)
+          cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
           cd src
@@ -413,10 +446,14 @@ jobs:
       - name: Locate QtKeychain library
         id: qtkeychain
         run: |
-          # Phase 4 dep: cross-platform credential store
-          KC=$(find /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu -maxdepth 1 \
-                  -name 'libqt6keychain.so*' 2>/dev/null | sort | head -1)
-          test -n "$KC" || { echo "libqt6keychain not found (install qt6-keychain)"; exit 1; }
+          # Phase 4 dep: cross-platform credential store.
+          # We compile QtKeychain from source into $QT_ROOT_DIR earlier,
+          # so the .so lives under $QT_ROOT_DIR/lib (with the system lib
+          # path as a fallback for distros that ship the package).
+          KC=$(find "$QT_ROOT_DIR/lib" /usr/lib/x86_64-linux-gnu \
+                 /lib/x86_64-linux-gnu -maxdepth 2 \
+                 -name 'libqt6keychain.so*' 2>/dev/null | sort | head -1)
+          test -n "$KC" || { echo "libqt6keychain not found"; exit 1; }
           echo "kc=$KC" >> $GITHUB_OUTPUT
       - name: Download linuxdeployqt
         run: |

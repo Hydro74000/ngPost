@@ -10,12 +10,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y build-essential
+        run: sudo apt update && sudo apt install -y build-essential cmake
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        run: |
+          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(nproc)
+          cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
           cd src
@@ -49,6 +57,15 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        shell: pwsh
+        run: |
+          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
+          cd $env:TEMP\qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON `
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$env:QT_ROOT_DIR"
+          cmake --build build --config Release
+          cmake --install build --config Release
       - name: Compile translations (.ts -> .qm)
         shell: pwsh
         run: |
@@ -86,6 +103,14 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'clang_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        run: |
+          git clone --depth=1 -b v0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(sysctl -n hw.ncpu)
+          cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
           cd src
