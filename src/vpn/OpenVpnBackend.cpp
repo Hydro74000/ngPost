@@ -395,25 +395,30 @@ void OpenVpnBackend::onWinPipeReadyRead()
 {
     if (!_winServicePipe) return;
     QByteArray data = _winServicePipe->readAll();
-    // The service ack format is a small struct ending in a UTF-16 error
-    // string. We don't need to fully decode it — we mostly care that the
-    // service responded at all. Surface the bytes to the user log so a
-    // failed start is at least debuggable.
-    if (data.size() >= 4) {
-        quint32 errCode = static_cast<quint8>(data[0])
-                        | (static_cast<quint8>(data[1]) << 8)
-                        | (static_cast<quint8>(data[2]) << 16)
-                        | (static_cast<quint8>(data[3]) << 24);
-        if (errCode != 0) {
-            QString detail = QString::fromUtf16(
-                reinterpret_cast<const char16_t *>(data.constData() + 4),
-                (data.size() - 4) / 2);
-            emit failed(tr("OpenVPN service refused start (code 0x%1): %2")
-                            .arg(errCode, 8, 16, QChar('0')).arg(detail.trimmed()));
-            _stopWindows();
-            return;
-        }
+    // OpenVPNServiceInteractive returns a UTF-16 LE text response shaped like:
+    //   "0x<errno>\n0x<pid_or_lasterror>\n<message>\0"
+    // On success errno == 0 and the second line carries openvpn.exe's PID.
+    if (data.size() < 2) return;
+    QString resp = QString::fromUtf16(
+        reinterpret_cast<const char16_t *>(data.constData()),
+        data.size() / 2);
+    QStringList lines = resp.split(QChar('\n'));
+    bool ok = false;
+    quint32 errCode = lines.value(0).trimmed().toUInt(&ok, 16);
+    if (!ok) {
+        emit logLine(tr("OpenVPN service: unparsable response (%1 bytes): %2")
+                         .arg(data.size()).arg(resp.left(200)));
+        return;
     }
+    if (errCode != 0) {
+        QString detail = lines.mid(1).join(' ').trimmed();
+        emit failed(tr("OpenVPN service refused start (code 0x%1): %2")
+                        .arg(errCode, 8, 16, QChar('0')).arg(detail));
+        _stopWindows();
+        return;
+    }
+    QString pidLine = lines.value(1).trimmed();
+    emit logLine(tr("OpenVPN service spawned openvpn.exe (%1)").arg(pidLine));
 }
 
 void OpenVpnBackend::onWinPipeDisconnected()
