@@ -316,8 +316,15 @@ bool OpenVpnBackend::_startWindowsViaInteractiveService(QString const &configPat
 
     _winServicePipe->connectToServer(QStringLiteral("openvpn\\service"));
     if (!_winServicePipe->waitForConnected(3000)) {
+        // Likely causes:
+        //  - OpenVPN Community not installed (no service exists)
+        //  - OpenVPNServiceInteractive installed but Start-Type=Manual and
+        //    nobody started it (we don't auto-elevate to start a service)
+        //  - the user does not have Connect permission to the pipe ACL
         emit failed(tr("Cannot reach OpenVPNServiceInteractive pipe. "
-                       "Is OpenVPN Community installed and the service running?"));
+                       "Open Services.msc, set \"OpenVPN Interactive Service\" "
+                       "to Automatic, and start it. If it is not present, "
+                       "re-run the ngPost setup with the OpenVPN Community option."));
         _winServicePipe->deleteLater();
         _winServicePipe = nullptr;
         return false;

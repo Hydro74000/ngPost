@@ -248,6 +248,11 @@ jobs:
           [Run]
           ; Chain-install OpenVPN Community silently (with TAP-Windows driver + interactive service)
           Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\openvpn.msi"" /qb! /norestart"; StatusMsg: "Installing OpenVPN Community..."; Tasks: installopenvpn
+          ; OpenVPN MSI registers OpenVPNServiceInteractive as Start=Manual.
+          ; ngPost talks to this service via named pipe, so make it auto-start
+          ; on boot and bring it up now.
+          Filename: "sc.exe"; Parameters: "config OpenVPNServiceInteractive start= auto"; Flags: runhidden waituntilterminated; Tasks: installopenvpn
+          Filename: "sc.exe"; Parameters: "start OpenVPNServiceInteractive"; Flags: runhidden waituntilterminated; Tasks: installopenvpn
           ; Chain-install WireGuard for Windows silently (with Wintun driver + manager service)
           Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\wireguard.msi"" /qb! /norestart DO_NOT_LAUNCH=1"; StatusMsg: "Installing WireGuard for Windows..."; Tasks: installwireguard
           Filename: "{app}\ngPost.exe"; Description: "Launch ngPost"; Flags: nowait postinstall skipifsilent
