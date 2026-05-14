@@ -605,3 +605,4 @@ src/.qmake.stash
 src/ngPost
 src/qmake_qmake_immediate_rc.py
 src/resources/resources_rc.py
+.claude/
