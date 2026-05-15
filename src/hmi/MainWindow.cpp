@@ -775,9 +775,13 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     // Phase 3: per-server "Use VPN" — when checked, the server's NNTP
     // sockets are bound to the VPN tun (and the VPN is auto-started for
     // any job that uses this server).
-    _ui->serversTable->setCellWidget(nbRows, col++,
-                                     new CheckBoxCenterWidget(_ui->serversTable,
-                                                              serverParam ? serverParam->useVpn : false));
+    // Phase 5d: persist immediately on toggle so the user doesn't have to
+    // hit "Save Config" after each tweak.
+    CheckBoxCenterWidget *vpnCb = new CheckBoxCenterWidget(
+        _ui->serversTable, serverParam ? serverParam->useVpn : false);
+    _ui->serversTable->setCellWidget(nbRows, col++, vpnCb);
+    connect(vpnCb, &CheckBoxCenterWidget::toggled,
+            this, &MainWindow::_onUseVpnToggled);
 
     QLineEdit *nbConsEdit = new QLineEdit(_ui->serversTable);
     nbConsEdit->setFrame(false);
@@ -909,6 +913,18 @@ void MainWindow::onDebugValue(int value)
     _ngPost->setDebug(static_cast<ushort>(value));
 }
 
+
+void MainWindow::_onUseVpnToggled(bool checked)
+{
+    Q_UNUSED(checked);
+    // Pull the current state of every "Use VPN" checkbox in the table back
+    // into the in-memory NntpServerParams list, then flush to disk. We can't
+    // target a single server here because the sender CheckBoxCenterWidget
+    // doesn't carry its row index — `updateServers()` is cheap enough that
+    // doing the full sync is simpler than introducing per-row bookkeeping.
+    updateServers();
+    _ngPost->saveConfig();
+}
 
 void MainWindow::onSaveConfig()
 {

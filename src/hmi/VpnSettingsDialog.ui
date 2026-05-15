@@ -116,10 +116,10 @@
       <item>
        <widget class="QCheckBox" name="autoConnectCB">
         <property name="text">
-         <string>Auto-connect VPN when a job starts</string>
+         <string>Route ALL ngPost connections through the VPN (override per-server)</string>
         </property>
         <property name="toolTip">
-         <string>When checked, ngPost will bring up the VPN tunnel automatically when any job starts, and disconnect 30 seconds after the queue is empty. Per-server "Use VPN" still controls which connections route through the tunnel.</string>
+         <string>When checked: every NNTP connection from ngPost is forced through the VPN tunnel, regardless of each server's "Use VPN" flag. The VPN auto-starts when a job begins and disconnects 30 s after the queue is empty. Use this if you want a single global switch instead of fiddling with the per-server column.&lt;br/&gt;&lt;br/&gt;When unchecked: only the servers whose "Use VPN" column is ticked route through the tunnel; the others connect directly.</string>
         </property>
        </widget>
       </item>

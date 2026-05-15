@@ -160,6 +160,11 @@ private slots:
     void onVpnSettingsClicked();
     void onVpnStateChanged(VpnManager::State newState);
 
+    //! Phase 5d: a per-server "Use VPN" checkbox in the server table got
+    //! toggled. Persist the change immediately so it survives a restart
+    //! without forcing the user through "Save Config".
+    void _onUseVpnToggled(bool checked);
+
 private:
     void _initServerBox();
     void _initPostingBox();

@@ -118,15 +118,17 @@ void NntpConnection::onStartConnection()
     _socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
     _socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, NgPost::articleSize());
 
-    // VPN binding is now decided PER SERVER (Phase 3): only sockets owned by
-    // a server marked `useVpn` route through the tunnel. Other servers connect
-    // directly via the system default route.
-    // Fail-closed: if this server requires VPN but the tunnel is not ready,
+    // VPN binding: per-server `useVpn` decides by default, but the global
+    // "Route ALL ngPost connections through the VPN" override (Phase 5d)
+    // forces every connection into the tunnel regardless of per-server flags.
+    // Fail-closed in both cases: if the tunnel is required but not ready,
     // refuse the connection rather than leaking traffic in the clear.
-    if (_srvParams.useVpn) {
-        VpnManager *vpn = _ngPost->vpnManager();
+    VpnManager *vpn = _ngPost->vpnManager();
+    bool routeViaVpn = _srvParams.useVpn
+                    || (vpn && vpn->forceAllConnectionsThroughVpn());
+    if (routeViaVpn) {
         if (!vpn || !vpn->isConnected() || vpn->tunIp().isNull()) {
-            _error(tr("Server '%1' is marked Use VPN but the VPN tunnel is not connected")
+            _error(tr("Server '%1' must route through the VPN but the tunnel is not connected")
                        .arg(_srvParams.host));
             deleteSocket();
             emit disconnected(this);

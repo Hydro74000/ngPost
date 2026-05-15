@@ -238,8 +238,8 @@ jobs:
 
           [Files]
           Source: "$source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-          Source: "$ovpnMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installopenvpn
-          Source: "$wgMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installwireguard
+          Source: "$ovpnMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installopenvpn; Check: OpenVpnNeeded
+          Source: "$wgMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installwireguard; Check: WireGuardNeeded
 
           [Icons]
           ; Flat Start Menu entry — appears directly under All Apps without a
@@ -251,31 +251,48 @@ jobs:
 
           [Run]
           ; Chain-install OpenVPN Community silently (with TAP-Windows driver + interactive service)
-          Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\openvpn.msi"" /qb! /norestart"; StatusMsg: "Installing OpenVPN Community..."; Tasks: installopenvpn
+          Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\openvpn.msi"" /qb! /norestart"; StatusMsg: "Installing OpenVPN Community..."; Tasks: installopenvpn; Check: OpenVpnNeeded
           ; OpenVPN MSI registers OpenVPNServiceInteractive as Start=Manual.
           ; ngPost talks to this service via named pipe, so make it auto-start
           ; on boot and bring it up now.
-          Filename: "sc.exe"; Parameters: "config OpenVPNServiceInteractive start= auto"; Flags: runhidden waituntilterminated; Tasks: installopenvpn
-          Filename: "sc.exe"; Parameters: "start OpenVPNServiceInteractive"; Flags: runhidden waituntilterminated; Tasks: installopenvpn
+          Filename: "sc.exe"; Parameters: "config OpenVPNServiceInteractive start= auto"; Flags: runhidden waituntilterminated; Tasks: installopenvpn; Check: OpenVpnNeeded
+          Filename: "sc.exe"; Parameters: "start OpenVPNServiceInteractive"; Flags: runhidden waituntilterminated; Tasks: installopenvpn; Check: OpenVpnNeeded
           ; Chain-install WireGuard for Windows silently (with Wintun driver + manager service)
-          Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\wireguard.msi"" /qb! /norestart DO_NOT_LAUNCH=1"; StatusMsg: "Installing WireGuard for Windows..."; Tasks: installwireguard
+          Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\wireguard.msi"" /qb! /norestart DO_NOT_LAUNCH=1"; StatusMsg: "Installing WireGuard for Windows..."; Tasks: installwireguard; Check: WireGuardNeeded
           Filename: "{app}\ngPost.exe"; Description: "Launch ngPost"; Flags: nowait postinstall skipifsilent
 
           [Code]
-          // If OpenVPN Community / WireGuard for Windows are already installed
-          // on the host, pre-uncheck the corresponding "Install ..." task in
-          // the wizard. The user can still re-check it to force a reinstall.
-          function OpenVpnAlreadyInstalled(): Boolean;
+          // Detect pre-existing OpenVPN Community / WireGuard for Windows.
+          // The result is cached in global vars at InitializeSetup time and
+          // referenced via Check: predicates on [Files] and [Run] so even if
+          // the user re-checks a task in the wizard the actual install is
+          // skipped. We also try to relabel the task in the wizard for clarity.
+          var
+            OpenVpnDetected: Boolean;
+            WireGuardDetected: Boolean;
+
+          function InitializeSetup(): Boolean;
           begin
-            Result := RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\OpenVPNServiceInteractive')
-                  or FileExists(ExpandConstant('{commonpf}\OpenVPN\bin\openvpn.exe'))
-                  or FileExists(ExpandConstant('{commonpf32}\OpenVPN\bin\openvpn.exe'));
+            OpenVpnDetected :=
+                RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\OpenVPNServiceInteractive')
+             or FileExists(ExpandConstant('{commonpf}\OpenVPN\bin\openvpn.exe'))
+             or FileExists(ExpandConstant('{commonpf32}\OpenVPN\bin\openvpn.exe'));
+            WireGuardDetected :=
+                FileExists(ExpandConstant('{commonpf}\WireGuard\wireguard.exe'))
+             or FileExists(ExpandConstant('{commonpf32}\WireGuard\wireguard.exe'));
+            Result := True;
           end;
-          function WireGuardAlreadyInstalled(): Boolean;
+
+          function OpenVpnNeeded(): Boolean;
           begin
-            Result := FileExists(ExpandConstant('{commonpf}\WireGuard\wireguard.exe'))
-                  or FileExists(ExpandConstant('{commonpf32}\WireGuard\wireguard.exe'));
+            Result := not OpenVpnDetected;
           end;
+
+          function WireGuardNeeded(): Boolean;
+          begin
+            Result := not WireGuardDetected;
+          end;
+
           procedure InitializeWizard();
           var
             i: Integer;
@@ -283,11 +300,11 @@ jobs:
           begin
             for i := 0 to WizardForm.TasksList.Items.Count - 1 do begin
               s := WizardForm.TasksList.Items[i];
-              if (Pos('OpenVPN Community', s) > 0) and OpenVpnAlreadyInstalled() then begin
+              if (Pos('OpenVPN Community', s) > 0) and OpenVpnDetected then begin
                 WizardForm.TasksList.Checked[i] := False;
                 WizardForm.TasksList.Items[i] := s + ' [already installed]';
               end;
-              if (Pos('WireGuard for Windows', s) > 0) and WireGuardAlreadyInstalled() then begin
+              if (Pos('WireGuard for Windows', s) > 0) and WireGuardDetected then begin
                 WizardForm.TasksList.Checked[i] := False;
                 WizardForm.TasksList.Items[i] := s + ' [already installed]';
               end;

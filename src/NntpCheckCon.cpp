@@ -70,11 +70,15 @@ void NntpCheckCon::onStartConnection()
     _socket->setSocketOption(QAbstractSocket::KeepAliveOption, true);
     _socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
 
-    // Per-server VPN bind (Phase 3): only tunnel if this server has useVpn.
-    if (_srvParams.useVpn) {
-        VpnManager *vpn = VpnManager::instance();
+    // Per-server VPN bind (Phase 3) + global override (Phase 5d): tunnel if
+    // either the server has useVpn=true OR the global "Route ALL through VPN"
+    // toggle is on.
+    VpnManager *vpn = VpnManager::instance();
+    bool routeViaVpn = _srvParams.useVpn
+                    || (vpn && vpn->forceAllConnectionsThroughVpn());
+    if (routeViaVpn) {
         if (!vpn || !vpn->isConnected() || vpn->tunIp().isNull()) {
-            _nzbCheck->error(tr("Server '%1' is marked Use VPN but the VPN tunnel is not connected")
+            _nzbCheck->error(tr("Server '%1' must route through the VPN but the tunnel is not connected")
                                  .arg(_srvParams.host));
             _socket->deleteLater();
             _socket = nullptr;

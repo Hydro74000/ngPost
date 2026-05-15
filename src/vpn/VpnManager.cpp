@@ -24,6 +24,7 @@
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QNetworkInterface>
 #include <QProcess>
 #include <QTemporaryFile>
 #include <QTimer>
@@ -54,11 +55,18 @@ VpnManager::VpnManager(QObject *parent)
     , _autoStartedByJob(false)
     , _activeJobsNeedingVpn(0)
     , _autoDisconnectTimer(new QTimer(this))
+    , _tunPollTimer(new QTimer(this))
+    , _tunPollAttempts(0)
 {
     _autoDisconnectTimer->setSingleShot(true);
     _autoDisconnectTimer->setInterval(kAutoDisconnectMs);
     connect(_autoDisconnectTimer, &QTimer::timeout,
             this, &VpnManager::onAutoDisconnectTimeout);
+
+    _tunPollTimer->setSingleShot(false);
+    _tunPollTimer->setInterval(kTunPollIntervalMs);
+    connect(_tunPollTimer, &QTimer::timeout,
+            this, &VpnManager::_pollTunIpAvailability);
 
     if (!sInstance)
         sInstance = this;
@@ -357,15 +365,54 @@ void VpnManager::onBackendReady(QString const &iface, QHostAddress const &ip,
     _tunIface = iface;
     _tunIp    = ip;
     _dnsServer = dns;
+    emit logLine(tr("VPN: backend reports ready (%1, %2) — waiting for kernel to bind the address")
+                     .arg(iface, ip.toString()));
+    // On Windows openvpn signals CONNECTED via the management socket BEFORE
+    // the NDIS stack has finished assigning the IP to the TAP/Wintun adapter.
+    // If we emit Connected immediately, NntpConnection::bind() races against
+    // that and fails with WSAEADDRNOTAVAIL. Poll QNetworkInterface until the
+    // address is actually live, with a short timeout. Linux usually returns
+    // true on the first tick (helper has finished `ip addr add` by the time
+    // it signals ready), so the cost there is one extra event-loop trip.
+    _tunPollAttempts = 0;
+    _pollTunIpAvailability();
+}
+
+void VpnManager::_pollTunIpAvailability()
+{
+    if (_tunIp.isNull()) {
+        _tunPollTimer->stop();
+        return;
+    }
+    if (QNetworkInterface::allAddresses().contains(_tunIp)) {
+        _tunPollTimer->stop();
+        _completeReady();
+        return;
+    }
+    ++_tunPollAttempts;
+    if (_tunPollAttempts >= kTunPollMaxAttempts) {
+        _tunPollTimer->stop();
+        QString reason = tr("VPN: tun IP %1 was reported by the backend but "
+                            "the kernel never bound it to an interface "
+                            "(waited %2 ms). Aborting to avoid a leaking bind.")
+                             .arg(_tunIp.toString())
+                             .arg(kTunPollMaxAttempts * kTunPollIntervalMs);
+        onBackendFailed(reason);
+        return;
+    }
+    if (!_tunPollTimer->isActive())
+        _tunPollTimer->start();
+}
+
+void VpnManager::_completeReady()
+{
     QString summary = !_dnsServer.isNull()
         ? tr("VPN: connected on %1 (%2), DNS %3")
-              .arg(iface, ip.toString(), _dnsServer.toString())
+              .arg(_tunIface, _tunIp.toString(), _dnsServer.toString())
         : tr("VPN: connected on %1 (%2) — no DNS captured, system resolver in use")
-              .arg(iface, ip.toString());
+              .arg(_tunIface, _tunIp.toString());
     emit logLine(summary);
     emit statusLine(summary);
-    // Policy routing is set up by the privileged helper script under the
-    // same pkexec invocation that brought up the tunnel — nothing to do here.
     _setState(State::Connected);
 }
 
@@ -374,6 +421,7 @@ void VpnManager::onBackendFailed(QString const &reason)
     QString line = tr("VPN: failed — %1").arg(reason);
     emit logLine(line);
     emit statusLine(line);
+    _tunPollTimer->stop();
     _tunIp = QHostAddress();
     _tunIface.clear();
     _dnsServer = QHostAddress();
@@ -394,6 +442,7 @@ void VpnManager::onBackendStopped()
     QString line = tr("VPN: tunnel stopped");
     emit logLine(line);
     emit statusLine(line);
+    _tunPollTimer->stop();
     _tunIp = QHostAddress();
     _tunIface.clear();
     _dnsServer = QHostAddress();
