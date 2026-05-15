@@ -202,8 +202,8 @@ jobs:
           # downloaded into a "deps" folder next to the setup output.
           $deps = (Resolve-Path "dist").Path + "\deps"
           New-Item -ItemType Directory -Force -Path $deps | Out-Null
-          $ovpnUrl = "https://swupdate.openvpn.org/community/releases/OpenVPN-2.6.14-I001-amd64.msi"
-          $wgUrl   = "https://download.wireguard.com/windows-client/wireguard-amd64-0.5.3.msi"
+          $ovpnUrl = "https://swupdate.openvpn.org/community/releases/OpenVPN-2.7.4-I001-amd64.msi"
+          $wgUrl   = "https://download.wireguard.com/windows-client/wireguard-amd64-1.1.msi"
           $ovpnMsi = "$deps\openvpn.msi"
           $wgMsi   = "$deps\wireguard.msi"
           Invoke-WebRequest -Uri $ovpnUrl -OutFile $ovpnMsi
@@ -242,8 +242,12 @@ jobs:
           Source: "$wgMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installwireguard
 
           [Icons]
-          Name: "{group}\ngPost"; Filename: "{app}\ngPost.exe"
-          Name: "{autodesktop}\ngPost"; Filename: "{app}\ngPost.exe"; Tasks: desktopicon
+          ; Flat Start Menu entry — appears directly under All Apps without a
+          ; subfolder, plus the legacy {group} one for users who like grouping.
+          Name: "{autoprograms}\ngPost"; Filename: "{app}\ngPost.exe"; WorkingDir: "{app}"
+          Name: "{group}\ngPost"; Filename: "{app}\ngPost.exe"; WorkingDir: "{app}"
+          Name: "{group}\Uninstall ngPost"; Filename: "{uninstallexe}"
+          Name: "{autodesktop}\ngPost"; Filename: "{app}\ngPost.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
           [Run]
           ; Chain-install OpenVPN Community silently (with TAP-Windows driver + interactive service)

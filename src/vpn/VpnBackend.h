@@ -42,7 +42,13 @@ signals:
                QHostAddress const &dnsServer = QHostAddress());
     void failed(QString const &reason);
     void stopped();
+    //! Full verbose stream — every line from the underlying VPN process.
+    //! Routed to the dedicated VPN log panel only.
     void logLine(QString const &line);
+    //! High-level status events (initiating, connected, disconnected, failed).
+    //! Routed to the main Posting log so the user sees tunnel state alongside
+    //! upload activity, without drowning in openvpn verbosity.
+    void statusLine(QString const &line);
 };
 
 #endif // VPNBACKEND_H

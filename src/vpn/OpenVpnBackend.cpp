@@ -439,7 +439,11 @@ void OpenVpnBackend::onWinMgmtConnected()
     if (_winMgmtRetryTimer)
         _winMgmtRetryTimer->stop();
     emit logLine(tr("Connected to openvpn management socket"));
+    // Subscribe to state notifications AND to log events. Without `log on all`,
+    // openvpn won't push PUSH_REPLY lines to us, and we'd never see the
+    // dhcp-option DNS X.X.X.X that we need for the DNS-leak fix on Windows.
     _winMgmt->write("state on\n");
+    _winMgmt->write("log on all\n");
     _winMgmt->write("hold release\n");
 }
 

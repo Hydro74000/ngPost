@@ -362,10 +362,11 @@ NgPost::NgPost(int &argc, char *argv[]):
     // doesn't have to click "Save Config" after every tweak.
     connect(_vpnManager, &VpnManager::configChanged,
             this, [this]() { saveConfig(); });
-    // Phase 3 — mirror VPN events into the main post log so the user sees
-    // tunnel events (connect, disconnect, auto-disconnect countdown) alongside
-    // the upload progress, not only inside the VPN dialog.
-    connect(_vpnManager, &VpnManager::logLine,
+    // Phase 3 — mirror VPN status events into the main post log so the user
+    // sees the headline tunnel events (init, connected, disconnected, failed)
+    // alongside upload activity. The full openvpn/wireguard verbosity stays
+    // routed only to the dedicated VPN log panel via logLine().
+    connect(_vpnManager, &VpnManager::statusLine,
             this, [this](QString const &line) {
         emit log(QStringLiteral("[VPN] ") + line, true);
     });
@@ -1988,14 +1989,23 @@ QString NgPost::_parseConfig(const QString &configPath)
                     }
                     else if (opt == sOptionNames[Opt::NZB_PATH])
                     {
-                        QFileInfo nzbFI(val);
-                        if (nzbFI.exists() && nzbFI.isDir() && nzbFI.isWritable())
+                        if (val.isEmpty())
                         {
-                            _nzbPath     = val;
-                            _nzbPathConf = val;
+                            // Unset NZB_PATH: legitimate (use default current dir at post time)
+                            _nzbPath.clear();
+                            _nzbPathConf.clear();
                         }
                         else
-                            err += tr("the nzbPath '%1' is not writable...\n").arg(val);
+                        {
+                            QFileInfo nzbFI(val);
+                            if (nzbFI.exists() && nzbFI.isDir() && nzbFI.isWritable())
+                            {
+                                _nzbPath     = val;
+                                _nzbPathConf = val;
+                            }
+                            else
+                                err += tr("the nzbPath '%1' is not writable...\n").arg(val);
+                        }
                     }
                     else if (opt == sOptionNames[Opt::NZB_UPLOAD_URL])
                     {

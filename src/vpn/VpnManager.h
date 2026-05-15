@@ -169,7 +169,12 @@ public:
 
 signals:
     void stateChanged(State newState);
+    //! Full verbose stream — routed to the dedicated VPN log panel.
     void logLine(QString const &line);
+    //! High-level status events — routed to the main Posting log so the user
+    //! sees init / connected / disconnected / failed alongside upload activity,
+    //! without the openvpn/wireguard verbosity drowning the main log.
+    void statusLine(QString const &line);
     void installStateChanged(bool installed);
     //! VPN preferences changed (auto-connect, profiles, active profile).
     //! NgPost listens to this to auto-persist the conf without manual Save.

@@ -299,6 +299,13 @@ bool VpnManager::start()
     _runtimeAuthFilePath = authFilePath;
 
     _setState(State::Starting);
+    {
+        QString line = tr("VPN: connecting profile '%1' (%2)…").arg(
+            p->name,
+            p->backend == Backend::OpenVPN ? QStringLiteral("OpenVPN") : QStringLiteral("WireGuard"));
+        emit logLine(line);
+        emit statusLine(line);
+    }
     // The backend interface accepts a single configPath today. To pass the
     // auth-file path, we encode it after a NUL separator. OpenVpnBackend
     // unpacks it and adds --auth-user-pass to the openvpn argv.
@@ -350,11 +357,13 @@ void VpnManager::onBackendReady(QString const &iface, QHostAddress const &ip,
     _tunIface = iface;
     _tunIp    = ip;
     _dnsServer = dns;
-    emit logLine(tr("VPN: tunnel up on %1 (%2)").arg(iface, ip.toString()));
-    if (!_dnsServer.isNull())
-        emit logLine(tr("VPN: DNS server = %1").arg(_dnsServer.toString()));
-    else
-        emit logLine(tr("VPN: no DNS server captured — DNS may leak to system resolver"));
+    QString summary = !_dnsServer.isNull()
+        ? tr("VPN: connected on %1 (%2), DNS %3")
+              .arg(iface, ip.toString(), _dnsServer.toString())
+        : tr("VPN: connected on %1 (%2) — no DNS captured, system resolver in use")
+              .arg(iface, ip.toString());
+    emit logLine(summary);
+    emit statusLine(summary);
     // Policy routing is set up by the privileged helper script under the
     // same pkexec invocation that brought up the tunnel — nothing to do here.
     _setState(State::Connected);
@@ -362,7 +371,9 @@ void VpnManager::onBackendReady(QString const &iface, QHostAddress const &ip,
 
 void VpnManager::onBackendFailed(QString const &reason)
 {
-    emit logLine(tr("VPN: failed — %1").arg(reason));
+    QString line = tr("VPN: failed — %1").arg(reason);
+    emit logLine(line);
+    emit statusLine(line);
     _tunIp = QHostAddress();
     _tunIface.clear();
     _dnsServer = QHostAddress();
@@ -380,7 +391,9 @@ void VpnManager::onBackendFailed(QString const &reason)
 
 void VpnManager::onBackendStopped()
 {
-    emit logLine(tr("VPN: tunnel stopped"));
+    QString line = tr("VPN: tunnel stopped");
+    emit logLine(line);
+    emit statusLine(line);
     _tunIp = QHostAddress();
     _tunIface.clear();
     _dnsServer = QHostAddress();
@@ -429,10 +442,11 @@ void VpnManager::_instantiateBackend()
     return;
 #endif
 
-    connect(_currentBackend, &VpnBackend::ready,    this, &VpnManager::onBackendReady);
-    connect(_currentBackend, &VpnBackend::failed,   this, &VpnManager::onBackendFailed);
-    connect(_currentBackend, &VpnBackend::stopped,  this, &VpnManager::onBackendStopped);
-    connect(_currentBackend, &VpnBackend::logLine,  this, &VpnManager::logLine);
+    connect(_currentBackend, &VpnBackend::ready,      this, &VpnManager::onBackendReady);
+    connect(_currentBackend, &VpnBackend::failed,     this, &VpnManager::onBackendFailed);
+    connect(_currentBackend, &VpnBackend::stopped,    this, &VpnManager::onBackendStopped);
+    connect(_currentBackend, &VpnBackend::logLine,    this, &VpnManager::logLine);
+    connect(_currentBackend, &VpnBackend::statusLine, this, &VpnManager::statusLine);
 }
 
 void VpnManager::_destroyBackend()
