@@ -134,12 +134,17 @@ void NntpCheckCon::onStartConnection()
             lookup.setNameserver(vpn->dnsServer());
             QEventLoop loop;
             QObject::connect(&lookup, &QDnsLookup::finished, &loop, &QEventLoop::quit);
-            QTimer::singleShot(3000, &loop, &QEventLoop::quit);
+            QTimer::singleShot(5000, &loop, &QEventLoop::quit);
             lookup.lookup();
             loop.exec();
             if (lookup.error() == QDnsLookup::NoError) {
                 auto const records = lookup.hostAddressRecords();
                 if (!records.isEmpty()) {
+                    // Set peerVerifyName so the SSL cert is validated against
+                    // the original hostname rather than the resolved IP.
+                    if (_srvParams.useSSL)
+                        static_cast<QSslSocket *>(_socket)
+                            ->setPeerVerifyName(_srvParams.host);
                     _socket->connectToHost(records.first().value(), _srvParams.port);
                     return;
                 }

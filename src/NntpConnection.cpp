@@ -199,12 +199,21 @@ void NntpConnection::onStartConnection()
             lookup.setNameserver(vpn->dnsServer());
             QEventLoop loop;
             QObject::connect(&lookup, &QDnsLookup::finished, &loop, &QEventLoop::quit);
-            QTimer::singleShot(3000, &loop, &QEventLoop::quit);
+            QTimer::singleShot(5000, &loop, &QEventLoop::quit);
             lookup.lookup();
             loop.exec();
             if (lookup.error() == QDnsLookup::NoError) {
                 auto const records = lookup.hostAddressRecords();
                 if (!records.isEmpty()) {
+                    // When connectToHost is called with a QHostAddress (raw IP),
+                    // QSslSocket defaults peerVerifyName to that IP — which
+                    // makes the certificate hostname check fail for every
+                    // server whose cert is issued for a hostname rather than
+                    // a literal IP. Set it explicitly to the original hostname
+                    // so SNI + cert verification still target the right name.
+                    if (_srvParams.useSSL)
+                        static_cast<QSslSocket *>(_socket)
+                            ->setPeerVerifyName(_srvParams.host);
                     _socket->connectToHost(records.first().value(), _srvParams.port);
                     goto connect_done;
                 }
