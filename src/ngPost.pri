@@ -41,7 +41,11 @@ TRANSLATIONS = lang/ngPost_en.ts lang/ngPost_fr.ts lang/ngPost_es.ts lang/ngPost
                lang/ngPost_nl.ts lang/ngPost_pt.ts lang/ngPost_zh.ts
 
 win32: {
-    LIBS += -luser32 -ladvapi32
+    # ws2_32 is needed for the raw WSASocket bind workaround in
+    # vpn/WindowsBindHelper.cpp. QtNetwork links it too, but listing it
+    # explicitly avoids relying on transitive symbol availability when
+    # the linker decides to dead-strip.
+    LIBS += -luser32 -ladvapi32 -lws2_32
     RC_ICONS = ngPost.ico
     RC_FILE = resources/version.rc
     # Include console only if not using HMI (GUI)
@@ -110,6 +114,7 @@ SOURCES += \
         vpn/OpenVpnBackend.cpp \
         vpn/VpnManager.cpp \
         vpn/VpnProfile.cpp \
+        vpn/WindowsBindHelper.cpp \
         vpn/WireGuardBackend.cpp
 
 
@@ -156,6 +161,7 @@ HEADERS += \
     vpn/VpnBackend.h \
     vpn/VpnManager.h \
     vpn/VpnProfile.h \
+    vpn/WindowsBindHelper.h \
     vpn/WireGuardBackend.h
 
 

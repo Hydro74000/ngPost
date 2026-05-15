@@ -25,6 +25,7 @@
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
 #include "vpn/VpnManager.h"
+#include "vpn/WindowsBindHelper.h"
 
 #include <QAbstractSocket>
 #include <QByteArray>
@@ -135,21 +136,28 @@ void NntpConnection::onStartConnection()
             emit disconnected(this);
             return;
         }
-        // ShareAddress | ReuseAddressHint maps to SO_REUSEADDR + no
-        // SO_EXCLUSIVEADDRUSE on Windows. Qt's DefaultForPlatform on Windows
-        // sets SO_EXCLUSIVEADDRUSE, which we've observed to reject bind() on
-        // virtual adapter IPs (OpenVPN DCO / Wintun) even though a raw .NET
-        // Socket.Bind() to the same IP succeeds. On Linux these flags
-        // collapse to SO_REUSEADDR which is also what we want.
+#ifdef Q_OS_WIN
+        // On Windows, Qt's QAbstractSocket::bind() fails on virtual adapter
+        // IPs (OpenVPN DCO / Wintun / TAP) due to a SO_EXCLUSIVEADDRUSE +
+        // SO_REUSEADDR setsockopt clash that we can't disable through the
+        // public API. Use a raw WSASocket+bind+setSocketDescriptor path.
+        QString bindErr;
+        bool bound = WindowsBindHelper::bindAndAttach(_socket, vpn->tunIp(), &bindErr);
+#else
+        // Linux: Qt's bind() works fine. SO_REUSEADDR via ShareAddress is the
+        // friendliest combination for source-binding to a tun IP.
         QAbstractSocket::BindMode bindFlags =
             QAbstractSocket::ShareAddress | QAbstractSocket::ReuseAddressHint;
-        if (!_socket->bind(vpn->tunIp(), 0, bindFlags)) {
+        bool bound = _socket->bind(vpn->tunIp(), 0, bindFlags);
+        QString bindErr = bound ? QString() : _socket->errorString();
+#endif
+        if (!bound) {
             QStringList visibleAddrs;
             for (QHostAddress const &a : QNetworkInterface::allAddresses())
                 visibleAddrs << a.toString();
             _error(tr("VPN bind failed on %1: %2 (local addresses visible to Qt: %3)")
                        .arg(vpn->tunIp().toString(),
-                            _socket->errorString(),
+                            bindErr,
                             visibleAddrs.join(", ")));
             deleteSocket();
             emit disconnected(this);
@@ -218,8 +226,16 @@ void NntpConnection::onStartConnection()
                     goto connect_done;
                 }
             }
-            _error(tr("VPN DNS lookup failed for %1, falling back to system resolver "
-                      "(DNS may leak)").arg(_srvParams.host));
+            // Surface the actual reason so we can tell timeout from server
+            // error from empty response. Helps diagnose "DNS may leak" reports.
+            QString why = (lookup.error() == QDnsLookup::NoError)
+                ? QStringLiteral("no A records returned")
+                : lookup.errorString();
+            _error(tr("VPN DNS lookup failed for %1 via %2: %3 — falling back to "
+                      "system resolver (DNS may leak)")
+                       .arg(_srvParams.host,
+                            vpn->dnsServer().toString(),
+                            why));
         }
     }
     _socket->connectToHost(_srvParams.host, _srvParams.port);

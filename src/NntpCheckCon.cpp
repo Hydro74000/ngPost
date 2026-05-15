@@ -26,6 +26,7 @@
 #include "NzbCheck.h"
 #include "nntp/Nntp.h"
 #include "vpn/VpnManager.h"
+#include "vpn/WindowsBindHelper.h"
 
 NntpCheckCon::NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &srvParams)
     : QObject()
@@ -85,15 +86,22 @@ void NntpCheckCon::onStartConnection()
             emit disconnected(this);
             return;
         }
+#ifdef Q_OS_WIN
+        QString bindErr;
+        bool bound = WindowsBindHelper::bindAndAttach(_socket, vpn->tunIp(), &bindErr);
+#else
         QAbstractSocket::BindMode bindFlags =
             QAbstractSocket::ShareAddress | QAbstractSocket::ReuseAddressHint;
-        if (!_socket->bind(vpn->tunIp(), 0, bindFlags)) {
+        bool bound = _socket->bind(vpn->tunIp(), 0, bindFlags);
+        QString bindErr = bound ? QString() : _socket->errorString();
+#endif
+        if (!bound) {
             QStringList visibleAddrs;
             for (QHostAddress const &a : QNetworkInterface::allAddresses())
                 visibleAddrs << a.toString();
             _nzbCheck->error(tr("VPN bind failed on %1: %2 (local addresses visible to Qt: %3)")
                                  .arg(vpn->tunIp().toString(),
-                                      _socket->errorString(),
+                                      bindErr,
                                       visibleAddrs.join(", ")));
             _socket->deleteLater();
             _socket = nullptr;
@@ -149,8 +157,13 @@ void NntpCheckCon::onStartConnection()
                     return;
                 }
             }
-            _nzbCheck->error(tr("VPN DNS lookup failed for %1 (falling back to system DNS)")
-                                 .arg(_srvParams.host));
+            QString why = (lookup.error() == QDnsLookup::NoError)
+                ? QStringLiteral("no A records returned")
+                : lookup.errorString();
+            _nzbCheck->error(tr("VPN DNS lookup failed for %1 via %2: %3 — falling back to system DNS")
+                                 .arg(_srvParams.host,
+                                      vpn->dnsServer().toString(),
+                                      why));
         }
     }
     _socket->connectToHost(_srvParams.host, _srvParams.port);
