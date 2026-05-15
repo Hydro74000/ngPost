@@ -31,6 +31,7 @@
 #include <QDnsLookup>
 #include <QEventLoop>
 #include <QFile>
+#include <QNetworkInterface>
 #include <QSslCertificate>
 #include <QSslCipher>
 #include <QSslKey>
@@ -135,8 +136,17 @@ void NntpConnection::onStartConnection()
             return;
         }
         if (!_socket->bind(vpn->tunIp(), 0, QAbstractSocket::DefaultForPlatform)) {
-            _error(tr("VPN bind failed on %1: %2")
-                       .arg(vpn->tunIp().toString(), _socket->errorString()));
+            // Dump local interface addresses to help diagnose why Windows said
+            // WSAEADDRNOTAVAIL — typically a sign that the tun IP we parsed
+            // from the openvpn management socket isn't the same one the NDIS
+            // stack actually assigned, or the adapter is in a transient state.
+            QStringList visibleAddrs;
+            for (QHostAddress const &a : QNetworkInterface::allAddresses())
+                visibleAddrs << a.toString();
+            _error(tr("VPN bind failed on %1: %2 (local addresses visible to Qt: %3)")
+                       .arg(vpn->tunIp().toString(),
+                            _socket->errorString(),
+                            visibleAddrs.join(", ")));
             deleteSocket();
             emit disconnected(this);
             return;

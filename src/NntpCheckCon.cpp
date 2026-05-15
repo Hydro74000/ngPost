@@ -20,6 +20,7 @@
 #include "NntpCheckCon.h"
 #include <QDnsLookup>
 #include <QEventLoop>
+#include <QNetworkInterface>
 #include <QSslSocket>
 #include <QTimer>
 #include "NzbCheck.h"
@@ -86,8 +87,13 @@ void NntpCheckCon::onStartConnection()
             return;
         }
         if (!_socket->bind(vpn->tunIp(), 0, QAbstractSocket::DefaultForPlatform)) {
-            _nzbCheck->error(tr("VPN bind failed on %1: %2")
-                                 .arg(vpn->tunIp().toString(), _socket->errorString()));
+            QStringList visibleAddrs;
+            for (QHostAddress const &a : QNetworkInterface::allAddresses())
+                visibleAddrs << a.toString();
+            _nzbCheck->error(tr("VPN bind failed on %1: %2 (local addresses visible to Qt: %3)")
+                                 .arg(vpn->tunIp().toString(),
+                                      _socket->errorString(),
+                                      visibleAddrs.join(", ")));
             _socket->deleteLater();
             _socket = nullptr;
             emit disconnected(this);

@@ -384,19 +384,28 @@ void VpnManager::_pollTunIpAvailability()
         _tunPollTimer->stop();
         return;
     }
-    if (QNetworkInterface::allAddresses().contains(_tunIp)) {
+    QList<QHostAddress> all = QNetworkInterface::allAddresses();
+    if (all.contains(_tunIp)) {
         _tunPollTimer->stop();
+        emit logLine(tr("VPN: kernel acknowledged tun IP %1 after %2 ms")
+                         .arg(_tunIp.toString())
+                         .arg(_tunPollAttempts * kTunPollIntervalMs));
         _completeReady();
         return;
     }
     ++_tunPollAttempts;
     if (_tunPollAttempts >= kTunPollMaxAttempts) {
         _tunPollTimer->stop();
+        QStringList visibleAddrs;
+        for (QHostAddress const &a : all)
+            visibleAddrs << a.toString();
         QString reason = tr("VPN: tun IP %1 was reported by the backend but "
                             "the kernel never bound it to an interface "
-                            "(waited %2 ms). Aborting to avoid a leaking bind.")
+                            "(waited %2 ms). Visible local addresses: %3. "
+                            "Aborting to avoid a leaking bind.")
                              .arg(_tunIp.toString())
-                             .arg(kTunPollMaxAttempts * kTunPollIntervalMs);
+                             .arg(kTunPollMaxAttempts * kTunPollIntervalMs)
+                             .arg(visibleAddrs.join(", "));
         onBackendFailed(reason);
         return;
     }
