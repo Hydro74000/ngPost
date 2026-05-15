@@ -2912,8 +2912,19 @@ void NgPost::saveConfig()
                << tr("## coma separated list using the keywords COMPRESS, GEN_NAME, GEN_PASS and GEN_PAR2") << "\n"
                << tr("## For Auto posting and Monitoring if you don't use COMPRESS you need GEN_PA2") << "\n"
                << tr("#PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2") << "\n"
-               << tr("#PACK = GEN_PAR2") << "\n"
-               << (_packAuto && _packAutoKeywords.size() ? QString("PACK = %1\n").arg(_packAutoKeywords.join(", ").toUpper()) : "")
+               << tr("#PACK = GEN_PAR2") << "\n";
+        // Rebuild the PACK keyword list from the current per-job flag state
+        // each time we save, otherwise toggling Compress / Generate Par2 in
+        // the GUI never propagates to the on-disk PACK = ... line and the
+        // user's choice silently rolls back to whatever was loaded.
+        if (_packAuto) {
+            _packAutoKeywords.clear();
+            if (_doCompress) _packAutoKeywords << sOptionNames[Opt::COMPRESS];
+            if (_genName)    _packAutoKeywords << sOptionNames[Opt::GEN_NAME];
+            if (_genPass)    _packAutoKeywords << sOptionNames[Opt::GEN_PASS];
+            if (_doPar2)     _packAutoKeywords << sOptionNames[Opt::GEN_PAR2];
+        }
+        stream << (_packAuto && _packAutoKeywords.size() ? QString("PACK = %1\n").arg(_packAutoKeywords.join(", ").toUpper()) : "")
                << "\n"
                << tr("## use the same Password for all your Posts using compression") << "\n"
           #ifdef __USE_HMI__
