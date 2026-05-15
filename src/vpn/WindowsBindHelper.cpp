@@ -16,6 +16,7 @@
 #include <ws2tcpip.h>
 
 #include <QIODevice>
+#include <QNetworkInterface>
 
 namespace {
 
@@ -33,6 +34,27 @@ bool validateIpv4(QHostAddress const &localIp, QString *errMsg)
     return false;
 }
 
+bool findInterfaceIndex(QHostAddress const &localIp, DWORD *ifIndex, QString *errMsg)
+{
+    for (QNetworkInterface const &iface : QNetworkInterface::allInterfaces()) {
+        for (QNetworkAddressEntry const &entry : iface.addressEntries()) {
+            if (entry.ip() == localIp) {
+                uint const idx = iface.index();
+                if (idx == 0) {
+                    setErr(errMsg, QStringLiteral("interface index unavailable for %1")
+                                       .arg(localIp.toString()));
+                    return false;
+                }
+                *ifIndex = DWORD(idx);
+                return true;
+            }
+        }
+    }
+    setErr(errMsg, QStringLiteral("no interface index found for %1")
+                       .arg(localIp.toString()));
+    return false;
+}
+
 SOCKET createTcpSocket(QString *errMsg)
 {
     SOCKET s = WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
@@ -40,6 +62,26 @@ SOCKET createTcpSocket(QString *errMsg)
     if (s == INVALID_SOCKET)
         setErr(errMsg, QStringLiteral("WSASocketW failed: WSA %1").arg(WSAGetLastError()));
     return s;
+}
+
+bool setOutgoingInterface(SOCKET s, QHostAddress const &localIp, QString *errMsg)
+{
+    DWORD ifIndex = 0;
+    if (!findInterfaceIndex(localIp, &ifIndex, errMsg))
+        return false;
+
+    // Windows bind() pins the source address, but route selection can still
+    // fail or pick another adapter. IP_UNICAST_IF pins outgoing IPv4 traffic
+    // to the tunnel interface; the IF_INDEX value must be in network order.
+    DWORD const opt = htonl(ifIndex);
+    if (::setsockopt(s, IPPROTO_IP, IP_UNICAST_IF,
+                     reinterpret_cast<const char *>(&opt), sizeof(opt)) != 0) {
+        setErr(errMsg, QStringLiteral("IP_UNICAST_IF(%1) failed: WSA %2")
+                           .arg(ifIndex)
+                           .arg(WSAGetLastError()));
+        return false;
+    }
+    return true;
 }
 
 sockaddr_in makeIpv4Sockaddr(QHostAddress const &localIp)
@@ -76,6 +118,11 @@ bool WindowsBindHelper::canBindLocalAddress(QHostAddress const &localIp,
     if (s == INVALID_SOCKET)
         return false;
 
+    if (!setOutgoingInterface(s, localIp, errMsg)) {
+        ::closesocket(s);
+        return false;
+    }
+
     bool ok = rawBind(s, localIp, errMsg);
     ::closesocket(s);
     return ok;
@@ -97,6 +144,11 @@ bool WindowsBindHelper::bindAndAttach(QAbstractSocket *socket,
     SOCKET s = createTcpSocket(errMsg);
     if (s == INVALID_SOCKET)
         return false;
+
+    if (!setOutgoingInterface(s, localIp, errMsg)) {
+        ::closesocket(s);
+        return false;
+    }
 
     if (!rawBind(s, localIp, errMsg)) {
         ::closesocket(s);

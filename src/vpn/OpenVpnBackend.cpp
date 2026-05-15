@@ -275,9 +275,10 @@ QString OpenVpnBackend::_buildOpenVpnOptions(QString const &configPath,
     // --management-hold makes openvpn wait for the management interface to
     // send "hold release" before it actually starts. This guarantees we
     // never miss a state transition (we always connect mgmt first).
-    // --pull-filter ignore redirect-gateway prevents openvpn from setting
-    // a default route — we want ngPost-only isolation by socket bind, not
-    // a system-wide reroute.
+    // --pull-filter ignore redirect-gateway prevents openvpn from taking
+    // over the machine. The explicit high-metric default route gives sockets
+    // pinned to the tunnel interface a usable route without winning over the
+    // normal system default route for unrelated apps.
     QStringList parts;
     parts << "--config" << q(configPath)
           << "--management" << "127.0.0.1" << "7505"
@@ -285,6 +286,7 @@ QString OpenVpnBackend::_buildOpenVpnOptions(QString const &configPath,
           << "--management-query-passwords"
           << "--pull-filter" << "ignore" << "redirect-gateway"
           << "--pull-filter" << "ignore" << "block-outside-dns"
+          << "--route" << "0.0.0.0" << "0.0.0.0" << "vpn_gateway" << "9999"
           << "--verb" << "3";
     if (!authFilePath.isEmpty())
         parts << "--auth-user-pass" << q(authFilePath);
