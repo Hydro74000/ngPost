@@ -50,7 +50,15 @@ QString vpnDir()
 
 QString vpnRuntimeDir()
 {
-    QString d = vpnDir() + QStringLiteral("/.runtime");
+    // No leading dot in the directory name: confirmed via live-reproduction
+    // on a Windows VM that OpenVPNServiceInteractive's impersonation of the
+    // calling user refuses to read an auth file from a directory whose name
+    // starts with '.'. openvpn.exe then exits with code 1 immediately and
+    // the service surfaces "0x20000000 OpenVPN exited with error". Using
+    // "runtime" (no dot) works on Windows and is functionally equivalent on
+    // Linux — security comes from the per-file permissions we set below,
+    // not from the directory being marked hidden.
+    QString d = vpnDir() + QStringLiteral("/runtime");
     QDir().mkpath(d);
     // Best-effort: tighten perms so other local users can't list our
     // ephemeral auth files. Qt's setPermissions is portable (no-op where
