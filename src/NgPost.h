@@ -157,7 +157,10 @@ public:
         VPN_PROFILE_BACKEND,
         VPN_PROFILE_CONFIG_FILE,
         VPN_PROFILE_HAS_AUTH,
-        SERVER_USE_VPN //!< per-server useVpn flag inside [server] block
+        SERVER_USE_VPN, //!< per-server useVpn flag inside [server] block
+        VPN,            //!< CLI-only: master switch on
+        NO_VPN,         //!< CLI-only: master switch off
+        VPN_PROFILE     //!< CLI-only: select active profile by name
     };
 
 private:

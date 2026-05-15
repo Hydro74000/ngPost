@@ -165,6 +165,10 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::VPN_PROFILE_CONFIG_FILE, "config_file"},
     {Opt::VPN_PROFILE_HAS_AUTH,    "has_auth"},
     {Opt::SERVER_USE_VPN,          "useVpn"},
+
+    {Opt::VPN,                     "vpn"},
+    {Opt::NO_VPN,                  "no_vpn"},
+    {Opt::VPN_PROFILE,             "vpn_profile"},
 };
 
 const QList<QCommandLineOption> NgPost::sCmdOptions = {
@@ -206,9 +210,10 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::RAR_SIZE],            tr( "size in MB of the RAR volumes (0 by default meaning NO split)"), sOptionNames[Opt::RAR_SIZE]},
     { sOptionNames[Opt::RAR_MAX],             tr( "maximum number of archive volumes"), sOptionNames[Opt::RAR_MAX]},
     { sOptionNames[Opt::PAR2_PCT],            tr( "par2 redundancy percentage (0 by default meaning NO par2 generation)"), sOptionNames[Opt::PAR2_PCT]},
-    { sOptionNames[Opt::PAR2_PATH],           tr( "par2 absolute file path (in case of self compilation of ngPost)"), sOptionNames[Opt::PAR2_PCT]},
+    { sOptionNames[Opt::PAR2_PATH],           tr( "par2 absolute file path (in case of self compilation of ngPost)"), sOptionNames[Opt::PAR2_PATH]},
 
     { sOptionNames[Opt::PACK],                tr( "Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)")},
+    { sOptionNames[Opt::AUTO_COMPRESS],       tr( "alias of --pack: enable auto-packing using the config PACK definition")},
     { sOptionNames[Opt::COMPRESS],            tr( "compress inputs using RAR or 7z")},
     { sOptionNames[Opt::GEN_PAR2],            tr( "generate par2 (to be used with --compress)")},
     { sOptionNames[Opt::RAR_NAME],            tr( "provide the RAR file name (to be used with --compress)"), sOptionNames[Opt::RAR_NAME]},
@@ -228,6 +233,15 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     {{"u", sOptionNames[Opt::USER]},          tr("NNTP server username"), sOptionNames[Opt::USER]},
     {{"p", sOptionNames[Opt::PASS]},          tr("NNTP server password"), sOptionNames[Opt::PASS]},
     {{"n", sOptionNames[Opt::CONNECTION]},    tr("number of NNTP connections"), sOptionNames[Opt::CONNECTION]},
+
+// NFO options
+    { sOptionNames[Opt::KEEP_NFO_EXTENSION],  tr("when obfuscating file names, keep the .nfo extension visible")},
+    { sOptionNames[Opt::NZB_COPY_NFO],        tr("copy the .nfo from the original files next to the generated nzb")},
+
+// VPN options (override the configured VPN behaviour for this run)
+    { sOptionNames[Opt::VPN],                 tr("force all NNTP connections through the configured VPN (master switch ON)")},
+    { sOptionNames[Opt::NO_VPN],              tr("disable VPN for this run (master switch OFF, per-server useVpn ignored too)")},
+    { sOptionNames[Opt::VPN_PROFILE],         tr("select the active VPN profile by name (must already exist in the config)"), sOptionNames[Opt::VPN_PROFILE]},
 };
 
 const QMap<NgPost::PostCmdPlaceHolders, QString> NgPost::sPostCmdPlaceHolders = {
@@ -1401,7 +1415,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     {
         if ( !parser.isSet(sOptionNames[Opt::AUTO_DIR]) && !parser.isSet(sOptionNames[Opt::MONITOR_DIR]))
         {
-            _error(tr("Error syntax: --del option is only available with --auto or --monitor"),
+            _error(tr("Error syntax: --rm_posted option is only available with --auto or --monitor"),
                    ERROR_CODE::ERR_DEL_AUTO);
             return false;
         }
@@ -1409,8 +1423,46 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
             _delAuto = true;
     }
 
-    if (parser.isSet(sOptionNames[Opt::PACK]))
+    if (parser.isSet(sOptionNames[Opt::PACK]) || parser.isSet(sOptionNames[Opt::AUTO_COMPRESS]))
         enableAutoPacking();
+
+    if (parser.isSet(sOptionNames[Opt::KEEP_NFO_EXTENSION]))
+        _keepNfoExtension = true;
+    if (parser.isSet(sOptionNames[Opt::NZB_COPY_NFO]))
+        _copyNfoWithNzb = true;
+
+    if (parser.isSet(sOptionNames[Opt::VPN]) && parser.isSet(sOptionNames[Opt::NO_VPN]))
+    {
+        _error(tr("Error syntax: --vpn and --no_vpn are mutually exclusive"),
+               ERROR_CODE::ERR_WRONG_ARG);
+        return false;
+    }
+    if (_vpnManager
+        && (parser.isSet(sOptionNames[Opt::VPN])
+            || parser.isSet(sOptionNames[Opt::NO_VPN])
+            || parser.isSet(sOptionNames[Opt::VPN_PROFILE])))
+    {
+        // Apply VPN overrides without triggering saveConfig(): the CLI is a
+        // one-shot override for this run, not a config edit.
+        bool vpnSignalsWereBlocked = _vpnManager->blockSignals(true);
+        if (parser.isSet(sOptionNames[Opt::VPN_PROFILE]))
+        {
+            QString name = parser.value(sOptionNames[Opt::VPN_PROFILE]);
+            if (_vpnManager->findProfileIndex(name) < 0)
+            {
+                _vpnManager->blockSignals(vpnSignalsWereBlocked);
+                _error(tr("Error syntax: --vpn_profile '%1' does not match any profile defined in the config").arg(name),
+                       ERROR_CODE::ERR_WRONG_ARG);
+                return false;
+            }
+            _vpnManager->setActiveProfileName(name);
+        }
+        if (parser.isSet(sOptionNames[Opt::VPN]))
+            _vpnManager->setAutoConnect(true);
+        else if (parser.isSet(sOptionNames[Opt::NO_VPN]))
+            _vpnManager->setAutoConnect(false);
+        _vpnManager->blockSignals(vpnSignalsWereBlocked);
+    }
 
     if (parser.isSet(sOptionNames[Opt::COMPRESS]))
         _doCompress = true;
@@ -1753,7 +1805,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         QFileInfo fileInfo(filePath);
         if (!fileInfo.exists() || !fileInfo.isReadable())
         {
-            _error(tr("Error: the input file '%1' is not readable...").arg(parser.value("input")),
+            _error(tr("Error: the input file '%1' is not readable...").arg(filePath),
                    ERROR_CODE::ERR_INPUT_READ);
             return false;
         }
@@ -2580,6 +2632,10 @@ void NgPost::_syntax(char *appName)
             _cout << "\n// " << tr("quick posting (several files/folders)") << "\n";
         else if (opt.valueName() == sOptionNames[Opt::OBFUSCATE])
             _cout << "\n// " << tr("general options") << "\n";
+        else if (opt.names().first() == sOptionNames[Opt::KEEP_NFO_EXTENSION])
+            _cout << "\n// " << tr("NFO options") << "\n";
+        else if (opt.names().first() == sOptionNames[Opt::VPN])
+            _cout << "\n// " << tr("VPN overrides (one-shot, not saved to config)") << "\n";
 
         if (opt.names().size() == 1)
             _cout << QString("\t--%1: %2\n").arg(opt.names().first(), -17).arg(tr(opt.description().toLocal8Bit().constData()));

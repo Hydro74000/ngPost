@@ -1,3 +1,9 @@
+# ngPost depends on qtkeychain-qt6 (libqt6keychain). Building with Qt 5
+# silently produces a broken binary because libQt6Core is pulled in via the
+# keychain dependency but never appears in the link line, so ld --as-needed
+# rejects it. Fail loudly here instead of waiting for the linker to crash.
+lessThan(QT_MAJOR_VERSION, 6): error("ngPost requires Qt 6 (qtkeychain-qt6). Use qmake6, not qmake/qmake-qt5.")
+
 QT += core network
 
 # Cross-platform credential store (QtKeychain) for OpenVPN auth.
