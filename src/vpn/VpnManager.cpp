@@ -13,6 +13,9 @@
 #include "VpnBackend.h"
 #include "VpnProfile.h"
 #include "WireGuardBackend.h"
+#ifdef Q_OS_WIN
+#include "WindowsBindHelper.h"
+#endif
 
 #include "nntp/NntpServerParams.h"
 #include "utils/PathHelper.h"
@@ -49,14 +52,14 @@ VpnManager::VpnManager(QObject *parent)
     , _tunIface()
     , _dnsServer()
     , _currentBackend(nullptr)
+    , _tunPollTimer(new QTimer(this))
+    , _tunPollAttempts(0)
     , _profiles()
     , _activeProfileName()
     , _runtimeAuthFilePath()
     , _autoStartedByJob(false)
     , _activeJobsNeedingVpn(0)
     , _autoDisconnectTimer(new QTimer(this))
-    , _tunPollTimer(new QTimer(this))
-    , _tunPollAttempts(0)
 {
     _autoDisconnectTimer->setSingleShot(true);
     _autoDisconnectTimer->setInterval(kAutoDisconnectMs);
@@ -120,9 +123,9 @@ bool VpnManager::addProfile(VpnProfile const &p)
     if (!p.isValid()) return false;
     if (findProfileIndex(p.name) >= 0) return false;
 #ifdef Q_OS_WIN
-    // Phase 5b: a WireGuard profile only makes sense on Windows if its
-    // tunnel service was registered (we need ACL grants for runtime start
-    // without UAC). Trigger the elevated PowerShell installer once here.
+    // A WireGuard profile only makes sense on Windows if its tunnel service
+    // was registered with runtime ACL grants. Trigger the elevated installer
+    // once when the profile is created.
     if (p.backend == Backend::WireGuard) {
         if (!registerWindowsWireGuardTunnel(p.absoluteConfigPath()))
             return false;
@@ -157,7 +160,7 @@ bool VpnManager::removeProfile(QString const &name)
     VpnProfile victim = _profiles.takeAt(idx);
 
 #ifdef Q_OS_WIN
-    // Phase 5b: tear down the Windows service registered for a WG profile.
+    // Tear down the Windows service registered for a WG profile.
     if (victim.backend == Backend::WireGuard) {
         QString svc = QStringLiteral("WireGuardTunnel$")
                       + QFileInfo(victim.configFileName).completeBaseName();
@@ -365,15 +368,11 @@ void VpnManager::onBackendReady(QString const &iface, QHostAddress const &ip,
     _tunIface = iface;
     _tunIp    = ip;
     _dnsServer = dns;
-    emit logLine(tr("VPN: backend reports ready (%1, %2) — waiting for kernel to bind the address")
+    emit logLine(tr("VPN: backend reports ready (%1, %2) — waiting for the address to become bindable")
                      .arg(iface, ip.toString()));
-    // On Windows openvpn signals CONNECTED via the management socket BEFORE
-    // the NDIS stack has finished assigning the IP to the TAP/Wintun adapter.
-    // If we emit Connected immediately, NntpConnection::bind() races against
-    // that and fails with WSAEADDRNOTAVAIL. Poll QNetworkInterface until the
-    // address is actually live, with a short timeout. Linux usually returns
-    // true on the first tick (helper has finished `ip addr add` by the time
-    // it signals ready), so the cost there is one extra event-loop trip.
+    // Windows can expose a tunnel address while it is still Tentative; Qt sees
+    // it, but Winsock rejects bind() with WSAEADDRNOTAVAIL. Non-Windows
+    // backends only need the address to appear in the local interface list.
     _tunPollAttempts = 0;
     _pollTunIpAvailability();
 }
@@ -385,6 +384,19 @@ void VpnManager::_pollTunIpAvailability()
         return;
     }
     QList<QHostAddress> all = QNetworkInterface::allAddresses();
+
+#ifdef Q_OS_WIN
+    QString bindErr;
+    if (WindowsBindHelper::canBindLocalAddress(_tunIp, &bindErr)) {
+        _tunPollTimer->stop();
+        emit logLine(tr("VPN: tun IP %1 became bindable after %2 ms")
+                         .arg(_tunIp.toString())
+                         .arg(_tunPollAttempts * kTunPollIntervalMs));
+        _completeReady();
+        return;
+    }
+    int const maxAttempts = kTunPollMaxAttemptsWindows;
+#else
     if (all.contains(_tunIp)) {
         _tunPollTimer->stop();
         emit logLine(tr("VPN: kernel acknowledged tun IP %1 after %2 ms")
@@ -393,19 +405,33 @@ void VpnManager::_pollTunIpAvailability()
         _completeReady();
         return;
     }
+    int const maxAttempts = kTunPollMaxAttempts;
+#endif
+
     ++_tunPollAttempts;
-    if (_tunPollAttempts >= kTunPollMaxAttempts) {
+    if (_tunPollAttempts >= maxAttempts) {
         _tunPollTimer->stop();
         QStringList visibleAddrs;
         for (QHostAddress const &a : all)
             visibleAddrs << a.toString();
+#ifdef Q_OS_WIN
+        QString reason = tr("VPN: tun IP %1 was reported by the backend but "
+                            "Winsock never accepted bind() (waited %2 ms; "
+                            "last error: %3). Visible local addresses: %4. "
+                            "Aborting to avoid a leaking bind.")
+                             .arg(_tunIp.toString())
+                             .arg(maxAttempts * kTunPollIntervalMs)
+                             .arg(bindErr.isEmpty() ? tr("unknown") : bindErr)
+                             .arg(visibleAddrs.join(", "));
+#else
         QString reason = tr("VPN: tun IP %1 was reported by the backend but "
                             "the kernel never bound it to an interface "
                             "(waited %2 ms). Visible local addresses: %3. "
                             "Aborting to avoid a leaking bind.")
                              .arg(_tunIp.toString())
-                             .arg(kTunPollMaxAttempts * kTunPollIntervalMs)
+                             .arg(maxAttempts * kTunPollIntervalMs)
                              .arg(visibleAddrs.join(", "));
+#endif
         onBackendFailed(reason);
         return;
     }
@@ -486,9 +512,8 @@ void VpnManager::_instantiateBackend()
     else
         _currentBackend = new WireGuardBackend(this);
 #elif defined(Q_OS_WIN)
-    // Phase 5: Windows backend is implemented on top of a SYSTEM service
-    // exposing a named pipe IPC. The C++ backend classes are the same;
-    // their start()/stop() implementations differ per OS (see Phase 5 plan).
+    // Windows backends use the installed VPN services; the C++ backend
+    // classes are shared, while start()/stop() differ per OS.
     if (backend == Backend::OpenVPN)
         _currentBackend = new OpenVpnBackend(this);
     else
@@ -559,14 +584,13 @@ QString VpnManager::helperScriptPath()
 bool VpnManager::isHelperInstalled() const
 {
 #ifdef Q_OS_WIN
-    // Phase 5 Windows: there's no ngPost-owned helper to install. Instead
-    // we rely on the user having OpenVPN Community (provides openvpn.exe
-    // + OpenVPNServiceInteractive) and WireGuard for Windows (provides
-    // wireguard.exe). The setup installer chain-installs these.
+    // There is no ngPost-owned helper to install on Windows. We rely on
+    // OpenVPN Community and WireGuard for Windows; the setup installer
+    // chain-installs them.
     //
     // We consider the VPN feature "available" if EITHER:
     //   - wireguard.exe is in a known location (WG support)
-    //   - OpenVPN Community is installed (OpenVPN support; pending Phase 5c)
+    //   - OpenVPN Community is installed (OpenVPN support)
     QStringList wgCandidates = {
         QStringLiteral("C:/Program Files/WireGuard/wireguard.exe"),
         QStringLiteral("C:/Program Files (x86)/WireGuard/wireguard.exe"),

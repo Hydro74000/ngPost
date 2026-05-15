@@ -1,6 +1,6 @@
 QT += core network
 
-# Phase 4: cross-platform credential store (QtKeychain) for OpenVPN auth.
+# Cross-platform credential store (QtKeychain) for OpenVPN auth.
 # Packages: Fedora qtkeychain-qt6, Ubuntu libqt6keychain1-dev, brew qtkeychain.
 # Header is <qt6keychain/keychain.h>; needs DBus on Linux.
 #
@@ -41,10 +41,7 @@ TRANSLATIONS = lang/ngPost_en.ts lang/ngPost_fr.ts lang/ngPost_es.ts lang/ngPost
                lang/ngPost_nl.ts lang/ngPost_pt.ts lang/ngPost_zh.ts
 
 win32: {
-    # ws2_32 is needed for the raw WSASocket bind workaround in
-    # vpn/WindowsBindHelper.cpp. QtNetwork links it too, but listing it
-    # explicitly avoids relying on transitive symbol availability when
-    # the linker decides to dead-strip.
+    # ws2_32 is needed by the Windows VPN bind helper.
     LIBS += -luser32 -ladvapi32 -lws2_32
     RC_ICONS = ngPost.ico
     RC_FILE = resources/version.rc
@@ -111,9 +108,11 @@ SOURCES += \
         utils/PathHelper.cpp \
         utils/UpdateChecker.cpp \
         utils/Yenc.cpp \
+        vpn/VpnDnsResolver.cpp \
         vpn/OpenVpnBackend.cpp \
         vpn/VpnManager.cpp \
         vpn/VpnProfile.cpp \
+        vpn/VpnSocketBinder.cpp \
         vpn/WindowsBindHelper.cpp \
         vpn/WireGuardBackend.cpp
 
@@ -157,10 +156,12 @@ HEADERS += \
     utils/PureStaticClass.h \
     utils/UpdateChecker.h \
     utils/Yenc.h \
+    vpn/VpnDnsResolver.h \
     vpn/OpenVpnBackend.h \
     vpn/VpnBackend.h \
     vpn/VpnManager.h \
     vpn/VpnProfile.h \
+    vpn/VpnSocketBinder.h \
     vpn/WindowsBindHelper.h \
     vpn/WireGuardBackend.h
 
@@ -169,4 +170,3 @@ HEADERS += \
 RESOURCES += \
     resources/resources.qrc \
     resources/version.rc
-

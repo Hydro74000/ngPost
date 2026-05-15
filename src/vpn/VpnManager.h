@@ -51,7 +51,7 @@ public:
     //! DNS server pushed by the VPN, populated from the helper READY message.
     //! Used by NntpConnection to perform DNS resolution through the VPN.
     QHostAddress  dnsServer() const { return _dnsServer; }
-    //! Phase 5d — global override: when true, the VPN auto-starts on every
+    //! Global override: when true, the VPN auto-starts on every
     //! job AND every NNTP connection (across all servers) binds to the tun,
     //! regardless of per-server `useVpn`. When false, per-server `useVpn`
     //! decides which servers route through the tunnel. The legacy
@@ -69,7 +69,7 @@ public:
     Backend backend() const;
     QString configPath() const;
 
-    //! Profile management (Phase 4).
+    //! Profile management.
     QList<VpnProfile> const &profiles() const { return _profiles; }
     VpnProfile const *activeProfile() const;
     QString  activeProfileName() const { return _activeProfileName; }
@@ -134,7 +134,7 @@ public:
     bool unregisterWindowsWireGuardTunnel(QString const &serviceName);
 #endif
 
-    //! Phase 3 orchestration.
+    //! VPN orchestration.
 
     //! Admission verdict for a starting job.
     enum class Admission {
@@ -198,11 +198,8 @@ private slots:
     void onBackendFailed(QString const &reason);
     void onBackendStopped();
     void onAutoDisconnectTimeout();
-    //! Phase 5d: openvpn may report CONNECTED via mgmt socket before the OS
-    //! kernel has actually assigned the tun IP to a network interface (Windows
-    //! NDIS lag). Poll QNetworkInterface::allAddresses() until the IP shows up,
-    //! THEN emit Connected — otherwise NntpConnection::bind would fail with
-    //! WSAEADDRNOTAVAIL ("The address is not available").
+    //! Wait until the reported tunnel IP is usable for source binding before
+    //! emitting Connected.
     void _pollTunIpAvailability();
 
 private:
@@ -213,8 +210,7 @@ private:
     //! the current openvpn invocation, if any.
     void _shredRuntimeAuthFile();
     void _cancelAutoDisconnect();
-    //! Phase 5d: declare the tunnel up — actually emit Connected once
-    //! `_tunIp` is confirmed reachable.
+    //! Declare the tunnel up once `_tunIp` is confirmed usable.
     void _completeReady();
 
     bool         _autoConnect;
@@ -224,11 +220,11 @@ private:
     QHostAddress _dnsServer;
     VpnBackend  *_currentBackend;
 
-    // Phase 5d — pending-ready bookkeeping while we wait for the tun IP to
-    // appear as a local interface address (Windows NDIS race).
+    // Pending-ready bookkeeping while the reported tunnel IP becomes usable.
     QTimer      *_tunPollTimer;
     int          _tunPollAttempts;
-    static constexpr int kTunPollMaxAttempts = 50;  // 50 × 100ms = 5s
+    static constexpr int kTunPollMaxAttempts = 50;         // 50 x 100ms = 5s
+    static constexpr int kTunPollMaxAttemptsWindows = 200; // 200 x 100ms = 20s
     static constexpr int kTunPollIntervalMs  = 100;
 
     QList<VpnProfile> _profiles;

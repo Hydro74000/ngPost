@@ -18,15 +18,12 @@
 //========================================================================
 
 #include "NntpCheckCon.h"
-#include <QDnsLookup>
-#include <QEventLoop>
-#include <QNetworkInterface>
 #include <QSslSocket>
-#include <QTimer>
 #include "NzbCheck.h"
 #include "nntp/Nntp.h"
+#include "vpn/VpnDnsResolver.h"
 #include "vpn/VpnManager.h"
-#include "vpn/WindowsBindHelper.h"
+#include "vpn/VpnSocketBinder.h"
 
 NntpCheckCon::NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &srvParams)
     : QObject()
@@ -69,11 +66,8 @@ void NntpCheckCon::onStartConnection()
     else
         _socket = new QTcpSocket();
 
-    // Per-server VPN bind (Phase 3) + global override (Phase 5d): tunnel if
-    // either the server has useVpn=true OR the global "Route ALL through VPN"
-    // toggle is on. We bind BEFORE any setSocketOption call so the underlying
-    // socket descriptor is created with the IPv4 protocol family matching the
-    // tun IP — defensive against Qt creating an IPv6 socket on Windows.
+    // Per-server VPN bind plus global override: tunnel if either the server
+    // has useVpn=true OR the global "Route ALL through VPN" toggle is on.
     VpnManager *vpn = VpnManager::instance();
     bool routeViaVpn = _srvParams.useVpn
                     || (vpn && vpn->forceAllConnectionsThroughVpn());
@@ -86,23 +80,13 @@ void NntpCheckCon::onStartConnection()
             emit disconnected(this);
             return;
         }
-#ifdef Q_OS_WIN
         QString bindErr;
-        bool bound = WindowsBindHelper::bindAndAttach(_socket, vpn->tunIp(), &bindErr);
-#else
-        QAbstractSocket::BindMode bindFlags =
-            QAbstractSocket::ShareAddress | QAbstractSocket::ReuseAddressHint;
-        bool bound = _socket->bind(vpn->tunIp(), 0, bindFlags);
-        QString bindErr = bound ? QString() : _socket->errorString();
-#endif
+        bool bound = VpnSocketBinder::bind(_socket, vpn->tunIp(), &bindErr);
         if (!bound) {
-            QStringList visibleAddrs;
-            for (QHostAddress const &a : QNetworkInterface::allAddresses())
-                visibleAddrs << a.toString();
             _nzbCheck->error(tr("VPN bind failed on %1: %2 (local addresses visible to Qt: %3)")
                                  .arg(vpn->tunIp().toString(),
                                       bindErr,
-                                      visibleAddrs.join(", ")));
+                                      VpnSocketBinder::localAddressSummary()));
             _socket->deleteLater();
             _socket = nullptr;
             emit disconnected(this);
@@ -132,38 +116,25 @@ void NntpCheckCon::onStartConnection()
             SLOT(onErrors(QAbstractSocket::SocketError)),
             Qt::DirectConnection);
 
-    // Phase 4: DNS leak fix — resolve through the VPN DNS for useVpn servers.
-    if (_srvParams.useVpn) {
-        VpnManager *vpn = VpnManager::instance();
+    // Resolve through a DNS socket bound to the tunnel IP.
+    if (routeViaVpn) {
         if (vpn && !vpn->dnsServer().isNull()) {
-            QDnsLookup lookup;
-            lookup.setType(QDnsLookup::A);
-            lookup.setName(_srvParams.host);
-            lookup.setNameserver(vpn->dnsServer());
-            QEventLoop loop;
-            QObject::connect(&lookup, &QDnsLookup::finished, &loop, &QEventLoop::quit);
-            QTimer::singleShot(5000, &loop, &QEventLoop::quit);
-            lookup.lookup();
-            loop.exec();
-            if (lookup.error() == QDnsLookup::NoError) {
-                auto const records = lookup.hostAddressRecords();
-                if (!records.isEmpty()) {
-                    // Set peerVerifyName so the SSL cert is validated against
-                    // the original hostname rather than the resolved IP.
-                    if (_srvParams.useSSL)
-                        static_cast<QSslSocket *>(_socket)
-                            ->setPeerVerifyName(_srvParams.host);
-                    _socket->connectToHost(records.first().value(), _srvParams.port);
-                    return;
-                }
+            QString dnsErr;
+            auto const records = VpnDnsResolver::resolveA(
+                _srvParams.host, vpn->dnsServer(), vpn->tunIp(), &dnsErr);
+            if (!records.isEmpty()) {
+                // Set peerVerifyName so the SSL cert is validated against
+                // the original hostname rather than the resolved IP.
+                if (_srvParams.useSSL)
+                    static_cast<QSslSocket *>(_socket)
+                        ->setPeerVerifyName(_srvParams.host);
+                _socket->connectToHost(records.first(), _srvParams.port);
+                return;
             }
-            QString why = (lookup.error() == QDnsLookup::NoError)
-                ? QStringLiteral("no A records returned")
-                : lookup.errorString();
             _nzbCheck->error(tr("VPN DNS lookup failed for %1 via %2: %3 — falling back to system DNS")
                                  .arg(_srvParams.host,
                                       vpn->dnsServer().toString(),
-                                      why));
+                                      dnsErr.isEmpty() ? tr("unknown error") : dnsErr));
         }
     }
     _socket->connectToHost(_srvParams.host, _srvParams.port);

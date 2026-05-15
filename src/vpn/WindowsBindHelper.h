@@ -16,25 +16,19 @@
 
 #ifdef Q_OS_WIN
 
-//! Phase 5d follow-up: Qt's QAbstractSocket::bind() on Windows fails with
-//! WSAEADDRNOTAVAIL when targeting a virtual adapter IP (OpenVPN DCO /
-//! Wintun / TAP-Windows6), even though a raw WSASocket+bind to the same
-//! address succeeds. Root cause confirmed via live probe on a Windows VM:
-//! Qt's socket creation sets SO_EXCLUSIVEADDRUSE; the BindMode flag then
-//! tries to set SO_REUSEADDR which fails with WSAEINVAL on the now-
-//! exclusive socket. Qt swallows the setsockopt error and proceeds to
-//! bind(), but the underlying TCP/IP stack rejects the address as
-//! "not available" on the virtual adapter. There is no Qt public API to
-//! disable SO_EXCLUSIVEADDRUSE at creation time.
+//! Windows-only Winsock helpers for VPN source binding.
 //!
-//! Workaround: do the socket creation + bind ourselves with the minimal
-//! options Qt would normally use, then hand the bound descriptor over via
-//! QAbstractSocket::setSocketDescriptor(BoundState). After that,
-//! connectToHost() (or connectToHostEncrypted() for QSslSocket) drives
-//! the rest of the lifecycle normally.
+//! Qt can see a just-created OpenVPN/WireGuard address before Winsock accepts
+//! bind() on it. We use a raw socket both to probe readiness and to hand an
+//! already-bound descriptor to QAbstractSocket.
 class WindowsBindHelper
 {
 public:
+    //! Try a temporary AF_INET bind to localIp:0, then close it immediately.
+    //! This is the Windows readiness check used before ngPost starts posting.
+    static bool canBindLocalAddress(QHostAddress const &localIp,
+                                    QString *errMsg = nullptr);
+
     //! Create AF_INET socket, bind to localIp:0, attach via setSocketDescriptor.
     //! On failure, *errMsg gets a human-readable description and false is returned.
     static bool bindAndAttach(QAbstractSocket *socket,

@@ -54,9 +54,8 @@ OpenVpnBackend::~OpenVpnBackend()
 bool OpenVpnBackend::start(QString const &configPathPacked)
 {
 #ifdef Q_OS_WIN
-    // Phase 5c: drive OpenVPN via the official interactive service on
-    // Windows. Block-scoped to keep the locals away from the Linux path
-    // below it (MSVC parses both branches as one function scope).
+    // Drive OpenVPN via the official interactive service on Windows. Keep
+    // this block scoped because MSVC parses both branches in one function.
     {
         QString cfg = configPathPacked;
         QString auth;

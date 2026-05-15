@@ -24,15 +24,13 @@
 #include "nntp/NntpArticle.h"
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
+#include "vpn/VpnDnsResolver.h"
 #include "vpn/VpnManager.h"
-#include "vpn/WindowsBindHelper.h"
+#include "vpn/VpnSocketBinder.h"
 
 #include <QAbstractSocket>
 #include <QByteArray>
-#include <QDnsLookup>
-#include <QEventLoop>
 #include <QFile>
-#include <QNetworkInterface>
 #include <QSslCertificate>
 #include <QSslCipher>
 #include <QSslKey>
@@ -116,9 +114,9 @@ void NntpConnection::onStartConnection()
     else
         _socket = new QTcpSocket();
 
-    // VPN binding: per-server `useVpn` decides by default, but the global
-    // "Route ALL ngPost connections through the VPN" override (Phase 5d)
-    // forces every connection into the tunnel regardless of per-server flags.
+    // Per-server `useVpn` decides by default; the global "Route ALL ngPost
+    // connections through the VPN" override forces every connection into the
+    // tunnel regardless of per-server flags.
     // Fail-closed in both cases: if the tunnel is required but not ready,
     // refuse the connection rather than leaking traffic in the clear.
     //
@@ -136,29 +134,13 @@ void NntpConnection::onStartConnection()
             emit disconnected(this);
             return;
         }
-#ifdef Q_OS_WIN
-        // On Windows, Qt's QAbstractSocket::bind() fails on virtual adapter
-        // IPs (OpenVPN DCO / Wintun / TAP) due to a SO_EXCLUSIVEADDRUSE +
-        // SO_REUSEADDR setsockopt clash that we can't disable through the
-        // public API. Use a raw WSASocket+bind+setSocketDescriptor path.
         QString bindErr;
-        bool bound = WindowsBindHelper::bindAndAttach(_socket, vpn->tunIp(), &bindErr);
-#else
-        // Linux: Qt's bind() works fine. SO_REUSEADDR via ShareAddress is the
-        // friendliest combination for source-binding to a tun IP.
-        QAbstractSocket::BindMode bindFlags =
-            QAbstractSocket::ShareAddress | QAbstractSocket::ReuseAddressHint;
-        bool bound = _socket->bind(vpn->tunIp(), 0, bindFlags);
-        QString bindErr = bound ? QString() : _socket->errorString();
-#endif
+        bool bound = VpnSocketBinder::bind(_socket, vpn->tunIp(), &bindErr);
         if (!bound) {
-            QStringList visibleAddrs;
-            for (QHostAddress const &a : QNetworkInterface::allAddresses())
-                visibleAddrs << a.toString();
             _error(tr("VPN bind failed on %1: %2 (local addresses visible to Qt: %3)")
                        .arg(vpn->tunIp().toString(),
                             bindErr,
-                            visibleAddrs.join(", ")));
+                            VpnSocketBinder::localAddressSummary()));
             deleteSocket();
             emit disconnected(this);
             return;
@@ -188,54 +170,30 @@ void NntpConnection::onStartConnection()
             SLOT(onErrors(QAbstractSocket::SocketError)),
             Qt::DirectConnection);
 
-    // DNS leak fix (Phase 4): when this server uses the VPN AND the VpnManager
-    // captured a pushed DNS server, resolve the NNTP hostname against THAT DNS
-    // (via QDnsLookup) instead of letting QTcpSocket use the system resolver
-    // (which would normally hit /etc/resolv.conf — outside the tunnel).
-    //
-    // The lookup is blocking with a short timeout. Each NNTP connection runs
-    // on its own thread (Poster's QThread), so this does not freeze the GUI.
-    // Falls back to connectToHost(QString) on any failure (better connect
-    // than nothing — we already proved the policy routing tunnels the bytes;
-    // only the resolution itself leaks in fallback).
-    if (_srvParams.useVpn) {
-        VpnManager *vpn = _ngPost->vpnManager();
+    // Resolve through a DNS socket bound to the tunnel IP. Each NNTP
+    // connection runs on a Poster thread, so the blocking lookup does not
+    // freeze the GUI. On failure we fall back to the system resolver so the
+    // post can continue, but we log that DNS may leak.
+    if (routeViaVpn) {
         if (vpn && !vpn->dnsServer().isNull()) {
-            QDnsLookup lookup;
-            lookup.setType(QDnsLookup::A);
-            lookup.setName(_srvParams.host);
-            lookup.setNameserver(vpn->dnsServer());
-            QEventLoop loop;
-            QObject::connect(&lookup, &QDnsLookup::finished, &loop, &QEventLoop::quit);
-            QTimer::singleShot(5000, &loop, &QEventLoop::quit);
-            lookup.lookup();
-            loop.exec();
-            if (lookup.error() == QDnsLookup::NoError) {
-                auto const records = lookup.hostAddressRecords();
-                if (!records.isEmpty()) {
-                    // When connectToHost is called with a QHostAddress (raw IP),
-                    // QSslSocket defaults peerVerifyName to that IP — which
-                    // makes the certificate hostname check fail for every
-                    // server whose cert is issued for a hostname rather than
-                    // a literal IP. Set it explicitly to the original hostname
-                    // so SNI + cert verification still target the right name.
-                    if (_srvParams.useSSL)
-                        static_cast<QSslSocket *>(_socket)
-                            ->setPeerVerifyName(_srvParams.host);
-                    _socket->connectToHost(records.first().value(), _srvParams.port);
-                    goto connect_done;
-                }
+            QString dnsErr;
+            auto const records = VpnDnsResolver::resolveA(
+                _srvParams.host, vpn->dnsServer(), vpn->tunIp(), &dnsErr);
+            if (!records.isEmpty()) {
+                // When connectToHost is called with a QHostAddress (raw IP),
+                // QSslSocket defaults peerVerifyName to that IP. Keep SNI and
+                // certificate verification tied to the configured hostname.
+                if (_srvParams.useSSL)
+                    static_cast<QSslSocket *>(_socket)
+                        ->setPeerVerifyName(_srvParams.host);
+                _socket->connectToHost(records.first(), _srvParams.port);
+                goto connect_done;
             }
-            // Surface the actual reason so we can tell timeout from server
-            // error from empty response. Helps diagnose "DNS may leak" reports.
-            QString why = (lookup.error() == QDnsLookup::NoError)
-                ? QStringLiteral("no A records returned")
-                : lookup.errorString();
             _error(tr("VPN DNS lookup failed for %1 via %2: %3 — falling back to "
                       "system resolver (DNS may leak)")
                        .arg(_srvParams.host,
                             vpn->dnsServer().toString(),
-                            why));
+                            dnsErr.isEmpty() ? tr("unknown error") : dnsErr));
         }
     }
     _socket->connectToHost(_srvParams.host, _srvParams.port);

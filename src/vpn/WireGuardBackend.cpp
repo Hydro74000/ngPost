@@ -45,9 +45,8 @@ WireGuardBackend::~WireGuardBackend()
 bool WireGuardBackend::start(QString const &configPathPacked)
 {
 #ifdef Q_OS_WIN
-    // Phase 5 Windows path: drive the WireGuard service registered for this
-    // tunnel via the Service Control Manager. Wrapped in braces so its locals
-    // don't clash with the Linux-path locals below.
+    // Drive the registered WireGuard tunnel service via the Service Control
+    // Manager. Keep locals scoped away from the Linux path below.
     {
         QString winCfg = configPathPacked;
         int nul = configPathPacked.indexOf(QChar(QChar::Null));
