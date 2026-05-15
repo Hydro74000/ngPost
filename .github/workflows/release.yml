@@ -256,6 +256,39 @@ jobs:
           ; Chain-install WireGuard for Windows silently (with Wintun driver + manager service)
           Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\wireguard.msi"" /qb! /norestart DO_NOT_LAUNCH=1"; StatusMsg: "Installing WireGuard for Windows..."; Tasks: installwireguard
           Filename: "{app}\ngPost.exe"; Description: "Launch ngPost"; Flags: nowait postinstall skipifsilent
+
+          [Code]
+          // If OpenVPN Community / WireGuard for Windows are already installed
+          // on the host, pre-uncheck the corresponding "Install ..." task in
+          // the wizard. The user can still re-check it to force a reinstall.
+          function OpenVpnAlreadyInstalled(): Boolean;
+          begin
+            Result := RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\OpenVPNServiceInteractive')
+                  or FileExists(ExpandConstant('{commonpf}\OpenVPN\bin\openvpn.exe'))
+                  or FileExists(ExpandConstant('{commonpf32}\OpenVPN\bin\openvpn.exe'));
+          end;
+          function WireGuardAlreadyInstalled(): Boolean;
+          begin
+            Result := FileExists(ExpandConstant('{commonpf}\WireGuard\wireguard.exe'))
+                  or FileExists(ExpandConstant('{commonpf32}\WireGuard\wireguard.exe'));
+          end;
+          procedure InitializeWizard();
+          var
+            i: Integer;
+            s: String;
+          begin
+            for i := 0 to WizardForm.TasksList.Items.Count - 1 do begin
+              s := WizardForm.TasksList.Items[i];
+              if (Pos('OpenVPN Community', s) > 0) and OpenVpnAlreadyInstalled() then begin
+                WizardForm.TasksList.Checked[i] := False;
+                WizardForm.TasksList.Items[i] := s + ' [already installed]';
+              end;
+              if (Pos('WireGuard for Windows', s) > 0) and WireGuardAlreadyInstalled() then begin
+                WizardForm.TasksList.Checked[i] := False;
+                WizardForm.TasksList.Items[i] := s + ' [already installed]';
+              end;
+            end;
+          end;
           "@
           Set-Content -Path installer.iss -Value $iss -Encoding ASCII
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
