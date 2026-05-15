@@ -68,12 +68,11 @@ void NntpCheckCon::onStartConnection()
     else
         _socket = new QTcpSocket();
 
-    _socket->setSocketOption(QAbstractSocket::KeepAliveOption, true);
-    _socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
-
     // Per-server VPN bind (Phase 3) + global override (Phase 5d): tunnel if
     // either the server has useVpn=true OR the global "Route ALL through VPN"
-    // toggle is on.
+    // toggle is on. We bind BEFORE any setSocketOption call so the underlying
+    // socket descriptor is created with the IPv4 protocol family matching the
+    // tun IP — defensive against Qt creating an IPv6 socket on Windows.
     VpnManager *vpn = VpnManager::instance();
     bool routeViaVpn = _srvParams.useVpn
                     || (vpn && vpn->forceAllConnectionsThroughVpn());
@@ -86,7 +85,9 @@ void NntpCheckCon::onStartConnection()
             emit disconnected(this);
             return;
         }
-        if (!_socket->bind(vpn->tunIp(), 0, QAbstractSocket::DefaultForPlatform)) {
+        QAbstractSocket::BindMode bindFlags =
+            QAbstractSocket::ShareAddress | QAbstractSocket::ReuseAddressHint;
+        if (!_socket->bind(vpn->tunIp(), 0, bindFlags)) {
             QStringList visibleAddrs;
             for (QHostAddress const &a : QNetworkInterface::allAddresses())
                 visibleAddrs << a.toString();
@@ -100,6 +101,9 @@ void NntpCheckCon::onStartConnection()
             return;
         }
     }
+
+    _socket->setSocketOption(QAbstractSocket::KeepAliveOption, true);
+    _socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
 
     connect(_socket,
             &QAbstractSocket::connected,

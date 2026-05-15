@@ -115,15 +115,15 @@ void NntpConnection::onStartConnection()
     else
         _socket = new QTcpSocket();
 
-    _socket->setSocketOption(QAbstractSocket::KeepAliveOption, true);
-    _socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
-    _socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, NgPost::articleSize());
-
     // VPN binding: per-server `useVpn` decides by default, but the global
     // "Route ALL ngPost connections through the VPN" override (Phase 5d)
     // forces every connection into the tunnel regardless of per-server flags.
     // Fail-closed in both cases: if the tunnel is required but not ready,
     // refuse the connection rather than leaking traffic in the clear.
+    //
+    // We do this BEFORE setSocketOption to avoid any chance of forcing the
+    // underlying socket descriptor to be created with the wrong protocol
+    // family (which would later cause an IPv4 bind to fail).
     VpnManager *vpn = _ngPost->vpnManager();
     bool routeViaVpn = _srvParams.useVpn
                     || (vpn && vpn->forceAllConnectionsThroughVpn());
@@ -135,11 +135,15 @@ void NntpConnection::onStartConnection()
             emit disconnected(this);
             return;
         }
-        if (!_socket->bind(vpn->tunIp(), 0, QAbstractSocket::DefaultForPlatform)) {
-            // Dump local interface addresses to help diagnose why Windows said
-            // WSAEADDRNOTAVAIL — typically a sign that the tun IP we parsed
-            // from the openvpn management socket isn't the same one the NDIS
-            // stack actually assigned, or the adapter is in a transient state.
+        // ShareAddress | ReuseAddressHint maps to SO_REUSEADDR + no
+        // SO_EXCLUSIVEADDRUSE on Windows. Qt's DefaultForPlatform on Windows
+        // sets SO_EXCLUSIVEADDRUSE, which we've observed to reject bind() on
+        // virtual adapter IPs (OpenVPN DCO / Wintun) even though a raw .NET
+        // Socket.Bind() to the same IP succeeds. On Linux these flags
+        // collapse to SO_REUSEADDR which is also what we want.
+        QAbstractSocket::BindMode bindFlags =
+            QAbstractSocket::ShareAddress | QAbstractSocket::ReuseAddressHint;
+        if (!_socket->bind(vpn->tunIp(), 0, bindFlags)) {
             QStringList visibleAddrs;
             for (QHostAddress const &a : QNetworkInterface::allAddresses())
                 visibleAddrs << a.toString();
@@ -152,6 +156,10 @@ void NntpConnection::onStartConnection()
             return;
         }
     }
+
+    _socket->setSocketOption(QAbstractSocket::KeepAliveOption, true);
+    _socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+    _socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, NgPost::articleSize());
 
     connect(_socket,
             &QAbstractSocket::connected,
