@@ -780,14 +780,8 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     CheckBoxCenterWidget *vpnCb = new CheckBoxCenterWidget(
         _ui->serversTable, serverParam ? serverParam->useVpn : false);
     _ui->serversTable->setCellWidget(nbRows, col++, vpnCb);
-    bool wired = connect(vpnCb, &CheckBoxCenterWidget::toggled,
-                          this, &MainWindow::_onUseVpnToggled);
-    fprintf(stderr, "[ngPost] _addServer row=%d host=%s initial useVpn=%d toggled-wired=%d\n",
-            nbRows,
-            qPrintable(serverParam ? serverParam->host : QStringLiteral("(new)")),
-            serverParam ? int(serverParam->useVpn) : 0,
-            int(wired));
-    fflush(stderr);
+    connect(vpnCb, &CheckBoxCenterWidget::toggled,
+            this, &MainWindow::_onUseVpnToggled);
 
     QLineEdit *nbConsEdit = new QLineEdit(_ui->serversTable);
     nbConsEdit->setFrame(false);
@@ -927,9 +921,7 @@ void MainWindow::_onUseVpnToggled(bool checked)
     // target a single server here because the sender CheckBoxCenterWidget
     // doesn't carry its row index — `updateServers()` is cheap enough that
     // doing the full sync is simpler than introducing per-row bookkeeping.
-    fprintf(stderr, "[ngPost] _onUseVpnToggled(%d) — syncing server table to disk\n",
-            int(checked));
-    fflush(stderr);
+    Q_UNUSED(checked);
     updateServers();
     _ngPost->saveConfig();
 }

@@ -2478,7 +2478,7 @@ QString NgPost::_parseConfig(const QString &configPath)
                         else
                             serverParams->nzbCheck = false;
                     }
-                    else if (opt == sOptionNames[Opt::SERVER_USE_VPN])
+                    else if (opt == sOptionNames[Opt::SERVER_USE_VPN].toLower())
                     {
                         val = val.toLower();
                         serverParams->useVpn =
@@ -3090,4 +3090,3 @@ const QString NgPost::sNgPostASCII = QString("\
      |___|  /\\___  /|____|   \\____/____  > |__|\n\
           \\//_____/                    \\/\n\
 ");
-
