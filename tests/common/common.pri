@@ -12,6 +12,16 @@ CONFIG   += qt warn_on testcase c++17
 CONFIG   -= app_bundle
 TEMPLATE  = app
 
+win32 {
+    # Keep QTest output attached to the CI console. Without this, Windows test
+    # binaries are GUI-subsystem apps: failures only surface as exit codes.
+    CONFIG += console
+
+    # Each test target still compiles the shared core sources; /MP lets MSVC
+    # compile each target's translation units in parallel.
+    msvc:QMAKE_CXXFLAGS += /MP
+}
+
 # Pull in the same source list, Qt modules, DEFINES and platform link flags
 # as the app. main.cpp is NOT in ngPost_core.pri, so we don't get a duplicate
 # main() — QTEST_MAIN(TestClass) at the bottom of each tst_*.cpp file fills

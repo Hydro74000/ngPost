@@ -18,6 +18,8 @@
 #include <QIODevice>
 #include <QNetworkInterface>
 
+#include <mutex>
+
 namespace {
 
 void setErr(QString *errMsg, QString const &msg)
@@ -32,6 +34,28 @@ bool validateIpv4(QHostAddress const &localIp, QString *errMsg)
         return true;
     setErr(errMsg, QStringLiteral("only IPv4 tun addresses supported"));
     return false;
+}
+
+bool ensureWinsockInitialized(QString *errMsg)
+{
+    static std::once_flag sOnce;
+    static int sStartupCode = 0;
+
+    std::call_once(sOnce, [] {
+        WSADATA data;
+        sStartupCode = WSAStartup(MAKEWORD(2, 2), &data);
+    });
+
+    if (sStartupCode != 0) {
+        setErr(errMsg, QStringLiteral("WSAStartup failed: WSA %1").arg(sStartupCode));
+        return false;
+    }
+    return true;
+}
+
+bool isIpv4Loopback(QHostAddress const &localIp)
+{
+    return (localIp.toIPv4Address() & 0xff000000u) == 0x7f000000u;
 }
 
 bool findInterfaceIndex(QHostAddress const &localIp, DWORD *ifIndex, QString *errMsg)
@@ -66,6 +90,12 @@ SOCKET createTcpSocket(QString *errMsg)
 
 bool setOutgoingInterface(SOCKET s, QHostAddress const &localIp, QString *errMsg)
 {
+    // Loopback traffic is already scoped to the local host. Some Windows
+    // builds reject IP_UNICAST_IF on the loopback pseudo-interface; skipping
+    // it keeps test/mock traffic valid without weakening real VPN binding.
+    if (isIpv4Loopback(localIp))
+        return true;
+
     DWORD ifIndex = 0;
     if (!findInterfaceIndex(localIp, &ifIndex, errMsg))
         return false;
@@ -113,6 +143,8 @@ bool WindowsBindHelper::canBindLocalAddress(QHostAddress const &localIp,
         errMsg->clear();
     if (!validateIpv4(localIp, errMsg))
         return false;
+    if (!ensureWinsockInitialized(errMsg))
+        return false;
 
     SOCKET s = createTcpSocket(errMsg);
     if (s == INVALID_SOCKET)
@@ -139,6 +171,8 @@ bool WindowsBindHelper::bindAndAttach(QAbstractSocket *socket,
         return false;
     }
     if (!validateIpv4(localIp, errMsg))
+        return false;
+    if (!ensureWinsockInitialized(errMsg))
         return false;
 
     SOCKET s = createTcpSocket(errMsg);
