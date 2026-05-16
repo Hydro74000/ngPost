@@ -73,6 +73,12 @@ cleanup() {
         done
         kill -KILL "$VPN_PID" 2>/dev/null || true
     fi
+    # Kernel-mode WG has no userspace process: the interface itself must be
+    # torn down explicitly. Safe to attempt unconditionally; failures (no
+    # such iface, already removed) are ignored.
+    if [ -n "$TUN_IFACE" ] && ip link show "$TUN_IFACE" >/dev/null 2>&1; then
+        ip link del "$TUN_IFACE" 2>/dev/null || true
+    fi
     # Drop the PID file too so the next startup's `cleanup` mode doesn't
     # think there's an orphan to clean.
     rm -f "$OVPN_PIDFILE" "$RUN_MARKER" "$LOG_FILE"
@@ -145,15 +151,26 @@ start_openvpn() {
 
 start_wireguard() {
     TUN_IFACE="ngpost-wg0"
-    wireguard-go -f "$TUN_IFACE" > "$LOG_FILE" 2>&1 &
-    VPN_PID=$!
 
-    local i
-    for i in $(seq 1 30); do
-        [ -e "/sys/class/net/$TUN_IFACE" ] && break
-        sleep 0.2
-    done
-    [ -e "/sys/class/net/$TUN_IFACE" ] || fail "wireguard-go did not create $TUN_IFACE"
+    # Prefer the in-kernel WireGuard implementation (Linux >= 5.6) — it's
+    # what every modern distro ships, what the test environment uses for the
+    # server side, and it removes a hard dependency on the userspace
+    # `wireguard-go` binary which is not part of `wireguard-tools`.
+    # Fall back to wireguard-go only when the kernel module is absent.
+    if ip link add "$TUN_IFACE" type wireguard 2>>"$LOG_FILE"; then
+        VPN_PID=""   # kernel iface, nothing to kill on cleanup beyond `ip link del`
+    elif command -v wireguard-go >/dev/null 2>&1; then
+        wireguard-go -f "$TUN_IFACE" > "$LOG_FILE" 2>&1 &
+        VPN_PID=$!
+        local i
+        for i in $(seq 1 30); do
+            [ -e "/sys/class/net/$TUN_IFACE" ] && break
+            sleep 0.2
+        done
+        [ -e "/sys/class/net/$TUN_IFACE" ] || fail "wireguard-go did not create $TUN_IFACE"
+    else
+        fail "no WireGuard backend: kernel module unavailable AND wireguard-go not installed"
+    fi
 
     wg setconf "$TUN_IFACE" "$CONFIG" || fail "wg setconf failed"
 

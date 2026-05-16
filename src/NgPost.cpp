@@ -385,14 +385,36 @@ NgPost::NgPost(int &argc, char *argv[]):
         emit log(QStringLiteral("[VPN] ") + line, true);
     });
     // Phase 3 — when the VPN reaches Connected, flush any job that was
-    // parked waiting for the tunnel.
+    // parked waiting for the tunnel. On Failed, abort any waiting jobs and
+    // — in CLI mode — terminate the process. The GUI keeps the queue so the
+    // user can retry after fixing the VPN; in CLI there's no one to retry,
+    // so hanging on a pending job is the wrong default.
     connect(_vpnManager, &VpnManager::stateChanged,
             this, [this](VpnManager::State s) {
-        if (s != VpnManager::State::Connected) return;
-        if (_activeJob || _pendingJobs.isEmpty()) return;
-        _vpnManager->retainForJob();
-        _activeJob = _pendingJobs.dequeue();
-        emit _activeJob->startPosting(true);
+        if (s == VpnManager::State::Connected) {
+            if (_activeJob || _pendingJobs.isEmpty()) return;
+            _vpnManager->retainForJob();
+            _activeJob = _pendingJobs.dequeue();
+            emit _activeJob->startPosting(true);
+            return;
+        }
+        if (s == VpnManager::State::Failed && !useHMI() && !_pendingJobs.isEmpty()) {
+            while (!_pendingJobs.isEmpty())
+                _pendingJobs.dequeue()->deleteLater();
+            _error(tr("VPN could not be established — aborting pending jobs"),
+                   ERROR_CODE::ERR_WRONG_ARG);
+            qApp->exit(static_cast<int>(ERROR_CODE::ERR_WRONG_ARG));
+        }
+    });
+    // Blocked admission also needs CLI handling: the GUI shows a popup, but
+    // there's no popup in CLI, so without this hook the binary hangs forever
+    // until the parent times it out. Surface the reason and exit non-zero.
+    connect(_vpnManager, &VpnManager::vpnRequiredButUnavailable,
+            this, [this](VpnManager::JobBlockReason, QString const &detail) {
+        if (useHMI()) return;
+        _error(tr("VPN required but unavailable: %1").arg(detail),
+               ERROR_CODE::ERR_WRONG_ARG);
+        qApp->exit(static_cast<int>(ERROR_CODE::ERR_WRONG_ARG));
     });
 
     _loadTanslators();

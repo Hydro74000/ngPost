@@ -904,7 +904,13 @@ VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
     VpnProfile const *active = activeProfile();
     QString activeCfgPath = active ? active->absoluteConfigPath() : QString();
 
-    if (!isHelperInstalled()) {
+    // The real capability check is "can we locate a helper script we can
+    // spawn", not "did the user run Install". The backends use
+    // helperScriptPath() — which also resolves the in-tree dev copy — so this
+    // gate must agree with them, otherwise a dev/CI build with a valid
+    // in-tree helper gets blocked here and the job hangs forever in the
+    // pending queue.
+    if (helperScriptPath().isEmpty()) {
         reason = JobBlockReason::HelperNotInstalled;
         detail = tr("The VPN helper is not installed. Open the VPN dialog "
                     "and click Install.");
