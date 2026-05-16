@@ -37,6 +37,8 @@ HomeSandbox::HomeSandbox()
     , _hadXdg(false)
     , _hadAppData(false)
     , _hadUserProfile(false)
+    , _hadTestHome(false)
+    , _hadTestConfigDir(false)
 {
     Q_ASSERT(_root.isValid());
 
@@ -44,13 +46,19 @@ HomeSandbox::HomeSandbox()
     _prevXdg         = getEnv("XDG_CONFIG_HOME", _hadXdg);
     _prevAppData     = getEnv("APPDATA", _hadAppData);
     _prevUserProfile = getEnv("USERPROFILE", _hadUserProfile);
+    _prevTestHome      = getEnv("NGPOST_TEST_HOME", _hadTestHome);
+    _prevTestConfigDir = getEnv("NGPOST_TEST_CONFIG_DIR", _hadTestConfigDir);
 
     QDir().mkpath(xdgConfigHome());
+    const QString testConfigDir = xdgConfigHome() + QStringLiteral("/ngPost");
+    QDir().mkpath(testConfigDir);
 
     setEnv("HOME", rootPath().toLocal8Bit());
     setEnv("XDG_CONFIG_HOME", xdgConfigHome().toLocal8Bit());
     setEnv("APPDATA", rootPath().toLocal8Bit());
     setEnv("USERPROFILE", rootPath().toLocal8Bit());
+    setEnv("NGPOST_TEST_HOME", rootPath().toLocal8Bit());
+    setEnv("NGPOST_TEST_CONFIG_DIR", testConfigDir.toLocal8Bit());
 }
 
 HomeSandbox::~HomeSandbox()
@@ -65,6 +73,8 @@ HomeSandbox::~HomeSandbox()
     restore("XDG_CONFIG_HOME", _hadXdg, _prevXdg);
     restore("APPDATA", _hadAppData, _prevAppData);
     restore("USERPROFILE", _hadUserProfile, _prevUserProfile);
+    restore("NGPOST_TEST_HOME", _hadTestHome, _prevTestHome);
+    restore("NGPOST_TEST_CONFIG_DIR", _hadTestConfigDir, _prevTestConfigDir);
 }
 
 QString HomeSandbox::rootPath() const

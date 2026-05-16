@@ -84,6 +84,7 @@ jobs:
       - name: Run VPN E2E tests
         env:
           NGPOST_BIN: ${{ github.workspace }}/src/ngPost
+          QT_QPA_PLATFORM: offscreen
           # tst_VpnE2E_WireGuard sets this on the ngPost subprocess so the
           # privileged helper goes via `sudo` instead of `pkexec` (no agent
           # in CI). Setting it at the parent shell too lets one-off manual
