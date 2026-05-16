@@ -161,11 +161,11 @@ bool VpnManager::removeProfile(QString const &name)
     VpnProfile victim = _profiles.takeAt(idx);
 
 #ifdef Q_OS_WIN
-    // Tear down the Windows service registered for a WG profile.
+    // Tear down the Windows service registered for a WG profile. Reuse the
+    // single source of truth so dev/test and runtime can't drift.
     if (victim.backend == Backend::WireGuard) {
-        QString svc = QStringLiteral("WireGuardTunnel$")
-                      + QFileInfo(victim.configFileName).completeBaseName();
-        unregisterWindowsWireGuardTunnel(svc);
+        unregisterWindowsWireGuardTunnel(
+            WireGuardBackend::serviceNameFromConfig(victim.configFileName));
     }
 #endif
 

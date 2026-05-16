@@ -117,6 +117,46 @@ jobs:
           nmake
       - name: Deploy Qt DLLs with windeployqt
         run: windeployqt src/release/ngPost.exe --release --qmldir src --compiler-runtime
+      - name: Build Tests on Windows
+        shell: pwsh
+        run: |
+          cd tests
+          qmake tests.pro -spec win32-msvc CONFIG+=release
+          nmake
+      - name: Run Unit + Integration Tests on Windows
+        shell: pwsh
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/release/ngPost.exe
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $fail = 0
+          # Tests live as <category>/tst_<Name>/release/tst_<Name>.exe (or
+          # directly under tst_<Name>/ depending on the qmake build dir) —
+          # Get-ChildItem walks both.
+          $tests = Get-ChildItem -Path tests\unit, tests\integration -Recurse -Filter 'tst_*.exe' -ErrorAction SilentlyContinue
+          if (-not $tests) {
+            Write-Host "::error::no test binaries found under tests\unit, tests\integration"
+            exit 1
+          }
+          foreach ($t in $tests) {
+            Write-Host "::group::$($t.Name)"
+            & $t.FullName
+            if ($LASTEXITCODE -ne 0) { $fail++ }
+            Write-Host "::endgroup::"
+          }
+          if ($fail -ne 0) {
+            Write-Host "::error::$fail test binary/binaries failed"
+            exit 1
+          }
+      - name: Upload Test Logs on Failure (Windows)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-windows
+          path: |
+            tests/**/*.log
+            tests/**/Testing/**/*.xml
+          if-no-files-found: ignore
       - name: Clean Build Artifacts
         shell: pwsh
         run: |

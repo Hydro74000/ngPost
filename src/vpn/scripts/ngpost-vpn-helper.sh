@@ -55,6 +55,7 @@ VPN_PID=""
 TUN_IFACE=""
 TUN_IP=""
 DNS_IP=""
+WG_SETCONF_FILE=""
 
 emit() { printf '%s\n' "$*"; }
 log()  { emit "LOG $*"; }
@@ -81,7 +82,7 @@ cleanup() {
     fi
     # Drop the PID file too so the next startup's `cleanup` mode doesn't
     # think there's an orphan to clean.
-    rm -f "$OVPN_PIDFILE" "$RUN_MARKER" "$LOG_FILE"
+    rm -f "$OVPN_PIDFILE" "$RUN_MARKER" "$LOG_FILE" "$WG_SETCONF_FILE"
 }
 trap cleanup EXIT TERM INT HUP
 
@@ -149,6 +150,47 @@ start_openvpn() {
              | head -1 | awk '{print $NF}')
 }
 
+write_wg_setconf_config() {
+    WG_SETCONF_FILE=$(mktemp /tmp/ngpost-wg-setconf-XXXXXX.conf) \
+        || fail "could not create temporary WireGuard config"
+
+    # User-facing WireGuard profiles are commonly wg-quick configs. `wg setconf`
+    # only accepts native WireGuard keys, so strip wg-quick-only [Interface]
+    # options before configuring the interface. The original file remains the
+    # source of truth for Address/DNS parsing below.
+    awk '
+        function trim(s) {
+            sub(/^[[:space:]]+/, "", s)
+            sub(/[[:space:]]+$/, "", s)
+            return s
+        }
+
+        /^[[:space:]]*\[/ {
+            section = tolower(trim($0))
+            print
+            next
+        }
+
+        {
+            raw = $0
+            key = raw
+            sub(/[[:space:]]*=.*/, "", key)
+            key = tolower(trim(key))
+
+            if (section == "[interface]" &&
+                (key == "address" || key == "addresses" || key == "dns" ||
+                 key == "mtu" || key == "table" || key == "preup" ||
+                 key == "postup" || key == "predown" || key == "postdown" ||
+                 key == "saveconfig")) {
+                next
+            }
+
+            print raw
+        }
+    ' "$CONFIG" > "$WG_SETCONF_FILE" \
+        || fail "could not prepare WireGuard setconf config"
+}
+
 start_wireguard() {
     TUN_IFACE="ngpost-wg0"
 
@@ -172,7 +214,11 @@ start_wireguard() {
         fail "no WireGuard backend: kernel module unavailable AND wireguard-go not installed"
     fi
 
-    wg setconf "$TUN_IFACE" "$CONFIG" || fail "wg setconf failed"
+    write_wg_setconf_config
+    wg setconf "$TUN_IFACE" "$WG_SETCONF_FILE" >>"$LOG_FILE" 2>&1 || {
+        tail -30 "$LOG_FILE" | sed 's/^/LOG /'
+        fail "wg setconf failed"
+    }
 
     TUN_IP=$(sed -n '/^\[Interface\]/,/^\[/p' "$CONFIG" \
              | grep -E '^[[:space:]]*Address' \

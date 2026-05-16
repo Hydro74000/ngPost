@@ -6,4 +6,6 @@ SUBDIRS = \
     tst_Yenc \
     tst_PathHelper \
     tst_VpnProfile \
-    tst_CliParser
+    tst_CliParser \
+    tst_WireGuardBackend \
+    tst_WindowsBindHelper
