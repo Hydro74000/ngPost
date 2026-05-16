@@ -104,5 +104,16 @@ fi
 cp "$STATE_DIR/server.conf" "$STATE_DIR/$IFACE.conf"
 wg-quick up "$STATE_DIR/$IFACE.conf"
 
+# The test binary runs unprivileged after this script returns. Keep server
+# secrets root-only, but hand back the client config and metadata it must
+# stage/read for ngPost.
+if [ -n "${SUDO_UID:-}" ] && [ -n "${SUDO_GID:-}" ]; then
+    chown "$SUDO_UID:$SUDO_GID" \
+        "$STATE_DIR/client.conf" \
+        "$STATE_DIR/server.addr" \
+        "$STATE_DIR/client.addr" \
+        "$STATE_DIR/listen.port"
+fi
+
 # Print a one-line summary so callers can grep this output.
 echo "WG_SERVER_UP iface=$IFACE addr=$SERVER_IP_BARE client=$CLIENT_IP_BARE port=$LISTEN_PORT state_dir=$STATE_DIR"

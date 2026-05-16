@@ -86,6 +86,8 @@ QString readMockLog(const QString &path)
     return QString::fromUtf8(f.readAll());
 }
 
+void wgServerDown(const QString &stateDir);
+
 //! Bring up the WG server. Returns the state dir on success or empty on
 //! failure. Sets `clientIp` and `serverIp` on success.
 QString wgServerUp(QString *serverIp, QString *clientIp, QString *errMsg)
@@ -99,11 +101,8 @@ QString wgServerUp(QString *serverIp, QString *clientIp, QString *errMsg)
 
     QProcess p;
     p.setProcessChannelMode(QProcess::MergedChannels);
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert("STATE_DIR", state.path());
-    p.setProcessEnvironment(env);
     p.start("sudo", { "-n",
-                      "-E",  // preserve STATE_DIR
+                      QStringLiteral("STATE_DIR=%1").arg(state.path()),
                       "bash",
                       runScriptsDir() + QStringLiteral("/wg_server_up.sh") });
     if (!p.waitForFinished(15000)) {
@@ -121,16 +120,20 @@ QString wgServerUp(QString *serverIp, QString *clientIp, QString *errMsg)
     QFile sa(state.path() + "/server.addr"), ca(state.path() + "/client.addr");
     if (sa.open(QIODevice::ReadOnly)) *serverIp = QString::fromUtf8(sa.readAll()).trimmed();
     if (ca.open(QIODevice::ReadOnly)) *clientIp = QString::fromUtf8(ca.readAll()).trimmed();
+    if (serverIp->isEmpty() || clientIp->isEmpty()
+        || !QFileInfo::exists(state.path() + "/client.conf")) {
+        *errMsg = QStringLiteral("wg_server_up.sh completed but did not populate %1. Output:\n%2")
+                      .arg(state.path(), out);
+        wgServerDown(state.path());
+        return {};
+    }
     return state.path();
 }
 
 void wgServerDown(const QString &stateDir)
 {
     QProcess p;
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert("STATE_DIR", stateDir);
-    p.setProcessEnvironment(env);
-    p.start("sudo", { "-n", "-E", "bash",
+    p.start("sudo", { "-n", QStringLiteral("STATE_DIR=%1").arg(stateDir), "bash",
                       runScriptsDir() + QStringLiteral("/wg_server_down.sh") });
     p.waitForFinished(8000);
 }
