@@ -1,0 +1,123 @@
+name: VPN E2E
+
+# This is the heavy CI: it sets up real WireGuard tunnels and exercises
+# the privileged helper flow. Lives in its own workflow so the
+# default main.yml stays fast and Linux-only-ish.
+
+on:
+  push:
+    branches: [master, devel, main, 'phase*']
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Nightly run gives an early warning if the runner kernel / wireguard
+    # tooling drifts under us.
+    - cron: '17 4 * * *'
+
+jobs:
+  wg-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libsecret-1-dev \
+                                  wireguard-tools openvpn iproute2 \
+                                  iptables python3 policykit-1 dbus-x11 \
+                                  libxkbcommon-x11-0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.2'
+          arch: 'linux_gcc_64'
+
+      - name: Build QtKeychain from source
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(nproc)
+          cmake --install build
+
+      - name: Compile translations (.ts -> .qm)
+        run: |
+          cd src
+          mkdir -p resources/lang
+          for ts in lang/ngPost_*.ts; do
+            base=$(basename "$ts" .ts)
+            lrelease "$ts" -qm "resources/lang/${base}.qm"
+          done
+
+      - name: Build ngPost
+        run: |
+          cd src
+          qmake ngPost.pro CONFIG+=release
+          make -j$(nproc)
+
+      - name: Build tests
+        run: |
+          cd tests
+          qmake tests.pro CONFIG+=release
+          make -j$(nproc)
+
+      - name: Verify WireGuard module + passwordless sudo
+        # GitHub-hosted Ubuntu runners ship with the wireguard module and
+        # NOPASSWD sudo. Fail fast if either drifts so we don't get a
+        # mysterious skip later.
+        run: |
+          sudo -n true
+          sudo modprobe wireguard 2>&1 || (echo "::error::wireguard kernel module not available"; exit 1)
+          lsmod | grep -q wireguard
+          wg --version
+
+      - name: Pre-flight bring-up + tear-down of WG (sanity check)
+        run: |
+          set -e
+          sudo STATE_DIR=/tmp/wg-preflight bash tests/vpn/wg_server_up.sh
+          sudo STATE_DIR=/tmp/wg-preflight bash tests/vpn/wg_server_down.sh
+
+      - name: Run VPN E2E tests
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost
+          # tst_VpnE2E_WireGuard sets this on the ngPost subprocess so the
+          # privileged helper goes via `sudo` instead of `pkexec` (no agent
+          # in CI). Setting it at the parent shell too lets one-off manual
+          # runs reproduce the same wiring.
+          NGPOST_HELPER_LAUNCHER: "sudo -n -E"
+        run: |
+          set -e
+          fail=0
+          for t in tests/vpn/tst_*/tst_*; do
+            [ -x "$t" ] || continue
+            echo "::group::$(basename "$t")"
+            "$t" || fail=$((fail+1))
+            echo "::endgroup::"
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::$fail VPN E2E test binary/binaries failed"
+            exit 1
+          fi
+
+      - name: Always tear down any lingering WG state
+        if: always()
+        run: |
+          # If a test crashed mid-run, the interface may still exist.
+          sudo ip link delete ngpost-wg 2>/dev/null || true
+          for d in /tmp/ngpost-wg /tmp/wg-preflight $(find /tmp -maxdepth 1 -name 'tmp.*' -type d 2>/dev/null); do
+            [ -f "$d/ngpost-wg.conf" ] && sudo wg-quick down "$d/ngpost-wg.conf" || true
+          done
+
+      - name: Upload Test + Server Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vpn-e2e-logs
+          path: |
+            tests/vpn/**/*.log
+            /tmp/ngpost-wg/**
+          if-no-files-found: ignore

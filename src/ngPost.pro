@@ -1,3 +1,9 @@
+# ngPost (GUI build) entry point.
+#
+# Toggle `use_hmi` off (or build ngPost_cmd.pro) for a headless CLI build.
+# All the heavy lifting — sources, defines, Qt modules, install rules —
+# lives in ngPost.pri / ngPost_core.pri.
+
 CONFIG  += use_hmi
 
 use_hmi {
@@ -12,30 +18,3 @@ else {
 }
 
 include(ngPost.pri)
-
-use_hmi {
-SOURCES += \
-    hmi/AutoPostWidget.cpp \
-    hmi/CheckBoxCenterWidget.cpp \
-    hmi/PostingWidget.cpp \
-    hmi/SignedListWidget.cpp \
-    hmi/MainWindow.cpp \
-    hmi/VpnProfileEditDialog.cpp \
-    hmi/VpnSettingsDialog.cpp
-
-HEADERS += \
-    hmi/AutoPostWidget.h \
-    hmi/CheckBoxCenterWidget.h \
-    hmi/PostingWidget.h \
-    hmi/SignedListWidget.h \
-    hmi/MainWindow.h \
-    hmi/VpnProfileEditDialog.h \
-    hmi/VpnSettingsDialog.h
-
-FORMS += \
-    hmi/AutoPostWidget.ui \
-    hmi/MainWindow.ui \
-    hmi/PostingWidget.ui \
-    hmi/VpnProfileEditDialog.ui \
-    hmi/VpnSettingsDialog.ui
-}

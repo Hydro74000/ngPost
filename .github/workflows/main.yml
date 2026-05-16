@@ -40,6 +40,37 @@ jobs:
           cd src
           qmake ngPost.pro CONFIG+=release
           make -j$(nproc)
+      - name: Build Tests on Linux
+        run: |
+          cd tests
+          qmake6 tests.pro CONFIG+=release
+          make -j$(nproc)
+      - name: Run Unit + Integration Tests on Linux
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -e
+          fail=0
+          for t in tests/unit/tst_*/tst_* tests/integration/tst_*/tst_*; do
+            [ -x "$t" ] || continue
+            echo "::group::$(basename "$t")"
+            "$t" || fail=$((fail+1))
+            echo "::endgroup::"
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::$fail test binary/binaries failed"
+            exit 1
+          fi
+      - name: Upload Test Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-linux
+          path: |
+            tests/**/*.log
+            tests/**/Testing/**/*.xml
+          if-no-files-found: ignore
       - name: Upload Linux Binary
         uses: actions/upload-artifact@v4
         with:
@@ -127,6 +158,37 @@ jobs:
           cd src
           qmake ngPost.pro CONFIG+=release
           make -j$(sysctl -n hw.ncpu)
+      - name: Build Tests on macOS
+        run: |
+          cd tests
+          qmake tests.pro CONFIG+=release
+          make -j$(sysctl -n hw.ncpu)
+      - name: Run Unit + Integration Tests on macOS
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost.app/Contents/MacOS/ngPost
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -e
+          fail=0
+          for t in tests/unit/tst_*/tst_* tests/integration/tst_*/tst_*; do
+            [ -x "$t" ] || continue
+            echo "::group::$(basename "$t")"
+            "$t" || fail=$((fail+1))
+            echo "::endgroup::"
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::$fail test binary/binaries failed"
+            exit 1
+          fi
+      - name: Upload Test Logs on Failure (macOS)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-macos
+          path: |
+            tests/**/*.log
+            tests/**/Testing/**/*.xml
+          if-no-files-found: ignore
       - name: Upload macOS Binary
         uses: actions/upload-artifact@v4
         with:

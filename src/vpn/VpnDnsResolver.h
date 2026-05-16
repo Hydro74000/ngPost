@@ -17,11 +17,16 @@
 class VpnDnsResolver
 {
 public:
+    //! Resolve A records for `host` via DNS-over-TCP. The socket source IP is
+    //! forced to `sourceIp` (so the query exits the right interface, eg. the
+    //! VPN tunnel). `port` defaults to 53 — pass a different value only in
+    //! tests that cannot bind privileged ports.
     static QList<QHostAddress> resolveA(QString const &host,
                                         QHostAddress const &dnsServer,
                                         QHostAddress const &sourceIp,
                                         QString *errMsg = nullptr,
-                                        int timeoutMs = 5000);
+                                        int timeoutMs = 5000,
+                                        quint16 port = 53);
 };
 
 #endif // VPNDNSRESOLVER_H

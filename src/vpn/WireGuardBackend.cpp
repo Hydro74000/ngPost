@@ -97,13 +97,17 @@ bool WireGuardBackend::start(QString const &configPathPacked)
     connect(_proc, &QProcess::errorOccurred,
             this, &WireGuardBackend::onProcessError);
 
-    QStringList args;
-    args << helper << "wireguard" << fi.absoluteFilePath();
+    QStringList helperArgs;
+    helperArgs << helper << "wireguard" << fi.absoluteFilePath();
 
-    emit logLine(tr("Launching VPN helper: pkexec %1").arg(args.join(' ')));
-    _proc->start(QStringLiteral("pkexec"), args);
+    QString const launcher = VpnManager::helperLauncherProgram();
+    QStringList args = VpnManager::helperLauncherPrefixArgs();
+    args += helperArgs;
+
+    emit logLine(tr("Launching VPN helper: %1 %2").arg(launcher, args.join(' ')));
+    _proc->start(launcher, args);
     if (!_proc->waitForStarted(5000)) {
-        emit failed(tr("Failed to start pkexec/helper"));
+        emit failed(tr("Failed to start %1/helper").arg(launcher));
         delete _proc;
         _proc = nullptr;
         return false;
