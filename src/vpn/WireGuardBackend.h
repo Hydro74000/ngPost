@@ -26,6 +26,20 @@ public:
     void stopAndWait(int timeoutMs) override;
     bool isRunning() const override;
 
+    //! Compute the Windows tunnel service name registered by
+    //! `wireguard.exe /installtunnelservice <conf>`. The convention is
+    //! `WireGuardTunnel$<conf-basename-without-ext>`. Pure path computation,
+    //! safe to call on any platform (used by Windows runtime + unit tests).
+    static QString serviceNameFromConfig(QString const &configPath);
+
+    //! Parse the local IPv4 Address and (optional) DNS server from the
+    //! [Interface] section of a WireGuard .conf. Returns true if at least
+    //! Address was matched. *ip and *dns receive the parsed values; *dns is
+    //! cleared if no DNS line was present. Pure string parsing — no I/O —
+    //! so it runs cross-platform and is unit-testable without Windows.
+    static bool parseInterfaceAddrAndDns(QString const &confContent,
+                                         QString *ip, QString *dns);
+
 private slots:
     void onReadyReadStdout();
     void onProcessFinished(int exitCode, QProcess::ExitStatus status);
@@ -44,7 +58,6 @@ private:
     //! /installtunnelservice + sc sdset for runtime ACL).
     bool _startWindows(QString const &configPath);
     void _stopWindows();
-    QString _serviceNameFromConfig(QString const &configPath) const;
     bool    _queryTunnelInfo(QString *iface, QString *ip, QString *dns) const;
 #endif
 

@@ -250,8 +250,11 @@ jobs:
           Name: "{autodesktop}\ngPost"; Filename: "{app}\ngPost.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
           [Run]
-          ; Chain-install OpenVPN Community silently (with TAP-Windows driver + interactive service)
-          Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\openvpn.msi"" /qb! /norestart"; StatusMsg: "Installing OpenVPN Community..."; Tasks: installopenvpn; Check: OpenVpnNeeded
+          ; Chain-install OpenVPN Community without the vendor tray GUI.
+          ; ngPost drives openvpn.exe through OpenVPNServiceInteractive and its
+          ; own VPN profile UI, so OpenVPN.GUI / OpenVPN.GUI.OnLogon would only
+          ; add a startup tray app that complains when OpenVPN's config dir is empty.
+          Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\openvpn.msi"" /qb! /norestart ADDLOCAL=OpenVPN,Drivers,Drivers.OvpnDco,Drivers.TAPWindows6"; StatusMsg: "Installing OpenVPN Community..."; Tasks: installopenvpn; Check: OpenVpnNeeded
           ; OpenVPN MSI registers OpenVPNServiceInteractive as Start=Manual.
           ; ngPost talks to this service via named pipe, so make it auto-start
           ; on boot and bring it up now.

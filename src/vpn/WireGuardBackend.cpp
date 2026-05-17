@@ -29,6 +29,45 @@ WireGuardBackend::WireGuardBackend(QObject *parent)
 #endif
 {}
 
+QString WireGuardBackend::serviceNameFromConfig(QString const &configPath)
+{
+    // The Windows service installed by wireguard.exe /installtunnelservice
+    // is named "WireGuardTunnel$" + the conf file basename, without the
+    // .conf extension. Pure path manipulation: no Windows API call, safe on
+    // every OS so unit tests can exercise it without an SCM.
+    QFileInfo fi(configPath);
+    return QStringLiteral("WireGuardTunnel$") + fi.completeBaseName();
+}
+
+bool WireGuardBackend::parseInterfaceAddrAndDns(QString const &confContent,
+                                                QString *ip, QString *dns)
+{
+    // We only need the [Interface] section. Capture from "[Interface]" to
+    // the next bracketed header (or end of string).
+    QRegularExpression reSection(
+        QStringLiteral("(?ims)^\\s*\\[Interface\\]\\s*\\n(.*?)(?=^\\s*\\[|\\z)"));
+    QRegularExpressionMatch ms = reSection.match(confContent);
+    QString iface = ms.hasMatch() ? ms.captured(1) : confContent;
+
+    QRegularExpression reAddr(
+        QStringLiteral("(?im)^\\s*Address\\s*=\\s*(\\d+\\.\\d+\\.\\d+\\.\\d+)"));
+    QRegularExpressionMatch m = reAddr.match(iface);
+    if (!m.hasMatch())
+        return false;
+    if (ip)
+        *ip = m.captured(1);
+
+    if (dns) {
+        dns->clear();
+        QRegularExpression reDns(
+            QStringLiteral("(?im)^\\s*DNS\\s*=\\s*([0-9.,\\s]+)"));
+        m = reDns.match(iface);
+        if (m.hasMatch())
+            *dns = m.captured(1).split(',').first().trimmed();
+    }
+    return true;
+}
+
 WireGuardBackend::~WireGuardBackend()
 {
     if (_proc) {
@@ -97,13 +136,17 @@ bool WireGuardBackend::start(QString const &configPathPacked)
     connect(_proc, &QProcess::errorOccurred,
             this, &WireGuardBackend::onProcessError);
 
-    QStringList args;
-    args << helper << "wireguard" << fi.absoluteFilePath();
+    QStringList helperArgs;
+    helperArgs << helper << "wireguard" << fi.absoluteFilePath();
 
-    emit logLine(tr("Launching VPN helper: pkexec %1").arg(args.join(' ')));
-    _proc->start(QStringLiteral("pkexec"), args);
+    QString const launcher = VpnManager::helperLauncherProgram();
+    QStringList args = VpnManager::helperLauncherPrefixArgs();
+    args += helperArgs;
+
+    emit logLine(tr("Launching VPN helper: %1 %2").arg(launcher, args.join(' ')));
+    _proc->start(launcher, args);
     if (!_proc->waitForStarted(5000)) {
-        emit failed(tr("Failed to start pkexec/helper"));
+        emit failed(tr("Failed to start %1/helper").arg(launcher));
         delete _proc;
         _proc = nullptr;
         return false;
@@ -234,27 +277,13 @@ void WireGuardBackend::onProcessError(QProcess::ProcessError err)
 #include <QStandardPaths>
 #include <QTimer>
 
-QString WireGuardBackend::_serviceNameFromConfig(QString const &configPath) const
-{
-    // The service name is "WireGuardTunnel$" + the basename of the config
-    // file *without* its .conf extension. wireguard.exe uses this convention
-    // when /installtunnelservice is called.
-    QFileInfo fi(configPath);
-    return QStringLiteral("WireGuardTunnel$") + fi.completeBaseName();
-}
-
 bool WireGuardBackend::_queryTunnelInfo(QString *iface, QString *ip, QString *dns) const
 {
     // After the service brings the tunnel up, query its state with wg.exe.
-    // Output format (per WireGuard docs):
-    //   interface: ngpost-foo
-    //   public key: ...
-    //   listening port: 51820
     QString wgPath = QStandardPaths::findExecutable(QStringLiteral("wg.exe"));
     if (wgPath.isEmpty())
         wgPath = QStringLiteral("C:/Program Files/WireGuard/wg.exe");
 
-    QFileInfo fi(_winServiceName);
     // wg show takes the iface name = service name without the prefix.
     QString tunnelName = _winServiceName;
     tunnelName.remove(QStringLiteral("WireGuardTunnel$"));
@@ -278,20 +307,11 @@ bool WireGuardBackend::_queryTunnelInfo(QString *iface, QString *ip, QString *dn
     QString content = QString::fromUtf8(cfg.readAll());
     cfg.close();
 
-    QRegularExpression reAddr(
-        QStringLiteral("(?im)^\\s*Address\\s*=\\s*(\\d+\\.\\d+\\.\\d+\\.\\d+)"));
-    QRegularExpressionMatch m = reAddr.match(content);
-    if (m.hasMatch())
-        *ip = m.captured(1);
-
-    QRegularExpression reDns(
-        QStringLiteral("(?im)^\\s*DNS\\s*=\\s*([0-9.,\\s]+)"));
-    m = reDns.match(content);
-    if (m.hasMatch())
-        *dns = m.captured(1).split(',').first().trimmed();
+    if (!parseInterfaceAddrAndDns(content, ip, dns))
+        return false;
 
     *iface = tunnelName;
-    return !ip->isEmpty();
+    return true;
 }
 
 bool WireGuardBackend::_startWindows(QString const &configPath)
@@ -301,7 +321,7 @@ bool WireGuardBackend::_startWindows(QString const &configPath)
         emit failed(tr("WireGuard config not found: %1").arg(configPath));
         return false;
     }
-    _winServiceName = _serviceNameFromConfig(configPath);
+    _winServiceName = serviceNameFromConfig(configPath);
     _winPollAttempts = 0;
 
     emit logLine(tr("Starting WireGuard service: %1").arg(_winServiceName));

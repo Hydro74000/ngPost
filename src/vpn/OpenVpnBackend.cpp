@@ -118,21 +118,28 @@ bool OpenVpnBackend::start(QString const &configPathPacked)
             this, &OpenVpnBackend::onProcessFinished);
     connect(_proc, &QProcess::errorOccurred, this, &OpenVpnBackend::onProcessError);
 
-    QStringList args;
-    args << helper << "openvpn" << fi.absoluteFilePath();
+    QStringList helperArgs;
+    helperArgs << helper << "openvpn" << fi.absoluteFilePath();
     if (!authFilePath.isEmpty())
-        args << "--auth-file" << authFilePath;
+        helperArgs << "--auth-file" << authFilePath;
 
-    // Avoid logging the auth-file path verbatim. The path goes to pkexec
-    // unchanged, but logs are user-visible.
+    // Compose the final argv. The launcher is normally `pkexec`, but
+    // `NGPOST_HELPER_LAUNCHER` can swap it for `sudo` etc. (see
+    // VpnManager::helperLauncherProgram).
+    QString const launcher = VpnManager::helperLauncherProgram();
+    QStringList args = VpnManager::helperLauncherPrefixArgs();
+    args += helperArgs;
+
+    // Avoid logging the auth-file path verbatim. The path goes to the
+    // launcher unchanged, but logs are user-visible.
     QStringList safeArgs = args;
     if (!authFilePath.isEmpty())
         safeArgs.replace(safeArgs.size() - 1, QStringLiteral("<authfile>"));
-    emit logLine(tr("Launching VPN helper: pkexec %1").arg(safeArgs.join(' ')));
+    emit logLine(tr("Launching VPN helper: %1 %2").arg(launcher, safeArgs.join(' ')));
 
-    _proc->start(QStringLiteral("pkexec"), args);
+    _proc->start(launcher, args);
     if (!_proc->waitForStarted(5000)) {
-        emit failed(tr("Failed to start pkexec/helper"));
+        emit failed(tr("Failed to start %1/helper").arg(launcher));
         delete _proc;
         _proc = nullptr;
         return false;

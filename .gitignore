@@ -606,3 +606,16 @@ src/ngPost
 src/qmake_qmake_immediate_rc.py
 src/resources/resources_rc.py
 .claude/
+
+# tests/ build artifacts. Only the per-test source files
+# (tst_<Name>.{cpp,h,pro,pri}) under each tst_<Name>/ should be tracked —
+# qmake6 + make regenerate everything else (Makefile, *.o, moc_*, qrc_*,
+# *.moc, the compiled binary, ...). The tst_ prefix on the whitelist avoids
+# re-including moc_*.cpp / qrc_*.cpp sitting alongside the source.
+tests/**/tst_*/*
+!tests/**/tst_*/tst_*.cpp
+!tests/**/tst_*/tst_*.h
+!tests/**/tst_*/tst_*.pro
+!tests/**/tst_*/tst_*.pri
+tests/**/Makefile
+tests/**/.qmake.stash

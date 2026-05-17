@@ -751,26 +751,36 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     int nbRows = _ui->serversTable->rowCount(), col = 0;
     _ui->serversTable->setRowCount(nbRows+1);
 
-    _ui->serversTable->setCellWidget(nbRows, col++,
-                                     new CheckBoxCenterWidget(_ui->serversTable,
-                                                              serverParam ? serverParam->enabled : true));
+    // Object names on the dynamically-created server row widgets make
+    // findChild<>() lookups deterministic for GUI tests. The naming
+    // convention is "server<Role>_<row>" so a test can target row N
+    // unambiguously.
+    const QString suffix = QStringLiteral("_%1").arg(nbRows);
+
+    auto *enabledCb = new CheckBoxCenterWidget(_ui->serversTable,
+                                               serverParam ? serverParam->enabled : true);
+    enabledCb->setObjectName(QStringLiteral("serverEnabledCb") + suffix);
+    _ui->serversTable->setCellWidget(nbRows, col++, enabledCb);
 
     QLineEdit *hostEdit = new QLineEdit(_ui->serversTable);
+    hostEdit->setObjectName(QStringLiteral("serverHostEdit") + suffix);
     if (serverParam)
         hostEdit->setText(serverParam->host);
     hostEdit->setFrame(false);
     _ui->serversTable->setCellWidget(nbRows, col++, hostEdit);
 
     QLineEdit *portEdit = new QLineEdit(_ui->serversTable);
+    portEdit->setObjectName(QStringLiteral("serverPortEdit") + suffix);
     portEdit->setFrame(false);
     portEdit->setValidator(new QIntValidator(1, 99999, portEdit));
     portEdit->setText(QString::number(serverParam ? serverParam->port : sDefaultServerPort));
     portEdit->setAlignment(Qt::AlignCenter);
     _ui->serversTable->setCellWidget(nbRows, col++, portEdit);
 
-    _ui->serversTable->setCellWidget(nbRows, col++,
-                                     new CheckBoxCenterWidget(_ui->serversTable,
-                                                              serverParam ? serverParam->useSSL : sDefaultServerSSL));
+    auto *sslCb = new CheckBoxCenterWidget(_ui->serversTable,
+                                           serverParam ? serverParam->useSSL : sDefaultServerSSL);
+    sslCb->setObjectName(QStringLiteral("serverSslCb") + suffix);
+    _ui->serversTable->setCellWidget(nbRows, col++, sslCb);
 
     // Phase 3: per-server "Use VPN" — when checked, the server's NNTP
     // sockets are bound to the VPN tun (and the VPN is auto-started for
@@ -779,11 +789,13 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     // hit "Save Config" after each tweak.
     CheckBoxCenterWidget *vpnCb = new CheckBoxCenterWidget(
         _ui->serversTable, serverParam ? serverParam->useVpn : false);
+    vpnCb->setObjectName(QStringLiteral("serverUseVpnCb") + suffix);
     _ui->serversTable->setCellWidget(nbRows, col++, vpnCb);
     connect(vpnCb, &CheckBoxCenterWidget::toggled,
             this, &MainWindow::_onUseVpnToggled);
 
     QLineEdit *nbConsEdit = new QLineEdit(_ui->serversTable);
+    nbConsEdit->setObjectName(QStringLiteral("serverNbConsEdit") + suffix);
     nbConsEdit->setFrame(false);
     nbConsEdit->setValidator(new QIntValidator(1, 99999, nbConsEdit));
     nbConsEdit->setText(QString::number(serverParam ? serverParam->nbCons : sDefaultConnections));
@@ -792,12 +804,14 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
 
 
     QLineEdit *userEdit = new QLineEdit(_ui->serversTable);
+    userEdit->setObjectName(QStringLiteral("serverUserEdit") + suffix);
     if (serverParam)
         userEdit->setText(serverParam->user.c_str());
     userEdit->setFrame(false);
     _ui->serversTable->setCellWidget(nbRows, col++, userEdit);
 
     QLineEdit *passEdit = new QLineEdit(_ui->serversTable);
+    passEdit->setObjectName(QStringLiteral("serverPassEdit") + suffix);
     passEdit->setEchoMode(QLineEdit::EchoMode::PasswordEchoOnEdit);
     if (serverParam)
         passEdit->setText(serverParam->pass.c_str());
@@ -805,6 +819,7 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     _ui->serversTable->setCellWidget(nbRows, col++, passEdit);
 
     QPushButton *delButton = new QPushButton(_ui->serversTable);
+    delButton->setObjectName(QStringLiteral("serverDelButton") + suffix);
     delButton->setProperty("server", QVariant::fromValue(static_cast<void*>(serverParam)));
     delButton->setIcon(QIcon(":/icons/clear.png"));
     delButton->setMaximumWidth(sDeleteColumnWidth);

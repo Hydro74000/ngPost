@@ -16,14 +16,14 @@
 //!
 //! Resolution:
 //!  - Linux  : $XDG_CONFIG_HOME/ngPost/   (fallback ~/.config/ngPost/)
-//!  - Windows: %APPDATA%\ngPost\
+//!  - Windows: %APPDATA%/ngPost/
 //!  - macOS  : ~/Library/Application Support/ngPost/
 //!
 //! Layout:
 //!  <configDir>/
 //!     ngPost.conf      main configuration (was ~/.ngPost on Linux)
 //!     vpn/             per-user VPN profile files (.ovpn / .conf)
-//!     vpn/.runtime/    short-lived auth files (chmod 600) — only while a
+//!     vpn/runtime/     short-lived auth files (chmod 600) — only while a
 //!                      VPN connection is active
 namespace PathHelper
 {

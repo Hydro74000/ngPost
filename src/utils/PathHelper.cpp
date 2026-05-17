@@ -9,6 +9,7 @@
 
 #include "PathHelper.h"
 
+#include <QByteArray>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -17,8 +18,29 @@
 namespace PathHelper
 {
 
+namespace
+{
+
+#ifdef NGPOST_TESTING
+QString testEnvPath(const char *name)
+{
+    const QByteArray value = qgetenv(name);
+    return value.isEmpty() ? QString() : QString::fromLocal8Bit(value);
+}
+#endif
+
+} // namespace
+
 QString configDir()
 {
+#ifdef NGPOST_TESTING
+    const QString testDir = testEnvPath("NGPOST_TEST_CONFIG_DIR");
+    if (!testDir.isEmpty()) {
+        QDir().mkpath(testDir);
+        return testDir;
+    }
+#endif
+
     // QStandardPaths::AppConfigLocation gives us:
     //   Linux   ~/.config/ngPost
     //   macOS   ~/Library/Preferences/<...>/ngPost  (not ideal — see below)
@@ -70,6 +92,12 @@ QString vpnRuntimeDir()
 
 QString legacyConfigFilePath()
 {
+#ifdef NGPOST_TESTING
+    const QString testHome = testEnvPath("NGPOST_TEST_HOME");
+    if (!testHome.isEmpty())
+        return testHome + QStringLiteral("/.ngPost");
+#endif
+
     return QDir::homePath() + QStringLiteral("/.ngPost");
 }
 

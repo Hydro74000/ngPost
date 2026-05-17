@@ -29,6 +29,7 @@
 #include <QJsonObject>
 #include <QNetworkInterface>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QTemporaryFile>
 #include <QTimer>
 
@@ -160,11 +161,11 @@ bool VpnManager::removeProfile(QString const &name)
     VpnProfile victim = _profiles.takeAt(idx);
 
 #ifdef Q_OS_WIN
-    // Tear down the Windows service registered for a WG profile.
+    // Tear down the Windows service registered for a WG profile. Reuse the
+    // single source of truth so dev/test and runtime can't drift.
     if (victim.backend == Backend::WireGuard) {
-        QString svc = QStringLiteral("WireGuardTunnel$")
-                      + QFileInfo(victim.configFileName).completeBaseName();
-        unregisterWindowsWireGuardTunnel(svc);
+        unregisterWindowsWireGuardTunnel(
+            WireGuardBackend::serviceNameFromConfig(victim.configFileName));
     }
 #endif
 
@@ -559,6 +560,35 @@ VpnManager::Backend VpnManager::backendFromString(QString const &s, bool *ok)
     return Backend::OpenVPN;
 }
 
+namespace
+{
+QStringList parseLauncherEnv()
+{
+    QByteArray env = qgetenv("NGPOST_HELPER_LAUNCHER");
+    if (env.isEmpty())
+        return {};
+    QString s = QString::fromLocal8Bit(env);
+    return s.split(QRegularExpression(QStringLiteral("\\s+")),
+                   Qt::SkipEmptyParts);
+}
+}
+
+QString VpnManager::helperLauncherProgram()
+{
+    auto const parts = parseLauncherEnv();
+    if (parts.isEmpty())
+        return QStringLiteral("pkexec");
+    return parts.first();
+}
+
+QStringList VpnManager::helperLauncherPrefixArgs()
+{
+    auto const parts = parseLauncherEnv();
+    if (parts.size() <= 1)
+        return {};
+    return parts.mid(1);
+}
+
 QString VpnManager::helperScriptPath()
 {
     // Priority: the system-installed path is the only one the polkit rule
@@ -672,13 +702,14 @@ bool VpnManager::runInstall()
         return false;
     }
 
-    emit logLine(tr("Running VPN install: pkexec %1 %2").arg(installer, resDir));
+    QString const launcher = helperLauncherProgram();
+    emit logLine(tr("Running VPN install: %1 %2 %3").arg(launcher, installer, resDir));
 
     QProcess p;
     p.setProcessChannelMode(QProcess::MergedChannels);
-    QStringList args;
+    QStringList args = helperLauncherPrefixArgs();
     args << installer << resDir;
-    p.start(QStringLiteral("pkexec"), args);
+    p.start(launcher, args);
     if (!p.waitForFinished(60000)) {
         emit logLine(tr("VPN install: timed out"));
         return false;
@@ -716,11 +747,14 @@ bool VpnManager::runUninstall()
     if (_state == State::Connected || _state == State::Starting)
         stop();
 
-    emit logLine(tr("Running VPN uninstall: pkexec %1").arg(uninstaller));
+    QString const launcher = helperLauncherProgram();
+    emit logLine(tr("Running VPN uninstall: %1 %2").arg(launcher, uninstaller));
 
     QProcess p;
     p.setProcessChannelMode(QProcess::MergedChannels);
-    p.start(QStringLiteral("pkexec"), {uninstaller});
+    QStringList args = helperLauncherPrefixArgs();
+    args << uninstaller;
+    p.start(launcher, args);
     if (!p.waitForFinished(30000)) {
         emit logLine(tr("VPN uninstall: timed out"));
         return false;
@@ -842,8 +876,9 @@ void VpnManager::runStartupCleanup()
                         emit logLine(QStringLiteral("[startup-cleanup] ") + out);
                     p->deleteLater();
                 });
-        p->start(QStringLiteral("pkexec"),
-                 {QString::fromLatin1(kInstalledHelperPath), QStringLiteral("cleanup")});
+        QStringList args = helperLauncherPrefixArgs();
+        args << QString::fromLatin1(kInstalledHelperPath) << QStringLiteral("cleanup");
+        p->start(helperLauncherProgram(), args);
     });
 }
 
@@ -869,7 +904,13 @@ VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
     VpnProfile const *active = activeProfile();
     QString activeCfgPath = active ? active->absoluteConfigPath() : QString();
 
-    if (!isHelperInstalled()) {
+    // The real capability check is "can we locate a helper script we can
+    // spawn", not "did the user run Install". The backends use
+    // helperScriptPath() — which also resolves the in-tree dev copy — so this
+    // gate must agree with them, otherwise a dev/CI build with a valid
+    // in-tree helper gets blocked here and the job hangs forever in the
+    // pending queue.
+    if (helperScriptPath().isEmpty()) {
         reason = JobBlockReason::HelperNotInstalled;
         detail = tr("The VPN helper is not installed. Open the VPN dialog "
                     "and click Install.");

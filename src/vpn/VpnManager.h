@@ -100,6 +100,16 @@ public:
     //! Returns the first path that exists, or empty if none.
     static QString helperScriptPath();
 
+    //! Program used to launch the privileged helper. Defaults to `pkexec`
+    //! (PolicyKit), but the `NGPOST_HELPER_LAUNCHER` environment variable
+    //! lets unattended environments (CI, headless servers without a polkit
+    //! agent) substitute `sudo`, `sudo -n`, or another wrapper. Example:
+    //!     NGPOST_HELPER_LAUNCHER="sudo -n" ./ngPost ...
+    //! When the variable holds multiple whitespace-separated tokens, the
+    //! first token is the program and the rest are prepended to argv.
+    static QString     helperLauncherProgram();
+    static QStringList helperLauncherPrefixArgs();
+
     //! Canonical install location for the privileged helper. The polkit rule
     //! whitelists this exact path so the rule and the installer agree.
     static constexpr const char *kInstalledHelperPath =

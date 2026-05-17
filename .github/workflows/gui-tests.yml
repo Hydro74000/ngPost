@@ -1,0 +1,90 @@
+name: GUI Tests (offscreen)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gui-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        # libsecret-1-dev: QtKeychain backend on Linux.
+        # libxkbcommon-x11-0 + libxcb-*: required even with offscreen QPA
+        #   because some Qt components touch the platform plugin at load
+        #   time.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libsecret-1-dev \
+                                  libxkbcommon-x11-0 libxcb-icccm4 \
+                                  libxcb-image0 libxcb-keysyms1 \
+                                  libxcb-randr0 libxcb-render-util0 \
+                                  libxcb-shape0 libxcb-sync1 \
+                                  libxcb-xfixes0 libxcb-xkb1 libxcb-cursor0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.2'
+          arch: 'linux_gcc_64'
+
+      - name: Build QtKeychain from source
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(nproc)
+          cmake --install build
+
+      - name: Compile translations (.ts -> .qm)
+        run: |
+          cd src
+          mkdir -p resources/lang
+          for ts in lang/ngPost_*.ts; do
+            base=$(basename "$ts" .ts)
+            lrelease "$ts" -qm "resources/lang/${base}.qm"
+          done
+
+      - name: Build ngPost (needed by tests' RESOURCES + locateNgPostBinary fallback)
+        run: |
+          cd src
+          qmake ngPost.pro CONFIG+=release
+          make -j$(nproc)
+
+      - name: Build GUI tests
+        run: |
+          cd tests
+          qmake tests.pro CONFIG+=release
+          make -j$(nproc)
+
+      - name: Run GUI tests under offscreen QPA
+        env:
+          QT_QPA_PLATFORM: offscreen
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost
+        run: |
+          set -e
+          fail=0
+          for t in tests/gui/tst_*/tst_*; do
+            [ -x "$t" ] || continue
+            echo "::group::$(basename "$t")"
+            "$t" || fail=$((fail+1))
+            echo "::endgroup::"
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::$fail GUI test binary/binaries failed"
+            exit 1
+          fi
+
+      - name: Upload Test Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-test-logs
+          path: |
+            tests/gui/**/*.log
+            tests/gui/**/Testing/**/*.xml
+          if-no-files-found: ignore

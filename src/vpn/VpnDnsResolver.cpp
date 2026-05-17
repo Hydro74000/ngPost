@@ -204,7 +204,8 @@ QList<QHostAddress> VpnDnsResolver::resolveA(QString const &host,
                                             QHostAddress const &dnsServer,
                                             QHostAddress const &sourceIp,
                                             QString *errMsg,
-                                            int timeoutMs)
+                                            int timeoutMs,
+                                            quint16 port)
 {
     if (errMsg)
         errMsg->clear();
@@ -247,7 +248,7 @@ QList<QHostAddress> VpnDnsResolver::resolveA(QString const &host,
 
     QElapsedTimer timer;
     timer.start();
-    socket.connectToHost(dnsServer, 53);
+    socket.connectToHost(dnsServer, port);
     if (!socket.waitForConnected(timeoutMs)) {
         setErr(errMsg, QStringLiteral("DNS TCP connect to %1 failed: %2")
                            .arg(dnsServer.toString(), socket.errorString()));
