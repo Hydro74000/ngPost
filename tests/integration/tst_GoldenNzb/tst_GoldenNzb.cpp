@@ -73,6 +73,8 @@ int runNgPost(const QString &bin, const QStringList &args,
 QByteArray normalizeNzb(const QByteArray &raw)
 {
     QString s = QString::fromUtf8(raw);
+    s.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    s.replace(QChar('\r'), QChar('\n'));
 
     // date="<digits>" → date="DATE"
     s.replace(QRegularExpression(R"(date="\d+")"), R"(date="DATE")");
@@ -199,7 +201,7 @@ void TestGoldenNzb::runAndCompare(const QString &goldenName,
 
     QFile g(goldenPath);
     QVERIFY(g.open(QIODevice::ReadOnly));
-    const QByteArray expected = g.readAll();
+    const QByteArray expected = normalizeNzb(g.readAll());
 
     if (normalized != expected) {
         // Dump a side-by-side hint to help diagnose.
