@@ -1,6 +1,9 @@
 name: Build and Release
 
 on:
+  push:
+    branches:
+      - devel
   workflow_dispatch:
     inputs:
       version:
@@ -11,19 +14,84 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  release-metadata:
+    name: Prepare Release Metadata
+    runs-on: ubuntu-latest
+    outputs:
+      package_version: ${{ steps.metadata.outputs.package_version }}
+      release_tag: ${{ steps.metadata.outputs.release_tag }}
+      release_name: ${{ steps.metadata.outputs.release_name }}
+      prerelease: ${{ steps.metadata.outputs.prerelease }}
+      channel: ${{ steps.metadata.outputs.channel }}
+      appimage_update_glob: ${{ steps.metadata.outputs.appimage_update_glob }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute release identity
+        id: metadata
+        env:
+          RELEASE_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "$RELEASE_INPUT" ]; then
+            tag="$RELEASE_INPUT"
+            package_version="$RELEASE_INPUT"
+            release_name="Release $RELEASE_INPUT"
+            prerelease="false"
+            channel="stable"
+            appimage_update_glob="ngPost-*-x86_64.AppImage.zsync"
+          else
+            base_version="$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*([0-9]+(\.[0-9]+){1,2}).*/\1/p' src/ngPost_core.pri | head -1)"
+            if [ -z "$base_version" ]; then
+              echo "Unable to read VERSION from src/ngPost_core.pri" >&2
+              exit 1
+            fi
+
+            date_id="$(date -u +%Y%m%d)"
+            short_sha="$(git rev-parse --short=7 HEAD)"
+            tag="v${base_version}-unstable.${date_id}.${GITHUB_RUN_NUMBER}.${short_sha}"
+            package_version="$tag"
+            release_name="Unstable $tag"
+            prerelease="true"
+            channel="unstable"
+            appimage_update_glob="ngPost-v*-unstable.*-x86_64.AppImage.zsync"
+          fi
+
+          {
+            echo "package_version=$package_version"
+            echo "release_tag=$tag"
+            echo "release_name=$release_name"
+            echo "prerelease=$prerelease"
+            echo "channel=$channel"
+            echo "appimage_update_glob=$appimage_update_glob"
+          } >> "$GITHUB_OUTPUT"
+
   build-linux:
     name: Build Linux
     runs-on: ubuntu-latest
+    needs: release-metadata
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y build-essential
+        run: sudo apt update && sudo apt install -y build-essential cmake libsecret-1-dev
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(nproc)
+          cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
           cd src
@@ -40,7 +108,7 @@ jobs:
           make -j$(nproc)
       - name: Package
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="${{ needs.release-metadata.outputs.package_version }}"
           PKG="ngPost-${VERSION}-linux-x86_64"
           mkdir -p "dist/${PKG}"
           cp src/ngPost "dist/${PKG}/"
@@ -57,6 +125,7 @@ jobs:
   build-windows:
     name: Build Windows
     runs-on: windows-latest
+    needs: release-metadata
     steps:
       - uses: actions/checkout@v4
       - name: Enable Developer Command Prompt
@@ -69,6 +138,15 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        shell: pwsh
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
+          cd $env:TEMP\qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON `
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$env:QT_ROOT_DIR"
+          cmake --build build --config Release
+          cmake --install build --config Release
       - name: Compile translations (.ts -> .qm)
         shell: pwsh
         run: |
@@ -93,27 +171,165 @@ jobs:
         run: |
           cd src/release
           Remove-Item -Force *.obj, *.cpp, *.rc, *.res, *.h, *.qrc -ErrorAction SilentlyContinue
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
       - name: Package
         shell: pwsh
         run: |
-          $version = "${{ inputs.version }}"
+          $version = "${{ needs.release-metadata.outputs.package_version }}"
           $pkg = "ngPost-$version-windows-x86_64"
           New-Item -ItemType Directory -Force -Path "dist/$pkg" | Out-Null
           Copy-Item -Recurse src/release/* "dist/$pkg/"
           Copy-Item ngPost.conf, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
+          # Phase 5b: bundle PowerShell helpers for Windows-only WireGuard
+          # tunnel registration. They run under UAC via Start-Process RunAs.
+          New-Item -ItemType Directory -Force -Path "dist/$pkg/scripts/win" | Out-Null
+          Copy-Item src/vpn/scripts/win/*.ps1 "dist/$pkg/scripts/win/"
           Compress-Archive -Path "dist/$pkg" -DestinationPath "dist/$pkg.zip"
+          Get-ChildItem dist
+      - name: Build Windows Setup
+        shell: pwsh
+        run: |
+          $version = "${{ needs.release-metadata.outputs.package_version }}"
+          $pkg = "ngPost-$version-windows-x86_64"
+          $source = (Resolve-Path "dist/$pkg").Path
+          $output = (Resolve-Path "dist").Path
+          $icon = (Resolve-Path "src/ngPost.ico").Path
+          # Phase 5 — chain-install the official OpenVPN Community and
+          # WireGuard for Windows binaries. Their signed installers are
+          # downloaded into a "deps" folder next to the setup output.
+          $deps = (Resolve-Path "dist").Path + "\deps"
+          New-Item -ItemType Directory -Force -Path $deps | Out-Null
+          $ovpnUrl = "https://swupdate.openvpn.org/community/releases/OpenVPN-2.7.4-I001-amd64.msi"
+          $wgUrl   = "https://download.wireguard.com/windows-client/wireguard-amd64-1.1.msi"
+          $ovpnMsi = "$deps\openvpn.msi"
+          $wgMsi   = "$deps\wireguard.msi"
+          Invoke-WebRequest -Uri $ovpnUrl -OutFile $ovpnMsi
+          Invoke-WebRequest -Uri $wgUrl   -OutFile $wgMsi
+
+          $iss = @"
+          [Setup]
+          AppId={{2E2A4868-85FE-4FC1-984A-0B051B78937D}
+          AppName=ngPost
+          AppVersion=$version
+          AppPublisher=Hydro74000
+          AppPublisherURL=https://github.com/Hydro74000/ngPost
+          AppSupportURL=https://github.com/Hydro74000/ngPost/issues
+          AppUpdatesURL=https://github.com/Hydro74000/ngPost/releases
+          DefaultDirName={autopf}\ngPost
+          DefaultGroupName=ngPost
+          DisableProgramGroupPage=yes
+          OutputDir=$output
+          OutputBaseFilename=$pkg-setup
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesAllowed=x64
+          ArchitecturesInstallIn64BitMode=x64
+          SetupIconFile=$icon
+          UninstallDisplayIcon={app}\ngPost.exe
+          WizardStyle=modern
+
+          [Tasks]
+          Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
+          Name: "installopenvpn"; Description: "Install OpenVPN Community (required for OpenVPN profiles)"; GroupDescription: "VPN backends (recommended):"
+          Name: "installwireguard"; Description: "Install WireGuard for Windows (required for WireGuard profiles)"; GroupDescription: "VPN backends (recommended):"
+
+          [Files]
+          Source: "$source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "$ovpnMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installopenvpn; Check: OpenVpnNeeded
+          Source: "$wgMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installwireguard; Check: WireGuardNeeded
+
+          [Icons]
+          ; Flat Start Menu entry — appears directly under All Apps without a
+          ; subfolder, plus the legacy {group} one for users who like grouping.
+          Name: "{autoprograms}\ngPost"; Filename: "{app}\ngPost.exe"; WorkingDir: "{app}"
+          Name: "{group}\ngPost"; Filename: "{app}\ngPost.exe"; WorkingDir: "{app}"
+          Name: "{group}\Uninstall ngPost"; Filename: "{uninstallexe}"
+          Name: "{autodesktop}\ngPost"; Filename: "{app}\ngPost.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+
+          [Run]
+          ; Chain-install OpenVPN Community without the vendor tray GUI.
+          ; ngPost drives openvpn.exe through OpenVPNServiceInteractive and its
+          ; own VPN profile UI, so OpenVPN.GUI / OpenVPN.GUI.OnLogon would only
+          ; add a startup tray app that complains when OpenVPN's config dir is empty.
+          Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\openvpn.msi"" /qb! /norestart ADDLOCAL=OpenVPN,Drivers,Drivers.OvpnDco,Drivers.TAPWindows6"; StatusMsg: "Installing OpenVPN Community..."; Tasks: installopenvpn; Check: OpenVpnNeeded
+          ; OpenVPN MSI registers OpenVPNServiceInteractive as Start=Manual.
+          ; ngPost talks to this service via named pipe, so make it auto-start
+          ; on boot and bring it up now.
+          Filename: "sc.exe"; Parameters: "config OpenVPNServiceInteractive start= auto"; Flags: runhidden waituntilterminated; Tasks: installopenvpn; Check: OpenVpnNeeded
+          Filename: "sc.exe"; Parameters: "start OpenVPNServiceInteractive"; Flags: runhidden waituntilterminated; Tasks: installopenvpn; Check: OpenVpnNeeded
+          ; Chain-install WireGuard for Windows silently (with Wintun driver + manager service)
+          Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\wireguard.msi"" /qb! /norestart DO_NOT_LAUNCH=1"; StatusMsg: "Installing WireGuard for Windows..."; Tasks: installwireguard; Check: WireGuardNeeded
+          Filename: "{app}\ngPost.exe"; Description: "Launch ngPost"; Flags: nowait postinstall skipifsilent
+
+          [Code]
+          // Detect pre-existing OpenVPN Community / WireGuard for Windows.
+          // The result is cached in global vars at InitializeSetup time and
+          // referenced via Check: predicates on [Files] and [Run] so even if
+          // the user re-checks a task in the wizard the actual install is
+          // skipped. We also try to relabel the task in the wizard for clarity.
+          var
+            OpenVpnDetected: Boolean;
+            WireGuardDetected: Boolean;
+
+          function InitializeSetup(): Boolean;
+          begin
+            OpenVpnDetected :=
+                RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\OpenVPNServiceInteractive')
+             or FileExists(ExpandConstant('{commonpf}\OpenVPN\bin\openvpn.exe'))
+             or FileExists(ExpandConstant('{commonpf32}\OpenVPN\bin\openvpn.exe'));
+            WireGuardDetected :=
+                FileExists(ExpandConstant('{commonpf}\WireGuard\wireguard.exe'))
+             or FileExists(ExpandConstant('{commonpf32}\WireGuard\wireguard.exe'));
+            Result := True;
+          end;
+
+          function OpenVpnNeeded(): Boolean;
+          begin
+            Result := not OpenVpnDetected;
+          end;
+
+          function WireGuardNeeded(): Boolean;
+          begin
+            Result := not WireGuardDetected;
+          end;
+
+          procedure InitializeWizard();
+          var
+            i: Integer;
+            s: String;
+          begin
+            for i := 0 to WizardForm.TasksList.Items.Count - 1 do begin
+              s := WizardForm.TasksList.Items[i];
+              if (Pos('OpenVPN Community', s) > 0) and OpenVpnDetected then begin
+                WizardForm.TasksList.Checked[i] := False;
+                WizardForm.TasksList.Items[i] := s + ' [already installed]';
+              end;
+              if (Pos('WireGuard for Windows', s) > 0) and WireGuardDetected then begin
+                WizardForm.TasksList.Checked[i] := False;
+                WizardForm.TasksList.Items[i] := s + ' [already installed]';
+              end;
+            end;
+          end;
+          "@
+          Set-Content -Path installer.iss -Value $iss -Encoding ASCII
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
           Remove-Item -Recurse -Force "dist/$pkg"
           Get-ChildItem dist
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: binary-windows
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.exe
 
   build-macos:
     name: Build macOS
     runs-on: macos-latest
+    needs: release-metadata
     steps:
       - uses: actions/checkout@v4
       - name: Install Qt
@@ -121,6 +337,14 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'clang_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(sysctl -n hw.ncpu)
+          cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
           cd src
@@ -139,7 +363,7 @@ jobs:
         run: macdeployqt src/ngPost.app
       - name: Package
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="${{ needs.release-metadata.outputs.package_version }}"
           PKG="ngPost-${VERSION}-macos"
           mkdir -p dist
           cd src
@@ -154,24 +378,50 @@ jobs:
 
   build-appimage:
     name: Build Linux AppImage
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    needs: release-metadata
     steps:
       - uses: actions/checkout@v4
       - name: Install build & runtime dependencies
         run: |
           sudo apt update
           sudo apt install -y \
-            build-essential libfuse2 wget file patchelf desktop-file-utils \
-            libssl3 openssl \
+            build-essential cmake libfuse2t64 wget file patchelf desktop-file-utils \
+            libssl3t64 openssl \
             par2 \
+            openvpn wireguard-tools wireguard-go \
+            libsecret-1-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 \
             libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
+      - name: Install Go for wireguard-go fallback
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: Build wireguard-go fallback
+        run: |
+          if command -v wireguard-go >/dev/null 2>&1; then
+            wireguard-go --version || true
+            exit 0
+          fi
+
+          git clone --depth=1 https://git.zx2c4.com/wireguard-go /tmp/wireguard-go
+          make -C /tmp/wireguard-go
+          sudo install -m 755 /tmp/wireguard-go/wireguard-go /usr/local/bin/wireguard-go
+          wireguard-go --version || true
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(nproc)
+          cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
           cd src
@@ -188,14 +438,64 @@ jobs:
           make -j$(nproc)
       - name: Prepare AppDir
         run: |
+          resolve_bin() {
+            local label="$1"
+            shift
+
+            local candidate
+            for candidate in "$@"; do
+              if command -v "$candidate" >/dev/null 2>&1; then
+                command -v "$candidate"
+                return 0
+              fi
+            done
+
+            find /usr/local/bin /usr/local/sbin /usr/bin /usr/sbin /bin /sbin \
+              -maxdepth 1 -type f -name "$label" -perm -111 2>/dev/null | head -1
+          }
+
+          install_bin() {
+            local label="$1"
+            local target="$2"
+            shift 2
+
+            local source
+            source="$(resolve_bin "$label" "$@")"
+            if [ -z "$source" ]; then
+              echo "ERROR: unable to find required binary '$label' (tried: $*)" >&2
+              exit 1
+            fi
+
+            echo "Bundling $label from $source"
+            cp "$source" "$target"
+            chmod 755 "$target"
+          }
+
           mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/bin/vpn
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           cp src/ngPost AppDir/usr/bin/
-          cp "$(which par2)" AppDir/usr/bin/par2
+          install_bin par2 AppDir/usr/bin/par2 par2 par2create par2repair
           if [ -x tools/rar ]; then
             cp tools/rar AppDir/usr/bin/rar
           fi
+          # Bundle VPN binaries next to ngPost. Code path: applicationDirPath()/vpn/<bin>
+          # On AppImage, applicationDirPath = $APPDIR/usr/bin so this lands at
+          # /usr/bin/vpn/{openvpn,wireguard-go,wg} inside the squashfs.
+          install_bin openvpn AppDir/usr/bin/vpn/openvpn openvpn
+          install_bin wireguard-go AppDir/usr/bin/vpn/wireguard-go wireguard-go
+          install_bin wg AppDir/usr/bin/vpn/wg wg
+          # VPN runtime: helper + install/uninstall scripts + polkit rule
+          # template. All next to the ngPost binary so the user-mode dialog
+          # can locate them via applicationDirPath() and pass them to pkexec
+          # for the one-time install.
+          cp src/vpn/scripts/ngpost-vpn-helper.sh    AppDir/usr/bin/
+          cp src/vpn/scripts/ngpost-vpn-install.sh   AppDir/usr/bin/
+          cp src/vpn/scripts/ngpost-vpn-uninstall.sh AppDir/usr/bin/
+          cp src/vpn/polkit/49-ngpost-vpn.rules.in   AppDir/usr/bin/
+          chmod 755 AppDir/usr/bin/ngpost-vpn-*.sh
+          chmod 644 AppDir/usr/bin/49-ngpost-vpn.rules.in
           cp ngPost.desktop AppDir/usr/share/applications/
           cp src/resources/icons/ngPost.png AppDir/usr/share/icons/hicolor/256x256/apps/
           cp src/resources/icons/ngPost.png AppDir/
@@ -209,6 +509,18 @@ jobs:
           test -n "$SSL" && test -n "$CRYPTO" || { echo "OpenSSL libs not found"; exit 1; }
           echo "ssl=$SSL"       >> $GITHUB_OUTPUT
           echo "crypto=$CRYPTO" >> $GITHUB_OUTPUT
+      - name: Locate QtKeychain library
+        id: qtkeychain
+        run: |
+          # Phase 4 dep: cross-platform credential store.
+          # We compile QtKeychain from source into $QT_ROOT_DIR earlier,
+          # so the .so lives under $QT_ROOT_DIR/lib (with the system lib
+          # path as a fallback for distros that ship the package).
+          KC=$(find "$QT_ROOT_DIR/lib" /usr/lib/x86_64-linux-gnu \
+                 /lib/x86_64-linux-gnu -maxdepth 2 \
+                 -name 'libqt6keychain.so*' 2>/dev/null | sort | head -1)
+          test -n "$KC" || { echo "libqt6keychain not found"; exit 1; }
+          echo "kc=$KC" >> $GITHUB_OUTPUT
       - name: Download linuxdeployqt
         run: |
           wget -q -O linuxdeployqt https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
@@ -222,12 +534,13 @@ jobs:
         env:
           # Qt 6 dlopen plugins that linuxdeploy-plugin-qt won't pick up automatically
           EXTRA_QT_PLUGINS: "tls;networkinformation"
-          LDAI_OUTPUT: ngPost-${{ inputs.version }}-x86_64.AppImage
+          LDAI_OUTPUT: ngPost-${{ needs.release-metadata.outputs.package_version }}-x86_64.AppImage
           # Embed update info into the ELF + emit a .zsync file alongside the AppImage.
           # Format: gh-releases-zsync|<user>|<repo>|<tag>|<glob>
           # Using "latest" => AppImageUpdate fetches the latest GitHub release each check.
-          UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|ngPost-*-x86_64.AppImage.zsync"
-          LDAI_UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|ngPost-*-x86_64.AppImage.zsync"
+          # The filename glob is channel-aware so unstable builds only follow unstable assets.
+          UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|${{ needs.release-metadata.outputs.appimage_update_glob }}"
+          LDAI_UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|${{ needs.release-metadata.outputs.appimage_update_glob }}"
         run: |
           # QT_ROOT_DIR is exported by jurplel/install-qt-action — resolve in shell, not in env:
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
@@ -239,7 +552,11 @@ jobs:
             --output appimage \
             --library "${{ steps.openssl.outputs.ssl }}" \
             --library "${{ steps.openssl.outputs.crypto }}" \
+            --library "${{ steps.qtkeychain.outputs.kc }}" \
             --executable AppDir/usr/bin/par2 \
+            --executable AppDir/usr/bin/vpn/openvpn \
+            --executable AppDir/usr/bin/vpn/wireguard-go \
+            --executable AppDir/usr/bin/vpn/wg \
             --desktop-file AppDir/usr/share/applications/ngPost.desktop \
             --icon-file AppDir/ngPost.png
           mkdir -p dist
@@ -248,15 +565,28 @@ jobs:
           # Hard fail if zsync file wasn't generated (means UPDATE_INFORMATION wasn't picked up)
           test -f dist/*.AppImage.zsync || { echo "ERROR: .zsync file not generated"; exit 1; }
       - name: Verify AppImage is self-contained & update-info embedded
+        env:
+          APPIMAGE_UPDATE_GLOB: ${{ needs.release-metadata.outputs.appimage_update_glob }}
         run: |
           cd dist
           APPIMAGE=$(ls *.AppImage)
           ./"$APPIMAGE" --appimage-extract >/dev/null
           test -f squashfs-root/usr/lib/libssl.so.3    || { echo "ERROR: libssl.so.3 not bundled";    exit 1; }
           test -f squashfs-root/usr/lib/libcrypto.so.3 || { echo "ERROR: libcrypto.so.3 not bundled"; exit 1; }
+          ls squashfs-root/usr/lib/libqt6keychain.so* >/dev/null 2>&1 || { echo "ERROR: libqt6keychain not bundled"; exit 1; }
           ls squashfs-root/usr/plugins/tls/ 2>/dev/null || { echo "ERROR: Qt TLS plugins not bundled"; exit 1; }
+          # VPN binaries must be present at the path my code looks up first
+          test -x squashfs-root/usr/bin/vpn/openvpn      || { echo "ERROR: openvpn not bundled";      exit 1; }
+          test -x squashfs-root/usr/bin/vpn/wireguard-go || { echo "ERROR: wireguard-go not bundled"; exit 1; }
+          test -x squashfs-root/usr/bin/vpn/wg           || { echo "ERROR: wg not bundled";           exit 1; }
+          # Privileged helper + install/uninstall + polkit rule template
+          test -x squashfs-root/usr/bin/ngpost-vpn-helper.sh    || { echo "ERROR: helper script not bundled";    exit 1; }
+          test -x squashfs-root/usr/bin/ngpost-vpn-install.sh   || { echo "ERROR: install script not bundled";   exit 1; }
+          test -x squashfs-root/usr/bin/ngpost-vpn-uninstall.sh || { echo "ERROR: uninstall script not bundled"; exit 1; }
+          test -f squashfs-root/usr/bin/49-ngpost-vpn.rules.in  || { echo "ERROR: polkit rule template not bundled"; exit 1; }
           # Check the update-information string is embedded in the ELF
-          if ! strings "$APPIMAGE" | grep -q "gh-releases-zsync|Hydro74000|ngPost|"; then
+          expected_update_info="gh-releases-zsync|Hydro74000|ngPost|latest|$APPIMAGE_UPDATE_GLOB"
+          if ! strings "$APPIMAGE" | grep -Fq "$expected_update_info"; then
             echo "ERROR: UPDATE_INFORMATION not embedded in AppImage ELF"; exit 1
           fi
           # Check .zsync file is present and references the AppImage
@@ -275,8 +605,11 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-linux, build-windows, build-macos, build-appimage]
+    needs: [release-metadata, build-linux, build-windows, build-macos, build-appimage]
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -284,14 +617,68 @@ jobs:
           merge-multiple: true
       - name: List artifacts
         run: ls -la artifacts/
+      - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+          RELEASE_NAME: ${{ needs.release-metadata.outputs.release_name }}
+          CHANNEL: ${{ needs.release-metadata.outputs.channel }}
+          PRERELEASE: ${{ needs.release-metadata.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+
+          previous_tag=""
+          if [ "$CHANNEL" = "unstable" ]; then
+            previous_tag="$(gh release list --limit 100 --json tagName,isPrerelease \
+              --jq '[.[] | select(.isPrerelease and (.tagName | test("-unstable\\.")))][0].tagName // ""')"
+          fi
+
+          if [ -z "$previous_tag" ]; then
+            previous_tag="$(gh release list --limit 100 --json tagName \
+              --jq '.[0].tagName // ""')"
+          fi
+
+          range=""
+          if [ -n "$previous_tag" ] && git rev-parse -q --verify "refs/tags/$previous_tag" >/dev/null; then
+            range="${previous_tag}..HEAD"
+          fi
+
+          if [ -n "$range" ]; then
+            git log "$range" --no-merges --pretty=format:'- %s (%h)' | sed '/^- $/d' > commits.md
+          else
+            git log --no-merges --pretty=format:'- %s (%h)' | sed '/^- $/d' > commits.md
+          fi
+
+          if [ ! -s commits.md ]; then
+            printf '%s\n' '- No commit found since the previous release.' > commits.md
+          fi
+
+          {
+            echo "# ${RELEASE_NAME}"
+            echo
+            echo "- Channel: ${CHANNEL}"
+            echo "- Commit: ${GITHUB_SHA}"
+            if [ -n "$previous_tag" ]; then
+              echo "- Previous release: ${previous_tag}"
+            else
+              echo "- Previous release: none found"
+            fi
+            echo
+            echo "## Changes since previous release"
+            echo
+            cat commits.md
+            echo
+          } > release-body.md
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.version }}
-          name: Release ${{ inputs.version }}
+          tag_name: ${{ needs.release-metadata.outputs.release_tag }}
+          name: ${{ needs.release-metadata.outputs.release_name }}
           draft: false
-          prerelease: false
-          generate_release_notes: true
+          prerelease: ${{ needs.release-metadata.outputs.prerelease }}
+          body_path: release-body.md
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

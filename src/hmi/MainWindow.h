@@ -20,6 +20,8 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "vpn/VpnManager.h"
+
 #include <QMainWindow>
 #include <QFileInfoList>
 #include <QUrl>
@@ -154,6 +156,14 @@ private slots:
     void onShutdownToggled(bool checked);
 
     void onPauseClicked();
+
+    void onVpnSettingsClicked();
+    void onVpnStateChanged(VpnManager::State newState);
+
+    //! Phase 5d: a per-server "Use VPN" checkbox in the server table got
+    //! toggled. Persist the change immediately so it survives a restart
+    //! without forcing the user through "Save Config".
+    void _onUseVpnToggled(bool checked);
 
 private:
     void _initServerBox();

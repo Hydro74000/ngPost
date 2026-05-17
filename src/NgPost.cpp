@@ -11,7 +11,10 @@
 #include "nntp/NntpServerParams.h"
 #include "FileUploader.h"
 #include "NzbCheck.h"
+#include "utils/PathHelper.h"
 #include "utils/UpdateChecker.h"
+#include "vpn/VpnManager.h"
+#include "vpn/VpnProfile.h"
 #ifdef __USE_HMI__
   #include "hmi/MainWindow.h"
   #include "hmi/PostingWidget.h"
@@ -152,6 +155,20 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 
     {Opt::CHECK_FOR_UPDATES, "check_for_updates"},
     {Opt::LAST_UPDATE_CHECK, "last_update_check"},
+
+    {Opt::VPN_AUTO_CONNECT,        "vpn_auto_connect"},
+    {Opt::VPN_BACKEND,             "vpn_backend"},
+    {Opt::VPN_CONFIG_PATH,         "vpn_config_path"},
+    {Opt::VPN_ACTIVE_PROFILE,      "vpn_active_profile"},
+    {Opt::VPN_PROFILE_NAME,        "name"},
+    {Opt::VPN_PROFILE_BACKEND,     "backend"},
+    {Opt::VPN_PROFILE_CONFIG_FILE, "config_file"},
+    {Opt::VPN_PROFILE_HAS_AUTH,    "has_auth"},
+    {Opt::SERVER_USE_VPN,          "useVpn"},
+
+    {Opt::VPN,                     "vpn"},
+    {Opt::NO_VPN,                  "no_vpn"},
+    {Opt::VPN_PROFILE,             "vpn_profile"},
 };
 
 const QList<QCommandLineOption> NgPost::sCmdOptions = {
@@ -193,9 +210,10 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::RAR_SIZE],            tr( "size in MB of the RAR volumes (0 by default meaning NO split)"), sOptionNames[Opt::RAR_SIZE]},
     { sOptionNames[Opt::RAR_MAX],             tr( "maximum number of archive volumes"), sOptionNames[Opt::RAR_MAX]},
     { sOptionNames[Opt::PAR2_PCT],            tr( "par2 redundancy percentage (0 by default meaning NO par2 generation)"), sOptionNames[Opt::PAR2_PCT]},
-    { sOptionNames[Opt::PAR2_PATH],           tr( "par2 absolute file path (in case of self compilation of ngPost)"), sOptionNames[Opt::PAR2_PCT]},
+    { sOptionNames[Opt::PAR2_PATH],           tr( "par2 absolute file path (in case of self compilation of ngPost)"), sOptionNames[Opt::PAR2_PATH]},
 
     { sOptionNames[Opt::PACK],                tr( "Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)")},
+    { sOptionNames[Opt::AUTO_COMPRESS],       tr( "alias of --pack: enable auto-packing using the config PACK definition")},
     { sOptionNames[Opt::COMPRESS],            tr( "compress inputs using RAR or 7z")},
     { sOptionNames[Opt::GEN_PAR2],            tr( "generate par2 (to be used with --compress)")},
     { sOptionNames[Opt::RAR_NAME],            tr( "provide the RAR file name (to be used with --compress)"), sOptionNames[Opt::RAR_NAME]},
@@ -215,6 +233,15 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     {{"u", sOptionNames[Opt::USER]},          tr("NNTP server username"), sOptionNames[Opt::USER]},
     {{"p", sOptionNames[Opt::PASS]},          tr("NNTP server password"), sOptionNames[Opt::PASS]},
     {{"n", sOptionNames[Opt::CONNECTION]},    tr("number of NNTP connections"), sOptionNames[Opt::CONNECTION]},
+
+// NFO options
+    { sOptionNames[Opt::KEEP_NFO_EXTENSION],  tr("when obfuscating file names, keep the .nfo extension visible")},
+    { sOptionNames[Opt::NZB_COPY_NFO],        tr("copy the .nfo from the original files next to the generated nzb")},
+
+// VPN options (override the configured VPN behaviour for this run)
+    { sOptionNames[Opt::VPN],                 tr("force all NNTP connections through the configured VPN (master switch ON)")},
+    { sOptionNames[Opt::NO_VPN],              tr("disable VPN for this run (master switch OFF, per-server useVpn ignored too)")},
+    { sOptionNames[Opt::VPN_PROFILE],         tr("select the active VPN profile by name (must already exist in the config)"), sOptionNames[Opt::VPN_PROFILE]},
 };
 
 const QMap<NgPost::PostCmdPlaceHolders, QString> NgPost::sPostCmdPlaceHolders = {
@@ -300,6 +327,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _groupPolicy(GROUP_POLICY::ALL),
     _nzbCheck(nullptr), _quiet(false),
     _proxySocks5(QNetworkProxy::NoProxy), _proxyUrl(),
+    _vpnManager(nullptr),
     _logFile(nullptr), _logStream(nullptr)
 {
     QThread::currentThread()->setObjectName(sMainThreadName);
@@ -340,6 +368,54 @@ NgPost::NgPost(int &argc, char *argv[]):
     connect(this, &NgPost::error, this, &NgPost::onError, Qt::QueuedConnection);
 
     _updateChecker = new UpdateChecker(this, &_netMgr, this);
+    _vpnManager    = new VpnManager(this);
+    // Best-effort sweep of any stale VPN state from a previous crashed run.
+    // No-op (and no prompt) if the VPN helper hasn't been installed yet.
+    _vpnManager->runStartupCleanup();
+    // Phase 3 — auto-persist VPN preferences as they change so the user
+    // doesn't have to click "Save Config" after every tweak.
+    connect(_vpnManager, &VpnManager::configChanged,
+            this, [this]() { saveConfig(); });
+    // Phase 3 — mirror VPN status events into the main post log so the user
+    // sees the headline tunnel events (init, connected, disconnected, failed)
+    // alongside upload activity. The full openvpn/wireguard verbosity stays
+    // routed only to the dedicated VPN log panel via logLine().
+    connect(_vpnManager, &VpnManager::statusLine,
+            this, [this](QString const &line) {
+        emit log(QStringLiteral("[VPN] ") + line, true);
+    });
+    // Phase 3 — when the VPN reaches Connected, flush any job that was
+    // parked waiting for the tunnel. On Failed, abort any waiting jobs and
+    // — in CLI mode — terminate the process. The GUI keeps the queue so the
+    // user can retry after fixing the VPN; in CLI there's no one to retry,
+    // so hanging on a pending job is the wrong default.
+    connect(_vpnManager, &VpnManager::stateChanged,
+            this, [this](VpnManager::State s) {
+        if (s == VpnManager::State::Connected) {
+            if (_activeJob || _pendingJobs.isEmpty()) return;
+            _vpnManager->retainForJob();
+            _activeJob = _pendingJobs.dequeue();
+            emit _activeJob->startPosting(true);
+            return;
+        }
+        if (s == VpnManager::State::Failed && !useHMI() && !_pendingJobs.isEmpty()) {
+            while (!_pendingJobs.isEmpty())
+                _pendingJobs.dequeue()->deleteLater();
+            _error(tr("VPN could not be established — aborting pending jobs"),
+                   ERROR_CODE::ERR_WRONG_ARG);
+            qApp->exit(static_cast<int>(ERROR_CODE::ERR_WRONG_ARG));
+        }
+    });
+    // Blocked admission also needs CLI handling: the GUI shows a popup, but
+    // there's no popup in CLI, so without this hook the binary hangs forever
+    // until the parent times it out. Surface the reason and exit non-zero.
+    connect(_vpnManager, &VpnManager::vpnRequiredButUnavailable,
+            this, [this](VpnManager::JobBlockReason, QString const &detail) {
+        if (useHMI()) return;
+        _error(tr("VPN required but unavailable: %1").arg(detail),
+               ERROR_CODE::ERR_WRONG_ARG);
+        qApp->exit(static_cast<int>(ERROR_CODE::ERR_WRONG_ARG));
+    });
 
     _loadTanslators();
 
@@ -950,9 +1026,25 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
         _activeJob->deleteLater();
         _activeJob = nullptr;
 
+        if (_vpnManager)
+            _vpnManager->releaseForJob();
+
         if (_pendingJobs.size())
         {
+            // The next job may itself need (or not) the VPN. Re-admit it so
+            // we either dequeue normally, defer (Wait), or refuse to activate
+            // it now if the VPN can't come up.
+            VpnManager::Admission nextAdm = VpnManager::Admission::Proceed;
+            if (_vpnManager)
+                nextAdm = _vpnManager->admitJob(_nntpServers);
+            if (nextAdm != VpnManager::Admission::Proceed) {
+                // Leave it in pending; the stateChanged(Connected) hook (or
+                // a Blocked->fixed user action) will eventually flush.
+                return;
+            }
             _activeJob = _pendingJobs.dequeue();
+            if (_vpnManager)
+                _vpnManager->retainForJob();
 
 #ifdef __USE_HMI__
             if (_hmi)
@@ -977,6 +1069,18 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
                     }
                     // otherwise it will be triggered automatically when the packing is finished
                     // as it is now the active job ;)
+                }
+                else if (_packingJob == nullptr)
+                {
+                    // Recovery path: the previous active job was cancelled
+                    // while still mid-packing, so _prepareNextPacking() had
+                    // not yet pre-packed the now-dequeued job. Start it
+                    // normally (its own packing happens as part of postFiles)
+                    // and schedule pre-pack of whatever comes after.
+                    if (debugFull())
+                        _log(tr("Recovering: starting next job that wasn't pre-packed"));
+                    emit _activeJob->startPosting(true);
+                    _prepareNextPacking();
                 }
                 else
                     _error("next active job different to the packing one..."); // should never happen...
@@ -1333,7 +1437,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     {
         if ( !parser.isSet(sOptionNames[Opt::AUTO_DIR]) && !parser.isSet(sOptionNames[Opt::MONITOR_DIR]))
         {
-            _error(tr("Error syntax: --del option is only available with --auto or --monitor"),
+            _error(tr("Error syntax: --rm_posted option is only available with --auto or --monitor"),
                    ERROR_CODE::ERR_DEL_AUTO);
             return false;
         }
@@ -1341,8 +1445,46 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
             _delAuto = true;
     }
 
-    if (parser.isSet(sOptionNames[Opt::PACK]))
+    if (parser.isSet(sOptionNames[Opt::PACK]) || parser.isSet(sOptionNames[Opt::AUTO_COMPRESS]))
         enableAutoPacking();
+
+    if (parser.isSet(sOptionNames[Opt::KEEP_NFO_EXTENSION]))
+        _keepNfoExtension = true;
+    if (parser.isSet(sOptionNames[Opt::NZB_COPY_NFO]))
+        _copyNfoWithNzb = true;
+
+    if (parser.isSet(sOptionNames[Opt::VPN]) && parser.isSet(sOptionNames[Opt::NO_VPN]))
+    {
+        _error(tr("Error syntax: --vpn and --no_vpn are mutually exclusive"),
+               ERROR_CODE::ERR_WRONG_ARG);
+        return false;
+    }
+    if (_vpnManager
+        && (parser.isSet(sOptionNames[Opt::VPN])
+            || parser.isSet(sOptionNames[Opt::NO_VPN])
+            || parser.isSet(sOptionNames[Opt::VPN_PROFILE])))
+    {
+        // Apply VPN overrides without triggering saveConfig(): the CLI is a
+        // one-shot override for this run, not a config edit.
+        bool vpnSignalsWereBlocked = _vpnManager->blockSignals(true);
+        if (parser.isSet(sOptionNames[Opt::VPN_PROFILE]))
+        {
+            QString name = parser.value(sOptionNames[Opt::VPN_PROFILE]);
+            if (_vpnManager->findProfileIndex(name) < 0)
+            {
+                _vpnManager->blockSignals(vpnSignalsWereBlocked);
+                _error(tr("Error syntax: --vpn_profile '%1' does not match any profile defined in the config").arg(name),
+                       ERROR_CODE::ERR_WRONG_ARG);
+                return false;
+            }
+            _vpnManager->setActiveProfileName(name);
+        }
+        if (parser.isSet(sOptionNames[Opt::VPN]))
+            _vpnManager->setAutoConnect(true);
+        else if (parser.isSet(sOptionNames[Opt::NO_VPN]))
+            _vpnManager->setAutoConnect(false);
+        _vpnManager->blockSignals(vpnSignalsWereBlocked);
+    }
 
     if (parser.isSet(sOptionNames[Opt::COMPRESS]))
         _doCompress = true;
@@ -1685,7 +1827,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         QFileInfo fileInfo(filePath);
         if (!fileInfo.exists() || !fileInfo.isReadable())
         {
-            _error(tr("Error: the input file '%1' is not readable...").arg(parser.value("input")),
+            _error(tr("Error: the input file '%1' is not readable...").arg(filePath),
                    ERROR_CODE::ERR_INPUT_READ);
             return false;
         }
@@ -1852,10 +1994,35 @@ QString NgPost::_parseConfig(const QString &configPath)
     if (!fileInfo.exists() || !fileInfo.isFile() || !fileInfo.isReadable())
         err = tr("The config file '%1' is not readable...").arg(configPath);
 
+    // CRITICAL: while we are LOADING a config, the VpnManager setters
+    // (setConfigPath / setAutoConnect / setBackend) would emit configChanged,
+    // and our NgPost handler connects that to saveConfig(). If we let those
+    // fire during parse, saveConfig() writes the in-memory state mid-parse
+    // — *before* the [server] blocks have been loaded — and silently wipes
+    // the user's servers from the file on disk.
+    // Block VpnManager signals only for the duration of the parse.
+    bool vpnSignalsWereBlocked = false;
+    if (_vpnManager)
+        vpnSignalsWereBlocked = _vpnManager->blockSignals(true);
+
+    // Phase 4 — collected during parse, applied to VpnManager at end.
+    QList<VpnProfile> parsedVpnProfiles;
+    QString           parsedActiveVpnProfile;
+    QString           legacyVpnConfigPath;
+    QString           legacyVpnBackend;
+
     QFile file(fileInfo.absoluteFilePath());
     if (file.open(QIODevice::ReadOnly))
     {
         NntpServerParams *serverParams = nullptr;
+        VpnProfile        currentVpn;
+        bool              inVpnProfile = false;
+        auto flushVpnProfile = [&]() {
+            if (inVpnProfile && currentVpn.isValid())
+                parsedVpnProfiles << currentVpn;
+            currentVpn   = VpnProfile();
+            inVpnProfile = false;
+        };
         QTextStream stream(&file);
         while (!stream.atEnd())
         {
@@ -1864,8 +2031,16 @@ QString NgPost::_parseConfig(const QString &configPath)
                 continue;
             else if (line == "[server]")
             {
+                flushVpnProfile();
                 serverParams = new NntpServerParams();
                 _nntpServers << serverParams;
+            }
+            else if (line == "[vpn_profile]")
+            {
+                flushVpnProfile();
+                serverParams = nullptr;
+                inVpnProfile = true;
+                currentVpn   = VpnProfile();
             }
             else
             {
@@ -1888,14 +2063,23 @@ QString NgPost::_parseConfig(const QString &configPath)
                     }
                     else if (opt == sOptionNames[Opt::NZB_PATH])
                     {
-                        QFileInfo nzbFI(val);
-                        if (nzbFI.exists() && nzbFI.isDir() && nzbFI.isWritable())
+                        if (val.isEmpty())
                         {
-                            _nzbPath     = val;
-                            _nzbPathConf = val;
+                            // Unset NZB_PATH: legitimate (use default current dir at post time)
+                            _nzbPath.clear();
+                            _nzbPathConf.clear();
                         }
                         else
-                            err += tr("the nzbPath '%1' is not writable...\n").arg(val);
+                        {
+                            QFileInfo nzbFI(val);
+                            if (nzbFI.exists() && nzbFI.isDir() && nzbFI.isWritable())
+                            {
+                                _nzbPath     = val;
+                                _nzbPathConf = val;
+                            }
+                            else
+                                err += tr("the nzbPath '%1' is not writable...\n").arg(val);
+                        }
                     }
                     else if (opt == sOptionNames[Opt::NZB_UPLOAD_URL])
                     {
@@ -1980,6 +2164,47 @@ QString NgPost::_parseConfig(const QString &configPath)
                     else if (opt == sOptionNames[Opt::LAST_UPDATE_CHECK])
                     {
                         _lastUpdateCheckEpoch = val.toLongLong();
+                    }
+                    else if (opt == sOptionNames[Opt::VPN_AUTO_CONNECT])
+                    {
+                        val = val.toLower();
+                        _vpnManager->setAutoConnect(val == "true" || val == "on" || val == "1");
+                    }
+                    else if (opt == sOptionNames[Opt::VPN_ACTIVE_PROFILE])
+                    {
+                        parsedActiveVpnProfile = val;
+                    }
+                    // Legacy single-profile keys (kept for migration only).
+                    else if (opt == sOptionNames[Opt::VPN_BACKEND])
+                    {
+                        legacyVpnBackend = val;
+                    }
+                    else if (opt == sOptionNames[Opt::VPN_CONFIG_PATH])
+                    {
+                        legacyVpnConfigPath = val;
+                    }
+                    // Inside [vpn_profile] block — these key names collide with
+                    // server fields but we know we're in a vpn_profile context.
+                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_NAME])
+                    {
+                        currentVpn.name = val;
+                    }
+                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_BACKEND])
+                    {
+                        bool ok = false;
+                        VpnManager::Backend b = VpnManager::backendFromString(val, &ok);
+                        if (ok)
+                            currentVpn.backend = b;
+                    }
+                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_CONFIG_FILE])
+                    {
+                        currentVpn.configFileName = val;
+                    }
+                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_HAS_AUTH])
+                    {
+                        val = val.toLower();
+                        currentVpn.hasAuth =
+                            (val == "true" || val == "on" || val == "1");
                     }
                     else if (opt == sOptionNames[Opt::KEEP_NFO_EXTENSION])
                     {
@@ -2327,6 +2552,12 @@ QString NgPost::_parseConfig(const QString &configPath)
                         else
                             serverParams->nzbCheck = false;
                     }
+                    else if (opt == sOptionNames[Opt::SERVER_USE_VPN].toLower())
+                    {
+                        val = val.toLower();
+                        serverParams->useVpn =
+                            (val == "true" || val == "on" || val == "1");
+                    }
                     else if (opt == sOptionNames[Opt::USER])
                     {
                         serverParams->user = val.toStdString();
@@ -2346,8 +2577,38 @@ QString NgPost::_parseConfig(const QString &configPath)
                 }
             }
         }
+        // Flush any trailing [vpn_profile] block (no [section] header after it).
+        flushVpnProfile();
         file.close();
     }
+
+    // Phase 4 — legacy single-profile config (VPN_BACKEND + VPN_CONFIG_PATH).
+    // Migrate it into a "Default" profile by copying the .ovpn/.conf into
+    // <configDir>/vpn/ if no [vpn_profile] block was found.
+    if (parsedVpnProfiles.isEmpty() && !legacyVpnConfigPath.isEmpty())
+    {
+        QFileInfo legacy(legacyVpnConfigPath);
+        if (legacy.exists() && legacy.isFile())
+        {
+            QString destName  = legacy.fileName();
+            QString destPath  = PathHelper::vpnDir() + "/" + destName;
+            if (!QFile::exists(destPath))
+                QFile::copy(legacyVpnConfigPath, destPath);
+            VpnProfile p;
+            p.name           = QStringLiteral("Default");
+            bool ok = false;
+            VpnManager::Backend b = VpnManager::backendFromString(legacyVpnBackend, &ok);
+            p.backend        = ok ? b : VpnManager::Backend::OpenVPN;
+            p.configFileName = destName;
+            p.hasAuth        = false; // legacy didn't track creds
+            parsedVpnProfiles << p;
+            parsedActiveVpnProfile = p.name;
+            _log(tr("VPN: migrated legacy VPN_CONFIG_PATH into profile 'Default'"));
+        }
+    }
+
+    if (_vpnManager)
+        _vpnManager->setProfilesFromConfig(parsedVpnProfiles, parsedActiveVpnProfile);
 
     if (err.isEmpty() && !_postHistoryFile.isEmpty())
     {
@@ -2367,6 +2628,11 @@ QString NgPost::_parseConfig(const QString &configPath)
             file.close();
         }
     }
+
+    // Restore VpnManager signal emission. From here on, setters can validly
+    // notify NgPost::saveConfig().
+    if (_vpnManager)
+        _vpnManager->blockSignals(vpnSignalsWereBlocked);
 
     return err;
 }
@@ -2388,6 +2654,10 @@ void NgPost::_syntax(char *appName)
             _cout << "\n// " << tr("quick posting (several files/folders)") << "\n";
         else if (opt.valueName() == sOptionNames[Opt::OBFUSCATE])
             _cout << "\n// " << tr("general options") << "\n";
+        else if (opt.names().first() == sOptionNames[Opt::KEEP_NFO_EXTENSION])
+            _cout << "\n// " << tr("NFO options") << "\n";
+        else if (opt.names().first() == sOptionNames[Opt::VPN])
+            _cout << "\n// " << tr("VPN overrides (one-shot, not saved to config)") << "\n";
 
         if (opt.names().size() == 1)
             _cout << QString("\t--%1: %2\n").arg(opt.names().first(), -17).arg(tr(opt.description().toLocal8Bit().constData()));
@@ -2410,11 +2680,11 @@ void NgPost::_syntax(char *appName)
 
 QString NgPost::parseDefaultConfig()
 {
-#if defined(WIN32) || defined(__MINGW64__)
-    QString conf = sDefaultConfig;
-#else
-    QString conf = QString("%1/%2").arg(getenv("HOME")).arg(sDefaultConfig);
-#endif
+    // Phase 4: cross-platform XDG config dir. Migrates legacy ~/.ngPost on
+    // first launch.
+    PathHelper::migrateLegacyConfigIfNeeded();
+    QString conf = PathHelper::configFilePath();
+
     QString err;
     QFileInfo defaultConf(conf);
     if (defaultConf.exists() && defaultConf.isFile())
@@ -2444,6 +2714,28 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
     }
 #endif
 
+    // VPN gate (Phase 3): ask the VpnManager whether this job can run NOW.
+    //   Proceed: the job activates (or queues behind another active job)
+    //   Wait   : the VPN is being brought up; we queue the job, retain a
+    //            slot in the VpnManager, and the Connected signal will
+    //            flush the queue below
+    //   Blocked: cannot start the VPN; queue the job, popup shown. Activation
+    //            will only happen after the user fixes the situation AND
+    //            another action re-triggers a queue advance (typically the
+    //            stateChanged(Connected) listener).
+    VpnManager::Admission adm = VpnManager::Admission::Proceed;
+    if (_vpnManager)
+        adm = _vpnManager->admitJob(_nntpServers);
+
+    if (adm == VpnManager::Admission::Blocked
+        || adm == VpnManager::Admission::Wait) {
+        // Job parked in the queue. retainForJob is deferred to the moment
+        // the job actually activates (via the stateChanged(Connected) flush
+        // or a subsequent startPostingJob attempt).
+        _pendingJobs << job;
+        return false;
+    }
+
     if (_activeJob)
     {
         _pendingJobs << job;
@@ -2456,6 +2748,8 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
     }
     else
     {
+        if (_vpnManager)
+            _vpnManager->retainForJob();
         _activeJob = job;
         emit job->startPosting(true);
         return true;
@@ -2515,11 +2809,7 @@ void NgPost::_showVersionASCII() const
 
 void NgPost::saveConfig()
 {
-#if defined(WIN32) || defined(__MINGW64__)
-    QString conf = sDefaultConfig;
-#else
-    QString conf = QString("%1/%2").arg(getenv("HOME")).arg(sDefaultConfig);
-#endif
+    QString conf = PathHelper::configFilePath();
 
     QFile file(conf);
     if (file.open(QIODevice::WriteOnly|QIODevice::Text))
@@ -2655,6 +2945,11 @@ void NgPost::saveConfig()
                << tr("## (internal) last update check timestamp, epoch seconds \xe2\x80\x94 managed automatically") << "\n"
                << "LAST_UPDATE_CHECK = " << _lastUpdateCheckEpoch << "\n"
                << "\n"
+               << tr("## tunnel ngPost connections through an embedded VPN (Linux v1)") << "\n"
+               << tr("## the VPN affects ngPost only; the rest of the system is unchanged") << "\n"
+               << "VPN_AUTO_CONNECT = " << (_vpnManager && _vpnManager->autoConnect() ? "true" : "false") << "\n"
+               << "VPN_ACTIVE_PROFILE = " << (_vpnManager ? _vpnManager->activeProfileName() : QString()) << "\n"
+               << "\n"
                << tr("## when obfuscating file names, keep the .nfo extension visible") << "\n"
                << (_keepNfoExtension ? "" : "#") << "KEEP_NFO_EXTENSION = true\n"
                << "\n"
@@ -2695,8 +2990,19 @@ void NgPost::saveConfig()
                << tr("## coma separated list using the keywords COMPRESS, GEN_NAME, GEN_PASS and GEN_PAR2") << "\n"
                << tr("## For Auto posting and Monitoring if you don't use COMPRESS you need GEN_PA2") << "\n"
                << tr("#PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2") << "\n"
-               << tr("#PACK = GEN_PAR2") << "\n"
-               << (_packAuto && _packAutoKeywords.size() ? QString("PACK = %1\n").arg(_packAutoKeywords.join(", ").toUpper()) : "")
+               << tr("#PACK = GEN_PAR2") << "\n";
+        // Rebuild the PACK keyword list from the current per-job flag state
+        // each time we save, otherwise toggling Compress / Generate Par2 in
+        // the GUI never propagates to the on-disk PACK = ... line and the
+        // user's choice silently rolls back to whatever was loaded.
+        if (_packAuto) {
+            _packAutoKeywords.clear();
+            if (_doCompress) _packAutoKeywords << sOptionNames[Opt::COMPRESS];
+            if (_genName)    _packAutoKeywords << sOptionNames[Opt::GEN_NAME];
+            if (_genPass)    _packAutoKeywords << sOptionNames[Opt::GEN_PASS];
+            if (_doPar2)     _packAutoKeywords << sOptionNames[Opt::GEN_PAR2];
+        }
+        stream << (_packAuto && _packAutoKeywords.size() ? QString("PACK = %1\n").arg(_packAutoKeywords.join(", ").toUpper()) : "")
                << "\n"
                << tr("## use the same Password for all your Posts using compression") << "\n"
           #ifdef __USE_HMI__
@@ -2802,6 +3108,7 @@ void NgPost::saveConfig()
                    << "connection = " << param->nbCons << "\n"
                    << "enabled = " << (param->enabled ? "true":"false") << "\n"
                    << "nzbCheck = " << (param->nzbCheck ? "true":"false") << "\n"
+                   << "useVpn = " << (param->useVpn ? "true":"false") << "\n"
                    << "\n\n";
         }
         stream << tr("## You can add as many server if you have several providers by adding other \"server\" sections") << "\n"
@@ -2816,6 +3123,19 @@ void NgPost::saveConfig()
                << "#nzbCheck = false\n"
                << "\n";
 
+        // Phase 4 — VPN profiles. The config files themselves live under
+        // <configDir>/vpn/; we only persist metadata here. Credentials are
+        // never saved in this file (keychain or inline-in-ovpn only).
+        if (_vpnManager) {
+            for (VpnProfile const &p : _vpnManager->profiles()) {
+                stream << "[vpn_profile]\n"
+                       << "name        = " << p.name << "\n"
+                       << "backend     = " << VpnManager::backendToString(p.backend) << "\n"
+                       << "config_file = " << p.configFileName << "\n"
+                       << "has_auth    = " << (p.hasAuth ? "true" : "false") << "\n"
+                       << "\n";
+            }
+        }
 
         _log(tr("the config '%1' file has been updated").arg(conf));
         file.close();
@@ -2848,4 +3168,3 @@ const QString NgPost::sNgPostASCII = QString("\
      |___|  /\\___  /|____|   \\____/____  > |__|\n\
           \\//_____/                    \\/\n\
 ");
-

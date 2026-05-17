@@ -32,6 +32,7 @@ struct NntpServerParams{
     bool        useSSL;
     bool        enabled;
     bool        nzbCheck;
+    bool        useVpn; //!< Phase 3: route this server's NNTP sockets through the VPN tun
 
     static const ushort sDefaultPort = 119;
     static const ushort sDefaultSslPort = 563;
@@ -39,14 +40,15 @@ struct NntpServerParams{
 
     NntpServerParams():
         host(""), port(sDefaultPort), auth(false), user(""),
-        pass(""), nbCons(1), useSSL(false), enabled(true), nzbCheck(false)
+        pass(""), nbCons(1), useSSL(false), enabled(true), nzbCheck(false), useVpn(false)
     {}
 
     NntpServerParams(const QString & aHost, ushort aPort = sDefaultPort, bool aAuth = false,
                          const std::string &aUser = "", const std::string &aPass = "",
                          int aNbCons = 1, bool aUseSSL = false, bool aNzbCheck = false):
        host(aHost), port(aPort), auth(aAuth), user(aUser),
-       pass(aPass), nbCons(aNbCons), useSSL(aUseSSL), enabled(true), nzbCheck(aNzbCheck)
+       pass(aPass), nbCons(aNbCons), useSSL(aUseSSL), enabled(true), nzbCheck(aNzbCheck),
+       useVpn(false)
     {}
 
     ~NntpServerParams() = default;

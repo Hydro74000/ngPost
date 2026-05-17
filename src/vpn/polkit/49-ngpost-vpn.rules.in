@@ -1,0 +1,17 @@
+// Auto-installed by ngpost-vpn-install. Grants polkit.Result.YES to pkexec
+// for the helper script — but ONLY when:
+//   * the requested program is the exact installed absolute path
+//   * the invoking subject is the user who ran the install
+//
+// This means Connect/Disconnect/Cleanup operations don't prompt. The strict
+// path scope ensures an attacker cannot swap in their own script: /var/lib/
+// is root-owned 755, only root can replace the file, and the rule won't fire
+// for any other path.
+
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        action.lookup("program") == "/var/lib/ngpost/ngpost-vpn-helper.sh" &&
+        subject.user == "@@USER@@") {
+        return polkit.Result.YES;
+    }
+});
