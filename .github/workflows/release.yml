@@ -46,9 +46,9 @@ jobs:
             channel="stable"
             appimage_update_glob="ngPost-*-x86_64.AppImage.zsync"
           else
-            base_version="$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*([0-9]+(\.[0-9]+){1,2}).*/\1/p' src/ngPost.pri | head -1)"
+            base_version="$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*([0-9]+(\.[0-9]+){1,2}).*/\1/p' src/ngPost_core.pri | head -1)"
             if [ -z "$base_version" ]; then
-              echo "Unable to read VERSION from src/ngPost.pri" >&2
+              echo "Unable to read VERSION from src/ngPost_core.pri" >&2
               exit 1
             fi
 

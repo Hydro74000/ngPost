@@ -28,7 +28,7 @@ QT_KEYCHAIN_PREFIX = $$(QT_ROOT_DIR)
 LIBS    += -lqt6keychain
 QT      += dbus
 
-VERSION = 5.2.2
+VERSION = 5.3.0
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 INCLUDEPATH += $$PWD
