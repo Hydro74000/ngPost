@@ -23,6 +23,10 @@
 
 #include "TestEnv.h"
 
+#ifndef APP_VERSION
+#  define APP_VERSION "0.0.0"
+#endif
+
 using ngpost::tests::HomeSandbox;
 using ngpost::tests::locateNgPostBinary;
 
@@ -113,7 +117,7 @@ void TestCliParser::version_flag_succeeds()
 
     QVERIFY2(!r.timedOut, "ngPost --version timed out");
     QCOMPARE(r.exitCode, 0);
-    QVERIFY2(r.stdoutText.contains("5.2.2"),
+    QVERIFY2(r.stdoutText.contains(QStringLiteral(APP_VERSION)),
              qPrintable(QStringLiteral("stdout did not mention version: %1").arg(r.stdoutText)));
 }
 
