@@ -35,7 +35,7 @@ def _log(log_path: Optional[Path], msg: str) -> None:
 
 
 def _parse_qname(buf: bytes, off: int) -> tuple[str, int]:
-    labels = []
+    labels: list[str] = []
     while True:
         if off >= len(buf):
             raise ValueError("qname overruns packet")

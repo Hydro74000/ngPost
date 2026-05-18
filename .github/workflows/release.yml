@@ -112,7 +112,7 @@ jobs:
           PKG="ngPost-${VERSION}-linux-x86_64"
           mkdir -p "dist/${PKG}"
           cp src/ngPost "dist/${PKG}/"
-          cp ngPost.conf release_notes.txt README* "dist/${PKG}/" 2>/dev/null || true
+          cp ngPost.conf release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
           tar -C dist -czf "dist/${PKG}.tar.gz" "${PKG}"
           rm -rf "dist/${PKG}"
           ls -la dist/
@@ -183,6 +183,7 @@ jobs:
           Copy-Item -Recurse src/release/* "dist/$pkg/"
           Copy-Item ngPost.conf, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
+          Copy-Item THIRD_PARTY_LICENSES.md "dist/$pkg/" -ErrorAction SilentlyContinue
           # Phase 5b: bundle PowerShell helpers for Windows-only WireGuard
           # tunnel registration. They run under UAC via Start-Process RunAs.
           New-Item -ItemType Directory -Force -Path "dist/$pkg/scripts/win" | Out-Null
@@ -209,6 +210,49 @@ jobs:
           Invoke-WebRequest -Uri $ovpnUrl -OutFile $ovpnMsi
           Invoke-WebRequest -Uri $wgUrl   -OutFile $wgMsi
 
+          # GPL notice file shown by Inno Setup before installation (LicenseFile page).
+          # Covers the third-party VPN components bundled/chain-installed by this setup.
+          $gplNoticePath = Join-Path (Get-Location) "gpl_notice.txt"
+          Set-Content -Path $gplNoticePath -Encoding UTF8 -Value @"
+          THIRD-PARTY SOFTWARE LICENCE NOTICES
+          ======================================
+
+          The optional VPN features of ngPost rely on the following third-party programs,
+          distributed by their respective authors under the licences listed below.
+          By selecting VPN backend installation you acknowledge these terms.
+
+          ------------------------------------------------------------------------
+          1. OpenVPN Community
+          ------------------------------------------------------------------------
+          Licence  : GNU General Public Licence, version 2 (with OpenSSL exception)
+          Copyright: (c) 2002-2024 OpenVPN Inc. and contributors
+          Source   : https://github.com/OpenVPN/openvpn
+
+          OpenVPN is free software licensed under the GNU GPL v2. In addition, as a
+          special exception, OpenVPN Inc. grants permission to link the code of this
+          release with the OpenSSL library and distribute the resulting executables.
+          Full GPL v2 text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+          ------------------------------------------------------------------------
+          2. WireGuard for Windows
+          ------------------------------------------------------------------------
+          Licence  : GNU General Public Licence, version 2 or later
+          Copyright: (c) 2015-2024 Jason A. Donenfeld <Jason@zx2c4.com>
+          Source   : https://git.zx2c4.com/wireguard-windows
+
+          WireGuard for Windows is free software: you can redistribute it and/or
+          modify it under the terms of the GNU GPL as published by the Free Software
+          Foundation; either version 2 of the License, or (at your option) any later.
+          Full GPL v2 text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+          ------------------------------------------------------------------------
+
+          These programs are independent products; ngPost does not modify them and
+          invokes them as separate processes. Their source code is available at the
+          URLs above. A full summary is in THIRD_PARTY_LICENSES.md, installed
+          alongside ngPost.
+          "@
+
           $iss = @"
           [Setup]
           AppId={{2E2A4868-85FE-4FC1-984A-0B051B78937D}
@@ -230,6 +274,7 @@ jobs:
           SetupIconFile=$icon
           UninstallDisplayIcon={app}\ngPost.exe
           WizardStyle=modern
+          LicenseFile=$gplNoticePath
 
           [Tasks]
           Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
@@ -238,6 +283,7 @@ jobs:
 
           [Files]
           Source: "$source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "THIRD_PARTY_LICENSES.md"; DestDir: "{app}"; Flags: ignoreversion
           Source: "$ovpnMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installopenvpn; Check: OpenVpnNeeded
           Source: "$wgMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installwireguard; Check: WireGuardNeeded
 
@@ -369,6 +415,7 @@ jobs:
           cd src
           zip -qr "../dist/${PKG}.zip" ngPost.app
           cd ..
+          zip -qj "dist/${PKG}.zip" THIRD_PARTY_LICENSES.md
           ls -la dist/
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
@@ -500,7 +547,7 @@ jobs:
           cp src/resources/icons/ngPost.png AppDir/usr/share/icons/hicolor/256x256/apps/
           cp src/resources/icons/ngPost.png AppDir/
           cp ngPost.desktop AppDir/
-          cp ngPost.conf release_notes.txt README* AppDir/ || true
+          cp ngPost.conf release_notes.txt README* THIRD_PARTY_LICENSES.md AppDir/ || true
       - name: Locate OpenSSL libraries
         id: openssl
         run: |

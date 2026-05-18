@@ -98,7 +98,7 @@ class Ui_VpnProfileEditDialog(object):
 
         self.passEdit = QLineEdit(self.authBox)
         self.passEdit.setObjectName(u"passEdit")
-        self.passEdit.setEchoMode(QLineEdit.Password)
+        self.passEdit.setEchoMode(QLineEdit.EchoMode.Password)
 
         self.authForm.setWidget(1, QFormLayout.ItemRole.FieldRole, self.passEdit)
 
@@ -113,7 +113,7 @@ class Ui_VpnProfileEditDialog(object):
 
         self.buttonBox = QDialogButtonBox(VpnProfileEditDialog)
         self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.StandardButton.Cancel|QDialogButtonBox.StandardButton.Save)
 
         self.rootLayout.addWidget(self.buttonBox)
 
@@ -140,4 +140,3 @@ class Ui_VpnProfileEditDialog(object):
         self.passLabel.setText(QCoreApplication.translate("VpnProfileEditDialog", u"Password:", None))
         self.authNoteLabel.setText(QCoreApplication.translate("VpnProfileEditDialog", u"Credentials are stored in your system keychain (GNOME Keyring / KWallet / Windows Credential Vault / macOS Keychain). If the keychain is unavailable, ngPost will ask before falling back to writing credentials into the .ovpn copy (mode 600).", None))
     # retranslateUi
-

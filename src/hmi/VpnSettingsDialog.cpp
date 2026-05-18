@@ -14,7 +14,11 @@
 #include "vpn/VpnManager.h"
 #include "vpn/VpnProfile.h"
 
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QMessageBox>
+#include <QTextBrowser>
+#include <QVBoxLayout>
 
 VpnSettingsDialog::VpnSettingsDialog(VpnManager *manager, QWidget *parent)
     : QDialog(parent)
@@ -37,6 +41,7 @@ VpnSettingsDialog::VpnSettingsDialog(VpnManager *manager, QWidget *parent)
     connect(_ui->profileCB,        QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &VpnSettingsDialog::onActiveProfileChanged);
     connect(_ui->buttonBox,        &QDialogButtonBox::rejected, this, &QDialog::accept);
+    connect(_ui->licencesLink,     &QLabel::linkActivated,      this, &VpnSettingsDialog::onAboutLicences);
 
     connect(_manager, &VpnManager::stateChanged,        this, &VpnSettingsDialog::onStateChanged);
     connect(_manager, &VpnManager::installStateChanged, this, &VpnSettingsDialog::onInstallStateChanged);
@@ -222,4 +227,65 @@ void VpnSettingsDialog::_refreshProfilesUi()
             _ui->profileCB->setCurrentIndex(idx);
     }
     _populating = false;
+}
+
+void VpnSettingsDialog::onAboutLicences(const QString &)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("VPN components — licence notices"));
+    dlg.resize(580, 460);
+    auto *layout = new QVBoxLayout(&dlg);
+    auto *browser = new QTextBrowser(&dlg);
+    browser->setOpenExternalLinks(true);
+    browser->setHtml(QStringLiteral(
+        "<style>"
+        "body { font-family: sans-serif; font-size: 9pt; }"
+        "h3   { margin-bottom: 2px; }"
+        "ul   { margin-top: 2px; }"
+        "code { background: #f0f0f0; padding: 1px 3px; border-radius: 2px; }"
+        "</style>"
+        "<p>The VPN features of ngPost use the following third-party programs, "
+        "each distributed under its own licence. ngPost does not modify these "
+        "programs; it invokes them as independent system processes.</p>"
+
+        "<h3>OpenVPN Community</h3>"
+        "<ul>"
+        "<li>Licence: GNU General Public Licence v2 (with OpenSSL exception)</li>"
+        "<li>Copyright: © 2002–2024 OpenVPN Inc.</li>"
+        "<li>Source: <a href=\"https://github.com/OpenVPN/openvpn\">"
+        "https://github.com/OpenVPN/openvpn</a></li>"
+        "</ul>"
+
+        "<h3>WireGuard for Windows</h3>"
+        "<ul>"
+        "<li>Licence: GNU General Public Licence v2 or later</li>"
+        "<li>Copyright: © 2015–2024 Jason A. Donenfeld</li>"
+        "<li>Source: <a href=\"https://git.zx2c4.com/wireguard-windows\">"
+        "https://git.zx2c4.com/wireguard-windows</a></li>"
+        "</ul>"
+
+        "<h3>wireguard-tools (<code>wg</code>)</h3>"
+        "<ul>"
+        "<li>Licence: GNU General Public Licence v2 only</li>"
+        "<li>Copyright: © 2015–2024 Jason A. Donenfeld</li>"
+        "<li>Source: <a href=\"https://git.zx2c4.com/wireguard-tools\">"
+        "https://git.zx2c4.com/wireguard-tools</a></li>"
+        "</ul>"
+
+        "<h3>wireguard-go</h3>"
+        "<ul>"
+        "<li>Licence: MIT</li>"
+        "<li>Copyright: © 2017–2024 WireGuard LLC</li>"
+        "<li>Source: <a href=\"https://git.zx2c4.com/wireguard-go\">"
+        "https://git.zx2c4.com/wireguard-go</a></li>"
+        "</ul>"
+
+        "<p>Full licence texts are available at the links above and in "
+        "<code>THIRD_PARTY_LICENSES.md</code> in the installation directory.</p>"
+    ));
+    auto *box = new QDialogButtonBox(QDialogButtonBox::Close, &dlg);
+    connect(box, &QDialogButtonBox::rejected, &dlg, &QDialog::accept);
+    layout->addWidget(browser);
+    layout->addWidget(box);
+    dlg.exec();
 }

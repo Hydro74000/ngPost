@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'VpnSettingsDialog.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.11.0
+## Created by: Qt User Interface Compiler version 6.11.1
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -142,11 +142,26 @@ class Ui_VpnSettingsDialog(object):
 
         self.rootLayout.addWidget(self.logBox)
 
+        self.footerLayout = QHBoxLayout()
+        self.footerLayout.setObjectName(u"footerLayout")
+        self.licencesLink = QLabel(VpnSettingsDialog)
+        self.licencesLink.setObjectName(u"licencesLink")
+        self.licencesLink.setTextFormat(Qt.TextFormat.RichText)
+
+        self.footerLayout.addWidget(self.licencesLink)
+
+        self.footerSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
+        self.footerLayout.addItem(self.footerSpacer)
+
         self.buttonBox = QDialogButtonBox(VpnSettingsDialog)
         self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setStandardButtons(QDialogButtonBox.Close)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.StandardButton.Close)
 
-        self.rootLayout.addWidget(self.buttonBox)
+        self.footerLayout.addWidget(self.buttonBox)
+
+
+        self.rootLayout.addLayout(self.footerLayout)
 
 
         self.retranslateUi(VpnSettingsDialog)
@@ -175,5 +190,5 @@ class Ui_VpnSettingsDialog(object):
         self.startBtn.setText(QCoreApplication.translate("VpnSettingsDialog", u"Connect", None))
         self.stopBtn.setText(QCoreApplication.translate("VpnSettingsDialog", u"Disconnect", None))
         self.logBox.setTitle(QCoreApplication.translate("VpnSettingsDialog", u"Log", None))
+        self.licencesLink.setText(QCoreApplication.translate("VpnSettingsDialog", u"<a href=\"about:licences\">About licences</a>", None))
     # retranslateUi
-
