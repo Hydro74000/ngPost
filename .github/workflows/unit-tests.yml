@@ -53,24 +53,7 @@ jobs:
           NGPOST_BIN: ${{ github.workspace }}/src/ngPost
           QT_QPA_PLATFORM: offscreen
         run: |
-          set -e
-          fail=0
-          found=0
-          for t in tests/unit/tst_*/tst_*; do
-            [ -x "$t" ] || continue
-            found=$((found+1))
-            echo "::group::$(basename "$t")"
-            "$t" || fail=$((fail+1))
-            echo "::endgroup::"
-          done
-          if [ "$found" -eq 0 ]; then
-            echo "::error::No unit test binaries found"
-            exit 1
-          fi
-          if [ "$fail" -ne 0 ]; then
-            echo "::error::$fail unit test binary/binaries failed"
-            exit 1
-          fi
+          bash .github/scripts/run-qt-tests.sh tests/unit "unit"
 
       - name: Upload logs on failure
         if: failure()
@@ -79,6 +62,7 @@ jobs:
           name: unit-test-logs-linux
           path: |
             tests/unit/**/*.log
+            tests/unit/**/*.stdout.log
             tests/unit/**/Testing/**/*.xml
           if-no-files-found: ignore
 
@@ -142,22 +126,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           export NGPOST_BIN="$(cygpath -w "$(pwd)/build/windows/release/ngPost.exe")"
-          fail=0
-          found=0
-          while IFS= read -r t; do
-            found=$((found+1))
-            echo "::group::$(basename "$t")"
-            "$t" || fail=$((fail+1))
-            echo "::endgroup::"
-          done < <(find tests/unit -type f -name 'tst_*.exe')
-          if [ "$found" -eq 0 ]; then
-            echo "::error::No unit test binaries found"
-            exit 1
-          fi
-          if [ "$fail" -ne 0 ]; then
-            echo "::error::$fail unit test binary/binaries failed"
-            exit 1
-          fi
+          bash .github/scripts/run-qt-tests.sh tests/unit "unit"
 
       - name: Upload logs on failure
         if: failure()
@@ -166,5 +135,6 @@ jobs:
           name: unit-test-logs-windows
           path: |
             tests/unit/**/*.log
+            tests/unit/**/*.stdout.log
             tests/unit/**/Testing/**/*.xml
           if-no-files-found: ignore

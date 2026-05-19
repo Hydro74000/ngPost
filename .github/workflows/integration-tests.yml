@@ -53,24 +53,7 @@ jobs:
           NGPOST_BIN: ${{ github.workspace }}/src/ngPost
           QT_QPA_PLATFORM: offscreen
         run: |
-          set -e
-          fail=0
-          found=0
-          for t in tests/integration/tst_*/tst_*; do
-            [ -x "$t" ] || continue
-            found=$((found+1))
-            echo "::group::$(basename "$t")"
-            "$t" || fail=$((fail+1))
-            echo "::endgroup::"
-          done
-          if [ "$found" -eq 0 ]; then
-            echo "::error::No integration test binaries found"
-            exit 1
-          fi
-          if [ "$fail" -ne 0 ]; then
-            echo "::error::$fail integration test binary/binaries failed"
-            exit 1
-          fi
+          bash .github/scripts/run-qt-tests.sh tests/integration "integration"
 
       - name: Upload logs on failure
         if: failure()
@@ -79,6 +62,7 @@ jobs:
           name: integration-test-logs-linux
           path: |
             tests/integration/**/*.log
+            tests/integration/**/*.stdout.log
             tests/integration/**/Testing/**/*.xml
           if-no-files-found: ignore
 
@@ -143,22 +127,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           export NGPOST_BIN="$(cygpath -w "$(pwd)/build/windows/release/ngPost.exe")"
-          fail=0
-          found=0
-          while IFS= read -r t; do
-            found=$((found+1))
-            echo "::group::$(basename "$t")"
-            "$t" || fail=$((fail+1))
-            echo "::endgroup::"
-          done < <(find tests/integration -type f -name 'tst_*.exe')
-          if [ "$found" -eq 0 ]; then
-            echo "::error::No integration test binaries found"
-            exit 1
-          fi
-          if [ "$fail" -ne 0 ]; then
-            echo "::error::$fail integration test binary/binaries failed"
-            exit 1
-          fi
+          bash .github/scripts/run-qt-tests.sh tests/integration "integration"
 
       - name: Upload logs on failure
         if: failure()
@@ -167,5 +136,6 @@ jobs:
           name: integration-test-logs-windows
           path: |
             tests/integration/**/*.log
+            tests/integration/**/*.stdout.log
             tests/integration/**/Testing/**/*.xml
           if-no-files-found: ignore

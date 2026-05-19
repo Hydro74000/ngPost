@@ -68,24 +68,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           NGPOST_BIN: ${{ github.workspace }}/src/ngPost
         run: |
-          set -e
-          fail=0
-          found=0
-          for t in tests/gui/tst_*/tst_*; do
-            [ -x "$t" ] || continue
-            found=$((found+1))
-            echo "::group::$(basename "$t")"
-            "$t" || fail=$((fail+1))
-            echo "::endgroup::"
-          done
-          if [ "$found" -eq 0 ]; then
-            echo "::error::No GUI test binaries found"
-            exit 1
-          fi
-          if [ "$fail" -ne 0 ]; then
-            echo "::error::$fail GUI test binary/binaries failed"
-            exit 1
-          fi
+          bash .github/scripts/run-qt-tests.sh tests/gui "GUI"
 
       - name: Upload Test Logs on Failure
         if: failure()
@@ -94,5 +77,6 @@ jobs:
           name: gui-test-logs
           path: |
             tests/gui/**/*.log
+            tests/gui/**/*.stdout.log
             tests/gui/**/Testing/**/*.xml
           if-no-files-found: ignore

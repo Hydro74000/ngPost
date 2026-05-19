@@ -5,7 +5,7 @@ Commit: `de8defc`
 
 ## En cours
 
-_Aucun bloc en cours._
+- [ ] Diagnostic/correctif GitHub Actions: logs QtTest et artefacts de tests
 
 ## A faire
 
@@ -52,3 +52,5 @@ _Aucun bloc en cours._
 - 2026-05-19T18:50:00+02:00: logs GitHub Actions analyses; les echecs Windows viennent de QtKeychain `messages`/traductions (`Error -1073741515`) avant build ngPost.
 - 2026-05-19T19:00:00+02:00: deuxieme blocage GitHub Actions: QtKeychain Windows compile avec l'option MSVC `/utf-8`; patch workflow ajoute une substitution vers flags GCC UTF-8.
 - 2026-05-19T19:15:00+02:00: dernier commit CI fonctionnel `cc69baa`; workflows GitHub OK: Development Project Build, Unit Tests, Integration Tests, GUI Tests, VPN E2E.
+- 2026-05-19T19:35:00+02:00: nouvelle passe GitHub Actions sur `d130b4d`; integration Windows KO sans artefact ni sortie QtTest detaillee, correction du logging CI en cours.
+- 2026-05-19T19:45:00+02:00: script commun `.github/scripts/run-qt-tests.sh` ajoute; integration locale Linux OK et logs QtTest visibles.

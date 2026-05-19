@@ -92,24 +92,7 @@ jobs:
           # runs reproduce the same wiring.
           NGPOST_HELPER_LAUNCHER: "sudo -n -E"
         run: |
-          set -e
-          fail=0
-          found=0
-          for t in tests/vpn/tst_*/tst_*; do
-            [ -x "$t" ] || continue
-            found=$((found+1))
-            echo "::group::$(basename "$t")"
-            "$t" || fail=$((fail+1))
-            echo "::endgroup::"
-          done
-          if [ "$found" -eq 0 ]; then
-            echo "::error::No VPN E2E test binaries found"
-            exit 1
-          fi
-          if [ "$fail" -ne 0 ]; then
-            echo "::error::$fail VPN E2E test binary/binaries failed"
-            exit 1
-          fi
+          bash .github/scripts/run-qt-tests.sh tests/vpn "VPN E2E"
 
       - name: Always tear down any lingering WG state
         if: always()
@@ -127,5 +110,6 @@ jobs:
           name: vpn-e2e-logs
           path: |
             tests/vpn/**/*.log
+            tests/vpn/**/*.stdout.log
             /tmp/ngpost-wg/**
           if-no-files-found: ignore
