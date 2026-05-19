@@ -15,7 +15,7 @@
 This application is a high-speed command line and GUI Usenet poster for binaries, designed for secure and efficient data posting. Developed with C++17 and [Qt 6.8.2](https://www.qt.io/blog/qt-6.8.2-released), it features file compression, par2 file generation, and a posting queue for managing multiple uploads. The tool automates tasks by scanning folders and posting files, with options for executing commands post-upload and shutting down the computer upon completion.
 
 
-![ngPost_v5.0.0](https://github.com/Hydro74000/ngPost/blob/rc-4.17/pics/ngPost_v4.17.png?raw=true)
+![ngPost_v5.3.0](https://github.com/Hydro74000/ngPost/blob/rc-4.17/pics/ngPost_v4.17.png?raw=true)
 
 # Getting Started
 
@@ -25,7 +25,7 @@ All the features are [highlighted here](https://github.com/Hydro74000/ngPost/wik
 - Full posting automation.
 - Compression using RAR or 7zip.
 - Multiple server support.
-- Optional Linux VPN tunnel for ngPost NNTP traffic only (OpenVPN/WireGuard, per-server opt-in).
+- Optional VPN tunnel for ngPost NNTP traffic only (OpenVPN/WireGuard, per-server opt-in — Linux & Windows).
 - Multithreading.
 - And many more.
 
@@ -33,11 +33,15 @@ All the features are [highlighted here](https://github.com/Hydro74000/ngPost/wik
 
 For building the project yourself, please refer to [the wiki](https://github.com/Hydro74000/ngPost/wiki/Build)
 
-## Linux VPN Tunnel
+## VPN Tunnel Support
 
-ngPost can route selected NNTP servers through an embedded VPN tunnel on Linux without changing the system default route. In the GUI, open **VPN...**, install the privileged helper once, choose **OpenVPN** or **WireGuard**, select the VPN configuration file, then tick **Use VPN** on the servers that must use the tunnel.
+ngPost can route selected NNTP servers through an embedded VPN tunnel without changing the system default route. In the GUI, open **VPN...**, choose **OpenVPN** or **WireGuard**, select the VPN configuration file, then tick **Use VPN** on the servers that must use the tunnel.
 
-The helper is installed through `pkexec`/Polkit and is limited to ngPost's VPN helper for the current user. When a server is marked **Use VPN**, ngPost binds that server's NNTP sockets to the tunnel IP and refuses to post or check through that server if the VPN is unavailable. Other applications and the normal system routing table are left untouched.
+When a server is marked **Use VPN**, ngPost binds that server's NNTP sockets to the tunnel IP and refuses to post or check through that server if the VPN is unavailable. Other applications and the normal system routing table are left untouched.
+
+**Linux**: A privileged helper script is installed once via `pkexec`/Polkit. The AppImage bundles the VPN runtime assets; source builds install helper resources under `/var/lib/ngpost`.
+
+**Windows**: ngPost uses the **OpenVPN Interactive Service** or the **WireGuard for Windows** installation to bind NNTP sockets to the tunnel interface via `IP_UNICAST_IF`. No extra helper is required.
 
 The related configuration keys are:
 
@@ -50,7 +54,7 @@ VPN_CONFIG_PATH = /path/to/config.ovpn
 useVpn = true
 ```
 
-`VPN_AUTO_CONNECT` starts the tunnel automatically when a job starts and disconnects it after the queue has been empty for a short grace period. The Linux AppImage/release packaging bundles the VPN runtime assets and helper scripts; source builds can install the runtime helper resources under `/var/lib/ngpost`.
+`VPN_AUTO_CONNECT` starts the tunnel automatically when a job starts and disconnects it after the queue has been empty for a short grace period.
 
 ## Command Line Usage
 
