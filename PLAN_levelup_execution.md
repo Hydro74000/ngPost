@@ -1,15 +1,15 @@
 # LevelUp execution tracking
 
 Branch: `levelup` tracking `origin/levelup`
-Commit: `de8defc`
+Commit valide CI: `5771094`
 
 ## En cours
 
-- [ ] Diagnostic/correctif GitHub Actions: logs QtTest et artefacts de tests
+_Aucun bloc en cours._
 
 ## A faire
 
-- [ ] Surveiller les GitHub Actions apres push
+_Aucun bloc restant._
 
 ## Termine
 
@@ -36,6 +36,8 @@ Commit: `de8defc`
 - [x] Push effectue vers `origin/levelup`
 - [x] GitHub Actions premiere passe: GUI et VPN OK, build/unit/integration KO sur QtKeychain Windows
 - [x] GitHub Actions corrigees: build, unit tests, integration tests, GUI, VPN E2E OK sur `cc69baa`
+- [x] Diagnostic GitHub Actions: logs QtTest explicites et artefacts `.log`/`.stdout.log`
+- [x] GitHub Actions finales: build, unit tests, integration tests, GUI, VPN E2E OK sur `5771094`
 
 ## Journal
 
@@ -54,3 +56,4 @@ Commit: `de8defc`
 - 2026-05-19T19:15:00+02:00: dernier commit CI fonctionnel `cc69baa`; workflows GitHub OK: Development Project Build, Unit Tests, Integration Tests, GUI Tests, VPN E2E.
 - 2026-05-19T19:35:00+02:00: nouvelle passe GitHub Actions sur `d130b4d`; integration Windows KO sans artefact ni sortie QtTest detaillee, correction du logging CI en cours.
 - 2026-05-19T19:45:00+02:00: script commun `.github/scripts/run-qt-tests.sh` ajoute; integration locale Linux OK et logs QtTest visibles.
+- 2026-05-19T20:05:00+02:00: workflows GitHub OK sur `5771094`: Development Project Build, Unit Tests, Integration Tests, GUI Tests, VPN E2E.
