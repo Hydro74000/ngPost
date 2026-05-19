@@ -148,9 +148,29 @@ Une fois les parties Serveurs et Paramètres remplies, on remarque un système d
 L'onglet **Nouveau** permet de créer d'autres Post Rapides.<br />
 À noter que vous pouvez faire un click droit sur les onglets et vous avez l'option **Fermer tous les onglets des Posts finis**<br/>
 
-L'onglet **Historique** regroupe l'historique des posts, les statistiques et le centre de reprise. Au démarrage, une bannière non bloquante signale les posts reprenables. La vue Reprise permet d'identifier les posts `resumable`, `partial` ou non reprenables; les mots de passe sont masqués par défaut.
+L'onglet **Historique** regroupe trois sous-onglets :
 
-La reprise repose sur la base SQLite: les articles confirmés par le serveur sont conservés, les articles `failed`, `pending` ou `unknown` sont repostés avec de nouveaux Message-ID. Les articles `unknown` correspondent aux cas où la connexion a été coupée avant confirmation serveur; l'ancien Message-ID reste dans l'historique technique et n'est pas utilisé dans le NZB final. Pour les posts compressés, les archives/par2 temporaires doivent encore exister; pour les fichiers non compressés, chemin, taille et date de modification doivent correspondre.
+**Sous-onglet Historique** (recherche, filtres, détail)
+- Recherche par nom, chemin NZB ou nom d'archive.
+- Filtres : statut, présence d'un mot de passe, présence d'erreurs, plage de dates, newsgroup.
+- Sélectionner une ligne affiche le détail complet (fichiers, articles, vitesse, archive, chemin NZB).
+- Actions : **Régénérer le NZB** (avec option d'inclure le mot de passe stocké), **Copier le mot de passe**, **Purger le mot de passe**, **Ouvrir l'emplacement du NZB** (ouvre le gestionnaire de fichiers), **Supprimer l'entrée**.
+- Export de tout l'historique au format CSV.
+
+**Sous-onglet Statistiques** (chronologie, par groupe, top posts)
+- Filtre par période (7/30/90 derniers jours, cette année, tout) et par newsgroup.
+- *Chronologie* : volume (Mo) et articles échoués par jour sous forme de graphique en barres.
+- *Par groupe* : nombre de posts par newsgroup sous forme de graphique en barres.
+- *Top posts* : les 20 posts les plus volumineux.
+
+**Sous-onglet Reprise** (centre de reprise)
+- Liste tous les posts pouvant être repris (totalement ou partiellement).
+- Sélection multiple : appliquer les actions sur plusieurs posts à la fois.
+- Détail par ligne : état de reprise (resumable, partiellement resumable ou non resumable), compteurs d'articles (postés / en attente / échoués / inconnus).
+- Actions : **Reprendre** (reposte les articles manquants), **Abandonner** (conserve l'entrée historique mais retire du centre de reprise), **Purger les données de reprise** (supprime le suivi d'articles, l'entrée historique est conservée), **Ignorer (session)** (masque de la vue jusqu'au redémarrage).
+- Une bannière en haut de l'onglet Historique signale les posts reprenables et propose un lien direct vers le sous-onglet Reprise.
+
+La reprise repose sur la base SQLite : les articles confirmés par le serveur sont conservés, les articles `failed`, `pending` ou `unknown` sont repostés avec de nouveaux Message-ID. Les articles `unknown` correspondent aux cas où la connexion a été coupée avant confirmation serveur ; l'ancien Message-ID reste dans l'historique technique et n'est pas utilisé dans le NZB final. Pour les posts compressés, les archives/par2 temporaires doivent encore exister ; pour les fichiers non compressés, chemin, taille et date de modification doivent correspondre.
 
 #### le tunnel VPN intégré (Linux):
 

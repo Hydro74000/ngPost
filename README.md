@@ -74,6 +74,37 @@ Message-ID and the old ID stays as technical history. Final NZB files are
 regenerated from the consolidated history so partial posts cannot silently look
 complete.
 
+### GUI — History, Statistics and Resume Center
+
+The **History** tab gives full access to the posting database from the GUI:
+
+**History sub-tab** (search, filter, detail)
+- Search by name, NZB path or archive name.
+- Filter by status, password presence, error count, date range and newsgroup.
+- Select a row to see full details (files, articles, speed, archive name, NZB path).
+- Actions: **Regenerate NZB** (optionally include stored password), **Copy password**,
+  **Purge password**, **Open NZB location** (opens file manager), **Delete entry**.
+- Export the full history to CSV at any time.
+
+**Stats sub-tab** (timeline, by group, top posts)
+- Period filter (last 7/30/90 days, this year, all time) and newsgroup filter.
+- *Timeline*: volume (MB) and failed-article count per day as a bar chart.
+- *By group*: number of posts per newsgroup as a bar chart.
+- *Top posts*: the 20 largest posts by total uploaded size.
+
+**Resume sub-tab** (resume center)
+- Lists all posts that can be (fully or partially) resumed.
+- Multi-select: apply actions to several posts at once.
+- Per-row detail: shows whether the post is fully resumable, partially resumable
+  or not resumable, with article counts (posted / pending / failed / unknown).
+- Actions: **Resume** (re-send missing articles), **Abandon** (keep history but
+  remove from resume list), **Purge resume data** (remove article tracking,
+  post history entry kept), **Ignore (session)** (hide from this view until restart).
+- A banner at the top of the History tab shows when resumable posts exist and
+  links directly to the Resume sub-tab.
+
+### CLI
+
 Useful CLI commands:
 
 ```bash

@@ -993,6 +993,91 @@ bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assume
     return scheduled;
 }
 
+bool NgPost::resumePostGui(qint64 postId)
+{
+    if (!_ensureHistoryStore())
+        return false;
+
+    ResumePlanner planner(_historyStore);
+    QString err;
+    const ResumePlanner::Decision decision = planner.check(postId, &err);
+    if (decision.state == ResumePlanner::ResumeState::NotResumable)
+        return false;
+
+    PostHistoryStore::PostDetails details;
+    if (!_historyStore->loadPostDetails(postId, &details, &err))
+        return false;
+
+    QFileInfoList filesToResume;
+    QMap<QString, QSet<uint>> alreadyPostedByPath;
+    for (const PostHistoryStore::FileSummary &file : details.files) {
+        QSet<uint> postedParts;
+        bool hasRemaining = false;
+        const QList<PostHistoryStore::ArticleSummary> articles =
+            details.articlesByFile.value(file.id);
+        for (const PostHistoryStore::ArticleSummary &article : articles) {
+            if (article.status == QStringLiteral("posted"))
+                postedParts.insert(static_cast<uint>(article.part));
+            else
+                hasRemaining = true;
+        }
+        if (file.totalArticles > articles.size())
+            hasRemaining = true;
+        if (!hasRemaining)
+            continue;
+        QFileInfo source(file.originalPath);
+        if (!source.exists())
+            continue;
+        filesToResume << source;
+        alreadyPostedByPath.insert(source.absoluteFilePath(), postedParts);
+    }
+
+    if (filesToResume.isEmpty())
+        return false;
+
+    QString nzbPath = details.nzbPath;
+    if (nzbPath.isEmpty()) {
+        nzbPath = _nzbPath + QDir::separator() + details.post.nzbName;
+        if (!nzbPath.endsWith(QStringLiteral(".nzb")))
+            nzbPath += QStringLiteral(".nzb");
+    }
+    QList<QString> groups = details.post.groups.split(',', Qt::SkipEmptyParts);
+    if (groups.isEmpty())
+        groups = getPostingGroups();
+
+    PostingJob *job = new PostingJob(this,
+                                     nzbPath,
+                                     filesToResume,
+                                     nullptr,
+                                     groups,
+                                     details.from.isEmpty() ? from() : details.from.toStdString(),
+                                     _obfuscateArticles,
+                                     _obfuscateFileName,
+                                     _tmpPath,
+                                     _rarPath,
+                                     _rarArgs,
+                                     _rarSize,
+                                     _useRarMax,
+                                     _par2Pct,
+                                     false,
+                                     false,
+                                     details.rarName,
+                                     details.rarPass,
+                                     false,
+                                     false,
+                                     true,
+                                     postId,
+                                     alreadyPostedByPath);
+    return startPostingJob(job);
+}
+
+bool NgPost::regenerateNzbGui(qint64 postId, const QString &outPath, bool includePassword)
+{
+    if (!_ensureHistoryStore())
+        return false;
+    return _regenerateNzbFromHistory(postId, outPath, includePassword);
+}
+
 void NgPost::updateGroups(const QString &groups)
 {
     _grpList.clear();

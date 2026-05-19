@@ -699,7 +699,89 @@ bool PostHistoryStore::markPostCrashedArticlesUnknown(QString *error)
         setError(error, a);
         return false;
     }
+    // Posts still in 'posting' status survived a crash — mark them resumable.
+    QSqlQuery p(db);
+    if (!p.exec(QStringLiteral(
+            "UPDATE posts SET status='resumable', resume_state='resumable',"
+            " resume_reason='application stopped while posting'"
+            " WHERE status='posting'"))) {
+        setError(error, p);
+        return false;
+    }
     return true;
+}
+
+namespace {
+
+PostHistoryStore::PostSummary summaryFromQuery(const QSqlQuery &q, bool forceResumable = false)
+{
+    PostHistoryStore::PostSummary s;
+    s.id               = valueI64(q,  "id");
+    s.nzbName          = valueString(q, "nzb_name");
+    s.nzbPath          = valueString(q, "nzb_path");
+    s.status           = valueString(q, "status");
+    s.groups           = valueString(q, "groups_text");
+    s.createdAt        = valueString(q, "created_at");
+    s.finishedAt       = valueString(q, "finished_at");
+    s.sizeBytes        = valueI64(q,  "size_bytes");
+    s.nbFiles          = valueInt(q,  "nb_files");
+    s.nbArticles       = valueInt(q,  "nb_articles");
+    s.nbFailedArticles = valueInt(q,  "nb_failed_articles");
+    s.hasPassword      = valueBool(q, "has_password");
+    s.passwordStored   = valueBool(q, "password_stored");
+    s.resumable        = forceResumable ||
+                         valueString(q, "resume_state") == QStringLiteral("resumable");
+    s.resumeReason     = valueString(q, "resume_reason");
+    s.avgSpeed         = valueString(q, "avg_speed");
+    return s;
+}
+
+} // anonymous namespace
+
+QList<PostHistoryStore::PostSummary> PostHistoryStore::listPosts(const ListFilter &f,
+                                                                 QString *error)
+{
+    QList<PostSummary> out;
+    if (!initialize(error))
+        return out;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+
+    QString sql = QStringLiteral(
+        "SELECT p.*, COALESCE(group_concat(DISTINCT g.group_name), '') AS groups_text "
+        "FROM posts p LEFT JOIN post_groups g ON g.post_id=p.id WHERE 1=1");
+
+    if (!f.status.isEmpty())
+        sql += QStringLiteral(" AND p.status='%1'").arg(sqlQuote(f.status));
+    if (!f.search.isEmpty()) {
+        const QString s = QStringLiteral("%%1%").arg(sqlQuote(f.search));
+        sql += QStringLiteral(
+                   " AND (p.nzb_name LIKE '%1' OR p.rar_name LIKE '%1' "
+                   "OR p.nzb_path LIKE '%1')").arg(s);
+    }
+    if (!f.group.isEmpty())
+        sql += QStringLiteral(
+                   " AND EXISTS (SELECT 1 FROM post_groups pg "
+                   "WHERE pg.post_id=p.id AND pg.group_name='%1')")
+                   .arg(sqlQuote(f.group));
+    if (f.onlyWithPassword)
+        sql += QStringLiteral(" AND p.has_password=1");
+    if (f.onlyWithErrors)
+        sql += QStringLiteral(" AND p.nb_failed_articles>0");
+    if (!f.dateFrom.isEmpty())
+        sql += QStringLiteral(" AND p.created_at>='%1'").arg(sqlQuote(f.dateFrom));
+    if (!f.dateTo.isEmpty())
+        sql += QStringLiteral(" AND p.created_at<='%1T23:59:59'").arg(sqlQuote(f.dateTo));
+
+    sql += QStringLiteral(" GROUP BY p.id ORDER BY p.created_at DESC");
+
+    QSqlQuery q(db);
+    if (!q.exec(sql)) {
+        setError(error, q);
+        return out;
+    }
+    while (q.next())
+        out << summaryFromQuery(q);
+    return out;
 }
 
 QList<PostHistoryStore::PostSummary> PostHistoryStore::listPosts(const QString &status,
@@ -707,47 +789,11 @@ QList<PostHistoryStore::PostSummary> PostHistoryStore::listPosts(const QString &
                                                                  bool onlyWithPassword,
                                                                  QString *error)
 {
-    QList<PostSummary> out;
-    if (!initialize(error))
-        return out;
-    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
-    QString sql = QStringLiteral(
-        "SELECT p.*, COALESCE(group_concat(g.group_name, ','), '') AS groups_text "
-        "FROM posts p LEFT JOIN post_groups g ON g.post_id=p.id WHERE 1=1");
-    if (!status.isEmpty())
-        sql += QStringLiteral(" AND p.status='%1'").arg(sqlQuote(status));
-    if (!search.isEmpty()) {
-        const QString s = QStringLiteral("%%1%").arg(sqlQuote(search));
-        sql += QStringLiteral(" AND (p.nzb_name LIKE '%1' OR p.rar_name LIKE '%1' OR "
-                              "p.nzb_path LIKE '%1')").arg(s);
-    }
-    if (onlyWithPassword)
-        sql += QStringLiteral(" AND p.has_password=1");
-    sql += QStringLiteral(" GROUP BY p.id ORDER BY p.created_at DESC");
-    QSqlQuery q(db);
-    if (!q.exec(sql)) {
-        setError(error, q);
-        return out;
-    }
-    while (q.next()) {
-        PostSummary s;
-        s.id = valueI64(q, "id");
-        s.nzbName = valueString(q, "nzb_name");
-        s.status = valueString(q, "status");
-        s.groups = valueString(q, "groups_text");
-        s.createdAt = valueString(q, "created_at");
-        s.finishedAt = valueString(q, "finished_at");
-        s.sizeBytes = valueI64(q, "size_bytes");
-        s.nbFiles = valueInt(q, "nb_files");
-        s.nbArticles = valueInt(q, "nb_articles");
-        s.nbFailedArticles = valueInt(q, "nb_failed_articles");
-        s.hasPassword = valueBool(q, "has_password");
-        s.passwordStored = valueBool(q, "password_stored");
-        s.resumable = valueString(q, "resume_state") == QStringLiteral("resumable");
-        s.resumeReason = valueString(q, "resume_reason");
-        out << s;
-    }
-    return out;
+    ListFilter f;
+    f.status           = status;
+    f.search           = search;
+    f.onlyWithPassword = onlyWithPassword;
+    return listPosts(f, error);
 }
 
 QList<PostHistoryStore::PostSummary> PostHistoryStore::resumeCandidates(QString *error)
@@ -758,32 +804,156 @@ QList<PostHistoryStore::PostSummary> PostHistoryStore::resumeCandidates(QString 
     QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
     QSqlQuery q(db);
     if (!q.exec(QStringLiteral(
-            "SELECT p.*, COALESCE(group_concat(g.group_name, ','), '') AS groups_text "
+            "SELECT p.*, COALESCE(group_concat(DISTINCT g.group_name), '') AS groups_text "
             "FROM posts p LEFT JOIN post_groups g ON g.post_id=p.id "
             "WHERE p.resume_state='resumable' OR p.status IN ('partial','resumable','unknown') "
             "GROUP BY p.id ORDER BY p.created_at DESC"))) {
         setError(error, q);
         return out;
     }
+    while (q.next())
+        out << summaryFromQuery(q, /*forceResumable=*/true);
+    return out;
+}
+
+QList<PostHistoryStore::DayStats> PostHistoryStore::statsByDay(const QString &dateFrom,
+                                                               const QString &dateTo,
+                                                               const QString &group,
+                                                               QString *error)
+{
+    QList<DayStats> out;
+    if (!initialize(error))
+        return out;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+
+    QString sql = QStringLiteral(
+        "SELECT substr(p.created_at,1,10) AS day,"
+        " COUNT(*) AS nb_posts,"
+        " SUM(p.nb_failed_articles) AS nb_failed,"
+        " SUM(p.size_bytes) AS total_bytes,"
+        " CASE WHEN SUM(CASE WHEN p.finished_at IS NOT NULL AND p.started_at IS NOT NULL"
+        "   THEN CAST(strftime('%s',p.finished_at) AS REAL)"
+        "      - CAST(strftime('%s',p.started_at) AS REAL) ELSE 0 END) > 0"
+        " THEN SUM(CASE WHEN p.finished_at IS NOT NULL THEN CAST(p.size_bytes AS REAL) ELSE 0 END)"
+        "    / SUM(CASE WHEN p.finished_at IS NOT NULL AND p.started_at IS NOT NULL"
+        "        THEN CAST(strftime('%s',p.finished_at) AS REAL)"
+        "           - CAST(strftime('%s',p.started_at) AS REAL) ELSE 0 END)"
+        " ELSE 0 END AS avg_speed_bps"
+        " FROM posts p WHERE 1=1");
+
+    if (!dateFrom.isEmpty())
+        sql += QStringLiteral(" AND p.created_at>='%1'").arg(sqlQuote(dateFrom));
+    if (!dateTo.isEmpty())
+        sql += QStringLiteral(" AND p.created_at<='%1T23:59:59'").arg(sqlQuote(dateTo));
+    if (!group.isEmpty())
+        sql += QStringLiteral(
+                   " AND EXISTS (SELECT 1 FROM post_groups pg"
+                   " WHERE pg.post_id=p.id AND pg.group_name='%1')")
+                   .arg(sqlQuote(group));
+
+    sql += QStringLiteral(" GROUP BY day ORDER BY day ASC");
+
+    QSqlQuery q(db);
+    if (!q.exec(sql)) {
+        setError(error, q);
+        return out;
+    }
     while (q.next()) {
-        PostSummary s;
-        s.id = valueI64(q, "id");
-        s.nzbName = valueString(q, "nzb_name");
-        s.status = valueString(q, "status");
-        s.groups = valueString(q, "groups_text");
-        s.createdAt = valueString(q, "created_at");
-        s.finishedAt = valueString(q, "finished_at");
-        s.sizeBytes = valueI64(q, "size_bytes");
-        s.nbFiles = valueInt(q, "nb_files");
-        s.nbArticles = valueInt(q, "nb_articles");
-        s.nbFailedArticles = valueInt(q, "nb_failed_articles");
-        s.hasPassword = valueBool(q, "has_password");
-        s.passwordStored = valueBool(q, "password_stored");
-        s.resumable = true;
-        s.resumeReason = valueString(q, "resume_reason");
+        DayStats d;
+        d.date        = q.value(0).toString();
+        d.nbPosts     = q.value(1).toInt();
+        d.nbFailed    = q.value(2).toInt();
+        d.totalBytes  = q.value(3).toLongLong();
+        d.avgSpeedBps = q.value(4).toDouble();
+        out << d;
+    }
+    return out;
+}
+
+QList<PostHistoryStore::GroupStats> PostHistoryStore::statsByGroup(const QString &dateFrom,
+                                                                   const QString &dateTo,
+                                                                   QString *error)
+{
+    QList<GroupStats> out;
+    if (!initialize(error))
+        return out;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+
+    QString sql = QStringLiteral(
+        "SELECT g.group_name, COUNT(DISTINCT p.id) AS nb_posts, SUM(p.size_bytes) AS total_bytes"
+        " FROM post_groups g JOIN posts p ON p.id=g.post_id WHERE 1=1");
+
+    if (!dateFrom.isEmpty())
+        sql += QStringLiteral(" AND p.created_at>='%1'").arg(sqlQuote(dateFrom));
+    if (!dateTo.isEmpty())
+        sql += QStringLiteral(" AND p.created_at<='%1T23:59:59'").arg(sqlQuote(dateTo));
+
+    sql += QStringLiteral(" GROUP BY g.group_name ORDER BY nb_posts DESC");
+
+    QSqlQuery q(db);
+    if (!q.exec(sql)) {
+        setError(error, q);
+        return out;
+    }
+    while (q.next()) {
+        GroupStats s;
+        s.group      = q.value(0).toString();
+        s.nbPosts    = q.value(1).toInt();
+        s.totalBytes = q.value(2).toLongLong();
         out << s;
     }
     return out;
+}
+
+QList<PostHistoryStore::PostSummary> PostHistoryStore::topPostsBySize(int n, QString *error)
+{
+    QList<PostSummary> out;
+    if (!initialize(error))
+        return out;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    QSqlQuery q(db);
+    if (!q.exec(QStringLiteral(
+            "SELECT p.*, COALESCE(group_concat(DISTINCT g.group_name), '') AS groups_text"
+            " FROM posts p LEFT JOIN post_groups g ON g.post_id=p.id"
+            " WHERE p.status != 'posting'"
+            " GROUP BY p.id ORDER BY p.size_bytes DESC LIMIT %1").arg(n))) {
+        setError(error, q);
+        return out;
+    }
+    while (q.next())
+        out << summaryFromQuery(q);
+    return out;
+}
+
+QStringList PostHistoryStore::allGroups(QString *error)
+{
+    QStringList out;
+    if (!initialize(error))
+        return out;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    QSqlQuery q(db);
+    if (!q.exec(QStringLiteral("SELECT DISTINCT group_name FROM post_groups ORDER BY group_name"))) {
+        setError(error, q);
+        return out;
+    }
+    while (q.next())
+        out << q.value(0).toString();
+    return out;
+}
+
+bool PostHistoryStore::deletePost(qint64 postId, QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("DELETE FROM posts WHERE id=?"));
+    q.addBindValue(postId);
+    if (!q.exec()) {
+        setError(error, q);
+        return false;
+    }
+    return true;
 }
 
 bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QString *error)

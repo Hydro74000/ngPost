@@ -464,6 +464,9 @@ public:
     inline bool hasPostingJobs() const;
     void closeAllPostingJobs();
 
+    bool resumePostGui(qint64 postId);
+    bool regenerateNzbGui(qint64 postId, const QString &outPath, bool includePassword = false);
+
     bool hasMonitoringPostingJobs() const;
     void closeAllMonitoringJobs();
 
