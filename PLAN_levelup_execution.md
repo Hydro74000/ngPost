@@ -1,11 +1,11 @@
 # LevelUp execution tracking
 
 Branch: `levelup` tracking `origin/levelup`
-Commit: `a0eba5f`
+Commit: `a233b7d`
 
 ## En cours
 
-- [ ] Commit et push des correctifs validation/CI
+- [ ] Push final de `levelup` vers `origin/levelup`
 
 ## A faire
 
@@ -32,6 +32,7 @@ Commit: `a0eba5f`
 - [x] Validation Windows VM: build app OK, unit tests OK, integration tests OK
 - [x] Validation locale ciblee: `tst_PostHistory` OK dans `my-distrobox`
 - [x] Validation syntaxe: `git diff --check` OK, workflows YAML parses via `js-yaml`
+- [x] Commit validation/CI associe: `a233b7d` (`Fix LevelUp validation and CI workflows`)
 
 ## Journal
 
