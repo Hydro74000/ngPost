@@ -41,7 +41,7 @@ private slots:
     void onInstallStateChanged(bool installed);
     void onProfilesChanged();
     void onLogLine(QString const &line);
-    void onAboutLicences(const QString &link);
+    void onAboutLicences(const QString &);
 
 private:
     void _refreshUi();

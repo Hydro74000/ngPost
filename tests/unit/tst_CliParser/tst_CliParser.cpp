@@ -117,7 +117,7 @@ void TestCliParser::version_flag_succeeds()
 
     QVERIFY2(!r.timedOut, "ngPost --version timed out");
     QCOMPARE(r.exitCode, 0);
-    QVERIFY2(r.stdoutText.contains(QStringLiteral(APP_VERSION)),
+    QVERIFY2(r.stdoutText.contains(QLatin1String(APP_VERSION)),
              qPrintable(QStringLiteral("stdout did not mention version: %1").arg(r.stdoutText)));
 }
 
