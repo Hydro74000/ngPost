@@ -49,3 +49,4 @@ Commit: `de8defc`
 - 2026-05-19T18:25:00+02:00: build Linux complet dans `my-distrobox` encore bloque par dependance locale manquante `QtCharts` (`Unknown module(s) in QT: charts`); les workflows installent `qtcharts`.
 - 2026-05-19T18:35:00+02:00: branche `levelup` poussee sur `origin/levelup`.
 - 2026-05-19T18:50:00+02:00: logs GitHub Actions analyses; les echecs Windows viennent de QtKeychain `messages`/traductions (`Error -1073741515`) avant build ngPost.
+- 2026-05-19T19:00:00+02:00: deuxieme blocage GitHub Actions: QtKeychain Windows compile avec l'option MSVC `/utf-8`; patch workflow ajoute une substitution vers flags GCC UTF-8.

@@ -109,6 +109,7 @@ jobs:
       - name: Build QtKeychain
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          sed -i 's|add_definitions( /utf-8 -DUNICODE )|add_definitions( -finput-charset=UTF-8 -fexec-charset=UTF-8 -DUNICODE )|' /tmp/qtkeychain/qtkeychain/CMakeLists.txt
           cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
                 -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release \
                 -DBUILD_WITH_QT6=ON -DBUILD_TESTING=OFF \
