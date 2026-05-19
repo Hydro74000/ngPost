@@ -699,13 +699,44 @@ bool PostHistoryStore::markPostCrashedArticlesUnknown(QString *error)
         setError(error, a);
         return false;
     }
-    // Posts still in 'posting' status survived a crash — mark them resumable.
+    QSqlQuery empty(db);
+    if (!empty.exec(QStringLiteral(
+            "UPDATE posts SET status='cancelled', resume_state=NULL,"
+            " resume_reason='posting never started; nothing to resume',"
+            " finished_at=COALESCE(finished_at, datetime('now'))"
+            " WHERE status='posting'"
+            " AND NOT EXISTS (SELECT 1 FROM post_files WHERE post_id=posts.id)"))) {
+        setError(error, empty);
+        return false;
+    }
+
+    // Posts still in 'posting' status survived a crash. They are resumable only
+    // once at least one file row exists; zero-file posts never reached upload.
     QSqlQuery p(db);
     if (!p.exec(QStringLiteral(
             "UPDATE posts SET status='resumable', resume_state='resumable',"
             " resume_reason='application stopped while posting'"
-            " WHERE status='posting'"))) {
+            " WHERE status='posting'"
+            " AND EXISTS (SELECT 1 FROM post_files WHERE post_id=posts.id)"))) {
         setError(error, p);
+        return false;
+    }
+    return true;
+}
+
+bool PostHistoryStore::cleanupInvalidResumePosts(QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    QSqlQuery q(db);
+    if (!q.exec(QStringLiteral(
+            "UPDATE posts SET status='cancelled', resume_state=NULL,"
+            " resume_reason='posting never started; nothing to resume',"
+            " finished_at=COALESCE(finished_at, datetime('now'))"
+            " WHERE (status IN ('posting','resumable') OR resume_state='resumable')"
+            " AND NOT EXISTS (SELECT 1 FROM post_files WHERE post_id=posts.id)"))) {
+        setError(error, q);
         return false;
     }
     return true;
@@ -806,7 +837,12 @@ QList<PostHistoryStore::PostSummary> PostHistoryStore::resumeCandidates(QString 
     if (!q.exec(QStringLiteral(
             "SELECT p.*, COALESCE(group_concat(DISTINCT g.group_name), '') AS groups_text "
             "FROM posts p LEFT JOIN post_groups g ON g.post_id=p.id "
-            "WHERE p.resume_state='resumable' OR p.status IN ('partial','resumable','unknown') "
+            "WHERE (p.resume_state='resumable' OR p.status IN ('partial','resumable','unknown')) "
+            "AND EXISTS (SELECT 1 FROM post_files f WHERE f.post_id=p.id) "
+            "AND EXISTS (SELECT 1 FROM post_files f WHERE f.post_id=p.id "
+            "  AND (f.total_articles > (SELECT COUNT(*) FROM post_articles a WHERE a.file_id=f.id) "
+            "       OR EXISTS (SELECT 1 FROM post_articles a WHERE a.file_id=f.id "
+            "                  AND a.status!='posted'))) "
             "GROUP BY p.id ORDER BY p.created_at DESC"))) {
         setError(error, q);
         return out;

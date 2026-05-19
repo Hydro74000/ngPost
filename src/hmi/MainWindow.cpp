@@ -51,6 +51,7 @@
 #include <QLabel>
 #include <QScreen>
 #include <QMessageBox>
+#include <QMenu>
 #include <QPushButton>
 #include <QStatusBar>
 #include <QtCharts/QAbstractAxis>
@@ -745,6 +746,8 @@ static QColor statusColor(const QString &status)
         return dark ? QColor(0xAA, 0xAA, 0xAA) : QColor(Qt::gray);
     if (status == QStringLiteral("resumable"))
         return dark ? QColor(0x66, 0xAA, 0xFF) : QColor(Qt::darkBlue);
+    if (status == QStringLiteral("partial_resumable"))
+        return QColor(0xFF, 0xA2, 0x00);
     if (status == QStringLiteral("posting"))
         return QColor(0xFF, 0xA2, 0x00);
     if (status == QStringLiteral("unknown"))
@@ -1134,15 +1137,24 @@ void MainWindow::_refreshHistoryViews()
         _resumeTable->setRowCount(0);
         QString err;
         const QList<PostHistoryStore::PostSummary> candidates = store->resumeCandidates(&err);
+        ResumePlanner planner(store);
         for (const PostHistoryStore::PostSummary &p : candidates) {
             if (_ignoredResumeIds.contains(p.id)) continue;
+            QString checkErr;
+            const ResumePlanner::Decision dec = planner.check(p.id, &checkErr);
+            if (dec.state == ResumePlanner::ResumeState::NotResumable)
+                continue;
+            const QString state =
+                dec.state == ResumePlanner::ResumeState::Resumable
+                    ? QStringLiteral("resumable")
+                    : QStringLiteral("partial_resumable");
             const int row = _resumeTable->rowCount();
             _resumeTable->setRowCount(row + 1);
             const QStringList values = {
-                p.nzbName, p.status,
-                QString::number(p.nbArticles - p.nbFailedArticles),
-                QString::number(p.nbFailedArticles),
-                QString(), p.resumeReason
+                p.nzbName, state,
+                QString::number(dec.postedArticles),
+                QString::number(dec.pendingArticles + dec.failedArticles),
+                QString::number(dec.unknownArticles), dec.reason
             };
             for (int col = 0; col < values.size(); ++col) {
                 auto *item = new QTableWidgetItem(values.at(col));
@@ -1187,6 +1199,41 @@ PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &f
         newPostingWidget->addPath(file.absoluteFilePath(), 0, file.isDir());
 
     return newPostingWidget;
+}
+
+bool MainWindow::_startResumePost(qint64 postId, bool askConfirmation)
+{
+    if (!postId || !_ngPost)
+        return false;
+
+    if (askConfirmation) {
+        const int res = QMessageBox::question(
+            this,
+            tr("Resume post"),
+            tr("Resume posting for this post?\nOnly missing or failed articles will be re-sent."),
+            QMessageBox::Yes,
+            QMessageBox::No);
+        if (res != QMessageBox::Yes)
+            return false;
+    }
+
+    const int lastTabIdx = _ui->postTabWidget->count() - 1;
+    PostingWidget *widget = addNewQuickTab(lastTabIdx);
+    _ui->postTabWidget->setCurrentWidget(widget);
+
+    QString err;
+    if (!_ngPost->resumePostGui(postId, widget, &err)) {
+        closeTab(widget);
+        QMessageBox::warning(this,
+                             tr("Resume failed"),
+                             err.isEmpty()
+                                 ? tr("This post could not be resumed.")
+                                 : tr("This post could not be resumed:\n%1").arg(err));
+        return false;
+    }
+
+    _refreshHistoryViews();
+    return true;
 }
 
 void MainWindow::setTab(QWidget *postWidget)
@@ -1797,6 +1844,13 @@ void MainWindow::_onHistoryOpenNzb()
         QUrl::fromLocalFile(QFileInfo(details.nzbPath).absolutePath()));
 }
 
+void MainWindow::_onHistoryResumePost()
+{
+    if (!_selectedHistoryId)
+        return;
+    _startResumePost(_selectedHistoryId, true);
+}
+
 // ============================================================
 // Stats tab slots
 // ============================================================
@@ -1994,7 +2048,7 @@ void MainWindow::_onResumePost()
     int failed = 0;
     for (const QModelIndex &idx : selected) {
         QTableWidgetItem *item = _resumeTable->item(idx.row(), 0);
-        if (item && !_ngPost->resumePostGui(item->data(Qt::UserRole).toLongLong()))
+        if (item && !_startResumePost(item->data(Qt::UserRole).toLongLong(), false))
             ++failed;
     }
     if (failed)
@@ -2093,23 +2147,50 @@ void MainWindow::_onResumeDeleteEntries()
 
 void MainWindow::_onHistoryContextMenu(const QPoint &pos)
 {
-    if (!_historyTable || !_selectedHistoryId || !_ngPost) return;
+    if (!_historyTable || !_ngPost) return;
+    QTableWidgetItem *clicked = _historyTable->itemAt(pos);
+    if (!clicked) return;
+
+    const int row = clicked->row();
+    QTableWidgetItem *idItem = _historyTable->item(row, 0);
+    if (!idItem) return;
+    _historyTable->setCurrentCell(row, clicked->column());
+    _onHistoryRowSelected(row);
+    const qint64 postId = idItem->data(Qt::UserRole).toLongLong();
+    if (!postId) return;
+
     PostHistoryStore *store = _ngPost->historyStore();
     if (!store) return;
 
     PostHistoryStore::PostDetails details;
     QString err;
-    if (!store->loadPostDetails(_selectedHistoryId, &details, &err)) return;
-    if (!details.post.hasPassword || !details.post.passwordStored) return;
+    if (!store->loadPostDetails(postId, &details, &err)) return;
 
     QMenu menu(this);
-    QAction *revealAct = menu.addAction(tr("Reveal password"));
-    QAction *copyAct   = menu.addAction(tr("Copy password"));
+    QAction *resumeAct = nullptr;
+    ResumePlanner planner(store);
+    const ResumePlanner::Decision dec = planner.check(postId, &err);
+    if (dec.state != ResumePlanner::ResumeState::NotResumable)
+        resumeAct = menu.addAction(tr("Resume"));
+
+    QAction *revealAct = nullptr;
+    QAction *copyAct = nullptr;
+    if (details.post.hasPassword && details.post.passwordStored) {
+        if (!menu.actions().isEmpty())
+            menu.addSeparator();
+        revealAct = menu.addAction(tr("Reveal password"));
+        copyAct   = menu.addAction(tr("Copy password"));
+    }
+
+    if (menu.actions().isEmpty())
+        return;
 
     const QAction *chosen = menu.exec(_historyTable->viewport()->mapToGlobal(pos));
     if (!chosen) return;
 
-    if (chosen == revealAct) {
+    if (chosen == resumeAct) {
+        _startResumePost(postId, true);
+    } else if (chosen == revealAct) {
         QMessageBox box(this);
         box.setWindowTitle(tr("Archive password"));
         box.setText(tr("Password for <b>%1</b>:").arg(details.post.nzbName));

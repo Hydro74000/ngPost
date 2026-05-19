@@ -599,7 +599,16 @@ bool NgPost::_ensureHistoryStore()
         return false;
     }
     if (!_historyCrashedArticlesChecked) {
-        _historyStore->markPostCrashedArticlesUnknown();
+        err.clear();
+        if (!_historyStore->markPostCrashedArticlesUnknown(&err)) {
+            _error(tr("History cleanup failed: %1").arg(err), ERROR_CODE::ERR_HISTORY);
+            return false;
+        }
+        err.clear();
+        if (!_historyStore->cleanupInvalidResumePosts(&err)) {
+            _error(tr("History cleanup failed: %1").arg(err), ERROR_CODE::ERR_HISTORY);
+            return false;
+        }
         _historyCrashedArticlesChecked = true;
     }
     return true;
@@ -838,22 +847,45 @@ void NgPost::_printResumeList(bool jsonOutput)
         _error(tr("Resume query failed: %1").arg(err), ERROR_CODE::ERR_HISTORY);
         return;
     }
+    ResumePlanner planner(_historyStore);
     if (jsonOutput) {
         QJsonArray arr;
         for (const PostHistoryStore::PostSummary &p : posts) {
+            QString checkErr;
+            const ResumePlanner::Decision d = planner.check(p.id, &checkErr);
+            if (d.state == ResumePlanner::ResumeState::NotResumable)
+                continue;
             QJsonObject obj;
             obj["id"] = static_cast<qint64>(p.id);
             obj["name"] = p.nzbName;
             obj["status"] = p.status;
-            obj["reason"] = p.resumeReason;
+            obj["state"] = d.state == ResumePlanner::ResumeState::Resumable
+                               ? QStringLiteral("resumable")
+                               : QStringLiteral("partial_resumable");
+            obj["reason"] = d.reason;
+            obj["posted"] = d.postedArticles;
+            obj["pending"] = d.pendingArticles;
+            obj["failed"] = d.failedArticles;
+            obj["unknown"] = d.unknownArticles;
             arr.append(obj);
         }
         _cout << QJsonDocument(arr).toJson(QJsonDocument::Compact) << "\n";
         return;
     }
-    _cout << "id\tstatus\tname\treason\n";
-    for (const PostHistoryStore::PostSummary &p : posts)
-        _cout << p.id << "\t" << p.status << "\t" << p.nzbName << "\t" << p.resumeReason << "\n";
+    _cout << "id\tstate\tposted\tpending\tfailed\tunknown\tname\treason\n";
+    for (const PostHistoryStore::PostSummary &p : posts) {
+        QString checkErr;
+        const ResumePlanner::Decision d = planner.check(p.id, &checkErr);
+        if (d.state == ResumePlanner::ResumeState::NotResumable)
+            continue;
+        const QString state = d.state == ResumePlanner::ResumeState::Resumable
+                                  ? QStringLiteral("resumable")
+                                  : QStringLiteral("partial_resumable");
+        _cout << p.id << "\t" << state << "\t"
+              << d.postedArticles << "\t" << d.pendingArticles << "\t"
+              << d.failedArticles << "\t" << d.unknownArticles << "\t"
+              << p.nzbName << "\t" << d.reason << "\n";
+    }
 }
 
 void NgPost::_printResumeCheck(qint64 postId)
@@ -993,20 +1025,29 @@ bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assume
     return scheduled;
 }
 
-bool NgPost::resumePostGui(qint64 postId)
+bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
 {
-    if (!_ensureHistoryStore())
+    if (!_ensureHistoryStore()) {
+        if (error)
+            *error = tr("history store is not available");
         return false;
+    }
 
     ResumePlanner planner(_historyStore);
     QString err;
     const ResumePlanner::Decision decision = planner.check(postId, &err);
-    if (decision.state == ResumePlanner::ResumeState::NotResumable)
+    if (decision.state == ResumePlanner::ResumeState::NotResumable) {
+        if (error)
+            *error = decision.reason;
         return false;
+    }
 
     PostHistoryStore::PostDetails details;
-    if (!_historyStore->loadPostDetails(postId, &details, &err))
+    if (!_historyStore->loadPostDetails(postId, &details, &err)) {
+        if (error)
+            *error = err;
         return false;
+    }
 
     QFileInfoList filesToResume;
     QMap<QString, QSet<uint>> alreadyPostedByPath;
@@ -1032,8 +1073,11 @@ bool NgPost::resumePostGui(qint64 postId)
         alreadyPostedByPath.insert(source.absoluteFilePath(), postedParts);
     }
 
-    if (filesToResume.isEmpty())
+    if (filesToResume.isEmpty()) {
+        if (error)
+            *error = tr("no source file remains available to resume");
         return false;
+    }
 
     QString nzbPath = details.nzbPath;
     if (nzbPath.isEmpty()) {
@@ -1048,7 +1092,7 @@ bool NgPost::resumePostGui(qint64 postId)
     PostingJob *job = new PostingJob(this,
                                      nzbPath,
                                      filesToResume,
-                                     nullptr,
+                                     widget,
                                      groups,
                                      details.from.isEmpty() ? from() : details.from.toStdString(),
                                      _obfuscateArticles,
@@ -1068,7 +1112,14 @@ bool NgPost::resumePostGui(qint64 postId)
                                      true,
                                      postId,
                                      alreadyPostedByPath);
-    return startPostingJob(job);
+#ifdef __USE_HMI__
+    const bool hasStarted = startPostingJob(job);
+    if (widget)
+        widget->attachResumeJob(job, filesToResume, hasStarted);
+#else
+    startPostingJob(job);
+#endif
+    return true;
 }
 
 bool NgPost::regenerateNzbGui(qint64 postId, const QString &outPath, bool includePassword)
@@ -1902,9 +1953,26 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (_historyStore)
         _historyStore->configure(_postDbFile, _historyStorePasswords);
 
-    bool startEventLoopFromHistory = false;
-    if (_handleHistoryCommand(parser, &startEventLoopFromHistory))
-        return startEventLoopFromHistory;
+    const bool hasHistoryCommand =
+        parser.isSet(sOptionNames[Opt::HISTORY])
+        || parser.isSet(sOptionNames[Opt::HISTORY_SHOW])
+        || parser.isSet(QStringLiteral("history-show"))
+        || parser.isSet(sOptionNames[Opt::HISTORY_IMPORT_CSV])
+        || parser.isSet(QStringLiteral("history-import-csv"))
+        || parser.isSet(sOptionNames[Opt::REGENERATE_NZB])
+        || parser.isSet(QStringLiteral("regenerate-nzb"))
+        || parser.isSet(sOptionNames[Opt::RESUME_LIST])
+        || parser.isSet(QStringLiteral("resume-list"))
+        || parser.isSet(sOptionNames[Opt::RESUME_CHECK])
+        || parser.isSet(QStringLiteral("resume-check"))
+        || parser.isSet(sOptionNames[Opt::RESUME_POST])
+        || parser.isSet(QStringLiteral("resume-post"))
+        || parser.isSet(sOptionNames[Opt::RESUME_ALL])
+        || parser.isSet(QStringLiteral("resume-all"))
+        || parser.isSet(sOptionNames[Opt::RESUME_ABANDON])
+        || parser.isSet(QStringLiteral("resume-abandon"))
+        || parser.isSet(sOptionNames[Opt::RESUME_PURGE])
+        || parser.isSet(QStringLiteral("resume-purge"));
 
     if (parser.isSet(sOptionNames[Opt::LANG]))
     {
@@ -1975,7 +2043,10 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         return false;
     }
 
-    if (!parser.isSet(sOptionNames[Opt::INPUT]) && !parser.isSet(sOptionNames[Opt::AUTO_DIR]) && !parser.isSet(sOptionNames[Opt::MONITOR_DIR]))
+    if (!hasHistoryCommand
+        && !parser.isSet(sOptionNames[Opt::INPUT])
+        && !parser.isSet(sOptionNames[Opt::AUTO_DIR])
+        && !parser.isSet(sOptionNames[Opt::MONITOR_DIR]))
     {
         _error(tr("Error syntax: you should provide at least one input file or directory using the option -i, --auto or --monitor"),
                ERROR_CODE::ERR_NO_INPUT);
@@ -2367,6 +2438,10 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     }
 
 
+    bool startEventLoopFromHistory = false;
+    if (_handleHistoryCommand(parser, &startEventLoopFromHistory))
+        return startEventLoopFromHistory;
+
 
     QList<QFileInfo> filesToUpload;
     QStringList filesPath;
@@ -2592,11 +2667,11 @@ QString NgPost::_parseConfig(const QString &configPath)
             }
             else
             {
-                QStringList args = line.split('=');
-                if (args.size() >= 2)
+                const int equalIdx = line.indexOf('=');
+                if (equalIdx > 0)
                 {
-                    QString opt = args.takeFirst().trimmed().toLower(),
-                            val = args.at(0).trimmed();
+                    QString opt = line.left(equalIdx).trimmed().toLower(),
+                            val = line.mid(equalIdx + 1).trimmed();
                     bool ok = false;
                     if (opt == sOptionNames[Opt::THREAD])
                     {
@@ -2632,8 +2707,6 @@ QString NgPost::_parseConfig(const QString &configPath)
                     else if (opt == sOptionNames[Opt::NZB_UPLOAD_URL])
                     {
                         _urlNzbUploadStr = val;
-                        for (int i = 2; i < args.size(); ++i)
-                            _urlNzbUploadStr += QString("=%1").arg(args.at(i).trimmed());
                         _urlNzbUpload    = new QUrl(_urlNzbUploadStr);
                         QStringList allowedProtocols = {"ftp", "http", "https"};
                         if (!allowedProtocols.contains(_urlNzbUpload->scheme()))
@@ -2899,7 +2972,7 @@ QString NgPost::_parseConfig(const QString &configPath)
                     }
 
                     else if (opt == sOptionNames[Opt::NZB_POST_CMD])
-                        _nzbPostCmd << args.join("=").trimmed();
+                        _nzbPostCmd << val;
 
                     else if (opt == sOptionNames[Opt::INPUT_DIR])
                         _inputDir = val;

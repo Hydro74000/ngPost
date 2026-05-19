@@ -175,6 +175,7 @@ public:
                             const QString &err,
                             QString *error = nullptr);
     bool markPostCrashedArticlesUnknown(QString *error = nullptr);
+    bool cleanupInvalidResumePosts(QString *error = nullptr);
 
     // Primary query with full filter support.
     QList<PostSummary> listPosts(const ListFilter &filter, QString *error = nullptr);

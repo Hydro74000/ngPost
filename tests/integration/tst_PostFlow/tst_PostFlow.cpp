@@ -122,6 +122,10 @@ private slots:
     //! The mock drops the connection after N bytes; ngPost must not crash or
     //! hang regardless of whether retry eventually succeeds.
     void retry_on_dropped_connection();
+
+    //! Config values are split on the first '=' only: server passwords,
+    //! NZB paths and RAR passwords may legally contain '='.
+    void config_values_keep_equals();
 };
 
 void TestPostFlow::initTestCase()
@@ -339,6 +343,66 @@ void TestPostFlow::retry_on_dropped_connection()
     // non-zero exit. Either way we want a NON-hanging finish.
     QVERIFY2(code != -1 && code != -2,
              qPrintable(QStringLiteral("ngPost crashed or timed out (code=%1):\n%2").arg(code).arg(out)));
+}
+
+void TestPostFlow::config_values_keep_equals()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--require-auth", "cfg-user:p=a=s=s" }));
+
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/cfg.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write("config-equals");
+    }
+
+    const QString nzbDir = sandbox.rootPath() + QStringLiteral("/nzb=out");
+    QVERIFY(QDir().mkpath(nzbDir));
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/ngpost=cfg.conf");
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "nzbPath = " << nzbDir << "\n"
+          << "RAR_PATH = " << sandbox.rootPath() << "/rar=tool\n"
+          << "RAR_PASS = pass=with=equals\n"
+          << "PACK = compress,gen_pass\n"
+          << "LENGTH_PASS = 19\n"
+          << "[server]\n"
+          << "host = 127.0.0.1\n"
+          << "port = " << mock.port() << "\n"
+          << "ssl = false\n"
+          << "user = cfg-user\n"
+          << "pass = p=a=s=s\n"
+          << "connection = 1\n"
+          << "enabled = true\n"
+          << "nzbcheck = false\n";
+    }
+
+    QString out;
+    const int code = runNgPost(_bin, {
+        "-c", confPath,
+        "-i", inPath,
+        "-g", "alt.binaries.test",
+        "--quiet",
+        "--disp_progress", "none",
+    }, sandbox.rootPath(), out);
+    QVERIFY2(code == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(code).arg(out)));
+
+    const QString nzbPath = nzbDir + QStringLiteral("/cfg.nzb");
+    QVERIFY2(QFile::exists(nzbPath),
+             qPrintable(QStringLiteral("NZB not written at expected config path: %1\n%2").arg(nzbPath, out)));
+
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::ReadOnly));
+    const QByteArray nzbContent = nzb.readAll();
+    QVERIFY2(nzbContent.contains("<meta type=\"password\">pass=with=equals</meta>"),
+             qPrintable(QStringLiteral("RAR_PASS with '=' was not preserved in NZB:\n%1")
+                            .arg(QString::fromUtf8(nzbContent))));
+    QCOMPARE(mock.receivedArticles().size(), 1);
 }
 
 QTEST_MAIN(TestPostFlow)

@@ -52,6 +52,7 @@ public:
 
     void setIDLE();
     void setPosting();
+    void attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted);
 
     void init();
     void genNameAndPassword(bool genName, bool genPass, bool doPar2, bool useRarMax);

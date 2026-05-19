@@ -215,6 +215,7 @@ private slots:
     void _onHistoryPurgePassword();
     void _onHistoryDeleteEntry();
     void _onHistoryOpenNzb();
+    void _onHistoryResumePost();
     void _onStatsRefresh();
     void _onResumeSelectionChanged();
     void _onResumePost();
@@ -235,6 +236,7 @@ private:
     void _initPostingBox();
     QWidget *_buildHistoryTab();
     void _refreshHistoryViews();
+    bool _startResumePost(qint64 postId, bool askConfirmation = true);
 
     void _addServer(NntpServerParams *serverParam);
     int  _serverRow(QObject *delButton);

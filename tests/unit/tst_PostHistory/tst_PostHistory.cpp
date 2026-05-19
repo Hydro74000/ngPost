@@ -21,6 +21,8 @@ class TestPostHistory : public QObject
 
 private slots:
     void sqlite_lifecycle_and_resume_states();
+    void empty_resume_post_is_cancelled_by_cleanup();
+    void missing_source_is_not_resumable();
     void nzb_regeneration_masks_password_by_default();
     void import_legacy_csv_is_explicit_history_only();
 };
@@ -91,6 +93,92 @@ void TestPostHistory::sqlite_lifecycle_and_resume_states()
     QCOMPARE(d.postedArticles, 1);
     QCOMPARE(d.failedArticles, 1);
     QCOMPARE(d.unknownArticles, 1);
+}
+
+void TestPostHistory::empty_resume_post_is_cancelled_by_cleanup()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString err;
+    QVERIFY2(store.initialize(&err), qPrintable(err));
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("never-started.nzb");
+    post.nzbPath = dir.filePath(QStringLiteral("never-started.nzb"));
+    post.from = QStringLiteral("poster@example.invalid");
+    post.groups = { QStringLiteral("alt.binaries.test") };
+    const qint64 postId = store.createPost(post, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    QVERIFY2(store.cleanupInvalidResumePosts(&err), qPrintable(err));
+    QVERIFY2(store.cleanupInvalidResumePosts(&err), qPrintable(err));
+
+    PostHistoryStore::PostDetails details;
+    QVERIFY2(store.loadPostDetails(postId, &details, &err), qPrintable(err));
+    QCOMPARE(details.post.status, QStringLiteral("cancelled"));
+    QVERIFY(!details.post.resumable);
+    QCOMPARE(details.post.resumeReason,
+             QStringLiteral("posting never started; nothing to resume"));
+    QCOMPARE(details.files.size(), 0);
+
+    ResumePlanner planner(&store);
+    const ResumePlanner::Decision d = planner.check(postId, &err);
+    QCOMPARE(d.state, ResumePlanner::ResumeState::NotResumable);
+    QCOMPARE(d.reason, QStringLiteral("posting never started; nothing to resume"));
+    QCOMPARE(store.resumeCandidates(&err).size(), 0);
+}
+
+void TestPostHistory::missing_source_is_not_resumable()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString err;
+    QVERIFY2(store.initialize(&err), qPrintable(err));
+
+    const QString sourcePath = dir.filePath(QStringLiteral("gone.bin"));
+    {
+        QFile source(sourcePath);
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        source.write(QByteArray(8, 'x'));
+    }
+    const QFileInfo sourceInfo(sourcePath);
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("missing-source.nzb");
+    post.nzbPath = dir.filePath(QStringLiteral("missing-source.nzb"));
+    post.from = QStringLiteral("poster@example.invalid");
+    post.groups = { QStringLiteral("alt.binaries.test") };
+    const qint64 postId = store.createPost(post, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.originalPath = sourceInfo.absoluteFilePath();
+    file.postedName = sourceInfo.fileName();
+    file.sizeBytes = sourceInfo.size();
+    file.mtimeEpoch = sourceInfo.lastModified().toSecsSinceEpoch();
+    file.totalArticles = 2;
+    file.groups = post.groups;
+    const qint64 fileId = store.upsertFile(file, &err);
+    QVERIFY2(fileId > 0, qPrintable(err));
+
+    PostHistoryStore::ArticleRecord article;
+    article.fileId = fileId;
+    article.part = 1;
+    article.bytes = 4;
+    QVERIFY2(store.upsertArticle(article, &err), qPrintable(err));
+    QVERIFY2(store.markArticlePosted(fileId, 1, QStringLiteral("ok@ngpost"), &err), qPrintable(err));
+    QVERIFY(QFile::remove(sourcePath));
+
+    ResumePlanner planner(&store);
+    const ResumePlanner::Decision d = planner.check(postId, &err);
+    QCOMPARE(d.state, ResumePlanner::ResumeState::NotResumable);
+    QCOMPARE(d.reason, QStringLiteral("source files are missing or changed"));
 }
 
 void TestPostHistory::nzb_regeneration_masks_password_by_default()

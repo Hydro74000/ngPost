@@ -30,6 +30,7 @@ class QCoreApplication;
 class QCommandLineParser;
 class MainWindow;
 class PostingJob;
+class PostingWidget;
 class FoldersMonitorForNewFiles;
 #ifdef __USE_TMP_RAM__
 class QStorageInfo;
@@ -464,7 +465,7 @@ public:
     inline bool hasPostingJobs() const;
     void closeAllPostingJobs();
 
-    bool resumePostGui(qint64 postId);
+    bool resumePostGui(qint64 postId, PostingWidget *widget = nullptr, QString *error = nullptr);
     bool regenerateNzbGui(qint64 postId, const QString &outPath, bool includePassword = false);
 
     bool hasMonitoringPostingJobs() const;

@@ -31,6 +31,12 @@ ResumePlanner::Decision ResumePlanner::check(qint64 postId, QString *error)
         return decision;
     }
 
+    if (details.files.isEmpty()) {
+        decision.state = ResumeState::NotResumable;
+        decision.reason = QStringLiteral("posting never started; nothing to resume");
+        return decision;
+    }
+
     bool missingSource = false;
     for (const PostHistoryStore::FileSummary &file : details.files) {
         if (file.originalPath.isEmpty())
