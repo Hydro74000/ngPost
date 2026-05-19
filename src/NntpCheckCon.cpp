@@ -21,6 +21,9 @@
 #include <QSslSocket>
 #include "NzbCheck.h"
 #include "nntp/Nntp.h"
+#include "vpn/VpnDnsResolver.h"
+#include "vpn/VpnManager.h"
+#include "vpn/VpnSocketBinder.h"
 
 NntpCheckCon::NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &srvParams)
     : QObject()
@@ -63,6 +66,34 @@ void NntpCheckCon::onStartConnection()
     else
         _socket = new QTcpSocket();
 
+    // Per-server VPN bind plus global override: tunnel if either the server
+    // has useVpn=true OR the global "Route ALL through VPN" toggle is on.
+    VpnManager *vpn = VpnManager::instance();
+    bool routeViaVpn = _srvParams.useVpn
+                    || (vpn && vpn->forceAllConnectionsThroughVpn());
+    if (routeViaVpn) {
+        if (!vpn || !vpn->isConnected() || vpn->tunIp().isNull()) {
+            _nzbCheck->error(tr("Server '%1' must route through the VPN but the tunnel is not connected")
+                                 .arg(_srvParams.host));
+            _socket->deleteLater();
+            _socket = nullptr;
+            emit disconnected(this);
+            return;
+        }
+        QString bindErr;
+        bool bound = VpnSocketBinder::bind(_socket, vpn->tunIp(), &bindErr);
+        if (!bound) {
+            _nzbCheck->error(tr("VPN bind failed on %1: %2 (local addresses visible to Qt: %3)")
+                                 .arg(vpn->tunIp().toString(),
+                                      bindErr,
+                                      VpnSocketBinder::localAddressSummary()));
+            _socket->deleteLater();
+            _socket = nullptr;
+            emit disconnected(this);
+            return;
+        }
+    }
+
     _socket->setSocketOption(QAbstractSocket::KeepAliveOption, true);
     _socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
 
@@ -85,6 +116,27 @@ void NntpCheckCon::onStartConnection()
             SLOT(onErrors(QAbstractSocket::SocketError)),
             Qt::DirectConnection);
 
+    // Resolve through a DNS socket bound to the tunnel IP.
+    if (routeViaVpn) {
+        if (vpn && !vpn->dnsServer().isNull()) {
+            QString dnsErr;
+            auto const records = VpnDnsResolver::resolveA(
+                _srvParams.host, vpn->dnsServer(), vpn->tunIp(), &dnsErr);
+            if (!records.isEmpty()) {
+                // Set peerVerifyName so the SSL cert is validated against
+                // the original hostname rather than the resolved IP.
+                if (_srvParams.useSSL)
+                    static_cast<QSslSocket *>(_socket)
+                        ->setPeerVerifyName(_srvParams.host);
+                _socket->connectToHost(records.first(), _srvParams.port);
+                return;
+            }
+            _nzbCheck->error(tr("VPN DNS lookup failed for %1 via %2: %3 — falling back to system DNS")
+                                 .arg(_srvParams.host,
+                                      vpn->dnsServer().toString(),
+                                      dnsErr.isEmpty() ? tr("unknown error") : dnsErr));
+        }
+    }
     _socket->connectToHost(_srvParams.host, _srvParams.port);
 }
 

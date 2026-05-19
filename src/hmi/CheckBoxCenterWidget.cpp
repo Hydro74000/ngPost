@@ -32,6 +32,8 @@ CheckBoxCenterWidget::CheckBoxCenterWidget(QWidget *parent, bool isChecked) :
     layout->setContentsMargins(0, 0, 0, 0);
 
     _checkbox->setChecked(isChecked);
+
+    connect(_checkbox, &QCheckBox::toggled, this, &CheckBoxCenterWidget::toggled);
 }
 
 bool CheckBoxCenterWidget::isChecked() const { return _checkbox->isChecked(); }

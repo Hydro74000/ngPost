@@ -264,6 +264,16 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_keepNfo.addWidget(self.checkForUpdatesCB)
 
+        self.vpnSettingsBtn = QPushButton(self.postingBox)
+        self.vpnSettingsBtn.setObjectName(u"vpnSettingsBtn")
+
+        self.horizontalLayout_keepNfo.addWidget(self.vpnSettingsBtn)
+
+        self.vpnStateLbl = QLabel(self.postingBox)
+        self.vpnStateLbl.setObjectName(u"vpnStateLbl")
+
+        self.horizontalLayout_keepNfo.addWidget(self.vpnStateLbl)
+
 
         self.verticalLayout_4.addLayout(self.horizontalLayout_keepNfo)
 
@@ -549,6 +559,14 @@ class Ui_MainWindow(object):
         self.checkForUpdatesCB.setToolTip(QCoreApplication.translate("MainWindow", u"Check once a day for a new ngPost release on GitHub", None))
 #endif // QT_CONFIG(tooltip)
         self.checkForUpdatesCB.setText(QCoreApplication.translate("MainWindow", u"Check for updates", None))
+#if QT_CONFIG(tooltip)
+        self.vpnSettingsBtn.setToolTip(QCoreApplication.translate("MainWindow", u"Tunnel ngPost connections through OpenVPN or WireGuard (the rest of the system is unaffected)", None))
+#endif // QT_CONFIG(tooltip)
+        self.vpnSettingsBtn.setText(QCoreApplication.translate("MainWindow", u"VPN...", None))
+#if QT_CONFIG(tooltip)
+        self.vpnStateLbl.setToolTip(QCoreApplication.translate("MainWindow", u"Current VPN tunnel state", None))
+#endif // QT_CONFIG(tooltip)
+        self.vpnStateLbl.setText(QCoreApplication.translate("MainWindow", u"VPN: disabled", None))
         self.nzbPathLbl.setText(QCoreApplication.translate("MainWindow", u"NZB Destination Path: ", None))
 #if QT_CONFIG(tooltip)
         self.nzbPathEdit.setToolTip(QCoreApplication.translate("MainWindow", u"set the destination path of all the nzb file", None))

@@ -35,6 +35,7 @@ class QStorageInfo;
 #endif
 class NzbCheck;
 class UpdateChecker;
+class VpnManager;
 
 #define NB_ARTICLES_TO_PREPARE_PER_CONNECTION 3
 
@@ -147,7 +148,19 @@ public:
         ENABLED,
         NZBCHECK,
         CHECK_FOR_UPDATES,
-        LAST_UPDATE_CHECK
+        LAST_UPDATE_CHECK,
+        VPN_AUTO_CONNECT,
+        VPN_BACKEND,        //!< legacy, kept for migration only
+        VPN_CONFIG_PATH,    //!< legacy, kept for migration only
+        VPN_ACTIVE_PROFILE,
+        VPN_PROFILE_NAME,        //!< inside [vpn_profile] block
+        VPN_PROFILE_BACKEND,
+        VPN_PROFILE_CONFIG_FILE,
+        VPN_PROFILE_HAS_AUTH,
+        SERVER_USE_VPN, //!< per-server useVpn flag inside [server] block
+        VPN,            //!< CLI-only: master switch on
+        NO_VPN,         //!< CLI-only: master switch off
+        VPN_PROFILE     //!< CLI-only: select active profile by name
     };
 
 private:
@@ -315,6 +328,8 @@ private:
     QNetworkProxy _proxySocks5;
     QString _proxyUrl;
 
+    VpnManager *_vpnManager; //!< app-scoped VPN (OpenVPN / WireGuard), bound to NNTP sockets only
+
     QFile *_logFile;
     QTextStream *_logStream;
 
@@ -475,6 +490,8 @@ public:
     inline bool useMultiPar() const;
 
     inline void enableAutoPacking(bool enable = true);
+
+    VpnManager *vpnManager() const { return _vpnManager; }
 
 signals:
     void log(QString msg, bool newline); //!< in case we signal from another thread

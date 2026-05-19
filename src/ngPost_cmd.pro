@@ -1,6 +1,5 @@
 QT += core network
 
-DEFINES += "APP_VERSION=\"5.0\""
 #CONFIG  += use_hmi
 
 INCLUDEPATH += $$PWD

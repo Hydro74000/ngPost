@@ -10,12 +10,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y build-essential
+        # libsecret-1-dev is the Linux backend QtKeychain uses (GNOME
+        # Secret Service / DBus). Without its headers the QtKeychain cmake
+        # bails out with "package libsecret-1 not found".
+        run: sudo apt update && sudo apt install -y build-essential cmake libsecret-1-dev
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(nproc)
+          cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
           cd src
@@ -29,6 +40,37 @@ jobs:
           cd src
           qmake ngPost.pro CONFIG+=release
           make -j$(nproc)
+      - name: Build Tests on Linux
+        run: |
+          cd tests
+          qmake6 tests.pro CONFIG+=release
+          make -j$(nproc)
+      - name: Run Unit + Integration Tests on Linux
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -e
+          fail=0
+          for t in tests/unit/tst_*/tst_* tests/integration/tst_*/tst_*; do
+            [ -x "$t" ] || continue
+            echo "::group::$(basename "$t")"
+            "$t" || fail=$((fail+1))
+            echo "::endgroup::"
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::$fail test binary/binaries failed"
+            exit 1
+          fi
+      - name: Upload Test Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-linux
+          path: |
+            tests/**/*.log
+            tests/**/Testing/**/*.xml
+          if-no-files-found: ignore
       - name: Upload Linux Binary
         uses: actions/upload-artifact@v4
         with:
@@ -49,6 +91,15 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        shell: pwsh
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
+          cd $env:TEMP\qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON `
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$env:QT_ROOT_DIR"
+          cmake --build build --config Release
+          cmake --install build --config Release
       - name: Compile translations (.ts -> .qm)
         shell: pwsh
         run: |
@@ -63,9 +114,68 @@ jobs:
           cd src
           Remove-Item -Force Makefile* -ErrorAction SilentlyContinue
           qmake ngPost.pro -spec win32-msvc CONFIG+="qtquickcompiler release use_hmi"
-          nmake
+          if (Get-Command jom -ErrorAction SilentlyContinue) {
+            jom -j $env:NUMBER_OF_PROCESSORS
+          } else {
+            nmake
+          }
       - name: Deploy Qt DLLs with windeployqt
         run: windeployqt src/release/ngPost.exe --release --qmldir src --compiler-runtime
+      - name: Build Tests on Windows
+        shell: pwsh
+        run: |
+          cd tests
+          qmake tests.pro -spec win32-msvc CONFIG+=release
+          if (Get-Command jom -ErrorAction SilentlyContinue) {
+            jom -j $env:NUMBER_OF_PROCESSORS
+          } else {
+            nmake
+          }
+      - name: Run Unit + Integration Tests on Windows
+        shell: pwsh
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/release/ngPost.exe
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $fail = 0
+          # Tests live as <category>/tst_<Name>/release/tst_<Name>.exe (or
+          # directly under tst_<Name>/ depending on the qmake build dir) —
+          # Get-ChildItem walks both.
+          $tests = Get-ChildItem -Path tests\unit, tests\integration -Recurse -Filter 'tst_*.exe' -ErrorAction SilentlyContinue
+          if (-not $tests) {
+            Write-Host "::error::no test binaries found under tests\unit, tests\integration"
+            exit 1
+          }
+          foreach ($t in $tests) {
+            Write-Host "::group::$($t.Name)"
+            $log = Join-Path $t.DirectoryName "$($t.BaseName).log"
+            $output = & $t.FullName -o "$log,txt" 2>&1
+            $code = $LASTEXITCODE
+            if (Test-Path $log) {
+              Get-Content $log | ForEach-Object { Write-Host $_ }
+            }
+            if ($output) {
+              $output | ForEach-Object { Write-Host $_ }
+            }
+            if ($code -ne 0) {
+              Write-Host "::error::$($t.FullName) failed with exit code $code"
+              $fail++
+            }
+            Write-Host "::endgroup::"
+          }
+          if ($fail -ne 0) {
+            Write-Host "::error::$fail test binary/binaries failed"
+            exit 1
+          }
+      - name: Upload Test Logs on Failure (Windows)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-windows
+          path: |
+            tests/**/*.log
+            tests/**/Testing/**/*.xml
+          if-no-files-found: ignore
       - name: Clean Build Artifacts
         shell: pwsh
         run: |
@@ -86,6 +196,14 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'clang_64'
+      - name: Build QtKeychain from source (Phase 4 dependency)
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cd /tmp/qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build build -j$(sysctl -n hw.ncpu)
+          cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
           cd src
@@ -99,6 +217,37 @@ jobs:
           cd src
           qmake ngPost.pro CONFIG+=release
           make -j$(sysctl -n hw.ncpu)
+      - name: Build Tests on macOS
+        run: |
+          cd tests
+          qmake tests.pro CONFIG+=release
+          make -j$(sysctl -n hw.ncpu)
+      - name: Run Unit + Integration Tests on macOS
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost.app/Contents/MacOS/ngPost
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -e
+          fail=0
+          for t in tests/unit/tst_*/tst_* tests/integration/tst_*/tst_*; do
+            [ -x "$t" ] || continue
+            echo "::group::$(basename "$t")"
+            "$t" || fail=$((fail+1))
+            echo "::endgroup::"
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::$fail test binary/binaries failed"
+            exit 1
+          fi
+      - name: Upload Test Logs on Failure (macOS)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-macos
+          path: |
+            tests/**/*.log
+            tests/**/Testing/**/*.xml
+          if-no-files-found: ignore
       - name: Upload macOS Binary
         uses: actions/upload-artifact@v4
         with:

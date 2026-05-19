@@ -25,12 +25,18 @@ class QCheckBox;
 
 class CheckBoxCenterWidget : public QWidget
 {
+    Q_OBJECT
 public:
     CheckBoxCenterWidget(QWidget *parent = nullptr, bool isChecked = false);
     ~CheckBoxCenterWidget() = default;
 
     bool isChecked() const;
     void setChecked(bool checked);
+
+signals:
+    //! Forwarded from the wrapped QCheckBox so callers can react to user
+    //! toggles without having to fish the inner widget out.
+    void toggled(bool checked);
 
 private:
     QCheckBox *_checkbox;

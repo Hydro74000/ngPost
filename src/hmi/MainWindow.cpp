@@ -22,10 +22,14 @@
 #include "PostingWidget.h"
 #include "AutoPostWidget.h"
 #include "NgPost.h"
+#include "VpnSettingsDialog.h"
 #include "nntp/NntpServerParams.h"
 #include "nntp/NntpArticle.h"
+#include "vpn/VpnManager.h"
 
+#include <QCoreApplication>
 #include <QDebug>
+#include <QElapsedTimer>
 #include <QProgressBar>
 #include <QProgressDialog>
 #include <QLabel>
@@ -51,12 +55,13 @@ const QList<const char *> MainWindow::sServerListHeaders = {
     QT_TRANSLATE_NOOP("MainWindow", "Host (name or IP)"),
     QT_TRANSLATE_NOOP("MainWindow", "Port"),
     QT_TRANSLATE_NOOP("MainWindow", "SSL"),
+    QT_TRANSLATE_NOOP("MainWindow", "Use VPN"),
     QT_TRANSLATE_NOOP("MainWindow", "Connections"),
     QT_TRANSLATE_NOOP("MainWindow", "Username"),
     QT_TRANSLATE_NOOP("MainWindow", "Password"),
     "" // for the delete button
 };
-const QVector<int> MainWindow::sServerListSizes   = {30, 200, 50, 30, 100, 150, 150, sDeleteColumnWidth};
+const QVector<int> MainWindow::sServerListSizes   = {30, 200, 50, 30, 60, 100, 150, 150, sDeleteColumnWidth};
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -264,11 +269,32 @@ void MainWindow::closeEvent(QCloseEvent *event)
             event->accept();
         }
         else
+        {
             event->ignore();
-
+            return;
+        }
     }
     else
         event->accept();
+
+    // Phase 3 — tear down the VPN here, while the event loop is still
+    // alive (waitForFinished needs it). If we let ~VpnManager handle it
+    // in the destructor chain, the event loop is already gone and the
+    // helper script doesn't get the EOF signal in time, leaving an
+    // orphan tunnel that gets detected as "stale state" on next launch.
+    if (VpnManager *vpn = _ngPost->vpnManager()) {
+        if (vpn->state() == VpnManager::State::Connected
+            || vpn->state() == VpnManager::State::Starting) {
+            vpn->stop();
+            // Spin the event loop briefly so the helper's stdin closure is
+            // processed and its trap can run cleanup.
+            QElapsedTimer t; t.start();
+            while (vpn->state() != VpnManager::State::Disabled
+                   && t.elapsed() < 5000) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+            }
+        }
+    }
 }
 
 void MainWindow::changeEvent(QEvent *event)
@@ -517,6 +543,20 @@ void MainWindow::_initPostingBox()
     _ui->autoCloseCB->setChecked(_ngPost->_autoCloseTabs);
     _ui->checkForUpdatesCB->setChecked(_ngPost->_checkForUpdates);
 
+    connect(_ui->vpnSettingsBtn, &QAbstractButton::clicked, this, &MainWindow::onVpnSettingsClicked);
+    if (VpnManager *vpn = _ngPost->vpnManager()) {
+        connect(vpn, &VpnManager::stateChanged, this, &MainWindow::onVpnStateChanged);
+        // Phase 3: surface VPN-required-but-unavailable as a popup so the
+        // user knows why their job didn't start.
+        connect(vpn, &VpnManager::vpnRequiredButUnavailable,
+                this, [this](VpnManager::JobBlockReason, QString const &detail) {
+            QMessageBox::warning(this, tr("VPN required"),
+                tr("This job needs the VPN but it cannot be started:\n\n%1\n\n"
+                   "The job stays in the queue.").arg(detail));
+        });
+        onVpnStateChanged(vpn->state());
+    }
+
     _ui->obfuscateMsgIdCB->setChecked(_ngPost->_obfuscateArticles);
     _ui->obfuscateFileNameCB->setChecked(_ngPost->_obfuscateFileName);
     _ui->keepNfoExtensionCB->setChecked(_ngPost->_keepNfoExtension);
@@ -551,12 +591,14 @@ void MainWindow::updateServers()
 
         QLineEdit *portEdit = static_cast<QLineEdit*>(_ui->serversTable->cellWidget(row, col++));
         CheckBoxCenterWidget *sslCb = static_cast<CheckBoxCenterWidget*>(_ui->serversTable->cellWidget(row, col++));
+        CheckBoxCenterWidget *vpnCb = static_cast<CheckBoxCenterWidget*>(_ui->serversTable->cellWidget(row, col++));
         QLineEdit *nbConsEdit = static_cast<QLineEdit*>(_ui->serversTable->cellWidget(row, col++));
         QLineEdit *userEdit = static_cast<QLineEdit*>(_ui->serversTable->cellWidget(row, col++));
         QLineEdit *passEdit = static_cast<QLineEdit*>(_ui->serversTable->cellWidget(row, col++));
 
         NntpServerParams *srvParams = new NntpServerParams(hostEdit->text(), portEdit->text().toUShort());
         srvParams->useSSL = sslCb->isChecked();
+        srvParams->useVpn = vpnCb->isChecked();
         srvParams->nbCons = nbConsEdit->text().toInt();
         srvParams->enabled = isEnabled;
         QString user = userEdit->text();
@@ -709,28 +751,51 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     int nbRows = _ui->serversTable->rowCount(), col = 0;
     _ui->serversTable->setRowCount(nbRows+1);
 
-    _ui->serversTable->setCellWidget(nbRows, col++,
-                                     new CheckBoxCenterWidget(_ui->serversTable,
-                                                              serverParam ? serverParam->enabled : true));
+    // Object names on the dynamically-created server row widgets make
+    // findChild<>() lookups deterministic for GUI tests. The naming
+    // convention is "server<Role>_<row>" so a test can target row N
+    // unambiguously.
+    const QString suffix = QStringLiteral("_%1").arg(nbRows);
+
+    auto *enabledCb = new CheckBoxCenterWidget(_ui->serversTable,
+                                               serverParam ? serverParam->enabled : true);
+    enabledCb->setObjectName(QStringLiteral("serverEnabledCb") + suffix);
+    _ui->serversTable->setCellWidget(nbRows, col++, enabledCb);
 
     QLineEdit *hostEdit = new QLineEdit(_ui->serversTable);
+    hostEdit->setObjectName(QStringLiteral("serverHostEdit") + suffix);
     if (serverParam)
         hostEdit->setText(serverParam->host);
     hostEdit->setFrame(false);
     _ui->serversTable->setCellWidget(nbRows, col++, hostEdit);
 
     QLineEdit *portEdit = new QLineEdit(_ui->serversTable);
+    portEdit->setObjectName(QStringLiteral("serverPortEdit") + suffix);
     portEdit->setFrame(false);
     portEdit->setValidator(new QIntValidator(1, 99999, portEdit));
     portEdit->setText(QString::number(serverParam ? serverParam->port : sDefaultServerPort));
     portEdit->setAlignment(Qt::AlignCenter);
     _ui->serversTable->setCellWidget(nbRows, col++, portEdit);
 
-    _ui->serversTable->setCellWidget(nbRows, col++,
-                                     new CheckBoxCenterWidget(_ui->serversTable,
-                                                              serverParam ? serverParam->useSSL : sDefaultServerSSL));
+    auto *sslCb = new CheckBoxCenterWidget(_ui->serversTable,
+                                           serverParam ? serverParam->useSSL : sDefaultServerSSL);
+    sslCb->setObjectName(QStringLiteral("serverSslCb") + suffix);
+    _ui->serversTable->setCellWidget(nbRows, col++, sslCb);
+
+    // Phase 3: per-server "Use VPN" — when checked, the server's NNTP
+    // sockets are bound to the VPN tun (and the VPN is auto-started for
+    // any job that uses this server).
+    // Phase 5d: persist immediately on toggle so the user doesn't have to
+    // hit "Save Config" after each tweak.
+    CheckBoxCenterWidget *vpnCb = new CheckBoxCenterWidget(
+        _ui->serversTable, serverParam ? serverParam->useVpn : false);
+    vpnCb->setObjectName(QStringLiteral("serverUseVpnCb") + suffix);
+    _ui->serversTable->setCellWidget(nbRows, col++, vpnCb);
+    connect(vpnCb, &CheckBoxCenterWidget::toggled,
+            this, &MainWindow::_onUseVpnToggled);
 
     QLineEdit *nbConsEdit = new QLineEdit(_ui->serversTable);
+    nbConsEdit->setObjectName(QStringLiteral("serverNbConsEdit") + suffix);
     nbConsEdit->setFrame(false);
     nbConsEdit->setValidator(new QIntValidator(1, 99999, nbConsEdit));
     nbConsEdit->setText(QString::number(serverParam ? serverParam->nbCons : sDefaultConnections));
@@ -739,12 +804,14 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
 
 
     QLineEdit *userEdit = new QLineEdit(_ui->serversTable);
+    userEdit->setObjectName(QStringLiteral("serverUserEdit") + suffix);
     if (serverParam)
         userEdit->setText(serverParam->user.c_str());
     userEdit->setFrame(false);
     _ui->serversTable->setCellWidget(nbRows, col++, userEdit);
 
     QLineEdit *passEdit = new QLineEdit(_ui->serversTable);
+    passEdit->setObjectName(QStringLiteral("serverPassEdit") + suffix);
     passEdit->setEchoMode(QLineEdit::EchoMode::PasswordEchoOnEdit);
     if (serverParam)
         passEdit->setText(serverParam->pass.c_str());
@@ -752,6 +819,7 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     _ui->serversTable->setCellWidget(nbRows, col++, passEdit);
 
     QPushButton *delButton = new QPushButton(_ui->serversTable);
+    delButton->setObjectName(QStringLiteral("serverDelButton") + suffix);
     delButton->setProperty("server", QVariant::fromValue(static_cast<void*>(serverParam)));
     delButton->setIcon(QIcon(":/icons/clear.png"));
     delButton->setMaximumWidth(sDeleteColumnWidth);
@@ -860,6 +928,18 @@ void MainWindow::onDebugValue(int value)
     _ngPost->setDebug(static_cast<ushort>(value));
 }
 
+
+void MainWindow::_onUseVpnToggled(bool checked)
+{
+    // Pull the current state of every "Use VPN" checkbox in the table back
+    // into the in-memory NntpServerParams list, then flush to disk. We can't
+    // target a single server here because the sender CheckBoxCenterWidget
+    // doesn't carry its row index — `updateServers()` is cheap enough that
+    // doing the full sync is simpler than introducing per-row bookkeeping.
+    Q_UNUSED(checked);
+    updateServers();
+    _ngPost->saveConfig();
+}
 
 void MainWindow::onSaveConfig()
 {
@@ -987,6 +1067,29 @@ void MainWindow::onPauseClicked()
         else
             _ngPost->pause();
     }
+}
+
+void MainWindow::onVpnSettingsClicked()
+{
+    if (!_ngPost->vpnManager())
+        return;
+    VpnSettingsDialog dlg(_ngPost->vpnManager(), this);
+    dlg.exec();
+}
+
+void MainWindow::onVpnStateChanged(VpnManager::State newState)
+{
+    QString text;
+    switch (newState) {
+    case VpnManager::State::Disabled:  text = tr("VPN: disabled");                 break;
+    case VpnManager::State::Starting:  text = tr("VPN: starting...");              break;
+    case VpnManager::State::Connected:
+        text = tr("VPN: connected (%1)").arg(_ngPost->vpnManager()->tunInterface());
+        break;
+    case VpnManager::State::Stopping:  text = tr("VPN: stopping...");              break;
+    case VpnManager::State::Failed:    text = tr("VPN: failed");                   break;
+    }
+    _ui->vpnStateLbl->setText(text);
 }
 
 

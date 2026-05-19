@@ -33,6 +33,7 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QThread>
+#include <algorithm>
 #include <cmath>
 
 PostingJob::PostingJob(NgPost *ngPost,
@@ -417,30 +418,41 @@ void PostingJob::_postFiles()
     }
 
     if (_doCompress) {
-        QStringList archiveNames;
         _files.clear();
-        for (const QFileInfo &file : _compressDir->entryInfoList(QDir::Files, QDir::Name)) {
+        for (const QFileInfo &file : _compressDir->entryInfoList(QDir::Files, QDir::Name))
             _files << file;
-            archiveNames << file.absoluteFilePath();
-            if (_ngPost->debugMode())
-                _ngPost->_log(QString("  - %1").arg(file.fileName()));
-        }
-        emit archiveFileNames(archiveNames);
     } else if (_doPar2) {
-        QStringList archiveNames;
-        for (const QFileInfo &file : _files)
-            archiveNames << file.absoluteFilePath();
-
-        for (const QFileInfo &file : _compressDir->entryInfoList(QDir::Files, QDir::Name)) {
+        for (const QFileInfo &file : _compressDir->entryInfoList(QDir::Files, QDir::Name))
             _files << file;
+    }
+
+    // Sort the upload queue alphabetically by filename (case-insensitive) so
+    // posting order is deterministic. With par2cmdline / parpar / multipar
+    // naming conventions this naturally puts:
+    //   archive.par2          (index, small)
+    //   archive.part01.rar    (rar parts)
+    //   archive.part02.rar
+    //   archive.vol00+01.par2 (par2 volumes)
+    //   ...
+    // i.e. the par2 index goes out first so downloaders can validate filenames
+    // before the bulk transfer arrives. Previously we relied solely on Qt's
+    // QDir::Name flag, which left the par2-only path producing
+    // [user-files... then par2-files...] (concatenation, not merged sort).
+    if (_doCompress || _doPar2) {
+        std::sort(_files.begin(), _files.end(),
+                  [](QFileInfo const &a, QFileInfo const &b) {
+                      return a.fileName().compare(b.fileName(),
+                                                  Qt::CaseInsensitive) < 0;
+                  });
+        QStringList archiveNames;
+        archiveNames.reserve(_files.size());
+        for (QFileInfo const &file : _files) {
             archiveNames << file.absoluteFilePath();
             if (_ngPost->debugMode())
                 _ngPost->_log(QString("  - %1").arg(file.fileName()));
         }
         emit archiveFileNames(archiveNames);
     }
-
-    
 
     _initPosting();
 

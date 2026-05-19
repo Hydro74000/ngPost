@@ -24,6 +24,9 @@
 #include "nntp/NntpArticle.h"
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
+#include "vpn/VpnDnsResolver.h"
+#include "vpn/VpnManager.h"
+#include "vpn/VpnSocketBinder.h"
 
 #include <QAbstractSocket>
 #include <QByteArray>
@@ -111,6 +114,39 @@ void NntpConnection::onStartConnection()
     else
         _socket = new QTcpSocket();
 
+    // Per-server `useVpn` decides by default; the global "Route ALL ngPost
+    // connections through the VPN" override forces every connection into the
+    // tunnel regardless of per-server flags.
+    // Fail-closed in both cases: if the tunnel is required but not ready,
+    // refuse the connection rather than leaking traffic in the clear.
+    //
+    // We do this BEFORE setSocketOption to avoid any chance of forcing the
+    // underlying socket descriptor to be created with the wrong protocol
+    // family (which would later cause an IPv4 bind to fail).
+    VpnManager *vpn = _ngPost->vpnManager();
+    bool routeViaVpn = _srvParams.useVpn
+                    || (vpn && vpn->forceAllConnectionsThroughVpn());
+    if (routeViaVpn) {
+        if (!vpn || !vpn->isConnected() || vpn->tunIp().isNull()) {
+            _error(tr("Server '%1' must route through the VPN but the tunnel is not connected")
+                       .arg(_srvParams.host));
+            deleteSocket();
+            emit disconnected(this);
+            return;
+        }
+        QString bindErr;
+        bool bound = VpnSocketBinder::bind(_socket, vpn->tunIp(), &bindErr);
+        if (!bound) {
+            _error(tr("VPN bind failed on %1: %2 (local addresses visible to Qt: %3)")
+                       .arg(vpn->tunIp().toString(),
+                            bindErr,
+                            VpnSocketBinder::localAddressSummary()));
+            deleteSocket();
+            emit disconnected(this);
+            return;
+        }
+    }
+
     _socket->setSocketOption(QAbstractSocket::KeepAliveOption, true);
     _socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
     _socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, NgPost::articleSize());
@@ -134,7 +170,34 @@ void NntpConnection::onStartConnection()
             SLOT(onErrors(QAbstractSocket::SocketError)),
             Qt::DirectConnection);
 
+    // Resolve through a DNS socket bound to the tunnel IP. Each NNTP
+    // connection runs on a Poster thread, so the blocking lookup does not
+    // freeze the GUI. On failure we fall back to the system resolver so the
+    // post can continue, but we log that DNS may leak.
+    if (routeViaVpn) {
+        if (vpn && !vpn->dnsServer().isNull()) {
+            QString dnsErr;
+            auto const records = VpnDnsResolver::resolveA(
+                _srvParams.host, vpn->dnsServer(), vpn->tunIp(), &dnsErr);
+            if (!records.isEmpty()) {
+                // When connectToHost is called with a QHostAddress (raw IP),
+                // QSslSocket defaults peerVerifyName to that IP. Keep SNI and
+                // certificate verification tied to the configured hostname.
+                if (_srvParams.useSSL)
+                    static_cast<QSslSocket *>(_socket)
+                        ->setPeerVerifyName(_srvParams.host);
+                _socket->connectToHost(records.first(), _srvParams.port);
+                goto connect_done;
+            }
+            _error(tr("VPN DNS lookup failed for %1 via %2: %3 — falling back to "
+                      "system resolver (DNS may leak)")
+                       .arg(_srvParams.host,
+                            vpn->dnsServer().toString(),
+                            dnsErr.isEmpty() ? tr("unknown error") : dnsErr));
+        }
+    }
     _socket->connectToHost(_srvParams.host, _srvParams.port);
+connect_done:
 
 #ifdef __USE_CONNECTION_TIMEOUT__
     if (!_timeout) {
