@@ -1,11 +1,11 @@
 # LevelUp execution tracking
 
 Branch: `levelup` tracking `origin/levelup`
-Commit: `a233b7d`
+Commit: `de8defc`
 
 ## En cours
 
-- [ ] Push final de `levelup` vers `origin/levelup`
+_Aucun bloc en cours._
 
 ## A faire
 
@@ -33,6 +33,7 @@ Commit: `a233b7d`
 - [x] Validation locale ciblee: `tst_PostHistory` OK dans `my-distrobox`
 - [x] Validation syntaxe: `git diff --check` OK, workflows YAML parses via `js-yaml`
 - [x] Commit validation/CI associe: `a233b7d` (`Fix LevelUp validation and CI workflows`)
+- [x] Push effectue vers `origin/levelup`
 
 ## Journal
 
@@ -45,3 +46,4 @@ Commit: `a233b7d`
 - 2026-05-19T17:50:00+02:00: unit tests Windows OK: `tst_CliParser` 8/8, `tst_PostHistory` 5/5, `tst_PathHelper` 10/10, `tst_VpnProfile` 11/11, `tst_WireGuardBackend` 13/13, `tst_WindowsBindHelper` 9/9, `tst_Yenc` 7/7.
 - 2026-05-19T18:20:00+02:00: integration tests Windows OK apres timeout mock NNTP: `tst_GoldenNzb` 4/4, `tst_MockNntp` 8/8, `tst_PostFlow` 7/7, `tst_VpnDnsResolver` 8/8.
 - 2026-05-19T18:25:00+02:00: build Linux complet dans `my-distrobox` encore bloque par dependance locale manquante `QtCharts` (`Unknown module(s) in QT: charts`); les workflows installent `qtcharts`.
+- 2026-05-19T18:35:00+02:00: branche `levelup` poussee sur `origin/levelup`.
