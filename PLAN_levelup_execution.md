@@ -1,6 +1,7 @@
 # LevelUp execution tracking
 
 Branch: `levelup` tracking `origin/levelup`
+Commit: `a0eba5f`
 
 ## En cours
 
@@ -23,9 +24,11 @@ Branch: `levelup` tracking `origin/levelup`
 - [x] Stabilisation build statique: signatures et diff whitespace verifies
 - [x] Documentation README/config/help: README EN/FR et notes de version mises a jour
 - [x] Tests unitaires/integration/gui: tests unitaires historique ajoutes, test help CLI etendu
+- [x] Commit associe: `a0eba5f` (`Implement LevelUp history and resume`)
 
 ## Journal
 
 - Initialisation: branche creee et publiee. `.gitignore` est inclus dans le perimetre a la demande utilisateur.
 - 2026-05-19T15:54:18+02:00: onglet Historique isole des onglets de post rapides pour eviter les casts invalides et fermetures accidentelles.
 - 2026-05-19T16:05:19+02:00: `git diff --check` OK; build `make -C src -j2` et tests `make -C tests -j2` bloques car `/usr/bin/qmake6` est absent.
+- 2026-05-19T16:05:19+02:00: commit local cree: `a0eba5f`.
