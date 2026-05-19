@@ -27,7 +27,8 @@ jobs:
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
           cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
                 -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
-                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+                -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
+                -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
           cmake --build /tmp/qtkeychain/build -j"$(nproc)"
           cmake --install /tmp/qtkeychain/build
 
@@ -82,6 +83,7 @@ jobs:
           cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
                 -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release \
                 -DBUILD_WITH_QT6=ON -DBUILD_TESTING=OFF \
+                -DBUILD_TRANSLATIONS=OFF \
                 -DCMAKE_INSTALL_PREFIX=/mingw64
           cmake --build /tmp/qtkeychain/build -j2
           cmake --install /tmp/qtkeychain/build
@@ -126,7 +128,8 @@ jobs:
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
           cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
                 -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
-                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+                -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
+                -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
           cmake --build /tmp/qtkeychain/build -j"$(sysctl -n hw.ncpu)"
           cmake --install /tmp/qtkeychain/build
 

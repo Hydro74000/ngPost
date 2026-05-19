@@ -5,7 +5,7 @@ Commit: `de8defc`
 
 ## En cours
 
-_Aucun bloc en cours._
+- [ ] Analyse/correction des echecs GitHub Actions apres push
 
 ## A faire
 
@@ -34,6 +34,7 @@ _Aucun bloc en cours._
 - [x] Validation syntaxe: `git diff --check` OK, workflows YAML parses via `js-yaml`
 - [x] Commit validation/CI associe: `a233b7d` (`Fix LevelUp validation and CI workflows`)
 - [x] Push effectue vers `origin/levelup`
+- [x] GitHub Actions premiere passe: GUI et VPN OK, build/unit/integration KO sur QtKeychain Windows
 
 ## Journal
 
@@ -47,3 +48,4 @@ _Aucun bloc en cours._
 - 2026-05-19T18:20:00+02:00: integration tests Windows OK apres timeout mock NNTP: `tst_GoldenNzb` 4/4, `tst_MockNntp` 8/8, `tst_PostFlow` 7/7, `tst_VpnDnsResolver` 8/8.
 - 2026-05-19T18:25:00+02:00: build Linux complet dans `my-distrobox` encore bloque par dependance locale manquante `QtCharts` (`Unknown module(s) in QT: charts`); les workflows installent `qtcharts`.
 - 2026-05-19T18:35:00+02:00: branche `levelup` poussee sur `origin/levelup`.
+- 2026-05-19T18:50:00+02:00: logs GitHub Actions analyses; les echecs Windows viennent de QtKeychain `messages`/traductions (`Error -1073741515`) avant build ngPost.
