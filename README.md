@@ -15,7 +15,7 @@
 This application is a high-speed command line and GUI Usenet poster for binaries, designed for secure and efficient data posting. Developed with C++17 and [Qt 6.8.2](https://www.qt.io/blog/qt-6.8.2-released), it features file compression, par2 file generation, and a posting queue for managing multiple uploads. The tool automates tasks by scanning folders and posting files, with options for executing commands post-upload and shutting down the computer upon completion.
 
 
-![ngPost_v5.3.0](https://github.com/Hydro74000/ngPost/blob/rc-4.17/pics/ngPost_v4.17.png?raw=true)
+![ngPost_v5.3.0](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.3.0.png?raw=true)
 
 # Getting Started
 
