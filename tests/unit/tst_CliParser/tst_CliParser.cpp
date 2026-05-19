@@ -130,7 +130,10 @@ void TestCliParser::help_lists_major_flags()
     QCOMPARE(r.exitCode, 0);
 
     const QString out = r.stdoutText + r.stderrText;
-    for (const char *flag : { "--vpn", "--vpn_profile", "--auto", "--monitor" }) {
+    for (const char *flag : { "--vpn", "--vpn_profile", "--auto", "--monitor",
+                              "--history", "--history-show", "--history_show",
+                              "--resume-list", "--resume_list",
+                              "--regenerate-nzb", "--regenerate_nzb" }) {
         QVERIFY2(out.contains(QString::fromLatin1(flag)),
                  qPrintable(QStringLiteral("help output did not mention '%1'").arg(QString::fromLatin1(flag))));
     }

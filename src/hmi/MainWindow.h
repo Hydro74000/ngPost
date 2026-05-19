@@ -30,6 +30,7 @@ struct NntpServerParams;
 class NntpFile;
 class PostingWidget;
 class AutoPostWidget;
+class QTableWidget;
 
 namespace Ui {
 class MainWindow;
@@ -168,6 +169,8 @@ private slots:
 private:
     void _initServerBox();
     void _initPostingBox();
+    QWidget *_buildHistoryTab();
+    void _refreshHistoryViews(QTableWidget *historyTable, QTableWidget *resumeTable);
 
     void _addServer(NntpServerParams *serverParam);
     int  _serverRow(QObject *delButton);

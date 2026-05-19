@@ -5,6 +5,7 @@ TEMPLATE = subdirs
 SUBDIRS = \
     tst_Yenc \
     tst_PathHelper \
+    tst_PostHistory \
     tst_VpnProfile \
     tst_CliParser \
     tst_WireGuardBackend \

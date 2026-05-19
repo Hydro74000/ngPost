@@ -619,3 +619,4 @@ tests/**/tst_*/*
 !tests/**/tst_*/tst_*.pri
 tests/**/Makefile
 tests/**/.qmake.stash
+PLAN*.md

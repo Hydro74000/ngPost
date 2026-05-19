@@ -10,7 +10,7 @@
 
 lessThan(QT_MAJOR_VERSION, 6): error("ngPost requires Qt 6 (qtkeychain-qt6). Use qmake6, not qmake/qmake-qt5.")
 
-QT += core network
+QT += core network sql
 
 # Cross-platform credential store (QtKeychain) for OpenVPN auth.
 # Packages: Fedora qtkeychain-qt6, Ubuntu libqt6keychain1-dev, brew qtkeychain.
@@ -79,6 +79,9 @@ SOURCES += \
         $$PWD/ArticleBuilder.cpp \
         $$PWD/FileUploader.cpp \
         $$PWD/FoldersMonitorForNewFiles.cpp \
+        $$PWD/history/NzbHistoryRegenerator.cpp \
+        $$PWD/history/PostHistoryStore.cpp \
+        $$PWD/history/ResumePlanner.cpp \
         $$PWD/NgPost.cpp \
         $$PWD/NntpCheckCon.cpp \
         $$PWD/NntpConnection.cpp \
@@ -104,6 +107,9 @@ HEADERS += \
     $$PWD/ArticleBuilder.h \
     $$PWD/FileUploader.h \
     $$PWD/FoldersMonitorForNewFiles.h \
+    $$PWD/history/NzbHistoryRegenerator.h \
+    $$PWD/history/PostHistoryStore.h \
+    $$PWD/history/ResumePlanner.h \
     $$PWD/NgPost.h \
     $$PWD/NntpCheckCon.h \
     $$PWD/NntpConnection.h \
@@ -137,7 +143,7 @@ HEADERS += \
 # .pro files only have to do `CONFIG += use_hmi ; include(common.pri)` and
 # everything resolves consistently.
 use_hmi {
-QT += gui
+QT += gui charts
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 DEFINES += __USE_HMI__
 

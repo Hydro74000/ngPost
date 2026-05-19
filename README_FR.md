@@ -11,7 +11,8 @@ Voici la liste des principales fonctionnalités et atouts de ngPost:
   - **surveillance de dossier(s)** afin de poster chaque nouveau fichier/dossier individuellement après les avoir compressés
   - **parallélisation de l'upload avec le packing du Post suivant**
   - **suppression automatique** des fichiers/dossiers une fois postés (uniquement avec --auto et --monitor)
-  - génération du **fichier nzb** et écriture d'un **fichier csv d'historique des posts**
+  - génération du **fichier nzb**, historique SQLite des posts, import CSV legacy et régénération de NZB depuis l'historique
+  - **reprise de post** après échec ou perte réseau, avec suivi article par article
   - **mode invisible**: obfuscation complète des Articles : impossible de (re)trouver un post sans avoir le fichier nzb
   - **exécution d'une commande ou un script une fois les nzb générés**
   - possibilité **d'éteindre l'ordinateur** lorsque tous les posts sont finis
@@ -37,6 +38,8 @@ Sinon vous pouvez éditer le fichier à la main. Il vous faut remplir:
   - nzbPath (dossier de destination par défaut pour les fichiers nzb)
   - inputDir (surtout pour l'IHM, commentez le)
   - POST_HISTORY (Fichier historique des posts)
+  - POST_DB (base SQLite d'historique structuré, par défaut dans le dossier de configuration)
+  - HISTORY_STORE_PASSWORDS (true par défaut; stocke les mots de passe d'archive en clair pour permettre la régénération NZB)
   - groups (liste des groupes sur lesquels vous postez)
   - TMP_DIR (dossier temporaire pour les archives et par2)
   - RAR_PATH (chemin d'accès complet de l'éxécutable RAR ou 7zip)
@@ -57,6 +60,20 @@ Syntaxe: ngPost (options)* (-i <file or folder> | --auto <folder> | --monitor <f
 	-l or --lang       : langue de l'application (EN, FR, ES ou DE)
 	--check            : check nzb file (if articles are available on Usenet) cf https://github.com/mbruel/nzbCheck
 	-q or --quiet      : quiet mode (no output on stdout)
+
+// historique SQLite, reprise et régénération NZB
+	--history          : liste l'historique structuré des posts
+	--history-show     : détail d'un post historisé (alias --history_show)
+	--history-import-csv: import explicite d'un ancien POST_HISTORY csv (alias --history_import_csv)
+	--regenerate-nzb   : régénère un NZB depuis l'historique vers stdout ou -o fichier (alias --regenerate_nzb)
+	--include-password : inclut le mot de passe d'archive stocké dans le NZB régénéré
+	--resume-list      : liste les posts reprenables, option --json disponible (alias --resume_list)
+	--resume-check     : diagnostique un post reprenable (alias --resume_check)
+	--resume-post      : reprend un ou plusieurs ids séparés par virgule, avec --dry-run ou --yes (alias --resume_post)
+	--resume-all       : reprend tous les posts reprenables avec --yes, ou simule avec --dry-run (alias --resume_all)
+	--resume-abandon   : marque un post incomplet comme abandonné avec --yes (alias --resume_abandon)
+	--resume-purge     : purge les données techniques de reprise avec --yes (alias --resume_purge)
+	--post_db          : chemin de la base SQLite d'historique
 
 // post automatique (scan et/ou surveillance du dossier auto)
 	--auto             : Scan du dossier en paramètre et post de chaque fichier/dossier individuellement. L'option de compression est obligatoire
@@ -130,6 +147,10 @@ Une fois les parties Serveurs et Paramètres remplies, on remarque un système d
   - Post Auto: pour générer des Post Rapides ou surveiller un ou plusieurs dossiers
 L'onglet **Nouveau** permet de créer d'autres Post Rapides.<br />
 À noter que vous pouvez faire un click droit sur les onglets et vous avez l'option **Fermer tous les onglets des Posts finis**<br/>
+
+L'onglet **Historique** regroupe l'historique des posts, les statistiques et le centre de reprise. Au démarrage, une bannière non bloquante signale les posts reprenables. La vue Reprise permet d'identifier les posts `resumable`, `partial` ou non reprenables; les mots de passe sont masqués par défaut.
+
+La reprise repose sur la base SQLite: les articles confirmés par le serveur sont conservés, les articles `failed`, `pending` ou `unknown` sont repostés avec de nouveaux Message-ID. Les articles `unknown` correspondent aux cas où la connexion a été coupée avant confirmation serveur; l'ancien Message-ID reste dans l'historique technique et n'est pas utilisé dans le NZB final. Pour les posts compressés, les archives/par2 temporaires doivent encore exister; pour les fichiers non compressés, chemin, taille et date de modification doivent correspondre.
 
 #### le tunnel VPN intégré (Linux):
 

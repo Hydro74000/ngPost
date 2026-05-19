@@ -1,0 +1,168 @@
+//========================================================================
+//
+// Structured posting history for ngPost.
+//
+//========================================================================
+
+#ifndef POSTHISTORYSTORE_H
+#define POSTHISTORYSTORE_H
+
+#include <QDateTime>
+#include <QList>
+#include <QMap>
+#include <QString>
+#include <QStringList>
+
+class QTextStream;
+
+class PostHistoryStore
+{
+public:
+    struct PostRecord {
+        QString nzbName;
+        QString nzbPath;
+        QString rarName;
+        QString rarPass;
+        QString passwordOrigin;
+        QString from;
+        QStringList groups;
+        bool hasPassword = false;
+        bool doCompress = false;
+        bool doPar2 = false;
+        bool obfuscateArticles = false;
+        bool obfuscateFileName = false;
+    };
+
+    struct FileRecord {
+        qint64 postId = 0;
+        int ordinal = 0;
+        QString originalPath;
+        QString postedName;
+        qint64 sizeBytes = 0;
+        qint64 mtimeEpoch = 0;
+        int totalArticles = 0;
+        QStringList groups;
+        QString status = QStringLiteral("pending");
+    };
+
+    struct ArticleRecord {
+        qint64 fileId = 0;
+        int part = 0;
+        qint64 pos = 0;
+        qint64 bytes = 0;
+        QString status = QStringLiteral("pending");
+        QString msgId;
+        QString error;
+    };
+
+    struct PostSummary {
+        qint64 id = 0;
+        QString nzbName;
+        QString status;
+        QString groups;
+        QString createdAt;
+        QString finishedAt;
+        qint64 sizeBytes = 0;
+        int nbFiles = 0;
+        int nbArticles = 0;
+        int nbFailedArticles = 0;
+        bool hasPassword = false;
+        bool passwordStored = false;
+        bool resumable = false;
+        QString resumeReason;
+    };
+
+    struct FileSummary {
+        qint64 id = 0;
+        int ordinal = 0;
+        QString originalPath;
+        QString postedName;
+        qint64 sizeBytes = 0;
+        qint64 mtimeEpoch = 0;
+        int totalArticles = 0;
+        QString groups;
+        QString status;
+    };
+
+    struct ArticleSummary {
+        qint64 fileId = 0;
+        int part = 0;
+        qint64 bytes = 0;
+        QString msgId;
+        QString status;
+    };
+
+    struct PostDetails {
+        PostSummary post;
+        QString nzbPath;
+        QString rarName;
+        QString rarPass;
+        QString passwordOrigin;
+        QString from;
+        QList<FileSummary> files;
+        QMap<qint64, QList<ArticleSummary>> articlesByFile;
+    };
+
+    explicit PostHistoryStore(const QString &dbPath = QString(), bool storePasswords = true);
+
+    void configure(const QString &dbPath, bool storePasswords);
+    QString dbPath() const;
+    bool storePasswords() const;
+
+    bool initialize(QString *error = nullptr);
+
+    qint64 createPost(const PostRecord &record, QString *error = nullptr);
+    bool updatePostStatus(qint64 postId,
+                          const QString &status,
+                          int nbFiles,
+                          int nbArticles,
+                          int nbFailedArticles,
+                          qint64 sizeBytes,
+                          const QString &avgSpeed,
+                          QString *error = nullptr);
+    bool markPostResuming(qint64 postId, QString *error = nullptr);
+    bool setPostAbandoned(qint64 postId, QString *error = nullptr);
+    bool purgeResumeData(qint64 postId, QString *error = nullptr);
+    bool purgePassword(qint64 postId, QString *error = nullptr);
+
+    qint64 upsertFile(const FileRecord &record, QString *error = nullptr);
+    bool updateFileStatus(qint64 fileId, const QString &status, QString *error = nullptr);
+    bool upsertArticle(const ArticleRecord &record, QString *error = nullptr);
+    bool markArticlePosting(qint64 fileId,
+                            int part,
+                            const QString &msgId,
+                            int attemptNo,
+                            QString *error = nullptr);
+    bool markArticlePosted(qint64 fileId, int part, const QString &msgId, QString *error = nullptr);
+    bool markArticleFailed(qint64 fileId,
+                           int part,
+                           const QString &msgId,
+                           const QString &err,
+                           QString *error = nullptr);
+    bool markArticleUnknown(qint64 fileId,
+                            int part,
+                            const QString &msgId,
+                            const QString &err,
+                            QString *error = nullptr);
+    bool markPostCrashedArticlesUnknown(QString *error = nullptr);
+
+    QList<PostSummary> listPosts(const QString &status = QString(),
+                                 const QString &search = QString(),
+                                 bool onlyWithPassword = false,
+                                 QString *error = nullptr);
+    QList<PostSummary> resumeCandidates(QString *error = nullptr);
+    bool loadPostDetails(qint64 postId, PostDetails *details, QString *error = nullptr);
+
+    bool exportCsv(QTextStream &stream, bool includePasswords, QString *error = nullptr);
+    bool importLegacyCsv(const QString &path, QString *error = nullptr);
+
+private:
+    QString _dbPath;
+    bool _storePasswords;
+
+    bool _execSchema(QString *error);
+    bool _exec(const QString &sql, QString *error);
+    QString _connectionName() const;
+};
+
+#endif // POSTHISTORYSTORE_H

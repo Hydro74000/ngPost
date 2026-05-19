@@ -23,20 +23,34 @@
 #include "AutoPostWidget.h"
 #include "NgPost.h"
 #include "VpnSettingsDialog.h"
+#include "history/PostHistoryStore.h"
 #include "nntp/NntpServerParams.h"
 #include "nntp/NntpArticle.h"
 #include "vpn/VpnManager.h"
 
 #include <QCoreApplication>
+#include <QAbstractItemView>
 #include <QDebug>
 #include <QElapsedTimer>
 #include <QProgressBar>
 #include <QProgressDialog>
+#include <QTableWidget>
+#include <QTabWidget>
+#include <QVBoxLayout>
 #include <QLabel>
 #include <QScreen>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QStatusBar>
+#include <QtCharts/QBarSeries>
+#include <QtCharts/QBarSet>
+#include <QtCharts/QChart>
+#include <QtCharts/QChartView>
 #include "utils/UpdateChecker.h"
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+QT_CHARTS_USE_NAMESPACE
+#endif
 
 
 const QColor  MainWindow::sPostingColor = QColor(255,162, 0); // gold (#FFA200)
@@ -138,8 +152,10 @@ void MainWindow::init(NgPost *ngPost)
     tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
     _ui->postTabWidget->addTab(_autoPostTab, QIcon(":/icons/auto.png"), _ngPost->folderMonitoringName());
     tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
+    _ui->postTabWidget->addTab(_buildHistoryTab(), QIcon(":/icons/monitor.png"), tr("History"));
+    tabBar->setTabToolTip(2, tr("Post history, statistics and resume center"));
     _ui->postTabWidget->addTab(new QWidget(_ui->postTabWidget), QIcon(":/icons/plus.png"), tr("New"));
-    tabBar->setTabToolTip(2, QString("Create a new %1").arg(_ngPost->quickJobName()));
+    tabBar->setTabToolTip(3, QString("Create a new %1").arg(_ngPost->quickJobName()));
 
 //    connect(_ui->postTabWidget,           &QTabWidget::currentChanged, this, &MainWindow::onJobTabClicked);
     connect(tabBar, &QTabBar::tabBarClicked,              this, &MainWindow::onJobTabClicked);
@@ -231,8 +247,8 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
         int currentTabIdx = _ui->postTabWidget->currentIndex();
         if (currentTabIdx == 1)
             static_cast<AutoPostWidget*>(_ui->postTabWidget->currentWidget())->handleKeyEvent(keyEvent);
-        else if (currentTabIdx < _ui->postTabWidget->count() - 1)
-            static_cast<PostingWidget*>(_ui->postTabWidget->currentWidget())->handleKeyEvent(keyEvent);
+        else if (PostingWidget *postWidget = _getPostWidget(currentTabIdx))
+            postWidget->handleKeyEvent(keyEvent);
     }
     return QObject::eventFilter(obj, event);
 }
@@ -249,8 +265,8 @@ void MainWindow::dropEvent(QDropEvent *e)
     int currentTabIdx = _ui->postTabWidget->currentIndex();
     if (currentTabIdx == 1)
         _autoPostTab->handleDropEvent(e);
-    else if (currentTabIdx < _ui->postTabWidget->count() - 1)
-        static_cast<PostingWidget*>(_ui->postTabWidget->currentWidget())->handleDropEvent(e);
+    else if (PostingWidget *postWidget = _getPostWidget(currentTabIdx))
+        postWidget->handleDropEvent(e);
 }
 
 
@@ -324,10 +340,13 @@ void MainWindow::changeEvent(QEvent *event)
             tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
             tabBar->setTabText(1, _ngPost->folderMonitoringName());
             tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
-            for (int i = 2 ; i < lastTabIdx; ++i)
-                tabBar->setTabText(i, _ngPost->quickJobName());
+            tabBar->setTabText(2, tr("History"));
+            tabBar->setTabToolTip(2, tr("Post history, statistics and resume center"));
+            for (int i = 3 ; i < lastTabIdx; ++i)
+                if (_getPostWidget(i))
+                    tabBar->setTabText(i, _ngPost->quickJobName());
             tabBar->setTabText(lastTabIdx, tr("New"));
-            tabBar->setTabToolTip(2, QString("Create a new %1").arg(_ngPost->quickJobName()));
+            tabBar->setTabToolTip(lastTabIdx, QString("Create a new %1").arg(_ngPost->quickJobName()));
 
             setJobLabel(_ui->postTabWidget->currentIndex());
 
@@ -339,7 +358,8 @@ void MainWindow::changeEvent(QEvent *event)
             _quickJobTab->retranslate();
             _autoPostTab->retranslate();
             for (int i = 2 ; i < _ui->postTabWidget->count() - 1; ++i)
-                _getPostWidget(i)->retranslate();
+                if (PostingWidget *postWidget = _getPostWidget(i))
+                    postWidget->retranslate();
             break;
 
             // this event is send, if the system, language changes
@@ -676,6 +696,112 @@ QString MainWindow::fixedArchivePassword() const
     return QString();
 }
 
+QWidget *MainWindow::_buildHistoryTab()
+{
+    QWidget *root = new QWidget(_ui->postTabWidget);
+    QVBoxLayout *layout = new QVBoxLayout(root);
+
+    QLabel *banner = new QLabel(root);
+    banner->setVisible(false);
+    banner->setStyleSheet("QLabel { background: #fff3cd; color: #5c4300; padding: 6px; }");
+    layout->addWidget(banner);
+
+    QTabWidget *tabs = new QTabWidget(root);
+    QTableWidget *historyTable = new QTableWidget(tabs);
+    historyTable->setColumnCount(7);
+    historyTable->setHorizontalHeaderLabels({tr("ID"), tr("Date"), tr("Name"), tr("Status"),
+                                             tr("Size"), tr("Groups"), tr("Password")});
+    historyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    tabs->addTab(historyTable, tr("History"));
+
+    QChart *chart = new QChart();
+    chart->setTitle(tr("Posts by status"));
+    QChartView *chartView = new QChartView(chart, tabs);
+    tabs->addTab(chartView, tr("Stats"));
+
+    QTableWidget *resumeTable = new QTableWidget(tabs);
+    resumeTable->setColumnCount(5);
+    resumeTable->setHorizontalHeaderLabels({tr("ID"), tr("Name"), tr("Status"),
+                                            tr("Reason"), tr("Password")});
+    resumeTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    resumeTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    tabs->addTab(resumeTable, tr("Resume"));
+
+    layout->addWidget(tabs);
+    _refreshHistoryViews(historyTable, resumeTable);
+
+    int success = 0, partial = 0, failed = 0;
+    QString err;
+    const QList<PostHistoryStore::PostSummary> posts =
+        _ngPost->historyStore()->listPosts(QString(), QString(), false, &err);
+    for (const PostHistoryStore::PostSummary &post : posts) {
+        if (post.status == QStringLiteral("success"))
+            ++success;
+        else if (post.status == QStringLiteral("partial"))
+            ++partial;
+        else if (post.status == QStringLiteral("failed"))
+            ++failed;
+    }
+    QBarSet *set = new QBarSet(tr("Posts"));
+    *set << success << partial << failed;
+    QBarSeries *series = new QBarSeries(chart);
+    series->append(set);
+    chart->addSeries(series);
+    chart->createDefaultAxes();
+
+    const QList<PostHistoryStore::PostSummary> candidates = _ngPost->historyStore()->resumeCandidates();
+    if (!candidates.isEmpty()) {
+        banner->setText(tr("%1 posts can be resumed. Open the Resume tab to review them.")
+                            .arg(candidates.size()));
+        banner->setVisible(true);
+        statusBar()->showMessage(banner->text(), 10000);
+    }
+    return root;
+}
+
+void MainWindow::_refreshHistoryViews(QTableWidget *historyTable, QTableWidget *resumeTable)
+{
+    if (!_ngPost || !_ngPost->historyStore())
+        return;
+
+    QString err;
+    const QList<PostHistoryStore::PostSummary> posts =
+        _ngPost->historyStore()->listPosts(QString(), QString(), false, &err);
+    historyTable->setRowCount(posts.size());
+    for (int row = 0; row < posts.size(); ++row) {
+        const PostHistoryStore::PostSummary &p = posts.at(row);
+        const QStringList values = {
+            QString::number(p.id),
+            p.createdAt,
+            p.nzbName,
+            p.status,
+            QString::number(p.sizeBytes),
+            p.groups,
+            p.hasPassword ? QStringLiteral("***") : QString()
+        };
+        for (int col = 0; col < values.size(); ++col)
+            historyTable->setItem(row, col, new QTableWidgetItem(values.at(col)));
+    }
+    historyTable->resizeColumnsToContents();
+
+    const QList<PostHistoryStore::PostSummary> candidates = _ngPost->historyStore()->resumeCandidates(&err);
+    resumeTable->setRowCount(candidates.size());
+    for (int row = 0; row < candidates.size(); ++row) {
+        const PostHistoryStore::PostSummary &p = candidates.at(row);
+        const QStringList values = {
+            QString::number(p.id),
+            p.nzbName,
+            p.status,
+            p.resumeReason,
+            p.hasPassword ? QStringLiteral("***") : QString()
+        };
+        for (int col = 0; col < values.size(); ++col)
+            resumeTable->setItem(row, col, new QTableWidgetItem(values.at(col)));
+    }
+    resumeTable->resizeColumnsToContents();
+}
+
 PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &files)
 {
     if (!lastTabIdx)
@@ -841,7 +967,7 @@ int MainWindow::_serverRow(QObject *delButton)
 PostingWidget *MainWindow::_getPostWidget(int tabIndex) const
 {
     if(tabIndex > 1 && tabIndex < _ui->postTabWidget->count() - 1)
-        return static_cast<PostingWidget*>(_ui->postTabWidget->widget(tabIndex));
+        return qobject_cast<PostingWidget*>(_ui->postTabWidget->widget(tabIndex));
     else
         return nullptr;
 }
@@ -974,6 +1100,8 @@ void MainWindow::onCloseJob(int index)
     if (index > 1 && index < nbJob )
     {
         PostingWidget *postWidget = _getPostWidget(index);
+        if (!postWidget)
+            return;
         if (postWidget->isPosting())
         {
             QMessageBox::warning(this,
