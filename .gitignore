@@ -603,6 +603,7 @@ src/qmake_qmake_immediate.qrc
 .claude/scheduled_tasks.lock
 src/.qmake.stash
 src/ngPost
+src/ui_*.h
 src/qmake_qmake_immediate_rc.py
 src/resources/resources_rc.py
 .claude/

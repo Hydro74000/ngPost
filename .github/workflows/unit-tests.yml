@@ -1,4 +1,4 @@
-name: Build
+name: Unit Tests
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   linux:
-    name: Linux app
+    name: Linux unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,29 +31,58 @@ jobs:
           cmake --build /tmp/qtkeychain/build -j"$(nproc)"
           cmake --install /tmp/qtkeychain/build
 
-      - name: Compile translations
+      - name: Build ngPost for CLI parser tests
         run: |
           cd src
           mkdir -p resources/lang
           for ts in lang/ngPost_*.ts; do
             lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
           done
-
-      - name: Build
-        run: |
-          mkdir -p build/linux
-          cd build/linux
-          qmake ../../src/ngPost.pro CONFIG+=release
+          qmake ngPost.pro CONFIG+=release
           make -j"$(nproc)"
 
-      - name: Upload binary
+      - name: Build unit tests
+        run: |
+          cd tests/unit
+          qmake unit.pro CONFIG+=release
+          make -j"$(nproc)"
+
+      - name: Run unit tests
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -e
+          fail=0
+          found=0
+          for t in tests/unit/tst_*/tst_*; do
+            [ -x "$t" ] || continue
+            found=$((found+1))
+            echo "::group::$(basename "$t")"
+            "$t" || fail=$((fail+1))
+            echo "::endgroup::"
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No unit test binaries found"
+            exit 1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::$fail unit test binary/binaries failed"
+            exit 1
+          fi
+
+      - name: Upload logs on failure
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ngPost-linux
-          path: build/linux/ngPost
+          name: unit-test-logs-linux
+          path: |
+            tests/unit/**/*.log
+            tests/unit/**/Testing/**/*.xml
+          if-no-files-found: ignore
 
   windows-mingw:
-    name: Windows MinGW app
+    name: Windows MinGW unit tests
     runs-on: windows-latest
     defaults:
       run:
@@ -86,67 +115,53 @@ jobs:
           cmake --build /tmp/qtkeychain/build -j2
           cmake --install /tmp/qtkeychain/build
 
-      - name: Compile translations
+      - name: Build ngPost for CLI parser tests
         run: |
           cd src
           mkdir -p resources/lang
           for ts in lang/ngPost_*.ts; do
             /mingw64/bin/lrelease.exe "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
           done
-
-      - name: Build
-        run: |
-          mkdir -p build/windows
-          cp src/ngPost.ico build/windows/
-          cd build/windows
+          mkdir -p ../build/windows
+          cp ngPost.ico ../build/windows/
+          cd ../build/windows
           /mingw64/bin/qmake6.exe ../../src/ngPost.pro CONFIG+=release
           /mingw64/bin/mingw32-make.exe -j2
 
-      - name: Upload binary
+      - name: Build unit tests
+        run: |
+          cd tests/unit
+          /mingw64/bin/qmake6.exe unit.pro CONFIG+=release
+          /mingw64/bin/mingw32-make.exe -j2
+
+      - name: Run unit tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          export NGPOST_BIN="$(cygpath -w "$(pwd)/build/windows/release/ngPost.exe")"
+          fail=0
+          found=0
+          while IFS= read -r t; do
+            found=$((found+1))
+            echo "::group::$(basename "$t")"
+            "$t" || fail=$((fail+1))
+            echo "::endgroup::"
+          done < <(find tests/unit -type f -name 'tst_*.exe')
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No unit test binaries found"
+            exit 1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::$fail unit test binary/binaries failed"
+            exit 1
+          fi
+
+      - name: Upload logs on failure
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ngPost-windows-mingw
-          path: build/windows/release/ngPost.exe
-
-  macos:
-    name: macOS app
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.8.2'
-          arch: 'clang_64'
-          modules: 'qtcharts'
-
-      - name: Build QtKeychain
-        run: |
-          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
-          cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
-                -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
-                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
-          cmake --build /tmp/qtkeychain/build -j"$(sysctl -n hw.ncpu)"
-          cmake --install /tmp/qtkeychain/build
-
-      - name: Compile translations
-        run: |
-          cd src
-          mkdir -p resources/lang
-          for ts in lang/ngPost_*.ts; do
-            lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
-          done
-
-      - name: Build
-        run: |
-          mkdir -p build/macos
-          cd build/macos
-          qmake ../../src/ngPost.pro CONFIG+=release
-          make -j"$(sysctl -n hw.ncpu)"
-
-      - name: Upload binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: ngPost-macos
-          path: build/macos/ngPost.app/Contents/MacOS/ngPost
+          name: unit-test-logs-windows
+          path: |
+            tests/unit/**/*.log
+            tests/unit/**/Testing/**/*.xml
+          if-no-files-found: ignore

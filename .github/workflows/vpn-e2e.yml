@@ -6,7 +6,6 @@ name: VPN E2E
 
 on:
   push:
-    branches: [master, devel, main, 'phase*']
   pull_request:
   workflow_dispatch:
   schedule:
@@ -34,6 +33,7 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+          modules: 'qtcharts'
 
       - name: Build QtKeychain from source
         run: |
@@ -61,8 +61,8 @@ jobs:
 
       - name: Build tests
         run: |
-          cd tests
-          qmake tests.pro CONFIG+=release
+          cd tests/vpn
+          qmake vpn.pro CONFIG+=release
           make -j$(nproc)
 
       - name: Verify WireGuard module + passwordless sudo
@@ -93,12 +93,18 @@ jobs:
         run: |
           set -e
           fail=0
+          found=0
           for t in tests/vpn/tst_*/tst_*; do
             [ -x "$t" ] || continue
+            found=$((found+1))
             echo "::group::$(basename "$t")"
             "$t" || fail=$((fail+1))
             echo "::endgroup::"
           done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No VPN E2E test binaries found"
+            exit 1
+          fi
           if [ "$fail" -ne 0 ]; then
             echo "::error::$fail VPN E2E test binary/binaries failed"
             exit 1

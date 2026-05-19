@@ -45,7 +45,7 @@ void TestPostHistory::sqlite_lifecycle_and_resume_states()
     const QString sourcePath = dir.filePath(QStringLiteral("payload.bin"));
     QFile source(sourcePath);
     QVERIFY(source.open(QIODevice::WriteOnly));
-    source.write(QByteArray(8, 'x'));
+    source.write(QByteArray(12, 'x'));
     source.close();
 
     QFileInfo sourceInfo(sourcePath);
@@ -56,7 +56,7 @@ void TestPostHistory::sqlite_lifecycle_and_resume_states()
     file.postedName = sourceInfo.fileName();
     file.sizeBytes = sourceInfo.size();
     file.mtimeEpoch = sourceInfo.lastModified().toSecsSinceEpoch();
-    file.totalArticles = 2;
+    file.totalArticles = 3;
     file.groups = post.groups;
     const qint64 fileId = store.upsertFile(file, &err);
     QVERIFY2(fileId > 0, qPrintable(err));
@@ -77,10 +77,19 @@ void TestPostHistory::sqlite_lifecycle_and_resume_states()
     QVERIFY2(store.markArticlePosting(fileId, 2, QStringLiteral("ok@ngpost"), 1, &err), qPrintable(err));
     QVERIFY2(store.markArticlePosted(fileId, 2, QStringLiteral("ok@ngpost"), &err), qPrintable(err));
 
+    PostHistoryStore::ArticleRecord a3 = a1;
+    a3.part = 3;
+    QVERIFY2(store.upsertArticle(a3, &err), qPrintable(err));
+    QVERIFY2(store.markArticlePosting(fileId, 3, QStringLiteral("ko@ngpost"), 1, &err), qPrintable(err));
+    QVERIFY2(store.markArticleFailed(fileId, 3, QStringLiteral("ko@ngpost"),
+                                     QStringLiteral("server rejected"), &err),
+             qPrintable(err));
+
     ResumePlanner planner(&store);
     const ResumePlanner::Decision d = planner.check(postId, &err);
     QCOMPARE(d.state, ResumePlanner::ResumeState::PartiallyResumable);
     QCOMPARE(d.postedArticles, 1);
+    QCOMPARE(d.failedArticles, 1);
     QCOMPARE(d.unknownArticles, 1);
 }
 

@@ -3128,10 +3128,11 @@ void NgPost::_syntax(char *appName)
         else if (opt.names().first() == sOptionNames[Opt::VPN])
             _cout << "\n// " << tr("VPN overrides (one-shot, not saved to config)") << "\n";
 
-        if (opt.names().size() == 1)
-            _cout << QString("\t--%1: %2\n").arg(opt.names().first(), -17).arg(tr(opt.description().toLocal8Bit().constData()));
-        else
-            _cout << QString("\t-%1: %2\n").arg(opt.names().join(" or --"), -18).arg(tr(opt.description().toLocal8Bit().constData()));
+        QStringList optionNames;
+        for (const QString &name : opt.names())
+            optionNames << QStringLiteral("%1%2").arg(name.size() == 1 ? QStringLiteral("-") : QStringLiteral("--"), name);
+        _cout << QString("\t%1: %2\n").arg(optionNames.join(QStringLiteral(" or ")), -22)
+                                      .arg(tr(opt.description().toLocal8Bit().constData()));
     }
 
     _cout << "\n" << tr("Examples:") << "\n"

@@ -592,7 +592,7 @@ bool PostHistoryStore::markArticlePosted(qint64 fileId, int part, const QString 
     QSqlQuery q(db);
     q.prepare(QStringLiteral("UPDATE post_article_attempts SET status='posted',"
                              "finished_at=? WHERE file_id=? AND part=? AND msg_id=?"
-                             "AND status='posting'"));
+                             " AND status='posting'"));
     q.addBindValue(nowIso());
     q.addBindValue(fileId);
     q.addBindValue(part);
@@ -629,7 +629,7 @@ bool PostHistoryStore::markArticleFailed(qint64 fileId,
     QSqlQuery q(db);
     q.prepare(QStringLiteral("UPDATE post_article_attempts SET status='failed',"
                              "error=?, finished_at=? WHERE file_id=? AND part=?"
-                             "AND msg_id=? AND status='posting'"));
+                             " AND msg_id=? AND status='posting'"));
     q.addBindValue(err);
     q.addBindValue(nowIso());
     q.addBindValue(fileId);
@@ -667,7 +667,7 @@ bool PostHistoryStore::markArticleUnknown(qint64 fileId,
     QSqlQuery q(db);
     q.prepare(QStringLiteral("UPDATE post_article_attempts SET status='unknown',"
                              "error=?, finished_at=? WHERE file_id=? AND part=?"
-                             "AND msg_id=? AND status='posting'"));
+                             " AND msg_id=? AND status='posting'"));
     q.addBindValue(err);
     q.addBindValue(nowIso());
     q.addBindValue(fileId);
