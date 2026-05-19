@@ -5,7 +5,7 @@ Commit: `de8defc`
 
 ## En cours
 
-- [ ] Analyse/correction des echecs GitHub Actions apres push
+_Aucun bloc en cours._
 
 ## A faire
 
@@ -35,6 +35,7 @@ Commit: `de8defc`
 - [x] Commit validation/CI associe: `a233b7d` (`Fix LevelUp validation and CI workflows`)
 - [x] Push effectue vers `origin/levelup`
 - [x] GitHub Actions premiere passe: GUI et VPN OK, build/unit/integration KO sur QtKeychain Windows
+- [x] GitHub Actions corrigees: build, unit tests, integration tests, GUI, VPN E2E OK sur `cc69baa`
 
 ## Journal
 
@@ -50,3 +51,4 @@ Commit: `de8defc`
 - 2026-05-19T18:35:00+02:00: branche `levelup` poussee sur `origin/levelup`.
 - 2026-05-19T18:50:00+02:00: logs GitHub Actions analyses; les echecs Windows viennent de QtKeychain `messages`/traductions (`Error -1073741515`) avant build ngPost.
 - 2026-05-19T19:00:00+02:00: deuxieme blocage GitHub Actions: QtKeychain Windows compile avec l'option MSVC `/utf-8`; patch workflow ajoute une substitution vers flags GCC UTF-8.
+- 2026-05-19T19:15:00+02:00: dernier commit CI fonctionnel `cc69baa`; workflows GitHub OK: Development Project Build, Unit Tests, Integration Tests, GUI Tests, VPN E2E.
