@@ -390,6 +390,7 @@ void MainWindow::changeEvent(QEvent *event)
             for (int i = 2 ; i < _ui->postTabWidget->count() - 1; ++i)
                 if (PostingWidget *postWidget = _getPostWidget(i))
                     postWidget->retranslate();
+            _retranslateHistoryTab();
             break;
 
             // this event is send, if the system, language changes
@@ -768,6 +769,124 @@ static QColor statusColor(const QString &status)
 
 } // namespace
 
+void MainWindow::_retranslateHistoryTab()
+{
+    if (!_innerHistoryTabs)
+        return;
+
+    // Inner tab labels
+    _innerHistoryTabs->setTabText(0, tr("History"));
+    _innerHistoryTabs->setTabText(1, tr("Stats"));
+    _innerHistoryTabs->setTabText(2, tr("Resume"));
+
+    // Banner
+    if (_bannerLabel && _bannerLabel->isVisible()) {
+        // Re-emit the count from the current text is fragile; just retranslate the format.
+        // The actual count will be refreshed next time _buildHistoryTab triggers the banner.
+    }
+    if (_bannerResumeBtn)
+        _bannerResumeBtn->setText(tr("Open Resume \342\206\222"));
+
+    // History filter row 1
+    if (_histSearchLabel)  _histSearchLabel->setText(tr("Search:"));
+    if (_histStatusLabel)  _histStatusLabel->setText(tr("Status:"));
+    if (_histRefreshBtn)   _histRefreshBtn->setText(tr("Refresh"));
+    if (_histExportCsvBtn) _histExportCsvBtn->setText(tr("Export CSV\342\200\246"));
+    if (_historySearchEdit)
+        _historySearchEdit->setPlaceholderText(tr("Search name, NZB, archive\342\200\246"));
+    if (_historyStatusFilter) {
+        const int cur = _historyStatusFilter->currentIndex();
+        _historyStatusFilter->setItemText(0, tr("All statuses"));
+        _historyStatusFilter->setCurrentIndex(cur);
+    }
+    if (_historyPassFilter)  _historyPassFilter->setText(tr("Has password"));
+
+    // History filter row 2
+    if (_histFromLabel)  _histFromLabel->setText(tr("From:"));
+    if (_histToLabel)    _histToLabel->setText(tr("To:"));
+    if (_histGroupLabel) _histGroupLabel->setText(tr("Group:"));
+    if (_historyGroupEdit)
+        _historyGroupEdit->setPlaceholderText(tr("Group filter\342\200\246"));
+    if (_historyErrorsFilter) _historyErrorsFilter->setText(tr("Has errors"));
+    if (_histClearBtn) {
+        _histClearBtn->setText(tr("Clear"));
+        _histClearBtn->setToolTip(tr("Clear all filters"));
+    }
+    if (_historyDateFrom) _historyDateFrom->setSpecialValueText(tr("Any date"));
+    if (_historyDateTo)   _historyDateTo->setSpecialValueText(tr("Any date"));
+
+    // History table headers
+    if (_historyTable)
+        _historyTable->setHorizontalHeaderLabels({
+            tr("Date"), tr("Name"), tr("Status"), tr("Size"), tr("Speed"),
+            tr("Files"), tr("Articles"), tr("Failed"), tr("Groups"), tr("Password"), tr("NZB path")});
+
+    // History detail panel
+    if (_historyDetailInfo && _historyDetailInfo->text().contains("Select a post"))
+        _historyDetailInfo->setText(tr("<i>Select a post to see its details.</i>"));
+    if (_histRegenNzbBtn)  _histRegenNzbBtn->setText(tr("Regenerate NZB\342\200\246"));
+    if (_histCopyPassBtn)  _histCopyPassBtn->setText(tr("Copy password"));
+    if (_histPurgePassBtn) _histPurgePassBtn->setText(tr("Purge password"));
+    if (_histOpenNzbBtn)   _histOpenNzbBtn->setText(tr("Open NZB location"));
+    if (_histDeleteBtn)    _histDeleteBtn->setText(tr("Delete entry"));
+
+    // Stats filter bar
+    if (_statsPeriodLabel) _statsPeriodLabel->setText(tr("Period:"));
+    if (_statsGroupLabel)  _statsGroupLabel->setText(tr("Group:"));
+    if (_statsRefreshBtn)  _statsRefreshBtn->setText(tr("Refresh"));
+    if (_statsPeriodFilter) {
+        const int cur = _statsPeriodFilter->currentIndex();
+        _statsPeriodFilter->setItemText(0, tr("Last 7 days"));
+        _statsPeriodFilter->setItemText(1, tr("Last 30 days"));
+        _statsPeriodFilter->setItemText(2, tr("Last 90 days"));
+        _statsPeriodFilter->setItemText(3, tr("This year"));
+        _statsPeriodFilter->setItemText(4, tr("All time"));
+        _statsPeriodFilter->setCurrentIndex(cur);
+    }
+    if (_statsGroupFilter && _statsGroupFilter->count() > 0)
+        _statsGroupFilter->setItemText(0, tr("All groups"));
+
+    // Stats inner tabs
+    if (_statsInnerTabs) {
+        _statsInnerTabs->setTabText(0, tr("Timeline"));
+        _statsInnerTabs->setTabText(1, tr("By group"));
+        _statsInnerTabs->setTabText(2, tr("Top posts"));
+    }
+    if (_statsTimelineChart) _statsTimelineChart->setTitle(tr("Volume and failures per day"));
+    if (_statsGroupChart)    _statsGroupChart->setTitle(tr("Posts by newsgroup"));
+    if (_statsTopTable)
+        _statsTopTable->setHorizontalHeaderLabels({
+            tr("Name"), tr("Date"), tr("Size"), tr("Status"), tr("Groups")});
+
+    // Resume tab
+    if (_resumeDetailInfo && _resumeDetailInfo->text().contains("Select a post"))
+        _resumeDetailInfo->setText(tr("<i>Select a post to see resume details.</i>"));
+    if (_resumeTable)
+        _resumeTable->setHorizontalHeaderLabels({
+            tr("Name"), tr("Status"), tr("Posted"), tr("To repost"), tr("Unknown"), tr("Reason")});
+    if (_resumeResumeBtn) {
+        _resumeResumeBtn->setText(tr("Resume"));
+        _resumeResumeBtn->setToolTip(tr("Resume posting the selected post(s) from where they stopped"));
+    }
+    if (_resumeAbandonBtn) {
+        _resumeAbandonBtn->setText(tr("Abandon"));
+        _resumeAbandonBtn->setToolTip(tr("Mark selected post(s) as abandoned (keep history entry)"));
+    }
+    if (_resumePurgeBtn) {
+        _resumePurgeBtn->setText(tr("Purge resume data"));
+        _resumePurgeBtn->setToolTip(tr("Delete the technical resume data for selected post(s)"));
+    }
+    if (_resumeIgnoreBtn) {
+        _resumeIgnoreBtn->setText(tr("Ignore (session)"));
+        _resumeIgnoreBtn->setToolTip(tr("Hide selected post(s) from this view for this session"));
+    }
+    if (_resumeDeleteBtn) {
+        _resumeDeleteBtn->setText(tr("Delete entry"));
+        _resumeDeleteBtn->setToolTip(tr("Permanently delete selected post(s) from the history database"));
+    }
+    if (_resumeRefreshBtn) _resumeRefreshBtn->setText(tr("Refresh"));
+}
+
 QWidget *MainWindow::_buildHistoryTab()
 {
     QWidget *root = new QWidget(_ui->postTabWidget);
@@ -775,18 +894,18 @@ QWidget *MainWindow::_buildHistoryTab()
     rootLayout->setContentsMargins(4, 4, 4, 4);
 
     // Banner: shown when resumable posts exist
-    QLabel *banner = new QLabel(root);
-    banner->setVisible(false);
-    banner->setStyleSheet(
+    _bannerLabel = new QLabel(root);
+    _bannerLabel->setVisible(false);
+    _bannerLabel->setStyleSheet(
         "QLabel { border: 2px solid #FFA200; color: palette(windowText); "
         "padding: 6px; border-radius: 4px; }");
-    QPushButton *bannerResumeBtn = new QPushButton(tr("Open Resume \342\206\222"), root);
-    bannerResumeBtn->setFlat(true);
-    bannerResumeBtn->setCursor(Qt::PointingHandCursor);
-    bannerResumeBtn->setVisible(false);
+    _bannerResumeBtn = new QPushButton(tr("Open Resume \342\206\222"), root);
+    _bannerResumeBtn->setFlat(true);
+    _bannerResumeBtn->setCursor(Qt::PointingHandCursor);
+    _bannerResumeBtn->setVisible(false);
     QHBoxLayout *bannerRow = new QHBoxLayout();
-    bannerRow->addWidget(banner, 1);
-    bannerRow->addWidget(bannerResumeBtn);
+    bannerRow->addWidget(_bannerLabel, 1);
+    bannerRow->addWidget(_bannerResumeBtn);
     rootLayout->addLayout(bannerRow);
 
     _innerHistoryTabs = new QTabWidget(root);
@@ -811,15 +930,17 @@ QWidget *MainWindow::_buildHistoryTab()
                                     QStringLiteral("posting"),
                                     QStringLiteral("unknown")});
     _historyPassFilter = new QCheckBox(tr("Has password"), histTab);
-    QPushButton *refreshBtn   = new QPushButton(tr("Refresh"), histTab);
-    QPushButton *exportCsvBtn = new QPushButton(tr("Export CSV\342\200\246"), histTab);
-    filterRow1->addWidget(new QLabel(tr("Search:"), histTab));
+    _histRefreshBtn   = new QPushButton(tr("Refresh"), histTab);
+    _histExportCsvBtn = new QPushButton(tr("Export CSV\342\200\246"), histTab);
+    _histSearchLabel = new QLabel(tr("Search:"), histTab);
+    filterRow1->addWidget(_histSearchLabel);
     filterRow1->addWidget(_historySearchEdit, 1);
-    filterRow1->addWidget(new QLabel(tr("Status:"), histTab));
+    _histStatusLabel = new QLabel(tr("Status:"), histTab);
+    filterRow1->addWidget(_histStatusLabel);
     filterRow1->addWidget(_historyStatusFilter);
     filterRow1->addWidget(_historyPassFilter);
-    filterRow1->addWidget(refreshBtn);
-    filterRow1->addWidget(exportCsvBtn);
+    filterRow1->addWidget(_histRefreshBtn);
+    filterRow1->addWidget(_histExportCsvBtn);
     histLayout->addLayout(filterRow1);
 
     // Filter row 2: date range / group / errors
@@ -844,17 +965,20 @@ QWidget *MainWindow::_buildHistoryTab()
 
     _historyErrorsFilter = new QCheckBox(tr("Has errors"), histTab);
 
-    QPushButton *clearBtn = new QPushButton(tr("Clear"), histTab);
-    clearBtn->setToolTip(tr("Clear all filters"));
+    _histClearBtn = new QPushButton(tr("Clear"), histTab);
+    _histClearBtn->setToolTip(tr("Clear all filters"));
 
-    filterRow2->addWidget(new QLabel(tr("From:"), histTab));
+    _histFromLabel  = new QLabel(tr("From:"), histTab);
+    _histToLabel    = new QLabel(tr("To:"), histTab);
+    _histGroupLabel = new QLabel(tr("Group:"), histTab);
+    filterRow2->addWidget(_histFromLabel);
     filterRow2->addWidget(_historyDateFrom);
-    filterRow2->addWidget(new QLabel(tr("To:"), histTab));
+    filterRow2->addWidget(_histToLabel);
     filterRow2->addWidget(_historyDateTo);
-    filterRow2->addWidget(new QLabel(tr("Group:"), histTab));
+    filterRow2->addWidget(_histGroupLabel);
     filterRow2->addWidget(_historyGroupEdit);
     filterRow2->addWidget(_historyErrorsFilter);
-    filterRow2->addWidget(clearBtn);
+    filterRow2->addWidget(_histClearBtn);
     filterRow2->addStretch();
     histLayout->addLayout(filterRow2);
 
@@ -939,18 +1063,20 @@ QWidget *MainWindow::_buildHistoryTab()
     _statsPeriodFilter->setCurrentIndex(1);
     _statsGroupFilter = new QComboBox(statsTab);
     _statsGroupFilter->addItem(tr("All groups"));
-    QPushButton *statsRefreshBtn = new QPushButton(tr("Refresh"), statsTab);
-    statsFilterBar->addWidget(new QLabel(tr("Period:"), statsTab));
+    _statsRefreshBtn = new QPushButton(tr("Refresh"), statsTab);
+    _statsPeriodLabel = new QLabel(tr("Period:"), statsTab);
+    _statsGroupLabel  = new QLabel(tr("Group:"), statsTab);
+    statsFilterBar->addWidget(_statsPeriodLabel);
     statsFilterBar->addWidget(_statsPeriodFilter);
-    statsFilterBar->addWidget(new QLabel(tr("Group:"), statsTab));
+    statsFilterBar->addWidget(_statsGroupLabel);
     statsFilterBar->addWidget(_statsGroupFilter);
-    statsFilterBar->addWidget(statsRefreshBtn);
+    statsFilterBar->addWidget(_statsRefreshBtn);
     statsFilterBar->addStretch();
     statsLayout->addLayout(statsFilterBar);
 
     // Stats inner tabs: Timeline / By group / Top posts
-    QTabWidget *statsInnerTabs = new QTabWidget(statsTab);
-    statsLayout->addWidget(statsInnerTabs, 1);
+    _statsInnerTabs = new QTabWidget(statsTab);
+    statsLayout->addWidget(_statsInnerTabs, 1);
 
     const QChart::ChartTheme chartTheme = isDarkMode()
                                               ? QChart::ChartThemeDark
@@ -962,7 +1088,7 @@ QWidget *MainWindow::_buildHistoryTab()
     _statsTimelineChart->legend()->setVisible(true);
     QChartView *timelineView = new QChartView(_statsTimelineChart, statsTab);
     timelineView->setRenderHint(QPainter::Antialiasing);
-    statsInnerTabs->addTab(timelineView, tr("Timeline"));
+    _statsInnerTabs->addTab(timelineView, tr("Timeline"));
 
     _statsGroupChart = new QChart();
     _statsGroupChart->setTheme(chartTheme);
@@ -970,7 +1096,7 @@ QWidget *MainWindow::_buildHistoryTab()
     _statsGroupChart->legend()->setVisible(false);
     QChartView *groupView = new QChartView(_statsGroupChart, statsTab);
     groupView->setRenderHint(QPainter::Antialiasing);
-    statsInnerTabs->addTab(groupView, tr("By group"));
+    _statsInnerTabs->addTab(groupView, tr("By group"));
 
     _statsTopTable = new QTableWidget(statsTab);
     _statsTopTable->setColumnCount(5);
@@ -981,7 +1107,7 @@ QWidget *MainWindow::_buildHistoryTab()
     _statsTopTable->setSelectionMode(QAbstractItemView::SingleSelection);
     _statsTopTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     _statsTopTable->verticalHeader()->hide();
-    statsInnerTabs->addTab(_statsTopTable, tr("Top posts"));
+    _statsInnerTabs->addTab(_statsTopTable, tr("Top posts"));
 
     _innerHistoryTabs->addTab(statsTab, tr("Stats"));
 
@@ -1012,7 +1138,7 @@ QWidget *MainWindow::_buildHistoryTab()
     _resumePurgeBtn   = new QPushButton(tr("Purge resume data"), resumeTab);
     _resumeIgnoreBtn  = new QPushButton(tr("Ignore (session)"), resumeTab);
     _resumeDeleteBtn  = new QPushButton(tr("Delete entry"), resumeTab);
-    QPushButton *resumeRefreshBtn = new QPushButton(tr("Refresh"), resumeTab);
+    _resumeRefreshBtn = new QPushButton(tr("Refresh"), resumeTab);
     _resumeResumeBtn->setToolTip(tr("Resume posting the selected post(s) from where they stopped"));
     _resumeAbandonBtn->setToolTip(tr("Mark selected post(s) as abandoned (keep history entry)"));
     _resumePurgeBtn->setToolTip(tr("Delete the technical resume data for selected post(s)"));
@@ -1028,15 +1154,15 @@ QWidget *MainWindow::_buildHistoryTab()
     resumeActions->addWidget(_resumeIgnoreBtn);
     resumeActions->addStretch();
     resumeActions->addWidget(_resumeDeleteBtn);
-    resumeActions->addWidget(resumeRefreshBtn);
+    resumeActions->addWidget(_resumeRefreshBtn);
     resumeLayout->addLayout(resumeActions);
 
     _innerHistoryTabs->addTab(resumeTab, tr("Resume"));
 
     // ===== Connect signals =====
-    connect(refreshBtn,           &QPushButton::clicked,  this, &MainWindow::_onHistoryRefresh);
-    connect(resumeRefreshBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryRefresh);
-    connect(exportCsvBtn,         &QPushButton::clicked,  this, &MainWindow::_onHistoryExportCsv);
+    connect(_histRefreshBtn,      &QPushButton::clicked,  this, &MainWindow::_onHistoryRefresh);
+    connect(_resumeRefreshBtn,    &QPushButton::clicked,  this, &MainWindow::_onHistoryRefresh);
+    connect(_histExportCsvBtn,    &QPushButton::clicked,  this, &MainWindow::_onHistoryExportCsv);
     connect(_historySearchEdit,   &QLineEdit::returnPressed, this, &MainWindow::_onHistoryRefresh);
     connect(_historyStatusFilter, qOverload<int>(&QComboBox::currentIndexChanged),
             this, &MainWindow::_onHistoryRefresh);
@@ -1045,7 +1171,7 @@ QWidget *MainWindow::_buildHistoryTab()
     connect(_historyDateFrom,     &QDateEdit::dateChanged, this, &MainWindow::_onHistoryRefresh);
     connect(_historyDateTo,       &QDateEdit::dateChanged, this, &MainWindow::_onHistoryRefresh);
     connect(_historyGroupEdit,    &QLineEdit::returnPressed, this, &MainWindow::_onHistoryRefresh);
-    connect(clearBtn,             &QPushButton::clicked,  this, [this]() {
+    connect(_histClearBtn,        &QPushButton::clicked,  this, [this]() {
         _historySearchEdit->clear();
         _historyStatusFilter->setCurrentIndex(0);
         _historyPassFilter->setChecked(false);
@@ -1064,7 +1190,7 @@ QWidget *MainWindow::_buildHistoryTab()
     connect(_histOpenNzbBtn,      &QPushButton::clicked,  this, &MainWindow::_onHistoryOpenNzb);
     connect(_historyTable,        &QTableWidget::customContextMenuRequested,
             this, &MainWindow::_onHistoryContextMenu);
-    connect(statsRefreshBtn,      &QPushButton::clicked,  this, &MainWindow::_onStatsRefresh);
+    connect(_statsRefreshBtn,     &QPushButton::clicked,  this, &MainWindow::_onStatsRefresh);
     connect(_statsPeriodFilter,   qOverload<int>(&QComboBox::currentIndexChanged),
             this, &MainWindow::_onStatsRefresh);
     connect(_statsGroupFilter,    qOverload<int>(&QComboBox::currentIndexChanged),
@@ -1076,7 +1202,7 @@ QWidget *MainWindow::_buildHistoryTab()
     connect(_resumePurgeBtn,      &QPushButton::clicked,  this, &MainWindow::_onResumePurge);
     connect(_resumeIgnoreBtn,     &QPushButton::clicked,  this, &MainWindow::_onResumeIgnore);
     connect(_resumeDeleteBtn,     &QPushButton::clicked,  this, &MainWindow::_onResumeDeleteEntries);
-    connect(bannerResumeBtn,      &QPushButton::clicked,  this, [this]() {
+    connect(_bannerResumeBtn,     &QPushButton::clicked,  this, [this]() {
         _innerHistoryTabs->setCurrentIndex(2);
     });
 
@@ -1089,9 +1215,9 @@ QWidget *MainWindow::_buildHistoryTab()
         if (store) {
             const QList<PostHistoryStore::PostSummary> candidates = store->resumeCandidates();
             if (!candidates.isEmpty()) {
-                banner->setText(tr("%1 post(s) can be resumed.").arg(candidates.size()));
-                banner->setVisible(true);
-                bannerResumeBtn->setVisible(true);
+                _bannerLabel->setText(tr("%1 post(s) can be resumed.").arg(candidates.size()));
+                _bannerLabel->setVisible(true);
+                _bannerResumeBtn->setVisible(true);
                 statusBar()->showMessage(
                     tr("%1 post(s) can be resumed. Open the Resume tab to review them.")
                         .arg(candidates.size()), 10000);

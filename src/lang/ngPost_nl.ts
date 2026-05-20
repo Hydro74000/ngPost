@@ -987,6 +987,222 @@ De taak blijft in de wachtrij.</translation>
         <source>VPN: failed</source>
         <translation>VPN: mislukt</translation>
     </message>
+    <message>
+        <source>Open Resume â</source>
+        <translation>Hervattingen openen →</translation>
+    </message>
+    <message>
+        <source>All statuses</source>
+        <translation>Alle statussen</translation>
+    </message>
+    <message>
+        <source>Has password</source>
+        <translation>Met wachtwoord</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>Vernieuwen</translation>
+    </message>
+    <message>
+        <source>Export CSVâ¦</source>
+        <translation>CSV exporteren…</translation>
+    </message>
+    <message>
+        <source>Search name, NZB, archiveâ¦</source>
+        <translation>Naam, NZB, archief zoeken…</translation>
+    </message>
+    <message>
+        <source>Search:</source>
+        <translation>Zoeken:</translation>
+    </message>
+    <message>
+        <source>Status:</source>
+        <translation>Status:</translation>
+    </message>
+    <message>
+        <source>Any date</source>
+        <translation>Elke datum</translation>
+    </message>
+    <message>
+        <source>Group filterâ¦</source>
+        <translation>Groepsfilter…</translation>
+    </message>
+    <message>
+        <source>Has errors</source>
+        <translation>Met fouten</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>Wissen</translation>
+    </message>
+    <message>
+        <source>Clear all filters</source>
+        <translation>Alle filters wissen</translation>
+    </message>
+    <message>
+        <source>From:</source>
+        <translation>Van:</translation>
+    </message>
+    <message>
+        <source>To:</source>
+        <translation>Tot:</translation>
+    </message>
+    <message>
+        <source>Group:</source>
+        <translation>Groep:</translation>
+    </message>
+    <message>
+        <source>Date</source>
+        <translation>Datum</translation>
+    </message>
+    <message>
+        <source>Speed</source>
+        <translation>Snelheid</translation>
+    </message>
+    <message>
+        <source>NZB path</source>
+        <translation>NZB-pad</translation>
+    </message>
+    <message>
+        <source>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</source>
+        <translation>&lt;i&gt;Selecteer een post om de details te zien.&lt;/i&gt;</translation>
+    </message>
+    <message>
+        <source>Regenerate NZBâ¦</source>
+        <translation>NZB regenereren…</translation>
+    </message>
+    <message>
+        <source>Copy password</source>
+        <translation>Wachtwoord kopiëren</translation>
+    </message>
+    <message>
+        <source>Purge password</source>
+        <translation>Wachtwoord wissen</translation>
+    </message>
+    <message>
+        <source>Open NZB location</source>
+        <translation>NZB-locatie openen</translation>
+    </message>
+    <message>
+        <source>Delete entry</source>
+        <translation>Item verwijderen</translation>
+    </message>
+    <message>
+        <source>History</source>
+        <translation>Geschiedenis</translation>
+    </message>
+    <message>
+        <source>Last 7 days</source>
+        <translation>Laatste 7 dagen</translation>
+    </message>
+    <message>
+        <source>Last 30 days</source>
+        <translation>Laatste 30 dagen</translation>
+    </message>
+    <message>
+        <source>Last 90 days</source>
+        <translation>Laatste 90 dagen</translation>
+    </message>
+    <message>
+        <source>This year</source>
+        <translation>Dit jaar</translation>
+    </message>
+    <message>
+        <source>All time</source>
+        <translation>Altijd</translation>
+    </message>
+    <message>
+        <source>All groups</source>
+        <translation>Alle groepen</translation>
+    </message>
+    <message>
+        <source>Volume and failures per day</source>
+        <translation>Volume en fouten per dag</translation>
+    </message>
+    <message>
+        <source>Timeline</source>
+        <translation>Tijdlijn</translation>
+    </message>
+    <message>
+        <source>By group</source>
+        <translation>Per groep</translation>
+    </message>
+    <message>
+        <source>Top posts</source>
+        <translation>Top posts</translation>
+    </message>
+    <message>
+        <source>Posts by newsgroup</source>
+        <translation>Posts per nieuwsgroep</translation>
+    </message>
+    <message>
+        <source>Stats</source>
+        <translation>Statistieken</translation>
+    </message>
+    <message>
+        <source>&lt;i&gt;Select a post to see resume details.&lt;/i&gt;</source>
+        <translation>&lt;i&gt;Selecteer een post om de hersteldetails te zien.&lt;/i&gt;</translation>
+    </message>
+    <message>
+        <source>Posted</source>
+        <translation>Geplaatst</translation>
+    </message>
+    <message>
+        <source>To repost</source>
+        <translation>Opnieuw plaatsen</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation>Onbekend</translation>
+    </message>
+    <message>
+        <source>Reason</source>
+        <translation>Reden</translation>
+    </message>
+    <message>
+        <source>Abandon</source>
+        <translation>Opgeven</translation>
+    </message>
+    <message>
+        <source>Purge resume data</source>
+        <translation>Herstelgegevens verwijderen</translation>
+    </message>
+    <message>
+        <source>Ignore (session)</source>
+        <translation>Negeren (sessie)</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>Hervattingen</translation>
+    </message>
+    <message>
+        <source>Resume posting the selected post(s) from where they stopped</source>
+        <translation>Het/de geselecteerde post(s) hervatten waar het/ze gebleven is/zijn</translation>
+    </message>
+    <message>
+        <source>Mark selected post(s) as abandoned (keep history entry)</source>
+        <translation>Het/de geselecteerde post(s) als opgegeven markeren (geschiedenisitem bewaren)</translation>
+    </message>
+    <message>
+        <source>Delete the technical resume data for selected post(s)</source>
+        <translation>De technische herstelgegevens voor het/de geselecteerde post(s) verwijderen</translation>
+    </message>
+    <message>
+        <source>Hide selected post(s) from this view for this session</source>
+        <translation>Het/de geselecteerde post(s) voor deze sessie verbergen</translation>
+    </message>
+    <message>
+        <source>Permanently delete selected post(s) from the history database</source>
+        <translation>Het/de geselecteerde post(s) permanent uit de database verwijderen</translation>
+    </message>
+    <message>
+        <source>%1 post(s) can be resumed.</source>
+        <translation>%1 post(s) kunnen worden hervat.</translation>
+    </message>
+    <message>
+        <source>%1 post(s) can be resumed. Open the Resume tab to review them.</source>
+        <translation>%1 post(s) kunnen worden hervat. Open het tabblad Hervattingen om ze te bekijken.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

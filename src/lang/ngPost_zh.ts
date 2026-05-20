@@ -989,6 +989,222 @@ The job stays in the queue.</source>
         <source>VPN: failed</source>
         <translation>VPN：失败</translation>
     </message>
+    <message>
+        <source>Open Resume â</source>
+        <translation>打开续传 →</translation>
+    </message>
+    <message>
+        <source>All statuses</source>
+        <translation>所有状态</translation>
+    </message>
+    <message>
+        <source>Has password</source>
+        <translation>有密码</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
+        <source>Export CSVâ¦</source>
+        <translation>导出 CSV…</translation>
+    </message>
+    <message>
+        <source>Search name, NZB, archiveâ¦</source>
+        <translation>搜索名称、NZB、归档…</translation>
+    </message>
+    <message>
+        <source>Search:</source>
+        <translation>搜索：</translation>
+    </message>
+    <message>
+        <source>Status:</source>
+        <translation>状态：</translation>
+    </message>
+    <message>
+        <source>Any date</source>
+        <translation>任意日期</translation>
+    </message>
+    <message>
+        <source>Group filterâ¦</source>
+        <translation>组过滤…</translation>
+    </message>
+    <message>
+        <source>Has errors</source>
+        <translation>有错误</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>清除</translation>
+    </message>
+    <message>
+        <source>Clear all filters</source>
+        <translation>清除所有过滤器</translation>
+    </message>
+    <message>
+        <source>From:</source>
+        <translation>从：</translation>
+    </message>
+    <message>
+        <source>To:</source>
+        <translation>至：</translation>
+    </message>
+    <message>
+        <source>Group:</source>
+        <translation>组：</translation>
+    </message>
+    <message>
+        <source>Date</source>
+        <translation>日期</translation>
+    </message>
+    <message>
+        <source>Speed</source>
+        <translation>速度</translation>
+    </message>
+    <message>
+        <source>NZB path</source>
+        <translation>NZB 路径</translation>
+    </message>
+    <message>
+        <source>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</source>
+        <translation>&lt;i&gt;选择一个帖子以查看详情。&lt;/i&gt;</translation>
+    </message>
+    <message>
+        <source>Regenerate NZBâ¦</source>
+        <translation>重新生成 NZB…</translation>
+    </message>
+    <message>
+        <source>Copy password</source>
+        <translation>复制密码</translation>
+    </message>
+    <message>
+        <source>Purge password</source>
+        <translation>删除密码</translation>
+    </message>
+    <message>
+        <source>Open NZB location</source>
+        <translation>打开 NZB 位置</translation>
+    </message>
+    <message>
+        <source>Delete entry</source>
+        <translation>删除条目</translation>
+    </message>
+    <message>
+        <source>History</source>
+        <translation>历史记录</translation>
+    </message>
+    <message>
+        <source>Last 7 days</source>
+        <translation>最近 7 天</translation>
+    </message>
+    <message>
+        <source>Last 30 days</source>
+        <translation>最近 30 天</translation>
+    </message>
+    <message>
+        <source>Last 90 days</source>
+        <translation>最近 90 天</translation>
+    </message>
+    <message>
+        <source>This year</source>
+        <translation>今年</translation>
+    </message>
+    <message>
+        <source>All time</source>
+        <translation>全部</translation>
+    </message>
+    <message>
+        <source>All groups</source>
+        <translation>所有组</translation>
+    </message>
+    <message>
+        <source>Volume and failures per day</source>
+        <translation>每日发送量与失败数</translation>
+    </message>
+    <message>
+        <source>Timeline</source>
+        <translation>时间线</translation>
+    </message>
+    <message>
+        <source>By group</source>
+        <translation>按组</translation>
+    </message>
+    <message>
+        <source>Top posts</source>
+        <translation>热门帖子</translation>
+    </message>
+    <message>
+        <source>Posts by newsgroup</source>
+        <translation>按新闻组分帖子</translation>
+    </message>
+    <message>
+        <source>Stats</source>
+        <translation>统计</translation>
+    </message>
+    <message>
+        <source>&lt;i&gt;Select a post to see resume details.&lt;/i&gt;</source>
+        <translation>&lt;i&gt;选择一个帖子以查看续传详情。&lt;/i&gt;</translation>
+    </message>
+    <message>
+        <source>Posted</source>
+        <translation>已发送</translation>
+    </message>
+    <message>
+        <source>To repost</source>
+        <translation>待重发</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation>未知</translation>
+    </message>
+    <message>
+        <source>Reason</source>
+        <translation>原因</translation>
+    </message>
+    <message>
+        <source>Abandon</source>
+        <translation>放弃</translation>
+    </message>
+    <message>
+        <source>Purge resume data</source>
+        <translation>清除续传数据</translation>
+    </message>
+    <message>
+        <source>Ignore (session)</source>
+        <translation>忽略（本次会话）</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>续传</translation>
+    </message>
+    <message>
+        <source>Resume posting the selected post(s) from where they stopped</source>
+        <translation>从上次停止处继续发送所选帖子</translation>
+    </message>
+    <message>
+        <source>Mark selected post(s) as abandoned (keep history entry)</source>
+        <translation>将所选帖子标记为已放弃（保留历史条目）</translation>
+    </message>
+    <message>
+        <source>Delete the technical resume data for selected post(s)</source>
+        <translation>删除所选帖子的技术续传数据</translation>
+    </message>
+    <message>
+        <source>Hide selected post(s) from this view for this session</source>
+        <translation>在本次会话中隐藏所选帖子</translation>
+    </message>
+    <message>
+        <source>Permanently delete selected post(s) from the history database</source>
+        <translation>从历史数据库中永久删除所选帖子</translation>
+    </message>
+    <message>
+        <source>%1 post(s) can be resumed.</source>
+        <translation>%1 个帖子可以续传。</translation>
+    </message>
+    <message>
+        <source>%1 post(s) can be resumed. Open the Resume tab to review them.</source>
+        <translation>%1 个帖子可以续传。请打开“续传”标签页查看。</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

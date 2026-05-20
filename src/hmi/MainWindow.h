@@ -103,6 +103,23 @@ private:
     qint64        _selectedHistoryId  = 0;
     QSet<qint64>  _ignoredResumeIds;
 
+    // Additional history tab widgets needed for retranslation
+    QLabel       *_bannerLabel        = nullptr;
+    QPushButton  *_bannerResumeBtn    = nullptr;
+    QLabel       *_histSearchLabel    = nullptr;
+    QLabel       *_histStatusLabel    = nullptr;
+    QPushButton  *_histRefreshBtn     = nullptr;
+    QPushButton  *_histExportCsvBtn   = nullptr;
+    QLabel       *_histFromLabel      = nullptr;
+    QLabel       *_histToLabel        = nullptr;
+    QLabel       *_histGroupLabel     = nullptr;
+    QPushButton  *_histClearBtn       = nullptr;
+    QLabel       *_statsPeriodLabel   = nullptr;
+    QLabel       *_statsGroupLabel    = nullptr;
+    QPushButton  *_statsRefreshBtn    = nullptr;
+    QTabWidget   *_statsInnerTabs     = nullptr;
+    QPushButton  *_resumeRefreshBtn   = nullptr;
+
 
 
 public:
@@ -238,6 +255,7 @@ private:
     void _initServerBox();
     void _initPostingBox();
     QWidget *_buildHistoryTab();
+    void     _retranslateHistoryTab();
     void _refreshHistoryViews();
     bool _startResumePost(qint64 postId, bool askConfirmation = true);
 

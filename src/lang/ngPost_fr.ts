@@ -967,6 +967,222 @@ Are you sure you want to quit?</source>
         <source>Select a Folder</source>
         <translation>Sélectionner un dossier</translation>
     </message>
+    <message>
+        <source>Open Resume â</source>
+        <translation>Voir Reprises →</translation>
+    </message>
+    <message>
+        <source>All statuses</source>
+        <translation>Tous les statuts</translation>
+    </message>
+    <message>
+        <source>Has password</source>
+        <translation>Avec mot de passe</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>Actualiser</translation>
+    </message>
+    <message>
+        <source>Export CSVâ¦</source>
+        <translation>Exporter CSV…</translation>
+    </message>
+    <message>
+        <source>Search name, NZB, archiveâ¦</source>
+        <translation>Rechercher nom, NZB, archive…</translation>
+    </message>
+    <message>
+        <source>Search:</source>
+        <translation>Recherche :</translation>
+    </message>
+    <message>
+        <source>Status:</source>
+        <translation>Statut :</translation>
+    </message>
+    <message>
+        <source>Any date</source>
+        <translation>Toute date</translation>
+    </message>
+    <message>
+        <source>Group filterâ¦</source>
+        <translation>Filtre groupe…</translation>
+    </message>
+    <message>
+        <source>Has errors</source>
+        <translation>Avec erreurs</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>Effacer</translation>
+    </message>
+    <message>
+        <source>Clear all filters</source>
+        <translation>Effacer tous les filtres</translation>
+    </message>
+    <message>
+        <source>From:</source>
+        <translation>Du :</translation>
+    </message>
+    <message>
+        <source>To:</source>
+        <translation>Au :</translation>
+    </message>
+    <message>
+        <source>Group:</source>
+        <translation>Groupe :</translation>
+    </message>
+    <message>
+        <source>Date</source>
+        <translation>Date</translation>
+    </message>
+    <message>
+        <source>Speed</source>
+        <translation>Vitesse</translation>
+    </message>
+    <message>
+        <source>NZB path</source>
+        <translation>Chemin NZB</translation>
+    </message>
+    <message>
+        <source>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</source>
+        <translation>&lt;i&gt;Sélectionnez un post pour voir ses détails.&lt;/i&gt;</translation>
+    </message>
+    <message>
+        <source>Regenerate NZBâ¦</source>
+        <translation>Régénérer NZB…</translation>
+    </message>
+    <message>
+        <source>Copy password</source>
+        <translation>Copier le mot de passe</translation>
+    </message>
+    <message>
+        <source>Purge password</source>
+        <translation>Supprimer le mot de passe</translation>
+    </message>
+    <message>
+        <source>Open NZB location</source>
+        <translation>Ouvrir l&apos;emplacement NZB</translation>
+    </message>
+    <message>
+        <source>Delete entry</source>
+        <translation>Supprimer l&apos;entrée</translation>
+    </message>
+    <message>
+        <source>History</source>
+        <translation>Historique</translation>
+    </message>
+    <message>
+        <source>Last 7 days</source>
+        <translation>7 derniers jours</translation>
+    </message>
+    <message>
+        <source>Last 30 days</source>
+        <translation>30 derniers jours</translation>
+    </message>
+    <message>
+        <source>Last 90 days</source>
+        <translation>90 derniers jours</translation>
+    </message>
+    <message>
+        <source>This year</source>
+        <translation>Cette année</translation>
+    </message>
+    <message>
+        <source>All time</source>
+        <translation>Tout</translation>
+    </message>
+    <message>
+        <source>All groups</source>
+        <translation>Tous les groupes</translation>
+    </message>
+    <message>
+        <source>Volume and failures per day</source>
+        <translation>Volume et échecs par jour</translation>
+    </message>
+    <message>
+        <source>Timeline</source>
+        <translation>Chronologie</translation>
+    </message>
+    <message>
+        <source>By group</source>
+        <translation>Par groupe</translation>
+    </message>
+    <message>
+        <source>Top posts</source>
+        <translation>Top posts</translation>
+    </message>
+    <message>
+        <source>Posts by newsgroup</source>
+        <translation>Posts par newsgroup</translation>
+    </message>
+    <message>
+        <source>Stats</source>
+        <translation>Statistiques</translation>
+    </message>
+    <message>
+        <source>&lt;i&gt;Select a post to see resume details.&lt;/i&gt;</source>
+        <translation>&lt;i&gt;Sélectionnez un post pour voir les détails de reprise.&lt;/i&gt;</translation>
+    </message>
+    <message>
+        <source>Posted</source>
+        <translation>Posté</translation>
+    </message>
+    <message>
+        <source>To repost</source>
+        <translation>À reposter</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation>Inconnu</translation>
+    </message>
+    <message>
+        <source>Reason</source>
+        <translation>Raison</translation>
+    </message>
+    <message>
+        <source>Abandon</source>
+        <translation>Abandonner</translation>
+    </message>
+    <message>
+        <source>Purge resume data</source>
+        <translation>Purger données reprise</translation>
+    </message>
+    <message>
+        <source>Ignore (session)</source>
+        <translation>Ignorer (session)</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>Reprises</translation>
+    </message>
+    <message>
+        <source>Resume posting the selected post(s) from where they stopped</source>
+        <translation>Reprendre l&apos;envoi du/des post(s) sélectionné(s) là où il s&apos;est arrêté</translation>
+    </message>
+    <message>
+        <source>Mark selected post(s) as abandoned (keep history entry)</source>
+        <translation>Marquer le(s) post(s) comme abandonné(s) (conserver l&apos;entrée)</translation>
+    </message>
+    <message>
+        <source>Delete the technical resume data for selected post(s)</source>
+        <translation>Supprimer les données de reprise du/des post(s) sélectionné(s)</translation>
+    </message>
+    <message>
+        <source>Hide selected post(s) from this view for this session</source>
+        <translation>Masquer le(s) post(s) sélectionné(s) de cette vue pour cette session</translation>
+    </message>
+    <message>
+        <source>Permanently delete selected post(s) from the history database</source>
+        <translation>Supprimer définitivement le(s) post(s) sélectionné(s) de la base de données</translation>
+    </message>
+    <message>
+        <source>%1 post(s) can be resumed.</source>
+        <translation>%1 post(s) peuvent être repris.</translation>
+    </message>
+    <message>
+        <source>%1 post(s) can be resumed. Open the Resume tab to review them.</source>
+        <translation>%1 post(s) peuvent être repris. Ouvrez l&apos;onglet Reprises pour les examiner.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
