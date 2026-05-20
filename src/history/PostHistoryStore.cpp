@@ -6,6 +6,7 @@
 
 #include "history/PostHistoryStore.h"
 
+#include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
@@ -117,18 +118,6 @@ PostHistoryStore::PostHistoryStore(const QString &dbPath, bool storePasswords)
 void PostHistoryStore::configure(const QString &dbPath, bool storePasswords)
 {
     if (_dbPath != dbPath || _storePasswords != storePasswords) {
-        // The cached SQLite connection is bound to the previous path; close
-        // and remove it so the next dbFor() call opens a fresh one against
-        // the new path. Must run on the same thread that uses the connection.
-        const QString connection = _connectionName();
-        if (QSqlDatabase::contains(connection)) {
-            {
-                QSqlDatabase db = QSqlDatabase::database(connection, false);
-                if (db.isOpen())
-                    db.close();
-            }
-            QSqlDatabase::removeDatabase(connection);
-        }
         _initialized = false;
         _initializedDbPath.clear();
     }
@@ -148,9 +137,17 @@ bool PostHistoryStore::storePasswords() const
 
 QString PostHistoryStore::_connectionName() const
 {
-    return QStringLiteral("ngpost_history_%1_%2")
+    // Include the db path's hash so a path change yields a fresh connection
+    // instead of reusing the previously-cached one (which is bound to the old
+    // path). Each thread still gets its own connection.
+    const QByteArray pathHash =
+        QCryptographicHash::hash(_dbPath.toUtf8(), QCryptographicHash::Md5)
+            .toHex()
+            .left(12);
+    return QStringLiteral("ngpost_history_%1_%2_%3")
         .arg(reinterpret_cast<quintptr>(this))
-        .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()));
+        .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()))
+        .arg(QString::fromLatin1(pathHash));
 }
 
 bool PostHistoryStore::initialize(QString *error)
