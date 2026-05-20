@@ -158,21 +158,53 @@ public:
     qint64 upsertFile(const FileRecord &record, QString *error = nullptr);
     bool updateFileStatus(qint64 fileId, const QString &status, QString *error = nullptr);
     bool upsertArticle(const ArticleRecord &record, QString *error = nullptr);
+    bool updateArticlePayload(qint64 fileId,
+                              int part,
+                              qint64 pos,
+                              qint64 bytes,
+                              QString *error = nullptr);
     bool markArticlePosting(qint64 fileId,
                             int part,
                             const QString &msgId,
                             int attemptNo,
                             QString *error = nullptr);
+    bool markArticlePosting(qint64 fileId,
+                            int part,
+                            const QString &msgId,
+                            int attemptNo,
+                            qint64 pos,
+                            qint64 bytes,
+                            QString *error = nullptr);
     bool markArticlePosted(qint64 fileId, int part, const QString &msgId, QString *error = nullptr);
+    bool markArticlePosted(qint64 fileId,
+                           int part,
+                           const QString &msgId,
+                           qint64 pos,
+                           qint64 bytes,
+                           QString *error = nullptr);
     bool markArticleFailed(qint64 fileId,
                            int part,
                            const QString &msgId,
                            const QString &err,
                            QString *error = nullptr);
+    bool markArticleFailed(qint64 fileId,
+                           int part,
+                           const QString &msgId,
+                           const QString &err,
+                           qint64 pos,
+                           qint64 bytes,
+                           QString *error = nullptr);
     bool markArticleUnknown(qint64 fileId,
                             int part,
                             const QString &msgId,
                             const QString &err,
+                            QString *error = nullptr);
+    bool markArticleUnknown(qint64 fileId,
+                            int part,
+                            const QString &msgId,
+                            const QString &err,
+                            qint64 pos,
+                            qint64 bytes,
                             QString *error = nullptr);
     bool markPostCrashedArticlesUnknown(QString *error = nullptr);
     bool cleanupInvalidResumePosts(QString *error = nullptr);

@@ -364,15 +364,10 @@ void PostingJob::recordHistoryArticle(qint64 fileId, int part, qint64 pos, qint6
 {
     if (!fileId || !_ngPost->historyStore())
         return;
-    PostHistoryStore::ArticleRecord rec;
-    rec.fileId = fileId;
-    rec.part = part;
-    rec.pos = pos;
-    rec.bytes = bytes;
-    rec.status = QStringLiteral("pending");
     QString err;
-    if (!_ngPost->historyStore()->upsertArticle(rec, &err) && _ngPost->debugMode())
-        _error(tr("History: could not create article record: %1").arg(err));
+    if (!_ngPost->historyStore()->updateArticlePayload(fileId, part, pos, bytes, &err)
+        && _ngPost->debugMode())
+        _error(tr("History: could not update article payload: %1").arg(err));
 }
 
 void PostingJob::recordHistoryArticlePosting(NntpArticle *article, int attemptNo)
@@ -384,6 +379,8 @@ void PostingJob::recordHistoryArticlePosting(NntpArticle *article, int attemptNo
                                                      static_cast<int>(article->part()),
                                                      article->id(),
                                                      attemptNo,
+                                                     article->filePos(),
+                                                     article->fileBytes(),
                                                      &err)
         && _ngPost->debugMode())
         _error(tr("History: could not mark article posting: %1").arg(err));
@@ -397,6 +394,8 @@ void PostingJob::recordHistoryArticlePosted(NntpArticle *article)
     if (!_ngPost->historyStore()->markArticlePosted(article->nntpFile()->historyFileId(),
                                                    static_cast<int>(article->part()),
                                                    article->id(),
+                                                   article->filePos(),
+                                                   article->fileBytes(),
                                                    &err)
         && _ngPost->debugMode())
         _error(tr("History: could not mark article posted: %1").arg(err));
@@ -411,6 +410,8 @@ void PostingJob::recordHistoryArticleFailed(NntpArticle *article, const QString 
                                                    static_cast<int>(article->part()),
                                                    article->id(),
                                                    reason,
+                                                   article->filePos(),
+                                                   article->fileBytes(),
                                                    &err)
         && _ngPost->debugMode())
         _error(tr("History: could not mark article failed: %1").arg(err));
@@ -425,6 +426,8 @@ void PostingJob::recordHistoryArticleUnknown(NntpArticle *article, const QString
                                                     static_cast<int>(article->part()),
                                                     article->id(),
                                                     reason,
+                                                    article->filePos(),
+                                                    article->fileBytes(),
                                                     &err)
         && _ngPost->debugMode())
         _error(tr("History: could not mark article unknown: %1").arg(err));

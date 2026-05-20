@@ -11,6 +11,8 @@
 #include <QDateTime>
 #include <QTextStream>
 
+#include <algorithm>
+
 namespace
 {
 
@@ -22,6 +24,80 @@ QString escapeXml(QString s)
 QStringList splitGroups(const QString &groups)
 {
     return groups.split(',', Qt::SkipEmptyParts);
+}
+
+qint64 ceilDivide(qint64 numerator, qint64 denominator)
+{
+    if (numerator <= 0 || denominator <= 0)
+        return 0;
+    return numerator / denominator + (numerator % denominator ? 1 : 0);
+}
+
+bool isPlausibleFullArticleSize(const PostHistoryStore::FileSummary &file,
+                                qint64 fullArticleBytes)
+{
+    if (file.totalArticles <= 0 || file.sizeBytes <= 0 || fullArticleBytes <= 0)
+        return false;
+    if (fullArticleBytes < ceilDivide(file.sizeBytes, file.totalArticles))
+        return false;
+    if (file.totalArticles == 1)
+        return file.sizeBytes <= fullArticleBytes;
+    return file.sizeBytes > fullArticleBytes * static_cast<qint64>(file.totalArticles - 1);
+}
+
+qint64 inferFullArticleBytes(const PostHistoryStore::FileSummary &file,
+                             const QList<PostHistoryStore::ArticleSummary> &articles,
+                             qint64 postFullArticleBytesHint)
+{
+    qint64 historyMaxBytes = 0;
+    for (const PostHistoryStore::ArticleSummary &article : articles) {
+        if (article.bytes > historyMaxBytes)
+            historyMaxBytes = article.bytes;
+    }
+
+    qint64 fullArticleBytes =
+        std::max(historyMaxBytes, ceilDivide(file.sizeBytes, file.totalArticles));
+    if (isPlausibleFullArticleSize(file, postFullArticleBytesHint)
+        && postFullArticleBytesHint > fullArticleBytes)
+        fullArticleBytes = postFullArticleBytesHint;
+    const qint64 configuredArticleBytes = NgPost::articleSize();
+    if (isPlausibleFullArticleSize(file, configuredArticleBytes)
+        && configuredArticleBytes > fullArticleBytes)
+        fullArticleBytes = configuredArticleBytes;
+    if (fullArticleBytes <= 0)
+        fullArticleBytes = configuredArticleBytes;
+    return fullArticleBytes;
+}
+
+qint64 inferPostFullArticleBytesHint(const PostHistoryStore::PostDetails &details)
+{
+    qint64 maxBytes = 0;
+    for (const PostHistoryStore::FileSummary &file : details.files) {
+        const QList<PostHistoryStore::ArticleSummary> articles =
+            details.articlesByFile.value(file.id);
+        for (const PostHistoryStore::ArticleSummary &article : articles) {
+            if (article.bytes > maxBytes)
+                maxBytes = article.bytes;
+        }
+    }
+    return maxBytes;
+}
+
+qint64 inferSegmentBytes(const PostHistoryStore::FileSummary &file,
+                         int part,
+                         qint64 fullArticleBytes)
+{
+    if (file.totalArticles <= 0)
+        return fullArticleBytes;
+    if (part == file.totalArticles && file.sizeBytes > 0) {
+        if (file.totalArticles == 1)
+            return file.sizeBytes;
+        const qint64 lastBytes =
+            file.sizeBytes - fullArticleBytes * static_cast<qint64>(file.totalArticles - 1);
+        if (lastBytes > 0)
+            return lastBytes;
+    }
+    return fullArticleBytes;
 }
 
 } // namespace
@@ -72,8 +148,12 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
         n /= 10;
     }
 
+    const qint64 postFullArticleBytesHint = inferPostFullArticleBytesHint(details);
+    int repairedArticleBytes = 0;
     for (const PostHistoryStore::FileSummary &file : details.files) {
         const QList<PostHistoryStore::ArticleSummary> articles = details.articlesByFile.value(file.id);
+        const qint64 fullArticleBytes =
+            inferFullArticleBytes(file, articles, postFullArticleBytesHint);
         bool hasUnknown = false;
         bool hasNonPosted = false;
         for (const PostHistoryStore::ArticleSummary &article : articles) {
@@ -104,8 +184,13 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
         for (const PostHistoryStore::ArticleSummary &article : articles) {
             if (article.status != QStringLiteral("posted") || article.msgId.isEmpty())
                 continue;
+            qint64 segmentBytes = article.bytes;
+            if (segmentBytes <= 0) {
+                segmentBytes = inferSegmentBytes(file, article.part, fullArticleBytes);
+                ++repairedArticleBytes;
+            }
             stream << tab << tab << tab << "<segment"
-                   << " bytes=\"" << article.bytes << "\""
+                   << " bytes=\"" << segmentBytes << "\""
                    << " number=\"" << article.part << "\">"
                    << escapeXml(article.msgId)
                    << "</segment>\n";
@@ -113,6 +198,10 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
         stream << tab << tab << "</segments>\n"
                << tab << "</file>\n";
     }
+
+    if (repairedArticleBytes > 0 && warnings)
+        *warnings << QStringLiteral("%1 article segment sizes were missing in history and rebuilt from file metadata")
+                         .arg(repairedArticleBytes);
 
     stream << "</nzb>\n";
     return true;

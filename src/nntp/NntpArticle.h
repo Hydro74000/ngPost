@@ -75,6 +75,8 @@ public:
     inline QString id() const;
     inline uint part() const;
     inline NntpFile *nntpFile() const;
+    inline qint64 filePos() const;
+    inline qint64 fileBytes() const;
 
     inline bool isFirstArticle() const;
 
@@ -112,6 +114,8 @@ std::string NntpArticle::body() const { return _body; }
 QString NntpArticle::id() const { return _msgId; }
 uint NntpArticle::part() const{ return _part; }
 NntpFile *NntpArticle::nntpFile() const { return _nntpFile; }
+qint64 NntpArticle::filePos() const { return _filePos; }
+qint64 NntpArticle::fileBytes() const { return _fileBytes; }
 
 bool NntpArticle::isFirstArticle() const { return _part == 1; }
 

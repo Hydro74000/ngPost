@@ -15,6 +15,7 @@
 #include "history/NzbHistoryRegenerator.h"
 #include "history/PostHistoryStore.h"
 #include "history/ResumePlanner.h"
+#include "NgPost.h"
 
 class TestPostHistory : public QObject
 {
@@ -24,7 +25,9 @@ private slots:
     void sqlite_lifecycle_and_resume_states();
     void empty_resume_post_is_cancelled_by_cleanup();
     void missing_source_is_not_resumable();
+    void mark_article_status_keeps_payload_when_row_is_missing();
     void nzb_regeneration_keeps_prior_files_after_resume();
+    void nzb_regeneration_repairs_missing_article_bytes();
     void nzb_regeneration_masks_password_by_default();
     void import_legacy_csv_is_explicit_history_only();
 };
@@ -42,6 +45,18 @@ int countNzbSegments(const QString &nzb)
             ++segments;
     }
     return segments;
+}
+
+QList<qint64> nzbSegmentBytes(const QString &nzb)
+{
+    QXmlStreamReader reader(nzb);
+    QList<qint64> bytes;
+    while (!reader.atEnd()) {
+        reader.readNext();
+        if (reader.isStartElement() && reader.name() == QLatin1String("segment"))
+            bytes << reader.attributes().value(QStringLiteral("bytes")).toLongLong();
+    }
+    return bytes;
 }
 
 } // namespace
@@ -97,6 +112,7 @@ void TestPostHistory::sqlite_lifecycle_and_resume_states()
     QVERIFY2(store.upsertArticle(a2, &err), qPrintable(err));
     QVERIFY2(store.markArticlePosting(fileId, 2, QStringLiteral("ok@ngpost"), 1, &err), qPrintable(err));
     QVERIFY2(store.markArticlePosted(fileId, 2, QStringLiteral("ok@ngpost"), &err), qPrintable(err));
+    QVERIFY2(store.updateArticlePayload(fileId, 2, 4, 4, &err), qPrintable(err));
 
     PostHistoryStore::ArticleRecord a3 = a1;
     a3.part = 3;
@@ -112,6 +128,11 @@ void TestPostHistory::sqlite_lifecycle_and_resume_states()
     QCOMPARE(d.postedArticles, 1);
     QCOMPARE(d.failedArticles, 1);
     QCOMPARE(d.unknownArticles, 1);
+
+    PostHistoryStore::PostDetails details;
+    QVERIFY2(store.loadPostDetails(postId, &details, &err), qPrintable(err));
+    QCOMPARE(details.articlesByFile.value(fileId).at(1).status, QStringLiteral("posted"));
+    QCOMPARE(details.articlesByFile.value(fileId).at(1).msgId, QStringLiteral("ok@ngpost"));
 }
 
 void TestPostHistory::empty_resume_post_is_cancelled_by_cleanup()
@@ -198,6 +219,47 @@ void TestPostHistory::missing_source_is_not_resumable()
     const ResumePlanner::Decision d = planner.check(postId, &err);
     QCOMPARE(d.state, ResumePlanner::ResumeState::NotResumable);
     QCOMPARE(d.reason, QStringLiteral("source files are missing or changed"));
+}
+
+void TestPostHistory::mark_article_status_keeps_payload_when_row_is_missing()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString err;
+    QVERIFY2(store.initialize(&err), qPrintable(err));
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("payload-status.nzb");
+    post.nzbPath = dir.filePath(QStringLiteral("payload-status.nzb"));
+    post.from = QStringLiteral("poster@example.invalid");
+    post.groups = { QStringLiteral("alt.binaries.test") };
+    const qint64 postId = store.createPost(post, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.postedName = QStringLiteral("payload.bin");
+    file.sizeBytes = 42;
+    file.totalArticles = 1;
+    file.groups = post.groups;
+    const qint64 fileId = store.upsertFile(file, &err);
+    QVERIFY2(fileId > 0, qPrintable(err));
+
+    QVERIFY2(store.markArticlePosted(fileId, 1, QStringLiteral("msg@ngpost"),
+                                     0, 42, &err),
+             qPrintable(err));
+
+    PostHistoryStore::PostDetails details;
+    QVERIFY2(store.loadPostDetails(postId, &details, &err), qPrintable(err));
+    const QList<PostHistoryStore::ArticleSummary> articles =
+        details.articlesByFile.value(fileId);
+    QCOMPARE(articles.size(), 1);
+    QCOMPARE(articles.first().status, QStringLiteral("posted"));
+    QCOMPARE(articles.first().msgId, QStringLiteral("msg@ngpost"));
+    QCOMPARE(articles.first().bytes, 42);
 }
 
 void TestPostHistory::nzb_regeneration_keeps_prior_files_after_resume()
@@ -307,6 +369,58 @@ void TestPostHistory::nzb_regeneration_keeps_prior_files_after_resume()
     QVERIFY(nzb.contains(QStringLiteral("second-1@ngpost")));
     QVERIFY(nzb.contains(QStringLiteral("second-new@ngpost")));
     QVERIFY(!nzb.contains(QStringLiteral("second-old@ngpost")));
+}
+
+void TestPostHistory::nzb_regeneration_repairs_missing_article_bytes()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString err;
+    QVERIFY2(store.initialize(&err), qPrintable(err));
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("zero-bytes.nzb");
+    post.nzbPath = dir.filePath(QStringLiteral("zero-bytes.nzb"));
+    post.from = QStringLiteral("poster@example.invalid");
+    post.groups = { QStringLiteral("alt.binaries.test") };
+    const qint64 postId = store.createPost(post, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    const qint64 articleBytes = NgPost::articleSize();
+    const qint64 tailBytes = 123;
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.postedName = QStringLiteral("payload.bin");
+    file.sizeBytes = articleBytes * 2 + tailBytes;
+    file.totalArticles = 3;
+    file.groups = post.groups;
+    const qint64 fileId = store.upsertFile(file, &err);
+    QVERIFY2(fileId > 0, qPrintable(err));
+
+    for (int part = 1; part <= 3; ++part) {
+        QVERIFY2(store.markArticlePosted(fileId,
+                                         part,
+                                         QStringLiteral("msg-%1@ngpost").arg(part),
+                                         &err),
+                 qPrintable(err));
+    }
+    QVERIFY2(store.updatePostStatus(postId, QStringLiteral("success"), 1, 3, 0,
+                                    file.sizeBytes, QStringLiteral("1 KB/s"), &err),
+             qPrintable(err));
+
+    NzbHistoryRegenerator regenerator(&store);
+    QString nzb;
+    QStringList warnings;
+    QTextStream stream(&nzb);
+    QVERIFY2(regenerator.writeNzb(postId, stream, false, &warnings, &err), qPrintable(err));
+
+    QList<qint64> expected;
+    expected << articleBytes << articleBytes << tailBytes;
+    QCOMPARE(nzbSegmentBytes(nzb), expected);
+    QVERIFY(warnings.join(QLatin1Char('\n')).contains(QStringLiteral("3 article segment sizes")));
 }
 
 void TestPostHistory::nzb_regeneration_masks_password_by_default()

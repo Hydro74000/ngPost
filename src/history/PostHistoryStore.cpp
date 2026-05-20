@@ -90,6 +90,16 @@ bool valueBool(const QSqlQuery &q, const char *name)
     return q.value(q.record().indexOf(QString::fromLatin1(name))).toInt() != 0;
 }
 
+qint64 storedPayloadPos(qint64 pos, qint64 bytes)
+{
+    return bytes > 0 ? pos : 0;
+}
+
+qint64 storedPayloadBytes(qint64 bytes)
+{
+    return bytes > 0 ? bytes : 0;
+}
+
 } // namespace
 
 PostHistoryStore::PostHistoryStore(const QString &dbPath, bool storePasswords)
@@ -526,10 +536,49 @@ bool PostHistoryStore::upsertArticle(const ArticleRecord &record, QString *error
     return true;
 }
 
+bool PostHistoryStore::updateArticlePayload(qint64 fileId,
+                                            int part,
+                                            qint64 pos,
+                                            qint64 bytes,
+                                            QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                             "status, updated_at)"
+                             "VALUES(?, ?, ?, ?, 'pending', ?)"
+                             "ON CONFLICT(file_id, part) DO UPDATE SET "
+                             "pos=excluded.pos, bytes=excluded.bytes,"
+                             "updated_at=excluded.updated_at"));
+    q.addBindValue(fileId);
+    q.addBindValue(part);
+    q.addBindValue(pos);
+    q.addBindValue(bytes);
+    q.addBindValue(nowIso());
+    if (!q.exec()) {
+        setError(error, q);
+        return false;
+    }
+    return true;
+}
+
 bool PostHistoryStore::markArticlePosting(qint64 fileId,
                                           int part,
                                           const QString &msgId,
                                           int attemptNo,
+                                          QString *error)
+{
+    return markArticlePosting(fileId, part, msgId, attemptNo, -1, -1, error);
+}
+
+bool PostHistoryStore::markArticlePosting(qint64 fileId,
+                                          int part,
+                                          const QString &msgId,
+                                          int attemptNo,
+                                          qint64 pos,
+                                          qint64 bytes,
                                           QString *error)
 {
     if (!initialize(error))
@@ -540,12 +589,20 @@ bool PostHistoryStore::markArticlePosting(qint64 fileId,
         return false;
     }
     QSqlQuery a(db);
-    a.prepare(QStringLiteral("UPDATE post_articles SET status='posting', msg_id=?,"
-                             "updated_at=? WHERE file_id=? AND part=?"));
-    a.addBindValue(msgId);
-    a.addBindValue(nowIso());
+    a.prepare(QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                             "status, msg_id, error, updated_at)"
+                             "VALUES(?, ?, ?, ?, 'posting', ?, '', ?)"
+                             "ON CONFLICT(file_id, part) DO UPDATE SET "
+                             "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
+                             "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                             "status='posting', msg_id=excluded.msg_id,"
+                             "updated_at=excluded.updated_at"));
     a.addBindValue(fileId);
     a.addBindValue(part);
+    a.addBindValue(storedPayloadPos(pos, bytes));
+    a.addBindValue(storedPayloadBytes(bytes));
+    a.addBindValue(msgId);
+    a.addBindValue(nowIso());
     if (!a.exec()) {
         setError(error, a);
         db.rollback();
@@ -574,15 +631,30 @@ bool PostHistoryStore::markArticlePosting(qint64 fileId,
 
 bool PostHistoryStore::markArticlePosted(qint64 fileId, int part, const QString &msgId, QString *error)
 {
+    return markArticlePosted(fileId, part, msgId, -1, -1, error);
+}
+
+bool PostHistoryStore::markArticlePosted(qint64 fileId,
+                                         int part,
+                                         const QString &msgId,
+                                         qint64 pos,
+                                         qint64 bytes,
+                                         QString *error)
+{
     QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
     QSqlQuery a(db);
-    a.prepare(QStringLiteral("INSERT INTO post_articles(file_id, part, status, msg_id, updated_at)"
-                             "VALUES(?, ?, 'posted', ?, ?)"
+    a.prepare(QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                             "status, msg_id, error, updated_at)"
+                             "VALUES(?, ?, ?, ?, 'posted', ?, '', ?)"
                              "ON CONFLICT(file_id, part) DO UPDATE SET "
+                             "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
+                             "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
                              "status='posted', msg_id=excluded.msg_id, error='',"
                              "updated_at=excluded.updated_at"));
     a.addBindValue(fileId);
     a.addBindValue(part);
+    a.addBindValue(storedPayloadPos(pos, bytes));
+    a.addBindValue(storedPayloadBytes(bytes));
     a.addBindValue(msgId);
     a.addBindValue(nowIso());
     if (!a.exec()) {
@@ -610,15 +682,31 @@ bool PostHistoryStore::markArticleFailed(qint64 fileId,
                                          const QString &err,
                                          QString *error)
 {
+    return markArticleFailed(fileId, part, msgId, err, -1, -1, error);
+}
+
+bool PostHistoryStore::markArticleFailed(qint64 fileId,
+                                         int part,
+                                         const QString &msgId,
+                                         const QString &err,
+                                         qint64 pos,
+                                         qint64 bytes,
+                                         QString *error)
+{
     QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
     QSqlQuery a(db);
-    a.prepare(QStringLiteral("INSERT INTO post_articles(file_id, part, status, msg_id, error, updated_at)"
-                             "VALUES(?, ?, 'failed', ?, ?, ?)"
+    a.prepare(QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                             "status, msg_id, error, updated_at)"
+                             "VALUES(?, ?, ?, ?, 'failed', ?, ?, ?)"
                              "ON CONFLICT(file_id, part) DO UPDATE SET "
+                             "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
+                             "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
                              "status='failed', msg_id=excluded.msg_id, error=excluded.error,"
                              "updated_at=excluded.updated_at"));
     a.addBindValue(fileId);
     a.addBindValue(part);
+    a.addBindValue(storedPayloadPos(pos, bytes));
+    a.addBindValue(storedPayloadBytes(bytes));
     a.addBindValue(msgId);
     a.addBindValue(err);
     a.addBindValue(nowIso());
@@ -648,15 +736,31 @@ bool PostHistoryStore::markArticleUnknown(qint64 fileId,
                                           const QString &err,
                                           QString *error)
 {
+    return markArticleUnknown(fileId, part, msgId, err, -1, -1, error);
+}
+
+bool PostHistoryStore::markArticleUnknown(qint64 fileId,
+                                          int part,
+                                          const QString &msgId,
+                                          const QString &err,
+                                          qint64 pos,
+                                          qint64 bytes,
+                                          QString *error)
+{
     QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
     QSqlQuery a(db);
-    a.prepare(QStringLiteral("INSERT INTO post_articles(file_id, part, status, msg_id, error, updated_at)"
-                             "VALUES(?, ?, 'unknown', ?, ?, ?)"
+    a.prepare(QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                             "status, msg_id, error, updated_at)"
+                             "VALUES(?, ?, ?, ?, 'unknown', ?, ?, ?)"
                              "ON CONFLICT(file_id, part) DO UPDATE SET "
+                             "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
+                             "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
                              "status='unknown', msg_id=excluded.msg_id, error=excluded.error,"
                              "updated_at=excluded.updated_at"));
     a.addBindValue(fileId);
     a.addBindValue(part);
+    a.addBindValue(storedPayloadPos(pos, bytes));
+    a.addBindValue(storedPayloadBytes(bytes));
     a.addBindValue(msgId);
     a.addBindValue(err);
     a.addBindValue(nowIso());
