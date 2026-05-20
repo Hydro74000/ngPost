@@ -9,7 +9,7 @@
 
 #include "history/PostHistoryStore.h"
 
-#include <QObject>
+#include <QCoreApplication>
 
 class QTextStream;
 
