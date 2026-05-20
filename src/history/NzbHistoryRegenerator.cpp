@@ -115,7 +115,7 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
 {
     if (!_store) {
         if (error)
-            *error = QStringLiteral("history store is not available");
+            *error = tr("history store is not available");
         return false;
     }
 
@@ -124,9 +124,9 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
         return false;
 
     if (details.post.status == QStringLiteral("partial") && warnings)
-        *warnings << QStringLiteral("post is partial; regenerated NZB may be incomplete");
+        *warnings << tr("post is partial; regenerated NZB may be incomplete");
     if (details.post.hasPassword && !details.post.passwordStored && warnings)
-        *warnings << QStringLiteral("post had an archive password, but it is not stored");
+        *warnings << tr("post had an archive password, but it is not stored");
 
     const QString tab = NgPost::space();
     stream << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -163,9 +163,9 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
                 hasNonPosted = true;
         }
         if (hasUnknown && warnings)
-            *warnings << QStringLiteral("file %1 contains unknown articles").arg(file.postedName);
+            *warnings << tr("file %1 contains unknown articles").arg(file.postedName);
         if (hasNonPosted && warnings)
-            *warnings << QStringLiteral("file %1 contains non-posted articles").arg(file.postedName);
+            *warnings << tr("file %1 contains non-posted articles").arg(file.postedName);
 
         stream << tab << "<file poster=\"" << escapeXml(details.from) << "\""
                << " date=\"" << QDateTime::currentSecsSinceEpoch() << "\""
@@ -200,7 +200,7 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
     }
 
     if (repairedArticleBytes > 0 && warnings)
-        *warnings << QStringLiteral("%1 article segment sizes were missing in history and rebuilt from file metadata")
+        *warnings << tr("%1 article segment sizes were missing in history and rebuilt from file metadata")
                          .arg(repairedArticleBytes);
 
     stream << "</nzb>\n";

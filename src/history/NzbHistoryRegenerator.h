@@ -9,10 +9,14 @@
 
 #include "history/PostHistoryStore.h"
 
+#include <QObject>
+
 class QTextStream;
 
 class NzbHistoryRegenerator
 {
+    Q_DECLARE_TR_FUNCTIONS(NzbHistoryRegenerator)
+
 public:
     explicit NzbHistoryRegenerator(PostHistoryStore *store);
 

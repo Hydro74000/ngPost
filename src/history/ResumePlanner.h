@@ -9,8 +9,12 @@
 
 #include "history/PostHistoryStore.h"
 
+#include <QObject>
+
 class ResumePlanner
 {
+    Q_DECLARE_TR_FUNCTIONS(ResumePlanner)
+
 public:
     enum class ResumeState {
         NotResumable,

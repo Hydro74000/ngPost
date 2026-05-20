@@ -510,12 +510,12 @@ It will be irreversible...</source>
     <message>
         <location filename="../hmi/MainWindow.ui" line="422"/>
         <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation type="unfinished"></translation>
+        <translation>每天一次检查 GitHub 上的 ngPost 新版本</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="425"/>
         <source>Check for updates</source>
-        <translation type="unfinished"></translation>
+        <translation>检查更新</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="399"/>
@@ -530,23 +530,23 @@ It will be irreversible...</source>
     <message>
         <location filename="../hmi/MainWindow.ui" line="432"/>
         <source>Tunnel ngPost connections through OpenVPN or WireGuard (the rest of the system is unaffected)</source>
-        <translation type="unfinished"></translation>
+        <translation>通过 OpenVPN 或 WireGuard 隧道传输 ngPost 连接（系统其他部分不受影响）</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="435"/>
         <source>VPN...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="442"/>
         <source>Current VPN tunnel state</source>
-        <translation type="unfinished"></translation>
+        <translation>当前 VPN 隧道状态</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="445"/>
         <location filename="../hmi/MainWindow.cpp" line="1030"/>
         <source>VPN: disabled</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：已禁用</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="468"/>
@@ -795,7 +795,7 @@ It will be irreversible...</source>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="56"/>
         <source>Use VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>使用 VPN</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="57"/>
@@ -886,42 +886,42 @@ Are you sure you want to quit?</source>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="420"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;h3&gt;有新版本：&lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;当前：v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;在 GitHub 上查看版本&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="428"/>
         <source>New version available</source>
-        <translation type="unfinished">找到新版本</translation>
+        <translation>找到新版本</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="432"/>
         <source>Install and Restart</source>
-        <translation type="unfinished"></translation>
+        <translation>安装并重启</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="433"/>
         <source>Later</source>
-        <translation type="unfinished"></translation>
+        <translation>稍后</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="439"/>
         <source>Downloading update...</source>
-        <translation type="unfinished"></translation>
+        <translation>正在下载更新...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="439"/>
         <source>Cancel</source>
-        <translation type="unfinished"></translation>
+        <translation>取消</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="457"/>
         <source>Update failed</source>
-        <translation type="unfinished"></translation>
+        <translation>更新失败</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="530"/>
         <source>VPN required</source>
-        <translation type="unfinished"></translation>
+        <translation>需要 VPN</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="531"/>
@@ -930,7 +930,11 @@ Are you sure you want to quit?</source>
 %1
 
 The job stays in the queue.</source>
-        <translation type="unfinished"></translation>
+        <translation>此任务需要 VPN 但无法启动：
+
+%1
+
+任务保留在队列中。</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="926"/>
@@ -968,22 +972,22 @@ The job stays in the queue.</source>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1031"/>
         <source>VPN: starting...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：正在启动...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1033"/>
         <source>VPN: connected (%1)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：已连接 (%1)</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1035"/>
         <source>VPN: stopping...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：正在停止...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1036"/>
         <source>VPN: failed</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：失败</translation>
     </message>
 </context>
 <context>
@@ -1522,7 +1526,8 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <location filename="../NgPost.cpp" line="2037"/>
         <source>Invalid VPN_BACKEND value: %1 (expected &apos;openvpn&apos; or &apos;wireguard&apos;)
 </source>
-        <translation type="unfinished"></translation>
+        <translation>VPN_BACKEND 值无效：%1（应为 &apos;openvpn&apos; 或 &apos;wireguard&apos;）
+</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2070"/>
@@ -2062,22 +2067,22 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="2742"/>
         <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation type="unfinished"></translation>
+        <translation>## 每天一次检查 GitHub 上的 ngPost 新版本 (Hydro74000/ngPost)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2744"/>
         <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation type="unfinished"></translation>
+        <translation>## （内部）上次更新检查时间戳，纪元秒 — 自动管理</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2747"/>
         <source>## tunnel ngPost connections through an embedded VPN (Linux v1)</source>
-        <translation type="unfinished"></translation>
+        <translation>## 通过内置 VPN 隧道传输 ngPost 连接（Linux v1）</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2748"/>
         <source>## the VPN affects ngPost only; the rest of the system is unchanged</source>
-        <translation type="unfinished"></translation>
+        <translation>## VPN 仅影响 ngPost；系统其他部分保持不变</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2753"/>
@@ -2374,12 +2379,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NntpCheckCon.cpp" line="74"/>
         <source>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</source>
-        <translation type="unfinished"></translation>
+        <translation>服务器 &apos;%1&apos; 被标记为使用 VPN，但 VPN 隧道未连接</translation>
     </message>
     <message>
         <location filename="../NntpCheckCon.cpp" line="82"/>
         <source>VPN bind failed on %1: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 上的 VPN 绑定失败：%2</translation>
     </message>
     <message>
         <location filename="../NntpCheckCon.cpp" line="145"/>
@@ -2418,12 +2423,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NntpConnection.cpp" line="127"/>
         <source>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</source>
-        <translation type="unfinished"></translation>
+        <translation>服务器 &apos;%1&apos; 被标记为使用 VPN，但 VPN 隧道未连接</translation>
     </message>
     <message>
         <location filename="../NntpConnection.cpp" line="134"/>
         <source>VPN bind failed on %1: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 上的 VPN 绑定失败：%2</translation>
     </message>
     <message>
         <location filename="../NntpConnection.cpp" line="243"/>
@@ -2551,42 +2556,42 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="44"/>
         <source>Config file not found or unreadable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>找不到配置文件或无法读取：%1</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="50"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found. Install it under /usr/lib/ngpost/ or run from the AppImage.</source>
-        <translation type="unfinished"></translation>
+        <translation>找不到特权辅助脚本 ngpost-vpn-helper.sh。请安装到 /usr/lib/ngpost/ 或从 AppImage 运行。</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="70"/>
         <source>Launching VPN helper: pkexec %1</source>
-        <translation type="unfinished"></translation>
+        <translation>正在启动 VPN 辅助程序：pkexec %1</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="73"/>
         <source>Failed to start pkexec/helper</source>
-        <translation type="unfinished"></translation>
+        <translation>pkexec/辅助程序启动失败</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="130"/>
         <source>Malformed READY from helper: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>来自辅助程序的 READY 消息格式错误：%1</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="148"/>
         <source>helper exited (code %1) before tunnel was ready</source>
-        <translation type="unfinished"></translation>
+        <translation>辅助程序在隧道就绪前退出（代码 %1）</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="155"/>
         <source>pkexec/helper failed to start (binary missing or denied)</source>
-        <translation type="unfinished"></translation>
+        <translation>pkexec/辅助程序启动失败（可执行文件缺失或被拒绝）</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="157"/>
         <source>helper process crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>辅助进程崩溃</translation>
     </message>
 </context>
 <context>
@@ -2873,6 +2878,71 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <location filename="../PostingJob.cpp" line="1483"/>
         <source>ERROR: par2 is not available...</source>
         <translation>错误: par2不可用...</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="237"/>
+        <source>History: could not mark post as resuming: %1</source>
+        <translation>历史记录：无法将帖子标记为恢复中：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="264"/>
+        <source>History: could not create post record: %1</source>
+        <translation>历史记录：无法创建帖子记录：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="342"/>
+        <source>History: missing resume state for file %1</source>
+        <translation>历史记录：文件 %1 缺少恢复状态</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="359"/>
+        <source>History: could not create file record: %1</source>
+        <translation>历史记录：无法创建文件记录：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="370"/>
+        <source>History: could not update article payload: %1</source>
+        <translation>历史记录：无法更新文章有效载荷：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="386"/>
+        <source>History: could not mark article posting: %1</source>
+        <translation>历史记录：无法将文章标记为发布中：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="401"/>
+        <source>History: could not mark article posted: %1</source>
+        <translation>历史记录：无法将文章标记为已发布：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="417"/>
+        <source>History: could not mark article failed: %1</source>
+        <translation>历史记录：无法将文章标记为失败：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="433"/>
+        <source>History: could not mark article unknown: %1</source>
+        <translation>历史记录：无法将文章标记为未知：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1234"/>
+        <source>Could not regenerate final NZB from history: %1</source>
+        <translation>无法从历史记录重新生成最终 NZB：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1236"/>
+        <source>NZB history warning: %1</source>
+        <translation>NZB 历史记录警告：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1238"/>
+        <source>Could not reopen NZB for history regeneration: %1</source>
+        <translation>无法重新打开 NZB 进行历史记录重建：%1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1013"/>
+        <source>[%1] skipping already posted article %2 from %3</source>
+        <translation>[%1] 跳过已发布的文章 %2 来自 %3</translation>
     </message>
 </context>
 <context>
@@ -3240,12 +3310,12 @@ Would you like to overwrite it ?</source>
     <message>
         <location filename="../utils/UpdateChecker.cpp" line="176"/>
         <source>Unable to write to install directory %1. Opening release page instead.</source>
-        <translation type="unfinished"></translation>
+        <translation>无法写入安装目录 %1。改为打开版本页面。</translation>
     </message>
     <message>
         <location filename="../utils/UpdateChecker.cpp" line="211"/>
         <source>Cannot write to %1</source>
-        <translation type="unfinished"></translation>
+        <translation>无法写入 %1</translation>
     </message>
 </context>
 <context>
@@ -3253,127 +3323,127 @@ Would you like to overwrite it ?</source>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="86"/>
         <source>VPN: no config file selected</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：未选择配置文件</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="122"/>
         <source>VPN: tunnel up on %1 (%2)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：隧道已在 %1 (%2) 上建立</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="130"/>
         <source>VPN: failed — %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：失败 — %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="146"/>
         <source>VPN: tunnel stopped</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：隧道已停止</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="176"/>
         <source>VPN: backend not supported on this platform yet</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：此平台尚不支持该后端</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="279"/>
         <source>VPN: install script not found at %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：未找到安装脚本：%1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="283"/>
         <source>Running VPN install: pkexec %1 %2</source>
-        <translation type="unfinished"></translation>
+        <translation>正在执行 VPN 安装：pkexec %1 %2</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="291"/>
         <source>VPN install: timed out</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 安装：超时</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="308"/>
         <source>VPN: uninstall script not found at %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：未找到卸载脚本：%1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="316"/>
         <source>Running VPN uninstall: pkexec %1</source>
-        <translation type="unfinished"></translation>
+        <translation>正在执行 VPN 卸载：pkexec %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="322"/>
         <source>VPN uninstall: timed out</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 卸载：超时</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="348"/>
         <source>Startup: cleaned up stale VPN state</source>
-        <translation type="unfinished"></translation>
+        <translation>启动：已清理过时的 VPN 状态</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="379"/>
         <source>The VPN helper is not installed. Open the VPN dialog and click Install.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 辅助程序未安装。请打开 VPN 对话框并点击安装。</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="383"/>
         <source>No VPN configuration file is selected.</source>
-        <translation type="unfinished"></translation>
+        <translation>未选择 VPN 配置文件。</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="388"/>
         <source>The VPN configuration file is missing or unreadable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 配置文件缺失或无法读取：%1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="392"/>
         <source>The last VPN attempt failed. Open the VPN dialog and try again.</source>
-        <translation type="unfinished"></translation>
+        <translation>上次 VPN 连接失败。请打开 VPN 对话框重试。</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="407"/>
         <source>Auto-starting VPN for incoming job...</source>
-        <translation type="unfinished"></translation>
+        <translation>正在为传入任务自动启动 VPN...</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="410"/>
         <source>Could not start the VPN.</source>
-        <translation type="unfinished"></translation>
+        <translation>无法启动 VPN。</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="433"/>
         <source>No more jobs need the VPN; scheduling auto-disconnect in %1 s</source>
-        <translation type="unfinished"></translation>
+        <translation>没有更多任务需要 VPN；将在 %1 秒后自动断开</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="446"/>
         <source>Auto-disconnect grace expired — stopping VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>自动断开宽限期已过 — 正在停止 VPN</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="460"/>
         <source>disabled</source>
-        <translation type="unfinished"></translation>
+        <translation>已禁用</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="461"/>
         <source>starting...</source>
-        <translation type="unfinished"></translation>
+        <translation>正在启动...</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="462"/>
         <source>connected</source>
-        <translation type="unfinished"></translation>
+        <translation>已连接</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="463"/>
         <source>stopping...</source>
-        <translation type="unfinished"></translation>
+        <translation>正在停止...</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="464"/>
         <source>failed</source>
-        <translation type="unfinished"></translation>
+        <translation>失败</translation>
     </message>
 </context>
 <context>
@@ -3381,162 +3451,162 @@ Would you like to overwrite it ?</source>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="14"/>
         <source>VPN tunnel</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 隧道</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="20"/>
         <source>Setup</source>
-        <translation type="unfinished"></translation>
+        <translation>设置</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="26"/>
         <source>VPN tunnel requires a one-time setup.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 隧道需要一次性设置。</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="49"/>
         <source>Install...</source>
-        <translation type="unfinished"></translation>
+        <translation>安装...</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="52"/>
         <source>Install the privileged VPN helper. After this you won&apos;t be prompted for a password on Connect / Disconnect.</source>
-        <translation type="unfinished"></translation>
+        <translation>安装特权 VPN 辅助程序。此后连接/断开时将不再提示密码。</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="59"/>
         <source>Uninstall...</source>
-        <translation type="unfinished"></translation>
+        <translation>卸载...</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="62"/>
         <source>Remove the privileged VPN helper from the system.</source>
-        <translation type="unfinished"></translation>
+        <translation>从系统中删除特权 VPN 辅助程序。</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="72"/>
         <source>Configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>配置</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="78"/>
         <source>Backend:</source>
-        <translation type="unfinished"></translation>
+        <translation>后端：</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="86"/>
         <source>OpenVPN</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="91"/>
         <source>WireGuard</source>
-        <translation type="unfinished"></translation>
+        <translation>WireGuard</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="99"/>
         <source>Config file:</source>
-        <translation type="unfinished"></translation>
+        <translation>配置文件：</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="111"/>
         <source>Browse...</source>
-        <translation type="unfinished"></translation>
+        <translation>浏览...</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="120"/>
         <source>Auto-connect VPN when a job starts</source>
-        <translation type="unfinished"></translation>
+        <translation>任务开始时自动连接 VPN</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="123"/>
         <source>When checked, ngPost will bring up the VPN tunnel automatically when any job starts, and disconnect 30 seconds after the queue is empty. Per-server &quot;Use VPN&quot; still controls which connections route through the tunnel.</source>
-        <translation type="unfinished"></translation>
+        <translation>启用时，ngPost 将在任意任务开始时自动建立 VPN 隧道，并在队列清空 30 秒后断开。每个服务器的&quot;使用 VPN&quot;选项仍控制哪些连接经由隧道路由。</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="133"/>
         <source>Status</source>
-        <translation type="unfinished"></translation>
+        <translation>状态</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="139"/>
         <source>disabled</source>
-        <translation type="unfinished"></translation>
+        <translation>已禁用</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="159"/>
         <source>Connect</source>
-        <translation type="unfinished"></translation>
+        <translation>连接</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="166"/>
         <source>Disconnect</source>
-        <translation type="unfinished"></translation>
+        <translation>断开</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="176"/>
         <source>Log</source>
-        <translation type="unfinished"></translation>
+        <translation>日志</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="55"/>
         <source>OpenVPN config (*.ovpn *.conf);;All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN 配置 (*.ovpn *.conf);;所有文件 (*)</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="56"/>
         <source>WireGuard config (*.conf);;All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation>WireGuard 配置 (*.conf);;所有文件 (*)</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="60"/>
         <source>Select VPN config</source>
-        <translation type="unfinished"></translation>
+        <translation>选择 VPN 配置</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="69"/>
         <source>No config file selected.</source>
-        <translation type="unfinished"></translation>
+        <translation>未选择配置文件。</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="86"/>
         <source>VPN install</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 安装</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="87"/>
         <source>VPN install failed. See the log for details.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 安装失败。详情请查看日志。</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="95"/>
         <source>Uninstall VPN helper</source>
-        <translation type="unfinished"></translation>
+        <translation>卸载 VPN 辅助程序</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="96"/>
         <source>This will remove the privileged VPN helper and its Polkit rule. You will need to install it again before using the VPN. Continue?</source>
-        <translation type="unfinished"></translation>
+        <translation>这将删除特权 VPN 辅助程序及其 Polkit 规则。使用 VPN 前需要重新安装。继续？</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="105"/>
         <source>VPN uninstall</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 卸载</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="106"/>
         <source>VPN uninstall failed. See the log for details.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 卸载失败。详情请查看日志。</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="155"/>
         <source>VPN tunnel is installed. Connect / Disconnect will not prompt.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 隧道已安装。连接/断开将不再提示密码。</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="159"/>
         <source>VPN tunnel requires a one-time setup (one password prompt).</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 隧道需要一次性设置（一次密码提示）。</translation>
     </message>
 </context>
 <context>
@@ -3544,42 +3614,114 @@ Would you like to overwrite it ?</source>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="44"/>
         <source>Config file not found or unreadable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>找不到配置文件或无法读取：%1</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="50"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found</source>
-        <translation type="unfinished"></translation>
+        <translation>找不到特权辅助脚本 ngpost-vpn-helper.sh</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="70"/>
         <source>Launching VPN helper: pkexec %1</source>
-        <translation type="unfinished"></translation>
+        <translation>正在启动 VPN 辅助程序：pkexec %1</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="73"/>
         <source>Failed to start pkexec/helper</source>
-        <translation type="unfinished"></translation>
+        <translation>pkexec/辅助程序启动失败</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="126"/>
         <source>Malformed READY from helper: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>来自辅助程序的 READY 消息格式错误：%1</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="143"/>
         <source>helper exited (code %1) before tunnel was ready</source>
-        <translation type="unfinished"></translation>
+        <translation>辅助程序在隧道就绪前退出（代码 %1）</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="150"/>
         <source>pkexec/helper failed to start</source>
-        <translation type="unfinished"></translation>
+        <translation>pkexec/辅助程序启动失败</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="152"/>
         <source>helper process crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>辅助进程崩溃</translation>
+    </message>
+</context>
+<context>
+    <name>NzbHistoryRegenerator</name>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="118"/>
+        <source>history store is not available</source>
+        <translation>历史记录存储不可用</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="127"/>
+        <source>post is partial; regenerated NZB may be incomplete</source>
+        <translation>帖子不完整；重新生成的 NZB 可能不完整</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="129"/>
+        <source>post had an archive password, but it is not stored</source>
+        <translation>帖子有存档密码，但未存储</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="166"/>
+        <source>file %1 contains unknown articles</source>
+        <translation>文件 %1 包含未知文章</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="168"/>
+        <source>file %1 contains non-posted articles</source>
+        <translation>文件 %1 包含未发布的文章</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="203"/>
+        <source>%1 article segment sizes were missing in history and rebuilt from file metadata</source>
+        <translation>%1 个文章段大小在历史记录中缺失，已从文件元数据重建</translation>
+    </message>
+</context>
+<context>
+    <name>ResumePlanner</name>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="23"/>
+        <location filename="../history/ResumePlanner.cpp" line="24"/>
+        <source>history store is not available</source>
+        <translation>历史记录存储不可用</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="30"/>
+        <source>cannot load post</source>
+        <translation>无法加载帖子</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="36"/>
+        <source>posting never started; nothing to resume</source>
+        <translation>发帖从未开始；无需恢复</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="69"/>
+        <source>nothing remains to resume</source>
+        <translation>没有剩余内容需要恢复</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="72"/>
+        <source>source files are missing or changed</source>
+        <translation>源文件缺失或已更改</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="75"/>
+        <source>some articles are already posted</source>
+        <translation>部分文章已发布</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="78"/>
+        <source>post can be resumed</source>
+        <translation>帖子可以恢复</translation>
     </message>
 </context>
 </TS>

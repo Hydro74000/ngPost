@@ -20,20 +20,20 @@ ResumePlanner::Decision ResumePlanner::check(qint64 postId, QString *error)
     decision.postId = postId;
     if (!_store) {
         if (error)
-            *error = QStringLiteral("history store is not available");
-        decision.reason = QStringLiteral("history store is not available");
+            *error = tr("history store is not available");
+        decision.reason = tr("history store is not available");
         return decision;
     }
 
     PostHistoryStore::PostDetails details;
     if (!_store->loadPostDetails(postId, &details, error)) {
-        decision.reason = error ? *error : QStringLiteral("cannot load post");
+        decision.reason = error ? *error : tr("cannot load post");
         return decision;
     }
 
     if (details.files.isEmpty()) {
         decision.state = ResumeState::NotResumable;
-        decision.reason = QStringLiteral("posting never started; nothing to resume");
+        decision.reason = tr("posting never started; nothing to resume");
         return decision;
     }
 
@@ -66,16 +66,16 @@ ResumePlanner::Decision ResumePlanner::check(qint64 postId, QString *error)
     const int remaining = decision.pendingArticles + decision.failedArticles + decision.unknownArticles;
     if (remaining == 0) {
         decision.state = ResumeState::NotResumable;
-        decision.reason = QStringLiteral("nothing remains to resume");
+        decision.reason = tr("nothing remains to resume");
     } else if (missingSource) {
         decision.state = ResumeState::NotResumable;
-        decision.reason = QStringLiteral("source files are missing or changed");
+        decision.reason = tr("source files are missing or changed");
     } else if (decision.postedArticles > 0) {
         decision.state = ResumeState::PartiallyResumable;
-        decision.reason = QStringLiteral("some articles are already posted");
+        decision.reason = tr("some articles are already posted");
     } else {
         decision.state = ResumeState::Resumable;
-        decision.reason = QStringLiteral("post can be resumed");
+        decision.reason = tr("post can be resumed");
     }
     return decision;
 }
