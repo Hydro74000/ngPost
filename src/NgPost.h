@@ -38,6 +38,7 @@ class QStorageInfo;
 class NzbCheck;
 class UpdateChecker;
 class VpnManager;
+class PostHistoryService;
 class PostHistoryStore;
 
 #define NB_ARTICLES_TO_PREPARE_PER_CONNECTION 3
@@ -302,6 +303,7 @@ private:
     QString _postDbFile;
     bool _historyStorePasswords;
     bool _historyCrashedArticlesChecked;
+    PostHistoryService *_historyService;
     PostHistoryStore *_historyStore;
     QList<QDir> _autoDirs;
 
@@ -519,6 +521,7 @@ public:
     inline void enableAutoPacking(bool enable = true);
 
     VpnManager *vpnManager() const { return _vpnManager; }
+    PostHistoryService *historyService() const { return _historyService; }
     PostHistoryStore *historyStore() const { return _historyStore; }
 
 signals:

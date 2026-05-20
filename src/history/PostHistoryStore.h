@@ -257,6 +257,8 @@ public:
 private:
     QString _dbPath;
     bool _storePasswords;
+    bool _initialized;
+    QString _initializedDbPath;
 
     bool _execSchema(QString *error);
     bool _exec(const QString &sql, QString *error);

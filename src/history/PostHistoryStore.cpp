@@ -15,6 +15,7 @@
 #include <QSqlRecord>
 #include <QTextStream>
 #include <QThread>
+#include <utility>
 
 namespace
 {
@@ -44,11 +45,13 @@ void setError(QString *error, const QSqlDatabase &db)
 QSqlDatabase dbFor(const QString &connectionName, const QString &dbPath, QString *error)
 {
     QSqlDatabase db;
+    bool newConnection = false;
     if (QSqlDatabase::contains(connectionName))
         db = QSqlDatabase::database(connectionName);
     else {
         db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
         db.setDatabaseName(dbPath);
+        newConnection = true;
     }
 
     if (!db.isOpen() && !db.open()) {
@@ -57,7 +60,8 @@ QSqlDatabase dbFor(const QString &connectionName, const QString &dbPath, QString
     }
 
     QSqlQuery pragma(db);
-    pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
+    if (newConnection)
+        pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
     pragma.exec(QStringLiteral("PRAGMA busy_timeout=5000"));
     pragma.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
     return db;
@@ -105,11 +109,17 @@ qint64 storedPayloadBytes(qint64 bytes)
 PostHistoryStore::PostHistoryStore(const QString &dbPath, bool storePasswords)
     : _dbPath(dbPath)
     , _storePasswords(storePasswords)
+    , _initialized(false)
+    , _initializedDbPath()
 {
 }
 
 void PostHistoryStore::configure(const QString &dbPath, bool storePasswords)
 {
+    if (_dbPath != dbPath || _storePasswords != storePasswords) {
+        _initialized = false;
+        _initializedDbPath.clear();
+    }
     _dbPath = dbPath;
     _storePasswords = storePasswords;
 }
@@ -133,6 +143,9 @@ QString PostHistoryStore::_connectionName() const
 
 bool PostHistoryStore::initialize(QString *error)
 {
+    if (_initialized && _initializedDbPath == _dbPath)
+        return true;
+
     if (_dbPath.isEmpty()) {
         if (error)
             *error = QStringLiteral("empty history database path");
@@ -147,7 +160,12 @@ bool PostHistoryStore::initialize(QString *error)
         return false;
     }
 
-    return _execSchema(error);
+    if (!_execSchema(error))
+        return false;
+
+    _initialized = true;
+    _initializedDbPath = _dbPath;
+    return true;
 }
 
 bool PostHistoryStore::_exec(const QString &sql, QString *error)
@@ -1104,6 +1122,11 @@ QList<PostHistoryStore::PostSummary> PostHistoryStore::listPosts(const ListFilte
     }
     while (q.next())
         out << summaryFromQuery(q);
+    if (q.lastError().isValid()) {
+        setError(error, q);
+        out.clear();
+    }
+    q.finish();
     return out;
 }
 
@@ -1141,6 +1164,11 @@ QList<PostHistoryStore::PostSummary> PostHistoryStore::resumeCandidates(QString 
     }
     while (q.next())
         out << summaryFromQuery(q, /*forceResumable=*/true);
+    if (q.lastError().isValid()) {
+        setError(error, q);
+        out.clear();
+    }
+    q.finish();
     return out;
 }
 
@@ -1195,6 +1223,11 @@ QList<PostHistoryStore::DayStats> PostHistoryStore::statsByDay(const QString &da
         d.avgSpeedBps = q.value(4).toDouble();
         out << d;
     }
+    if (q.lastError().isValid()) {
+        setError(error, q);
+        out.clear();
+    }
+    q.finish();
     return out;
 }
 
@@ -1230,6 +1263,11 @@ QList<PostHistoryStore::GroupStats> PostHistoryStore::statsByGroup(const QString
         s.totalBytes = q.value(2).toLongLong();
         out << s;
     }
+    if (q.lastError().isValid()) {
+        setError(error, q);
+        out.clear();
+    }
+    q.finish();
     return out;
 }
 
@@ -1250,6 +1288,11 @@ QList<PostHistoryStore::PostSummary> PostHistoryStore::topPostsBySize(int n, QSt
     }
     while (q.next())
         out << summaryFromQuery(q);
+    if (q.lastError().isValid()) {
+        setError(error, q);
+        out.clear();
+    }
+    q.finish();
     return out;
 }
 
@@ -1266,6 +1309,11 @@ QStringList PostHistoryStore::allGroups(QString *error)
     }
     while (q.next())
         out << q.value(0).toString();
+    if (q.lastError().isValid()) {
+        setError(error, q);
+        out.clear();
+    }
+    q.finish();
     return out;
 }
 
@@ -1320,6 +1368,7 @@ bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QStr
     details->rarPass = valueString(p, "rar_pass");
     details->passwordOrigin = valueString(p, "password_origin");
     details->from = valueString(p, "from_addr");
+    p.finish();
 
     QSqlQuery f(db);
     f.prepare(QStringLiteral("SELECT * FROM post_files WHERE post_id=? ORDER BY ordinal"));
@@ -1340,7 +1389,15 @@ bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QStr
         fs.groups = valueString(f, "groups_text");
         fs.status = valueString(f, "status");
         details->files << fs;
+    }
+    if (f.lastError().isValid()) {
+        setError(error, f);
+        f.finish();
+        return false;
+    }
+    f.finish();
 
+    for (const FileSummary &fs : std::as_const(details->files)) {
         QSqlQuery a(db);
         a.prepare(QStringLiteral("SELECT * FROM post_articles WHERE file_id=? ORDER BY part"));
         a.addBindValue(fs.id);
@@ -1357,6 +1414,12 @@ bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QStr
             as.status = valueString(a, "status");
             details->articlesByFile[fs.id] << as;
         }
+        if (a.lastError().isValid()) {
+            setError(error, a);
+            a.finish();
+            return false;
+        }
+        a.finish();
     }
     return true;
 }

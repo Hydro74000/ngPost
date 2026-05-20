@@ -23,6 +23,7 @@
 #include "AutoPostWidget.h"
 #include "NgPost.h"
 #include "VpnSettingsDialog.h"
+#include "history/PostHistoryService.h"
 #include "history/PostHistoryStore.h"
 #include "nntp/NntpServerParams.h"
 #include "nntp/NntpArticle.h"
@@ -68,7 +69,6 @@
 #include <QDate>
 #include <QDateEdit>
 #include <QDesktopServices>
-#include "history/ResumePlanner.h"
 #include "utils/UpdateChecker.h"
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
@@ -1209,20 +1209,21 @@ QWidget *MainWindow::_buildHistoryTab()
     // ===== Initial data load =====
     _refreshHistoryViews();
 
-    // Banner: show if resumable posts exist
-    if (_ngPost) {
-        PostHistoryStore *store = _ngPost->historyStore();
-        if (store) {
-            const QList<PostHistoryStore::PostSummary> candidates = store->resumeCandidates();
-            if (!candidates.isEmpty()) {
-                _bannerLabel->setText(tr("%1 post(s) can be resumed.").arg(candidates.size()));
-                _bannerLabel->setVisible(true);
-                _bannerResumeBtn->setVisible(true);
-                statusBar()->showMessage(
-                    tr("%1 post(s) can be resumed. Open the Resume tab to review them.")
-                        .arg(candidates.size()), 10000);
-            }
-        }
+    // Banner: show if resumable posts exist.
+    if (_ngPost && _ngPost->historyService()) {
+        _ngPost->historyService()->requestHistorySnapshot(PostHistoryStore::ListFilter(),
+                                                          _ignoredResumeIds,
+                                                          this,
+                                                          [this](const PostHistoryService::HistorySnapshot &snapshot) {
+            if (!snapshot.error.isEmpty() || snapshot.resumeRows.isEmpty())
+                return;
+            _bannerLabel->setText(tr("%1 post(s) can be resumed.").arg(snapshot.resumeRows.size()));
+            _bannerLabel->setVisible(true);
+            _bannerResumeBtn->setVisible(true);
+            statusBar()->showMessage(
+                tr("%1 post(s) can be resumed. Open the Resume tab to review them.")
+                    .arg(snapshot.resumeRows.size()), 10000);
+        });
     }
 
     return root;
@@ -1230,29 +1231,36 @@ QWidget *MainWindow::_buildHistoryTab()
 
 void MainWindow::_refreshHistoryViews()
 {
-    PostHistoryStore *store = _ngPost ? _ngPost->historyStore() : nullptr;
+    PostHistoryService *history = _ngPost ? _ngPost->historyService() : nullptr;
+    if (!history)
+        return;
 
-    // ---- History table ----
-    if (_historyTable && store) {
+    PostHistoryStore::ListFilter filter;
+    if (_historyStatusFilter && _historyStatusFilter->currentIndex() > 0)
+        filter.status = _historyStatusFilter->currentText();
+    if (_historySearchEdit)
+        filter.search = _historySearchEdit->text().trimmed();
+    filter.onlyWithPassword = _historyPassFilter && _historyPassFilter->isChecked();
+    filter.onlyWithErrors   = _historyErrorsFilter && _historyErrorsFilter->isChecked();
+    if (_historyGroupEdit)
+        filter.group = _historyGroupEdit->text().trimmed();
+    if (_historyDateFrom && _historyDateFrom->date() > _historyDateFrom->minimumDate())
+        filter.dateFrom = _historyDateFrom->date().toString(Qt::ISODate);
+    if (_historyDateTo && _historyDateTo->date() > _historyDateTo->minimumDate())
+        filter.dateTo = _historyDateTo->date().toString(Qt::ISODate);
+
+    const QSet<qint64> ignoredResumeIds = _ignoredResumeIds;
+    history->requestHistorySnapshot(filter, ignoredResumeIds, this, [this](const PostHistoryService::HistorySnapshot &snapshot) {
+        if (!snapshot.error.isEmpty()) {
+            statusBar()->showMessage(tr("History refresh failed: %1").arg(snapshot.error), 6000);
+            return;
+        }
+
+        if (!_historyTable || !_resumeTable)
+            return;
+
         _historyTable->setSortingEnabled(false);
-        _historyTable->setRowCount(0);
-
-        PostHistoryStore::ListFilter filter;
-        if (_historyStatusFilter && _historyStatusFilter->currentIndex() > 0)
-            filter.status = _historyStatusFilter->currentText();
-        if (_historySearchEdit)
-            filter.search = _historySearchEdit->text().trimmed();
-        filter.onlyWithPassword = _historyPassFilter && _historyPassFilter->isChecked();
-        filter.onlyWithErrors   = _historyErrorsFilter && _historyErrorsFilter->isChecked();
-        if (_historyGroupEdit)
-            filter.group = _historyGroupEdit->text().trimmed();
-        if (_historyDateFrom && _historyDateFrom->date() > _historyDateFrom->minimumDate())
-            filter.dateFrom = _historyDateFrom->date().toString(Qt::ISODate);
-        if (_historyDateTo && _historyDateTo->date() > _historyDateTo->minimumDate())
-            filter.dateTo = _historyDateTo->date().toString(Qt::ISODate);
-
-        QString err;
-        const QList<PostHistoryStore::PostSummary> posts = store->listPosts(filter, &err);
+        const QList<PostHistoryStore::PostSummary> posts = snapshot.posts;
         _historyTable->setRowCount(posts.size());
         for (int row = 0; row < posts.size(); ++row) {
             const PostHistoryStore::PostSummary &p = posts.at(row);
@@ -1280,59 +1288,43 @@ void MainWindow::_refreshHistoryViews()
         _historyTable->resizeColumnsToContents();
         _historyTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
         _historyTable->setSortingEnabled(true);
-    }
 
-    // ---- Stats ----
-    _onStatsRefresh();
-
-    // ---- Resume table ----
-    if (_resumeTable && store) {
         _resumeTable->setRowCount(0);
-        QString err;
-        const QList<PostHistoryStore::PostSummary> candidates = store->resumeCandidates(&err);
-        ResumePlanner planner(store);
-        for (const PostHistoryStore::PostSummary &p : candidates) {
-            if (_ignoredResumeIds.contains(p.id)) continue;
-            QString checkErr;
-            const ResumePlanner::Decision dec = planner.check(p.id, &checkErr);
-            if (dec.state == ResumePlanner::ResumeState::NotResumable)
-                continue;
-            const QString state =
-                dec.state == ResumePlanner::ResumeState::Resumable
-                    ? QStringLiteral("resumable")
-                    : QStringLiteral("partial_resumable");
+        for (const PostHistoryService::ResumeRow &resume : snapshot.resumeRows) {
             const int row = _resumeTable->rowCount();
             _resumeTable->setRowCount(row + 1);
             const QStringList values = {
-                p.nzbName, state,
-                QString::number(dec.postedArticles),
-                QString::number(dec.pendingArticles + dec.failedArticles),
-                QString::number(dec.unknownArticles), dec.reason
+                resume.name, resume.state,
+                QString::number(resume.postedArticles),
+                QString::number(resume.pendingArticles + resume.failedArticles),
+                QString::number(resume.unknownArticles), resume.reason
             };
             for (int col = 0; col < values.size(); ++col) {
                 auto *item = new QTableWidgetItem(values.at(col));
                 if (col == 1)
-                    item->setForeground(statusColor(p.status));
-                item->setData(Qt::UserRole, p.id);
+                    item->setForeground(statusColor(resume.status));
+                item->setData(Qt::UserRole, resume.postId);
                 _resumeTable->setItem(row, col, item);
             }
         }
         _resumeTable->resizeColumnsToContents();
         _resumeTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
-    }
 
-    // Reset selection state
-    _selectedHistoryId = 0;
-    for (QPushButton *btn : {_histRegenNzbBtn, _histCopyPassBtn, _histPurgePassBtn,
-                             _histOpenNzbBtn, _histDeleteBtn})
-        if (btn) btn->setEnabled(false);
-    for (QPushButton *btn : {_resumeResumeBtn, _resumeAbandonBtn, _resumePurgeBtn,
-                             _resumeIgnoreBtn, _resumeDeleteBtn})
-        if (btn) btn->setEnabled(false);
-    if (_historyDetailInfo)
-        _historyDetailInfo->setText(tr("<i>Select a post to see its details.</i>"));
-    if (_resumeDetailInfo)
-        _resumeDetailInfo->setText(tr("<i>Select a post to see resume details.</i>"));
+        // Reset selection state only after a successful snapshot.
+        _selectedHistoryId = 0;
+        for (QPushButton *btn : {_histRegenNzbBtn, _histCopyPassBtn, _histPurgePassBtn,
+                                 _histOpenNzbBtn, _histDeleteBtn})
+            if (btn) btn->setEnabled(false);
+        for (QPushButton *btn : {_resumeResumeBtn, _resumeAbandonBtn, _resumePurgeBtn,
+                                 _resumeIgnoreBtn, _resumeDeleteBtn})
+            if (btn) btn->setEnabled(false);
+        if (_historyDetailInfo)
+            _historyDetailInfo->setText(tr("<i>Select a post to see its details.</i>"));
+        if (_resumeDetailInfo)
+            _resumeDetailInfo->setText(tr("<i>Select a post to see resume details.</i>"));
+    });
+
+    _onStatsRefresh();
 }
 
 PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &files)
@@ -1790,17 +1782,25 @@ void MainWindow::_onHistoryRowSelected(int row)
     if (!item) return;
     _selectedHistoryId = item->data(Qt::UserRole).toLongLong();
 
-    PostHistoryStore *store = _ngPost ? _ngPost->historyStore() : nullptr;
-    if (!store || !_selectedHistoryId) return;
+    PostHistoryService *history = _ngPost ? _ngPost->historyService() : nullptr;
+    if (!history || !_selectedHistoryId) return;
+    const qint64 requestedId = _selectedHistoryId;
+    history->requestPostDetails(requestedId, this, [this, requestedId](bool ok,
+                                                                       const PostHistoryStore::PostDetails &details,
+                                                                       const QString &err) {
+        if (requestedId != _selectedHistoryId)
+            return;
+        if (!ok) {
+            if (_historyDetailInfo)
+                _historyDetailInfo->setText(tr("<i>Could not load details: %1</i>").arg(err));
+            return;
+        }
+        _showHistoryDetails(details);
+    });
+}
 
-    PostHistoryStore::PostDetails details;
-    QString err;
-    if (!store->loadPostDetails(_selectedHistoryId, &details, &err)) {
-        if (_historyDetailInfo)
-            _historyDetailInfo->setText(tr("<i>Could not load details: %1</i>").arg(err));
-        return;
-    }
-
+void MainWindow::_showHistoryDetails(const PostHistoryStore::PostDetails &details)
+{
     const PostHistoryStore::PostSummary &s = details.post;
     QString html = QStringLiteral(
         "<table cellspacing='4'>"
@@ -1870,12 +1870,12 @@ void MainWindow::_onHistoryRegenNzb()
 {
     if (!_selectedHistoryId || !_ngPost) return;
 
-    PostHistoryStore *store = _ngPost->historyStore();
-    if (!store) return;
+    PostHistoryService *history = _ngPost->historyService();
+    if (!history) return;
 
     PostHistoryStore::PostDetails details;
     QString err;
-    if (!store->loadPostDetails(_selectedHistoryId, &details, &err)) return;
+    if (!history->loadPostDetails(_selectedHistoryId, &details, &err)) return;
 
     bool includePassword = false;
     if (details.post.hasPassword && details.post.passwordStored) {
@@ -1930,12 +1930,12 @@ void MainWindow::_onHistoryExportCsv()
 void MainWindow::_onHistoryCopyPassword()
 {
     if (!_selectedHistoryId || !_ngPost) return;
-    PostHistoryStore *store = _ngPost->historyStore();
-    if (!store) return;
+    PostHistoryService *history = _ngPost->historyService();
+    if (!history) return;
 
     PostHistoryStore::PostDetails details;
     QString err;
-    if (!store->loadPostDetails(_selectedHistoryId, &details, &err)) return;
+    if (!history->loadPostDetails(_selectedHistoryId, &details, &err)) return;
     if (details.rarPass.isEmpty()) return;
 
     QApplication::clipboard()->setText(details.rarPass);
@@ -1952,9 +1952,9 @@ void MainWindow::_onHistoryPurgePassword()
         QMessageBox::Yes, QMessageBox::No);
     if (res != QMessageBox::Yes) return;
 
-    PostHistoryStore *store = _ngPost->historyStore();
+    PostHistoryService *history = _ngPost->historyService();
     QString err;
-    if (!store || !store->purgePassword(_selectedHistoryId, &err))
+    if (!history || !history->purgePassword(_selectedHistoryId, &err))
         QMessageBox::warning(this, tr("Error"), err.isEmpty()
                              ? tr("Could not purge password.") : err);
     else
@@ -1971,9 +1971,9 @@ void MainWindow::_onHistoryDeleteEntry()
         QMessageBox::Yes, QMessageBox::No);
     if (res != QMessageBox::Yes) return;
 
-    PostHistoryStore *store = _ngPost->historyStore();
+    PostHistoryService *history = _ngPost->historyService();
     QString err;
-    if (!store || !store->deletePost(_selectedHistoryId, &err))
+    if (!history || !history->deletePost(_selectedHistoryId, &err))
         QMessageBox::warning(this, tr("Error"), err.isEmpty()
                              ? tr("Could not delete entry.") : err);
     else
@@ -1983,11 +1983,11 @@ void MainWindow::_onHistoryDeleteEntry()
 void MainWindow::_onHistoryOpenNzb()
 {
     if (!_selectedHistoryId || !_ngPost) return;
-    PostHistoryStore *store = _ngPost->historyStore();
-    if (!store) return;
+    PostHistoryService *history = _ngPost->historyService();
+    if (!history) return;
     PostHistoryStore::PostDetails details;
     QString err;
-    if (!store->loadPostDetails(_selectedHistoryId, &details, &err)) return;
+    if (!history->loadPostDetails(_selectedHistoryId, &details, &err)) return;
     if (details.nzbPath.isEmpty()) {
         QMessageBox::information(this, tr("No NZB path"),
                                  tr("No NZB path stored for this post."));
@@ -2010,8 +2010,8 @@ void MainWindow::_onHistoryResumePost()
 
 void MainWindow::_onStatsRefresh()
 {
-    PostHistoryStore *store = _ngPost ? _ngPost->historyStore() : nullptr;
-    if (!store) return;
+    PostHistoryService *history = _ngPost ? _ngPost->historyService() : nullptr;
+    if (!history) return;
 
     // Compute date range from period combo
     QString dateFrom, dateTo;
@@ -2030,32 +2030,33 @@ void MainWindow::_onStatsRefresh()
     const QString groupFilter = (_statsGroupFilter && _statsGroupFilter->currentIndex() > 0)
                                     ? _statsGroupFilter->currentText() : QString();
 
-    // Refresh group combo (preserve selection)
+    const QString previousGroup = (_statsGroupFilter && _statsGroupFilter->currentIndex() > 0)
+                                      ? _statsGroupFilter->currentText() : QString();
+
+    history->requestStatsSnapshot(dateFrom, dateTo, groupFilter, this, [this, previousGroup](const PostHistoryService::StatsSnapshot &snapshot) {
+    if (!snapshot.error.isEmpty()) {
+        statusBar()->showMessage(tr("History stats refresh failed: %1").arg(snapshot.error), 6000);
+        return;
+    }
+
     if (_statsGroupFilter) {
-        const QString prev = _statsGroupFilter->currentIndex() > 0
-                                 ? _statsGroupFilter->currentText() : QString();
         _statsGroupFilter->blockSignals(true);
         _statsGroupFilter->clear();
         _statsGroupFilter->addItem(tr("All groups"));
-        QString err;
-        for (const QString &g : store->allGroups(&err))
+        for (const QString &g : snapshot.groups)
             _statsGroupFilter->addItem(g);
-        if (!prev.isEmpty()) {
-            const int idx = _statsGroupFilter->findText(prev);
-            if (idx >= 0) _statsGroupFilter->setCurrentIndex(idx);
+        if (!previousGroup.isEmpty()) {
+            const int idx = _statsGroupFilter->findText(previousGroup);
+            if (idx >= 0)
+                _statsGroupFilter->setCurrentIndex(idx);
         }
         _statsGroupFilter->blockSignals(false);
     }
 
-    // Timeline chart
     if (_statsTimelineChart) {
         _statsTimelineChart->removeAllSeries();
         for (QAbstractAxis *ax : _statsTimelineChart->axes())
             _statsTimelineChart->removeAxis(ax);
-
-        QString err;
-        const QList<PostHistoryStore::DayStats> days =
-            store->statsByDay(dateFrom, dateTo, groupFilter, &err);
 
         auto *volSet  = new QBarSet(tr("Volume (MB)"), _statsTimelineChart);
         auto *failSet = new QBarSet(tr("Failed"), _statsTimelineChart);
@@ -2063,7 +2064,7 @@ void MainWindow::_onStatsRefresh()
         failSet->setColor(QColor(Qt::darkRed));
 
         QStringList labels;
-        for (const PostHistoryStore::DayStats &d : days) {
+        for (const PostHistoryStore::DayStats &d : snapshot.days) {
             *volSet  << (d.totalBytes / (1024.0 * 1024.0));
             *failSet << d.nbFailed;
             labels   << d.date.mid(5); // MM-DD
@@ -2085,20 +2086,15 @@ void MainWindow::_onStatsRefresh()
         series->attachAxis(axisY);
     }
 
-    // By-group chart
     if (_statsGroupChart) {
         _statsGroupChart->removeAllSeries();
         for (QAbstractAxis *ax : _statsGroupChart->axes())
             _statsGroupChart->removeAxis(ax);
 
-        QString err;
-        const QList<PostHistoryStore::GroupStats> groups =
-            store->statsByGroup(dateFrom, dateTo, &err);
-
         auto *set = new QBarSet(tr("Posts"), _statsGroupChart);
         set->setColor(QColor(Qt::darkBlue));
         QStringList labels;
-        for (const PostHistoryStore::GroupStats &g : groups) {
+        for (const PostHistoryStore::GroupStats &g : snapshot.groupStats) {
             *set << g.nbPosts;
             labels << g.group;
         }
@@ -2118,11 +2114,9 @@ void MainWindow::_onStatsRefresh()
         series->attachAxis(axisY);
     }
 
-    // Top posts table
     if (_statsTopTable) {
         _statsTopTable->setRowCount(0);
-        QString err;
-        const QList<PostHistoryStore::PostSummary> tops = store->topPostsBySize(20, &err);
+        const QList<PostHistoryStore::PostSummary> tops = snapshot.topPosts;
         _statsTopTable->setRowCount(tops.size());
         for (int row = 0; row < tops.size(); ++row) {
             const PostHistoryStore::PostSummary &p = tops.at(row);
@@ -2138,6 +2132,7 @@ void MainWindow::_onStatsRefresh()
         _statsTopTable->resizeColumnsToContents();
         _statsTopTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
     }
+    });
 }
 
 // ============================================================
@@ -2164,16 +2159,16 @@ void MainWindow::_onResumeSelectionChanged()
     if (!item) return;
     const qint64 postId = item->data(Qt::UserRole).toLongLong();
     if (!postId || !_ngPost) return;
-    PostHistoryStore *store = _ngPost->historyStore();
-    if (!store) return;
+    PostHistoryService *history = _ngPost->historyService();
+    if (!history) return;
 
-    ResumePlanner planner(store);
+    PostHistoryService::ResumeRow dec;
     QString err;
-    const ResumePlanner::Decision dec = planner.check(postId, &err);
+    history->checkResume(postId, &dec, &err);
     const QString stateStr =
-        dec.state == ResumePlanner::ResumeState::Resumable
+        dec.state == QStringLiteral("resumable")
             ? tr("<span style='color:darkgreen'>Resumable</span>")
-            : dec.state == ResumePlanner::ResumeState::PartiallyResumable
+            : dec.state == QStringLiteral("partial_resumable")
                 ? tr("<span style='color:#FFA200'>Partially resumable</span>")
                 : tr("<span style='color:darkred'>Not resumable</span>");
     _resumeDetailInfo->setText(
@@ -2223,13 +2218,13 @@ void MainWindow::_onResumeAbandon()
             .arg(selected.size()),
         QMessageBox::Yes, QMessageBox::No);
     if (res != QMessageBox::Yes) return;
-    PostHistoryStore *store = _ngPost->historyStore();
-    if (!store) return;
+    PostHistoryService *history = _ngPost->historyService();
+    if (!history) return;
     for (const QModelIndex &idx : selected) {
         QTableWidgetItem *item = _resumeTable->item(idx.row(), 0);
         if (item) {
             QString err;
-            store->setPostAbandoned(item->data(Qt::UserRole).toLongLong(), &err);
+            history->setPostAbandoned(item->data(Qt::UserRole).toLongLong(), &err);
         }
     }
     _refreshHistoryViews();
@@ -2247,13 +2242,13 @@ void MainWindow::_onResumePurge()
             .arg(selected.size()),
         QMessageBox::Yes, QMessageBox::No);
     if (res != QMessageBox::Yes) return;
-    PostHistoryStore *store = _ngPost->historyStore();
-    if (!store) return;
+    PostHistoryService *history = _ngPost->historyService();
+    if (!history) return;
     for (const QModelIndex &idx : selected) {
         QTableWidgetItem *item = _resumeTable->item(idx.row(), 0);
         if (item) {
             QString err;
-            store->purgeResumeData(item->data(Qt::UserRole).toLongLong(), &err);
+            history->purgeResumeData(item->data(Qt::UserRole).toLongLong(), &err);
         }
     }
     _refreshHistoryViews();
@@ -2282,13 +2277,13 @@ void MainWindow::_onResumeDeleteEntries()
             .arg(selected.size()),
         QMessageBox::Yes, QMessageBox::No);
     if (res != QMessageBox::Yes) return;
-    PostHistoryStore *store = _ngPost->historyStore();
-    if (!store) return;
+    PostHistoryService *history = _ngPost->historyService();
+    if (!history) return;
     for (const QModelIndex &idx : selected) {
         QTableWidgetItem *item = _resumeTable->item(idx.row(), 0);
         if (item) {
             QString err;
-            store->deletePost(item->data(Qt::UserRole).toLongLong(), &err);
+            history->deletePost(item->data(Qt::UserRole).toLongLong(), &err);
         }
     }
     _refreshHistoryViews();
@@ -2312,18 +2307,17 @@ void MainWindow::_onHistoryContextMenu(const QPoint &pos)
     const qint64 postId = idItem->data(Qt::UserRole).toLongLong();
     if (!postId) return;
 
-    PostHistoryStore *store = _ngPost->historyStore();
-    if (!store) return;
+    PostHistoryService *history = _ngPost->historyService();
+    if (!history) return;
 
     PostHistoryStore::PostDetails details;
     QString err;
-    if (!store->loadPostDetails(postId, &details, &err)) return;
+    if (!history->loadPostDetails(postId, &details, &err)) return;
 
     QMenu menu(this);
     QAction *resumeAct = nullptr;
-    ResumePlanner planner(store);
-    const ResumePlanner::Decision dec = planner.check(postId, &err);
-    if (dec.state != ResumePlanner::ResumeState::NotResumable)
+    PostHistoryService::ResumeRow dec;
+    if (history->checkResume(postId, &dec, &err))
         resumeAct = menu.addAction(tr("Resume"));
 
     QAction *revealAct = nullptr;

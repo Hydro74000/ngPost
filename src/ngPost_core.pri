@@ -80,8 +80,8 @@ SOURCES += \
         $$PWD/FileUploader.cpp \
         $$PWD/FoldersMonitorForNewFiles.cpp \
         $$PWD/history/NzbHistoryRegenerator.cpp \
+        $$PWD/history/PostHistoryService.cpp \
         $$PWD/history/PostHistoryStore.cpp \
-        $$PWD/history/PostHistoryWriter.cpp \
         $$PWD/history/ResumePlanner.cpp \
         $$PWD/NgPost.cpp \
         $$PWD/NntpCheckCon.cpp \
@@ -109,8 +109,8 @@ HEADERS += \
     $$PWD/FileUploader.h \
     $$PWD/FoldersMonitorForNewFiles.h \
     $$PWD/history/NzbHistoryRegenerator.h \
+    $$PWD/history/PostHistoryService.h \
     $$PWD/history/PostHistoryStore.h \
-    $$PWD/history/PostHistoryWriter.h \
     $$PWD/history/ResumePlanner.h \
     $$PWD/NgPost.h \
     $$PWD/NntpCheckCon.h \

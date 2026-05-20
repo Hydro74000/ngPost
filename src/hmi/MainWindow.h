@@ -21,6 +21,7 @@
 #define MAINWINDOW_H
 
 #include "vpn/VpnManager.h"
+#include "history/PostHistoryStore.h"
 
 #include <QMainWindow>
 #include <QFileInfoList>
@@ -257,6 +258,7 @@ private:
     QWidget *_buildHistoryTab();
     void     _retranslateHistoryTab();
     void _refreshHistoryViews();
+    void _showHistoryDetails(const PostHistoryStore::PostDetails &details);
     bool _startResumePost(qint64 postId, bool askConfirmation = true);
 
     void _addServer(NntpServerParams *serverParam);

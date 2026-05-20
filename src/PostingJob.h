@@ -40,7 +40,6 @@ class NntpFile;
 class NntpArticle;
 class PostingWidget;
 class Poster;
-class PostHistoryWriter;
 
 using AtomicBool = QAtomicInteger<unsigned short>; // 16 bit only (faster than using 8 bit variable...)
 
@@ -167,8 +166,6 @@ private:
     qint64 _historyPostId;
     const bool _resumeFromHistory;
     const QMap<QString, ResumeFileState> _resumeFileStatesByPath;
-    QThread _historyWriterThread;
-    PostHistoryWriter *_historyWriter;
 
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     quint64 _immediateSize; //!< bytes posted (to compute the avg speed)
@@ -320,9 +317,7 @@ private:
     void _postFiles();
     void _finishPosting();
 
-    void _startHistoryWriter();
-    void _flushHistoryWriter();
-    void _stopHistoryWriter();
+    void _flushHistoryService();
 
     void _closeNzb();
     void _printStats() const;

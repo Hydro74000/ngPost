@@ -12,6 +12,7 @@
 #include "FileUploader.h"
 #include "NzbCheck.h"
 #include "history/NzbHistoryRegenerator.h"
+#include "history/PostHistoryService.h"
 #include "history/PostHistoryStore.h"
 #include "history/ResumePlanner.h"
 #include "utils/PathHelper.h"
@@ -341,6 +342,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _postDbFile(PathHelper::configDir() + QStringLiteral("/ngPost_history.sqlite")),
     _historyStorePasswords(true),
     _historyCrashedArticlesChecked(false),
+    _historyService(nullptr),
     _historyStore(nullptr),
     _autoDirs(),
     _folderMonitor(nullptr), _monitorThread(nullptr),
@@ -462,6 +464,12 @@ NgPost::NgPost(int &argc, char *argv[]):
 
     _loadTanslators();
     _historyStore = new PostHistoryStore(_postDbFile, _historyStorePasswords);
+    _historyService = new PostHistoryService(_postDbFile, _historyStorePasswords, this);
+    connect(_historyService,
+            &PostHistoryService::error,
+            this,
+            [this](const QString &msg) { _error(msg); },
+            Qt::QueuedConnection);
 
 #if defined(__DEBUG__) && QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
     QNetworkConfigurationManager netConfMgr;
@@ -530,7 +538,10 @@ NgPost::~NgPost()
     if (_nzbCheck)
         delete _nzbCheck;
 
+    delete _historyService;
+    _historyService = nullptr;
     delete _historyStore;
+    _historyStore = nullptr;
 
     _stopMonitoring();
 
@@ -593,23 +604,39 @@ bool NgPost::_ensureHistoryStore()
     else
         _historyStore->configure(_postDbFile, _historyStorePasswords);
 
+    if (!_historyService) {
+        _historyService = new PostHistoryService(_postDbFile, _historyStorePasswords, this);
+        connect(_historyService,
+                &PostHistoryService::error,
+                this,
+                [this](const QString &msg) { _error(msg); },
+                Qt::QueuedConnection);
+    } else {
+        _historyService->configure(_postDbFile, _historyStorePasswords);
+    }
+
     QString err;
-    if (!_historyStore->initialize(&err)) {
+    if (!_historyService->initialize(&err)) {
         _error(tr("History database error: %1").arg(err), ERROR_CODE::ERR_HISTORY);
         return false;
     }
     if (!_historyCrashedArticlesChecked) {
         err.clear();
-        if (!_historyStore->markPostCrashedArticlesUnknown(&err)) {
+        if (!_historyService->markPostCrashedArticlesUnknown(&err)) {
             _error(tr("History cleanup failed: %1").arg(err), ERROR_CODE::ERR_HISTORY);
             return false;
         }
         err.clear();
-        if (!_historyStore->cleanupInvalidResumePosts(&err)) {
+        if (!_historyService->cleanupInvalidResumePosts(&err)) {
             _error(tr("History cleanup failed: %1").arg(err), ERROR_CODE::ERR_HISTORY);
             return false;
         }
         _historyCrashedArticlesChecked = true;
+    }
+    err.clear();
+    if (!_historyStore->initialize(&err)) {
+        _error(tr("History database error: %1").arg(err), ERROR_CODE::ERR_HISTORY);
+        return false;
     }
     return true;
 }
@@ -813,6 +840,14 @@ void NgPost::_printHistoryShow(qint64 postId, bool includePassword)
 
 bool NgPost::_regenerateNzbFromHistory(qint64 postId, const QString &outPath, bool includePassword)
 {
+    if (_historyService) {
+        QString flushErr;
+        if (!_historyService->flush(&flushErr)) {
+            _error(tr("Could not flush pending history before NZB regeneration: %1").arg(flushErr),
+                   ERROR_CODE::ERR_HISTORY);
+            return false;
+        }
+    }
     NzbHistoryRegenerator regenerator(_historyStore);
     QStringList warnings;
     QString err;
@@ -1077,6 +1112,14 @@ bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
         if (error)
             *error = tr("history store is not available");
         return false;
+    }
+    if (_historyService) {
+        QString flushErr;
+        if (!_historyService->flush(&flushErr)) {
+            if (error)
+                *error = flushErr;
+            return false;
+        }
     }
 
     ResumePlanner planner(_historyStore);
