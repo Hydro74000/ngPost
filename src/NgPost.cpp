@@ -11,10 +11,8 @@
 #include "nntp/NntpServerParams.h"
 #include "FileUploader.h"
 #include "NzbCheck.h"
-#include "history/NzbHistoryRegenerator.h"
 #include "history/PostHistoryService.h"
 #include "history/PostHistoryStore.h"
-#include "history/ResumePlanner.h"
 #include "utils/PathHelper.h"
 #include "utils/UpdateChecker.h"
 #include "vpn/VpnManager.h"
@@ -343,7 +341,6 @@ NgPost::NgPost(int &argc, char *argv[]):
     _historyStorePasswords(true),
     _historyCrashedArticlesChecked(false),
     _historyService(nullptr),
-    _historyStore(nullptr),
     _autoDirs(),
     _folderMonitor(nullptr), _monitorThread(nullptr),
     _delAuto(false),
@@ -463,7 +460,6 @@ NgPost::NgPost(int &argc, char *argv[]):
     });
 
     _loadTanslators();
-    _historyStore = new PostHistoryStore(_postDbFile, _historyStorePasswords);
     _historyService = new PostHistoryService(_postDbFile, _historyStorePasswords, this);
     connect(_historyService,
             &PostHistoryService::error,
@@ -540,8 +536,6 @@ NgPost::~NgPost()
 
     delete _historyService;
     _historyService = nullptr;
-    delete _historyStore;
-    _historyStore = nullptr;
 
     _stopMonitoring();
 
@@ -599,11 +593,6 @@ void NgPost::_finishPosting()
 
 bool NgPost::_ensureHistoryStore()
 {
-    if (!_historyStore)
-        _historyStore = new PostHistoryStore(_postDbFile, _historyStorePasswords);
-    else
-        _historyStore->configure(_postDbFile, _historyStorePasswords);
-
     if (!_historyService) {
         _historyService = new PostHistoryService(_postDbFile, _historyStorePasswords, this);
         connect(_historyService,
@@ -632,11 +621,6 @@ bool NgPost::_ensureHistoryStore()
             return false;
         }
         _historyCrashedArticlesChecked = true;
-    }
-    err.clear();
-    if (!_historyStore->initialize(&err)) {
-        _error(tr("History database error: %1").arg(err), ERROR_CODE::ERR_HISTORY);
-        return false;
     }
     return true;
 }
@@ -683,7 +667,7 @@ bool NgPost::_handleHistoryCommand(QCommandLineParser &parser, bool *startEventL
         || parser.isSet(QStringLiteral("history-import-csv"))) {
         QString err;
         const QString path = parser.value(sOptionNames[Opt::HISTORY_IMPORT_CSV]);
-        if (!_historyStore->importLegacyCsv(path, &err))
+        if (!_historyService->importLegacyCsv(path, &err))
             _error(tr("History CSV import failed: %1").arg(err), ERROR_CODE::ERR_HISTORY);
         else
             _cout << tr("History CSV imported: %1").arg(path) << "\n";
@@ -720,7 +704,7 @@ bool NgPost::_handleHistoryCommand(QCommandLineParser &parser, bool *startEventL
     if (parser.isSet(sOptionNames[Opt::RESUME_ALL])
         || parser.isSet(QStringLiteral("resume-all"))) {
         QString err;
-        const QList<PostHistoryStore::PostSummary> posts = _historyStore->resumeCandidates(&err);
+        const QList<PostHistoryStore::PostSummary> posts = _historyService->resumeCandidates(&err);
         if (!err.isEmpty()) {
             _error(tr("Resume query failed: %1").arg(err), ERROR_CODE::ERR_HISTORY);
             return true;
@@ -757,7 +741,7 @@ bool NgPost::_handleHistoryCommand(QCommandLineParser &parser, bool *startEventL
         }
         QString err;
         const qint64 postId = parser.value(sOptionNames[Opt::RESUME_ABANDON]).toLongLong();
-        if (!_historyStore->setPostAbandoned(postId, &err))
+        if (!_historyService->setPostAbandoned(postId, &err))
             _error(tr("Could not abandon post %1: %2").arg(postId).arg(err), ERROR_CODE::ERR_HISTORY);
         else
             _cout << tr("Post %1 marked as abandoned").arg(postId) << "\n";
@@ -773,7 +757,7 @@ bool NgPost::_handleHistoryCommand(QCommandLineParser &parser, bool *startEventL
         }
         QString err;
         const qint64 postId = parser.value(sOptionNames[Opt::RESUME_PURGE]).toLongLong();
-        if (!_historyStore->purgeResumeData(postId, &err))
+        if (!_historyService->purgeResumeData(postId, &err))
             _error(tr("Could not purge resume data for post %1: %2").arg(postId).arg(err), ERROR_CODE::ERR_HISTORY);
         else
             _cout << tr("Resume data purged for post %1").arg(postId) << "\n";
@@ -786,7 +770,8 @@ bool NgPost::_handleHistoryCommand(QCommandLineParser &parser, bool *startEventL
 void NgPost::_printHistory(bool jsonOutput)
 {
     QString err;
-    const QList<PostHistoryStore::PostSummary> posts = _historyStore->listPosts(QString(), QString(), false, &err);
+    const QList<PostHistoryStore::PostSummary> posts =
+        _historyService->listPosts(PostHistoryStore::ListFilter(), &err);
     if (!err.isEmpty()) {
         _error(tr("History query failed: %1").arg(err), ERROR_CODE::ERR_HISTORY);
         return;
@@ -818,7 +803,7 @@ void NgPost::_printHistoryShow(qint64 postId, bool includePassword)
 {
     PostHistoryStore::PostDetails details;
     QString err;
-    if (!_historyStore->loadPostDetails(postId, &details, &err)) {
+    if (!_historyService->loadPostDetails(postId, &details, &err)) {
         _error(tr("History post %1 not found: %2").arg(postId).arg(err), ERROR_CODE::ERR_HISTORY);
         return;
     }
@@ -840,34 +825,19 @@ void NgPost::_printHistoryShow(qint64 postId, bool includePassword)
 
 bool NgPost::_regenerateNzbFromHistory(qint64 postId, const QString &outPath, bool includePassword)
 {
-    if (_historyService) {
-        QString flushErr;
-        if (!_historyService->flush(&flushErr)) {
-            _error(tr("Could not flush pending history before NZB regeneration: %1").arg(flushErr),
-                   ERROR_CODE::ERR_HISTORY);
-            return false;
-        }
-    }
-    NzbHistoryRegenerator regenerator(_historyStore);
     QStringList warnings;
     QString err;
+    bool ok = false;
     if (outPath.isEmpty()) {
-        if (!regenerator.writeNzb(postId, _cout, includePassword, &warnings, &err)) {
-            _error(tr("Could not regenerate NZB: %1").arg(err), ERROR_CODE::ERR_HISTORY);
-            return false;
-        }
+        ok = _historyService->regenerateNzb(postId, _cout, includePassword, &warnings, &err);
     } else {
-        QFile file(outPath);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            _error(tr("Could not write NZB: %1").arg(outPath), ERROR_CODE::ERR_HISTORY);
-            return false;
-        }
-        QTextStream stream(&file);
-        if (!regenerator.writeNzb(postId, stream, includePassword, &warnings, &err)) {
-            _error(tr("Could not regenerate NZB: %1").arg(err), ERROR_CODE::ERR_HISTORY);
-            return false;
-        }
-        _cout << tr("NZB written: %1").arg(outPath) << "\n";
+        ok = _historyService->regenerateNzbToFile(postId, outPath, includePassword, &warnings, &err);
+        if (ok)
+            _cout << tr("NZB written: %1").arg(outPath) << "\n";
+    }
+    if (!ok) {
+        _error(tr("Could not regenerate NZB: %1").arg(err), ERROR_CODE::ERR_HISTORY);
+        return false;
     }
     for (const QString &warning : warnings)
         _cerr << tr("Warning: %1").arg(warning) << "\n";
@@ -877,26 +847,23 @@ bool NgPost::_regenerateNzbFromHistory(qint64 postId, const QString &outPath, bo
 void NgPost::_printResumeList(bool jsonOutput)
 {
     QString err;
-    const QList<PostHistoryStore::PostSummary> posts = _historyStore->resumeCandidates(&err);
+    const QList<PostHistoryStore::PostSummary> posts = _historyService->resumeCandidates(&err);
     if (!err.isEmpty()) {
         _error(tr("Resume query failed: %1").arg(err), ERROR_CODE::ERR_HISTORY);
         return;
     }
-    ResumePlanner planner(_historyStore);
     if (jsonOutput) {
         QJsonArray arr;
         for (const PostHistoryStore::PostSummary &p : posts) {
+            PostHistoryService::ResumeRow d;
             QString checkErr;
-            const ResumePlanner::Decision d = planner.check(p.id, &checkErr);
-            if (d.state == ResumePlanner::ResumeState::NotResumable)
+            if (!_historyService->checkResume(p.id, &d, &checkErr))
                 continue;
             QJsonObject obj;
             obj["id"] = static_cast<qint64>(p.id);
             obj["name"] = p.nzbName;
             obj["status"] = p.status;
-            obj["state"] = d.state == ResumePlanner::ResumeState::Resumable
-                               ? QStringLiteral("resumable")
-                               : QStringLiteral("partial_resumable");
+            obj["state"] = d.state;
             obj["reason"] = d.reason;
             obj["posted"] = d.postedArticles;
             obj["pending"] = d.pendingArticles;
@@ -909,14 +876,11 @@ void NgPost::_printResumeList(bool jsonOutput)
     }
     _cout << "id\tstate\tposted\tpending\tfailed\tunknown\tname\treason\n";
     for (const PostHistoryStore::PostSummary &p : posts) {
+        PostHistoryService::ResumeRow d;
         QString checkErr;
-        const ResumePlanner::Decision d = planner.check(p.id, &checkErr);
-        if (d.state == ResumePlanner::ResumeState::NotResumable)
+        if (!_historyService->checkResume(p.id, &d, &checkErr))
             continue;
-        const QString state = d.state == ResumePlanner::ResumeState::Resumable
-                                  ? QStringLiteral("resumable")
-                                  : QStringLiteral("partial_resumable");
-        _cout << p.id << "\t" << state << "\t"
+        _cout << p.id << "\t" << d.state << "\t"
               << d.postedArticles << "\t" << d.pendingArticles << "\t"
               << d.failedArticles << "\t" << d.unknownArticles << "\t"
               << p.nzbName << "\t" << d.reason << "\n";
@@ -925,16 +889,13 @@ void NgPost::_printResumeList(bool jsonOutput)
 
 void NgPost::_printResumeCheck(qint64 postId)
 {
-    ResumePlanner planner(_historyStore);
+    PostHistoryService::ResumeRow d;
     QString err;
-    const ResumePlanner::Decision d = planner.check(postId, &err);
-    QString state = "not_resumable";
-    if (d.state == ResumePlanner::ResumeState::Resumable)
-        state = "resumable";
-    else if (d.state == ResumePlanner::ResumeState::PartiallyResumable)
-        state = "partial_resumable";
+    _historyService->checkResume(postId, &d, &err);
+    if (d.state.isEmpty())
+        d.state = QStringLiteral("not_resumable");
     _cout << "post_id: " << postId << "\n"
-          << "state: " << state << "\n"
+          << "state: " << d.state << "\n"
           << "reason: " << d.reason << "\n"
           << "posted: " << d.postedArticles << "\n"
           << "pending: " << d.pendingArticles << "\n"
@@ -1022,24 +983,21 @@ bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assume
         if (!postId)
             continue;
 
-        ResumePlanner planner(_historyStore);
+        PostHistoryService::ResumeRow decision;
         QString err;
-        const ResumePlanner::Decision decision = planner.check(postId, &err);
-        QString state = QStringLiteral("not_resumable");
-        if (decision.state == ResumePlanner::ResumeState::Resumable)
-            state = QStringLiteral("resumable");
-        else if (decision.state == ResumePlanner::ResumeState::PartiallyResumable)
-            state = QStringLiteral("partial_resumable");
+        _historyService->checkResume(postId, &decision, &err);
+        if (decision.state.isEmpty())
+            decision.state = QStringLiteral("not_resumable");
 
         _cout << "post_id: " << postId << "\n"
-              << "state: " << state << "\n"
+              << "state: " << decision.state << "\n"
               << "reason: " << decision.reason << "\n"
               << "posted: " << decision.postedArticles << "\n"
               << "pending: " << decision.pendingArticles << "\n"
               << "failed: " << decision.failedArticles << "\n"
               << "unknown: " << decision.unknownArticles << "\n";
 
-        if (decision.state == ResumePlanner::ResumeState::NotResumable) {
+        if (decision.state == QStringLiteral("not_resumable")) {
             _error(tr("Post %1 cannot be resumed: %2").arg(postId).arg(decision.reason),
                    ERROR_CODE::ERR_HISTORY);
             continue;
@@ -1048,7 +1006,7 @@ bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assume
             continue;
 
         PostHistoryStore::PostDetails details;
-        if (!_historyStore->loadPostDetails(postId, &details, &err)) {
+        if (!_historyService->loadPostDetails(postId, &details, &err)) {
             _error(tr("Could not load history post %1: %2").arg(postId).arg(err),
                    ERROR_CODE::ERR_HISTORY);
             continue;
@@ -1113,26 +1071,18 @@ bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
             *error = tr("history store is not available");
         return false;
     }
-    if (_historyService) {
-        QString flushErr;
-        if (!_historyService->flush(&flushErr)) {
-            if (error)
-                *error = flushErr;
-            return false;
-        }
-    }
 
-    ResumePlanner planner(_historyStore);
+    PostHistoryService::ResumeRow decision;
     QString err;
-    const ResumePlanner::Decision decision = planner.check(postId, &err);
-    if (decision.state == ResumePlanner::ResumeState::NotResumable) {
+    _historyService->checkResume(postId, &decision, &err);
+    if (decision.state.isEmpty() || decision.state == QStringLiteral("not_resumable")) {
         if (error)
-            *error = decision.reason;
+            *error = decision.reason.isEmpty() ? err : decision.reason;
         return false;
     }
 
     PostHistoryStore::PostDetails details;
-    if (!_historyStore->loadPostDetails(postId, &details, &err)) {
+    if (!_historyService->loadPostDetails(postId, &details, &err)) {
         if (error)
             *error = err;
         return false;
@@ -2021,8 +1971,8 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (parser.isSet(sOptionNames[Opt::POST_DB]))
         _postDbFile = parser.value(sOptionNames[Opt::POST_DB]);
 
-    if (_historyStore)
-        _historyStore->configure(_postDbFile, _historyStorePasswords);
+    if (_historyService)
+        _historyService->configure(_postDbFile, _historyStorePasswords);
 
     const bool hasHistoryCommand =
         parser.isSet(sOptionNames[Opt::HISTORY])

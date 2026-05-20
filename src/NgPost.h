@@ -39,7 +39,6 @@ class NzbCheck;
 class UpdateChecker;
 class VpnManager;
 class PostHistoryService;
-class PostHistoryStore;
 
 #define NB_ARTICLES_TO_PREPARE_PER_CONNECTION 3
 
@@ -304,7 +303,6 @@ private:
     bool _historyStorePasswords;
     bool _historyCrashedArticlesChecked;
     PostHistoryService *_historyService;
-    PostHistoryStore *_historyStore;
     QList<QDir> _autoDirs;
 
     FoldersMonitorForNewFiles *_folderMonitor;
@@ -522,7 +520,6 @@ public:
 
     VpnManager *vpnManager() const { return _vpnManager; }
     PostHistoryService *historyService() const { return _historyService; }
-    PostHistoryStore *historyStore() const { return _historyStore; }
 
 signals:
     void log(QString msg, bool newline); //!< in case we signal from another thread

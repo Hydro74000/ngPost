@@ -20,7 +20,6 @@
 #include "PostingJob.h"
 #include "NgPost.h"
 #include "NntpConnection.h"
-#include "history/NzbHistoryRegenerator.h"
 #include "history/PostHistoryService.h"
 #include "history/PostHistoryStore.h"
 #include "nntp/NntpArticle.h"
@@ -1203,21 +1202,14 @@ void PostingJob::_closeNzb()
         if (_nzb->isOpen()) {
             _nzbStream << "</nzb>\n";
             _nzb->close();
-            if (_historyPostId && _ngPost->historyStore()) {
-                _flushHistoryService();
-                QFile consolidated(_nzbFilePath);
-                if (consolidated.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                    QTextStream stream(&consolidated);
-                    QStringList warnings;
-                    QString err;
-                    NzbHistoryRegenerator regenerator(_ngPost->historyStore());
-                    if (!regenerator.writeNzb(_historyPostId, stream, true, &warnings, &err))
-                        _error(tr("Could not regenerate final NZB from history: %1").arg(err));
-                    for (const QString &warning : warnings)
-                        _error(tr("NZB history warning: %1").arg(warning));
-                } else {
-                    _error(tr("Could not reopen NZB for history regeneration: %1").arg(_nzbFilePath));
-                }
+            if (_historyPostId && _ngPost->historyService()) {
+                QStringList warnings;
+                QString err;
+                if (!_ngPost->historyService()->regenerateNzbToFile(
+                        _historyPostId, _nzbFilePath, true, &warnings, &err))
+                    _error(tr("Could not regenerate final NZB from history: %1").arg(err));
+                for (const QString &warning : warnings)
+                    _error(tr("NZB history warning: %1").arg(warning));
             }
             _ngPost->doNzbPostCMD(this);
         }

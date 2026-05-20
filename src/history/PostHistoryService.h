@@ -16,6 +16,8 @@
 #include <QThread>
 #include <functional>
 
+class QTextStream;
+
 class PostHistoryWorker;
 
 class PostHistoryService : public QObject
@@ -111,6 +113,24 @@ public:
                          PostHistoryStore::PostDetails *details,
                          QString *error = nullptr);
     bool checkResume(qint64 postId, ResumeRow *row, QString *error = nullptr);
+
+    QList<PostHistoryStore::PostSummary> listPosts(const PostHistoryStore::ListFilter &filter,
+                                                   QString *error = nullptr);
+    QList<PostHistoryStore::PostSummary> resumeCandidates(QString *error = nullptr);
+
+    bool exportCsv(QTextStream &stream, bool includePasswords, QString *error = nullptr);
+    bool importLegacyCsv(const QString &path, QString *error = nullptr);
+
+    bool regenerateNzb(qint64 postId,
+                       QTextStream &stream,
+                       bool includePassword,
+                       QStringList *warnings,
+                       QString *error = nullptr);
+    bool regenerateNzbToFile(qint64 postId,
+                             const QString &outPath,
+                             bool includePassword,
+                             QStringList *warnings,
+                             QString *error = nullptr);
 
     void requestHistorySnapshot(const PostHistoryStore::ListFilter &filter,
                                 const QSet<qint64> &ignoredResumeIds,

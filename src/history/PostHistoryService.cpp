@@ -6,12 +6,16 @@
 
 #include "history/PostHistoryService.h"
 
+#include "history/NzbHistoryRegenerator.h"
 #include "history/ResumePlanner.h"
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QFile>
+#include <QIODevice>
 #include <QMetaObject>
 #include <QPointer>
+#include <QTextStream>
 #include <QTimer>
 #include <QtGlobal>
 
@@ -198,6 +202,70 @@ public:
     {
         flushArticleEventsBlocking(error);
         return _store.loadPostDetails(postId, details, error);
+    }
+
+    QList<PostHistoryStore::PostSummary> listPosts(const PostHistoryStore::ListFilter &filter,
+                                                   QString *error)
+    {
+        flushArticleEventsBlocking(error);
+        if (error)
+            error->clear();
+        return _store.listPosts(filter, error);
+    }
+
+    QList<PostHistoryStore::PostSummary> resumeCandidates(QString *error)
+    {
+        flushArticleEventsBlocking(error);
+        if (error)
+            error->clear();
+        return _store.resumeCandidates(error);
+    }
+
+    bool exportCsv(QTextStream &stream, bool includePasswords, QString *error)
+    {
+        flushArticleEventsBlocking(error);
+        if (error)
+            error->clear();
+        return _store.exportCsv(stream, includePasswords, error);
+    }
+
+    bool importLegacyCsv(const QString &path, QString *error)
+    {
+        flushArticleEventsBlocking(error);
+        if (error)
+            error->clear();
+        return _store.importLegacyCsv(path, error);
+    }
+
+    bool regenerateNzb(qint64 postId,
+                       QTextStream &stream,
+                       bool includePassword,
+                       QStringList *warnings,
+                       QString *error)
+    {
+        if (!flushArticleEventsBlocking(error))
+            return false;
+        NzbHistoryRegenerator regenerator(&_store);
+        return regenerator.writeNzb(postId, stream, includePassword, warnings, error);
+    }
+
+    bool regenerateNzbToFile(qint64 postId,
+                             const QString &outPath,
+                             bool includePassword,
+                             QStringList *warnings,
+                             QString *error)
+    {
+        if (!flushArticleEventsBlocking(error))
+            return false;
+        QFile file(outPath);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            if (error)
+                *error = QObject::tr("Could not open file for writing: %1").arg(outPath);
+            return false;
+        }
+        QTextStream stream(&file);
+        NzbHistoryRegenerator regenerator(&_store);
+        return regenerator.writeNzb(postId, stream, includePassword, warnings, error);
     }
 
     bool checkResume(qint64 postId, PostHistoryService::ResumeRow *row, QString *error)
@@ -642,6 +710,83 @@ bool PostHistoryService::loadPostDetails(qint64 postId,
     bool ok = false;
     _invokeBlocking([&](PostHistoryWorker *worker) {
         ok = worker->loadPostDetails(postId, details, &err);
+    });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+QList<PostHistoryStore::PostSummary> PostHistoryService::listPosts(
+    const PostHistoryStore::ListFilter &filter, QString *error)
+{
+    QString err;
+    QList<PostHistoryStore::PostSummary> posts;
+    _invokeBlocking([&](PostHistoryWorker *worker) { posts = worker->listPosts(filter, &err); });
+    if (error)
+        *error = err;
+    return posts;
+}
+
+QList<PostHistoryStore::PostSummary> PostHistoryService::resumeCandidates(QString *error)
+{
+    QString err;
+    QList<PostHistoryStore::PostSummary> posts;
+    _invokeBlocking([&](PostHistoryWorker *worker) { posts = worker->resumeCandidates(&err); });
+    if (error)
+        *error = err;
+    return posts;
+}
+
+bool PostHistoryService::exportCsv(QTextStream &stream, bool includePasswords, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->exportCsv(stream, includePasswords, &err);
+    });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::importLegacyCsv(const QString &path, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->importLegacyCsv(path, &err);
+    });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::regenerateNzb(qint64 postId,
+                                       QTextStream &stream,
+                                       bool includePassword,
+                                       QStringList *warnings,
+                                       QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->regenerateNzb(postId, stream, includePassword, warnings, &err);
+    });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::regenerateNzbToFile(qint64 postId,
+                                             const QString &outPath,
+                                             bool includePassword,
+                                             QStringList *warnings,
+                                             QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->regenerateNzbToFile(postId, outPath, includePassword, warnings, &err);
     });
     if (error)
         *error = err;

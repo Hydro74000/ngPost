@@ -1905,8 +1905,8 @@ void MainWindow::_onHistoryRegenNzb()
 
 void MainWindow::_onHistoryExportCsv()
 {
-    PostHistoryStore *store = _ngPost ? _ngPost->historyStore() : nullptr;
-    if (!store) return;
+    PostHistoryService *history = _ngPost ? _ngPost->historyService() : nullptr;
+    if (!history) return;
 
     const QString path = QFileDialog::getSaveFileName(
         this, tr("Export history as CSV"), QString(), tr("CSV files (*.csv)"));
@@ -1920,7 +1920,7 @@ void MainWindow::_onHistoryExportCsv()
     }
     QTextStream stream(&f);
     QString err;
-    if (store->exportCsv(stream, false, &err))
+    if (history->exportCsv(stream, false, &err))
         QMessageBox::information(this, tr("Export done"),
                                  tr("History exported to:\n%1").arg(path));
     else
