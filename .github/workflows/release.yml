@@ -597,6 +597,9 @@ jobs:
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
           # Restrict to Qt's lib dir so unrelated tool-cache libs aren't candidates
           export LD_LIBRARY_PATH="$QT_ROOT_DIR/lib"
+          # Remove Mimer SQL plugin: libqsqlmimer.so requires libmimerapi.so which
+          # is not available on the runner and would cause linuxdeploy to abort.
+          find "$QT_ROOT_DIR" -name 'libqsqlmimer*' -delete
           ./linuxdeploy \
             --appdir AppDir \
             --plugin qt \
