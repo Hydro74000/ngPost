@@ -6,7 +6,6 @@
 
 #include "history/PostHistoryStore.h"
 
-#include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
@@ -115,14 +114,37 @@ PostHistoryStore::PostHistoryStore(const QString &dbPath, bool storePasswords)
 {
 }
 
+PostHistoryStore::~PostHistoryStore()
+{
+    closeConnection();
+}
+
 void PostHistoryStore::configure(const QString &dbPath, bool storePasswords)
 {
     if (_dbPath != dbPath || _storePasswords != storePasswords) {
+        closeConnection();
         _initialized = false;
         _initializedDbPath.clear();
     }
     _dbPath = dbPath;
     _storePasswords = storePasswords;
+}
+
+void PostHistoryStore::closeConnection()
+{
+    const QString connection = _connectionName();
+    _initialized = false;
+    _initializedDbPath.clear();
+
+    if (!QSqlDatabase::contains(connection))
+        return;
+
+    {
+        QSqlDatabase db = QSqlDatabase::database(connection, false);
+        if (db.isOpen())
+            db.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
 }
 
 QString PostHistoryStore::dbPath() const
@@ -137,17 +159,9 @@ bool PostHistoryStore::storePasswords() const
 
 QString PostHistoryStore::_connectionName() const
 {
-    // Include the db path's hash so a path change yields a fresh connection
-    // instead of reusing the previously-cached one (which is bound to the old
-    // path). Each thread still gets its own connection.
-    const QByteArray pathHash =
-        QCryptographicHash::hash(_dbPath.toUtf8(), QCryptographicHash::Md5)
-            .toHex()
-            .left(12);
-    return QStringLiteral("ngpost_history_%1_%2_%3")
+    return QStringLiteral("ngpost_history_%1_%2")
         .arg(reinterpret_cast<quintptr>(this))
-        .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()))
-        .arg(QString::fromLatin1(pathHash));
+        .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()));
 }
 
 bool PostHistoryStore::initialize(QString *error)

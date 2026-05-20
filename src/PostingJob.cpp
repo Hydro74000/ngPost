@@ -717,9 +717,14 @@ void PostingJob::onDisconnectedConnection(NntpConnection *con)
 
         if (_nntpConnections.isEmpty()) {
             if (con->hasNoMoreFiles()) {
-                _finishPosting();
-                if (!_postFinished)
-                    emit noMoreConnection();
+                // Article/file completion is delivered through queued signals.
+                // The last connection can close before the final file slot has
+                // written its NZB entry, so let that slot finish the job.
+                if (_nbPosted == _nbFiles) {
+                    _finishPosting();
+                    if (!_postFinished)
+                        emit noMoreConnection();
+                }
             } else {
                 _error(tr("we lost all the connections..."));
                 if (_ngPost->_tryResumePostWhenConnectionLost) {

@@ -74,6 +74,7 @@ public:
         _retryTimer.stop();
         QString err;
         flushArticleEventsBlocking(&err);
+        _store.closeConnection();
     }
 
     void configure(const QString &dbPath, bool storePasswords)

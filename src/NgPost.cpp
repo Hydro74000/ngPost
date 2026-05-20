@@ -386,9 +386,9 @@ NgPost::NgPost(int &argc, char *argv[]):
     // check if the embedded par2 is available (windows or appImage)
     QString par2Embedded;
 #if defined(WIN32) || defined(__MINGW64__)
-    par2Embedded = QString("%1/par2.exe").arg(qApp->applicationDirPath());
+    par2Embedded = QString("%1/par2.exe").arg(QCoreApplication::applicationDirPath());
 #else
-    par2Embedded = QString("%1/par2").arg(qApp->applicationDirPath());
+    par2Embedded = QString("%1/par2").arg(QCoreApplication::applicationDirPath());
 #endif
 
     QFileInfo fi(par2Embedded);
@@ -398,9 +398,9 @@ NgPost::NgPost(int &argc, char *argv[]):
     // check if an embedded rar is available (windows or appImage)
     QString rarEmbedded;
 #if defined(WIN32) || defined(__MINGW64__)
-    rarEmbedded = QString("%1/rar.exe").arg(qApp->applicationDirPath());
+    rarEmbedded = QString("%1/rar.exe").arg(QCoreApplication::applicationDirPath());
 #else
-    rarEmbedded = QString("%1/rar").arg(qApp->applicationDirPath());
+    rarEmbedded = QString("%1/rar").arg(QCoreApplication::applicationDirPath());
 #endif
     QFileInfo rarFi(rarEmbedded);
     if (rarFi.exists() && rarFi.isFile() && rarFi.isExecutable())
@@ -445,7 +445,7 @@ NgPost::NgPost(int &argc, char *argv[]):
                 _pendingJobs.dequeue()->deleteLater();
             _error(tr("VPN could not be established — aborting pending jobs"),
                    ERROR_CODE::ERR_WRONG_ARG);
-            qApp->exit(static_cast<int>(ERROR_CODE::ERR_WRONG_ARG));
+            QCoreApplication::exit(static_cast<int>(ERROR_CODE::ERR_WRONG_ARG));
         }
     });
     // Blocked admission also needs CLI handling: the GUI shows a popup, but
@@ -456,7 +456,7 @@ NgPost::NgPost(int &argc, char *argv[]):
         if (useHMI()) return;
         _error(tr("VPN required but unavailable: %1").arg(detail),
                ERROR_CODE::ERR_WRONG_ARG);
-        qApp->exit(static_cast<int>(ERROR_CODE::ERR_WRONG_ARG));
+        QCoreApplication::exit(static_cast<int>(ERROR_CODE::ERR_WRONG_ARG));
     });
 
     _loadTanslators();
@@ -1735,7 +1735,7 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
         {
 	    if( debugFull())
                 _error(tr(" => closing application"));
-            qApp->quit();
+            QCoreApplication::quit();
         }
     }
     else if (_preparePacking && job ==_packingJob)

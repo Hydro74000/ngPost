@@ -105,7 +105,7 @@ void handleShutdown(int signal)
     Q_UNUSED(signal)
     std::cout << "Closing the application...\n";
     std::cout.flush();
-    qApp->quit();
+    QCoreApplication::quit();
 }
 
 #ifdef __linux__

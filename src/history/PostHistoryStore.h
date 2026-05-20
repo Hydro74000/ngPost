@@ -151,8 +151,10 @@ public:
     };
 
     explicit PostHistoryStore(const QString &dbPath = QString(), bool storePasswords = true);
+    ~PostHistoryStore();
 
     void configure(const QString &dbPath, bool storePasswords);
+    void closeConnection();
     QString dbPath() const;
     bool storePasswords() const;
 
