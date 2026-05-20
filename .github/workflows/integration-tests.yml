@@ -66,41 +66,27 @@ jobs:
             tests/integration/**/Testing/**/*.xml
           if-no-files-found: ignore
 
-  windows-mingw:
-    name: Windows MinGW integration tests
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
+  macos:
+    name: macOS integration tests
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up MSYS2
-        uses: msys2/setup-msys2@v2
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
         with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            git
-            base-devel
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-make
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-python
-            mingw-w64-x86_64-qt6-base
-            mingw-w64-x86_64-qt6-tools
-            mingw-w64-x86_64-qt6-charts
+          version: '6.8.2'
+          arch: 'clang_64'
+          modules: 'qtcharts'
 
       - name: Build QtKeychain
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
-          sed -i 's|add_definitions( /utf-8 -DUNICODE )|add_definitions( -finput-charset=UTF-8 -fexec-charset=UTF-8 -DUNICODE )|' /tmp/qtkeychain/qtkeychain/CMakeLists.txt
           cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
-                -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release \
-                -DBUILD_WITH_QT6=ON -DBUILD_TESTING=OFF \
-                -DBUILD_TRANSLATIONS=OFF \
-                -DCMAKE_INSTALL_PREFIX=/mingw64
-          cmake --build /tmp/qtkeychain/build -j2
+                -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
+                -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build /tmp/qtkeychain/build -j"$(sysctl -n hw.ncpu)"
           cmake --install /tmp/qtkeychain/build
 
       - name: Build ngPost
@@ -108,25 +94,88 @@ jobs:
           cd src
           mkdir -p resources/lang
           for ts in lang/ngPost_*.ts; do
-            /mingw64/bin/lrelease.exe "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
+            lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
           done
-          mkdir -p ../build/windows
-          cp ngPost.ico ../build/windows/
-          cd ../build/windows
-          /mingw64/bin/qmake6.exe ../../src/ngPost.pro CONFIG+=release
-          /mingw64/bin/mingw32-make.exe -j2
+          qmake ngPost.pro CONFIG+=release
+          make -j"$(sysctl -n hw.ncpu)"
 
       - name: Build integration tests
         run: |
           cd tests/integration
-          /mingw64/bin/qmake6.exe integration.pro CONFIG+=release
-          /mingw64/bin/mingw32-make.exe -j2
+          qmake integration.pro CONFIG+=release
+          make -j"$(sysctl -n hw.ncpu)"
 
       - name: Run integration tests
         env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost.app/Contents/MacOS/ngPost
           QT_QPA_PLATFORM: offscreen
         run: |
-          export NGPOST_BIN="$(cygpath -w "$(pwd)/build/windows/release/ngPost.exe")"
+          bash .github/scripts/run-qt-tests.sh tests/integration "integration"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-logs-macos
+          path: |
+            tests/integration/**/*.log
+            tests/integration/**/*.stdout.log
+            tests/integration/**/Testing/**/*.xml
+          if-no-files-found: ignore
+
+  windows-msvc:
+    name: Windows MSVC integration tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: '==3.2.0'
+          version: '6.8.2'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtcharts'
+
+      - name: Build QtKeychain
+        shell: pwsh
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
+          cd $env:TEMP\qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON `
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$env:QT_ROOT_DIR"
+          cmake --build build --config Release
+          cmake --install build --config Release
+
+      - name: Build ngPost
+        shell: pwsh
+        run: |
+          cd src
+          New-Item -ItemType Directory -Force -Path resources/lang | Out-Null
+          Get-ChildItem lang/ngPost_*.ts | ForEach-Object {
+            lrelease $_.FullName -qm "resources/lang/$($_.BaseName).qm"
+          }
+          qmake ngPost.pro -spec win32-msvc CONFIG+=release
+          nmake
+
+      - name: Build integration tests
+        shell: pwsh
+        run: |
+          cd tests/integration
+          qmake integration.pro -spec win32-msvc CONFIG+=release
+          nmake
+
+      - name: Run integration tests
+        env:
+          NGPOST_BIN: ${{ github.workspace }}\src\release\ngPost.exe
+          QT_QPA_PLATFORM: offscreen
+        shell: bash
+        run: |
           bash .github/scripts/run-qt-tests.sh tests/integration "integration"
 
       - name: Upload logs on failure
