@@ -84,6 +84,7 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+          modules: 'qtcharts'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
@@ -138,6 +139,7 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
+          modules: 'qtcharts'
       - name: Build QtKeychain from source (Phase 4 dependency)
         shell: pwsh
         run: |
@@ -383,6 +385,7 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'clang_64'
+          modules: 'qtcharts'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
@@ -461,6 +464,7 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+          modules: 'qtcharts'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
