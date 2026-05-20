@@ -83,6 +83,7 @@ public:
     void stopThreads();
 
     bool prepareArticlesInAdvance();
+    void scheduleArticlesInAdvance(int rounds);
 
     bool isPosting() const;
 

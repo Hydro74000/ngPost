@@ -29,6 +29,7 @@
 #include <QSet>
 #include <QStringList>
 #include <QTextStream>
+#include <QThread>
 #include <QTime>
 #include <QTimer>
 #include <QVector>
@@ -39,6 +40,7 @@ class NntpFile;
 class NntpArticle;
 class PostingWidget;
 class Poster;
+class PostHistoryWriter;
 
 using AtomicBool = QAtomicInteger<unsigned short>; // 16 bit only (faster than using 8 bit variable...)
 
@@ -165,6 +167,8 @@ private:
     qint64 _historyPostId;
     const bool _resumeFromHistory;
     const QMap<QString, ResumeFileState> _resumeFileStatesByPath;
+    QThread _historyWriterThread;
+    PostHistoryWriter *_historyWriter;
 
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     quint64 _immediateSize; //!< bytes posted (to compute the avg speed)
@@ -252,7 +256,6 @@ public:
     static bool supportsSsl();
 
     qint64 registerHistoryFile(int ordinal, const QFileInfo &file, NntpFile *nntpFile);
-    void recordHistoryArticle(qint64 fileId, int part, qint64 pos, qint64 bytes);
     void recordHistoryArticlePosting(NntpArticle *article, int attemptNo);
     void recordHistoryArticlePosted(NntpArticle *article);
     void recordHistoryArticleFailed(NntpArticle *article, const QString &reason);
@@ -316,6 +319,10 @@ private:
     void _initPosting();
     void _postFiles();
     void _finishPosting();
+
+    void _startHistoryWriter();
+    void _flushHistoryWriter();
+    void _stopHistoryWriter();
 
     void _closeNzb();
     void _printStats() const;

@@ -26,6 +26,7 @@ private slots:
     void empty_resume_post_is_cancelled_by_cleanup();
     void missing_source_is_not_resumable();
     void mark_article_status_keeps_payload_when_row_is_missing();
+    void apply_article_events_batches_ordered_status_changes();
     void nzb_regeneration_keeps_prior_files_after_resume();
     void nzb_regeneration_repairs_missing_article_bytes();
     void nzb_regeneration_masks_password_by_default();
@@ -260,6 +261,83 @@ void TestPostHistory::mark_article_status_keeps_payload_when_row_is_missing()
     QCOMPARE(articles.first().status, QStringLiteral("posted"));
     QCOMPARE(articles.first().msgId, QStringLiteral("msg@ngpost"));
     QCOMPARE(articles.first().bytes, 42);
+}
+
+void TestPostHistory::apply_article_events_batches_ordered_status_changes()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString err;
+    QVERIFY2(store.initialize(&err), qPrintable(err));
+
+    const QString sourcePath = dir.filePath(QStringLiteral("payload.bin"));
+    QFile source(sourcePath);
+    QVERIFY(source.open(QIODevice::WriteOnly));
+    source.write(QByteArray(8, 'x'));
+    source.close();
+
+    const QFileInfo sourceInfo(sourcePath);
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("batch.nzb");
+    post.nzbPath = dir.filePath(QStringLiteral("batch.nzb"));
+    post.from = QStringLiteral("poster@example.invalid");
+    post.groups = { QStringLiteral("alt.binaries.test") };
+    const qint64 postId = store.createPost(post, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.originalPath = sourceInfo.absoluteFilePath();
+    file.postedName = sourceInfo.fileName();
+    file.sizeBytes = sourceInfo.size();
+    file.mtimeEpoch = sourceInfo.lastModified().toSecsSinceEpoch();
+    file.totalArticles = 2;
+    file.groups = post.groups;
+    const qint64 fileId = store.upsertFile(file, &err);
+    QVERIFY2(fileId > 0, qPrintable(err));
+
+    QList<PostHistoryStore::ArticleEvent> events;
+    PostHistoryStore::ArticleEvent e;
+    e.kind = PostHistoryStore::ArticleEvent::Kind::Posting;
+    e.fileId = fileId;
+    e.part = 1;
+    e.pos = 0;
+    e.bytes = 4;
+    e.attemptNo = 1;
+    e.msgId = QStringLiteral("one@ngpost");
+    events << e;
+    e.kind = PostHistoryStore::ArticleEvent::Kind::Posted;
+    events << e;
+
+    e.kind = PostHistoryStore::ArticleEvent::Kind::Posting;
+    e.part = 2;
+    e.pos = 4;
+    e.msgId = QStringLiteral("two@ngpost");
+    events << e;
+    e.kind = PostHistoryStore::ArticleEvent::Kind::Failed;
+    e.error = QStringLiteral("server rejected");
+    events << e;
+
+    QVERIFY2(store.applyArticleEvents(events, &err), qPrintable(err));
+
+    PostHistoryStore::PostDetails details;
+    QVERIFY2(store.loadPostDetails(postId, &details, &err), qPrintable(err));
+    const QList<PostHistoryStore::ArticleSummary> articles =
+        details.articlesByFile.value(fileId);
+    QCOMPARE(articles.size(), 2);
+    QCOMPARE(articles.at(0).status, QStringLiteral("posted"));
+    QCOMPARE(articles.at(0).bytes, 4);
+    QCOMPARE(articles.at(1).status, QStringLiteral("failed"));
+    QCOMPARE(articles.at(1).msgId, QStringLiteral("two@ngpost"));
+
+    ResumePlanner planner(&store);
+    const ResumePlanner::Decision d = planner.check(postId, &err);
+    QCOMPARE(d.state, ResumePlanner::ResumeState::PartiallyResumable);
+    QCOMPARE(d.postedArticles, 1);
+    QCOMPARE(d.failedArticles, 1);
 }
 
 void TestPostHistory::nzb_regeneration_keeps_prior_files_after_resume()

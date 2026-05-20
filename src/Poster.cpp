@@ -149,6 +149,13 @@ bool Poster::prepareArticlesInAdvance()
     return canProduceAll;
 }
 
+void Poster::scheduleArticlesInAdvance(int rounds)
+{
+    const int nbArticlesToPrepare = rounds * _nntpConnections.size();
+    for (int i = 0; i < nbArticlesToPrepare; ++i)
+        emit _articleBuilder->scheduleNextArticle();
+}
+
 NntpArticle *Poster::_prepareNextArticle(const QString &threadName, bool fillQueue)
 {
     NntpArticle *article = _articleBuilder->getNextArticle(threadName);

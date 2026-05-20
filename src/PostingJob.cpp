@@ -22,6 +22,7 @@
 #include "NntpConnection.h"
 #include "history/NzbHistoryRegenerator.h"
 #include "history/PostHistoryStore.h"
+#include "history/PostHistoryWriter.h"
 #include "nntp/NntpArticle.h"
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
@@ -32,6 +33,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QDir>
+#include <QMetaObject>
 #include <QMutex>
 #include <QProcess>
 #include <QRegularExpression>
@@ -155,6 +157,8 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _historyPostId(resumeHistoryPostId)
     , _resumeFromHistory(resumeHistoryPostId != 0)
     , _resumeFileStatesByPath(resumeFileStatesByPath)
+    , _historyWriterThread()
+    , _historyWriter(nullptr)
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     , _immediateSize(0)
     , _immediateSpeedTimer()
@@ -235,6 +239,7 @@ PostingJob::PostingJob(NgPost *ngPost,
             if (!_ngPost->historyStore()->markPostResuming(_historyPostId, &err)
                 && _ngPost->debugMode())
                 _error(tr("History: could not mark post as resuming: %1").arg(err));
+            _startHistoryWriter();
             return;
         }
 
@@ -262,6 +267,7 @@ PostingJob::PostingJob(NgPost *ngPost,
         _historyPostId = _ngPost->historyStore()->createPost(rec, &err);
         if (!_historyPostId && _ngPost->debugMode())
             _error(tr("History: could not create post record: %1").arg(err));
+        _startHistoryWriter();
     }
 }
 
@@ -284,6 +290,8 @@ PostingJob::~PostingJob()
 
     if (_extProc)
         _cleanExtProc();
+
+    _stopHistoryWriter();
 
     qDeleteAll(_filesFailed);
     qDeleteAll(_filesInProgress);
@@ -328,6 +336,60 @@ bool PostingJob::supportsSsl()
     return NntpConnection::supportsSsl();
 }
 
+void PostingJob::_startHistoryWriter()
+{
+    if (_historyWriter || !_historyPostId || !_ngPost->historyStore())
+        return;
+
+    _historyWriterThread.setObjectName(QStringLiteral("HistoryWriter #%1").arg(_historyPostId));
+    _historyWriter = new PostHistoryWriter(_ngPost->historyStore());
+    _historyWriter->moveToThread(&_historyWriterThread);
+    connect(&_historyWriterThread,
+            &QThread::finished,
+            _historyWriter,
+            &QObject::deleteLater);
+    connect(_historyWriter,
+            &PostHistoryWriter::error,
+            this,
+            [this](const QString &msg) { emit _ngPost->error(msg); },
+            Qt::QueuedConnection);
+    _historyWriterThread.start();
+    QMetaObject::invokeMethod(_historyWriter, "start", Qt::QueuedConnection);
+}
+
+void PostingJob::_flushHistoryWriter()
+{
+    if (!_historyWriter)
+        return;
+
+    bool ok = false;
+    if (QThread::currentThread() == _historyWriter->thread())
+        ok = _historyWriter->flush();
+    else
+        QMetaObject::invokeMethod(_historyWriter,
+                                  "flush",
+                                  Qt::BlockingQueuedConnection,
+                                  Q_RETURN_ARG(bool, ok));
+    if (!ok && _ngPost->debugMode())
+        _error(tr("History: could not flush pending article events"));
+}
+
+void PostingJob::_stopHistoryWriter()
+{
+    if (!_historyWriter)
+        return;
+
+    if (_historyWriterThread.isRunning()) {
+        if (QThread::currentThread() == _historyWriter->thread())
+            _historyWriter->stop();
+        else
+            QMetaObject::invokeMethod(_historyWriter, "stop", Qt::BlockingQueuedConnection);
+        _historyWriterThread.quit();
+        _historyWriterThread.wait();
+    }
+    _historyWriter = nullptr;
+}
+
 qint64 PostingJob::registerHistoryFile(int ordinal, const QFileInfo &file, NntpFile *nntpFile)
 {
     if (!_historyPostId || !_ngPost->historyStore())
@@ -360,77 +422,63 @@ qint64 PostingJob::registerHistoryFile(int ordinal, const QFileInfo &file, NntpF
     return id;
 }
 
-void PostingJob::recordHistoryArticle(qint64 fileId, int part, qint64 pos, qint64 bytes)
-{
-    if (!fileId || !_ngPost->historyStore())
-        return;
-    QString err;
-    if (!_ngPost->historyStore()->updateArticlePayload(fileId, part, pos, bytes, &err)
-        && _ngPost->debugMode())
-        _error(tr("History: could not update article payload: %1").arg(err));
-}
-
 void PostingJob::recordHistoryArticlePosting(NntpArticle *article, int attemptNo)
 {
-    if (!article || !article->nntpFile() || !_ngPost->historyStore())
+    if (!article || !article->nntpFile() || !_historyWriter)
         return;
-    QString err;
-    if (!_ngPost->historyStore()->markArticlePosting(article->nntpFile()->historyFileId(),
-                                                     static_cast<int>(article->part()),
-                                                     article->id(),
-                                                     attemptNo,
-                                                     article->filePos(),
-                                                     article->fileBytes(),
-                                                     &err)
-        && _ngPost->debugMode())
-        _error(tr("History: could not mark article posting: %1").arg(err));
+    QMetaObject::invokeMethod(_historyWriter,
+                              "enqueueArticlePosting",
+                              Qt::QueuedConnection,
+                              Q_ARG(qint64, article->nntpFile()->historyFileId()),
+                              Q_ARG(int, static_cast<int>(article->part())),
+                              Q_ARG(QString, article->id()),
+                              Q_ARG(int, attemptNo),
+                              Q_ARG(qint64, article->filePos()),
+                              Q_ARG(qint64, article->fileBytes()));
 }
 
 void PostingJob::recordHistoryArticlePosted(NntpArticle *article)
 {
-    if (!article || !article->nntpFile() || !_ngPost->historyStore())
+    if (!article || !article->nntpFile() || !_historyWriter)
         return;
-    QString err;
-    if (!_ngPost->historyStore()->markArticlePosted(article->nntpFile()->historyFileId(),
-                                                   static_cast<int>(article->part()),
-                                                   article->id(),
-                                                   article->filePos(),
-                                                   article->fileBytes(),
-                                                   &err)
-        && _ngPost->debugMode())
-        _error(tr("History: could not mark article posted: %1").arg(err));
+    QMetaObject::invokeMethod(_historyWriter,
+                              "enqueueArticlePosted",
+                              Qt::QueuedConnection,
+                              Q_ARG(qint64, article->nntpFile()->historyFileId()),
+                              Q_ARG(int, static_cast<int>(article->part())),
+                              Q_ARG(QString, article->id()),
+                              Q_ARG(qint64, article->filePos()),
+                              Q_ARG(qint64, article->fileBytes()));
 }
 
 void PostingJob::recordHistoryArticleFailed(NntpArticle *article, const QString &reason)
 {
-    if (!article || !article->nntpFile() || !_ngPost->historyStore())
+    if (!article || !article->nntpFile() || !_historyWriter)
         return;
-    QString err;
-    if (!_ngPost->historyStore()->markArticleFailed(article->nntpFile()->historyFileId(),
-                                                   static_cast<int>(article->part()),
-                                                   article->id(),
-                                                   reason,
-                                                   article->filePos(),
-                                                   article->fileBytes(),
-                                                   &err)
-        && _ngPost->debugMode())
-        _error(tr("History: could not mark article failed: %1").arg(err));
+    QMetaObject::invokeMethod(_historyWriter,
+                              "enqueueArticleFailed",
+                              Qt::QueuedConnection,
+                              Q_ARG(qint64, article->nntpFile()->historyFileId()),
+                              Q_ARG(int, static_cast<int>(article->part())),
+                              Q_ARG(QString, article->id()),
+                              Q_ARG(QString, reason),
+                              Q_ARG(qint64, article->filePos()),
+                              Q_ARG(qint64, article->fileBytes()));
 }
 
 void PostingJob::recordHistoryArticleUnknown(NntpArticle *article, const QString &reason)
 {
-    if (!article || !article->nntpFile() || !_ngPost->historyStore())
+    if (!article || !article->nntpFile() || !_historyWriter)
         return;
-    QString err;
-    if (!_ngPost->historyStore()->markArticleUnknown(article->nntpFile()->historyFileId(),
-                                                    static_cast<int>(article->part()),
-                                                    article->id(),
-                                                    reason,
-                                                    article->filePos(),
-                                                    article->fileBytes(),
-                                                    &err)
-        && _ngPost->debugMode())
-        _error(tr("History: could not mark article unknown: %1").arg(err));
+    QMetaObject::invokeMethod(_historyWriter,
+                              "enqueueArticleUnknown",
+                              Qt::QueuedConnection,
+                              Q_ARG(qint64, article->nntpFile()->historyFileId()),
+                              Q_ARG(int, static_cast<int>(article->part())),
+                              Q_ARG(QString, article->id()),
+                              Q_ARG(QString, reason),
+                              Q_ARG(qint64, article->filePos()),
+                              Q_ARG(qint64, article->fileBytes()));
 }
 
 void PostingJob::onResumeTriggered()
@@ -895,14 +943,8 @@ void PostingJob::_preparePostersArticles()
     if (_ngPost->debugFull())
         _log("PostingJob::_prepareArticles");
 
-    for (int i = 0; i < _ngPost->sNbPreparedArticlePerConnection; ++i) {
-        if (MB_LoadAtomic(_noMoreFiles))
-            break;
-        for (Poster *poster : _posters) {
-            if (!poster->prepareArticlesInAdvance())
-                break;
-        }
-    }
+    for (Poster *poster : _posters)
+        poster->scheduleArticlesInAdvance(_ngPost->sNbPreparedArticlePerConnection);
 }
 
 void PostingJob::_resolveNfoSource()
@@ -1016,10 +1058,6 @@ NntpArticle *PostingJob::_readNextArticleIntoBufferPtr(const QString &threadName
                              .arg(_nntpFile->path()));
                 return _readNextArticleIntoBufferPtr(threadName, bufferPtr);
             }
-            recordHistoryArticle(_nntpFile->historyFileId(),
-                                 static_cast<int>(_part),
-                                 pos,
-                                 bytesRead);
             NntpArticle *article = new NntpArticle(_nntpFile,
                                                    _part,
                                                    pos,
@@ -1140,6 +1178,23 @@ void PostingJob::_finishPosting()
 
     _ngPost->_finishPosting(); // to update progress bar
 
+    // 1.: print stats
+    if (_timeStart.isValid())
+        _printStats();
+
+    for (NntpConnection *con : _nntpConnections) {
+        if (con->thread() == QThread::currentThread())
+            con->onKillConnection();
+        else
+            QMetaObject::invokeMethod(con, "onKillConnection", Qt::BlockingQueuedConnection);
+    }
+
+    // 3.: close all the connections (they're living in the _threadPool)
+    for (Poster *poster : _posters)
+        poster->stopThreads();
+
+    _flushHistoryWriter();
+
     if (_historyPostId && _ngPost->historyStore()) {
         QString status;
         if (_postFinished)
@@ -1157,22 +1212,8 @@ void PostingJob::_finishPosting()
                                                   &err);
     }
 
-    // 1.: print stats
-    if (_timeStart.isValid())
-        _printStats();
-
-    for (NntpConnection *con : _nntpConnections)
-        emit con->killConnection();
-
-    qApp->processEvents();
-
-    // 4.: stop and wait for all threads
     // 2.: close nzb file
     _closeNzb();
-
-    // 3.: close all the connections (they're living in the _threadPool)
-    for (Poster *poster : _posters)
-        poster->stopThreads();
 
     if (_ngPost->debugMode())
         _log("All posters stopped...");
@@ -1224,6 +1265,7 @@ void PostingJob::_closeNzb()
             _nzbStream << "</nzb>\n";
             _nzb->close();
             if (_historyPostId && _ngPost->historyStore()) {
+                _flushHistoryWriter();
                 QFile consolidated(_nzbFilePath);
                 if (consolidated.open(QIODevice::WriteOnly | QIODevice::Text)) {
                     QTextStream stream(&consolidated);

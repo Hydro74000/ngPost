@@ -55,6 +55,24 @@ public:
         QString error;
     };
 
+    struct ArticleEvent {
+        enum class Kind {
+            Posting,
+            Posted,
+            Failed,
+            Unknown
+        };
+
+        Kind kind = Kind::Posted;
+        qint64 fileId = 0;
+        int part = 0;
+        qint64 pos = 0;
+        qint64 bytes = 0;
+        int attemptNo = 0;
+        QString msgId;
+        QString error;
+    };
+
     struct PostSummary {
         qint64 id = 0;
         QString nzbName;
@@ -206,6 +224,7 @@ public:
                             qint64 pos,
                             qint64 bytes,
                             QString *error = nullptr);
+    bool applyArticleEvents(const QList<ArticleEvent> &events, QString *error = nullptr);
     bool markPostCrashedArticlesUnknown(QString *error = nullptr);
     bool cleanupInvalidResumePosts(QString *error = nullptr);
 

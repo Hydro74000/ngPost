@@ -784,6 +784,194 @@ bool PostHistoryStore::markArticleUnknown(qint64 fileId,
     return true;
 }
 
+bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QString *error)
+{
+    if (events.isEmpty())
+        return true;
+    if (!initialize(error))
+        return false;
+
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    if (!db.transaction()) {
+        setError(error, db);
+        return false;
+    }
+
+    QSqlQuery postingArticle(db);
+    QSqlQuery postingAttempt(db);
+    QSqlQuery postedArticle(db);
+    QSqlQuery postedAttempt(db);
+    QSqlQuery failedArticle(db);
+    QSqlQuery failedAttempt(db);
+    QSqlQuery unknownArticle(db);
+    QSqlQuery unknownAttempt(db);
+
+    auto prepare = [&](QSqlQuery &q, const QString &sql) {
+        if (q.prepare(sql))
+            return true;
+        setError(error, q);
+        db.rollback();
+        return false;
+    };
+
+    if (!prepare(postingArticle,
+                 QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                                "status, msg_id, error, updated_at)"
+                                "VALUES(?, ?, ?, ?, 'posting', ?, '', ?)"
+                                "ON CONFLICT(file_id, part) DO UPDATE SET "
+                                "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
+                                "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                "status='posting', msg_id=excluded.msg_id,"
+                                "updated_at=excluded.updated_at "
+                                "WHERE post_articles.status!='posted'"))
+        || !prepare(postingAttempt,
+                    QStringLiteral("INSERT INTO post_article_attempts(file_id, part,"
+                                   "attempt_no, msg_id, status, created_at)"
+                                   "VALUES(?, ?, ?, ?, 'posting', ?)"))
+        || !prepare(postedArticle,
+                    QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                                   "status, msg_id, error, updated_at)"
+                                   "VALUES(?, ?, ?, ?, 'posted', ?, '', ?)"
+                                   "ON CONFLICT(file_id, part) DO UPDATE SET "
+                                   "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
+                                   "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                   "status='posted', msg_id=excluded.msg_id, error='',"
+                                   "updated_at=excluded.updated_at"))
+        || !prepare(postedAttempt,
+                    QStringLiteral("UPDATE post_article_attempts SET status='posted',"
+                                   "finished_at=? WHERE file_id=? AND part=? AND msg_id=?"
+                                   " AND status='posting'"))
+        || !prepare(failedArticle,
+                    QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                                   "status, msg_id, error, updated_at)"
+                                   "VALUES(?, ?, ?, ?, 'failed', ?, ?, ?)"
+                                   "ON CONFLICT(file_id, part) DO UPDATE SET "
+                                   "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
+                                   "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                   "status='failed', msg_id=excluded.msg_id, error=excluded.error,"
+                                   "updated_at=excluded.updated_at "
+                                   "WHERE post_articles.status!='posted'"))
+        || !prepare(failedAttempt,
+                    QStringLiteral("UPDATE post_article_attempts SET status='failed',"
+                                   "error=?, finished_at=? WHERE file_id=? AND part=?"
+                                   " AND msg_id=? AND status='posting'"))
+        || !prepare(unknownArticle,
+                    QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                                   "status, msg_id, error, updated_at)"
+                                   "VALUES(?, ?, ?, ?, 'unknown', ?, ?, ?)"
+                                   "ON CONFLICT(file_id, part) DO UPDATE SET "
+                                   "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
+                                   "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                   "status='unknown', msg_id=excluded.msg_id, error=excluded.error,"
+                                   "updated_at=excluded.updated_at "
+                                   "WHERE post_articles.status!='posted'"))
+        || !prepare(unknownAttempt,
+                    QStringLiteral("UPDATE post_article_attempts SET status='unknown',"
+                                   "error=?, finished_at=? WHERE file_id=? AND part=?"
+                                   " AND msg_id=? AND status='posting'"))) {
+        return false;
+    }
+
+    auto execPrepared = [&](QSqlQuery &q) {
+        if (q.exec())
+            return true;
+        setError(error, q);
+        db.rollback();
+        return false;
+    };
+
+    for (const ArticleEvent &event : events) {
+        if (!event.fileId || event.part <= 0)
+            continue;
+
+        const QString stamp = nowIso();
+        switch (event.kind) {
+        case ArticleEvent::Kind::Posting:
+            postingArticle.bindValue(0, event.fileId);
+            postingArticle.bindValue(1, event.part);
+            postingArticle.bindValue(2, storedPayloadPos(event.pos, event.bytes));
+            postingArticle.bindValue(3, storedPayloadBytes(event.bytes));
+            postingArticle.bindValue(4, event.msgId);
+            postingArticle.bindValue(5, stamp);
+            if (!execPrepared(postingArticle))
+                return false;
+
+            postingAttempt.bindValue(0, event.fileId);
+            postingAttempt.bindValue(1, event.part);
+            postingAttempt.bindValue(2, event.attemptNo);
+            postingAttempt.bindValue(3, event.msgId);
+            postingAttempt.bindValue(4, stamp);
+            if (!execPrepared(postingAttempt))
+                return false;
+            break;
+
+        case ArticleEvent::Kind::Posted:
+            postedArticle.bindValue(0, event.fileId);
+            postedArticle.bindValue(1, event.part);
+            postedArticle.bindValue(2, storedPayloadPos(event.pos, event.bytes));
+            postedArticle.bindValue(3, storedPayloadBytes(event.bytes));
+            postedArticle.bindValue(4, event.msgId);
+            postedArticle.bindValue(5, stamp);
+            if (!execPrepared(postedArticle))
+                return false;
+
+            postedAttempt.bindValue(0, stamp);
+            postedAttempt.bindValue(1, event.fileId);
+            postedAttempt.bindValue(2, event.part);
+            postedAttempt.bindValue(3, event.msgId);
+            if (!execPrepared(postedAttempt))
+                return false;
+            break;
+
+        case ArticleEvent::Kind::Failed:
+            failedArticle.bindValue(0, event.fileId);
+            failedArticle.bindValue(1, event.part);
+            failedArticle.bindValue(2, storedPayloadPos(event.pos, event.bytes));
+            failedArticle.bindValue(3, storedPayloadBytes(event.bytes));
+            failedArticle.bindValue(4, event.msgId);
+            failedArticle.bindValue(5, event.error);
+            failedArticle.bindValue(6, stamp);
+            if (!execPrepared(failedArticle))
+                return false;
+
+            failedAttempt.bindValue(0, event.error);
+            failedAttempt.bindValue(1, stamp);
+            failedAttempt.bindValue(2, event.fileId);
+            failedAttempt.bindValue(3, event.part);
+            failedAttempt.bindValue(4, event.msgId);
+            if (!execPrepared(failedAttempt))
+                return false;
+            break;
+
+        case ArticleEvent::Kind::Unknown:
+            unknownArticle.bindValue(0, event.fileId);
+            unknownArticle.bindValue(1, event.part);
+            unknownArticle.bindValue(2, storedPayloadPos(event.pos, event.bytes));
+            unknownArticle.bindValue(3, storedPayloadBytes(event.bytes));
+            unknownArticle.bindValue(4, event.msgId);
+            unknownArticle.bindValue(5, event.error);
+            unknownArticle.bindValue(6, stamp);
+            if (!execPrepared(unknownArticle))
+                return false;
+
+            unknownAttempt.bindValue(0, event.error);
+            unknownAttempt.bindValue(1, stamp);
+            unknownAttempt.bindValue(2, event.fileId);
+            unknownAttempt.bindValue(3, event.part);
+            unknownAttempt.bindValue(4, event.msgId);
+            if (!execPrepared(unknownAttempt))
+                return false;
+            break;
+        }
+    }
+
+    if (!db.commit()) {
+        setError(error, db);
+        return false;
+    }
+    return true;
+}
+
 bool PostHistoryStore::markPostCrashedArticlesUnknown(QString *error)
 {
     if (!initialize(error))
