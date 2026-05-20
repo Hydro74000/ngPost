@@ -117,6 +117,18 @@ PostHistoryStore::PostHistoryStore(const QString &dbPath, bool storePasswords)
 void PostHistoryStore::configure(const QString &dbPath, bool storePasswords)
 {
     if (_dbPath != dbPath || _storePasswords != storePasswords) {
+        // The cached SQLite connection is bound to the previous path; close
+        // and remove it so the next dbFor() call opens a fresh one against
+        // the new path. Must run on the same thread that uses the connection.
+        const QString connection = _connectionName();
+        if (QSqlDatabase::contains(connection)) {
+            {
+                QSqlDatabase db = QSqlDatabase::database(connection, false);
+                if (db.isOpen())
+                    db.close();
+            }
+            QSqlDatabase::removeDatabase(connection);
+        }
         _initialized = false;
         _initializedDbPath.clear();
     }
