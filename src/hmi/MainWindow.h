@@ -110,6 +110,9 @@ public:
     ~MainWindow() override;
 
     void init(NgPost *ngPost);
+#ifdef NGPOST_TESTING
+    QWidget *buildHistoryTabForTest();
+#endif
 
     void updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded, const QString &avgSpeed = "0 B/s"
                        #ifdef __COMPUTE_IMMEDIATE_SPEED__

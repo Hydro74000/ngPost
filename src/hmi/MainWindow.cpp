@@ -29,6 +29,7 @@
 #include "vpn/VpnManager.h"
 
 #include <QCoreApplication>
+#include <QAbstractScrollArea>
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QCheckBox>
@@ -37,12 +38,14 @@
 #include <QDebug>
 #include <QElapsedTimer>
 #include <QFileDialog>
+#include <QFrame>
 #include <QHeaderView>
 #include <QLineEdit>
 #include <QProgressBar>
 #include <QProgressDialog>
 #include <QHBoxLayout>
 #include <QPainter>
+#include <QScrollArea>
 #include <QSplitter>
 #include <QTableWidget>
 #include <QTabWidget>
@@ -53,6 +56,7 @@
 #include <QMessageBox>
 #include <QMenu>
 #include <QPushButton>
+#include <QSizePolicy>
 #include <QStatusBar>
 #include <QtCharts/QAbstractAxis>
 #include <QtCharts/QBarCategoryAxis>
@@ -203,6 +207,13 @@ void MainWindow::init(NgPost *ngPost)
     updateProgressBar(0, 0);
 }
 
+#ifdef NGPOST_TESTING
+QWidget *MainWindow::buildHistoryTabForTest()
+{
+    return _buildHistoryTab();
+}
+#endif
+
 
 void MainWindow::updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded, const QString &avgSpeed
                                    #ifdef __COMPUTE_IMMEDIATE_SPEED__
@@ -284,7 +295,7 @@ void MainWindow::dropEvent(QDropEvent *e)
     int currentTabIdx = _ui->postTabWidget->currentIndex();
     if (currentTabIdx == 1)
         _autoPostTab->handleDropEvent(e);
-    else if (PostingWidget *postWidget = _getPostWidget(currentTabIdx))
+    else if (PostingWidget *postWidget = qobject_cast<PostingWidget*>(_ui->postTabWidget->currentWidget()))
         postWidget->handleDropEvent(e);
 }
 
@@ -871,13 +882,26 @@ QWidget *MainWindow::_buildHistoryTab()
     QWidget *detailPanel = new QWidget(histSplitter);
     QVBoxLayout *detailLayout = new QVBoxLayout(detailPanel);
     detailLayout->setContentsMargins(4, 4, 4, 4);
+    QScrollArea *detailScroll = new QScrollArea(detailPanel);
+    detailScroll->setObjectName(QStringLiteral("historyDetailScroll"));
+    detailScroll->setWidgetResizable(true);
+    detailScroll->setFrameShape(QFrame::NoFrame);
+    detailScroll->setSizeAdjustPolicy(QAbstractScrollArea::AdjustIgnored);
+    detailScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    detailScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    detailScroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
     _historyDetailInfo = new QLabel(
-        tr("<i>Select a post to see its details.</i>"), detailPanel);
+        tr("<i>Select a post to see its details.</i>"), detailScroll);
+    _historyDetailInfo->setObjectName(QStringLiteral("historyDetailInfo"));
     _historyDetailInfo->setWordWrap(true);
     _historyDetailInfo->setTextFormat(Qt::RichText);
     _historyDetailInfo->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     _historyDetailInfo->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    detailLayout->addWidget(_historyDetailInfo, 1);
+    _historyDetailInfo->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+    _historyDetailInfo->setMinimumSize(0, 0);
+    detailScroll->setWidget(_historyDetailInfo);
+    detailLayout->addWidget(detailScroll, 1);
 
     QHBoxLayout *detailActions = new QHBoxLayout();
     _histRegenNzbBtn  = new QPushButton(tr("Regenerate NZB\342\200\246"), detailPanel);
@@ -1060,15 +1084,18 @@ QWidget *MainWindow::_buildHistoryTab()
     _refreshHistoryViews();
 
     // Banner: show if resumable posts exist
-    if (PostHistoryStore *store = _ngPost->historyStore()) {
-        const QList<PostHistoryStore::PostSummary> candidates = store->resumeCandidates();
-        if (!candidates.isEmpty()) {
-            banner->setText(tr("%1 post(s) can be resumed.").arg(candidates.size()));
-            banner->setVisible(true);
-            bannerResumeBtn->setVisible(true);
-            statusBar()->showMessage(
-                tr("%1 post(s) can be resumed. Open the Resume tab to review them.")
-                    .arg(candidates.size()), 10000);
+    if (_ngPost) {
+        PostHistoryStore *store = _ngPost->historyStore();
+        if (store) {
+            const QList<PostHistoryStore::PostSummary> candidates = store->resumeCandidates();
+            if (!candidates.isEmpty()) {
+                banner->setText(tr("%1 post(s) can be resumed.").arg(candidates.size()));
+                banner->setVisible(true);
+                bannerResumeBtn->setVisible(true);
+                statusBar()->showMessage(
+                    tr("%1 post(s) can be resumed. Open the Resume tab to review them.")
+                        .arg(candidates.size()), 10000);
+            }
         }
     }
 

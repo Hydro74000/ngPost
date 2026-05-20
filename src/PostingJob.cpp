@@ -39,6 +39,21 @@
 #include <algorithm>
 #include <cmath>
 
+namespace
+{
+
+int decimalPadding(uint count)
+{
+    int padding = 1;
+    while (count >= 10) {
+        ++padding;
+        count /= 10;
+    }
+    return padding;
+}
+
+} // namespace
+
 PostingJob::PostingJob(NgPost *ngPost,
                        const QString &nzbFilePath,
                        const QFileInfoList &files,
@@ -61,7 +76,7 @@ PostingJob::PostingJob(NgPost *ngPost,
                        bool delFilesAfterPost,
                        bool overwriteNzb,
                        qint64 resumeHistoryPostId,
-                       const QMap<QString, QSet<uint>> &resumePostedPartsByPath,
+                       const QMap<QString, PostingJob::ResumeFileState> &resumeFileStatesByPath,
                        QObject *parent)
     : QObject(parent)
     , _ngPost(ngPost)
@@ -139,7 +154,7 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _isActiveJob(false)
     , _historyPostId(resumeHistoryPostId)
     , _resumeFromHistory(resumeHistoryPostId != 0)
-    , _resumePostedPartsByPath(resumePostedPartsByPath)
+    , _resumeFileStatesByPath(resumeFileStatesByPath)
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     , _immediateSize(0)
     , _immediateSpeedTimer()
@@ -317,6 +332,17 @@ qint64 PostingJob::registerHistoryFile(int ordinal, const QFileInfo &file, NntpF
 {
     if (!_historyPostId || !_ngPost->historyStore())
         return 0;
+
+    if (_resumeFromHistory) {
+        const ResumeFileState state =
+            _resumeFileStatesByPath.value(file.absoluteFilePath());
+        if (state.historyFileId)
+            return state.historyFileId;
+        if (_ngPost->debugMode())
+            _error(tr("History: missing resume state for file %1").arg(file.absoluteFilePath()));
+        return 0;
+    }
+
     PostHistoryStore::FileRecord rec;
     rec.postId = _historyPostId;
     rec.ordinal = ordinal;
@@ -1035,27 +1061,37 @@ void PostingJob::_initPosting()
     _nzb = new QFile(_nzbFilePath);
     _nbFiles = static_cast<uint>(_files.size());
 
-    int numPadding = 1;
-    double padding = static_cast<double>(_nbFiles) / 10.;
-    while (padding > 1.) {
-        ++numPadding;
-        padding /= 10.;
-    }
-
     // initialize the NntpFiles (active objects)
     _filesToUpload.reserve(static_cast<int>(_nbFiles));
     uint fileNum = 0;
     int nbGroups = _grpList.size();
     for (const QFileInfo &file : _files) {
+        ++fileNum;
+        const ResumeFileState resumeState =
+            _resumeFileStatesByPath.value(file.absoluteFilePath());
+        const bool useResumeState = _resumeFromHistory && resumeState.historyFileId;
+        const uint displayFileNum = useResumeState && resumeState.ordinal > 0
+            ? static_cast<uint>(resumeState.ordinal)
+            : fileNum;
+        const uint displayNbFiles = useResumeState && resumeState.totalFiles > 0
+            ? static_cast<uint>(resumeState.totalFiles)
+            : _nbFiles;
+        QList<QString> fileGroups;
+        if (useResumeState && !resumeState.groups.isEmpty()) {
+            fileGroups = resumeState.groups;
+        } else {
+            fileGroups = _obfuscateArticles && _ngPost->groupPolicyPerFile()
+                         && nbGroups > 1
+                ? QStringList(_grpList.at(std::rand() % nbGroups))
+                : _grpList;
+        }
+
         NntpFile *nntpFile = new NntpFile(this,
                                           file,
-                                          ++fileNum,
-                                          _nbFiles,
-                                          numPadding,
-                                          _obfuscateArticles && _ngPost->groupPolicyPerFile()
-                                                  && nbGroups > 1
-                                              ? QStringList(_grpList.at(std::rand() % nbGroups))
-                                              : _grpList);
+                                          displayFileNum,
+                                          displayNbFiles,
+                                          decimalPadding(displayNbFiles),
+                                          fileGroups);
         connect(nntpFile,
                 &NntpFile::allArticlesArePosted,
                 this,
@@ -1074,10 +1110,8 @@ void PostingJob::_initPosting()
                     Qt::QueuedConnection);
 
         nntpFile->setHistoryFileId(registerHistoryFile(static_cast<int>(fileNum), file, nntpFile));
-        if (_resumeFromHistory) {
-            const QSet<uint> alreadyPosted =
-                _resumePostedPartsByPath.value(file.absoluteFilePath());
-            for (uint part : alreadyPosted)
+        if (useResumeState) {
+            for (uint part : resumeState.postedParts)
                 nntpFile->markAlreadyPosted(part);
         }
         _filesToUpload.enqueue(nntpFile);

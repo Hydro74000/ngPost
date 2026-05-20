@@ -17,9 +17,11 @@
 #include <QtTest>
 #include <QApplication>
 #include <QCheckBox>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalSpy>
+#include <QTabWidget>
 #include <QTableWidget>
 
 #include "hmi/MainWindow.h"
@@ -42,6 +44,10 @@ private slots:
     //! Toggling the per-row "Use VPN" checkbox via the inner QCheckBox
     //! programmatically fires CheckBoxCenterWidget::toggled.
     void vpn_checkbox_toggled_emits_signal();
+
+    //! Long history details should scroll inside the history panel instead of
+    //! changing the top-level window dimensions.
+    void history_detail_text_does_not_resize_window();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -127,6 +133,36 @@ void TestMainWindow::vpn_checkbox_toggled_emits_signal()
     vpnCb->setChecked(!initial);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(vpnCb->isChecked(), !initial);
+}
+
+void TestMainWindow::history_detail_text_does_not_resize_window()
+{
+    MainWindow window;
+    auto *tabs = window.findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    QVERIFY2(tabs, "postTabWidget not found in MainWindow");
+
+    QWidget *historyTab = window.buildHistoryTabForTest();
+    tabs->addTab(historyTab, QStringLiteral("History"));
+    tabs->setCurrentWidget(historyTab);
+
+    window.resize(900, 600);
+    window.show();
+    QTest::qWait(50);
+    const QSize before = window.size();
+
+    auto *detail = window.findChild<QLabel*>(QStringLiteral("historyDetailInfo"));
+    QVERIFY2(detail, "historyDetailInfo not found");
+
+    QString rows;
+    for (int i = 0; i < 200; ++i) {
+        rows += QStringLiteral("<tr><td>file_%1_with_a_long_name.bin</td>"
+                               "<td align='right'>4 MB</td>"
+                               "<td align='center'>posted</td></tr>").arg(i);
+    }
+    detail->setText(QStringLiteral("<table>%1</table>").arg(rows));
+    QApplication::processEvents();
+
+    QCOMPARE(window.size(), before);
 }
 
 QTEST_MAIN(TestMainWindow)

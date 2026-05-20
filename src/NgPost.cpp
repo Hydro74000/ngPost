@@ -907,6 +907,72 @@ void NgPost::_printResumeCheck(qint64 postId)
           << "unknown: " << d.unknownArticles << "\n";
 }
 
+namespace
+{
+
+struct ResumeJobPlan {
+    QFileInfoList files;
+    QMap<QString, PostingJob::ResumeFileState> statesByPath;
+    QStringList unavailableSources;
+};
+
+QStringList splitStoredGroups(const QString &groups)
+{
+    return groups.split(',', Qt::SkipEmptyParts);
+}
+
+ResumeJobPlan buildResumeJobPlan(const PostHistoryStore::PostDetails &details)
+{
+    ResumeJobPlan plan;
+    const int fileRows = static_cast<int>(details.files.size());
+    const int originalTotalFiles = details.post.nbFiles > fileRows
+        ? details.post.nbFiles
+        : fileRows;
+    const QStringList postGroups = splitStoredGroups(details.post.groups);
+
+    for (const PostHistoryStore::FileSummary &file : details.files) {
+        QSet<uint> postedParts;
+        bool hasRemaining = false;
+        const QList<PostHistoryStore::ArticleSummary> articles =
+            details.articlesByFile.value(file.id);
+        for (const PostHistoryStore::ArticleSummary &article : articles) {
+            if (article.status == QStringLiteral("posted"))
+                postedParts.insert(static_cast<uint>(article.part));
+            else
+                hasRemaining = true;
+        }
+        if (file.totalArticles > articles.size())
+            hasRemaining = true;
+        if (!hasRemaining)
+            continue;
+
+        QFileInfo source(file.originalPath);
+        if (!source.exists()
+            || source.size() != file.sizeBytes
+            || (file.mtimeEpoch
+                && source.lastModified().toSecsSinceEpoch() != file.mtimeEpoch)) {
+            plan.unavailableSources << file.originalPath;
+            continue;
+        }
+
+        PostingJob::ResumeFileState state;
+        state.historyFileId = file.id;
+        state.ordinal = file.ordinal;
+        state.totalFiles = originalTotalFiles;
+        state.groups = splitStoredGroups(file.groups);
+        if (state.groups.isEmpty())
+            state.groups = postGroups;
+        state.postedParts = postedParts;
+
+        plan.files << source;
+        plan.statesByPath.insert(source.absoluteFilePath(), state);
+    }
+
+    return plan;
+}
+
+} // namespace
+
 bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assumeYes)
 {
     if (!dryRun && !assumeYes) {
@@ -953,35 +1019,15 @@ bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assume
             continue;
         }
 
-        QFileInfoList filesToResume;
-        QMap<QString, QSet<uint>> alreadyPostedByPath;
-        for (const PostHistoryStore::FileSummary &file : details.files) {
-            QSet<uint> postedParts;
-            bool hasRemaining = false;
-            const QList<PostHistoryStore::ArticleSummary> articles =
-                details.articlesByFile.value(file.id);
-            for (const PostHistoryStore::ArticleSummary &article : articles) {
-                if (article.status == QStringLiteral("posted"))
-                    postedParts.insert(static_cast<uint>(article.part));
-                else
-                    hasRemaining = true;
-            }
-            if (file.totalArticles > articles.size())
-                hasRemaining = true;
-            if (!hasRemaining)
-                continue;
-
-            QFileInfo source(file.originalPath);
-            if (!source.exists()) {
-                _error(tr("Source missing for post %1: %2").arg(postId).arg(file.originalPath),
-                       ERROR_CODE::ERR_HISTORY);
-                continue;
-            }
-            filesToResume << source;
-            alreadyPostedByPath.insert(source.absoluteFilePath(), postedParts);
+        const ResumeJobPlan resumePlan = buildResumeJobPlan(details);
+        for (const QString &source : resumePlan.unavailableSources) {
+            _error(tr("Source missing or changed for post %1: %2").arg(postId).arg(source),
+                   ERROR_CODE::ERR_HISTORY);
         }
+        if (!resumePlan.unavailableSources.isEmpty())
+            continue;
 
-        if (filesToResume.isEmpty()) {
+        if (resumePlan.files.isEmpty()) {
             _cout << tr("Post %1 has no article left to resume").arg(postId) << "\n";
             continue;
         }
@@ -998,7 +1044,7 @@ bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assume
 
         PostingJob *job = new PostingJob(this,
                                          nzbPath,
-                                         filesToResume,
+                                         resumePlan.files,
                                          nullptr,
                                          groups,
                                          details.from.isEmpty() ? from() : details.from.toStdString(),
@@ -1018,7 +1064,7 @@ bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assume
                                          false,
                                          true,
                                          postId,
-                                         alreadyPostedByPath);
+                                         resumePlan.statesByPath);
         startPostingJob(job);
         scheduled = true;
     }
@@ -1049,31 +1095,13 @@ bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
         return false;
     }
 
-    QFileInfoList filesToResume;
-    QMap<QString, QSet<uint>> alreadyPostedByPath;
-    for (const PostHistoryStore::FileSummary &file : details.files) {
-        QSet<uint> postedParts;
-        bool hasRemaining = false;
-        const QList<PostHistoryStore::ArticleSummary> articles =
-            details.articlesByFile.value(file.id);
-        for (const PostHistoryStore::ArticleSummary &article : articles) {
-            if (article.status == QStringLiteral("posted"))
-                postedParts.insert(static_cast<uint>(article.part));
-            else
-                hasRemaining = true;
-        }
-        if (file.totalArticles > articles.size())
-            hasRemaining = true;
-        if (!hasRemaining)
-            continue;
-        QFileInfo source(file.originalPath);
-        if (!source.exists())
-            continue;
-        filesToResume << source;
-        alreadyPostedByPath.insert(source.absoluteFilePath(), postedParts);
+    const ResumeJobPlan resumePlan = buildResumeJobPlan(details);
+    if (!resumePlan.unavailableSources.isEmpty()) {
+        if (error)
+            *error = tr("source files are missing or changed");
+        return false;
     }
-
-    if (filesToResume.isEmpty()) {
+    if (resumePlan.files.isEmpty()) {
         if (error)
             *error = tr("no source file remains available to resume");
         return false;
@@ -1091,7 +1119,7 @@ bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
 
     PostingJob *job = new PostingJob(this,
                                      nzbPath,
-                                     filesToResume,
+                                     resumePlan.files,
                                      widget,
                                      groups,
                                      details.from.isEmpty() ? from() : details.from.toStdString(),
@@ -1111,11 +1139,11 @@ bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
                                      false,
                                      true,
                                      postId,
-                                     alreadyPostedByPath);
+                                     resumePlan.statesByPath);
 #ifdef __USE_HMI__
     const bool hasStarted = startPostingJob(job);
     if (widget)
-        widget->attachResumeJob(job, filesToResume, hasStarted);
+        widget->attachResumeJob(job, resumePlan.files, hasStarted);
 #else
     startPostingJob(job);
 #endif

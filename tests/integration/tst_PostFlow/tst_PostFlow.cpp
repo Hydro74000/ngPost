@@ -25,6 +25,7 @@
 #include <QStandardPaths>
 #include <QXmlStreamReader>
 
+#include "history/PostHistoryStore.h"
 #include "MockNntpServer.h"
 #include "TestEnv.h"
 
@@ -85,6 +86,32 @@ int countSegmentsInNzb(const QByteArray &nzbBytes, QString *firstSubject = nullp
     return segments;
 }
 
+struct NzbFileEntry
+{
+    QString subject;
+    QStringList segments;
+};
+
+QList<NzbFileEntry> collectNzbFiles(const QByteArray &nzbBytes)
+{
+    QList<NzbFileEntry> files;
+    QXmlStreamReader r(nzbBytes);
+    int current = -1;
+    while (!r.atEnd()) {
+        r.readNext();
+        if (r.isStartElement() && r.name() == QLatin1String("file")) {
+            NzbFileEntry entry;
+            entry.subject = r.attributes().value(QLatin1String("subject")).toString();
+            files << entry;
+            current = files.size() - 1;
+        } else if (r.isStartElement() && r.name() == QLatin1String("segment")
+                   && current >= 0) {
+            files[current].segments << r.readElementText();
+        }
+    }
+    return files;
+}
+
 } // namespace
 
 class TestPostFlow : public QObject
@@ -122,6 +149,10 @@ private slots:
     //! The mock drops the connection after N bytes; ngPost must not crash or
     //! hang regardless of whether retry eventually succeeds.
     void retry_on_dropped_connection();
+
+    //! Resuming only the second file of a multi-file post must preserve the
+    //! original history row/ordinal instead of overwriting file #1.
+    void resume_history_post_preserves_original_file_ordinals();
 
     //! Config values are split on the first '=' only: server passwords,
     //! NZB paths and RAR passwords may legally contain '='.
@@ -343,6 +374,111 @@ void TestPostFlow::retry_on_dropped_connection()
     // non-zero exit. Either way we want a NON-hanging finish.
     QVERIFY2(code != -1 && code != -2,
              qPrintable(QStringLiteral("ngPost crashed or timed out (code=%1):\n%2").arg(code).arg(out)));
+}
+
+void TestPostFlow::resume_history_post_preserves_original_file_ordinals()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    const QString firstPath = sandbox.rootPath() + QStringLiteral("/first.bin");
+    const QString secondPath = sandbox.rootPath() + QStringLiteral("/second.bin");
+    for (const QString &path : { firstPath, secondPath }) {
+        QFile source(path);
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        source.write(QByteArray(8, 'x'));
+    }
+
+    const QString dbPath = sandbox.rootPath() + QStringLiteral("/history.sqlite");
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/resume.nzb");
+    PostHistoryStore store(dbPath, true);
+    QString err;
+    QVERIFY2(store.initialize(&err), qPrintable(err));
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("resume.nzb");
+    post.nzbPath = nzbPath;
+    post.from = QStringLiteral("poster@example.invalid");
+    post.groups = { QStringLiteral("alt.binaries.test") };
+    const qint64 postId = store.createPost(post, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    auto addFile = [&](int ordinal, const QString &path) {
+        const QFileInfo sourceInfo(path);
+        PostHistoryStore::FileRecord file;
+        file.postId = postId;
+        file.ordinal = ordinal;
+        file.originalPath = sourceInfo.absoluteFilePath();
+        file.postedName = sourceInfo.fileName();
+        file.sizeBytes = sourceInfo.size();
+        file.mtimeEpoch = sourceInfo.lastModified().toSecsSinceEpoch();
+        file.totalArticles = 2;
+        file.groups = post.groups;
+        return store.upsertFile(file, &err);
+    };
+    const qint64 firstId = addFile(1, firstPath);
+    const qint64 secondId = addFile(2, secondPath);
+    QVERIFY2(firstId > 0, qPrintable(err));
+    QVERIFY2(secondId > 0, qPrintable(err));
+
+    auto addArticle = [&](qint64 fileId, int part, qint64 pos, const QString &msgId,
+                          bool posted) {
+        PostHistoryStore::ArticleRecord article;
+        article.fileId = fileId;
+        article.part = part;
+        article.pos = pos;
+        article.bytes = 4;
+        QVERIFY2(store.upsertArticle(article, &err), qPrintable(err));
+        QVERIFY2(store.markArticlePosting(fileId, part, msgId, 1, &err), qPrintable(err));
+        if (posted)
+            QVERIFY2(store.markArticlePosted(fileId, part, msgId, &err), qPrintable(err));
+        else
+            QVERIFY2(store.markArticleFailed(fileId, part, msgId,
+                                             QStringLiteral("server rejected"), &err),
+                     qPrintable(err));
+    };
+    addArticle(firstId, 1, 0, QStringLiteral("first-1@ngpost"), true);
+    addArticle(firstId, 2, 4, QStringLiteral("first-2@ngpost"), true);
+    addArticle(secondId, 1, 0, QStringLiteral("second-1@ngpost"), true);
+    addArticle(secondId, 2, 4, QStringLiteral("second-old@ngpost"), false);
+    QVERIFY2(store.updateFileStatus(firstId, QStringLiteral("posted"), &err), qPrintable(err));
+    QVERIFY2(store.updateFileStatus(secondId, QStringLiteral("partial"), &err), qPrintable(err));
+    QVERIFY2(store.updatePostStatus(postId, QStringLiteral("partial"), 2, 4, 1, 16,
+                                    QStringLiteral("1 KB/s"), &err),
+             qPrintable(err));
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+    QString out;
+    const int code = runNgPost(_bin, {
+        "-S", srv,
+        "--resume-post", QString::number(postId),
+        "--yes",
+        "--post_db", dbPath,
+        "-a", "4",
+        "--quiet",
+        "--disp_progress", "none",
+    }, sandbox.rootPath(), out, /*timeoutMs=*/60000);
+    QVERIFY2(code == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(code).arg(out)));
+
+    QCOMPARE(mock.receivedArticles().size(), 1);
+
+    QFile nzb(nzbPath);
+    QVERIFY2(nzb.open(QIODevice::ReadOnly),
+             qPrintable(QStringLiteral("NZB was not regenerated at %1").arg(nzbPath)));
+    const QList<NzbFileEntry> files = collectNzbFiles(nzb.readAll());
+    QCOMPARE(files.size(), 2);
+    QVERIFY2(files.at(0).subject.contains(QStringLiteral("[1/2]")),
+             qPrintable(files.at(0).subject));
+    QVERIFY2(files.at(1).subject.contains(QStringLiteral("[2/2]")),
+             qPrintable(files.at(1).subject));
+    QCOMPARE(files.at(0).segments.size(), 2);
+    QCOMPARE(files.at(1).segments.size(), 2);
+    QVERIFY(files.at(0).segments.contains(QStringLiteral("first-1@ngpost")));
+    QVERIFY(files.at(0).segments.contains(QStringLiteral("first-2@ngpost")));
+    QVERIFY(files.at(1).segments.contains(QStringLiteral("second-1@ngpost")));
+    QVERIFY(!files.at(1).segments.contains(QStringLiteral("second-old@ngpost")));
 }
 
 void TestPostFlow::config_values_keep_equals()

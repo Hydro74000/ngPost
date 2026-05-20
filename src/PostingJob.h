@@ -27,6 +27,7 @@
 #include <QMutex>
 #include <QQueue>
 #include <QSet>
+#include <QStringList>
 #include <QTextStream>
 #include <QTime>
 #include <QTimer>
@@ -55,6 +56,15 @@ class PostingJob : public QObject
     friend class Poster;
     friend class ArticleBuilder;
     friend class NgPost;
+
+public:
+    struct ResumeFileState {
+        qint64 historyFileId = 0;
+        int ordinal = 0;
+        int totalFiles = 0;
+        QStringList groups;
+        QSet<uint> postedParts;
+    };
 
 private:
     NgPost *const _ngPost; //!< handle on the application to access global configs
@@ -154,7 +164,7 @@ private:
     bool _isActiveJob;
     qint64 _historyPostId;
     const bool _resumeFromHistory;
-    const QMap<QString, QSet<uint>> _resumePostedPartsByPath;
+    const QMap<QString, ResumeFileState> _resumeFileStatesByPath;
 
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     quint64 _immediateSize; //!< bytes posted (to compute the avg speed)
@@ -186,7 +196,8 @@ public:
                bool delFilesAfterPost = false,
                bool overwriteNzb = true,
                qint64 resumeHistoryPostId = 0,
-               const QMap<QString, QSet<uint>> &resumePostedPartsByPath = QMap<QString, QSet<uint>>(),
+               const QMap<QString, ResumeFileState> &resumeFileStatesByPath =
+                   QMap<QString, ResumeFileState>(),
                QObject *parent = nullptr);
     ~PostingJob();
 
