@@ -20,6 +20,8 @@
 #include "PostingJob.h"
 #include "NgPost.h"
 #include "NntpConnection.h"
+#include "history/NzbHistoryRegenerator.h"
+#include "history/PostHistoryStore.h"
 #include "nntp/NntpArticle.h"
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
@@ -27,6 +29,7 @@
 #include "hmi/PostingWidget.h"
 #endif
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDebug>
 #include <QDir>
 #include <QMutex>
@@ -57,6 +60,8 @@ PostingJob::PostingJob(NgPost *ngPost,
                        bool keepRar,
                        bool delFilesAfterPost,
                        bool overwriteNzb,
+                       qint64 resumeHistoryPostId,
+                       const QMap<QString, QSet<uint>> &resumePostedPartsByPath,
                        QObject *parent)
     : QObject(parent)
     , _ngPost(ngPost)
@@ -132,6 +137,9 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _isPaused(false)
     , _resumeTimer()
     , _isActiveJob(false)
+    , _historyPostId(resumeHistoryPostId)
+    , _resumeFromHistory(resumeHistoryPostId != 0)
+    , _resumePostedPartsByPath(resumePostedPartsByPath)
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     , _immediateSize(0)
     , _immediateSpeedTimer()
@@ -205,6 +213,41 @@ PostingJob::PostingJob(NgPost *ngPost,
 
     if (ngPost->debugMode())
         _log(NntpConnection::sslSupportInfo());
+
+    if (_ngPost->_ensureHistoryStore()) {
+        if (_resumeFromHistory) {
+            QString err;
+            if (!_ngPost->historyStore()->markPostResuming(_historyPostId, &err)
+                && _ngPost->debugMode())
+                _error(tr("History: could not mark post as resuming: %1").arg(err));
+            return;
+        }
+
+        PostHistoryStore::PostRecord rec;
+        rec.nzbName = _nzbName;
+        rec.nzbPath = _nzbFilePath;
+        rec.rarName = _rarName;
+        rec.rarPass = _rarPass;
+        rec.hasPassword = !_rarPass.isEmpty();
+        if (_rarPass.isEmpty())
+            rec.passwordOrigin = QStringLiteral("absent");
+        else if (_ngPost->_genPass && _ngPost->_rarPassFixed.isEmpty())
+            rec.passwordOrigin = QStringLiteral("generated");
+        else if (!_ngPost->_rarPassFixed.isEmpty())
+            rec.passwordOrigin = QStringLiteral("fixed");
+        else
+            rec.passwordOrigin = QStringLiteral("provided");
+        rec.from = QString::fromStdString(_from);
+        rec.groups = _grpList;
+        rec.doCompress = _doCompress;
+        rec.doPar2 = _doPar2;
+        rec.obfuscateArticles = _obfuscateArticles;
+        rec.obfuscateFileName = _obfuscateFileName;
+        QString err;
+        _historyPostId = _ngPost->historyStore()->createPost(rec, &err);
+        if (!_historyPostId && _ngPost->debugMode())
+            _error(tr("History: could not create post record: %1").arg(err));
+    }
 }
 
 PostingJob::~PostingJob()
@@ -268,6 +311,97 @@ QString PostingJob::sslSupportInfo()
 bool PostingJob::supportsSsl()
 {
     return NntpConnection::supportsSsl();
+}
+
+qint64 PostingJob::registerHistoryFile(int ordinal, const QFileInfo &file, NntpFile *nntpFile)
+{
+    if (!_historyPostId || !_ngPost->historyStore())
+        return 0;
+    PostHistoryStore::FileRecord rec;
+    rec.postId = _historyPostId;
+    rec.ordinal = ordinal;
+    rec.originalPath = file.absoluteFilePath();
+    rec.postedName = file.fileName();
+    rec.sizeBytes = file.size();
+    rec.mtimeEpoch = file.lastModified().toSecsSinceEpoch();
+    rec.totalArticles = static_cast<int>(nntpFile->nbArticles());
+    rec.groups = QString::fromStdString(nntpFile->groups()).split(',', Qt::SkipEmptyParts);
+    rec.status = QStringLiteral("pending");
+    QString err;
+    const qint64 id = _ngPost->historyStore()->upsertFile(rec, &err);
+    if (!id && _ngPost->debugMode())
+        _error(tr("History: could not create file record: %1").arg(err));
+    return id;
+}
+
+void PostingJob::recordHistoryArticle(qint64 fileId, int part, qint64 pos, qint64 bytes)
+{
+    if (!fileId || !_ngPost->historyStore())
+        return;
+    PostHistoryStore::ArticleRecord rec;
+    rec.fileId = fileId;
+    rec.part = part;
+    rec.pos = pos;
+    rec.bytes = bytes;
+    rec.status = QStringLiteral("pending");
+    QString err;
+    if (!_ngPost->historyStore()->upsertArticle(rec, &err) && _ngPost->debugMode())
+        _error(tr("History: could not create article record: %1").arg(err));
+}
+
+void PostingJob::recordHistoryArticlePosting(NntpArticle *article, int attemptNo)
+{
+    if (!article || !article->nntpFile() || !_ngPost->historyStore())
+        return;
+    QString err;
+    if (!_ngPost->historyStore()->markArticlePosting(article->nntpFile()->historyFileId(),
+                                                     static_cast<int>(article->part()),
+                                                     article->id(),
+                                                     attemptNo,
+                                                     &err)
+        && _ngPost->debugMode())
+        _error(tr("History: could not mark article posting: %1").arg(err));
+}
+
+void PostingJob::recordHistoryArticlePosted(NntpArticle *article)
+{
+    if (!article || !article->nntpFile() || !_ngPost->historyStore())
+        return;
+    QString err;
+    if (!_ngPost->historyStore()->markArticlePosted(article->nntpFile()->historyFileId(),
+                                                   static_cast<int>(article->part()),
+                                                   article->id(),
+                                                   &err)
+        && _ngPost->debugMode())
+        _error(tr("History: could not mark article posted: %1").arg(err));
+}
+
+void PostingJob::recordHistoryArticleFailed(NntpArticle *article, const QString &reason)
+{
+    if (!article || !article->nntpFile() || !_ngPost->historyStore())
+        return;
+    QString err;
+    if (!_ngPost->historyStore()->markArticleFailed(article->nntpFile()->historyFileId(),
+                                                   static_cast<int>(article->part()),
+                                                   article->id(),
+                                                   reason,
+                                                   &err)
+        && _ngPost->debugMode())
+        _error(tr("History: could not mark article failed: %1").arg(err));
+}
+
+void PostingJob::recordHistoryArticleUnknown(NntpArticle *article, const QString &reason)
+{
+    if (!article || !article->nntpFile() || !_ngPost->historyStore())
+        return;
+    QString err;
+    if (!_ngPost->historyStore()->markArticleUnknown(article->nntpFile()->historyFileId(),
+                                                    static_cast<int>(article->part()),
+                                                    article->id(),
+                                                    reason,
+                                                    &err)
+        && _ngPost->debugMode())
+        _error(tr("History: could not mark article unknown: %1").arg(err));
 }
 
 void PostingJob::onResumeTriggered()
@@ -608,7 +742,19 @@ void PostingJob::onNntpFilePosted()
                  .arg(avgSpeed())
                  .arg(nntpFile->name()));
 
-    nntpFile->writeToNZB(_nzbStream, QString::fromStdString(_from));
+    if (_ngPost->historyStore() && nntpFile->historyFileId()) {
+        QString err;
+        _ngPost->historyStore()->updateFileStatus(
+            nntpFile->historyFileId(),
+            nntpFile->hasFailedArticles() ? QStringLiteral("partial") : QStringLiteral("posted"),
+            &err);
+    }
+    if (!nntpFile->hasFailedArticles())
+        nntpFile->writeToNZB(_nzbStream, QString::fromStdString(_from));
+    else
+        _error(tr("Skipping NZB entry for %1 because it has %2 failed articles")
+                   .arg(nntpFile->name())
+                   .arg(nntpFile->nbFailedArticles()));
     _filesInProgress.remove(nntpFile);
     emit nntpFile->scheduleDeletion();
     if (_nbPosted == _nbFiles) {
@@ -638,6 +784,12 @@ void PostingJob::onNntpErrorReading()
 
     _filesInProgress.remove(nntpFile);
     _filesFailed.insert(nntpFile);
+    if (_ngPost->historyStore() && nntpFile->historyFileId()) {
+        QString err;
+        _ngPost->historyStore()->updateFileStatus(nntpFile->historyFileId(),
+                                                  QStringLiteral("failed"),
+                                                  &err);
+    }
     if (_nbPosted == _nbFiles) {
 #ifdef __DEBUG__
         _log(QString(
@@ -827,6 +979,18 @@ NntpArticle *PostingJob::_readNextArticleIntoBufferPtr(const QString &threadName
                          .arg(pos)
                          .arg(_file->pos()));
             ++_part;
+            if (_resumeFromHistory && _nntpFile->isArticleAlreadyPosted(_part)) {
+                if (_ngPost->debugFull())
+                    _log(tr("[%1] skipping already posted article %2 from %3")
+                             .arg(threadName)
+                             .arg(_part)
+                             .arg(_nntpFile->path()));
+                return _readNextArticleIntoBufferPtr(threadName, bufferPtr);
+            }
+            recordHistoryArticle(_nntpFile->historyFileId(),
+                                 static_cast<int>(_part),
+                                 pos,
+                                 bytesRead);
             NntpArticle *article = new NntpArticle(_nntpFile,
                                                    _part,
                                                    pos,
@@ -909,6 +1073,13 @@ void PostingJob::_initPosting()
                     &PostingJob::onNntpFileStartPosting,
                     Qt::QueuedConnection);
 
+        nntpFile->setHistoryFileId(registerHistoryFile(static_cast<int>(fileNum), file, nntpFile));
+        if (_resumeFromHistory) {
+            const QSet<uint> alreadyPosted =
+                _resumePostedPartsByPath.value(file.absoluteFilePath());
+            for (uint part : alreadyPosted)
+                nntpFile->markAlreadyPosted(part);
+        }
         _filesToUpload.enqueue(nntpFile);
         _nbArticlesTotal += nntpFile->nbArticles();
     }
@@ -931,6 +1102,23 @@ void PostingJob::_finishPosting()
         _log("Finishing posting...");
 
     _ngPost->_finishPosting(); // to update progress bar
+
+    if (_historyPostId && _ngPost->historyStore()) {
+        QString status;
+        if (_postFinished)
+            status = _nbArticlesFailed ? QStringLiteral("partial") : QStringLiteral("success");
+        else
+            status = QStringLiteral("failed");
+        QString err;
+        _ngPost->historyStore()->updatePostStatus(_historyPostId,
+                                                  status,
+                                                  static_cast<int>(_nbFiles),
+                                                  static_cast<int>(_nbArticlesTotal),
+                                                  static_cast<int>(_nbArticlesFailed),
+                                                  static_cast<qint64>(_totalSize),
+                                                  avgSpeed(),
+                                                  &err);
+    }
 
     // 1.: print stats
     if (_timeStart.isValid())
@@ -998,6 +1186,21 @@ void PostingJob::_closeNzb()
         if (_nzb->isOpen()) {
             _nzbStream << "</nzb>\n";
             _nzb->close();
+            if (_historyPostId && _ngPost->historyStore()) {
+                QFile consolidated(_nzbFilePath);
+                if (consolidated.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                    QTextStream stream(&consolidated);
+                    QStringList warnings;
+                    QString err;
+                    NzbHistoryRegenerator regenerator(_ngPost->historyStore());
+                    if (!regenerator.writeNzb(_historyPostId, stream, true, &warnings, &err))
+                        _error(tr("Could not regenerate final NZB from history: %1").arg(err));
+                    for (const QString &warning : warnings)
+                        _error(tr("NZB history warning: %1").arg(warning));
+                } else {
+                    _error(tr("Could not reopen NZB for history regeneration: %1").arg(_nzbFilePath));
+                }
+            }
             _ngPost->doNzbPostCMD(this);
         }
         delete _nzb;

@@ -21,6 +21,7 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 
+#include "history/PostHistoryStore.h"
 #include "TestEnv.h"
 
 #ifndef APP_VERSION
@@ -65,6 +66,37 @@ RunResult run(const QString &bin, const QStringList &args, const QString &sandbo
     return r;
 }
 
+qint64 createResumablePost(const QString &dbPath, const QString &sourcePath, QString *error)
+{
+    PostHistoryStore store(dbPath, true);
+    if (!store.initialize(error))
+        return 0;
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("cli-resume.nzb");
+    post.nzbPath = QFileInfo(sourcePath).absolutePath() + QStringLiteral("/cli-resume.nzb");
+    post.from = QStringLiteral("poster@example.invalid");
+    post.groups = { QStringLiteral("alt.binaries.test") };
+    const qint64 postId = store.createPost(post, error);
+    if (!postId)
+        return 0;
+
+    QFileInfo sourceInfo(sourcePath);
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.originalPath = sourceInfo.absoluteFilePath();
+    file.postedName = sourceInfo.fileName();
+    file.sizeBytes = sourceInfo.size();
+    file.mtimeEpoch = sourceInfo.lastModified().toSecsSinceEpoch();
+    file.totalArticles = 1;
+    file.groups = post.groups;
+    if (!store.upsertFile(file, error))
+        return 0;
+
+    return postId;
+}
+
 } // namespace
 
 class TestCliParser : public QObject
@@ -99,6 +131,10 @@ private slots:
 
     //! `--auto <dir>` without `--compress` must error with ERR_AUTO_NO_COMPRESS.
     void auto_dir_without_compress_rejected();
+
+    //! Resume commands should work through dash/underscore aliases and dry-run
+    //! without requiring normal posting input.
+    void resume_commands_accept_aliases_and_dry_run();
 };
 
 void TestCliParser::initTestCase()
@@ -130,7 +166,15 @@ void TestCliParser::help_lists_major_flags()
     QCOMPARE(r.exitCode, 0);
 
     const QString out = r.stdoutText + r.stderrText;
-    for (const char *flag : { "--vpn", "--vpn_profile", "--auto", "--monitor" }) {
+    for (const char *flag : { "--vpn", "--vpn_profile", "--auto", "--monitor",
+                              "--history", "--history-show", "--history_show",
+                              "--resume-list", "--resume_list",
+                              "--resume-check", "--resume_check",
+                              "--resume-post", "--resume_post",
+                              "--resume-all", "--resume_all",
+                              "--resume-abandon", "--resume_abandon",
+                              "--resume-purge", "--resume_purge",
+                              "--regenerate-nzb", "--regenerate_nzb" }) {
         QVERIFY2(out.contains(QString::fromLatin1(flag)),
                  qPrintable(QStringLiteral("help output did not mention '%1'").arg(QString::fromLatin1(flag))));
     }
@@ -203,6 +247,64 @@ void TestCliParser::auto_dir_without_compress_rejected()
 
     QVERIFY2(!r.timedOut, "process timed out");
     QVERIFY2(r.exitCode != 0, "expected non-zero exit for --auto without --compress");
+}
+
+void TestCliParser::resume_commands_accept_aliases_and_dry_run()
+{
+    HomeSandbox sandbox;
+
+    const QString sourcePath = sandbox.rootPath() + QStringLiteral("/resume.bin");
+    QFile source(sourcePath);
+    QVERIFY(source.open(QIODevice::WriteOnly));
+    source.write("resume me");
+    source.close();
+
+    const QString dbPath = sandbox.rootPath() + QStringLiteral("/history.sqlite");
+    QString err;
+    const qint64 postId = createResumablePost(dbPath, sourcePath, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    const RunResult listDash = run(_bin, { "--resume-list", "--post_db", dbPath },
+                                   sandbox.rootPath());
+    QVERIFY2(!listDash.timedOut, "resume-list timed out");
+    QCOMPARE(listDash.exitCode, 0);
+    QVERIFY2(listDash.stdoutText.contains(QString::number(postId)),
+             qPrintable(QStringLiteral("resume-list did not include post %1:\n%2")
+                            .arg(postId).arg(listDash.stdoutText + listDash.stderrText)));
+
+    const RunResult listUnderscore = run(_bin, { "--resume_list", "--post_db", dbPath },
+                                         sandbox.rootPath());
+    QVERIFY2(!listUnderscore.timedOut, "resume_list timed out");
+    QCOMPARE(listUnderscore.exitCode, 0);
+    QVERIFY2(listUnderscore.stdoutText.contains(QString::number(postId)),
+             qPrintable(QStringLiteral("resume_list did not include post %1:\n%2")
+                            .arg(postId).arg(listUnderscore.stdoutText + listUnderscore.stderrText)));
+
+    const RunResult check = run(_bin, { "--resume-check", QString::number(postId),
+                                        "--post_db", dbPath },
+                                sandbox.rootPath());
+    QVERIFY2(!check.timedOut, "resume-check timed out");
+    QCOMPARE(check.exitCode, 0);
+    QVERIFY2(check.stdoutText.contains(QStringLiteral("state: resumable")),
+             qPrintable(QStringLiteral("resume-check output was:\n%1")
+                            .arg(check.stdoutText + check.stderrText)));
+
+    const RunResult postDryRun = run(_bin, { "--resume-post", QString::number(postId),
+                                             "--dry-run", "--post_db", dbPath },
+                                     sandbox.rootPath());
+    QVERIFY2(!postDryRun.timedOut, "resume-post dry-run timed out");
+    QCOMPARE(postDryRun.exitCode, 0);
+    QVERIFY2(postDryRun.stdoutText.contains(QStringLiteral("pending: 1")),
+             qPrintable(QStringLiteral("resume-post dry-run output was:\n%1")
+                            .arg(postDryRun.stdoutText + postDryRun.stderrText)));
+
+    const RunResult allDryRun = run(_bin, { "--resume-all", "--dry-run", "--post_db", dbPath },
+                                    sandbox.rootPath());
+    QVERIFY2(!allDryRun.timedOut, "resume-all dry-run timed out");
+    QCOMPARE(allDryRun.exitCode, 0);
+    QVERIFY2(allDryRun.stdoutText.contains(QString::number(postId)),
+             qPrintable(QStringLiteral("resume-all dry-run output was:\n%1")
+                            .arg(allDryRun.stdoutText + allDryRun.stderrText)));
 }
 
 QTEST_MAIN(TestCliParser)

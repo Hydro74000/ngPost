@@ -135,7 +135,9 @@ bool NntpArticle::tryResend()
 void NntpArticle::write(NntpConnection *con, const std::string &idSignature)
 {
     ++_nbTrySending;
-    con->write(header(idSignature).c_str());
+    const std::string articleHeader = header(idSignature);
+    _nntpFile->onArticlePostingStarted(this, _nbTrySending);
+    con->write(articleHeader.c_str());
     con->write(_body);
 }
 

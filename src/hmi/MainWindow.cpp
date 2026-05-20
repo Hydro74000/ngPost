@@ -23,20 +23,53 @@
 #include "AutoPostWidget.h"
 #include "NgPost.h"
 #include "VpnSettingsDialog.h"
+#include "history/PostHistoryStore.h"
 #include "nntp/NntpServerParams.h"
 #include "nntp/NntpArticle.h"
 #include "vpn/VpnManager.h"
 
 #include <QCoreApplication>
+#include <QAbstractItemView>
+#include <QApplication>
+#include <QCheckBox>
+#include <QClipboard>
+#include <QComboBox>
 #include <QDebug>
 #include <QElapsedTimer>
+#include <QFileDialog>
+#include <QHeaderView>
+#include <QLineEdit>
 #include <QProgressBar>
 #include <QProgressDialog>
+#include <QHBoxLayout>
+#include <QPainter>
+#include <QSplitter>
+#include <QTableWidget>
+#include <QTabWidget>
+#include <QTextStream>
+#include <QVBoxLayout>
 #include <QLabel>
 #include <QScreen>
 #include <QMessageBox>
+#include <QMenu>
 #include <QPushButton>
+#include <QStatusBar>
+#include <QtCharts/QAbstractAxis>
+#include <QtCharts/QBarCategoryAxis>
+#include <QtCharts/QBarSeries>
+#include <QtCharts/QBarSet>
+#include <QtCharts/QChart>
+#include <QtCharts/QChartView>
+#include <QtCharts/QValueAxis>
+#include <QDate>
+#include <QDateEdit>
+#include <QDesktopServices>
+#include "history/ResumePlanner.h"
 #include "utils/UpdateChecker.h"
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+QT_CHARTS_USE_NAMESPACE
+#endif
 
 
 const QColor  MainWindow::sPostingColor = QColor(255,162, 0); // gold (#FFA200)
@@ -138,8 +171,10 @@ void MainWindow::init(NgPost *ngPost)
     tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
     _ui->postTabWidget->addTab(_autoPostTab, QIcon(":/icons/auto.png"), _ngPost->folderMonitoringName());
     tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
+    _ui->postTabWidget->addTab(_buildHistoryTab(), QIcon(":/icons/monitor.png"), tr("History"));
+    tabBar->setTabToolTip(2, tr("Post history, statistics and resume center"));
     _ui->postTabWidget->addTab(new QWidget(_ui->postTabWidget), QIcon(":/icons/plus.png"), tr("New"));
-    tabBar->setTabToolTip(2, QString("Create a new %1").arg(_ngPost->quickJobName()));
+    tabBar->setTabToolTip(3, QString("Create a new %1").arg(_ngPost->quickJobName()));
 
 //    connect(_ui->postTabWidget,           &QTabWidget::currentChanged, this, &MainWindow::onJobTabClicked);
     connect(tabBar, &QTabBar::tabBarClicked,              this, &MainWindow::onJobTabClicked);
@@ -231,8 +266,8 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
         int currentTabIdx = _ui->postTabWidget->currentIndex();
         if (currentTabIdx == 1)
             static_cast<AutoPostWidget*>(_ui->postTabWidget->currentWidget())->handleKeyEvent(keyEvent);
-        else if (currentTabIdx < _ui->postTabWidget->count() - 1)
-            static_cast<PostingWidget*>(_ui->postTabWidget->currentWidget())->handleKeyEvent(keyEvent);
+        else if (PostingWidget *postWidget = _getPostWidget(currentTabIdx))
+            postWidget->handleKeyEvent(keyEvent);
     }
     return QObject::eventFilter(obj, event);
 }
@@ -249,8 +284,8 @@ void MainWindow::dropEvent(QDropEvent *e)
     int currentTabIdx = _ui->postTabWidget->currentIndex();
     if (currentTabIdx == 1)
         _autoPostTab->handleDropEvent(e);
-    else if (currentTabIdx < _ui->postTabWidget->count() - 1)
-        static_cast<PostingWidget*>(_ui->postTabWidget->currentWidget())->handleDropEvent(e);
+    else if (PostingWidget *postWidget = _getPostWidget(currentTabIdx))
+        postWidget->handleDropEvent(e);
 }
 
 
@@ -324,10 +359,13 @@ void MainWindow::changeEvent(QEvent *event)
             tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
             tabBar->setTabText(1, _ngPost->folderMonitoringName());
             tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
-            for (int i = 2 ; i < lastTabIdx; ++i)
-                tabBar->setTabText(i, _ngPost->quickJobName());
+            tabBar->setTabText(2, tr("History"));
+            tabBar->setTabToolTip(2, tr("Post history, statistics and resume center"));
+            for (int i = 3 ; i < lastTabIdx; ++i)
+                if (_getPostWidget(i))
+                    tabBar->setTabText(i, _ngPost->quickJobName());
             tabBar->setTabText(lastTabIdx, tr("New"));
-            tabBar->setTabToolTip(2, QString("Create a new %1").arg(_ngPost->quickJobName()));
+            tabBar->setTabToolTip(lastTabIdx, QString("Create a new %1").arg(_ngPost->quickJobName()));
 
             setJobLabel(_ui->postTabWidget->currentIndex());
 
@@ -339,7 +377,8 @@ void MainWindow::changeEvent(QEvent *event)
             _quickJobTab->retranslate();
             _autoPostTab->retranslate();
             for (int i = 2 ; i < _ui->postTabWidget->count() - 1; ++i)
-                _getPostWidget(i)->retranslate();
+                if (PostingWidget *postWidget = _getPostWidget(i))
+                    postWidget->retranslate();
             break;
 
             // this event is send, if the system, language changes
@@ -676,6 +715,473 @@ QString MainWindow::fixedArchivePassword() const
     return QString();
 }
 
+namespace {
+
+static QString histHumanSize(qint64 bytes)
+{
+    if (bytes < 1024LL)
+        return QStringLiteral("%1 B").arg(bytes);
+    if (bytes < 1024LL * 1024)
+        return QStringLiteral("%1 KB").arg(bytes / 1024.0, 0, 'f', 1);
+    if (bytes < 1024LL * 1024 * 1024)
+        return QStringLiteral("%1 MB").arg(bytes / (1024.0 * 1024), 0, 'f', 1);
+    return QStringLiteral("%1 GB").arg(bytes / (1024.0 * 1024 * 1024), 0, 'f', 2);
+}
+
+static bool isDarkMode()
+{
+    return qApp->palette().color(QPalette::Window).lightness() < 128;
+}
+
+static QColor statusColor(const QString &status)
+{
+    const bool dark = isDarkMode();
+    if (status == QStringLiteral("success"))
+        return dark ? QColor(0x4C, 0xFF, 0x4C) : QColor(Qt::darkGreen);
+    if (status == QStringLiteral("partial"))
+        return QColor(0xFF, 0xA2, 0x00);
+    if (status == QStringLiteral("failed"))
+        return dark ? QColor(0xFF, 0x60, 0x60) : QColor(Qt::darkRed);
+    if (status == QStringLiteral("cancelled"))
+        return dark ? QColor(0xAA, 0xAA, 0xAA) : QColor(Qt::gray);
+    if (status == QStringLiteral("resumable"))
+        return dark ? QColor(0x66, 0xAA, 0xFF) : QColor(Qt::darkBlue);
+    if (status == QStringLiteral("partial_resumable"))
+        return QColor(0xFF, 0xA2, 0x00);
+    if (status == QStringLiteral("posting"))
+        return QColor(0xFF, 0xA2, 0x00);
+    if (status == QStringLiteral("unknown"))
+        return dark ? QColor(0xFF, 0x66, 0xFF) : QColor(Qt::darkMagenta);
+    return qApp->palette().color(QPalette::WindowText);
+}
+
+} // namespace
+
+QWidget *MainWindow::_buildHistoryTab()
+{
+    QWidget *root = new QWidget(_ui->postTabWidget);
+    QVBoxLayout *rootLayout = new QVBoxLayout(root);
+    rootLayout->setContentsMargins(4, 4, 4, 4);
+
+    // Banner: shown when resumable posts exist
+    QLabel *banner = new QLabel(root);
+    banner->setVisible(false);
+    banner->setStyleSheet(
+        "QLabel { border: 2px solid #FFA200; color: palette(windowText); "
+        "padding: 6px; border-radius: 4px; }");
+    QPushButton *bannerResumeBtn = new QPushButton(tr("Open Resume \342\206\222"), root);
+    bannerResumeBtn->setFlat(true);
+    bannerResumeBtn->setCursor(Qt::PointingHandCursor);
+    bannerResumeBtn->setVisible(false);
+    QHBoxLayout *bannerRow = new QHBoxLayout();
+    bannerRow->addWidget(banner, 1);
+    bannerRow->addWidget(bannerResumeBtn);
+    rootLayout->addLayout(bannerRow);
+
+    _innerHistoryTabs = new QTabWidget(root);
+    rootLayout->addWidget(_innerHistoryTabs);
+
+    // ===== Tab 0: History =====
+    QWidget *histTab = new QWidget(_innerHistoryTabs);
+    QVBoxLayout *histLayout = new QVBoxLayout(histTab);
+    histLayout->setContentsMargins(4, 4, 4, 4);
+
+    // Filter row 1: search / status / password
+    QHBoxLayout *filterRow1 = new QHBoxLayout();
+    _historySearchEdit = new QLineEdit(histTab);
+    _historySearchEdit->setPlaceholderText(tr("Search name, NZB, archive\342\200\246"));
+    _historyStatusFilter = new QComboBox(histTab);
+    _historyStatusFilter->addItems({tr("All statuses"),
+                                    QStringLiteral("success"),
+                                    QStringLiteral("partial"),
+                                    QStringLiteral("failed"),
+                                    QStringLiteral("cancelled"),
+                                    QStringLiteral("resumable"),
+                                    QStringLiteral("posting"),
+                                    QStringLiteral("unknown")});
+    _historyPassFilter = new QCheckBox(tr("Has password"), histTab);
+    QPushButton *refreshBtn   = new QPushButton(tr("Refresh"), histTab);
+    QPushButton *exportCsvBtn = new QPushButton(tr("Export CSV\342\200\246"), histTab);
+    filterRow1->addWidget(new QLabel(tr("Search:"), histTab));
+    filterRow1->addWidget(_historySearchEdit, 1);
+    filterRow1->addWidget(new QLabel(tr("Status:"), histTab));
+    filterRow1->addWidget(_historyStatusFilter);
+    filterRow1->addWidget(_historyPassFilter);
+    filterRow1->addWidget(refreshBtn);
+    filterRow1->addWidget(exportCsvBtn);
+    histLayout->addLayout(filterRow1);
+
+    // Filter row 2: date range / group / errors
+    QHBoxLayout *filterRow2 = new QHBoxLayout();
+    _historyDateFrom = new QDateEdit(histTab);
+    _historyDateFrom->setCalendarPopup(true);
+    _historyDateFrom->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
+    _historyDateFrom->setSpecialValueText(tr("Any date"));
+    _historyDateFrom->setMinimumDate(QDate(2000, 1, 1));
+    _historyDateFrom->setDate(_historyDateFrom->minimumDate());
+
+    _historyDateTo = new QDateEdit(histTab);
+    _historyDateTo->setCalendarPopup(true);
+    _historyDateTo->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
+    _historyDateTo->setSpecialValueText(tr("Any date"));
+    _historyDateTo->setMinimumDate(QDate(2000, 1, 1));
+    _historyDateTo->setDate(_historyDateTo->minimumDate());
+
+    _historyGroupEdit = new QLineEdit(histTab);
+    _historyGroupEdit->setPlaceholderText(tr("Group filter\342\200\246"));
+    _historyGroupEdit->setMaximumWidth(200);
+
+    _historyErrorsFilter = new QCheckBox(tr("Has errors"), histTab);
+
+    QPushButton *clearBtn = new QPushButton(tr("Clear"), histTab);
+    clearBtn->setToolTip(tr("Clear all filters"));
+
+    filterRow2->addWidget(new QLabel(tr("From:"), histTab));
+    filterRow2->addWidget(_historyDateFrom);
+    filterRow2->addWidget(new QLabel(tr("To:"), histTab));
+    filterRow2->addWidget(_historyDateTo);
+    filterRow2->addWidget(new QLabel(tr("Group:"), histTab));
+    filterRow2->addWidget(_historyGroupEdit);
+    filterRow2->addWidget(_historyErrorsFilter);
+    filterRow2->addWidget(clearBtn);
+    filterRow2->addStretch();
+    histLayout->addLayout(filterRow2);
+
+    // Splitter: table / detail panel
+    QSplitter *histSplitter = new QSplitter(Qt::Vertical, histTab);
+    histLayout->addWidget(histSplitter);
+
+    // History table — 11 columns
+    _historyTable = new QTableWidget(histSplitter);
+    _historyTable->setColumnCount(11);
+    _historyTable->setHorizontalHeaderLabels({
+        tr("Date"), tr("Name"), tr("Status"), tr("Size"), tr("Speed"),
+        tr("Files"), tr("Articles"), tr("Failed"), tr("Groups"), tr("Password"), tr("NZB path")});
+    _historyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    _historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    _historyTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    _historyTable->setSortingEnabled(true);
+    _historyTable->horizontalHeader()->setStretchLastSection(false);
+    _historyTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    _historyTable->verticalHeader()->hide();
+    _historyTable->setContextMenuPolicy(Qt::CustomContextMenu);
+    histSplitter->addWidget(_historyTable);
+
+    // Detail panel
+    QWidget *detailPanel = new QWidget(histSplitter);
+    QVBoxLayout *detailLayout = new QVBoxLayout(detailPanel);
+    detailLayout->setContentsMargins(4, 4, 4, 4);
+    _historyDetailInfo = new QLabel(
+        tr("<i>Select a post to see its details.</i>"), detailPanel);
+    _historyDetailInfo->setWordWrap(true);
+    _historyDetailInfo->setTextFormat(Qt::RichText);
+    _historyDetailInfo->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    _historyDetailInfo->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    detailLayout->addWidget(_historyDetailInfo, 1);
+
+    QHBoxLayout *detailActions = new QHBoxLayout();
+    _histRegenNzbBtn  = new QPushButton(tr("Regenerate NZB\342\200\246"), detailPanel);
+    _histCopyPassBtn  = new QPushButton(tr("Copy password"), detailPanel);
+    _histPurgePassBtn = new QPushButton(tr("Purge password"), detailPanel);
+    _histOpenNzbBtn   = new QPushButton(tr("Open NZB location"), detailPanel);
+    _histDeleteBtn    = new QPushButton(tr("Delete entry"), detailPanel);
+    _histDeleteBtn->setStyleSheet("QPushButton { color: #dd4444; }");
+    for (QPushButton *btn : {_histRegenNzbBtn, _histCopyPassBtn, _histPurgePassBtn,
+                             _histOpenNzbBtn, _histDeleteBtn})
+        btn->setEnabled(false);
+    detailActions->addWidget(_histRegenNzbBtn);
+    detailActions->addWidget(_histCopyPassBtn);
+    detailActions->addWidget(_histPurgePassBtn);
+    detailActions->addWidget(_histOpenNzbBtn);
+    detailActions->addStretch();
+    detailActions->addWidget(_histDeleteBtn);
+    detailLayout->addLayout(detailActions);
+    histSplitter->addWidget(detailPanel);
+    histSplitter->setStretchFactor(0, 3);
+    histSplitter->setStretchFactor(1, 1);
+
+    _innerHistoryTabs->addTab(histTab, tr("History"));
+
+    // ===== Tab 1: Stats =====
+    QWidget *statsTab = new QWidget(_innerHistoryTabs);
+    QVBoxLayout *statsLayout = new QVBoxLayout(statsTab);
+    statsLayout->setContentsMargins(4, 4, 4, 4);
+
+    // Stats filter bar
+    QHBoxLayout *statsFilterBar = new QHBoxLayout();
+    _statsPeriodFilter = new QComboBox(statsTab);
+    _statsPeriodFilter->addItems({tr("Last 7 days"), tr("Last 30 days"), tr("Last 90 days"),
+                                  tr("This year"), tr("All time")});
+    _statsPeriodFilter->setCurrentIndex(1);
+    _statsGroupFilter = new QComboBox(statsTab);
+    _statsGroupFilter->addItem(tr("All groups"));
+    QPushButton *statsRefreshBtn = new QPushButton(tr("Refresh"), statsTab);
+    statsFilterBar->addWidget(new QLabel(tr("Period:"), statsTab));
+    statsFilterBar->addWidget(_statsPeriodFilter);
+    statsFilterBar->addWidget(new QLabel(tr("Group:"), statsTab));
+    statsFilterBar->addWidget(_statsGroupFilter);
+    statsFilterBar->addWidget(statsRefreshBtn);
+    statsFilterBar->addStretch();
+    statsLayout->addLayout(statsFilterBar);
+
+    // Stats inner tabs: Timeline / By group / Top posts
+    QTabWidget *statsInnerTabs = new QTabWidget(statsTab);
+    statsLayout->addWidget(statsInnerTabs, 1);
+
+    const QChart::ChartTheme chartTheme = isDarkMode()
+                                              ? QChart::ChartThemeDark
+                                              : QChart::ChartThemeLight;
+
+    _statsTimelineChart = new QChart();
+    _statsTimelineChart->setTheme(chartTheme);
+    _statsTimelineChart->setTitle(tr("Volume and failures per day"));
+    _statsTimelineChart->legend()->setVisible(true);
+    QChartView *timelineView = new QChartView(_statsTimelineChart, statsTab);
+    timelineView->setRenderHint(QPainter::Antialiasing);
+    statsInnerTabs->addTab(timelineView, tr("Timeline"));
+
+    _statsGroupChart = new QChart();
+    _statsGroupChart->setTheme(chartTheme);
+    _statsGroupChart->setTitle(tr("Posts by newsgroup"));
+    _statsGroupChart->legend()->setVisible(false);
+    QChartView *groupView = new QChartView(_statsGroupChart, statsTab);
+    groupView->setRenderHint(QPainter::Antialiasing);
+    statsInnerTabs->addTab(groupView, tr("By group"));
+
+    _statsTopTable = new QTableWidget(statsTab);
+    _statsTopTable->setColumnCount(5);
+    _statsTopTable->setHorizontalHeaderLabels({
+        tr("Name"), tr("Date"), tr("Size"), tr("Status"), tr("Groups")});
+    _statsTopTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    _statsTopTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    _statsTopTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    _statsTopTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    _statsTopTable->verticalHeader()->hide();
+    statsInnerTabs->addTab(_statsTopTable, tr("Top posts"));
+
+    _innerHistoryTabs->addTab(statsTab, tr("Stats"));
+
+    // ===== Tab 2: Resume =====
+    QWidget *resumeTab = new QWidget(_innerHistoryTabs);
+    QVBoxLayout *resumeLayout = new QVBoxLayout(resumeTab);
+    resumeLayout->setContentsMargins(4, 4, 4, 4);
+
+    _resumeDetailInfo = new QLabel(tr("<i>Select a post to see resume details.</i>"), resumeTab);
+    _resumeDetailInfo->setWordWrap(true);
+    _resumeDetailInfo->setTextFormat(Qt::RichText);
+    resumeLayout->addWidget(_resumeDetailInfo);
+
+    _resumeTable = new QTableWidget(resumeTab);
+    _resumeTable->setColumnCount(6);
+    _resumeTable->setHorizontalHeaderLabels({
+        tr("Name"), tr("Status"), tr("Posted"), tr("To repost"), tr("Unknown"), tr("Reason")});
+    _resumeTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    _resumeTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    _resumeTable->setSelectionMode(QAbstractItemView::MultiSelection);
+    _resumeTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    _resumeTable->verticalHeader()->hide();
+    resumeLayout->addWidget(_resumeTable, 1);
+
+    QHBoxLayout *resumeActions = new QHBoxLayout();
+    _resumeResumeBtn  = new QPushButton(tr("Resume"), resumeTab);
+    _resumeAbandonBtn = new QPushButton(tr("Abandon"), resumeTab);
+    _resumePurgeBtn   = new QPushButton(tr("Purge resume data"), resumeTab);
+    _resumeIgnoreBtn  = new QPushButton(tr("Ignore (session)"), resumeTab);
+    _resumeDeleteBtn  = new QPushButton(tr("Delete entry"), resumeTab);
+    QPushButton *resumeRefreshBtn = new QPushButton(tr("Refresh"), resumeTab);
+    _resumeResumeBtn->setToolTip(tr("Resume posting the selected post(s) from where they stopped"));
+    _resumeAbandonBtn->setToolTip(tr("Mark selected post(s) as abandoned (keep history entry)"));
+    _resumePurgeBtn->setToolTip(tr("Delete the technical resume data for selected post(s)"));
+    _resumeIgnoreBtn->setToolTip(tr("Hide selected post(s) from this view for this session"));
+    _resumeDeleteBtn->setToolTip(tr("Permanently delete selected post(s) from the history database"));
+    _resumeDeleteBtn->setStyleSheet("QPushButton { color: #dd4444; }");
+    for (QPushButton *btn : {_resumeResumeBtn, _resumeAbandonBtn, _resumePurgeBtn,
+                             _resumeIgnoreBtn, _resumeDeleteBtn})
+        btn->setEnabled(false);
+    resumeActions->addWidget(_resumeResumeBtn);
+    resumeActions->addWidget(_resumeAbandonBtn);
+    resumeActions->addWidget(_resumePurgeBtn);
+    resumeActions->addWidget(_resumeIgnoreBtn);
+    resumeActions->addStretch();
+    resumeActions->addWidget(_resumeDeleteBtn);
+    resumeActions->addWidget(resumeRefreshBtn);
+    resumeLayout->addLayout(resumeActions);
+
+    _innerHistoryTabs->addTab(resumeTab, tr("Resume"));
+
+    // ===== Connect signals =====
+    connect(refreshBtn,           &QPushButton::clicked,  this, &MainWindow::_onHistoryRefresh);
+    connect(resumeRefreshBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryRefresh);
+    connect(exportCsvBtn,         &QPushButton::clicked,  this, &MainWindow::_onHistoryExportCsv);
+    connect(_historySearchEdit,   &QLineEdit::returnPressed, this, &MainWindow::_onHistoryRefresh);
+    connect(_historyStatusFilter, qOverload<int>(&QComboBox::currentIndexChanged),
+            this, &MainWindow::_onHistoryRefresh);
+    connect(_historyPassFilter,   &QCheckBox::toggled,    this, &MainWindow::_onHistoryRefresh);
+    connect(_historyErrorsFilter, &QCheckBox::toggled,    this, &MainWindow::_onHistoryRefresh);
+    connect(_historyDateFrom,     &QDateEdit::dateChanged, this, &MainWindow::_onHistoryRefresh);
+    connect(_historyDateTo,       &QDateEdit::dateChanged, this, &MainWindow::_onHistoryRefresh);
+    connect(_historyGroupEdit,    &QLineEdit::returnPressed, this, &MainWindow::_onHistoryRefresh);
+    connect(clearBtn,             &QPushButton::clicked,  this, [this]() {
+        _historySearchEdit->clear();
+        _historyStatusFilter->setCurrentIndex(0);
+        _historyPassFilter->setChecked(false);
+        _historyErrorsFilter->setChecked(false);
+        _historyDateFrom->setDate(_historyDateFrom->minimumDate());
+        _historyDateTo->setDate(_historyDateTo->minimumDate());
+        _historyGroupEdit->clear();
+        _onHistoryRefresh();
+    });
+    connect(_historyTable,        &QTableWidget::currentCellChanged,
+            this, [this](int row, int, int, int) { _onHistoryRowSelected(row); });
+    connect(_histRegenNzbBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryRegenNzb);
+    connect(_histCopyPassBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryCopyPassword);
+    connect(_histPurgePassBtn,    &QPushButton::clicked,  this, &MainWindow::_onHistoryPurgePassword);
+    connect(_histDeleteBtn,       &QPushButton::clicked,  this, &MainWindow::_onHistoryDeleteEntry);
+    connect(_histOpenNzbBtn,      &QPushButton::clicked,  this, &MainWindow::_onHistoryOpenNzb);
+    connect(_historyTable,        &QTableWidget::customContextMenuRequested,
+            this, &MainWindow::_onHistoryContextMenu);
+    connect(statsRefreshBtn,      &QPushButton::clicked,  this, &MainWindow::_onStatsRefresh);
+    connect(_statsPeriodFilter,   qOverload<int>(&QComboBox::currentIndexChanged),
+            this, &MainWindow::_onStatsRefresh);
+    connect(_statsGroupFilter,    qOverload<int>(&QComboBox::currentIndexChanged),
+            this, &MainWindow::_onStatsRefresh);
+    connect(_resumeTable,         &QTableWidget::itemSelectionChanged,
+            this, &MainWindow::_onResumeSelectionChanged);
+    connect(_resumeResumeBtn,     &QPushButton::clicked,  this, &MainWindow::_onResumePost);
+    connect(_resumeAbandonBtn,    &QPushButton::clicked,  this, &MainWindow::_onResumeAbandon);
+    connect(_resumePurgeBtn,      &QPushButton::clicked,  this, &MainWindow::_onResumePurge);
+    connect(_resumeIgnoreBtn,     &QPushButton::clicked,  this, &MainWindow::_onResumeIgnore);
+    connect(_resumeDeleteBtn,     &QPushButton::clicked,  this, &MainWindow::_onResumeDeleteEntries);
+    connect(bannerResumeBtn,      &QPushButton::clicked,  this, [this]() {
+        _innerHistoryTabs->setCurrentIndex(2);
+    });
+
+    // ===== Initial data load =====
+    _refreshHistoryViews();
+
+    // Banner: show if resumable posts exist
+    if (PostHistoryStore *store = _ngPost->historyStore()) {
+        const QList<PostHistoryStore::PostSummary> candidates = store->resumeCandidates();
+        if (!candidates.isEmpty()) {
+            banner->setText(tr("%1 post(s) can be resumed.").arg(candidates.size()));
+            banner->setVisible(true);
+            bannerResumeBtn->setVisible(true);
+            statusBar()->showMessage(
+                tr("%1 post(s) can be resumed. Open the Resume tab to review them.")
+                    .arg(candidates.size()), 10000);
+        }
+    }
+
+    return root;
+}
+
+void MainWindow::_refreshHistoryViews()
+{
+    PostHistoryStore *store = _ngPost ? _ngPost->historyStore() : nullptr;
+
+    // ---- History table ----
+    if (_historyTable && store) {
+        _historyTable->setSortingEnabled(false);
+        _historyTable->setRowCount(0);
+
+        PostHistoryStore::ListFilter filter;
+        if (_historyStatusFilter && _historyStatusFilter->currentIndex() > 0)
+            filter.status = _historyStatusFilter->currentText();
+        if (_historySearchEdit)
+            filter.search = _historySearchEdit->text().trimmed();
+        filter.onlyWithPassword = _historyPassFilter && _historyPassFilter->isChecked();
+        filter.onlyWithErrors   = _historyErrorsFilter && _historyErrorsFilter->isChecked();
+        if (_historyGroupEdit)
+            filter.group = _historyGroupEdit->text().trimmed();
+        if (_historyDateFrom && _historyDateFrom->date() > _historyDateFrom->minimumDate())
+            filter.dateFrom = _historyDateFrom->date().toString(Qt::ISODate);
+        if (_historyDateTo && _historyDateTo->date() > _historyDateTo->minimumDate())
+            filter.dateTo = _historyDateTo->date().toString(Qt::ISODate);
+
+        QString err;
+        const QList<PostHistoryStore::PostSummary> posts = store->listPosts(filter, &err);
+        _historyTable->setRowCount(posts.size());
+        for (int row = 0; row < posts.size(); ++row) {
+            const PostHistoryStore::PostSummary &p = posts.at(row);
+            const QStringList values = {
+                p.createdAt,
+                p.nzbName,
+                p.status,
+                histHumanSize(p.sizeBytes),
+                p.avgSpeed,
+                QString::number(p.nbFiles),
+                QString::number(p.nbArticles),
+                p.nbFailedArticles > 0 ? QString::number(p.nbFailedArticles) : QString(),
+                p.groups,
+                p.hasPassword ? QStringLiteral("***") : QString(),
+                p.nzbPath
+            };
+            for (int col = 0; col < values.size(); ++col) {
+                auto *item = new QTableWidgetItem(values.at(col));
+                if (col == 2)
+                    item->setForeground(statusColor(p.status));
+                item->setData(Qt::UserRole, p.id);
+                _historyTable->setItem(row, col, item);
+            }
+        }
+        _historyTable->resizeColumnsToContents();
+        _historyTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+        _historyTable->setSortingEnabled(true);
+    }
+
+    // ---- Stats ----
+    _onStatsRefresh();
+
+    // ---- Resume table ----
+    if (_resumeTable && store) {
+        _resumeTable->setRowCount(0);
+        QString err;
+        const QList<PostHistoryStore::PostSummary> candidates = store->resumeCandidates(&err);
+        ResumePlanner planner(store);
+        for (const PostHistoryStore::PostSummary &p : candidates) {
+            if (_ignoredResumeIds.contains(p.id)) continue;
+            QString checkErr;
+            const ResumePlanner::Decision dec = planner.check(p.id, &checkErr);
+            if (dec.state == ResumePlanner::ResumeState::NotResumable)
+                continue;
+            const QString state =
+                dec.state == ResumePlanner::ResumeState::Resumable
+                    ? QStringLiteral("resumable")
+                    : QStringLiteral("partial_resumable");
+            const int row = _resumeTable->rowCount();
+            _resumeTable->setRowCount(row + 1);
+            const QStringList values = {
+                p.nzbName, state,
+                QString::number(dec.postedArticles),
+                QString::number(dec.pendingArticles + dec.failedArticles),
+                QString::number(dec.unknownArticles), dec.reason
+            };
+            for (int col = 0; col < values.size(); ++col) {
+                auto *item = new QTableWidgetItem(values.at(col));
+                if (col == 1)
+                    item->setForeground(statusColor(p.status));
+                item->setData(Qt::UserRole, p.id);
+                _resumeTable->setItem(row, col, item);
+            }
+        }
+        _resumeTable->resizeColumnsToContents();
+        _resumeTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    }
+
+    // Reset selection state
+    _selectedHistoryId = 0;
+    for (QPushButton *btn : {_histRegenNzbBtn, _histCopyPassBtn, _histPurgePassBtn,
+                             _histOpenNzbBtn, _histDeleteBtn})
+        if (btn) btn->setEnabled(false);
+    for (QPushButton *btn : {_resumeResumeBtn, _resumeAbandonBtn, _resumePurgeBtn,
+                             _resumeIgnoreBtn, _resumeDeleteBtn})
+        if (btn) btn->setEnabled(false);
+    if (_historyDetailInfo)
+        _historyDetailInfo->setText(tr("<i>Select a post to see its details.</i>"));
+    if (_resumeDetailInfo)
+        _resumeDetailInfo->setText(tr("<i>Select a post to see resume details.</i>"));
+}
+
 PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &files)
 {
     if (!lastTabIdx)
@@ -693,6 +1199,41 @@ PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &f
         newPostingWidget->addPath(file.absoluteFilePath(), 0, file.isDir());
 
     return newPostingWidget;
+}
+
+bool MainWindow::_startResumePost(qint64 postId, bool askConfirmation)
+{
+    if (!postId || !_ngPost)
+        return false;
+
+    if (askConfirmation) {
+        const int res = QMessageBox::question(
+            this,
+            tr("Resume post"),
+            tr("Resume posting for this post?\nOnly missing or failed articles will be re-sent."),
+            QMessageBox::Yes,
+            QMessageBox::No);
+        if (res != QMessageBox::Yes)
+            return false;
+    }
+
+    const int lastTabIdx = _ui->postTabWidget->count() - 1;
+    PostingWidget *widget = addNewQuickTab(lastTabIdx);
+    _ui->postTabWidget->setCurrentWidget(widget);
+
+    QString err;
+    if (!_ngPost->resumePostGui(postId, widget, &err)) {
+        closeTab(widget);
+        QMessageBox::warning(this,
+                             tr("Resume failed"),
+                             err.isEmpty()
+                                 ? tr("This post could not be resumed.")
+                                 : tr("This post could not be resumed:\n%1").arg(err));
+        return false;
+    }
+
+    _refreshHistoryViews();
+    return true;
 }
 
 void MainWindow::setTab(QWidget *postWidget)
@@ -841,7 +1382,7 @@ int MainWindow::_serverRow(QObject *delButton)
 PostingWidget *MainWindow::_getPostWidget(int tabIndex) const
 {
     if(tabIndex > 1 && tabIndex < _ui->postTabWidget->count() - 1)
-        return static_cast<PostingWidget*>(_ui->postTabWidget->widget(tabIndex));
+        return qobject_cast<PostingWidget*>(_ui->postTabWidget->widget(tabIndex));
     else
         return nullptr;
 }
@@ -974,6 +1515,8 @@ void MainWindow::onCloseJob(int index)
     if (index > 1 && index < nbJob )
     {
         PostingWidget *postWidget = _getPostWidget(index);
+        if (!postWidget)
+            return;
         if (postWidget->isPosting())
         {
             QMessageBox::warning(this,
@@ -1069,6 +1612,598 @@ void MainWindow::onPauseClicked()
     }
 }
 
+// ============================================================
+// History tab slots
+// ============================================================
+
+void MainWindow::_onHistoryRefresh()
+{
+    _refreshHistoryViews();
+}
+
+void MainWindow::_onHistoryRowSelected(int row)
+{
+    if (!_historyTable || row < 0) {
+        _selectedHistoryId = 0;
+        if (_historyDetailInfo)
+            _historyDetailInfo->setText(tr("<i>Select a post to see its details.</i>"));
+        for (QPushButton *btn : {_histRegenNzbBtn, _histCopyPassBtn, _histPurgePassBtn,
+                                 _histOpenNzbBtn, _histDeleteBtn})
+            if (btn) btn->setEnabled(false);
+        return;
+    }
+
+    QTableWidgetItem *item = _historyTable->item(row, 0);
+    if (!item) return;
+    _selectedHistoryId = item->data(Qt::UserRole).toLongLong();
+
+    PostHistoryStore *store = _ngPost ? _ngPost->historyStore() : nullptr;
+    if (!store || !_selectedHistoryId) return;
+
+    PostHistoryStore::PostDetails details;
+    QString err;
+    if (!store->loadPostDetails(_selectedHistoryId, &details, &err)) {
+        if (_historyDetailInfo)
+            _historyDetailInfo->setText(tr("<i>Could not load details: %1</i>").arg(err));
+        return;
+    }
+
+    const PostHistoryStore::PostSummary &s = details.post;
+    QString html = QStringLiteral(
+        "<table cellspacing='4'>"
+        "<tr><td><b>%1</b></td><td>%2</td>"
+        "<td>&nbsp;&nbsp;<b>%3</b></td><td>%4</td></tr>"
+        "<tr><td><b>%5</b></td><td>%6</td>"
+        "<td>&nbsp;&nbsp;<b>%7</b></td><td>%8</td></tr>"
+        "<tr><td><b>%9</b></td><td>%10</td>"
+        "<td>&nbsp;&nbsp;<b>%11</b></td><td>%12</td></tr>"
+        "<tr><td><b>%13</b></td><td>%14</td>"
+        "<td>&nbsp;&nbsp;<b>%15</b></td><td>%16</td></tr>"
+        "<tr><td><b>%17</b></td><td colspan='3'>%18</td></tr>"
+        "<tr><td><b>%19</b></td><td colspan='3'>%20</td></tr>"
+        "</table>")
+        .arg(tr("Name:"), s.nzbName,
+             tr("Status:"),
+             QStringLiteral("<span style='color:%1'>%2</span>")
+                 .arg(statusColor(s.status).name(), s.status))
+        .arg(tr("Created:"), s.createdAt,
+             tr("Finished:"), s.finishedAt.isEmpty() ? tr("\342\200\224") : s.finishedAt)
+        .arg(tr("Size:"), histHumanSize(s.sizeBytes),
+             tr("Speed:"), s.avgSpeed.isEmpty() ? tr("\342\200\224") : s.avgSpeed)
+        .arg(tr("Files:"), QString::number(s.nbFiles),
+             tr("Articles:"), QString("%1 / %2 failed")
+                 .arg(s.nbArticles).arg(s.nbFailedArticles))
+        .arg(tr("Groups:"), s.groups.isEmpty() ? tr("\342\200\224") : s.groups)
+        .arg(tr("Archive:"), details.rarName.isEmpty() ? tr("\342\200\224") : details.rarName);
+
+    if (!details.nzbPath.isEmpty())
+        html += QStringLiteral("<table cellspacing='4'><tr><td><b>%1</b></td><td>%2</td></tr></table>")
+                    .arg(tr("NZB path:"), details.nzbPath);
+
+    if (s.hasPassword) {
+        const QString passInfo = s.passwordStored
+            ? tr("stored (%1 \342\200\224 hidden)").arg(details.passwordOrigin)
+            : tr("present but not stored (%1)").arg(details.passwordOrigin);
+        html += QStringLiteral("<table cellspacing='4'><tr><td><b>%1</b></td><td>%2</td></tr></table>")
+                    .arg(tr("Password:"), passInfo);
+    }
+
+    if (!details.files.isEmpty()) {
+        html += QStringLiteral("<br/><b>%1</b><br/><table cellspacing='2'>"
+                               "<tr><th align='left'>%2</th><th>%3</th><th>%4</th></tr>")
+                    .arg(tr("Files:"), tr("Name"), tr("Size"), tr("Status"));
+        for (const PostHistoryStore::FileSummary &f : details.files) {
+            html += QStringLiteral("<tr><td>%1</td><td align='right'>%2</td>"
+                                   "<td align='center'><span style='color:%3'>%4</span></td></tr>")
+                        .arg(f.postedName.isEmpty() ? f.originalPath : f.postedName,
+                             histHumanSize(f.sizeBytes),
+                             statusColor(f.status).name(),
+                             f.status);
+        }
+        html += QStringLiteral("</table>");
+    }
+
+    if (_historyDetailInfo)
+        _historyDetailInfo->setText(html);
+
+    if (_histRegenNzbBtn)  _histRegenNzbBtn->setEnabled(true);
+    if (_histDeleteBtn)    _histDeleteBtn->setEnabled(true);
+    if (_histCopyPassBtn)  _histCopyPassBtn->setEnabled(s.hasPassword && s.passwordStored);
+    if (_histPurgePassBtn) _histPurgePassBtn->setEnabled(s.hasPassword && s.passwordStored);
+    if (_histOpenNzbBtn)   _histOpenNzbBtn->setEnabled(!details.nzbPath.isEmpty());
+}
+
+void MainWindow::_onHistoryRegenNzb()
+{
+    if (!_selectedHistoryId || !_ngPost) return;
+
+    PostHistoryStore *store = _ngPost->historyStore();
+    if (!store) return;
+
+    PostHistoryStore::PostDetails details;
+    QString err;
+    if (!store->loadPostDetails(_selectedHistoryId, &details, &err)) return;
+
+    bool includePassword = false;
+    if (details.post.hasPassword && details.post.passwordStored) {
+        const int res = QMessageBox::question(
+            this, tr("Include password?"),
+            tr("This post has a stored password.\n"
+               "Include the password in the regenerated NZB?"),
+            QMessageBox::Yes | QMessageBox::No);
+        includePassword = (res == QMessageBox::Yes);
+    }
+
+    const QString outPath = QFileDialog::getSaveFileName(
+        this,
+        tr("Save regenerated NZB"),
+        _ngPost->_nzbPath,
+        tr("NZB files (*.nzb)"));
+    if (outPath.isEmpty()) return;
+
+    if (_ngPost->regenerateNzbGui(_selectedHistoryId, outPath, includePassword))
+        QMessageBox::information(this, tr("NZB regenerated"),
+                                 tr("NZB written to:\n%1").arg(outPath));
+    else
+        QMessageBox::warning(this, tr("NZB regeneration failed"),
+                             tr("Could not regenerate the NZB.\n"
+                                "Check that the post has complete article history."));
+}
+
+void MainWindow::_onHistoryExportCsv()
+{
+    PostHistoryStore *store = _ngPost ? _ngPost->historyStore() : nullptr;
+    if (!store) return;
+
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Export history as CSV"), QString(), tr("CSV files (*.csv)"));
+    if (path.isEmpty()) return;
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Export failed"),
+                             tr("Cannot write file:\n%1").arg(path));
+        return;
+    }
+    QTextStream stream(&f);
+    QString err;
+    if (store->exportCsv(stream, false, &err))
+        QMessageBox::information(this, tr("Export done"),
+                                 tr("History exported to:\n%1").arg(path));
+    else
+        QMessageBox::warning(this, tr("Export failed"), err);
+}
+
+void MainWindow::_onHistoryCopyPassword()
+{
+    if (!_selectedHistoryId || !_ngPost) return;
+    PostHistoryStore *store = _ngPost->historyStore();
+    if (!store) return;
+
+    PostHistoryStore::PostDetails details;
+    QString err;
+    if (!store->loadPostDetails(_selectedHistoryId, &details, &err)) return;
+    if (details.rarPass.isEmpty()) return;
+
+    QApplication::clipboard()->setText(details.rarPass);
+    statusBar()->showMessage(tr("Password copied to clipboard."), 4000);
+}
+
+void MainWindow::_onHistoryPurgePassword()
+{
+    if (!_selectedHistoryId || !_ngPost) return;
+    const int res = QMessageBox::question(
+        this, tr("Purge password"),
+        tr("Remove the stored password for this post?\n"
+           "The history entry is kept; only the password value is erased."),
+        QMessageBox::Yes, QMessageBox::No);
+    if (res != QMessageBox::Yes) return;
+
+    PostHistoryStore *store = _ngPost->historyStore();
+    QString err;
+    if (!store || !store->purgePassword(_selectedHistoryId, &err))
+        QMessageBox::warning(this, tr("Error"), err.isEmpty()
+                             ? tr("Could not purge password.") : err);
+    else
+        _refreshHistoryViews();
+}
+
+void MainWindow::_onHistoryDeleteEntry()
+{
+    if (!_selectedHistoryId || !_ngPost) return;
+    const int res = QMessageBox::question(
+        this, tr("Delete history entry"),
+        tr("Permanently delete this post from the history?\n"
+           "This also removes all associated file and article records."),
+        QMessageBox::Yes, QMessageBox::No);
+    if (res != QMessageBox::Yes) return;
+
+    PostHistoryStore *store = _ngPost->historyStore();
+    QString err;
+    if (!store || !store->deletePost(_selectedHistoryId, &err))
+        QMessageBox::warning(this, tr("Error"), err.isEmpty()
+                             ? tr("Could not delete entry.") : err);
+    else
+        _refreshHistoryViews();
+}
+
+void MainWindow::_onHistoryOpenNzb()
+{
+    if (!_selectedHistoryId || !_ngPost) return;
+    PostHistoryStore *store = _ngPost->historyStore();
+    if (!store) return;
+    PostHistoryStore::PostDetails details;
+    QString err;
+    if (!store->loadPostDetails(_selectedHistoryId, &details, &err)) return;
+    if (details.nzbPath.isEmpty()) {
+        QMessageBox::information(this, tr("No NZB path"),
+                                 tr("No NZB path stored for this post."));
+        return;
+    }
+    QDesktopServices::openUrl(
+        QUrl::fromLocalFile(QFileInfo(details.nzbPath).absolutePath()));
+}
+
+void MainWindow::_onHistoryResumePost()
+{
+    if (!_selectedHistoryId)
+        return;
+    _startResumePost(_selectedHistoryId, true);
+}
+
+// ============================================================
+// Stats tab slots
+// ============================================================
+
+void MainWindow::_onStatsRefresh()
+{
+    PostHistoryStore *store = _ngPost ? _ngPost->historyStore() : nullptr;
+    if (!store) return;
+
+    // Compute date range from period combo
+    QString dateFrom, dateTo;
+    if (_statsPeriodFilter) {
+        const QDate today = QDate::currentDate();
+        switch (_statsPeriodFilter->currentIndex()) {
+        case 0: dateFrom = today.addDays(-6).toString(Qt::ISODate); break;
+        case 1: dateFrom = today.addDays(-29).toString(Qt::ISODate); break;
+        case 2: dateFrom = today.addDays(-89).toString(Qt::ISODate); break;
+        case 3: dateFrom = QDate(today.year(), 1, 1).toString(Qt::ISODate); break;
+        default: break; // All time
+        }
+        dateTo = today.toString(Qt::ISODate);
+    }
+
+    const QString groupFilter = (_statsGroupFilter && _statsGroupFilter->currentIndex() > 0)
+                                    ? _statsGroupFilter->currentText() : QString();
+
+    // Refresh group combo (preserve selection)
+    if (_statsGroupFilter) {
+        const QString prev = _statsGroupFilter->currentIndex() > 0
+                                 ? _statsGroupFilter->currentText() : QString();
+        _statsGroupFilter->blockSignals(true);
+        _statsGroupFilter->clear();
+        _statsGroupFilter->addItem(tr("All groups"));
+        QString err;
+        for (const QString &g : store->allGroups(&err))
+            _statsGroupFilter->addItem(g);
+        if (!prev.isEmpty()) {
+            const int idx = _statsGroupFilter->findText(prev);
+            if (idx >= 0) _statsGroupFilter->setCurrentIndex(idx);
+        }
+        _statsGroupFilter->blockSignals(false);
+    }
+
+    // Timeline chart
+    if (_statsTimelineChart) {
+        _statsTimelineChart->removeAllSeries();
+        for (QAbstractAxis *ax : _statsTimelineChart->axes())
+            _statsTimelineChart->removeAxis(ax);
+
+        QString err;
+        const QList<PostHistoryStore::DayStats> days =
+            store->statsByDay(dateFrom, dateTo, groupFilter, &err);
+
+        auto *volSet  = new QBarSet(tr("Volume (MB)"), _statsTimelineChart);
+        auto *failSet = new QBarSet(tr("Failed"), _statsTimelineChart);
+        volSet->setColor(QColor(Qt::darkGreen));
+        failSet->setColor(QColor(Qt::darkRed));
+
+        QStringList labels;
+        for (const PostHistoryStore::DayStats &d : days) {
+            *volSet  << (d.totalBytes / (1024.0 * 1024.0));
+            *failSet << d.nbFailed;
+            labels   << d.date.mid(5); // MM-DD
+        }
+
+        auto *series = new QBarSeries(_statsTimelineChart);
+        series->append(volSet);
+        series->append(failSet);
+        _statsTimelineChart->addSeries(series);
+
+        auto *axisX = new QBarCategoryAxis(_statsTimelineChart);
+        axisX->append(labels);
+        _statsTimelineChart->addAxis(axisX, Qt::AlignBottom);
+        series->attachAxis(axisX);
+
+        auto *axisY = new QValueAxis(_statsTimelineChart);
+        axisY->setLabelFormat("%.0f");
+        _statsTimelineChart->addAxis(axisY, Qt::AlignLeft);
+        series->attachAxis(axisY);
+    }
+
+    // By-group chart
+    if (_statsGroupChart) {
+        _statsGroupChart->removeAllSeries();
+        for (QAbstractAxis *ax : _statsGroupChart->axes())
+            _statsGroupChart->removeAxis(ax);
+
+        QString err;
+        const QList<PostHistoryStore::GroupStats> groups =
+            store->statsByGroup(dateFrom, dateTo, &err);
+
+        auto *set = new QBarSet(tr("Posts"), _statsGroupChart);
+        set->setColor(QColor(Qt::darkBlue));
+        QStringList labels;
+        for (const PostHistoryStore::GroupStats &g : groups) {
+            *set << g.nbPosts;
+            labels << g.group;
+        }
+
+        auto *series = new QBarSeries(_statsGroupChart);
+        series->append(set);
+        _statsGroupChart->addSeries(series);
+
+        auto *axisX = new QBarCategoryAxis(_statsGroupChart);
+        axisX->append(labels);
+        _statsGroupChart->addAxis(axisX, Qt::AlignBottom);
+        series->attachAxis(axisX);
+
+        auto *axisY = new QValueAxis(_statsGroupChart);
+        axisY->setLabelFormat("%d");
+        _statsGroupChart->addAxis(axisY, Qt::AlignLeft);
+        series->attachAxis(axisY);
+    }
+
+    // Top posts table
+    if (_statsTopTable) {
+        _statsTopTable->setRowCount(0);
+        QString err;
+        const QList<PostHistoryStore::PostSummary> tops = store->topPostsBySize(20, &err);
+        _statsTopTable->setRowCount(tops.size());
+        for (int row = 0; row < tops.size(); ++row) {
+            const PostHistoryStore::PostSummary &p = tops.at(row);
+            const QStringList values = {
+                p.nzbName, p.createdAt, histHumanSize(p.sizeBytes), p.status, p.groups
+            };
+            for (int col = 0; col < values.size(); ++col) {
+                auto *item = new QTableWidgetItem(values.at(col));
+                if (col == 3) item->setForeground(statusColor(p.status));
+                _statsTopTable->setItem(row, col, item);
+            }
+        }
+        _statsTopTable->resizeColumnsToContents();
+        _statsTopTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    }
+}
+
+// ============================================================
+// Resume tab slots
+// ============================================================
+
+void MainWindow::_onResumeSelectionChanged()
+{
+    if (!_resumeTable) return;
+    const QModelIndexList selected = _resumeTable->selectionModel()->selectedRows();
+    const bool hasSelection = !selected.isEmpty();
+    for (QPushButton *btn : {_resumeResumeBtn, _resumeAbandonBtn, _resumePurgeBtn,
+                             _resumeIgnoreBtn, _resumeDeleteBtn})
+        if (btn) btn->setEnabled(hasSelection);
+
+    if (!_resumeDetailInfo) return;
+    if (!hasSelection) {
+        _resumeDetailInfo->setText(tr("<i>Select a post to see resume details.</i>"));
+        return;
+    }
+
+    const int firstRow = selected.first().row();
+    QTableWidgetItem *item = _resumeTable->item(firstRow, 0);
+    if (!item) return;
+    const qint64 postId = item->data(Qt::UserRole).toLongLong();
+    if (!postId || !_ngPost) return;
+    PostHistoryStore *store = _ngPost->historyStore();
+    if (!store) return;
+
+    ResumePlanner planner(store);
+    QString err;
+    const ResumePlanner::Decision dec = planner.check(postId, &err);
+    const QString stateStr =
+        dec.state == ResumePlanner::ResumeState::Resumable
+            ? tr("<span style='color:darkgreen'>Resumable</span>")
+            : dec.state == ResumePlanner::ResumeState::PartiallyResumable
+                ? tr("<span style='color:#FFA200'>Partially resumable</span>")
+                : tr("<span style='color:darkred'>Not resumable</span>");
+    _resumeDetailInfo->setText(
+        QStringLiteral("<b>%1</b> \342\200\224 %2 | "
+                       "Posted: %3 | Pending: %4 | Failed: %5 | Unknown: %6%7")
+            .arg(item->text(), stateStr)
+            .arg(dec.postedArticles).arg(dec.pendingArticles)
+            .arg(dec.failedArticles).arg(dec.unknownArticles)
+            .arg(dec.reason.isEmpty()
+                     ? QString()
+                     : QStringLiteral("<br/>%1").arg(dec.reason)));
+}
+
+void MainWindow::_onResumePost()
+{
+    if (!_resumeTable || !_ngPost) return;
+    const QModelIndexList selected = _resumeTable->selectionModel()->selectedRows();
+    if (selected.isEmpty()) return;
+    const int res = QMessageBox::question(
+        this, tr("Resume post(s)"),
+        tr("Resume posting for %1 selected post(s)?\n"
+           "Only missing or failed articles will be re-sent.").arg(selected.size()),
+        QMessageBox::Yes, QMessageBox::No);
+    if (res != QMessageBox::Yes) return;
+    int failed = 0;
+    for (const QModelIndex &idx : selected) {
+        QTableWidgetItem *item = _resumeTable->item(idx.row(), 0);
+        if (item && !_startResumePost(item->data(Qt::UserRole).toLongLong(), false))
+            ++failed;
+    }
+    if (failed)
+        QMessageBox::warning(this, tr("Resume failed"),
+                             tr("%1 post(s) could not be resumed.\n"
+                                "Source files may be missing.").arg(failed));
+    _refreshHistoryViews();
+}
+
+void MainWindow::_onResumeAbandon()
+{
+    if (!_resumeTable || !_ngPost) return;
+    const QModelIndexList selected = _resumeTable->selectionModel()->selectedRows();
+    if (selected.isEmpty()) return;
+    const int res = QMessageBox::question(
+        this, tr("Abandon post(s)"),
+        tr("Mark %1 selected post(s) as abandoned?\n"
+           "The history entries are kept but the posts will no longer be offered for resume.")
+            .arg(selected.size()),
+        QMessageBox::Yes, QMessageBox::No);
+    if (res != QMessageBox::Yes) return;
+    PostHistoryStore *store = _ngPost->historyStore();
+    if (!store) return;
+    for (const QModelIndex &idx : selected) {
+        QTableWidgetItem *item = _resumeTable->item(idx.row(), 0);
+        if (item) {
+            QString err;
+            store->setPostAbandoned(item->data(Qt::UserRole).toLongLong(), &err);
+        }
+    }
+    _refreshHistoryViews();
+}
+
+void MainWindow::_onResumePurge()
+{
+    if (!_resumeTable || !_ngPost) return;
+    const QModelIndexList selected = _resumeTable->selectionModel()->selectedRows();
+    if (selected.isEmpty()) return;
+    const int res = QMessageBox::question(
+        this, tr("Purge resume data"),
+        tr("Delete the technical resume data for %1 selected post(s)?\n"
+           "The posts will no longer be resumable but the history entries are kept.")
+            .arg(selected.size()),
+        QMessageBox::Yes, QMessageBox::No);
+    if (res != QMessageBox::Yes) return;
+    PostHistoryStore *store = _ngPost->historyStore();
+    if (!store) return;
+    for (const QModelIndex &idx : selected) {
+        QTableWidgetItem *item = _resumeTable->item(idx.row(), 0);
+        if (item) {
+            QString err;
+            store->purgeResumeData(item->data(Qt::UserRole).toLongLong(), &err);
+        }
+    }
+    _refreshHistoryViews();
+}
+
+void MainWindow::_onResumeIgnore()
+{
+    if (!_resumeTable) return;
+    for (const QModelIndex &idx : _resumeTable->selectionModel()->selectedRows()) {
+        QTableWidgetItem *item = _resumeTable->item(idx.row(), 0);
+        if (item)
+            _ignoredResumeIds.insert(item->data(Qt::UserRole).toLongLong());
+    }
+    _refreshHistoryViews();
+}
+
+void MainWindow::_onResumeDeleteEntries()
+{
+    if (!_resumeTable || !_ngPost) return;
+    const QModelIndexList selected = _resumeTable->selectionModel()->selectedRows();
+    if (selected.isEmpty()) return;
+    const int res = QMessageBox::question(
+        this, tr("Delete history entries"),
+        tr("Permanently delete %1 selected post(s) from the history database?\n"
+           "This also removes all associated file and article records.")
+            .arg(selected.size()),
+        QMessageBox::Yes, QMessageBox::No);
+    if (res != QMessageBox::Yes) return;
+    PostHistoryStore *store = _ngPost->historyStore();
+    if (!store) return;
+    for (const QModelIndex &idx : selected) {
+        QTableWidgetItem *item = _resumeTable->item(idx.row(), 0);
+        if (item) {
+            QString err;
+            store->deletePost(item->data(Qt::UserRole).toLongLong(), &err);
+        }
+    }
+    _refreshHistoryViews();
+}
+
+// ============================================================
+// History table context menu (reveal password)
+// ============================================================
+
+void MainWindow::_onHistoryContextMenu(const QPoint &pos)
+{
+    if (!_historyTable || !_ngPost) return;
+    QTableWidgetItem *clicked = _historyTable->itemAt(pos);
+    if (!clicked) return;
+
+    const int row = clicked->row();
+    QTableWidgetItem *idItem = _historyTable->item(row, 0);
+    if (!idItem) return;
+    _historyTable->setCurrentCell(row, clicked->column());
+    _onHistoryRowSelected(row);
+    const qint64 postId = idItem->data(Qt::UserRole).toLongLong();
+    if (!postId) return;
+
+    PostHistoryStore *store = _ngPost->historyStore();
+    if (!store) return;
+
+    PostHistoryStore::PostDetails details;
+    QString err;
+    if (!store->loadPostDetails(postId, &details, &err)) return;
+
+    QMenu menu(this);
+    QAction *resumeAct = nullptr;
+    ResumePlanner planner(store);
+    const ResumePlanner::Decision dec = planner.check(postId, &err);
+    if (dec.state != ResumePlanner::ResumeState::NotResumable)
+        resumeAct = menu.addAction(tr("Resume"));
+
+    QAction *revealAct = nullptr;
+    QAction *copyAct = nullptr;
+    if (details.post.hasPassword && details.post.passwordStored) {
+        if (!menu.actions().isEmpty())
+            menu.addSeparator();
+        revealAct = menu.addAction(tr("Reveal password"));
+        copyAct   = menu.addAction(tr("Copy password"));
+    }
+
+    if (menu.actions().isEmpty())
+        return;
+
+    const QAction *chosen = menu.exec(_historyTable->viewport()->mapToGlobal(pos));
+    if (!chosen) return;
+
+    if (chosen == resumeAct) {
+        _startResumePost(postId, true);
+    } else if (chosen == revealAct) {
+        QMessageBox box(this);
+        box.setWindowTitle(tr("Archive password"));
+        box.setText(tr("Password for <b>%1</b>:").arg(details.post.nzbName));
+        box.setInformativeText(details.rarPass);
+        box.setIcon(QMessageBox::Information);
+        box.setStandardButtons(QMessageBox::Ok);
+        box.exec();
+    } else if (chosen == copyAct) {
+        QApplication::clipboard()->setText(details.rarPass);
+        statusBar()->showMessage(tr("Password copied to clipboard."), 4000);
+    }
+}
+
 void MainWindow::onVpnSettingsClicked()
 {
     if (!_ngPost->vpnManager())
@@ -1096,7 +2231,7 @@ void MainWindow::onVpnStateChanged(VpnManager::State newState)
 const QString MainWindow::sGroupBoxStyle =  "\
         QGroupBox {\
         font: bold; \
-        border: 1px solid silver;\
+        border: 1px solid palette(mid);\
         border-radius: 6px;\
         margin-top: 6px;\
         }\
@@ -1106,72 +2241,40 @@ const QString MainWindow::sGroupBoxStyle =  "\
         padding: 0 5px 0 5px;\
         }";
 
-// from https://doc.qt.io/qt-5/stylesheet-examples.html#customizing-qtabwidget-and-qtabbar
 const QString MainWindow::sTabWidgetStyle = "\
-        QTabWidget::pane { /* The tab widget frame */\
-            border-top: 2px solid #C2C7CB;\
+        QTabWidget::pane {\
+            border-top: 2px solid palette(mid);\
         }\
-        \
         QTabWidget::tab-bar {\
-            left: 5px; /* move to the right by 5px */\
+            left: 5px;\
         }\
-        \
-        /* Style the tab using the tab sub-control. Note that\
-            it reads QTabBar _not_ QTabWidget */ \
-        QTabBar::tab { \
-            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\
-                                        stop: 0 #E1E1E1, stop: 0.4 #DDDDDD,\
-                                        stop: 0.5 #D8D8D8, stop: 1.0 #D3D3D3);\
-            border: 2px solid #C4C4C3;\
-            border-bottom-color: #C2C7CB; /* same as the pane color */\
+        QTabBar::tab {\
+            background: palette(button);\
+            color: palette(buttonText);\
+            border: 2px solid palette(mid);\
+            border-bottom-color: palette(window);\
             border-top-left-radius: 4px;\
             border-top-right-radius: 4px;\
             min-width: 8ex;\
             padding: 2px;\
         }\
-        \
         QTabBar::tab:selected, QTabBar::tab:hover {\
-            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\
-                                        stop: 0 #fafafa, stop: 0.4 #f4f4f4,\
-                                        stop: 0.5 #e7e7e7, stop: 1.0 #fafafa);\
+            background: palette(window);\
+            color: palette(windowText);\
         }\
-        \
         QTabBar::tab:selected {\
-            border-color: #9B9B9B;\
-            border-bottom-color: #C2C7CB; /* same as pane color */\
-        }\
-        \
-        QTabBar::tab:!selected {\
-            margin-top: 2px; /* make non-selected tabs look smaller */\
-        }\
-        \
-        /* make use of negative margins for overlapping tabs */\
-        QTabBar::tab:selected {\
-            /* expand/overlap to the left and right by 4px */\
+            border-color: palette(dark);\
+            border-bottom-color: palette(window);\
             margin-left: -4px;\
             margin-right: -4px;\
         }\
-        \
-        QTabBar::tab:first:selected {\
-            margin-left: 0; /* the first selected tab has nothing to overlap with on the left */\
+        QTabBar::tab:!selected {\
+            margin-top: 2px;\
         }\
-        \
-        QTabBar::tab:last:selected {\
-            margin-right: 0; /* the last selected tab has nothing to overlap with on the right */\
-        }\
-        \
-        QTabBar::tab:only-one {\
-            margin: 0; /* if there is only one tab, we don't want overlapping margins */\
-        }\
-        \
-        QTabBar::scroller { /* the width of the scroll buttons */\
-            width: 40px;\
-        }\
-        QTabBar QToolButton::right-arrow { /* the arrow mark in the tool buttons */\
-            image: url(:/icons/right.png);\
-        }\
-        \
-        QTabBar QToolButton::left-arrow {\
-            image: url(:/icons/left.png);\
-        }\
+        QTabBar::tab:first:selected { margin-left: 0; }\
+        QTabBar::tab:last:selected  { margin-right: 0; }\
+        QTabBar::tab:only-one       { margin: 0; }\
+        QTabBar::scroller { width: 40px; }\
+        QTabBar QToolButton::right-arrow { image: url(:/icons/right.png); }\
+        QTabBar QToolButton::left-arrow  { image: url(:/icons/left.png);  }\
 ";

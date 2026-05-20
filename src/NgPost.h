@@ -27,8 +27,10 @@ struct NntpServerParams;
 class NntpFile;
 class NntpArticle;
 class QCoreApplication;
+class QCommandLineParser;
 class MainWindow;
 class PostingJob;
+class PostingWidget;
 class FoldersMonitorForNewFiles;
 #ifdef __USE_TMP_RAM__
 class QStorageInfo;
@@ -36,6 +38,7 @@ class QStorageInfo;
 class NzbCheck;
 class UpdateChecker;
 class VpnManager;
+class PostHistoryStore;
 
 #define NB_ARTICLES_TO_PREPARE_PER_CONNECTION 3
 
@@ -82,6 +85,8 @@ public:
         DEBUG_FULL,
         POST_HISTORY,
         FIELD_SEPARATOR,
+        POST_DB,
+        HISTORY_STORE_PASSWORDS,
         NZB_RM_ACCENTS,
         RESUME_WAIT,
         NO_RESUME_AUTO,
@@ -160,7 +165,21 @@ public:
         SERVER_USE_VPN, //!< per-server useVpn flag inside [server] block
         VPN,            //!< CLI-only: master switch on
         NO_VPN,         //!< CLI-only: master switch off
-        VPN_PROFILE     //!< CLI-only: select active profile by name
+        VPN_PROFILE,    //!< CLI-only: select active profile by name
+        HISTORY,
+        HISTORY_SHOW,
+        HISTORY_IMPORT_CSV,
+        REGENERATE_NZB,
+        INCLUDE_PASSWORD,
+        RESUME_LIST,
+        RESUME_CHECK,
+        RESUME_POST,
+        RESUME_ALL,
+        RESUME_ABANDON,
+        RESUME_PURGE,
+        DRY_RUN,
+        YES,
+        JSON
     };
 
 private:
@@ -204,7 +223,8 @@ private:
         ERR_SERVER_REGEX,
         ERR_SERVER_PORT,
         ERR_SERVER_CONS,
-        ERR_INPUT_READ
+        ERR_INPUT_READ,
+        ERR_HISTORY
     };
 
 private:
@@ -279,6 +299,10 @@ private:
 
     QString _historyFieldSeparator;
     QString _postHistoryFile;
+    QString _postDbFile;
+    bool _historyStorePasswords;
+    bool _historyCrashedArticlesChecked;
+    PostHistoryStore *_historyStore;
     QList<QDir> _autoDirs;
 
     FoldersMonitorForNewFiles *_folderMonitor;
@@ -441,6 +465,9 @@ public:
     inline bool hasPostingJobs() const;
     void closeAllPostingJobs();
 
+    bool resumePostGui(qint64 postId, PostingWidget *widget = nullptr, QString *error = nullptr);
+    bool regenerateNzbGui(qint64 postId, const QString &outPath, bool includePassword = false);
+
     bool hasMonitoringPostingJobs() const;
     void closeAllMonitoringJobs();
 
@@ -492,6 +519,7 @@ public:
     inline void enableAutoPacking(bool enable = true);
 
     VpnManager *vpnManager() const { return _vpnManager; }
+    PostHistoryStore *historyStore() const { return _historyStore; }
 
 signals:
     void log(QString msg, bool newline); //!< in case we signal from another thread
@@ -544,6 +572,14 @@ private:
 #endif
 
     void _showVersionASCII() const;
+    bool _ensureHistoryStore();
+    bool _handleHistoryCommand(QCommandLineParser &parser, bool *startEventLoop = nullptr);
+    void _printHistory(bool jsonOutput = false);
+    void _printHistoryShow(qint64 postId, bool includePassword);
+    bool _regenerateNzbFromHistory(qint64 postId, const QString &outPath, bool includePassword);
+    void _printResumeList(bool jsonOutput);
+    void _printResumeCheck(qint64 postId);
+    bool _resumePostFromHistory(const QString &ids, bool dryRun, bool assumeYes);
 
     // Static functions
 public:

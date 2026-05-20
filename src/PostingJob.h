@@ -23,6 +23,7 @@
 
 #include <QElapsedTimer>
 #include <QFileInfoList>
+#include <QMap>
 #include <QMutex>
 #include <QQueue>
 #include <QSet>
@@ -151,6 +152,9 @@ private:
     QTimer _resumeTimer;
 
     bool _isActiveJob;
+    qint64 _historyPostId;
+    const bool _resumeFromHistory;
+    const QMap<QString, QSet<uint>> _resumePostedPartsByPath;
 
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     quint64 _immediateSize; //!< bytes posted (to compute the avg speed)
@@ -181,6 +185,8 @@ public:
                bool keepRar = false,
                bool delFilesAfterPost = false,
                bool overwriteNzb = true,
+               qint64 resumeHistoryPostId = 0,
+               const QMap<QString, QSet<uint>> &resumePostedPartsByPath = QMap<QString, QSet<uint>>(),
                QObject *parent = nullptr);
     ~PostingJob();
 
@@ -233,6 +239,13 @@ public:
 
     static QString sslSupportInfo();
     static bool supportsSsl();
+
+    qint64 registerHistoryFile(int ordinal, const QFileInfo &file, NntpFile *nntpFile);
+    void recordHistoryArticle(qint64 fileId, int part, qint64 pos, qint64 bytes);
+    void recordHistoryArticlePosting(NntpArticle *article, int attemptNo);
+    void recordHistoryArticlePosted(NntpArticle *article);
+    void recordHistoryArticleFailed(NntpArticle *article, const QString &reason);
+    void recordHistoryArticleUnknown(NntpArticle *article, const QString &reason);
 
 signals:
     void startPosting(

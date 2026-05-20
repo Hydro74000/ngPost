@@ -624,3 +624,26 @@ void PostingWidget::setPosting()
     _ui->postButton->setText(tr("Stop Posting"));
     _state = STATE::POSTING;
 }
+
+void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted)
+{
+    if (!job)
+        return;
+
+    _ui->filesList->clear2();
+    for (const QFileInfo &file : files)
+        _ui->filesList->addPath(file.absoluteFilePath(), file.isDir());
+
+    _postingJob = job;
+    _postingFinished = false;
+    _state = STATE::POSTING;
+    _ui->nzbFileEdit->setText(job->nzbFilePath());
+
+    if (hasStarted) {
+        _ui->postButton->setText(tr("Stop Posting"));
+        _hmi->updateJobTab(this, _hmi->sPostingColor, QIcon(_hmi->sPostingIcon), job->nzbName());
+    } else {
+        _ui->postButton->setText(tr("Cancel Posting"));
+        _hmi->updateJobTab(this, _hmi->sPendingColor, QIcon(_hmi->sPendingIcon), job->nzbName());
+    }
+}
