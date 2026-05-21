@@ -48,7 +48,8 @@ public slots:
 
 protected:
     void resizeEvent(QResizeEvent *e) override;
-    void mousePressEvent(QMouseEvent * e) override;    
+    void mousePressEvent(QMouseEvent * e) override;
+    void keyPressEvent(QKeyEvent *e) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 
