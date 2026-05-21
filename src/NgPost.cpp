@@ -3329,9 +3329,74 @@ void NgPost::_syntax(char *appName)
 
 QString NgPost::parseDefaultConfig()
 {
-    // Phase 4: cross-platform XDG config dir. Migrates legacy ~/.ngPost on
-    // first launch.
-    PathHelper::migrateLegacyConfigIfNeeded();
+    // Cross-platform config dir migration. This is intentionally non
+    // destructive: the ngPost 4.16 config remains available at its legacy path.
+    auto migration = PathHelper::migrateLegacyConfigIfNeeded();
+    if (migration.status == PathHelper::ConfigMigrationStatus::NeedsOverwriteConfirmation)
+    {
+        bool confirmed = false;
+#ifdef __USE_HMI__
+        if (useHMI())
+        {
+            const int answer = QMessageBox::question(
+                nullptr,
+                tr("Config migration"),
+                tr("The legacy config and the new config resolve to the same file:\n%1\n\n"
+                   "ngPost must create a backup before this file can be reused by the new config layout.\n"
+                   "Create a .bak backup and continue?")
+                    .arg(migration.newPath),
+                QMessageBox::Yes | QMessageBox::No,
+                QMessageBox::No);
+            confirmed = (answer == QMessageBox::Yes);
+        }
+        else
+#endif
+        {
+            const QString yesArg = QStringLiteral("--") + sOptionNames[Opt::YES];
+            confirmed = QCoreApplication::arguments().contains(yesArg);
+        }
+
+        if (!confirmed)
+        {
+            return tr("Config migration requires confirmation because legacy and new config paths are the same: %1\n"
+                      "No file was overwritten. Re-run with --yes in CLI mode to create a .bak backup and continue.")
+                .arg(migration.newPath);
+        }
+
+        migration = PathHelper::migrateLegacyConfigIfNeeded(true);
+    }
+
+    switch (migration.status)
+    {
+    case PathHelper::ConfigMigrationStatus::CopiedAndKeptLegacy:
+        if (!_quiet)
+            _cout << tr("Migrated legacy config to: %1\nLegacy config kept at: %2")
+                         .arg(migration.newPath, migration.legacyPath)
+                  << "\n" << MB_FLUSH;
+        break;
+    case PathHelper::ConfigMigrationStatus::SkippedNewExists:
+        if (!_quiet)
+            _cout << tr("New config already exists: %1\nLegacy config kept at: %2")
+                         .arg(migration.newPath, migration.legacyPath)
+                  << "\n" << MB_FLUSH;
+        break;
+    case PathHelper::ConfigMigrationStatus::AlreadyMigrated:
+        if (!migration.backupPath.isEmpty() && !_quiet)
+            _cout << tr("Config backup created before migration: %1")
+                         .arg(migration.backupPath)
+                  << "\n" << MB_FLUSH;
+        break;
+    case PathHelper::ConfigMigrationStatus::BackupFailed:
+        return tr("Config migration failed: could not create backup '%1'.")
+            .arg(migration.backupPath);
+    case PathHelper::ConfigMigrationStatus::CopyFailed:
+        return tr("Config migration failed: could not copy legacy config '%1' to '%2'.")
+            .arg(migration.legacyPath, migration.newPath);
+    case PathHelper::ConfigMigrationStatus::NoLegacy:
+    case PathHelper::ConfigMigrationStatus::NeedsOverwriteConfirmation:
+        break;
+    }
+
     QString conf = PathHelper::configFilePath();
 
     QString err;

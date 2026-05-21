@@ -39,6 +39,7 @@ HomeSandbox::HomeSandbox()
     , _hadUserProfile(false)
     , _hadTestHome(false)
     , _hadTestConfigDir(false)
+    , _hadTestLegacyConfig(false)
 {
     Q_ASSERT(_root.isValid());
 
@@ -48,6 +49,7 @@ HomeSandbox::HomeSandbox()
     _prevUserProfile = getEnv("USERPROFILE", _hadUserProfile);
     _prevTestHome      = getEnv("NGPOST_TEST_HOME", _hadTestHome);
     _prevTestConfigDir = getEnv("NGPOST_TEST_CONFIG_DIR", _hadTestConfigDir);
+    _prevTestLegacyConfig = getEnv("NGPOST_TEST_LEGACY_CONFIG", _hadTestLegacyConfig);
 
     QDir().mkpath(xdgConfigHome());
     const QString testConfigDir = xdgConfigHome() + QStringLiteral("/ngPost");
@@ -75,6 +77,7 @@ HomeSandbox::~HomeSandbox()
     restore("USERPROFILE", _hadUserProfile, _prevUserProfile);
     restore("NGPOST_TEST_HOME", _hadTestHome, _prevTestHome);
     restore("NGPOST_TEST_CONFIG_DIR", _hadTestConfigDir, _prevTestConfigDir);
+    restore("NGPOST_TEST_LEGACY_CONFIG", _hadTestLegacyConfig, _prevTestLegacyConfig);
 }
 
 QString HomeSandbox::rootPath() const

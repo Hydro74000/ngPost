@@ -41,12 +41,14 @@ private:
     QString       _prevUserProfile;
     QString       _prevTestHome;
     QString       _prevTestConfigDir;
+    QString       _prevTestLegacyConfig;
     bool          _hadHome;
     bool          _hadXdg;
     bool          _hadAppData;
     bool          _hadUserProfile;
     bool          _hadTestHome;
     bool          _hadTestConfigDir;
+    bool          _hadTestLegacyConfig;
 };
 
 //! Allocate a free TCP port on 127.0.0.1 for a test. Returns 0 on failure.

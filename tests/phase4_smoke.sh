@@ -53,8 +53,8 @@ run_ngpost "$T1"
 newConf="$T1/.config/ngPost/ngPost.conf"
 [ -f "$newConf" ] || ko "new conf not present at $newConf"
 [ -f "$newConf" ] && ok "new conf created"
-[ ! -f "$T1/.ngPost" ] && ok "legacy ~/.ngPost removed" \
-    || ko "legacy ~/.ngPost still present (should be moved)"
+[ -f "$T1/.ngPost" ] && ok "legacy ~/.ngPost kept for ngPost 4.16" \
+    || ko "legacy ~/.ngPost missing (should be kept)"
 grep -q "host = test1.example.com" "$newConf" && ok "server preserved" \
     || ko "server entry missing from migrated conf"
 
@@ -129,13 +129,13 @@ run_ngpost "$T3"
 # The migrate-then-parse path copies the legacy ovpn into vpn/ AND creates
 # a Default profile in memory. The profile is only persisted to disk if a
 # saveConfig() fires — which doesn't happen on a --version-only run. So we
-# only check the file copy here, plus the legacy file presence/absence.
+# only check the file copy here, plus the legacy file is kept for 4.16.
 [ -f "$T3/.config/ngPost/vpn/old.ovpn" ] \
     && ok "legacy .ovpn copied into <configDir>/vpn/" \
     || ko "legacy .ovpn NOT copied (expected $T3/.config/ngPost/vpn/old.ovpn)"
-[ ! -f "$T3/.ngPost" ] \
-    && ok "legacy ~/.ngPost removed" \
-    || ko "legacy ~/.ngPost still present"
+[ -f "$T3/.ngPost" ] \
+    && ok "legacy ~/.ngPost kept" \
+    || ko "legacy ~/.ngPost missing"
 
 rm -rf "$T3"
 

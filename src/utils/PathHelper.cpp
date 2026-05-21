@@ -10,6 +10,8 @@
 #include "PathHelper.h"
 
 #include <QByteArray>
+#include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -28,6 +30,34 @@ QString testEnvPath(const char *name)
     return value.isEmpty() ? QString() : QString::fromLocal8Bit(value);
 }
 #endif
+
+bool samePath(const QString &a, const QString &b)
+{
+    QFileInfo ai(a);
+    QFileInfo bi(b);
+    const QString ac = ai.canonicalFilePath();
+    const QString bc = bi.canonicalFilePath();
+    if (!ac.isEmpty() && !bc.isEmpty())
+        return ac == bc;
+
+    return QDir::cleanPath(ai.absoluteFilePath())
+           == QDir::cleanPath(bi.absoluteFilePath());
+}
+
+ConfigMigrationResult result(ConfigMigrationStatus status,
+                             const QString &legacyPath,
+                             const QString &newPath,
+                             const QString &backupPath = QString(),
+                             const QString &error = QString())
+{
+    ConfigMigrationResult r;
+    r.status     = status;
+    r.legacyPath = legacyPath;
+    r.newPath    = newPath;
+    r.backupPath = backupPath;
+    r.error      = error;
+    return r;
+}
 
 } // namespace
 
@@ -93,35 +123,102 @@ QString vpnRuntimeDir()
 QString legacyConfigFilePath()
 {
 #ifdef NGPOST_TESTING
+    const QString testLegacy = testEnvPath("NGPOST_TEST_LEGACY_CONFIG");
+    if (!testLegacy.isEmpty())
+        return testLegacy;
+#endif
+
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
+#ifdef NGPOST_TESTING
+    const QString testHome = testEnvPath("NGPOST_TEST_HOME");
+    if (!testHome.isEmpty())
+        return testHome + QStringLiteral("/ngPost.conf");
+#endif
+    return QCoreApplication::applicationDirPath() + QStringLiteral("/ngPost.conf");
+#else
+#ifdef NGPOST_TESTING
     const QString testHome = testEnvPath("NGPOST_TEST_HOME");
     if (!testHome.isEmpty())
         return testHome + QStringLiteral("/.ngPost");
 #endif
-
     return QDir::homePath() + QStringLiteral("/.ngPost");
+#endif
 }
 
-void migrateLegacyConfigIfNeeded()
+QString backupPathFor(const QString &path)
+{
+    const QString simple = path + QStringLiteral(".bak");
+    if (!QFile::exists(simple))
+        return simple;
+
+    const QFileInfo fi(path);
+    const QString stamp = QDateTime::currentDateTime()
+                              .toString(QStringLiteral("yyyyMMdd-HHmmss"));
+    QString candidate = QStringLiteral("%1/%2.%3.bak")
+                            .arg(fi.absolutePath(), fi.fileName(), stamp);
+    if (!QFile::exists(candidate))
+        return candidate;
+
+    for (int i = 1; ; ++i) {
+        candidate = QStringLiteral("%1/%2.%3.%4.bak")
+                        .arg(fi.absolutePath(), fi.fileName(), stamp)
+                        .arg(i);
+        if (!QFile::exists(candidate))
+            return candidate;
+    }
+}
+
+ConfigMigrationResult migrateLegacyConfigIfNeeded(bool overwriteConfirmed)
 {
     QString newPath    = configFilePath();
     QString legacyPath = legacyConfigFilePath();
 
-    if (QFile::exists(newPath))
-        return; // already on the new layout
-
     QFileInfo legacy(legacyPath);
-    if (!legacy.exists() || !legacy.isFile())
-        return; // no legacy conf to migrate
+    if (!legacy.exists() || !legacy.isFile()) {
+        if (QFile::exists(newPath))
+            return result(ConfigMigrationStatus::AlreadyMigrated, legacyPath, newPath);
+        return result(ConfigMigrationStatus::NoLegacy, legacyPath, newPath);
+    }
+
+    if (samePath(legacyPath, newPath)) {
+        if (!overwriteConfirmed)
+            return result(ConfigMigrationStatus::NeedsOverwriteConfirmation,
+                          legacyPath,
+                          newPath);
+
+        const QString backupPath = backupPathFor(newPath);
+        if (!QFile::copy(newPath, backupPath))
+            return result(ConfigMigrationStatus::BackupFailed,
+                          legacyPath,
+                          newPath,
+                          backupPath,
+                          QStringLiteral("could not create backup"));
+
+        return result(ConfigMigrationStatus::AlreadyMigrated,
+                      legacyPath,
+                      newPath,
+                      backupPath);
+    }
+
+    if (QFile::exists(newPath))
+        return result(ConfigMigrationStatus::SkippedNewExists,
+                      legacyPath,
+                      newPath);
 
     // Make sure the parent dir exists (configDir() already does it via mkpath
     // when called above, but be explicit).
     QDir().mkpath(QFileInfo(newPath).absolutePath());
 
-    // Use copy + remove rather than rename so we keep the file readable if
-    // something else is mid-write on it. The legacy file is then deleted to
-    // avoid double-write on next launch.
-    if (QFile::copy(legacyPath, newPath))
-        QFile::remove(legacyPath);
+    if (!QFile::copy(legacyPath, newPath))
+        return result(ConfigMigrationStatus::CopyFailed,
+                      legacyPath,
+                      newPath,
+                      QString(),
+                      QStringLiteral("could not copy legacy config"));
+
+    return result(ConfigMigrationStatus::CopiedAndKeptLegacy,
+                  legacyPath,
+                  newPath);
 }
 
 } // namespace PathHelper
