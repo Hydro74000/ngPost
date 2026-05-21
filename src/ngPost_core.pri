@@ -26,7 +26,10 @@ QT_KEYCHAIN_PREFIX = $$(QT_ROOT_DIR)
     LIBS        += -L$$QT_KEYCHAIN_PREFIX/lib
 }
 LIBS    += -lqt6keychain
-QT      += dbus
+# QtKeychain pulls in DBus only on Linux (KWallet/libsecret). On Windows it
+# uses wincred and on macOS the Keychain API — adding QT += dbus there links
+# a DLL that nothing imports, which windeployqt then skips.
+linux:!android: QT += dbus
 
 VERSION = 5.4.0
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"

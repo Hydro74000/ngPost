@@ -194,13 +194,15 @@ jobs:
         run: |
           $root = Resolve-Path "src/release"
 
+          # NB: Qt6DBus.dll is intentionally absent — QtKeychain only pulls in
+          # QtDBus on Linux. On Windows it uses wincred, so nothing imports
+          # Qt6DBus and windeployqt does not deploy it.
           $requiredFiles = @(
             "ngPost.exe",
             "Qt6Core.dll",
             "Qt6Gui.dll",
             "Qt6Network.dll",
             "Qt6Sql.dll",
-            "Qt6DBus.dll",
             "Qt6Widgets.dll",
             "Qt6Charts.dll",
             "sqldrivers/qsqlite.dll",
@@ -222,7 +224,6 @@ jobs:
             "Qt6Gui.dll",
             "Qt6Network.dll",
             "Qt6Sql.dll",
-            "Qt6DBus.dll",
             "Qt6Widgets.dll",
             "Qt6Charts.dll"
           )
