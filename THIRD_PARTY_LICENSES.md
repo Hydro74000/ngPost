@@ -44,6 +44,21 @@ the GNU GPL v2 in all respects.
 
 ---
 
+## par2cmdline-turbo (`par2` / `par2.exe`)
+
+- **How used**: `par2` from the Debian/Ubuntu `par2` package is bundled inside
+  the Linux AppImage; the official `par2cmdline-turbo` Windows build is shipped
+  in the Windows ZIP and offered as an optional installer task (drop-in
+  replacement for upstream par2cmdline, same CLI, same GPL terms)
+- **Licence**: GNU General Public Licence, version 2 or later
+- **Copyright**: © 2003 Peter Brian Clements; © 2019–2024 Michael Nahas, Anime
+  Tosho and contributors
+- **Source code**: <https://github.com/animetosho/par2cmdline-turbo>
+  (upstream: <https://github.com/Parchive/par2cmdline>)
+- **Full licence text**: <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>
+
+---
+
 ## wireguard-go
 
 - **How used**: bundled inside the Linux AppImage as a fallback userspace WireGuard

@@ -184,6 +184,35 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path src/release/sqldrivers | Out-Null
           Copy-Item $sqlitePlugin src/release/sqldrivers/ -Force
+      - name: Fetch par2 (par2cmdline-turbo) for optional bundling
+        shell: pwsh
+        run: |
+          # NgPost.cpp auto-detects an "embedded" par2.exe sitting next to
+          # ngPost.exe (see par2Embedded check in NgPost::NgPost). Linux gets
+          # par2 from apt; on Windows we offer par2cmdline-turbo's official
+          # GPLv2 build as an optional installer component so the user can
+          # decline if they prefer their own par2/parpar/MultiPar.
+          #
+          # par2 is staged outside src/release/ on purpose: src/release/* is
+          # copied unconditionally by both the ZIP package and the Inno Setup
+          # main [Files] entry. par2.exe is wired into Inno Setup as a
+          # task-gated extra source instead.
+          $par2Version = "1.4.0"
+          $asset       = "par2cmdline-turbo-$par2Version-win-x64.zip"
+          $url         = "https://github.com/animetosho/par2cmdline-turbo/releases/download/v$par2Version/$asset"
+          $stage       = Join-Path (Get-Location) "dist\par2"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          $zip = Join-Path $env:RUNNER_TEMP $asset
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          $extract = Join-Path $env:RUNNER_TEMP "par2-extract"
+          Remove-Item -Recurse -Force $extract -ErrorAction SilentlyContinue
+          Expand-Archive -Path $zip -DestinationPath $extract -Force
+          $par2 = Get-ChildItem $extract -Recurse -File -Filter 'par2.exe' |
+            Select-Object -First 1
+          if (-not $par2) {
+            throw "par2.exe not found inside $asset"
+          }
+          Copy-Item $par2.FullName (Join-Path $stage 'par2.exe') -Force
       - name: Clean Build Artifacts
         shell: pwsh
         run: |
@@ -217,6 +246,12 @@ jobs:
           }
           if (-not (Get-ChildItem $root -File -Filter '*qt6keychain*.dll')) {
             throw "Missing deployed dependency: qt6keychain DLL"
+          }
+          # par2.exe lives in dist/par2 (staged for the optional installer
+          # task), not in src/release — the global Inno Setup [Files] entry
+          # would otherwise copy it unconditionally.
+          if (-not (Test-Path "dist/par2/par2.exe")) {
+            throw "Missing staged par2.exe (dist/par2/par2.exe)"
           }
 
           $expectedDlls = @(
@@ -252,6 +287,11 @@ jobs:
           $pkg = "ngPost-$version-windows-x86_64"
           New-Item -ItemType Directory -Force -Path "dist/$pkg" | Out-Null
           Copy-Item -Recurse src/release/* "dist/$pkg/"
+          # par2 is staged outside src/release/ so the Inno Setup installer
+          # can gate it behind the optional "installpar2" task. For the
+          # standalone ZIP we always include it — no install wizard to drive
+          # the choice, and users who don't want it can just delete the file.
+          Copy-Item dist/par2/par2.exe "dist/$pkg/par2.exe" -Force
           Copy-Item ngPost.conf, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item THIRD_PARTY_LICENSES.md "dist/$pkg/" -ErrorAction SilentlyContinue
@@ -322,6 +362,19 @@ jobs:
           Full GPL v2 text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
           ------------------------------------------------------------------------
+          3. par2cmdline-turbo (par2.exe)
+          ------------------------------------------------------------------------
+          Licence  : GNU General Public Licence, version 2 or later
+          Copyright: (c) 2003 Peter Brian Clements;
+                     (c) 2019-2024 Michael Nahas, Anime Tosho and contributors
+          Source   : https://github.com/animetosho/par2cmdline-turbo
+                     (upstream: https://github.com/Parchive/par2cmdline)
+
+          par2cmdline-turbo is a drop-in replacement for par2cmdline distributed
+          under the GNU GPL v2 or later. Full GPL v2 text:
+          https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+          ------------------------------------------------------------------------
 
           These programs are independent products; ngPost does not modify them and
           invokes them as separate processes. Their source code is available at the
@@ -354,11 +407,15 @@ jobs:
 
           [Tasks]
           Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
+          Name: "installpar2"; Description: "Install par2 (recommended for PAR2 redundancy generation)"; GroupDescription: "Optional tools (recommended):"
           Name: "installopenvpn"; Description: "Install OpenVPN Community (required for OpenVPN profiles)"; GroupDescription: "VPN backends (recommended):"
           Name: "installwireguard"; Description: "Install WireGuard for Windows (required for WireGuard profiles)"; GroupDescription: "VPN backends (recommended):"
 
           [Files]
-          Source: "$source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          ; par2.exe is excluded here and re-added below under Tasks: installpar2
+          ; so the user can opt out at install time.
+          Source: "$source\*"; DestDir: "{app}"; Excludes: "par2.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "$source\par2.exe"; DestDir: "{app}"; Flags: ignoreversion; Tasks: installpar2
           Source: "THIRD_PARTY_LICENSES.md"; DestDir: "{app}"; Flags: ignoreversion
           Source: "$ovpnMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installopenvpn; Check: OpenVpnNeeded
           Source: "$wgMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installwireguard; Check: WireGuardNeeded
@@ -434,6 +491,56 @@ jobs:
                 WizardForm.TasksList.Items[i] := s + ' [already installed]';
               end;
             end;
+          end;
+
+          // After a successful install, if the user opted into par2 and the
+          // bundled ngPost.conf template has no active PAR2_PATH line, append
+          // one pointing at our bundled par2.exe. NgPost migrates this seed
+          // template into the per-user config on first launch (see
+          // PathHelper::migrateLegacyConfigIfNeeded), so fresh installs pick
+          // up the path automatically. Existing per-user configs are left
+          // untouched — ngPost's runtime auto-detection of par2.exe sitting
+          // next to ngPost.exe covers that case.
+          function ConfHasActivePar2Path(const Lines: TArrayOfString): Boolean;
+          var
+            j: Integer;
+            trimmed: String;
+          begin
+            Result := False;
+            for j := 0 to GetArrayLength(Lines) - 1 do begin
+              trimmed := Trim(Lines[j]);
+              if (trimmed = '') or (Copy(trimmed, 1, 1) = '#') or (Copy(trimmed, 1, 2) = '//') then
+                continue;
+              if (Pos('PAR2_PATH', Uppercase(trimmed)) = 1) then begin
+                Result := True;
+                exit;
+              end;
+            end;
+          end;
+
+          procedure CurStepChanged(CurStep: TSetupStep);
+          var
+            confPath: String;
+            par2Path: String;
+            lines: TArrayOfString;
+            n: Integer;
+          begin
+            if CurStep <> ssPostInstall then exit;
+            if not IsTaskSelected('installpar2') then exit;
+
+            confPath := ExpandConstant('{app}\ngPost.conf');
+            par2Path := ExpandConstant('{app}\par2.exe');
+            if not FileExists(confPath) then exit;
+            if not FileExists(par2Path) then exit;
+            if not LoadStringsFromFile(confPath, lines) then exit;
+            if ConfHasActivePar2Path(lines) then exit;
+
+            n := GetArrayLength(lines);
+            SetArrayLength(lines, n + 3);
+            lines[n]     := '';
+            lines[n + 1] := '## Auto-configured by the ngPost Windows installer (installpar2 task)';
+            lines[n + 2] := 'PAR2_PATH = ' + par2Path;
+            SaveStringsToFile(confPath, lines, False);
           end;
           "@
           Set-Content -Path installer.iss -Value $iss -Encoding ASCII
