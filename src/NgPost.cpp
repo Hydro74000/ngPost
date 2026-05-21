@@ -383,17 +383,27 @@ NgPost::NgPost(int &argc, char *argv[]):
 //    std::srand(static_cast<uint>(QDateTime::currentMSecsSinceEpoch()));
     std::srand(QUuid::createUuid().data1); // use more random seed
 
-    // check if the embedded par2 is available (windows or appImage)
-    QString par2Embedded;
+    // check if an embedded par2 implementation sits next to the binary
+    // (Windows installer / AppImage). We prefer parpar when present because
+    // it does not rely on shell wildcard expansion (see useParPar handling
+    // in PostingJob::startGenPar2) — a hard requirement on Windows where
+    // QProcess invokes CreateProcess directly without a shell.
+    const QString appDir = QCoreApplication::applicationDirPath();
+    QStringList par2Candidates;
 #if defined(WIN32) || defined(__MINGW64__)
-    par2Embedded = QString("%1/par2.exe").arg(QCoreApplication::applicationDirPath());
+    par2Candidates << QString("%1/parpar.exe").arg(appDir)
+                   << QString("%1/par2.exe").arg(appDir);
 #else
-    par2Embedded = QString("%1/par2").arg(QCoreApplication::applicationDirPath());
+    par2Candidates << QString("%1/parpar").arg(appDir)
+                   << QString("%1/par2").arg(appDir);
 #endif
-
-    QFileInfo fi(par2Embedded);
-    if (fi.exists() && fi.isFile() && fi.isExecutable())
-        _par2Path = par2Embedded;
+    for (const QString &candidate : par2Candidates) {
+        QFileInfo fi(candidate);
+        if (fi.exists() && fi.isFile() && fi.isExecutable()) {
+            _par2Path = candidate;
+            break;
+        }
+    }
 
     // check if an embedded rar is available (windows or appImage)
     QString rarEmbedded;

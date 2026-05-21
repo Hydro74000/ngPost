@@ -1473,13 +1473,22 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
     if (!_canGenPar2())
         return false;
 
+    bool useParPar = _ngPost->useParPar();
+
     QStringList args;
     if (_ngPost->_par2Args.isEmpty())
-        args << "c" << "-l" << "-m1024" << QString("-r%1").arg(redundancy);
+    {
+        if (useParPar)
+            // parpar has no `c` subcommand, no `-l`, requires `-s`, and
+            // interprets bare `-r8` as 8 slices — append `%` for percent.
+            args << QString("-s1M") << QString("-m1024M")
+                 << QString("-r%1%").arg(redundancy);
+        else
+            args << "c" << "-l" << "-m1024" << QString("-r%1").arg(redundancy);
+    }
     else
         args << _ngPost->_par2Args.split(" ");
 
-    bool useParPar = _ngPost->useParPar();
     QString archiveTmpFolder = QString("%1/%2").arg(tmpFolder, archiveName);
 
     // we've already compressed => we gen par2 for the files in the archive folder

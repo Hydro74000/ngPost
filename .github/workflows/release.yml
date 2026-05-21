@@ -184,35 +184,49 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path src/release/sqldrivers | Out-Null
           Copy-Item $sqlitePlugin src/release/sqldrivers/ -Force
-      - name: Fetch par2 (par2cmdline-turbo) for optional bundling
+      - name: Fetch ParPar for optional bundling
         shell: pwsh
         run: |
-          # NgPost.cpp auto-detects an "embedded" par2.exe sitting next to
-          # ngPost.exe (see par2Embedded check in NgPost::NgPost). Linux gets
-          # par2 from apt; on Windows we offer par2cmdline-turbo's official
-          # GPLv2 build as an optional installer component so the user can
-          # decline if they prefer their own par2/parpar/MultiPar.
+          # NgPost.cpp auto-detects an "embedded" parpar.exe sitting next to
+          # ngPost.exe (see par2Candidates loop in NgPost::NgPost). We ship
+          # ParPar specifically (not par2cmdline / par2cmdline-turbo) because
+          # ngPost passes wildcard arguments like archive.7z* to the par2
+          # binary on Windows. QProcess invokes CreateProcess directly with
+          # no shell, so the binary has to do its own globbing —
+          # par2cmdline-turbo currently doesn't, while ngPost's ParPar path
+          # uses -R <folder> and avoids globbing entirely. ParPar is
+          # released by animetosho into the public domain (CC0).
           #
-          # par2 is staged outside src/release/ on purpose: src/release/* is
-          # copied unconditionally by both the ZIP package and the Inno Setup
-          # main [Files] entry. par2.exe is wired into Inno Setup as a
-          # task-gated extra source instead.
-          $par2Version = "1.4.0"
-          $asset       = "par2cmdline-turbo-$par2Version-win-x64.zip"
-          $url         = "https://github.com/animetosho/par2cmdline-turbo/releases/download/v$par2Version/$asset"
-          $stage       = Join-Path (Get-Location) "dist\par2"
+          # parpar is staged outside src/release/ on purpose: src/release/*
+          # is copied unconditionally by both the ZIP package and the Inno
+          # Setup main [Files] entry. parpar.exe is wired into Inno Setup as
+          # a task-gated extra source instead.
+          $parparVersion = "0.4.5"
+          $asset         = "parpar-v$parparVersion-win64.7z"
+          $url           = "https://github.com/animetosho/ParPar/releases/download/v$parparVersion/$asset"
+          $stage         = Join-Path (Get-Location) "dist\parpar"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          $zip = Join-Path $env:RUNNER_TEMP $asset
-          Invoke-WebRequest -Uri $url -OutFile $zip
-          $extract = Join-Path $env:RUNNER_TEMP "par2-extract"
-          Remove-Item -Recurse -Force $extract -ErrorAction SilentlyContinue
-          Expand-Archive -Path $zip -DestinationPath $extract -Force
-          $par2 = Get-ChildItem $extract -Recurse -File -Filter 'par2.exe' |
-            Select-Object -First 1
-          if (-not $par2) {
-            throw "par2.exe not found inside $asset"
+          $archive = Join-Path $env:RUNNER_TEMP $asset
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          # 7-Zip ships preinstalled on windows-latest runners. PowerShell's
+          # Expand-Archive does not support .7z, so we shell out to 7z.exe.
+          $sevenZip = "C:\Program Files\7-Zip\7z.exe"
+          if (-not (Test-Path $sevenZip)) {
+            throw "7-Zip not found at $sevenZip — runner image changed?"
           }
-          Copy-Item $par2.FullName (Join-Path $stage 'par2.exe') -Force
+          $extract = Join-Path $env:RUNNER_TEMP "parpar-extract"
+          Remove-Item -Recurse -Force $extract -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $extract | Out-Null
+          & $sevenZip x $archive "-o$extract" -y | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "7-Zip failed to extract $asset (exit $LASTEXITCODE)"
+          }
+          $parpar = Get-ChildItem $extract -Recurse -File -Filter 'parpar.exe' |
+            Select-Object -First 1
+          if (-not $parpar) {
+            throw "parpar.exe not found inside $asset"
+          }
+          Copy-Item $parpar.FullName (Join-Path $stage 'parpar.exe') -Force
       - name: Clean Build Artifacts
         shell: pwsh
         run: |
@@ -247,11 +261,11 @@ jobs:
           if (-not (Get-ChildItem $root -File -Filter '*qt6keychain*.dll')) {
             throw "Missing deployed dependency: qt6keychain DLL"
           }
-          # par2.exe lives in dist/par2 (staged for the optional installer
+          # parpar.exe lives in dist/parpar (staged for the optional installer
           # task), not in src/release — the global Inno Setup [Files] entry
           # would otherwise copy it unconditionally.
-          if (-not (Test-Path "dist/par2/par2.exe")) {
-            throw "Missing staged par2.exe (dist/par2/par2.exe)"
+          if (-not (Test-Path "dist/parpar/parpar.exe")) {
+            throw "Missing staged parpar.exe (dist/parpar/parpar.exe)"
           }
 
           $expectedDlls = @(
@@ -287,11 +301,11 @@ jobs:
           $pkg = "ngPost-$version-windows-x86_64"
           New-Item -ItemType Directory -Force -Path "dist/$pkg" | Out-Null
           Copy-Item -Recurse src/release/* "dist/$pkg/"
-          # par2 is staged outside src/release/ so the Inno Setup installer
-          # can gate it behind the optional "installpar2" task. For the
+          # parpar is staged outside src/release/ so the Inno Setup installer
+          # can gate it behind the optional "installparpar" task. For the
           # standalone ZIP we always include it — no install wizard to drive
           # the choice, and users who don't want it can just delete the file.
-          Copy-Item dist/par2/par2.exe "dist/$pkg/par2.exe" -Force
+          Copy-Item dist/parpar/parpar.exe "dist/$pkg/parpar.exe" -Force
           Copy-Item ngPost.conf, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item THIRD_PARTY_LICENSES.md "dist/$pkg/" -ErrorAction SilentlyContinue
@@ -362,17 +376,15 @@ jobs:
           Full GPL v2 text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
           ------------------------------------------------------------------------
-          3. par2cmdline-turbo (par2.exe)
+          3. ParPar (parpar.exe)
           ------------------------------------------------------------------------
-          Licence  : GNU General Public Licence, version 2 or later
-          Copyright: (c) 2003 Peter Brian Clements;
-                     (c) 2019-2024 Michael Nahas, Anime Tosho and contributors
-          Source   : https://github.com/animetosho/par2cmdline-turbo
-                     (upstream: https://github.com/Parchive/par2cmdline)
+          Licence  : Public Domain / CC0 1.0 Universal
+          Copyright: released into the public domain by Anime Tosho
+          Source   : https://github.com/animetosho/ParPar
 
-          par2cmdline-turbo is a drop-in replacement for par2cmdline distributed
-          under the GNU GPL v2 or later. Full GPL v2 text:
-          https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+          ParPar is a high-performance PAR2 creation tool released into the public
+          domain. Where public domain is not recognised, the project applies the
+          CC0 1.0 dedication. Full text: https://creativecommons.org/publicdomain/zero/1.0/
 
           ------------------------------------------------------------------------
 
@@ -407,15 +419,15 @@ jobs:
 
           [Tasks]
           Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
-          Name: "installpar2"; Description: "Install par2 (recommended for PAR2 redundancy generation)"; GroupDescription: "Optional tools (recommended):"
+          Name: "installparpar"; Description: "Install ParPar (recommended for PAR2 redundancy generation)"; GroupDescription: "Optional tools (recommended):"
           Name: "installopenvpn"; Description: "Install OpenVPN Community (required for OpenVPN profiles)"; GroupDescription: "VPN backends (recommended):"
           Name: "installwireguard"; Description: "Install WireGuard for Windows (required for WireGuard profiles)"; GroupDescription: "VPN backends (recommended):"
 
           [Files]
-          ; par2.exe is excluded here and re-added below under Tasks: installpar2
-          ; so the user can opt out at install time.
-          Source: "$source\*"; DestDir: "{app}"; Excludes: "par2.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
-          Source: "$source\par2.exe"; DestDir: "{app}"; Flags: ignoreversion; Tasks: installpar2
+          ; parpar.exe is excluded here and re-added below under Tasks:
+          ; installparpar so the user can opt out at install time.
+          Source: "$source\*"; DestDir: "{app}"; Excludes: "parpar.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "$source\parpar.exe"; DestDir: "{app}"; Flags: ignoreversion; Tasks: installparpar
           Source: "THIRD_PARTY_LICENSES.md"; DestDir: "{app}"; Flags: ignoreversion
           Source: "$ovpnMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installopenvpn; Check: OpenVpnNeeded
           Source: "$wgMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installwireguard; Check: WireGuardNeeded
@@ -493,14 +505,15 @@ jobs:
             end;
           end;
 
-          // After a successful install, if the user opted into par2 and the
+          // After a successful install, if the user opted into ParPar and the
           // bundled ngPost.conf template has no active PAR2_PATH line, append
-          // one pointing at our bundled par2.exe. NgPost migrates this seed
-          // template into the per-user config on first launch (see
+          // one pointing at our bundled parpar.exe. NgPost migrates this
+          // seed template into the per-user config on first launch (see
           // PathHelper::migrateLegacyConfigIfNeeded), so fresh installs pick
           // up the path automatically. Existing per-user configs are left
-          // untouched — ngPost's runtime auto-detection of par2.exe sitting
-          // next to ngPost.exe covers that case.
+          // untouched — ngPost's runtime auto-detection of parpar.exe sitting
+          // next to ngPost.exe (see par2Candidates in NgPost::NgPost) covers
+          // that case.
           function ConfHasActivePar2Path(const Lines: TArrayOfString): Boolean;
           var
             j: Integer;
@@ -521,25 +534,25 @@ jobs:
           procedure CurStepChanged(CurStep: TSetupStep);
           var
             confPath: String;
-            par2Path: String;
+            parparPath: String;
             lines: TArrayOfString;
             n: Integer;
           begin
             if CurStep <> ssPostInstall then exit;
-            if not IsTaskSelected('installpar2') then exit;
+            if not IsTaskSelected('installparpar') then exit;
 
-            confPath := ExpandConstant('{app}\ngPost.conf');
-            par2Path := ExpandConstant('{app}\par2.exe');
+            confPath   := ExpandConstant('{app}\ngPost.conf');
+            parparPath := ExpandConstant('{app}\parpar.exe');
             if not FileExists(confPath) then exit;
-            if not FileExists(par2Path) then exit;
+            if not FileExists(parparPath) then exit;
             if not LoadStringsFromFile(confPath, lines) then exit;
             if ConfHasActivePar2Path(lines) then exit;
 
             n := GetArrayLength(lines);
             SetArrayLength(lines, n + 3);
             lines[n]     := '';
-            lines[n + 1] := '## Auto-configured by the ngPost Windows installer (installpar2 task)';
-            lines[n + 2] := 'PAR2_PATH = ' + par2Path;
+            lines[n + 1] := '## Auto-configured by the ngPost Windows installer (installparpar task)';
+            lines[n + 2] := 'PAR2_PATH = ' + parparPath;
             SaveStringsToFile(confPath, lines, False);
           end;
           "@
