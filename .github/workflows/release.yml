@@ -232,8 +232,13 @@ jobs:
             $dump | Write-Output
             throw "dumpbin failed for ngPost.exe"
           }
+          # Collapse the multi-line dumpbin output into one string. Against an
+          # array, PowerShell's -match/-notmatch filter elements instead of
+          # returning a boolean, which made the check always fire on the first
+          # DLL.
+          $dumpText = ($dump | Out-String)
           foreach ($dll in $expectedDlls) {
-            if ($dump -notmatch [regex]::Escape($dll)) {
+            if ($dumpText -notmatch [regex]::Escape($dll)) {
               throw "ngPost.exe does not declare expected dependency: $dll"
             }
           }
