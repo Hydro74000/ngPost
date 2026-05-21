@@ -88,6 +88,7 @@ PostingJob::PostingJob(NgPost *ngPost,
     _extProc(nullptr)
     , _compressDir(nullptr)
     , _limitProcDisplay(false)
+    , _extProcIsPar2(false)
     , _nbProcDisp(42)
     ,
 
@@ -1415,6 +1416,7 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
     else
         _log(QString("%1...\n").arg(tr("Compressing files")));
     _limitProcDisplay = false;
+    _extProcIsPar2 = false;
     _extProc->start(cmdRar, args);
 
 #ifdef __DEBUG__
@@ -1581,8 +1583,8 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
                  .arg(args.join(" ")));
     else
         _log(QString("%1...\n").arg(tr("Generating par2")));
-    if (!_ngPost->useParPar())
-        _limitProcDisplay = true;
+    _limitProcDisplay = true;
+    _extProcIsPar2 = true;
     _nbProcDisp = 0;
     _extProc->start(_ngPost->_par2Path, args);
 
@@ -1615,6 +1617,7 @@ void PostingJob::_cleanExtProc()
 {
     delete _extProc;
     _extProc = nullptr;
+    _extProcIsPar2 = false;
     if (_ngPost->debugFull())
         _log(tr("External process deleted."));
 }
@@ -1661,7 +1664,19 @@ void PostingJob::onExtProcReadyReadStandardOutput()
 
 void PostingJob::onExtProcReadyReadStandardError()
 {
-    _error(_extProc->readAllStandardError());
+    const QByteArray output = _extProc->readAllStandardError();
+
+    if (_extProcIsPar2 && _ngPost->useParPar()) {
+        if (_ngPost->debugMode())
+            _log(QString::fromLocal8Bit(output), false);
+        else if (_isActiveJob) {
+            if (!_limitProcDisplay || ++_nbProcDisp % 42 == 0)
+                _log("*", false);
+        }
+        return;
+    }
+
+    _error(QString::fromLocal8Bit(output));
 }
 
 bool PostingJob::_checkTmpFolder() const

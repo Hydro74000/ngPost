@@ -76,6 +76,7 @@ private:
     QProcess *_extProc;
     QDir *_compressDir;
     bool _limitProcDisplay;
+    bool _extProcIsPar2;
     ushort _nbProcDisp;
 
 #ifdef __USE_TMP_RAM__
