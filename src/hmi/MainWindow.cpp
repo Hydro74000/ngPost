@@ -1333,7 +1333,9 @@ PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &f
         lastTabIdx = _ui->postTabWidget->count() -1;
     PostingWidget *newPostingWidget = new PostingWidget(_ngPost, this, static_cast<uint>(lastTabIdx));
     newPostingWidget->init();
-    QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(lastTabIdx);
+    // Tab layout: 0=quick (#1), 1=folder, 2=history, 3="+" — so a tab inserted
+    // at lastTabIdx becomes the (lastTabIdx-1)-th quick post for display.
+    QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(lastTabIdx - 1);
     _ui->postTabWidget->insertTab(lastTabIdx,
                                   newPostingWidget ,
                                   QIcon(":/icons/quick.png"),
