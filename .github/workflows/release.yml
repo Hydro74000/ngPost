@@ -168,11 +168,74 @@ jobs:
           nmake
       - name: Deploy Qt DLLs with windeployqt
         run: windeployqt src/release/ngPost.exe --release --qmldir src --compiler-runtime
+      - name: Ensure third-party Windows DLLs and plugins are deployed
+        shell: pwsh
+        run: |
+          $qtKeychain = Get-ChildItem "$env:QT_ROOT_DIR" -Recurse -File -Include '*qt6keychain*.dll' |
+            Select-Object -First 1
+          if (-not $qtKeychain) {
+            throw "qt6keychain DLL not found under QT_ROOT_DIR"
+          }
+          Copy-Item $qtKeychain.FullName src/release/ -Force
+
+          $sqlitePlugin = Join-Path $env:QT_ROOT_DIR "plugins\sqldrivers\qsqlite.dll"
+          if (-not (Test-Path $sqlitePlugin)) {
+            throw "Qt SQLite plugin not found at $sqlitePlugin"
+          }
+          New-Item -ItemType Directory -Force -Path src/release/sqldrivers | Out-Null
+          Copy-Item $sqlitePlugin src/release/sqldrivers/ -Force
       - name: Clean Build Artifacts
         shell: pwsh
         run: |
           cd src/release
           Remove-Item -Force *.obj, *.cpp, *.rc, *.res, *.h, *.qrc -ErrorAction SilentlyContinue
+      - name: Verify Windows deployment
+        shell: pwsh
+        run: |
+          $root = Resolve-Path "src/release"
+
+          $requiredFiles = @(
+            "ngPost.exe",
+            "Qt6Core.dll",
+            "Qt6Gui.dll",
+            "Qt6Network.dll",
+            "Qt6Sql.dll",
+            "Qt6DBus.dll",
+            "Qt6Widgets.dll",
+            "Qt6Charts.dll",
+            "sqldrivers/qsqlite.dll",
+            "platforms/qwindows.dll",
+            "tls/qschannelbackend.dll"
+          )
+          foreach ($rel in $requiredFiles) {
+            $path = Join-Path $root $rel
+            if (-not (Test-Path $path)) {
+              throw "Missing deployed dependency: $rel"
+            }
+          }
+          if (-not (Get-ChildItem $root -File -Filter '*qt6keychain*.dll')) {
+            throw "Missing deployed dependency: qt6keychain DLL"
+          }
+
+          $expectedDlls = @(
+            "Qt6Core.dll",
+            "Qt6Gui.dll",
+            "Qt6Network.dll",
+            "Qt6Sql.dll",
+            "Qt6DBus.dll",
+            "Qt6Widgets.dll",
+            "Qt6Charts.dll"
+          )
+          $dump = & dumpbin /DEPENDENTS "$root\ngPost.exe" 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            $dump | Write-Output
+            throw "dumpbin failed for ngPost.exe"
+          }
+          foreach ($dll in $expectedDlls) {
+            if ($dump -notmatch [regex]::Escape($dll)) {
+              throw "ngPost.exe does not declare expected dependency: $dll"
+            }
+          }
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -190,6 +253,11 @@ jobs:
           # tunnel registration. They run under UAC via Start-Process RunAs.
           New-Item -ItemType Directory -Force -Path "dist/$pkg/scripts/win" | Out-Null
           Copy-Item src/vpn/scripts/win/*.ps1 "dist/$pkg/scripts/win/"
+          foreach ($helper in @("install-wg-tunnel.ps1", "uninstall-wg-tunnel.ps1")) {
+            if (-not (Test-Path "dist/$pkg/scripts/win/$helper")) {
+              throw "Missing Windows VPN helper in package: $helper"
+            }
+          }
           Compress-Archive -Path "dist/$pkg" -DestinationPath "dist/$pkg.zip"
           Get-ChildItem dist
       - name: Build Windows Setup
@@ -625,9 +693,26 @@ jobs:
           cd dist
           APPIMAGE=$(ls *.AppImage)
           ./"$APPIMAGE" --appimage-extract >/dev/null
+          export LD_LIBRARY_PATH="$PWD/squashfs-root/usr/lib:$PWD/squashfs-root/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+          while IFS= read -r -d '' elf; do
+            if file "$elf" | grep -q 'ELF'; then
+              if ldd "$elf" 2>&1 | grep -q 'not found'; then
+                echo "ERROR: unresolved shared libraries for $elf"
+                ldd "$elf" || true
+                exit 1
+              fi
+            fi
+          done < <(find squashfs-root/usr/bin squashfs-root/usr/plugins -type f -perm -111 -print0)
+          for lib in Core Gui Network Widgets Charts Sql DBus; do
+            ls squashfs-root/usr/lib/libQt6${lib}.so* >/dev/null 2>&1 || {
+              echo "ERROR: libQt6${lib} not bundled"; exit 1;
+            }
+          done
           test -f squashfs-root/usr/lib/libssl.so.3    || { echo "ERROR: libssl.so.3 not bundled";    exit 1; }
           test -f squashfs-root/usr/lib/libcrypto.so.3 || { echo "ERROR: libcrypto.so.3 not bundled"; exit 1; }
           ls squashfs-root/usr/lib/libqt6keychain.so* >/dev/null 2>&1 || { echo "ERROR: libqt6keychain not bundled"; exit 1; }
+          test -f squashfs-root/usr/plugins/sqldrivers/libqsqlite.so || { echo "ERROR: Qt SQLite plugin not bundled"; exit 1; }
+          test -f squashfs-root/usr/plugins/platforms/libqxcb.so     || { echo "ERROR: Qt xcb platform plugin not bundled"; exit 1; }
           ls squashfs-root/usr/plugins/tls/ 2>/dev/null || { echo "ERROR: Qt TLS plugins not bundled"; exit 1; }
           # VPN binaries must be present at the path my code looks up first
           test -x squashfs-root/usr/bin/vpn/openvpn      || { echo "ERROR: openvpn not bundled";      exit 1; }

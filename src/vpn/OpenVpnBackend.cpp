@@ -11,6 +11,7 @@
 
 #include "VpnManager.h"
 
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <QHostAddress>
 
@@ -37,6 +38,19 @@ OpenVpnBackend::OpenVpnBackend(QObject *parent)
     , _winDnsIp()
 #endif
 {}
+
+namespace
+{
+QString bundledVpnBinDir()
+{
+#ifdef Q_OS_LINUX
+    QString const dir = QCoreApplication::applicationDirPath() + QStringLiteral("/vpn");
+    if (QFileInfo::exists(dir + QStringLiteral("/openvpn")))
+        return dir;
+#endif
+    return QString();
+}
+}
 
 OpenVpnBackend::~OpenVpnBackend()
 {
@@ -120,6 +134,9 @@ bool OpenVpnBackend::start(QString const &configPathPacked)
 
     QStringList helperArgs;
     helperArgs << helper << "openvpn" << fi.absoluteFilePath();
+    QString const binDir = bundledVpnBinDir();
+    if (!binDir.isEmpty())
+        helperArgs << "--bin-dir" << binDir;
     if (!authFilePath.isEmpty())
         helperArgs << "--auth-file" << authFilePath;
 
