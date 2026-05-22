@@ -716,6 +716,33 @@ void MainWindow::updateAutoPostingParams()
     _autoPostTab->udatePostingParams();
 }
 
+void MainWindow::updateConfigFromUi()
+{
+    if (!_ngPost)
+        return;
+
+    updateParams();
+
+    if (!_quickJobTab || !_autoPostTab)
+        return;
+
+    int currentTabIdx = _ui->postTabWidget->currentIndex();
+    if (currentTabIdx == 0)
+        _quickJobTab->udatePostingParams();
+    else if (currentTabIdx == 1)
+        _autoPostTab->udatePostingParams();
+    else
+    {
+        PostingWidget *postWidget = _getPostWidget(currentTabIdx);
+        if (postWidget)
+            postWidget->udatePostingParams();
+    }
+
+    const bool signalsWereBlocked = _ui->autoCompressCB->blockSignals(true);
+    _ui->autoCompressCB->setChecked(_ngPost->_packAuto);
+    _ui->autoCompressCB->blockSignals(signalsWereBlocked);
+}
+
 QString MainWindow::fixedArchivePassword() const
 {
     if (_ui->rarPassCB->isChecked())
@@ -1632,18 +1659,6 @@ void MainWindow::_onUseVpnToggled(bool checked)
 void MainWindow::onSaveConfig()
 {
     updateServers();
-    updateParams();
-    int currentTabIdx = _ui->postTabWidget->currentIndex();
-    if (currentTabIdx == 0)
-        _quickJobTab->udatePostingParams();
-    else if (currentTabIdx == 1)
-        _autoPostTab->udatePostingParams();
-    else
-    {
-        PostingWidget *postWidget = _getPostWidget(currentTabIdx);
-        if (postWidget)
-            postWidget->udatePostingParams();
-    }
     _ngPost->saveConfig();
 }
 

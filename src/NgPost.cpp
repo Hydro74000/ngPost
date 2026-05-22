@@ -2664,6 +2664,8 @@ QString NgPost::_parseConfig(const QString &configPath)
     QString           parsedActiveVpnProfile;
     QString           legacyVpnConfigPath;
     QString           legacyVpnBackend;
+    bool              parsedPack = false;
+    bool              legacyAutoCompress = false;
 
     QFile file(fileInfo.absoluteFilePath());
     if (file.open(QIODevice::ReadOnly))
@@ -3101,6 +3103,9 @@ QString NgPost::_parseConfig(const QString &configPath)
                     }
                     else if (opt == sOptionNames[Opt::AUTO_COMPRESS])
                     {
+                        val = val.toLower();
+                        if (val == "true" || val == "on" || val == "1")
+                            legacyAutoCompress = true;
                         if (useHMI())
                             _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it."));
                         else
@@ -3110,14 +3115,15 @@ QString NgPost::_parseConfig(const QString &configPath)
                     else if (opt == sOptionNames[Opt::PACK])
                     {
                         val = val.toLower();
+                        parsedPack = true;
                         QStringList packKeywords = val.split(","), wrongKeywords,
-                                allowedKeywords = {sOptionNames[Opt::COMPRESS], sOptionNames[Opt::GEN_NAME],
-                                                    sOptionNames[Opt::GEN_PASS], sOptionNames[Opt::GEN_PAR2]};
+                                parsedKeywords,
+                                allowedKeywords = defaultPackKeywords();
                         for (auto it = packKeywords.cbegin(), itEnd = packKeywords.cend(); it != itEnd; ++it)
                         {
                             QString keyWord = (*it).trimmed();
                             if (allowedKeywords.contains(keyWord))
-                                _packAutoKeywords << keyWord;
+                                parsedKeywords << keyWord;
                             else
                                 wrongKeywords << keyWord.toUpper();
                         }
@@ -3125,8 +3131,12 @@ QString NgPost::_parseConfig(const QString &configPath)
                         if (wrongKeywords.size())
                             err += tr("Wrong keywords for PACK: %1. It should be a subset of (%2)").arg(
                                         wrongKeywords.join(", "), allowedKeywords.join(", ").toUpper());
-                        else if (useHMI())
-                            enableAutoPacking();
+                        else
+                        {
+                            _packAutoKeywords = parsedKeywords;
+                            if (useHMI())
+                                enableAutoPacking();
+                        }
                     }
                     else if (opt == sOptionNames[Opt::RAR_NO_ROOT_FOLDER])
                     {
@@ -3238,6 +3248,12 @@ QString NgPost::_parseConfig(const QString &configPath)
         // Flush any trailing [vpn_profile] block (no [section] header after it).
         flushVpnProfile();
         file.close();
+    }
+
+    if (legacyAutoCompress && !parsedPack)
+    {
+        _packAutoKeywords = defaultPackKeywords();
+        enableAutoPacking();
     }
 
     // Phase 4 — legacy single-profile config (VPN_BACKEND + VPN_CONFIG_PATH).
@@ -3533,6 +3549,11 @@ void NgPost::_showVersionASCII() const
 
 void NgPost::saveConfig()
 {
+#ifdef __USE_HMI__
+    if (_hmi)
+        _hmi->updateConfigFromUi();
+#endif
+
     QString conf = PathHelper::configFilePath();
 
     QFile file(conf);

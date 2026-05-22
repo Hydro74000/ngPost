@@ -566,6 +566,7 @@ private:
 
     void _syntax(char *appName);
     QString _parseConfig(const QString &configPath);
+    static QStringList defaultPackKeywords();
 
 #ifdef __DEBUG__
     void _dumpParams() const;
@@ -863,7 +864,14 @@ QStringList NgPost::parseCombinedArgString(const QString &program)
 void NgPost::enableAutoPacking(bool enable)
 {
     _packAuto = enable;
+    _doCompress = false;
+    _genName = false;
+    _genPass = false;
+    _doPar2 = false;
     if (enable) {
+        if (_packAutoKeywords.isEmpty())
+            _packAutoKeywords = defaultPackKeywords();
+
         for (auto it = _packAutoKeywords.cbegin(), itEnd = _packAutoKeywords.cend(); it != itEnd;
              ++it) {
             QString keyWord = (*it).toLower();
@@ -883,11 +891,6 @@ void NgPost::enableAutoPacking(bool enable)
         if (!_quiet)
 #endif
             _log(tr("PACKing auto using: %1").arg(_packAutoKeywords.join(", ").toUpper()));
-    } else {
-        _doCompress = true;
-        _genName = true;
-        _genPass = true;
-        _doPar2 = true;
     }
 }
 
@@ -905,6 +908,16 @@ int NgPost::immediateSpeedDurationMs()
 QString NgPost::optionName(NgPost::Opt key)
 {
     return sOptionNames.value(key, "");
+}
+
+inline QStringList NgPost::defaultPackKeywords()
+{
+    return {
+        sOptionNames[Opt::COMPRESS],
+        sOptionNames[Opt::GEN_NAME],
+        sOptionNames[Opt::GEN_PASS],
+        sOptionNames[Opt::GEN_PAR2]
+    };
 }
 
 QString NgPost::desc(bool useHTML)

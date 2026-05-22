@@ -141,6 +141,7 @@ public:
     void updateServers();
     void updateParams();
     void updateAutoPostingParams();
+    void updateConfigFromUi();
 
     QString fixedArchivePassword() const;
 

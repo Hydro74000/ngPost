@@ -372,6 +372,7 @@ void AutoPostWidget::udatePostingParams()
     _ngPost->_genName    = _ngPost->_doCompress ? _ui->genNameCB->isChecked() : false;
     _ngPost->_genPass    = _ngPost->_doCompress ? _ui->genPassCB->isChecked() : false;
     _ngPost->_doPar2     = _ui->par2CB->isChecked();
+    _ngPost->_packAuto   = _ngPost->_doCompress || _ngPost->_doPar2;
 
     _ngPost->_tmpPath    = _ui->compressPathEdit->text();
     _ngPost->_rarPath    = _ui->rarEdit->text();
