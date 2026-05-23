@@ -587,12 +587,11 @@ void NntpConnection::onReadyRead()
                 //                _error(err);
                 //#endif
                 emit errorConnecting(tr("[Connection #%1] Error authentication to server %2:%3 "
-                                        "with user '%4' and pass '%5'")
+                                        "with user '%4'")
                                          .arg(_id)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
-                                         .arg(_srvParams.user.c_str())
-                                         .arg(_srvParams.pass.c_str()));
+                                         .arg(_srvParams.user.c_str()));
                 _closeConnection();
             } else {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)

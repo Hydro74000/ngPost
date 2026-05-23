@@ -1310,7 +1310,9 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
 
     // 2.: create rar args (rar a -v50m -ed -ep1 -m0 -hp"$PASS" "$TMP_FOLDER/$RAR_NAME.rar" "${FILES[@]}")
     //    QStringList args = {"a", "-idp", "-ep1", compressLevel, QString("%1/%2.rar").arg(archiveTmpFolder).arg(archiveName)};
-    QStringList args = _rarArgs.split(" ");
+    // Use QProcess::splitCommand so quoted values (paths, switches like -p"my key")
+    // survive intact — plain split(' ') was breaking on any embedded space.
+    QStringList args = QProcess::splitCommand(_rarArgs);
     if (!args.contains("a"))
         args.prepend("a");
     if (!_use7z && !args.contains("-idp"))

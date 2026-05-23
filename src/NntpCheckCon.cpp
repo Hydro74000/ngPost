@@ -254,12 +254,11 @@ void NntpCheckCon::onReadyRead()
         } else if (_postingState == PostingState::AUTH_PASS) {
             if (strncmp(line.constData(), Nntp::getResponse(281), 2) != 0) {
                 emit errorConnecting(tr("[Connection #%1] Error authentication to server %2:%3 "
-                                        "with user '%4' and pass '%5'")
+                                        "with user '%4'")
                                          .arg(_id)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
-                                         .arg(_srvParams.user.c_str())
-                                         .arg(_srvParams.pass.c_str()));
+                                         .arg(_srvParams.user.c_str()));
                 _closeConnection();
             } else {
                 _postingState = PostingState::IDLE;

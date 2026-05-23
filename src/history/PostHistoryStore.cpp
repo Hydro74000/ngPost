@@ -67,13 +67,6 @@ QSqlDatabase dbFor(const QString &connectionName, const QString &dbPath, QString
     return db;
 }
 
-QString sqlQuote(const QString &s)
-{
-    QString out = s;
-    out.replace(QStringLiteral("'"), QStringLiteral("''"));
-    return out;
-}
-
 QString valueString(const QSqlQuery &q, const char *name)
 {
     return q.value(q.record().indexOf(QString::fromLatin1(name))).toString();
@@ -1115,31 +1108,42 @@ QList<PostHistoryStore::PostSummary> PostHistoryStore::listPosts(const ListFilte
         "FROM posts p LEFT JOIN post_groups g ON g.post_id=p.id WHERE 1=1");
 
     if (!f.status.isEmpty())
-        sql += QStringLiteral(" AND p.status='%1'").arg(sqlQuote(f.status));
-    if (!f.search.isEmpty()) {
-        const QString s = QStringLiteral("%%1%").arg(sqlQuote(f.search));
+        sql += QStringLiteral(" AND p.status=:status");
+    if (!f.search.isEmpty())
         sql += QStringLiteral(
-                   " AND (p.nzb_name LIKE '%1' OR p.rar_name LIKE '%1' "
-                   "OR p.nzb_path LIKE '%1')").arg(s);
-    }
+                   " AND (p.nzb_name LIKE :search OR p.rar_name LIKE :search "
+                   "OR p.nzb_path LIKE :search)");
     if (!f.group.isEmpty())
         sql += QStringLiteral(
                    " AND EXISTS (SELECT 1 FROM post_groups pg "
-                   "WHERE pg.post_id=p.id AND pg.group_name='%1')")
-                   .arg(sqlQuote(f.group));
+                   "WHERE pg.post_id=p.id AND pg.group_name=:group)");
     if (f.onlyWithPassword)
         sql += QStringLiteral(" AND p.has_password=1");
     if (f.onlyWithErrors)
         sql += QStringLiteral(" AND p.nb_failed_articles>0");
     if (!f.dateFrom.isEmpty())
-        sql += QStringLiteral(" AND p.created_at>='%1'").arg(sqlQuote(f.dateFrom));
+        sql += QStringLiteral(" AND p.created_at>=:dateFrom");
     if (!f.dateTo.isEmpty())
-        sql += QStringLiteral(" AND p.created_at<='%1T23:59:59'").arg(sqlQuote(f.dateTo));
+        sql += QStringLiteral(" AND p.created_at<=:dateTo");
 
     sql += QStringLiteral(" GROUP BY p.id ORDER BY p.created_at DESC");
 
     QSqlQuery q(db);
-    if (!q.exec(sql)) {
+    if (!q.prepare(sql)) {
+        setError(error, q);
+        return out;
+    }
+    if (!f.status.isEmpty())
+        q.bindValue(QStringLiteral(":status"), f.status);
+    if (!f.search.isEmpty())
+        q.bindValue(QStringLiteral(":search"), QStringLiteral("%%1%").arg(f.search));
+    if (!f.group.isEmpty())
+        q.bindValue(QStringLiteral(":group"), f.group);
+    if (!f.dateFrom.isEmpty())
+        q.bindValue(QStringLiteral(":dateFrom"), f.dateFrom);
+    if (!f.dateTo.isEmpty())
+        q.bindValue(QStringLiteral(":dateTo"), f.dateTo + QStringLiteral("T23:59:59"));
+    if (!q.exec()) {
         setError(error, q);
         return out;
     }
@@ -1221,19 +1225,28 @@ QList<PostHistoryStore::DayStats> PostHistoryStore::statsByDay(const QString &da
         " FROM posts p WHERE 1=1");
 
     if (!dateFrom.isEmpty())
-        sql += QStringLiteral(" AND p.created_at>='%1'").arg(sqlQuote(dateFrom));
+        sql += QStringLiteral(" AND p.created_at>=:dateFrom");
     if (!dateTo.isEmpty())
-        sql += QStringLiteral(" AND p.created_at<='%1T23:59:59'").arg(sqlQuote(dateTo));
+        sql += QStringLiteral(" AND p.created_at<=:dateTo");
     if (!group.isEmpty())
         sql += QStringLiteral(
                    " AND EXISTS (SELECT 1 FROM post_groups pg"
-                   " WHERE pg.post_id=p.id AND pg.group_name='%1')")
-                   .arg(sqlQuote(group));
+                   " WHERE pg.post_id=p.id AND pg.group_name=:group)");
 
     sql += QStringLiteral(" GROUP BY day ORDER BY day ASC");
 
     QSqlQuery q(db);
-    if (!q.exec(sql)) {
+    if (!q.prepare(sql)) {
+        setError(error, q);
+        return out;
+    }
+    if (!dateFrom.isEmpty())
+        q.bindValue(QStringLiteral(":dateFrom"), dateFrom);
+    if (!dateTo.isEmpty())
+        q.bindValue(QStringLiteral(":dateTo"), dateTo + QStringLiteral("T23:59:59"));
+    if (!group.isEmpty())
+        q.bindValue(QStringLiteral(":group"), group);
+    if (!q.exec()) {
         setError(error, q);
         return out;
     }
@@ -1268,14 +1281,22 @@ QList<PostHistoryStore::GroupStats> PostHistoryStore::statsByGroup(const QString
         " FROM post_groups g JOIN posts p ON p.id=g.post_id WHERE 1=1");
 
     if (!dateFrom.isEmpty())
-        sql += QStringLiteral(" AND p.created_at>='%1'").arg(sqlQuote(dateFrom));
+        sql += QStringLiteral(" AND p.created_at>=:dateFrom");
     if (!dateTo.isEmpty())
-        sql += QStringLiteral(" AND p.created_at<='%1T23:59:59'").arg(sqlQuote(dateTo));
+        sql += QStringLiteral(" AND p.created_at<=:dateTo");
 
     sql += QStringLiteral(" GROUP BY g.group_name ORDER BY nb_posts DESC");
 
     QSqlQuery q(db);
-    if (!q.exec(sql)) {
+    if (!q.prepare(sql)) {
+        setError(error, q);
+        return out;
+    }
+    if (!dateFrom.isEmpty())
+        q.bindValue(QStringLiteral(":dateFrom"), dateFrom);
+    if (!dateTo.isEmpty())
+        q.bindValue(QStringLiteral(":dateTo"), dateTo + QStringLiteral("T23:59:59"));
+    if (!q.exec()) {
         setError(error, q);
         return out;
     }
