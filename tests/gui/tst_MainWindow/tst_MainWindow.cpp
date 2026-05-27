@@ -191,7 +191,7 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
           << "RAR_PATH = /bin/true\n"
           << "RAR_MAX = 99\n"
           << "PAR2_PCT = 8\n"
-          << "PAR2_ARGS = --auto-slice-size -r1n*0.6 -m2048M --progress stdout -q\n";
+          << "PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -m2048M --progress stdout -q\n";
     }
 
     int argc = 1;

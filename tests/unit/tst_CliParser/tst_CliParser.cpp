@@ -149,6 +149,10 @@ private slots:
     //! those known values so existing configs stop tripping the slice cap.
     void parpar_legacy_slice_size_uses_auto_slice_size();
 
+    //! Repair configs that were temporarily written with --auto-slice-size
+    //! but without ParPar's required --input-slices value.
+    void parpar_auto_slice_size_without_input_slices_gets_default();
+
     //! GUI PAR2_PCT must override PAR2_ARGS redundancy for par2cmdline too.
     void par2_args_redundancy_override_for_par2cmdline();
 };
@@ -326,12 +330,13 @@ void TestCliParser::resume_commands_accept_aliases_and_dry_run()
 void TestCliParser::par2_args_redundancy_override_for_parpar()
 {
     const QStringList args = PostingJob::buildPar2ArgsForTest(
-        QStringLiteral("--auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q"),
+        QStringLiteral("-s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q"),
         true,
         false,
         8);
 
     QCOMPARE(args, QStringList({
+        QStringLiteral("-s1M"),
         QStringLiteral("--auto-slice-size"),
         QStringLiteral("-r8%"),
         QStringLiteral("-m2048M"),
@@ -351,6 +356,7 @@ void TestCliParser::parpar_default_args_use_auto_slice_size()
         8);
 
     QCOMPARE(args, QStringList({
+        QStringLiteral("-s1M"),
         QStringLiteral("--auto-slice-size"),
         QStringLiteral("-m1024M"),
         QStringLiteral("-r8%"),
@@ -366,6 +372,27 @@ void TestCliParser::parpar_legacy_slice_size_uses_auto_slice_size()
         8);
 
     QCOMPARE(args, QStringList({
+        QStringLiteral("-s1M"),
+        QStringLiteral("--auto-slice-size"),
+        QStringLiteral("-r8%"),
+        QStringLiteral("-m2048M"),
+        QStringLiteral("-p1l"),
+        QStringLiteral("--progress"),
+        QStringLiteral("stdout"),
+        QStringLiteral("-q"),
+    }));
+}
+
+void TestCliParser::parpar_auto_slice_size_without_input_slices_gets_default()
+{
+    const QStringList args = PostingJob::buildPar2ArgsForTest(
+        QStringLiteral("--auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q"),
+        true,
+        false,
+        8);
+
+    QCOMPARE(args, QStringList({
+        QStringLiteral("-s1M"),
         QStringLiteral("--auto-slice-size"),
         QStringLiteral("-r8%"),
         QStringLiteral("-m2048M"),

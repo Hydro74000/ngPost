@@ -75,44 +75,47 @@ bool isInlineRedundancyArg(const QString &arg, bool useMultiPar)
     return trimmed.startsWith(QStringLiteral("-r")) && trimmed.size() > 2;
 }
 
-bool isLegacyParParSliceSizeValue(const QString &arg)
+bool isParParAutoSliceLimitArg(const QString &arg)
 {
+    const QString trimmed = arg.trimmed();
     const QString lowered = arg.trimmed().toLower();
-    return lowered == QStringLiteral("1m") || lowered == QStringLiteral("5m");
+    return trimmed == QStringLiteral("-S")
+           || lowered == QStringLiteral("--auto-slice-size")
+           || lowered.startsWith(QStringLiteral("--max-input-slices"));
 }
 
-void normalizeLegacyParParSliceSize(QStringList &args)
+int parParInputSlicesEndIndex(const QStringList &args)
 {
-    bool hasAutoSliceSize = false;
     for (int i = 0; i < args.size(); ++i) {
-        if (args.at(i).trimmed() == QStringLiteral("--auto-slice-size")) {
-            hasAutoSliceSize = true;
+        const QString trimmed = args.at(i).trimmed();
+        const QString lowered = args.at(i).trimmed().toLower();
+        if (trimmed == QStringLiteral("-s") || lowered == QStringLiteral("--input-slices"))
+            return (i + 1 < args.size()) ? i + 1 : i;
+        if ((trimmed.startsWith(QStringLiteral("-s")) && trimmed.size() > 2)
+            || lowered.startsWith(QStringLiteral("--input-slices=")))
+            return i;
+    }
+    return -1;
+}
+
+void normalizeParParSliceSize(QStringList &args)
+{
+    bool hasSliceLimit = false;
+    for (int i = 0; i < args.size(); ++i) {
+        if (isParParAutoSliceLimitArg(args.at(i))) {
+            hasSliceLimit = true;
             break;
         }
     }
 
-    for (int i = 0; i < args.size(); ++i) {
-        const QString lowered = args.at(i).trimmed().toLower();
-        if (lowered == QStringLiteral("-s1m") || lowered == QStringLiteral("-s5m")) {
-            if (hasAutoSliceSize)
-                args.removeAt(i);
-            else
-                args[i] = QStringLiteral("--auto-slice-size");
-            return;
-        }
-        if (lowered == QStringLiteral("-s")
-            && i + 1 < args.size()
-            && isLegacyParParSliceSizeValue(args.at(i + 1))) {
-            if (hasAutoSliceSize) {
-                args.removeAt(i + 1);
-                args.removeAt(i);
-            } else {
-                args[i] = QStringLiteral("--auto-slice-size");
-                args.removeAt(i + 1);
-            }
-            return;
-        }
+    int inputSlicesEnd = parParInputSlicesEndIndex(args);
+    if (inputSlicesEnd < 0) {
+        args.prepend(QStringLiteral("-s1M"));
+        inputSlicesEnd = 0;
     }
+
+    if (!hasSliceLimit)
+        args.insert(inputSlicesEnd + 1, QStringLiteral("--auto-slice-size"));
 }
 
 QStringList buildPar2Args(const QString &configuredArgs,
@@ -123,7 +126,8 @@ QStringList buildPar2Args(const QString &configuredArgs,
     const QString redundancyArg = par2RedundancyArg(useParPar, useMultiPar, redundancy);
     if (configuredArgs.trimmed().isEmpty()) {
         if (useParPar)
-            return { QStringLiteral("--auto-slice-size"),
+            return { QStringLiteral("-s1M"),
+                     QStringLiteral("--auto-slice-size"),
                      QStringLiteral("-m1024M"),
                      redundancyArg };
         return { QStringLiteral("c"),
@@ -134,7 +138,7 @@ QStringList buildPar2Args(const QString &configuredArgs,
 
     QStringList args = QProcess::splitCommand(configuredArgs);
     if (useParPar)
-        normalizeLegacyParParSliceSize(args);
+        normalizeParParSliceSize(args);
 
     bool hasRedundancy = false;
     for (int i = 0; i < args.size(); ++i) {

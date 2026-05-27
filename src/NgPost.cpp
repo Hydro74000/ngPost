@@ -3827,7 +3827,7 @@ void NgPost::saveConfig()
         stream << "\n"
                << tr("## fixed parameters for the par2 (or alternative) command") << "\n"
                << tr("## you could for exemple use Multipar on Windows") << "\n"
-               << "#PAR2_ARGS = --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q   (for parpar)\n"
+               << "#PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q   (for parpar)\n"
                << "#PAR2_ARGS = c -l -m1024 -r8 -s768000                 (for par2cmdline)\n"
                << "#PAR2_ARGS = create /rr8 /lc40 /lr /rd2 /ss768000     (for Multipar)\n"
                << (_par2Args.isEmpty() ? "" : QString("PAR2_ARGS = %1\n").arg(_par2Args))
