@@ -403,6 +403,7 @@ void PostingWidget::_buildFilesList(QFileInfoList &files, bool &hasFolder)
 void PostingWidget::init()
 {
     _ui->rarMaxCB->setChecked(_ngPost->_useRarMax);
+    _ui->rarMaxCB->setEnabled(true);
 
     _ui->nzbPassCB->setChecked(false);
     onNzbPassToggled(false);
@@ -417,7 +418,7 @@ void PostingWidget::init()
 
     _ui->redundancySB->setRange(0, 100);
     _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
-    _ui->redundancySB->setEnabled(_ngPost->_par2Args.isEmpty());
+    _ui->redundancySB->setEnabled(true);
 
     if (!_ngPost->_rarPassFixed.isEmpty())
     {
@@ -523,8 +524,7 @@ void PostingWidget::udatePostingParams()
 
     // fetch par2 settings
     _ngPost->_doPar2  = _ui->par2CB->isChecked();
-    if (_ngPost->_par2Args.isEmpty())
-        _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
+    _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
 
     _ngPost->_keepRar = _ui->keepRarCB->isChecked();
 

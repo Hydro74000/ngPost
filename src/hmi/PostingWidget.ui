@@ -138,9 +138,6 @@
          </item>
          <item>
           <widget class="QCheckBox" name="rarMaxCB">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
            <property name="toolTip">
             <string/>
            </property>

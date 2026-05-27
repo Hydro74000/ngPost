@@ -138,9 +138,6 @@
          </item>
          <item>
           <widget class="QCheckBox" name="rarMaxCB">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
            <property name="toolTip">
             <string>Check the configuration file and define or comment RAR_MAX to activate/deactivate this feature</string>
            </property>

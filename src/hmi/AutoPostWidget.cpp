@@ -50,6 +50,7 @@ AutoPostWidget::~AutoPostWidget()
 void AutoPostWidget::init()
 {
     _ui->rarMaxCB->setChecked(_ngPost->_useRarMax);
+    _ui->rarMaxCB->setEnabled(true);
 
     _ui->keepRarCB->setChecked(_ngPost->_keepRar);
 
@@ -61,7 +62,7 @@ void AutoPostWidget::init()
 
     _ui->redundancySB->setRange(0, 100);
     _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
-    _ui->redundancySB->setEnabled(_ngPost->_par2Args.isEmpty());
+    _ui->redundancySB->setEnabled(true);
 
     _ui->autoDirEdit->setText(_ngPost->_inputDir);
     _ui->nameLengthSB->setRange(5, 50);
@@ -387,10 +388,10 @@ void AutoPostWidget::udatePostingParams()
         if (ok)
             _ngPost->_rarSize = val;
     }
+    _ngPost->_useRarMax = _ui->rarMaxCB->isChecked();
 
     // fetch par2 settings
-    if (_ngPost->_par2Args.isEmpty())
-        _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
+    _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
 
     QFileInfo inputDir(_ui->autoDirEdit->text());
     if (inputDir.exists() && inputDir.isDir() && inputDir.isWritable())

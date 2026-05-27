@@ -3800,7 +3800,7 @@ void NgPost::saveConfig()
                << tr("## maximum number of archive volumes") << "\n"
                << tr("## we'll use RAR_SIZE except if it genereates too many volumes") << "\n"
                << tr("## in that case we'll update rar_size to be <size of post> / rar_max") << "\n"
-               << "RAR_MAX = " << _rarMax << "\n"
+               << (_useRarMax ? "" : "#") << "RAR_MAX = " << _rarMax << "\n"
                << "\n"
                << tr("##  keep rar folder after posting (otherwise it is automatically deleted uppon successful post)") << "\n"
                << (_keepRar  ? "" : "#") << "KEEP_RAR = true\n"
@@ -3827,7 +3827,7 @@ void NgPost::saveConfig()
         stream << "\n"
                << tr("## fixed parameters for the par2 (or alternative) command") << "\n"
                << tr("## you could for exemple use Multipar on Windows") << "\n"
-               << "#PAR2_ARGS = -s5M -r1n*0.6 -m2048M -p1l --progress stdout -q   (for parpar)\n"
+               << "#PAR2_ARGS = --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q   (for parpar)\n"
                << "#PAR2_ARGS = c -l -m1024 -r8 -s768000                 (for par2cmdline)\n"
                << "#PAR2_ARGS = create /rr8 /lc40 /lr /rd2 /ss768000     (for Multipar)\n"
                << (_par2Args.isEmpty() ? "" : QString("PAR2_ARGS = %1\n").arg(_par2Args))

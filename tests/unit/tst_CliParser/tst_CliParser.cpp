@@ -22,6 +22,7 @@
 #include <QProcessEnvironment>
 
 #include "history/PostHistoryStore.h"
+#include "PostingJob.h"
 #include "TestEnv.h"
 
 #ifndef APP_VERSION
@@ -135,6 +136,21 @@ private slots:
     //! Resume commands should work through dash/underscore aliases and dry-run
     //! without requiring normal posting input.
     void resume_commands_accept_aliases_and_dry_run();
+
+    //! GUI PAR2_PCT must override PAR2_ARGS redundancy while preserving
+    //! ParPar's percentage syntax.
+    void par2_args_redundancy_override_for_parpar();
+
+    //! ParPar's built-in default must let ParPar choose a slice size to stay
+    //! under its hard 32768-slice limit on large posts.
+    void parpar_default_args_use_auto_slice_size();
+
+    //! Older bundled/default configs used a fixed ParPar slice size; normalize
+    //! those known values so existing configs stop tripping the slice cap.
+    void parpar_legacy_slice_size_uses_auto_slice_size();
+
+    //! GUI PAR2_PCT must override PAR2_ARGS redundancy for par2cmdline too.
+    void par2_args_redundancy_override_for_par2cmdline();
 };
 
 void TestCliParser::initTestCase()
@@ -305,6 +321,76 @@ void TestCliParser::resume_commands_accept_aliases_and_dry_run()
     QVERIFY2(allDryRun.stdoutText.contains(QString::number(postId)),
              qPrintable(QStringLiteral("resume-all dry-run output was:\n%1")
                             .arg(allDryRun.stdoutText + allDryRun.stderrText)));
+}
+
+void TestCliParser::par2_args_redundancy_override_for_parpar()
+{
+    const QStringList args = PostingJob::buildPar2ArgsForTest(
+        QStringLiteral("--auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q"),
+        true,
+        false,
+        8);
+
+    QCOMPARE(args, QStringList({
+        QStringLiteral("--auto-slice-size"),
+        QStringLiteral("-r8%"),
+        QStringLiteral("-m2048M"),
+        QStringLiteral("-p1l"),
+        QStringLiteral("--progress"),
+        QStringLiteral("stdout"),
+        QStringLiteral("-q"),
+    }));
+}
+
+void TestCliParser::parpar_default_args_use_auto_slice_size()
+{
+    const QStringList args = PostingJob::buildPar2ArgsForTest(
+        QString(),
+        true,
+        false,
+        8);
+
+    QCOMPARE(args, QStringList({
+        QStringLiteral("--auto-slice-size"),
+        QStringLiteral("-m1024M"),
+        QStringLiteral("-r8%"),
+    }));
+}
+
+void TestCliParser::parpar_legacy_slice_size_uses_auto_slice_size()
+{
+    const QStringList args = PostingJob::buildPar2ArgsForTest(
+        QStringLiteral("-s1M -r1n*0.6 -m2048M -p1l --progress stdout -q"),
+        true,
+        false,
+        8);
+
+    QCOMPARE(args, QStringList({
+        QStringLiteral("--auto-slice-size"),
+        QStringLiteral("-r8%"),
+        QStringLiteral("-m2048M"),
+        QStringLiteral("-p1l"),
+        QStringLiteral("--progress"),
+        QStringLiteral("stdout"),
+        QStringLiteral("-q"),
+    }));
+}
+
+void TestCliParser::par2_args_redundancy_override_for_par2cmdline()
+{
+    const QStringList args = PostingJob::buildPar2ArgsForTest(
+        QStringLiteral("c -l -m1024 -r8 -s768000"),
+        false,
+        false,
+        12);
+
+    QCOMPARE(args, QStringList({
+        QStringLiteral("c"),
+        QStringLiteral("-l"),
+        QStringLiteral("-m1024"),
+        QStringLiteral("-r12"),
+        QStringLiteral("-s768000"),
+    }));
 }
 
 QTEST_MAIN(TestCliParser)

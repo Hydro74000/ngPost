@@ -444,6 +444,10 @@ public:
 
     QString parseDefaultConfig();
 
+#if defined(NGPOST_TESTING) && defined(__USE_HMI__)
+    inline MainWindow *mainWindowForTest() const;
+#endif
+
     bool startPostingJob(PostingJob *job);
 
     void updateGroups(const QString &groups);
@@ -697,6 +701,13 @@ int NgPost::errCode() const
 {
     return static_cast<int>(_err);
 }
+
+#if defined(NGPOST_TESTING) && defined(__USE_HMI__)
+MainWindow *NgPost::mainWindowForTest() const
+{
+    return _hmi;
+}
+#endif
 
 int NgPost::nbThreads() const
 {

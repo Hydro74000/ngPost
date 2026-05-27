@@ -53,7 +53,124 @@ int decimalPadding(uint count)
     return padding;
 }
 
+QString par2RedundancyArg(bool useParPar, bool useMultiPar, uint redundancy)
+{
+    if (useParPar)
+        return QString("-r%1%").arg(redundancy);
+    if (useMultiPar)
+        return QString("/rr%1").arg(redundancy);
+    return QString("-r%1").arg(redundancy);
+}
+
+bool isSeparateRedundancyArg(const QString &arg)
+{
+    return arg.trimmed() == QStringLiteral("-r");
+}
+
+bool isInlineRedundancyArg(const QString &arg, bool useMultiPar)
+{
+    const QString trimmed = arg.trimmed();
+    if (useMultiPar)
+        return trimmed.startsWith(QStringLiteral("/rr"), Qt::CaseInsensitive);
+    return trimmed.startsWith(QStringLiteral("-r")) && trimmed.size() > 2;
+}
+
+bool isLegacyParParSliceSizeValue(const QString &arg)
+{
+    const QString lowered = arg.trimmed().toLower();
+    return lowered == QStringLiteral("1m") || lowered == QStringLiteral("5m");
+}
+
+void normalizeLegacyParParSliceSize(QStringList &args)
+{
+    bool hasAutoSliceSize = false;
+    for (int i = 0; i < args.size(); ++i) {
+        if (args.at(i).trimmed() == QStringLiteral("--auto-slice-size")) {
+            hasAutoSliceSize = true;
+            break;
+        }
+    }
+
+    for (int i = 0; i < args.size(); ++i) {
+        const QString lowered = args.at(i).trimmed().toLower();
+        if (lowered == QStringLiteral("-s1m") || lowered == QStringLiteral("-s5m")) {
+            if (hasAutoSliceSize)
+                args.removeAt(i);
+            else
+                args[i] = QStringLiteral("--auto-slice-size");
+            return;
+        }
+        if (lowered == QStringLiteral("-s")
+            && i + 1 < args.size()
+            && isLegacyParParSliceSizeValue(args.at(i + 1))) {
+            if (hasAutoSliceSize) {
+                args.removeAt(i + 1);
+                args.removeAt(i);
+            } else {
+                args[i] = QStringLiteral("--auto-slice-size");
+                args.removeAt(i + 1);
+            }
+            return;
+        }
+    }
+}
+
+QStringList buildPar2Args(const QString &configuredArgs,
+                          bool useParPar,
+                          bool useMultiPar,
+                          uint redundancy)
+{
+    const QString redundancyArg = par2RedundancyArg(useParPar, useMultiPar, redundancy);
+    if (configuredArgs.trimmed().isEmpty()) {
+        if (useParPar)
+            return { QStringLiteral("--auto-slice-size"),
+                     QStringLiteral("-m1024M"),
+                     redundancyArg };
+        return { QStringLiteral("c"),
+                 QStringLiteral("-l"),
+                 QStringLiteral("-m1024"),
+                 redundancyArg };
+    }
+
+    QStringList args = QProcess::splitCommand(configuredArgs);
+    if (useParPar)
+        normalizeLegacyParParSliceSize(args);
+
+    bool hasRedundancy = false;
+    for (int i = 0; i < args.size(); ++i) {
+        if (isSeparateRedundancyArg(args.at(i))) {
+            args[i] = redundancyArg;
+            if (i + 1 < args.size()
+                && !args.at(i + 1).startsWith(QLatin1Char('-'))
+                && !args.at(i + 1).startsWith(QLatin1Char('/'))) {
+                args.removeAt(i + 1);
+            }
+            hasRedundancy = true;
+            break;
+        }
+        if (isInlineRedundancyArg(args.at(i), useMultiPar)) {
+            args[i] = redundancyArg;
+            hasRedundancy = true;
+            break;
+        }
+    }
+
+    if (!hasRedundancy)
+        args << redundancyArg;
+    return args;
+}
+
 } // namespace
+
+#ifdef NGPOST_TESTING
+QStringList PostingJob::buildPar2ArgsForTest(const QString &configuredArgs,
+                                             bool useParPar,
+                                             bool useMultiPar,
+                                             uint redundancy)
+{
+    return buildPar2Args(configuredArgs, useParPar, useMultiPar, redundancy);
+}
+#endif
 
 PostingJob::PostingJob(NgPost *ngPost,
                        const QString &nzbFilePath,
@@ -1479,25 +1596,16 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
 
     bool useParPar = _ngPost->useParPar();
 
-    QStringList args;
-    if (_ngPost->_par2Args.isEmpty())
-    {
-        if (useParPar)
-            // parpar has no `c` subcommand, no `-l`, requires `-s`, and
-            // interprets bare `-r8` as 8 slices — append `%` for percent.
-            args << QString("-s1M") << QString("-m1024M")
-                 << QString("-r%1%").arg(redundancy);
-        else
-            args << "c" << "-l" << "-m1024" << QString("-r%1").arg(redundancy);
-    }
-    else
-        args << _ngPost->_par2Args.split(" ");
+    QStringList args = buildPar2Args(_ngPost->_par2Args,
+                                     useParPar,
+                                     _ngPost->useMultiPar(),
+                                     redundancy);
 
     QString archiveTmpFolder = QString("%1/%2").arg(tmpFolder, archiveName);
 
     // we've already compressed => we gen par2 for the files in the archive folder
     if (_extProc) {
-        if (useParPar && args.last().trimmed() != "-o")
+        if (useParPar && (args.isEmpty() || args.last().trimmed() != "-o"))
             args << "-o";
         args << QString("%1/%2.par2").arg(archiveTmpFolder, archiveName);
         if (useParPar)
@@ -1516,7 +1624,7 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
         QString basePath = _files.first().absolutePath();
         if (useParPar) {
             args << "-f" << "basename";
-            if (args.last().trimmed() != "-o")
+            if (args.isEmpty() || args.last().trimmed() != "-o")
                 args << "-o";
             args << QString("%1/%2.par2").arg(archiveTmpFolder, archiveName);
         } else {

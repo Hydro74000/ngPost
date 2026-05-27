@@ -259,6 +259,13 @@ public:
     void recordHistoryArticleFailed(NntpArticle *article, const QString &reason);
     void recordHistoryArticleUnknown(NntpArticle *article, const QString &reason);
 
+#ifdef NGPOST_TESTING
+    static QStringList buildPar2ArgsForTest(const QString &configuredArgs,
+                                            bool useParPar,
+                                            bool useMultiPar,
+                                            uint redundancy);
+#endif
+
 signals:
     void startPosting(
         bool isActiveJob); //!< connected to onStartPosting (to be able to run on a different Thread)

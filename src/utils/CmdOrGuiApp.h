@@ -30,6 +30,7 @@ protected:
     enum class AppMode : bool {CMD = 0, HMI = 1}; //!< supposed to be CMD but a simple HMI has been added
 
     QCoreApplication  *_app;  //!< Application instance (either a QCoreApplication or a QApplication in HMI mode)
+    bool               _ownsApp;
 #ifdef __USE_HMI__
     const AppMode      _mode; //!< CMD or HMI (for Windowser...)
     MainWindow        *_hmi;  //!< potential HMI
