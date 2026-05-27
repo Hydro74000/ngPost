@@ -6,10 +6,18 @@
 
 #include <QtTest>
 #include <QDir>
+#include <QHostAddress>
+#include <QList>
+#include <QObject>
+#include <QString>
 
 #include "TestEnv.h"
 #include "utils/PathHelper.h"
+
+#define private public
 #include "vpn/VpnManager.h"
+#undef private
+
 #include "vpn/VpnProfile.h"
 
 using ngpost::tests::HomeSandbox;
@@ -41,6 +49,12 @@ private slots:
 
     //! Unknown backend strings set ok=false and fall back to OpenVPN.
     void backendFromString_unknown_sets_ok_false();
+
+    //! The profile selected for a running connection must stay fixed until
+    //! the tunnel reaches a terminal state.
+    void runtime_profile_overrides_active_profile();
+    void start_rejects_switching_profile_while_connection_in_progress();
+    void runtime_profile_is_protected_while_connection_is_in_progress();
 };
 
 void TestVpnProfile::default_profile_is_invalid()
@@ -150,6 +164,96 @@ void TestVpnProfile::backendFromString_unknown_sets_ok_false()
     ok = true;
     VpnManager::backendFromString(QString(), &ok);
     QVERIFY(!ok);
+}
+
+void TestVpnProfile::runtime_profile_overrides_active_profile()
+{
+    HomeSandbox sandbox;
+
+    VpnProfile primary;
+    primary.name = QStringLiteral("Primary");
+    primary.backend = VpnManager::Backend::OpenVPN;
+    primary.configFileName = QStringLiteral("primary.ovpn");
+
+    VpnProfile backup;
+    backup.name = QStringLiteral("Backup");
+    backup.backend = VpnManager::Backend::WireGuard;
+    backup.configFileName = QStringLiteral("backup.conf");
+
+    VpnManager manager;
+    manager.setProfilesFromConfig({ primary, backup }, primary.name);
+
+    QCOMPARE(manager.activeProfileName(), primary.name);
+    QCOMPARE(manager.backend(), VpnManager::Backend::OpenVPN);
+    QCOMPARE(manager.configPath(), primary.absoluteConfigPath());
+
+    manager._runtimeProfileName = backup.name;
+    QCOMPARE(manager.runtimeProfileName(), backup.name);
+    QCOMPARE(manager.backend(), VpnManager::Backend::WireGuard);
+    QCOMPARE(manager.configPath(), backup.absoluteConfigPath());
+    QVERIFY(manager.configPath().startsWith(sandbox.rootPath()));
+}
+
+void TestVpnProfile::start_rejects_switching_profile_while_connection_in_progress()
+{
+    VpnProfile primary;
+    primary.name = QStringLiteral("Primary");
+    primary.configFileName = QStringLiteral("primary.ovpn");
+
+    VpnProfile backup;
+    backup.name = QStringLiteral("Backup");
+    backup.configFileName = QStringLiteral("backup.ovpn");
+
+    for (VpnManager::State state : { VpnManager::State::Starting,
+                                     VpnManager::State::Connected,
+                                     VpnManager::State::Stopping }) {
+        VpnManager manager;
+        manager.setProfilesFromConfig({ primary, backup }, primary.name);
+        manager._state = state;
+        manager._runtimeProfileName = primary.name;
+
+        QVERIFY2(manager.start(primary.name),
+                 qPrintable(QStringLiteral("start should accept the already-running profile in %1")
+                             .arg(VpnManager::stateToString(state))));
+        QVERIFY2(!manager.start(backup.name),
+                 qPrintable(QStringLiteral("start should reject a profile switch in %1")
+                             .arg(VpnManager::stateToString(state))));
+        QCOMPARE(manager.runtimeProfileName(), primary.name);
+    }
+}
+
+void TestVpnProfile::runtime_profile_is_protected_while_connection_is_in_progress()
+{
+    VpnProfile primary;
+    primary.name = QStringLiteral("Primary");
+    primary.configFileName = QStringLiteral("primary.ovpn");
+
+    VpnProfile replacement = primary;
+    replacement.configFileName = QStringLiteral("primary-updated.ovpn");
+
+    for (VpnManager::State state : { VpnManager::State::Starting,
+                                     VpnManager::State::Connected,
+                                     VpnManager::State::Stopping }) {
+        VpnManager manager;
+        manager.setProfilesFromConfig({ primary }, primary.name);
+        manager._state = state;
+        manager._runtimeProfileName = primary.name;
+
+        QVERIFY(manager.isProfileInUse(primary.name));
+        QVERIFY(!manager.updateProfile(primary.name, replacement));
+        QVERIFY(!manager.removeProfile(primary.name));
+        QCOMPARE(manager.profiles().first().configFileName, primary.configFileName);
+    }
+
+    for (VpnManager::State state : { VpnManager::State::Disabled,
+                                     VpnManager::State::Failed }) {
+        VpnManager manager;
+        manager.setProfilesFromConfig({ primary }, primary.name);
+        manager._state = state;
+        manager._runtimeProfileName = primary.name;
+
+        QVERIFY(!manager.isProfileInUse(primary.name));
+    }
 }
 
 QTEST_APPLESS_MAIN(TestVpnProfile)

@@ -57,6 +57,7 @@ VpnManager::VpnManager(QObject *parent)
     , _tunPollAttempts(0)
     , _profiles()
     , _activeProfileName()
+    , _runtimeProfileName()
     , _runtimeAuthFilePath()
     , _autoStartedByJob(false)
     , _activeJobsNeedingVpn(0)
@@ -85,13 +86,17 @@ void VpnManager::setAutoConnect(bool v)
 
 VpnManager::Backend VpnManager::backend() const
 {
-    VpnProfile const *p = activeProfile();
+    VpnProfile const *p = runtimeProfile();
+    if (!p)
+        p = activeProfile();
     return p ? p->backend : Backend::OpenVPN;
 }
 
 QString VpnManager::configPath() const
 {
-    VpnProfile const *p = activeProfile();
+    VpnProfile const *p = runtimeProfile();
+    if (!p)
+        p = activeProfile();
     return p ? p->absoluteConfigPath() : QString();
 }
 
@@ -101,6 +106,21 @@ VpnProfile const *VpnManager::activeProfile() const
 {
     int idx = findProfileIndex(_activeProfileName);
     return idx >= 0 ? &_profiles.at(idx) : nullptr;
+}
+
+VpnProfile const *VpnManager::runtimeProfile() const
+{
+    int idx = findProfileIndex(_runtimeProfileName);
+    return idx >= 0 ? &_profiles.at(idx) : nullptr;
+}
+
+bool VpnManager::isProfileInUse(QString const &name) const
+{
+    if (name.isEmpty() || _runtimeProfileName != name)
+        return false;
+    return _state == State::Starting
+        || _state == State::Connected
+        || _state == State::Stopping;
 }
 
 int VpnManager::findProfileIndex(QString const &name) const
@@ -144,6 +164,7 @@ bool VpnManager::updateProfile(QString const &oldName, VpnProfile const &p)
 {
     int idx = findProfileIndex(oldName);
     if (idx < 0 || !p.isValid()) return false;
+    if (isProfileInUse(oldName)) return false;
     // If renaming, ensure the new name doesn't collide with another profile.
     if (p.name != oldName && findProfileIndex(p.name) >= 0) return false;
     _profiles[idx] = p;
@@ -158,6 +179,7 @@ bool VpnManager::removeProfile(QString const &name)
 {
     int idx = findProfileIndex(name);
     if (idx < 0) return false;
+    if (isProfileInUse(name)) return false;
     VpnProfile victim = _profiles.takeAt(idx);
 
 #ifdef Q_OS_WIN
@@ -268,14 +290,21 @@ QString writeAuthFile(QString const &user, QString const &pass)
 }
 } // namespace
 
-bool VpnManager::start()
+bool VpnManager::start(QString const &profileName)
 {
-    if (_state == State::Starting || _state == State::Connected)
+    if (_state == State::Starting || _state == State::Connected || _state == State::Stopping) {
+        if (!profileName.isEmpty() && profileName != _runtimeProfileName)
+            return false;
         return true;
+    }
 
-    VpnProfile const *p = activeProfile();
+    const QString chosenProfile = profileName.isEmpty() ? _activeProfileName : profileName;
+    _runtimeProfileName = chosenProfile;
+
+    VpnProfile const *p = runtimeProfile();
     if (!p) {
-        emit logLine(tr("VPN: no active profile — nothing to start"));
+        emit logLine(tr("VPN: no profile selected — nothing to start"));
+        _runtimeProfileName.clear();
         _setState(State::Failed);
         return false;
     }
@@ -283,12 +312,14 @@ bool VpnManager::start()
     QString cfgPath = p->absoluteConfigPath();
     if (cfgPath.isEmpty() || !QFile::exists(cfgPath)) {
         emit logLine(tr("VPN: config file missing for profile '%1' (%2)").arg(p->name, cfgPath));
+        _runtimeProfileName.clear();
         _setState(State::Failed);
         return false;
     }
 
     _instantiateBackend();
     if (!_currentBackend) {
+        _runtimeProfileName.clear();
         _setState(State::Failed);
         return false;
     }
@@ -326,6 +357,7 @@ bool VpnManager::start()
         packed += QChar(QChar::Null) + authFilePath;
 
     if (!_currentBackend->start(packed)) {
+        _runtimeProfileName.clear();
         _setState(State::Failed);
         _destroyBackend();
         _shredRuntimeAuthFile();
@@ -359,8 +391,10 @@ void VpnManager::stop()
     _setState(State::Stopping);
     if (_currentBackend)
         _currentBackend->stop();
-    else
+    else {
+        _runtimeProfileName.clear();
         _setState(State::Disabled);
+    }
 }
 
 void VpnManager::onBackendReady(QString const &iface, QHostAddress const &ip,
@@ -461,9 +495,10 @@ void VpnManager::onBackendFailed(QString const &reason)
     _tunIp = QHostAddress();
     _tunIface.clear();
     _dnsServer = QHostAddress();
-    _setState(State::Failed);
     _destroyBackend();
     _shredRuntimeAuthFile();
+    _runtimeProfileName.clear();
+    _setState(State::Failed);
 
     // If a job was waiting on us, surface the failure so the GUI can popup.
     if (_activeJobsNeedingVpn > 0) {
@@ -482,6 +517,7 @@ void VpnManager::onBackendStopped()
     _tunIp = QHostAddress();
     _tunIface.clear();
     _dnsServer = QHostAddress();
+    _runtimeProfileName.clear();
     _setState(State::Disabled);
     _destroyBackend();
     _shredRuntimeAuthFile();
@@ -504,7 +540,9 @@ void VpnManager::_instantiateBackend()
 {
     _destroyBackend();
 
-    VpnProfile const *p = activeProfile();
+    VpnProfile const *p = runtimeProfile();
+    if (!p)
+        p = activeProfile();
     Backend backend = p ? p->backend : Backend::OpenVPN;
 
 #if defined(Q_OS_LINUX)

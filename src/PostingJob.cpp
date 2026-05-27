@@ -35,6 +35,7 @@
 #include <QMetaObject>
 #include <QMutex>
 #include <QProcess>
+#include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QThread>
 #include <algorithm>
@@ -1186,9 +1187,8 @@ void PostingJob::_initPosting()
         if (useResumeState && !resumeState.groups.isEmpty()) {
             fileGroups = resumeState.groups;
         } else {
-            fileGroups = _obfuscateArticles && _ngPost->groupPolicyPerFile()
-                         && nbGroups > 1
-                ? QStringList(_grpList.at(std::rand() % nbGroups))
+            fileGroups = _ngPost->groupPolicyPerFile() && nbGroups > 1
+                ? QStringList(_grpList.at(QRandomGenerator::global()->bounded(nbGroups)))
                 : _grpList;
         }
 

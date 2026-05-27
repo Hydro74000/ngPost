@@ -43,7 +43,7 @@ public:
     explicit VpnManager(QObject *parent = nullptr);
     ~VpnManager() override;
 
-    bool          start();
+    bool          start(QString const &profileName = QString());
     void          stop();
     State         state() const { return _state; }
     QHostAddress  tunIp() const { return _tunIp; }
@@ -72,7 +72,10 @@ public:
     //! Profile management.
     QList<VpnProfile> const &profiles() const { return _profiles; }
     VpnProfile const *activeProfile() const;
+    VpnProfile const *runtimeProfile() const;
     QString  activeProfileName() const { return _activeProfileName; }
+    QString  runtimeProfileName() const { return _runtimeProfileName; }
+    bool     isProfileInUse(QString const &name) const;
     void     setActiveProfileName(QString const &name); // emits configChanged
     int      findProfileIndex(QString const &name) const;
 
@@ -239,6 +242,7 @@ private:
 
     QList<VpnProfile> _profiles;
     QString           _activeProfileName;
+    QString           _runtimeProfileName;
 
     //! Path to the short-lived auth-user-pass file we created for the
     //! currently-running openvpn invocation, if any. Empty otherwise.

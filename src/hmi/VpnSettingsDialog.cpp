@@ -27,8 +27,15 @@ VpnSettingsDialog::VpnSettingsDialog(VpnManager *manager, QWidget *parent)
     , _populating(false)
 {
     _ui->setupUi(this);
+    setWindowTitle(tr("VPN actions"));
 
-    _ui->autoConnectCB->setChecked(_manager->autoConnect());
+    _ui->setupBox->hide();
+    _ui->optionsBox->hide();
+    _ui->newProfileBtn->hide();
+    _ui->editProfileBtn->hide();
+    _ui->deleteProfileBtn->hide();
+    _ui->profilesBox->setTitle(tr("Connection"));
+    _ui->profileLabel->setText(tr("Profile to connect:"));
 
     connect(_ui->startBtn,         &QPushButton::clicked, this, &VpnSettingsDialog::onStart);
     connect(_ui->stopBtn,          &QPushButton::clicked, this, &VpnSettingsDialog::onStop);
@@ -60,26 +67,22 @@ VpnSettingsDialog::~VpnSettingsDialog()
 
 void VpnSettingsDialog::onAutoConnectToggled(bool checked)
 {
-    _manager->setAutoConnect(checked);
+    Q_UNUSED(checked);
 }
 
 void VpnSettingsDialog::onActiveProfileChanged(int idx)
 {
-    if (_populating || idx < 0)
-        return;
-    QString name = _ui->profileCB->itemData(idx).toString();
-    if (name.isEmpty())
-        name = _ui->profileCB->currentText();
-    _manager->setActiveProfileName(name);
+    Q_UNUSED(idx);
 }
 
 void VpnSettingsDialog::onStart()
 {
-    if (!_manager->activeProfile()) {
-        onLogLine(tr("No active VPN profile selected."));
+    const QString name = _ui->profileCB->currentData().toString();
+    if (name.isEmpty()) {
+        onLogLine(tr("No VPN profile selected."));
         return;
     }
-    _manager->start();
+    _manager->start(name);
 }
 
 void VpnSettingsDialog::onStop()
@@ -181,17 +184,18 @@ void VpnSettingsDialog::_refreshUi()
     _ui->stateLabel->setText(text);
 
     bool installed = _manager->isHelperInstalled();
-    bool hasActive = (_manager->activeProfile() != nullptr);
+    bool hasActive = !_ui->profileCB->currentData().toString().isEmpty();
     bool canStart  = installed && hasActive
                   && (s == VpnManager::State::Disabled || s == VpnManager::State::Failed);
     bool canStop   = (s == VpnManager::State::Connected || s == VpnManager::State::Starting);
     _ui->startBtn->setEnabled(canStart);
     _ui->stopBtn->setEnabled(canStop);
-    _ui->profilesBox->setEnabled(installed);
-    _ui->optionsBox->setEnabled(installed);
+    _ui->profilesBox->setEnabled(true);
+    _ui->profileCB->setEnabled(s == VpnManager::State::Disabled || s == VpnManager::State::Failed);
+    _ui->optionsBox->setEnabled(false);
 
-    _ui->editProfileBtn->setEnabled(hasActive);
-    _ui->deleteProfileBtn->setEnabled(hasActive);
+    _ui->editProfileBtn->setEnabled(false);
+    _ui->deleteProfileBtn->setEnabled(false);
 }
 
 void VpnSettingsDialog::_refreshSetupUi()
@@ -220,7 +224,9 @@ void VpnSettingsDialog::_refreshProfilesUi()
             VpnManager::backendToString(p.backend));
         _ui->profileCB->addItem(label, p.name);
     }
-    QString active = _manager->activeProfileName();
+    QString active = _manager->runtimeProfileName();
+    if (active.isEmpty())
+        active = _manager->activeProfileName();
     if (!active.isEmpty()) {
         int idx = _manager->findProfileIndex(active);
         if (idx >= 0)

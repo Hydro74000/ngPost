@@ -153,6 +153,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 
     {Opt::SERVER,       "server"},
     {Opt::HOST,         "host"},
+    {Opt::SERVER_LABEL, "label"},
     {Opt::PORT,         "port"},
     {Opt::SSL,          "ssl"},
     {Opt::USER,         "user"},
@@ -233,6 +234,7 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
 // general options
     {{"x", sOptionNames[Opt::OBFUSCATE]},     tr("obfuscate the subjects of the articles (CAREFUL you won't find your post if you lose the nzb file)")},
     {{"g", sOptionNames[Opt::GROUPS]},        tr("newsgroups where to post the files (coma separated without space)"), sOptionNames[Opt::GROUPS]},
+    { sOptionNames[Opt::GROUP_POLICY],        tr("newsgroup selection policy: all, each_post or each_file"), sOptionNames[Opt::GROUP_POLICY]},
     {{"m", sOptionNames[Opt::META]},          tr("extra meta data in header (typically \"password=qwerty42\")"), sOptionNames[Opt::META]},
     {{"f", sOptionNames[Opt::FROM]},          tr("poster email (random one if not provided)"), sOptionNames[Opt::FROM]},
     {{"a", sOptionNames[Opt::ARTICLE_SIZE]},  tr("article size (default one: %1)").arg(sDefaultArticleSize), sOptionNames[Opt::ARTICLE_SIZE]},
@@ -1164,7 +1166,11 @@ void NgPost::updateGroups(const QString &groups)
 {
     _grpList.clear();
     for (const QString &grp : groups.split(","))
-        _grpList << grp;
+    {
+        const QString trimmed = grp.trimmed();
+        if (!trimmed.isEmpty())
+            _grpList << trimmed;
+    }
     _nbGroups = _grpList.size();
 }
 
@@ -2244,6 +2250,23 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (parser.isSet(sOptionNames[Opt::GROUPS]))
         updateGroups(parser.value(sOptionNames[Opt::GROUPS]));
 
+    if (parser.isSet(sOptionNames[Opt::GROUP_POLICY]))
+    {
+        const QString val = parser.value(sOptionNames[Opt::GROUP_POLICY]).trimmed().toLower();
+        if (val == sGroupPolicies[GROUP_POLICY::ALL])
+            _groupPolicy = GROUP_POLICY::ALL;
+        else if (val == sGroupPolicies[GROUP_POLICY::EACH_POST])
+            _groupPolicy = GROUP_POLICY::EACH_POST;
+        else if (val == sGroupPolicies[GROUP_POLICY::EACH_FILE])
+            _groupPolicy = GROUP_POLICY::EACH_FILE;
+        else
+        {
+            _error(tr("You should give a valid group policy: all, each_post or each_file"),
+                   ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+    }
+
     if (parser.isSet(sOptionNames[Opt::FROM]))
     {
         QString val = parser.value(sOptionNames[Opt::FROM]);
@@ -3187,6 +3210,11 @@ QString NgPost::_parseConfig(const QString &configPath)
                     {
                         serverParams->host = val;
                     }
+                    else if (opt == sOptionNames[Opt::SERVER_LABEL]
+                             || opt == QStringLiteral("caption"))
+                    {
+                        serverParams->label = val;
+                    }
                     else if (opt == sOptionNames[Opt::PORT])
                     {
                         ushort nb = val.toUShort(&ok);
@@ -3850,6 +3878,7 @@ void NgPost::saveConfig()
         for (NntpServerParams *param : _nntpServers)
         {
             stream << "[server]\n"
+                   << "label = " << param->label.trimmed() << "\n"
                    << "host = " << param->host << "\n"
                    << "port = " << param->port << "\n"
                    << "ssl  = " << (param->useSSL ? "true" : "false") << "\n"

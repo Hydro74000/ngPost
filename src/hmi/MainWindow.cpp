@@ -22,6 +22,7 @@
 #include "PostingWidget.h"
 #include "AutoPostWidget.h"
 #include "NgPost.h"
+#include "SettingsDialog.h"
 #include "VpnSettingsDialog.h"
 #include "history/PostHistoryService.h"
 #include "history/PostHistoryStore.h"
@@ -49,6 +50,7 @@
 #include <QScrollArea>
 #include <QSplitter>
 #include <QTableWidget>
+#include <QTableWidgetItem>
 #include <QTabWidget>
 #include <QTextStream>
 #include <QVBoxLayout>
@@ -88,17 +90,11 @@ const QColor  MainWindow::sArticlesFailedColor  = Qt::darkYellow;
 
 
 const QList<const char *> MainWindow::sServerListHeaders = {
-    QT_TRANSLATE_NOOP("MainWindow", "on"),
-    QT_TRANSLATE_NOOP("MainWindow", "Host (name or IP)"),
-    QT_TRANSLATE_NOOP("MainWindow", "Port"),
-    QT_TRANSLATE_NOOP("MainWindow", "SSL"),
-    QT_TRANSLATE_NOOP("MainWindow", "Use VPN"),
-    QT_TRANSLATE_NOOP("MainWindow", "Connections"),
-    QT_TRANSLATE_NOOP("MainWindow", "Username"),
-    QT_TRANSLATE_NOOP("MainWindow", "Password"),
-    "" // for the delete button
+    QT_TRANSLATE_NOOP("MainWindow", "Use"),
+    QT_TRANSLATE_NOOP("MainWindow", "Server"),
+    QT_TRANSLATE_NOOP("MainWindow", "VPN")
 };
-const QVector<int> MainWindow::sServerListSizes   = {30, 200, 50, 30, 60, 100, 150, 150, sDeleteColumnWidth};
+const QVector<int> MainWindow::sServerListSizes   = {40, 240, 140};
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -259,12 +255,12 @@ void MainWindow::logError(const QString &error) const
 
 bool MainWindow::useFixedPassword() const
 {
-    return _ui->rarPassCB->isChecked();
+    return _ngPost && !_ngPost->_rarPassFixed.isEmpty();
 }
 
 bool MainWindow::hasAutoCompress() const
 {
-    return _ui->autoCompressCB->isChecked();
+    return _ngPost && _ngPost->_packAuto;
 }
 
 #include <QKeyEvent>
@@ -365,6 +361,14 @@ void MainWindow::changeEvent(QEvent *event)
             _ui->fileBox->setTitle(tr("Files"));
             _ui->postingBox->setTitle(tr("Parameters"));
             _ui->logBox->setTitle(tr("Posting Log"));
+            _refreshMainConfigTexts();
+            if (_groupPolicyCB) {
+                const int idx = _groupPolicyCB->currentIndex();
+                _groupPolicyCB->setItemText(0, tr("All groups"));
+                _groupPolicyCB->setItemText(1, tr("One group per post"));
+                _groupPolicyCB->setItemText(2, tr("One group per file"));
+                _groupPolicyCB->setCurrentIndex(idx);
+            }
 
             tabBar->setTabText(0, _ngPost->quickJobName());
             tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
@@ -406,7 +410,8 @@ void MainWindow::changeEvent(QEvent *event)
 #include "CheckBoxCenterWidget.h"
 void MainWindow::onAddServer()
 {
-    _addServer(nullptr);
+    if (_ngPost)
+        onSettingsClicked();
 }
 
 void MainWindow::onDelServer()
@@ -543,24 +548,53 @@ void MainWindow::_initServerBox()
 {
     _ui->serversTable->verticalHeader()->hide();
     _ui->serversTable->setColumnCount(sServerListHeaders.size());
+    QStringList serverTableHeader;
+    for (const char *header : sServerListHeaders)
+        serverTableHeader << tr(header);
+    _ui->serversTable->setHorizontalHeaderLabels(serverTableHeader);
+    _ui->serversTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    _ui->serversTable->setSelectionMode(QAbstractItemView::NoSelection);
 
-    int width = 2, col = 0;
+    int col = 0;
     for (int size : sServerListSizes)
-    {
         _ui->serversTable->setColumnWidth(col++, size);
-        width += size;
-    }
 //    _ui->serversTable->setMaximumWidth(width);
 
-    connect(_ui->addServerButton,   &QAbstractButton::clicked, this, &MainWindow::onAddServer);
+    connect(_ui->addServerButton, &QAbstractButton::clicked, this, &MainWindow::onSettingsClicked);
 
-    for (NntpServerParams *srv : _ngPost->_nntpServers)
-        _addServer(srv);
+    refreshServerSelection();
 }
 
 
 void MainWindow::_initPostingBox()
 {
+    _setGlobalConfigWidgetsVisible(false);
+    _refreshMainConfigTexts();
+
+    if (!_groupPolicyCB) {
+        _groupPolicyCB = new QComboBox(_ui->postingBox);
+        _groupPolicyCB->setObjectName(QStringLiteral("groupPolicyCB"));
+        _ui->groupsLayout->addWidget(_groupPolicyCB);
+    }
+    _groupPolicyCB->clear();
+    _groupPolicyCB->addItem(tr("All groups"), 0);
+    _groupPolicyCB->addItem(tr("One group per post"), 1);
+    _groupPolicyCB->addItem(tr("One group per file"), 2);
+    if (_ngPost->_groupPolicy == NgPost::GROUP_POLICY::EACH_POST)
+        _groupPolicyCB->setCurrentIndex(1);
+    else if (_ngPost->_groupPolicy == NgPost::GROUP_POLICY::EACH_FILE)
+        _groupPolicyCB->setCurrentIndex(2);
+    else
+        _groupPolicyCB->setCurrentIndex(0);
+
+    if (!_settingsButton) {
+        _settingsButton = new QPushButton(QIcon(":/icons/save.png"), tr("Settings..."), _ui->postingBox);
+        _settingsButton->setObjectName(QStringLiteral("settingsButton"));
+        _settingsButton->setToolTip(tr("Open application settings"));
+        _ui->horizontalLayout_8->insertWidget(_ui->horizontalLayout_8->count() - 1, _settingsButton);
+        connect(_settingsButton, &QPushButton::clicked, this, &MainWindow::onSettingsClicked);
+    }
+
     connect(_ui->shutdownCB,        &QAbstractButton::toggled, this, &MainWindow::onShutdownToggled);
     connect(_ui->saveButton,        &QAbstractButton::clicked, this, &MainWindow::onSaveConfig);
 
@@ -625,88 +659,104 @@ void MainWindow::_initPostingBox()
     connect(_ui->nzbPathButton, &QAbstractButton::clicked, this, &MainWindow::onNzbPathClicked);
 }
 
+void MainWindow::_refreshMainConfigTexts()
+{
+    _ui->uniqueFromCB->setText(tr("Utiliser une adresse mail aléatoire pour poster"));
+    _ui->uniqueFromCB->setToolTip(tr("generate a new random email for each Post"));
+    _ui->addServerButton->setText(tr("Settings..."));
+    _ui->addServerButton->setToolTip(tr("Declare servers and application settings"));
+    if (_settingsButton) {
+        _settingsButton->setText(tr("Settings..."));
+        _settingsButton->setToolTip(tr("Open application settings"));
+    }
+}
+
+void MainWindow::_setGlobalConfigWidgetsVisible(bool visible)
+{
+    const QList<QWidget*> widgets = {
+        _ui->fromLbl, _ui->fromEdit, _ui->genPoster, _ui->saveFromCB,
+        _ui->rarPassCB, _ui->rarPassEdit, _ui->rarLengthSB, _ui->genPass,
+        _ui->articleSizeLbl, _ui->articleSizeEdit, _ui->nbRetryLbl,
+        _ui->nbRetrySB, _ui->threadLbl, _ui->threadSB,
+        _ui->obfuscateMsgIdCB, _ui->obfuscateFileNameCB,
+        _ui->autoCompressCB, _ui->autoCloseCB,
+        _ui->keepNfoExtensionCB, _ui->checkForUpdatesCB,
+        _ui->nzbPathLbl, _ui->nzbPathEdit, _ui->nzbPathButton,
+        _ui->langLbl, _ui->langCB,
+        _ui->frame_2, _ui->frame_3, _ui->frame_4
+    };
+    for (QWidget *widget : widgets)
+        if (widget)
+            widget->setVisible(visible);
+}
+
 void MainWindow::updateServers()
 {
-    qDeleteAll(_ngPost->_nntpServers);
-    _ngPost->_nntpServers.clear();
-
-    int nbRows = _ui->serversTable->rowCount();
-    for (int row = 0 ; row < nbRows; ++row)
-    {
-        int col = 0;
-        bool isEnabled =  static_cast<CheckBoxCenterWidget*>(_ui->serversTable->cellWidget(row, col++))->isChecked();
-
-        QLineEdit *hostEdit = static_cast<QLineEdit*>(_ui->serversTable->cellWidget(row, col++));
-        if (hostEdit->text().isEmpty())
-            continue;
-
-        QLineEdit *portEdit = static_cast<QLineEdit*>(_ui->serversTable->cellWidget(row, col++));
-        CheckBoxCenterWidget *sslCb = static_cast<CheckBoxCenterWidget*>(_ui->serversTable->cellWidget(row, col++));
-        CheckBoxCenterWidget *vpnCb = static_cast<CheckBoxCenterWidget*>(_ui->serversTable->cellWidget(row, col++));
-        QLineEdit *nbConsEdit = static_cast<QLineEdit*>(_ui->serversTable->cellWidget(row, col++));
-        QLineEdit *userEdit = static_cast<QLineEdit*>(_ui->serversTable->cellWidget(row, col++));
-        QLineEdit *passEdit = static_cast<QLineEdit*>(_ui->serversTable->cellWidget(row, col++));
-
-        NntpServerParams *srvParams = new NntpServerParams(hostEdit->text(), portEdit->text().toUShort());
-        srvParams->useSSL = sslCb->isChecked();
-        srvParams->useVpn = vpnCb->isChecked();
-        srvParams->nbCons = nbConsEdit->text().toInt();
-        srvParams->enabled = isEnabled;
-        QString user = userEdit->text();
-        if (!user.isEmpty())
-        {
-            srvParams->auth = true;
-            srvParams->user = user.toStdString();
-            srvParams->pass = passEdit->text().toStdString();
-        }
-
-        _ngPost->_nntpServers << srvParams;
+    const int rows = qMin(_ui->serversTable->rowCount(), _ngPost->_nntpServers.size());
+    for (int row = 0; row < rows; ++row) {
+        QTableWidgetItem *enabled = _ui->serversTable->item(row, 0);
+        if (_ngPost->_nntpServers.at(row))
+            _ngPost->_nntpServers.at(row)->enabled =
+                enabled && enabled->checkState() == Qt::Checked;
     }
+}
+
+void MainWindow::refreshServerSelection()
+{
+    _ui->serversTable->setRowCount(0);
+    int row = 0;
+    VpnManager *vpn = _ngPost ? _ngPost->vpnManager() : nullptr;
+    for (NntpServerParams *srv : _ngPost->_nntpServers) {
+        _ui->serversTable->insertRow(row);
+        auto *enabled = new QTableWidgetItem;
+        enabled->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable);
+        enabled->setCheckState(srv->enabled ? Qt::Checked : Qt::Unchecked);
+        _ui->serversTable->setItem(row, 0, enabled);
+
+        QString label = srv->displayName();
+        if (label.isEmpty())
+            label = tr("(unnamed server)");
+        auto *name = new QTableWidgetItem(label);
+        name->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+        _ui->serversTable->setItem(row, 1, name);
+
+        QString vpnText = srv->useVpn ? tr("VPN required") : tr("Direct");
+        if (srv->useVpn && vpn) {
+            switch (vpn->state()) {
+            case VpnManager::State::Connected: vpnText = tr("VPN connected"); break;
+            case VpnManager::State::Starting:  vpnText = tr("VPN starting"); break;
+            case VpnManager::State::Stopping:  vpnText = tr("VPN stopping"); break;
+            case VpnManager::State::Failed:    vpnText = tr("VPN failed"); break;
+            case VpnManager::State::Disabled:  break;
+            }
+        }
+        auto *vpnItem = new QTableWidgetItem(vpnText);
+        vpnItem->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+        _ui->serversTable->setItem(row, 2, vpnItem);
+        ++row;
+    }
+    _ui->serversTable->resizeRowsToContents();
 }
 
 void MainWindow::updateParams()
 {
-    QString from = _ui->fromEdit->text();
-    if (!from.isEmpty())
-    {
-        QRegularExpression email("\\w+@\\w+\\.\\w+");
-        if (!email.match(from).hasMatch())
-            from += QString("@%1.com").arg(_ngPost->aticleSignature().c_str());
-        _ngPost->_from   = _ngPost->escapeXML(from).toStdString();
-    }
     _ngPost->_genFrom  = _ui->uniqueFromCB->isChecked();
-    _ngPost->_saveFrom = _ui->saveFromCB->isChecked();
-
-    if (_ui->rarPassCB->isChecked())
-    {
-        _ngPost->_rarPassFixed = _ui->rarPassEdit->text();
-        _ngPost->_rarPass      = _ngPost->_rarPassFixed;
-    }
-
-    _ngPost->enableAutoPacking(_ui->autoCompressCB->isChecked());
-    _ngPost->_autoCloseTabs   = _ui->autoCloseCB->isChecked();
-    _ngPost->_checkForUpdates = _ui->checkForUpdatesCB->isChecked();
 
     _ngPost->updateGroups(_ui->groupsEdit->toPlainText());
+    if (_groupPolicyCB) {
+        switch (_groupPolicyCB->currentIndex()) {
+        case 1:
+            _ngPost->_groupPolicy = NgPost::GROUP_POLICY::EACH_POST;
+            break;
+        case 2:
+            _ngPost->_groupPolicy = NgPost::GROUP_POLICY::EACH_FILE;
+            break;
+        default:
+            _ngPost->_groupPolicy = NgPost::GROUP_POLICY::ALL;
+            break;
+        }
+    }
 
-    _ngPost->_obfuscateArticles = _ui->obfuscateMsgIdCB->isChecked();
-    _ngPost->_obfuscateFileName = _ui->obfuscateFileNameCB->isChecked();
-    _ngPost->_keepNfoExtension  = _ui->keepNfoExtensionCB->isChecked();
-
-    bool ok = false;
-    uint articleSize = _ui->articleSizeEdit->text().toUInt(&ok);
-    if (ok)
-        NgPost::sArticleSize = articleSize;
-
-    NntpArticle::setNbMaxRetry(static_cast<ushort>(_ui->nbRetrySB->value()));
-
-    _ngPost->_nbThreads = _ui->threadSB->value();
-    if (_ngPost->_nbThreads < 1)
-        _ngPost->_nbThreads = 1;
-
-    QFileInfo nzbPath(_ui->nzbPathEdit->text());
-    if (nzbPath.exists() && nzbPath.isDir() && nzbPath.isWritable())
-        _ngPost->_nzbPath = nzbPath.absoluteFilePath();
 }
 
 void MainWindow::updateAutoPostingParams()
@@ -745,13 +795,28 @@ void MainWindow::updateConfigFromUi()
 
 QString MainWindow::fixedArchivePassword() const
 {
-    if (_ui->rarPassCB->isChecked())
-    {
-        QString pass = _ui->rarPassEdit->text();
-        if (!pass.isEmpty())
-            return pass;
+    return _ngPost ? _ngPost->_rarPassFixed : QString();
+}
+
+void MainWindow::refreshConfigDependentWidgets()
+{
+    if (!_ngPost)
+        return;
+    refreshServerSelection();
+
+    if (_quickJobTab) {
+        const QString fixedPass = fixedArchivePassword();
+        if (!fixedPass.isEmpty())
+            _quickJobTab->setNzbPassword(fixedPass);
+        if (!_quickJobTab->isPosting())
+            _quickJobTab->setPackingAuto(_ngPost->_packAuto, _ngPost->_packAutoKeywords);
     }
-    return QString();
+    if (_autoPostTab)
+        _autoPostTab->setPackingAuto(_ngPost->_packAuto, _ngPost->_packAutoKeywords);
+
+    PostingWidget *currentQuickPost = _getPostWidget(_ui->postTabWidget->currentIndex());
+    if (currentQuickPost && !currentQuickPost->isPosting())
+        currentQuickPost->setPackingAuto(_ngPost->_packAuto, _ngPost->_packAutoKeywords);
 }
 
 namespace {
@@ -1659,6 +1724,7 @@ void MainWindow::_onUseVpnToggled(bool checked)
 void MainWindow::onSaveConfig()
 {
     updateServers();
+    updateParams();
     _ngPost->saveConfig();
 }
 
@@ -2376,6 +2442,12 @@ void MainWindow::onVpnSettingsClicked()
     dlg.exec();
 }
 
+void MainWindow::onSettingsClicked()
+{
+    SettingsDialog dlg(_ngPost, this, this);
+    dlg.exec();
+}
+
 void MainWindow::onVpnStateChanged(VpnManager::State newState)
 {
     QString text;
@@ -2389,6 +2461,7 @@ void MainWindow::onVpnStateChanged(VpnManager::State newState)
     case VpnManager::State::Failed:    text = tr("VPN: failed");                   break;
     }
     _ui->vpnStateLbl->setText(text);
+    refreshServerSelection();
 }
 
 

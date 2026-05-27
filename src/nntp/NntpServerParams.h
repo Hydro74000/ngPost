@@ -23,6 +23,7 @@
 #include <QString>
 
 struct NntpServerParams{
+    QString     label; //!< Human-readable caption shown in the GUI
     QString     host;
     ushort      port;
     bool        auth;
@@ -39,14 +40,14 @@ struct NntpServerParams{
 
 
     NntpServerParams():
-        host(""), port(sDefaultPort), auth(false), user(""),
+        label(""), host(""), port(sDefaultPort), auth(false), user(""),
         pass(""), nbCons(1), useSSL(false), enabled(true), nzbCheck(false), useVpn(false)
     {}
 
     NntpServerParams(const QString & aHost, ushort aPort = sDefaultPort, bool aAuth = false,
                          const std::string &aUser = "", const std::string &aPass = "",
                          int aNbCons = 1, bool aUseSSL = false, bool aNzbCheck = false):
-       host(aHost), port(aPort), auth(aAuth), user(aUser),
+       label(""), host(aHost), port(aPort), auth(aAuth), user(aUser),
        pass(aPass), nbCons(aNbCons), useSSL(aUseSSL), enabled(true), nzbCheck(aNzbCheck),
        useVpn(false)
     {}
@@ -57,17 +58,27 @@ struct NntpServerParams{
     NntpServerParams(NntpServerParams&& aParams) = default;
 
     inline QString str() const;
+    inline QString displayName() const;
 };
 
+
+QString NntpServerParams::displayName() const
+{
+    if (!label.trimmed().isEmpty())
+        return label.trimmed();
+    if (!host.trimmed().isEmpty())
+        return QString("%1:%2").arg(host).arg(port);
+    return QString();
+}
 
 QString NntpServerParams::str() const
 {
     if (auth)
-        return QString("[%4con%5 on %1@%2:%3 enabled:%6, nzbCheck:%7]").arg(user.c_str()).arg(
-                    host).arg(port).arg(nbCons).arg(useSSL?" SSL":"").arg(enabled).arg(nzbCheck);
+        return QString("[%8 %4con%5 on %1@%2:%3 enabled:%6, nzbCheck:%7]").arg(user.c_str()).arg(
+                    host).arg(port).arg(nbCons).arg(useSSL?" SSL":"").arg(enabled).arg(nzbCheck).arg(displayName());
     else
-        return QString("[%3con%4 on %1:%2 enabled:%5, nzbCheck:%6]").arg(host).arg(port).arg(nbCons).arg(
-                    useSSL?" SSL":"").arg(enabled).arg(nzbCheck);
+        return QString("[%7 %3con%4 on %1:%2 enabled:%5, nzbCheck:%6]").arg(host).arg(port).arg(nbCons).arg(
+                    useSSL?" SSL":"").arg(enabled).arg(nzbCheck).arg(displayName());
 }
 
 #endif // NNTPSERVERPARAMS_H

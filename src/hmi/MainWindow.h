@@ -120,6 +120,8 @@ private:
     QPushButton  *_statsRefreshBtn    = nullptr;
     QTabWidget   *_statsInnerTabs     = nullptr;
     QPushButton  *_resumeRefreshBtn   = nullptr;
+    QComboBox    *_groupPolicyCB      = nullptr;
+    QPushButton  *_settingsButton     = nullptr;
 
 
 
@@ -139,6 +141,8 @@ public:
                            );
 
     void updateServers();
+    void refreshServerSelection();
+    void refreshConfigDependentWidgets();
     void updateParams();
     void updateAutoPostingParams();
     void updateConfigFromUi();
@@ -227,6 +231,7 @@ private slots:
     void onPauseClicked();
 
     void onVpnSettingsClicked();
+    void onSettingsClicked();
     void onVpnStateChanged(VpnManager::State newState);
 
     void _onHistoryRefresh();
@@ -256,6 +261,8 @@ private slots:
 private:
     void _initServerBox();
     void _initPostingBox();
+    void _refreshMainConfigTexts();
+    void _setGlobalConfigWidgetsVisible(bool visible);
     QWidget *_buildHistoryTab();
     void     _retranslateHistoryTab();
     void _refreshHistoryViews();

@@ -16,6 +16,7 @@
 #include <QNetworkProxy>
 #include <QProcess>
 #include <QQueue>
+#include <QRandomGenerator>
 #include <QSet>
 #include <QSettings>
 #include <QTextStream>
@@ -65,6 +66,7 @@ class NgPost : public QObject, public CmdOrGuiApp
     Q_OBJECT
 
     friend class MainWindow; //!< so it can access all parameters
+    friend class SettingsDialog;
     friend class PostingWidget;
     friend class AutoPostWidget;
     friend class PostingJob;
@@ -145,6 +147,7 @@ public:
         LOG_IN_FILE,
         SERVER,
         HOST,
+        SERVER_LABEL,
         PORT,
         SSL,
         USER,
@@ -653,7 +656,7 @@ QString NgPost::groups() const
 QStringList NgPost::getPostingGroups() const
 {
     if (_groupPolicy == GROUP_POLICY::EACH_POST && _nbGroups > 1)
-        return QStringList(_grpList.at(std::rand() % _nbGroups));
+        return QStringList(_grpList.at(QRandomGenerator::global()->bounded(_nbGroups)));
     else
         return _grpList;
 }

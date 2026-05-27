@@ -17,6 +17,7 @@
 #include <QtTest>
 #include <QApplication>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QFile>
 #include <QLabel>
 #include <QLineEdit>
@@ -25,11 +26,19 @@
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QTableWidget>
+#include <QTextEdit>
 #include <QTextStream>
 
+#define private public
+#include "vpn/VpnManager.h"
+#undef private
+
 #include "hmi/MainWindow.h"
+#include "hmi/SettingsDialog.h"
+#include "hmi/VpnSettingsDialog.h"
 #include "hmi/CheckBoxCenterWidget.h"
 #include "utils/PathHelper.h"
+#include "vpn/VpnProfile.h"
 #include "NgPost.h"
 #include "TestEnv.h"
 
@@ -40,18 +49,21 @@ class TestMainWindow : public QObject
     Q_OBJECT
 
 private slots:
-    //! Clicking the "Add Server" button adds a row to the servers table,
-    //! and every per-row widget retrofitted with an objectName is findable
-    //! from the window root.
-    void add_server_row_creates_named_widgets();
+    //! The main window now shows a multi-server selection table, using the
+    //! configured server labels/captions instead of declaring servers inline.
+    void server_selection_lists_labels_and_vpn_status();
 
-    //! Two consecutive Adds produce two rows with distinct objectName
-    //! suffixes (`_0` and `_1`).
-    void add_two_servers_yields_unique_object_names();
+    //! Save Config persists the main-window server selection while preserving
+    //! server declarations and labels from the Settings-owned table.
+    void server_selection_save_persists_enabled_and_labels();
 
-    //! Toggling the per-row "Use VPN" checkbox via the inner QCheckBox
-    //! programmatically fires CheckBoxCenterWidget::toggled.
-    void vpn_checkbox_toggled_emits_signal();
+    //! Settings Apply pushes edited config to NgPost and disk; closing without
+    //! Apply leaves in-memory values untouched.
+    void settings_dialog_apply_persists_and_cancel_discards();
+
+    //! The random-poster option stays on MainWindow, with the requested new
+    //! French wording, and GROUP_POLICY is kept next to the groups field.
+    void main_window_keeps_random_email_and_group_policy_controls();
 
     //! Long history details should scroll inside the history panel instead of
     //! changing the top-level window dimensions.
@@ -60,6 +72,10 @@ private slots:
     //! Save Config must persist the active GUI tab's RAR_MAX checkbox and
     //! PAR2_PCT spinbox, even when PAR2_ARGS is present.
     void save_config_persists_rar_max_and_par2_pct();
+
+    //! The VPN actions dialog chooses the profile to connect without changing
+    //! the Settings-owned default profile, then freezes it while connecting.
+    void vpn_actions_profile_selector_is_independent_and_freezes();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -72,79 +88,216 @@ private slots:
 
 namespace
 {
-//! MainWindow::onAddServer is a private slot that's only connected to the
-//! addServerButton inside init(NgPost*) — which we don't call in these
-//! tests (it would pull in NgPost / VpnManager / config). Invoking via
-//! QMetaObject mirrors what the connect would dispatch.
-void addServer(QObject *window)
+void writeServerConfig(const QString &confPath, const QString &tmpDir)
 {
-    QVERIFY(QMetaObject::invokeMethod(window, "onAddServer", Qt::DirectConnection));
+    QFile conf(confPath);
+    QVERIFY2(conf.open(QIODevice::WriteOnly | QIODevice::Text),
+             qPrintable(QStringLiteral("Could not write test config: %1").arg(confPath)));
+    QTextStream s(&conf);
+    s << "GROUPS = alt.binaries.test, alt.binaries.test2\n"
+      << "GROUP_POLICY = EACH_FILE\n"
+      << "TMP_DIR = " << tmpDir << "\n"
+      << "RAR_PATH = /bin/true\n"
+      << "[server]\n"
+      << "label = Primary\n"
+      << "host = primary.example.test\n"
+      << "port = 563\n"
+      << "ssl = true\n"
+      << "user = user1\n"
+      << "pass = pass1\n"
+      << "connection = 4\n"
+      << "enabled = true\n"
+      << "useVpn = true\n"
+      << "[server]\n"
+      << "caption = Backup\n"
+      << "host = backup.example.test\n"
+      << "port = 119\n"
+      << "ssl = false\n"
+      << "connection = 2\n"
+      << "enabled = false\n";
 }
 } // namespace
 
-void TestMainWindow::add_server_row_creates_named_widgets()
+void TestMainWindow::server_selection_lists_labels_and_vpn_status()
 {
-    MainWindow window;
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    writeServerConfig(confPath, sandbox.rootPath());
 
-    auto *table = window.findChild<QTableWidget*>(QStringLiteral("serversTable"));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString parseError = ngPost.parseDefaultConfig();
+    QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY(window);
+    window->init(&ngPost);
+
+    auto *table = window->findChild<QTableWidget*>(QStringLiteral("serversTable"));
     QVERIFY2(table, "serversTable not found in MainWindow");
+    QCOMPARE(table->rowCount(), 2);
+    QCOMPARE(table->item(0, 1)->text(), QStringLiteral("Primary"));
+    QCOMPARE(table->item(1, 1)->text(), QStringLiteral("Backup"));
+    QCOMPARE(table->item(0, 0)->checkState(), Qt::Checked);
+    QCOMPARE(table->item(1, 0)->checkState(), Qt::Unchecked);
+    QVERIFY2(table->item(0, 2)->text().contains(QStringLiteral("VPN")),
+             qPrintable(table->item(0, 2)->text()));
+}
 
-    const int before = table->rowCount();
-    addServer(&window);
-    QCOMPARE(table->rowCount(), before + 1);
+void TestMainWindow::server_selection_save_persists_enabled_and_labels()
+{
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    writeServerConfig(confPath, sandbox.rootPath());
 
-    // The Phase 1d retrofit gives each dynamic widget a `<Role>_<row>` name.
-    // First row should be suffixed _0.
-    for (const char *name : { "serverEnabledCb_0", "serverHostEdit_0",
-                              "serverPortEdit_0",  "serverSslCb_0",
-                              "serverUseVpnCb_0",  "serverNbConsEdit_0",
-                              "serverUserEdit_0",  "serverPassEdit_0",
-                              "serverDelButton_0" }) {
-        QVERIFY2(window.findChild<QWidget*>(QString::fromLatin1(name)),
-                 qPrintable(QStringLiteral("widget not found: %1").arg(QString::fromLatin1(name))));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString parseError = ngPost.parseDefaultConfig();
+    QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY(window);
+    window->init(&ngPost);
+
+    auto *table = window->findChild<QTableWidget*>(QStringLiteral("serversTable"));
+    QVERIFY(table);
+    table->item(0, 0)->setCheckState(Qt::Unchecked);
+    table->item(1, 0)->setCheckState(Qt::Checked);
+    QVERIFY(QMetaObject::invokeMethod(window, "onSaveConfig", Qt::DirectConnection));
+
+    QFile saved(confPath);
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString content = QString::fromUtf8(saved.readAll());
+    QVERIFY2(content.contains(QStringLiteral("label = Primary")), qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("label = Backup")), qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("host = primary.example.test\n"
+                                             "port = 563\n"
+                                             "ssl  = true\n"
+                                             "user = user1\n"
+                                             "pass = pass1\n"
+                                             "connection = 4\n"
+                                             "enabled = false")),
+             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("host = backup.example.test\n"
+                                             "port = 119\n"
+                                             "ssl  = false\n"
+                                             "user = \n"
+                                             "pass = \n"
+                                             "connection = 2\n"
+                                             "enabled = true")),
+             qPrintable(content));
+}
+
+void TestMainWindow::settings_dialog_apply_persists_and_cancel_discards()
+{
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    writeServerConfig(confPath, sandbox.rootPath());
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString parseError = ngPost.parseDefaultConfig();
+    QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY(window);
+    window->init(&ngPost);
+
+    {
+        SettingsDialog dialog(&ngPost, window);
+        auto *from = dialog.findChild<QLineEdit*>(QStringLiteral("settingsFromEdit"));
+        auto *saveFrom = dialog.findChild<QCheckBox*>(QStringLiteral("settingsSaveFromCB"));
+        auto *servers = dialog.findChild<QTableWidget*>(QStringLiteral("settingsServersTable"));
+        QVERIFY(from);
+        QVERIFY(saveFrom);
+        QVERIFY(servers);
+        QCOMPARE(servers->rowCount(), 2);
+
+        from->setText(QStringLiteral("poster@example.test"));
+        saveFrom->setChecked(true);
+        servers->item(0, 1)->setText(QStringLiteral("Edited Primary"));
+        QVERIFY(QMetaObject::invokeMethod(&dialog, "onApply", Qt::DirectConnection));
     }
 
-    // Specifically check the default port is the documented 563 (NNTP/SSL).
-    auto *portEdit = window.findChild<QLineEdit*>(QStringLiteral("serverPortEdit_0"));
-    QVERIFY(portEdit);
-    QCOMPARE(portEdit->text(), QStringLiteral("563"));
+    QFile saved(confPath);
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    QString content = QString::fromUtf8(saved.readAll());
+    QVERIFY2(content.contains(QStringLiteral("FROM = poster@example.test")),
+             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("label = Edited Primary")),
+             qPrintable(content));
+
+    {
+        SettingsDialog dialog(&ngPost, window);
+        auto *from = dialog.findChild<QLineEdit*>(QStringLiteral("settingsFromEdit"));
+        auto *servers = dialog.findChild<QTableWidget*>(QStringLiteral("settingsServersTable"));
+        QVERIFY(from);
+        QVERIFY(servers);
+        from->setText(QStringLiteral("cancelled@example.test"));
+        servers->item(0, 1)->setText(QStringLiteral("Cancelled"));
+        dialog.reject();
+    }
+
+    saved.close();
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    content = QString::fromUtf8(saved.readAll());
+    QVERIFY2(content.contains(QStringLiteral("FROM = poster@example.test")),
+             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("label = Edited Primary")),
+             qPrintable(content));
+    QVERIFY2(!content.contains(QStringLiteral("cancelled@example.test")),
+             qPrintable(content));
+    QVERIFY2(!content.contains(QStringLiteral("label = Cancelled")),
+             qPrintable(content));
 }
 
-void TestMainWindow::add_two_servers_yields_unique_object_names()
+void TestMainWindow::main_window_keeps_random_email_and_group_policy_controls()
 {
-    MainWindow window;
-    auto *table = window.findChild<QTableWidget*>(QStringLiteral("serversTable"));
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    writeServerConfig(confPath, sandbox.rootPath());
 
-    addServer(&window);
-    addServer(&window);
-    QCOMPARE(table->rowCount(), 2);
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString parseError = ngPost.parseDefaultConfig();
+    QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
 
-    QVERIFY(window.findChild<QLineEdit*>(QStringLiteral("serverHostEdit_0")));
-    QVERIFY(window.findChild<QLineEdit*>(QStringLiteral("serverHostEdit_1")));
-    QVERIFY(window.findChild<QPushButton*>(QStringLiteral("serverDelButton_0")));
-    QVERIFY(window.findChild<QPushButton*>(QStringLiteral("serverDelButton_1")));
-}
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY(window);
+    window->init(&ngPost);
 
-void TestMainWindow::vpn_checkbox_toggled_emits_signal()
-{
-    MainWindow window;
-    addServer(&window);
+    auto *randomEmail = window->findChild<QCheckBox*>(QStringLiteral("uniqueFromCB"));
+    QVERIFY(randomEmail);
+    QCOMPARE(randomEmail->text(), QStringLiteral("Utiliser une adresse mail aléatoire pour poster"));
 
-    auto *vpnCb = window.findChild<CheckBoxCenterWidget*>(QStringLiteral("serverUseVpnCb_0"));
-    QVERIFY2(vpnCb, "serverUseVpnCb_0 not found");
+    auto *policy = window->findChild<QComboBox*>(QStringLiteral("groupPolicyCB"));
+    QVERIFY2(policy, "groupPolicyCB not found");
+    QCOMPARE(policy->currentText(), QStringLiteral("One group per file"));
 
-    // _addServer wires the checkbox's toggled() signal to
-    // MainWindow::_onUseVpnToggled, which dereferences _ngPost — null in
-    // this test. Disconnect the handler so the test only exercises the
-    // signal-emission path, not the downstream side effect on NgPost.
-    QObject::disconnect(vpnCb, &CheckBoxCenterWidget::toggled, &window, nullptr);
+    auto *groups = window->findChild<QTextEdit*>(QStringLiteral("groupsEdit"));
+    QVERIFY(groups);
+    randomEmail->setChecked(true);
+    groups->setPlainText(QStringLiteral(" alt.binaries.one, ,alt.binaries.two "));
+    policy->setCurrentIndex(1);
+    QVERIFY(QMetaObject::invokeMethod(window, "onSaveConfig", Qt::DirectConnection));
 
-    QSignalSpy spy(vpnCb, &CheckBoxCenterWidget::toggled);
-
-    const bool initial = vpnCb->isChecked();
-    vpnCb->setChecked(!initial);
-    QCOMPARE(spy.count(), 1);
-    QCOMPARE(vpnCb->isChecked(), !initial);
+    QFile saved(confPath);
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString content = QString::fromUtf8(saved.readAll());
+    QVERIFY2(content.contains(QStringLiteral("GEN_FROM = true")),
+             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("GROUP_POLICY = EACH_POST")),
+             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("alt.binaries.one,alt.binaries.two")),
+             qPrintable(content));
 }
 
 void TestMainWindow::history_detail_text_does_not_resize_window()
@@ -243,6 +396,50 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
              qPrintable(content));
     QVERIFY2(content.contains(QStringLiteral("\nPAR2_PCT = 23\n")),
              qPrintable(content));
+}
+
+void TestMainWindow::vpn_actions_profile_selector_is_independent_and_freezes()
+{
+    HomeSandbox sandbox;
+
+    VpnProfile primary;
+    primary.name = QStringLiteral("Primary");
+    primary.backend = VpnManager::Backend::OpenVPN;
+    primary.configFileName = QStringLiteral("primary.ovpn");
+
+    VpnProfile backup;
+    backup.name = QStringLiteral("Backup");
+    backup.backend = VpnManager::Backend::WireGuard;
+    backup.configFileName = QStringLiteral("backup.conf");
+
+    VpnManager manager;
+    manager.setProfilesFromConfig({ primary, backup }, primary.name);
+
+    VpnSettingsDialog dialog(&manager);
+    auto *profile = dialog.findChild<QComboBox*>(QStringLiteral("profileCB"));
+    QVERIFY2(profile, "profileCB not found in VPN actions dialog");
+    QCOMPARE(profile->count(), 2);
+    QCOMPARE(profile->currentData().toString(), primary.name);
+
+    profile->setCurrentIndex(profile->findData(backup.name));
+    QCOMPARE(profile->currentData().toString(), backup.name);
+    QCOMPARE(manager.activeProfileName(), primary.name);
+
+    manager._runtimeProfileName = backup.name;
+    manager._state = VpnManager::State::Starting;
+    QVERIFY(QMetaObject::invokeMethod(&dialog, "onStateChanged", Qt::DirectConnection,
+                                      Q_ARG(VpnManager::State, VpnManager::State::Starting)));
+    QVERIFY(!profile->isEnabled());
+    QCOMPARE(profile->currentData().toString(), backup.name);
+
+    manager._runtimeProfileName.clear();
+    manager._state = VpnManager::State::Disabled;
+    QVERIFY(QMetaObject::invokeMethod(&dialog, "onStateChanged", Qt::DirectConnection,
+                                      Q_ARG(VpnManager::State, VpnManager::State::Disabled)));
+    QVERIFY(profile->isEnabled());
+    QCOMPARE(profile->currentData().toString(), backup.name);
+
+    Q_UNUSED(sandbox);
 }
 
 QTEST_MAIN(TestMainWindow)

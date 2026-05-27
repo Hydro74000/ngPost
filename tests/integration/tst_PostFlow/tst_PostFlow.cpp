@@ -89,6 +89,7 @@ int countSegmentsInNzb(const QByteArray &nzbBytes, QString *firstSubject = nullp
 struct NzbFileEntry
 {
     QString subject;
+    QStringList groups;
     QStringList segments;
 };
 
@@ -104,6 +105,9 @@ QList<NzbFileEntry> collectNzbFiles(const QByteArray &nzbBytes)
             entry.subject = r.attributes().value(QLatin1String("subject")).toString();
             files << entry;
             current = files.size() - 1;
+        } else if (r.isStartElement() && r.name() == QLatin1String("group")
+                   && current >= 0) {
+            files[current].groups << r.readElementText();
         } else if (r.isStartElement() && r.name() == QLatin1String("segment")
                    && current >= 0) {
             files[current].segments << r.readElementText();
@@ -157,6 +161,17 @@ private slots:
     //! Config values are split on the first '=' only: server passwords,
     //! NZB paths and RAR passwords may legally contain '='.
     void config_values_keep_equals();
+
+    //! GROUP_POLICY=ALL must post each file to every configured group.
+    void group_policy_all_keeps_all_groups();
+
+    //! GROUP_POLICY=EACH_POST must pick exactly one configured group for the
+    //! whole post.
+    void group_policy_each_post_uses_one_group();
+
+    //! GROUP_POLICY=EACH_FILE must pick exactly one configured group for each
+    //! file even when article obfuscation is disabled.
+    void group_policy_each_file_uses_one_group_per_file_without_obfuscation();
 };
 
 void TestPostFlow::initTestCase()
@@ -259,6 +274,137 @@ void TestPostFlow::post_split_file_matches_segment_count()
 
     const QStringList arts = mock.receivedArticles();
     QCOMPARE(arts.size(), 8);
+}
+
+void TestPostFlow::group_policy_all_keeps_all_groups()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/all.bin");
+    QFile in(inPath);
+    QVERIFY(in.open(QIODevice::WriteOnly));
+    in.write("all groups");
+    in.close();
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/all.nzb");
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+    const QString groups = QStringLiteral("alt.binaries.test,alt.binaries.test2");
+    const QStringList args = {
+        "-S", srv,
+        "-i", inPath,
+        "-o", nzbPath,
+        "-g", groups,
+        "--group_policy", "all",
+        "--quiet",
+        "--disp_progress", "none",
+    };
+
+    QString out;
+    const int exitCode = runNgPost(_bin, args, sandbox.rootPath(), out);
+    QVERIFY2(exitCode == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::ReadOnly));
+    const QList<NzbFileEntry> files = collectNzbFiles(nzb.readAll());
+    QCOMPARE(files.size(), 1);
+    QCOMPARE(files.first().groups, QStringList({ QStringLiteral("alt.binaries.test"),
+                                                 QStringLiteral("alt.binaries.test2") }));
+
+    const QStringList arts = mock.receivedArticles();
+    QCOMPARE(arts.size(), 1);
+    const QByteArray article = mock.readArticle(arts.first());
+    QVERIFY(article.contains("Newsgroups: alt.binaries.test,alt.binaries.test2"));
+}
+
+void TestPostFlow::group_policy_each_post_uses_one_group()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/each-post.bin");
+    QFile in(inPath);
+    QVERIFY(in.open(QIODevice::WriteOnly));
+    in.write("each post");
+    in.close();
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/each-post.nzb");
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+    const QStringList allowed = { QStringLiteral("alt.binaries.test"),
+                                  QStringLiteral("alt.binaries.test2") };
+    const QStringList args = {
+        "-S", srv,
+        "-i", inPath,
+        "-o", nzbPath,
+        "-g", allowed.join(','),
+        "--group_policy", "each_post",
+        "--quiet",
+        "--disp_progress", "none",
+    };
+
+    QString out;
+    const int exitCode = runNgPost(_bin, args, sandbox.rootPath(), out);
+    QVERIFY2(exitCode == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::ReadOnly));
+    const QList<NzbFileEntry> files = collectNzbFiles(nzb.readAll());
+    QCOMPARE(files.size(), 1);
+    QCOMPARE(files.first().groups.size(), 1);
+    QVERIFY2(allowed.contains(files.first().groups.first()),
+             qPrintable(files.first().groups.join(',')));
+}
+
+void TestPostFlow::group_policy_each_file_uses_one_group_per_file_without_obfuscation()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    const QString inPath1 = sandbox.rootPath() + QStringLiteral("/each-file-1.bin");
+    const QString inPath2 = sandbox.rootPath() + QStringLiteral("/each-file-2.bin");
+    QFile in1(inPath1);
+    QVERIFY(in1.open(QIODevice::WriteOnly));
+    in1.write("first");
+    in1.close();
+    QFile in2(inPath2);
+    QVERIFY(in2.open(QIODevice::WriteOnly));
+    in2.write("second");
+    in2.close();
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/each-file.nzb");
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+    const QStringList allowed = { QStringLiteral("alt.binaries.test"),
+                                  QStringLiteral("alt.binaries.test2") };
+    const QStringList args = {
+        "-S", srv,
+        "-i", inPath1,
+        "-i", inPath2,
+        "-o", nzbPath,
+        "-g", allowed.join(','),
+        "--group_policy", "each_file",
+        "--quiet",
+        "--disp_progress", "none",
+    };
+
+    QString out;
+    const int exitCode = runNgPost(_bin, args, sandbox.rootPath(), out);
+    QVERIFY2(exitCode == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::ReadOnly));
+    const QList<NzbFileEntry> files = collectNzbFiles(nzb.readAll());
+    QCOMPARE(files.size(), 2);
+    for (const NzbFileEntry &file : files) {
+        QCOMPARE(file.groups.size(), 1);
+        QVERIFY2(allowed.contains(file.groups.first()),
+                 qPrintable(file.groups.join(',')));
+    }
 }
 
 void TestPostFlow::ssl_rejects_self_signed_cert()
