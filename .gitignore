@@ -621,3 +621,4 @@ tests/**/tst_*/*
 tests/**/Makefile
 tests/**/.qmake.stash
 PLAN*.md
+AGENTS.md
