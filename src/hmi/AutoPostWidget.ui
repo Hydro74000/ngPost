@@ -288,6 +288,16 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QCheckBox" name="copyNfoCB">
+         <property name="toolTip">
+          <string>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</string>
+         </property>
+         <property name="text">
+          <string>copy nfo alongside other files</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
      <item>

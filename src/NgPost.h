@@ -140,6 +140,7 @@ public:
         AUTO_CLOSE_TABS,
         KEEP_NFO_EXTENSION,
         NZB_COPY_NFO,
+        AUTO_INCLUDE_NFO,
         AUTO_COMPRESS,
         GROUP_POLICY,
         LOG_IN_FILE,
@@ -337,6 +338,7 @@ private:
     bool _rarNoRootFolder;
     bool _keepNfoExtension; //!< when obfuscating file names, keep the .nfo extension visible
     bool _copyNfoWithNzb;   //!< copy the .nfo from the original files next to the generated nzb
+    bool _autoIncludeNfo;   //!< auto-post: include a sibling .nfo (same base name) in the same post
 
     bool _tryResumePostWhenConnectionLost;
     ushort _waitDurationBeforeAutoResume;
@@ -558,6 +560,13 @@ private:
 
     void _post(const QFileInfo &fileInfo, const QString &monitorFolder = "");
     void _finishPosting();
+
+    //!< auto-post nfo bundling (cf AUTO_INCLUDE_NFO):
+    //!< return the sibling <completeBaseName>.nfo of a non-nfo file, or an invalid QFileInfo
+    QFileInfo _autoSiblingNfo(const QFileInfo &fileInfo) const;
+    //!< true when fileInfo is a .nfo that has a non-nfo sibling sharing its base name
+    //!< (such a .nfo must not be posted on its own: it is bundled with its sibling)
+    bool _autoIsBundledNfo(const QFileInfo &fileInfo) const;
 
     void _prepareNextPacking();
 

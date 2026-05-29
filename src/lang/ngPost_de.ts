@@ -27,6 +27,16 @@
 <context>
     <name>AutoPostWidget</name>
     <message>
+        <location filename="../hmi/AutoPostWidget.ui" line="294"/>
+        <source>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</source>
+        <translation>Wenn eine gepostete Datei eine benachbarte .nfo-Datei hat (gleicher Name, andere Endung), diese .nfo in denselben Post aufnehmen (die einzelne .nfo wird nicht separat gepostet)</translation>
+    </message>
+    <message>
+        <location filename="../hmi/AutoPostWidget.ui" line="297"/>
+        <source>copy nfo alongside other files</source>
+        <translation>NFO zusammen mit anderen Dateien posten</translation>
+    </message>
+    <message>
         <location filename="../hmi/AutoPostWidget.ui" line="14"/>
         <source>Form</source>
         <translation>Formular</translation>

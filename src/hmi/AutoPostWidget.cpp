@@ -99,6 +99,7 @@ void AutoPostWidget::init()
 
     _ui->extensionFilterEdit->setText(_ngPost->_monitorExtensions.isEmpty()? "" : _ngPost->_monitorExtensions.join(","));
     _ui->dirAllowedCB->setChecked(!_ngPost->_monitorIgnoreDir);
+    _ui->copyNfoCB->setChecked(_ngPost->_autoIncludeNfo);
 }
 
 
@@ -409,6 +410,7 @@ void AutoPostWidget::udatePostingParams()
     }
 
     _ngPost->_monitorIgnoreDir = !_ui->dirAllowedCB->isChecked();
+    _ngPost->_autoIncludeNfo   = _ui->copyNfoCB->isChecked();
 
     _ngPost->_keepRar = _ui->keepRarCB->isChecked();
 }

@@ -89,6 +89,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::AUTO_CLOSE_TABS,"auto_close_tabs"},
     {Opt::KEEP_NFO_EXTENSION, "keep_nfo_extension"},
     {Opt::NZB_COPY_NFO,   "nzb_copy_nfo"},
+    {Opt::AUTO_INCLUDE_NFO, "auto_include_nfo"},
     {Opt::RAR_NO_ROOT_FOLDER, "rar_no_root_folder"},
     {Opt::LOG_IN_FILE,     "log_in_file"},
 
@@ -275,6 +276,7 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
 // NFO options
     { sOptionNames[Opt::KEEP_NFO_EXTENSION],  tr("when obfuscating file names, keep the .nfo extension visible")},
     { sOptionNames[Opt::NZB_COPY_NFO],        tr("copy the .nfo from the original files next to the generated nzb")},
+    { sOptionNames[Opt::AUTO_INCLUDE_NFO],    tr("auto-post: include a sibling .nfo (same name, different extension) in the same post")},
 
 // VPN options (override the configured VPN behaviour for this run)
     { sOptionNames[Opt::VPN],                 tr("force all NNTP connections through the configured VPN (master switch ON)")},
@@ -363,6 +365,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _rarNoRootFolder(false),
     _keepNfoExtension(false),
     _copyNfoWithNzb(false),
+    _autoIncludeNfo(false),
     _tryResumePostWhenConnectionLost(true),
     _waitDurationBeforeAutoResume(sDefaultResumeWaitInSec),
     _nzbPostCmd(), _preparePacking(false),
@@ -1292,11 +1295,24 @@ void NgPost::onNewFileToProcess(const QFileInfo & fileInfo)
 #ifdef __USE_HMI__
     if (_hmi)
     {
-        _hmi->updateAutoPostingParams();
+        _hmi->updateAutoPostingParams(); // refreshes _autoIncludeNfo from the UI
         _hmi->setJobLabel(-1);
         _delAuto = _hmi->autoWidget()->deleteFilesOncePosted();
-        _hmi->autoWidget()->newFileToProcess(fileInfo);
     }
+#endif
+
+    // AUTO_INCLUDE_NFO: a .nfo bundled with a sibling must not be listed/posted on its own
+    if (_autoIsBundledNfo(fileInfo))
+    {
+        if (_debug)
+            _log(tr("AUTO_INCLUDE_NFO ON => %1 will be bundled with its sibling, not posted alone")
+                     .arg(fileInfo.absoluteFilePath()));
+        return;
+    }
+
+#ifdef __USE_HMI__
+    if (_hmi)
+        _hmi->autoWidget()->newFileToProcess(fileInfo);
 #endif
     _log(tr("Processing new incoming file: %1").arg(fileInfo.absoluteFilePath()));
     _post(fileInfo, _monitor_nzb_folders ? QDir(fileInfo.absolutePath()).dirName() : QString());
@@ -1502,6 +1518,16 @@ qint64 NgPost::recursiveSize(const QFileInfo &fi)
 
 void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
 {
+    // AUTO_INCLUDE_NFO: a .nfo that belongs to a sibling file is not posted on its
+    // own, it is bundled with that sibling (see the QFileInfoList built below).
+    if (_autoIsBundledNfo(fileInfo))
+    {
+        if (_debug)
+            _log(tr("AUTO_INCLUDE_NFO ON => %1 will be bundled with its sibling, not posted alone")
+                     .arg(fileInfo.absoluteFilePath()));
+        return;
+    }
+
     setNzbName(fileInfo);
     QString nzbFilePath = nzbPath(monitorFolder);
     if (!nzbFilePath.endsWith(".nzb"))
@@ -1526,13 +1552,61 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
              << " with rar_name: " << _rarName << " and pass: " << _rarPass
              << " (auto delete: " << _delAuto << ")";
 
-    startPostingJob(new PostingJob(this, nzbFilePath, {fileInfo}, nullptr,
+    QFileInfoList postFiles{fileInfo};
+    QFileInfo nfo = _autoSiblingNfo(fileInfo);
+    if (nfo.isFile())
+    {
+        postFiles << nfo;
+        _log(tr("AUTO_INCLUDE_NFO ON => bundling %1 in the post of %2")
+                 .arg(nfo.fileName(), fileInfo.fileName()));
+    }
+
+    startPostingJob(new PostingJob(this, nzbFilePath, postFiles, nullptr,
                                    getPostingGroups(), from(),
                                    _obfuscateArticles, _obfuscateFileName,
                                    _tmpPath, _rarPath, _rarArgs,
                                    _rarSize, _useRarMax, _par2Pct,
                                    _doCompress, _doPar2, _rarName, _rarPass,
                                    _keepRar, _delAuto, false));
+}
+
+QFileInfo NgPost::_autoSiblingNfo(const QFileInfo &fileInfo) const
+{
+    // only when enabled, and never for the .nfo itself
+    if (!_autoIncludeNfo || fileInfo.suffix().compare("nfo", Qt::CaseInsensitive) == 0)
+        return QFileInfo();
+
+    // look for <completeBaseName>.nfo next to fileInfo (try lower/upper case so it
+    // also works on case sensitive file systems)
+    const QDir dir = fileInfo.absoluteDir();
+    const QString base = fileInfo.completeBaseName();
+    for (const QString &ext : {QStringLiteral("nfo"), QStringLiteral("NFO")})
+    {
+        QFileInfo nfo(dir.absoluteFilePath(QStringLiteral("%1.%2").arg(base, ext)));
+        if (nfo.isFile())
+            return nfo;
+    }
+    return QFileInfo();
+}
+
+bool NgPost::_autoIsBundledNfo(const QFileInfo &fileInfo) const
+{
+    if (!_autoIncludeNfo || fileInfo.suffix().compare("nfo", Qt::CaseInsensitive) != 0)
+        return false;
+
+    // the .nfo is bundled (and thus not posted alone) only if a sibling sharing its
+    // base name but with a different extension sits next to it
+    const QDir dir = fileInfo.absoluteDir();
+    const QString base = fileInfo.completeBaseName();
+    for (const QFileInfo &fi :
+         dir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot))
+    {
+        if (fi.suffix().compare("nfo", Qt::CaseInsensitive) == 0)
+            continue;
+        if (fi.completeBaseName().compare(base, Qt::CaseSensitive) == 0)
+            return true;
+    }
+    return false;
 }
 
 
@@ -2102,6 +2176,8 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _keepNfoExtension = true;
     if (parser.isSet(sOptionNames[Opt::NZB_COPY_NFO]))
         _copyNfoWithNzb = true;
+    if (parser.isSet(sOptionNames[Opt::AUTO_INCLUDE_NFO]))
+        _autoIncludeNfo = true;
 
     if (parser.isSet(sOptionNames[Opt::VPN]) && parser.isSet(sOptionNames[Opt::NO_VPN]))
     {
@@ -2871,6 +2947,12 @@ QString NgPost::_parseConfig(const QString &configPath)
                         val = val.toLower();
                         if (val == "true" || val == "on" || val == "1")
                             _copyNfoWithNzb = true;
+                    }
+                    else if (opt == sOptionNames[Opt::AUTO_INCLUDE_NFO])
+                    {
+                        val = val.toLower();
+                        if (val == "true" || val == "on" || val == "1")
+                            _autoIncludeNfo = true;
                     }
                     else if (opt == sOptionNames[Opt::LOG_IN_FILE] && useHMI())
                     {
@@ -3705,6 +3787,10 @@ void NgPost::saveConfig()
                << "\n"
                << tr("## copy the .nfo file (if present in the original files) next to the generated nzb") << "\n"
                << (_copyNfoWithNzb ? "" : "#") << "NZB_COPY_NFO = true\n"
+               << "\n"
+               << tr("## auto-post (--auto / --monitor): if a posted file has a sibling .nfo") << "\n"
+               << tr("## (same name, different extension) next to it, include that .nfo in the same post") << "\n"
+               << (_autoIncludeNfo ? "" : "#") << "AUTO_INCLUDE_NFO = true\n"
                << "\n"
                << "\n"
                << tr("## Time to wait (seconds) before trying to resume a Post automatically in case of loss of Network (min: %1)").arg(

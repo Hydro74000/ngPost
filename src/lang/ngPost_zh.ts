@@ -27,6 +27,16 @@
 <context>
     <name>AutoPostWidget</name>
     <message>
+        <location filename="../hmi/AutoPostWidget.ui" line="294"/>
+        <source>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</source>
+        <translation>当发布的文件旁边有同名的 .nfo 文件（名称相同、扩展名不同）时，将该 .nfo 包含在同一帖子中（单独的 .nfo 不会单独发布）</translation>
+    </message>
+    <message>
+        <location filename="../hmi/AutoPostWidget.ui" line="297"/>
+        <source>copy nfo alongside other files</source>
+        <translation>将 nfo 与其他文件一起发布</translation>
+    </message>
+    <message>
         <location filename="../hmi/AutoPostWidget.ui" line="14"/>
         <source>Form</source>
         <translation>表格</translation>
