@@ -137,7 +137,18 @@ Press the Scan button and remove what you don't want to post ;)\n\
          useRarMax = _ui->rarMaxCB->isChecked();
     for (const QFileInfo &file : files)
     {
-        PostingWidget *quickPostWidget = _hmi->addNewQuickTab(0, {file});
+        // "copy nfo alongside other files": a lone .nfo that has a sibling is not
+        // posted on its own, and any other file pulls in its sibling .nfo so both
+        // end up in the same post (udatePostingParams() above refreshed the flag)
+        if (_ngPost->_autoIsBundledNfo(file))
+            continue;
+
+        QFileInfoList postFiles{file};
+        QFileInfo nfo = _ngPost->_autoSiblingNfo(file);
+        if (nfo.isFile())
+            postFiles << nfo;
+
+        PostingWidget *quickPostWidget = _hmi->addNewQuickTab(0, postFiles);
         quickPostWidget->init();
         quickPostWidget->genNameAndPassword(_ngPost->_genName, _ngPost->_genPass, _ngPost->_doPar2, useRarMax);
 
