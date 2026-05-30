@@ -46,6 +46,18 @@ jobs:
             prerelease="false"
             channel="stable"
             appimage_update_glob="ngPost-*-x86_64.AppImage.zsync"
+          elif [ "${GITHUB_REF}" = "refs/heads/master" ]; then
+            base_version="$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*([0-9]+([.][0-9]+){1,2}).*/\1/p' src/ngPost_core.pri | head -1)"
+            if [ -z "$base_version" ]; then
+              echo "Unable to read VERSION from src/ngPost_core.pri" >&2
+              exit 1
+            fi
+            tag="v${base_version}"
+            package_version="v${base_version}"
+            release_name="Release v${base_version}"
+            prerelease="false"
+            channel="stable"
+            appimage_update_glob="ngPost-*-x86_64.AppImage.zsync"
           else
             base_version="$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*([0-9]+(\.[0-9]+){1,2}).*/\1/p' src/ngPost_core.pri | head -1)"
             if [ -z "$base_version" ]; then
