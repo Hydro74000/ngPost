@@ -47,6 +47,8 @@
 #include <QHBoxLayout>
 #include <QPainter>
 #include <QScrollArea>
+#include <QShortcut>
+#include <QKeySequence>
 #include <QSplitter>
 #include <QTableWidget>
 #include <QTabWidget>
@@ -1021,7 +1023,7 @@ QWidget *MainWindow::_buildHistoryTab()
         tr("Files"), tr("Articles"), tr("Failed"), tr("Groups"), tr("Password"), tr("NZB path")});
     _historyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     _historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    _historyTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    _historyTable->setSelectionMode(QAbstractItemView::ExtendedSelection);
     _historyTable->setSortingEnabled(true);
     _historyTable->horizontalHeader()->setStretchLastSection(false);
     _historyTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
@@ -1214,6 +1216,11 @@ QWidget *MainWindow::_buildHistoryTab()
     connect(_histCopyPassBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryCopyPassword);
     connect(_histPurgePassBtn,    &QPushButton::clicked,  this, &MainWindow::_onHistoryPurgePassword);
     connect(_histDeleteBtn,       &QPushButton::clicked,  this, &MainWindow::_onHistoryDeleteEntry);
+    // Del key triggers the delete button, but only while the history table has
+    // focus (so it never fires from the resume tab or a text field).
+    auto *histDeleteShortcut = new QShortcut(QKeySequence::Delete, _historyTable);
+    histDeleteShortcut->setContext(Qt::WidgetShortcut);
+    connect(histDeleteShortcut,   &QShortcut::activated,  this, &MainWindow::_onHistoryDeleteEntry);
     connect(_histOpenNzbBtn,      &QPushButton::clicked,  this, &MainWindow::_onHistoryOpenNzb);
     connect(_historyTable,        &QTableWidget::customContextMenuRequested,
             this, &MainWindow::_onHistoryContextMenu);
@@ -1980,21 +1987,47 @@ void MainWindow::_onHistoryPurgePassword()
 
 void MainWindow::_onHistoryDeleteEntry()
 {
-    if (!_selectedHistoryId || !_ngPost) return;
+    if (!_historyTable || !_ngPost) return;
+
+    // Collect the post id of every selected row (multi-selection), falling back
+    // to the current row if the selection model happens to be empty.
+    QList<qint64> postIds;
+    for (const QModelIndex &idx : _historyTable->selectionModel()->selectedRows()) {
+        if (QTableWidgetItem *item = _historyTable->item(idx.row(), 0))
+            postIds << item->data(Qt::UserRole).toLongLong();
+    }
+    if (postIds.isEmpty() && _selectedHistoryId)
+        postIds << _selectedHistoryId;
+    if (postIds.isEmpty()) return;
+
     const int res = QMessageBox::question(
-        this, tr("Delete history entry"),
-        tr("Permanently delete this post from the history?\n"
-           "This also removes all associated file and article records."),
+        this, tr("Delete history entries"),
+        tr("Permanently delete %1 selected post(s) from the history?\n"
+           "This also removes all associated file and article records.")
+            .arg(postIds.size()),
         QMessageBox::Yes, QMessageBox::No);
     if (res != QMessageBox::Yes) return;
 
     PostHistoryService *history = _ngPost->historyService();
-    QString err;
-    if (!history || !history->deletePost(_selectedHistoryId, &err))
-        QMessageBox::warning(this, tr("Error"), err.isEmpty()
-                             ? tr("Could not delete entry.") : err);
-    else
-        _refreshHistoryViews();
+    if (!history) return;
+
+    QString firstError;
+    int failures = 0;
+    for (const qint64 postId : postIds) {
+        QString err;
+        if (!history->deletePost(postId, &err)) {
+            ++failures;
+            if (firstError.isEmpty())
+                firstError = err;
+        }
+    }
+    if (failures)
+        QMessageBox::warning(this, tr("Error"),
+                             firstError.isEmpty()
+                                 ? tr("Could not delete %1 of %2 selected entries.")
+                                       .arg(failures).arg(postIds.size())
+                                 : firstError);
+    _refreshHistoryViews();
 }
 
 void MainWindow::_onHistoryOpenNzb()
