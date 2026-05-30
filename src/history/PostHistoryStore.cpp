@@ -279,7 +279,14 @@ bool PostHistoryStore::_execSchema(QString *error)
                        "FOREIGN KEY(file_id) REFERENCES post_files(id) ON DELETE CASCADE)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status)"),
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_articles_status ON post_articles(status)"),
-        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_files_post ON post_files(post_id)")
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_files_post ON post_files(post_id)"),
+        // Without this index the per-article status UPDATEs (posted/failed/unknown,
+        // keyed on file_id+part) full-scan post_article_attempts, a table that grows
+        // for the whole queue and is never pruned for successful posts. That turns
+        // finalization flushing into O(N^2) work and makes the inter-post stall grow
+        // post after post. (file_id, part) also covers the resume-purge delete.
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_attempts_file_part "
+                       "ON post_article_attempts(file_id, part)")
     };
 
     for (const QString &sql : statements) {
@@ -398,6 +405,21 @@ bool PostHistoryStore::updatePostStatus(qint64 postId,
     if (!q.exec()) {
         setError(error, q);
         return false;
+    }
+
+    // Once a post reaches a terminal status, its per-attempt audit rows are dead
+    // weight: nothing reads post_article_attempts (NZB regeneration and resume
+    // both rely on post_articles), and keeping them lets the table grow unbounded
+    // across a posting queue. Drop them here, best-effort: the status update is
+    // the critical part and must not fail because of this housekeeping, so a purge
+    // error is not propagated (the rows stay and get collected on a later pass).
+    if (status == QStringLiteral("success") || status == QStringLiteral("partial")
+        || status == QStringLiteral("failed")) {
+        QSqlQuery purge(db);
+        purge.prepare(QStringLiteral("DELETE FROM post_article_attempts "
+                                     "WHERE file_id IN (SELECT id FROM post_files WHERE post_id=?)"));
+        purge.addBindValue(postId);
+        purge.exec();
     }
     return true;
 }

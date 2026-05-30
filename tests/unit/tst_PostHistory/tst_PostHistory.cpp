@@ -9,6 +9,8 @@
 #include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QTimer>
@@ -30,6 +32,7 @@ private slots:
     void missing_source_is_not_resumable();
     void mark_article_status_keeps_payload_when_row_is_missing();
     void apply_article_events_batches_ordered_status_changes();
+    void terminal_status_purges_attempt_audit_rows();
     void service_flushes_batches_and_returns_snapshots();
     void nzb_regeneration_keeps_prior_files_after_resume();
     void nzb_regeneration_repairs_missing_article_bytes();
@@ -62,6 +65,29 @@ QList<qint64> nzbSegmentBytes(const QString &nzb)
             bytes << reader.attributes().value(QStringLiteral("bytes")).toLongLong();
     }
     return bytes;
+}
+
+// Counts the per-attempt audit rows of a post by reading the SQLite file
+// directly, since the store exposes no API for them (they are write-only).
+int countAttemptRows(const QString &dbPath, qint64 postId)
+{
+    int n = -1;
+    const QString conn = QStringLiteral("tst_count_attempts");
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conn);
+        db.setDatabaseName(dbPath);
+        if (db.open()) {
+            QSqlQuery q(db);
+            q.prepare(QStringLiteral("SELECT COUNT(*) FROM post_article_attempts "
+                                     "WHERE file_id IN (SELECT id FROM post_files WHERE post_id=?)"));
+            q.addBindValue(postId);
+            if (q.exec() && q.next())
+                n = q.value(0).toInt();
+            db.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(conn);
+    return n;
 }
 
 } // namespace
@@ -342,6 +368,63 @@ void TestPostHistory::apply_article_events_batches_ordered_status_changes()
     QCOMPARE(d.state, ResumePlanner::ResumeState::PartiallyResumable);
     QCOMPARE(d.postedArticles, 1);
     QCOMPARE(d.failedArticles, 1);
+}
+
+void TestPostHistory::terminal_status_purges_attempt_audit_rows()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString dbPath = dir.filePath(QStringLiteral("history.sqlite"));
+    PostHistoryStore store(dbPath, true);
+    QString err;
+    QVERIFY2(store.initialize(&err), qPrintable(err));
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("purge.nzb");
+    post.nzbPath = dir.filePath(QStringLiteral("purge.nzb"));
+    post.from = QStringLiteral("poster@example.invalid");
+    post.groups = { QStringLiteral("alt.binaries.test") };
+    const qint64 postId = store.createPost(post, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.postedName = QStringLiteral("payload.bin");
+    file.sizeBytes = 8;
+    file.totalArticles = 2;
+    file.groups = post.groups;
+    const qint64 fileId = store.upsertFile(file, &err);
+    QVERIFY2(fileId > 0, qPrintable(err));
+
+    // Each posting attempt writes an audit row in post_article_attempts.
+    for (int part = 1; part <= 2; ++part) {
+        const QString msgId = QStringLiteral("a%1@ngpost").arg(part);
+        QVERIFY2(store.markArticlePosting(fileId, part, msgId, 1, &err), qPrintable(err));
+        QVERIFY2(store.markArticlePosted(fileId, part, msgId, &err), qPrintable(err));
+        store.updateArticlePayload(fileId, part, (part - 1) * 4, 4, &err);
+    }
+    QCOMPARE(countAttemptRows(dbPath, postId), 2);
+
+    // Reaching a terminal status drops the now-useless audit rows...
+    QVERIFY2(store.updatePostStatus(postId, QStringLiteral("success"), 1, 2, 0, 8,
+                                    QStringLiteral("1 KB/s"), &err),
+             qPrintable(err));
+    QCOMPARE(countAttemptRows(dbPath, postId), 0);
+
+    // ...while post_articles stay intact and the NZB still regenerates fully.
+    PostHistoryStore::PostDetails details;
+    QVERIFY2(store.loadPostDetails(postId, &details, &err), qPrintable(err));
+    QCOMPARE(details.articlesByFile.value(fileId).size(), 2);
+
+    NzbHistoryRegenerator regenerator(&store);
+    QString nzb;
+    QTextStream stream(&nzb);
+    QVERIFY2(regenerator.writeNzb(postId, stream, false, nullptr, &err), qPrintable(err));
+    QCOMPARE(countNzbSegments(nzb), 2);
+    QVERIFY(nzb.contains(QStringLiteral("a1@ngpost")));
+    QVERIFY(nzb.contains(QStringLiteral("a2@ngpost")));
 }
 
 void TestPostHistory::service_flushes_batches_and_returns_snapshots()
