@@ -1,3 +1,4 @@
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 //========================================================================
 //
 // tst_GoldenNzb.cpp — non-regression diff against committed "golden" NZB

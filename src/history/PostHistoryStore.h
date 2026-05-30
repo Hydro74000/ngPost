@@ -1,3 +1,4 @@
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 //========================================================================
 //
 // Structured posting history for ngPost.

@@ -1,3 +1,4 @@
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 //========================================================================
 //
 // tst_VpnProfile.cpp — VpnProfile struct + VpnManager::Backend enum helpers.

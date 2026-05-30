@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+ * Copyright (c) 2024-2026 Hydro74000 <acymap@gmail.com>
  * Licensed under the GNU General Public License v3.0
  */
 
