@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -403,6 +404,7 @@ void PostingWidget::_buildFilesList(QFileInfoList &files, bool &hasFolder)
 void PostingWidget::init()
 {
     _ui->rarMaxCB->setChecked(_ngPost->_useRarMax);
+    _ui->rarMaxCB->setEnabled(true);
 
     _ui->nzbPassCB->setChecked(false);
     onNzbPassToggled(false);
@@ -417,7 +419,7 @@ void PostingWidget::init()
 
     _ui->redundancySB->setRange(0, 100);
     _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
-    _ui->redundancySB->setEnabled(_ngPost->_par2Args.isEmpty());
+    _ui->redundancySB->setEnabled(true);
 
     if (!_ngPost->_rarPassFixed.isEmpty())
     {
@@ -523,8 +525,7 @@ void PostingWidget::udatePostingParams()
 
     // fetch par2 settings
     _ngPost->_doPar2  = _ui->par2CB->isChecked();
-    if (_ngPost->_par2Args.isEmpty())
-        _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
+    _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
 
     _ngPost->_keepRar = _ui->keepRarCB->isChecked();
 
@@ -623,4 +624,27 @@ void PostingWidget::setPosting()
     _hmi->updateJobTab(this, _hmi->sPostingColor, QIcon(_hmi->sPostingIcon), _postingJob->nzbName());
     _ui->postButton->setText(tr("Stop Posting"));
     _state = STATE::POSTING;
+}
+
+void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted)
+{
+    if (!job)
+        return;
+
+    _ui->filesList->clear2();
+    for (const QFileInfo &file : files)
+        _ui->filesList->addPath(file.absoluteFilePath(), file.isDir());
+
+    _postingJob = job;
+    _postingFinished = false;
+    _state = STATE::POSTING;
+    _ui->nzbFileEdit->setText(job->nzbFilePath());
+
+    if (hasStarted) {
+        _ui->postButton->setText(tr("Stop Posting"));
+        _hmi->updateJobTab(this, _hmi->sPostingColor, QIcon(_hmi->sPostingIcon), job->nzbName());
+    } else {
+        _ui->postButton->setText(tr("Cancel Posting"));
+        _hmi->updateJobTab(this, _hmi->sPendingColor, QIcon(_hmi->sPendingIcon), job->nzbName());
+    }
 }

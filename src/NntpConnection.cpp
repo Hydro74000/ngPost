@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -239,9 +240,14 @@ void NntpConnection::onKillConnection()
             _socket->waitForDisconnected();
         deleteSocket();
 
-        // Coming from PostingJob::pause
-        if (_currentArticle)
+        // Pause/stop can cut an article after the socket write but before the
+        // server reply. Treat it like the other ambiguous network exits.
+        if (_currentArticle) {
+            _currentArticle->nntpFile()->markArticleUnknown(
+                _currentArticle,
+                tr("connection killed before server confirmation"));
             _currentArticle->genNewId();
+        }
     }
 }
 
@@ -288,6 +294,12 @@ void NntpConnection::_closeConnection()
 #endif
             _currentArticle = nullptr;
         }
+        else if (_currentArticle) {
+            _currentArticle->nntpFile()->markArticleUnknown(
+                _currentArticle,
+                tr("connection closed before server confirmation"));
+            _currentArticle->genNewId();
+        }
         emit disconnected(this);
     }
 }
@@ -307,8 +319,12 @@ void NntpConnection::onDisconnected()
         // Let's try to reconnect
         _error(
             tr("Connection lost, trying to reconnect! (nb disconnected: %1)").arg(_nbDisconnected));
-        if (_currentArticle)
+        if (_currentArticle) {
+            _currentArticle->nntpFile()->markArticleUnknown(
+                _currentArticle,
+                tr("connection lost before server confirmation"));
             _currentArticle->genNewId();
+        }
 
         emit startConnection();
     } else {
@@ -572,12 +588,11 @@ void NntpConnection::onReadyRead()
                 //                _error(err);
                 //#endif
                 emit errorConnecting(tr("[Connection #%1] Error authentication to server %2:%3 "
-                                        "with user '%4' and pass '%5'")
+                                        "with user '%4'")
                                          .arg(_id)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
-                                         .arg(_srvParams.user.c_str())
-                                         .arg(_srvParams.pass.c_str()));
+                                         .arg(_srvParams.user.c_str()));
                 _closeConnection();
             } else {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)

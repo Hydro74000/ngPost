@@ -6,7 +6,6 @@ name: VPN E2E
 
 on:
   push:
-    branches: [master, devel, main, 'phase*']
   pull_request:
   workflow_dispatch:
   schedule:
@@ -34,13 +33,15 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+          modules: 'qtcharts'
 
       - name: Build QtKeychain from source
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
-                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+                -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
+                -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
           cmake --build build -j$(nproc)
           cmake --install build
 
@@ -61,8 +62,8 @@ jobs:
 
       - name: Build tests
         run: |
-          cd tests
-          qmake tests.pro CONFIG+=release
+          cd tests/vpn
+          qmake vpn.pro CONFIG+=release
           make -j$(nproc)
 
       - name: Verify WireGuard module + passwordless sudo
@@ -91,18 +92,7 @@ jobs:
           # runs reproduce the same wiring.
           NGPOST_HELPER_LAUNCHER: "sudo -n -E"
         run: |
-          set -e
-          fail=0
-          for t in tests/vpn/tst_*/tst_*; do
-            [ -x "$t" ] || continue
-            echo "::group::$(basename "$t")"
-            "$t" || fail=$((fail+1))
-            echo "::endgroup::"
-          done
-          if [ "$fail" -ne 0 ]; then
-            echo "::error::$fail VPN E2E test binary/binaries failed"
-            exit 1
-          fi
+          bash .github/scripts/run-qt-tests.sh tests/vpn "VPN E2E"
 
       - name: Always tear down any lingering WG state
         if: always()
@@ -120,5 +110,6 @@ jobs:
           name: vpn-e2e-logs
           path: |
             tests/vpn/**/*.log
+            tests/vpn/**/*.stdout.log
             /tmp/ngpost-wg/**
           if-no-files-found: ignore

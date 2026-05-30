@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -20,6 +21,8 @@
 #include "PostingJob.h"
 #include "NgPost.h"
 #include "NntpConnection.h"
+#include "history/PostHistoryService.h"
+#include "history/PostHistoryStore.h"
 #include "nntp/NntpArticle.h"
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
@@ -27,14 +30,152 @@
 #include "hmi/PostingWidget.h"
 #endif
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDebug>
 #include <QDir>
+#include <QMetaObject>
 #include <QMutex>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QThread>
 #include <algorithm>
 #include <cmath>
+
+namespace
+{
+
+int decimalPadding(uint count)
+{
+    int padding = 1;
+    while (count >= 10) {
+        ++padding;
+        count /= 10;
+    }
+    return padding;
+}
+
+QString par2RedundancyArg(bool useParPar, bool useMultiPar, uint redundancy)
+{
+    if (useParPar)
+        return QString("-r%1%").arg(redundancy);
+    if (useMultiPar)
+        return QString("/rr%1").arg(redundancy);
+    return QString("-r%1").arg(redundancy);
+}
+
+bool isSeparateRedundancyArg(const QString &arg)
+{
+    return arg.trimmed() == QStringLiteral("-r");
+}
+
+bool isInlineRedundancyArg(const QString &arg, bool useMultiPar)
+{
+    const QString trimmed = arg.trimmed();
+    if (useMultiPar)
+        return trimmed.startsWith(QStringLiteral("/rr"), Qt::CaseInsensitive);
+    return trimmed.startsWith(QStringLiteral("-r")) && trimmed.size() > 2;
+}
+
+bool isParParAutoSliceLimitArg(const QString &arg)
+{
+    const QString trimmed = arg.trimmed();
+    const QString lowered = arg.trimmed().toLower();
+    return trimmed == QStringLiteral("-S")
+           || lowered == QStringLiteral("--auto-slice-size")
+           || lowered.startsWith(QStringLiteral("--max-input-slices"));
+}
+
+int parParInputSlicesEndIndex(const QStringList &args)
+{
+    for (int i = 0; i < args.size(); ++i) {
+        const QString trimmed = args.at(i).trimmed();
+        const QString lowered = args.at(i).trimmed().toLower();
+        if (trimmed == QStringLiteral("-s") || lowered == QStringLiteral("--input-slices"))
+            return (i + 1 < args.size()) ? i + 1 : i;
+        if ((trimmed.startsWith(QStringLiteral("-s")) && trimmed.size() > 2)
+            || lowered.startsWith(QStringLiteral("--input-slices=")))
+            return i;
+    }
+    return -1;
+}
+
+void normalizeParParSliceSize(QStringList &args)
+{
+    bool hasSliceLimit = false;
+    for (int i = 0; i < args.size(); ++i) {
+        if (isParParAutoSliceLimitArg(args.at(i))) {
+            hasSliceLimit = true;
+            break;
+        }
+    }
+
+    int inputSlicesEnd = parParInputSlicesEndIndex(args);
+    if (inputSlicesEnd < 0) {
+        args.prepend(QStringLiteral("-s1M"));
+        inputSlicesEnd = 0;
+    }
+
+    if (!hasSliceLimit)
+        args.insert(inputSlicesEnd + 1, QStringLiteral("--auto-slice-size"));
+}
+
+QStringList buildPar2Args(const QString &configuredArgs,
+                          bool useParPar,
+                          bool useMultiPar,
+                          uint redundancy)
+{
+    const QString redundancyArg = par2RedundancyArg(useParPar, useMultiPar, redundancy);
+    if (configuredArgs.trimmed().isEmpty()) {
+        if (useParPar)
+            return { QStringLiteral("-s1M"),
+                     QStringLiteral("--auto-slice-size"),
+                     QStringLiteral("-m1024M"),
+                     redundancyArg };
+        return { QStringLiteral("c"),
+                 QStringLiteral("-l"),
+                 QStringLiteral("-m1024"),
+                 redundancyArg };
+    }
+
+    QStringList args = QProcess::splitCommand(configuredArgs);
+    if (useParPar)
+        normalizeParParSliceSize(args);
+
+    bool hasRedundancy = false;
+    for (int i = 0; i < args.size(); ++i) {
+        if (isSeparateRedundancyArg(args.at(i))) {
+            args[i] = redundancyArg;
+            if (i + 1 < args.size()
+                && !args.at(i + 1).startsWith(QLatin1Char('-'))
+                && !args.at(i + 1).startsWith(QLatin1Char('/'))) {
+                args.removeAt(i + 1);
+            }
+            hasRedundancy = true;
+            break;
+        }
+        if (isInlineRedundancyArg(args.at(i), useMultiPar)) {
+            args[i] = redundancyArg;
+            hasRedundancy = true;
+            break;
+        }
+    }
+
+    if (!hasRedundancy)
+        args << redundancyArg;
+    return args;
+}
+
+} // namespace
+
+#ifdef NGPOST_TESTING
+QStringList PostingJob::buildPar2ArgsForTest(const QString &configuredArgs,
+                                             bool useParPar,
+                                             bool useMultiPar,
+                                             uint redundancy)
+{
+    return buildPar2Args(configuredArgs, useParPar, useMultiPar, redundancy);
+}
+#endif
 
 PostingJob::PostingJob(NgPost *ngPost,
                        const QString &nzbFilePath,
@@ -57,6 +198,8 @@ PostingJob::PostingJob(NgPost *ngPost,
                        bool keepRar,
                        bool delFilesAfterPost,
                        bool overwriteNzb,
+                       qint64 resumeHistoryPostId,
+                       const QMap<QString, PostingJob::ResumeFileState> &resumeFileStatesByPath,
                        QObject *parent)
     : QObject(parent)
     , _ngPost(ngPost)
@@ -67,6 +210,7 @@ PostingJob::PostingJob(NgPost *ngPost,
     _extProc(nullptr)
     , _compressDir(nullptr)
     , _limitProcDisplay(false)
+    , _extProcIsPar2(false)
     , _nbProcDisp(42)
     ,
 
@@ -132,6 +276,9 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _isPaused(false)
     , _resumeTimer()
     , _isActiveJob(false)
+    , _historyPostId(resumeHistoryPostId)
+    , _resumeFromHistory(resumeHistoryPostId != 0)
+    , _resumeFileStatesByPath(resumeFileStatesByPath)
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     , _immediateSize(0)
     , _immediateSpeedTimer()
@@ -205,6 +352,42 @@ PostingJob::PostingJob(NgPost *ngPost,
 
     if (ngPost->debugMode())
         _log(NntpConnection::sslSupportInfo());
+
+    if (_ngPost->_ensureHistoryStore()) {
+        PostHistoryService *history = _ngPost->historyService();
+        if (_resumeFromHistory) {
+            QString err;
+            if ((!history || !history->markPostResuming(_historyPostId, &err))
+                && _ngPost->debugMode())
+                _error(tr("History: could not mark post as resuming: %1").arg(err));
+            return;
+        }
+
+        PostHistoryStore::PostRecord rec;
+        rec.nzbName = _nzbName;
+        rec.nzbPath = _nzbFilePath;
+        rec.rarName = _rarName;
+        rec.rarPass = _rarPass;
+        rec.hasPassword = !_rarPass.isEmpty();
+        if (_rarPass.isEmpty())
+            rec.passwordOrigin = QStringLiteral("absent");
+        else if (_ngPost->_genPass && _ngPost->_rarPassFixed.isEmpty())
+            rec.passwordOrigin = QStringLiteral("generated");
+        else if (!_ngPost->_rarPassFixed.isEmpty())
+            rec.passwordOrigin = QStringLiteral("fixed");
+        else
+            rec.passwordOrigin = QStringLiteral("provided");
+        rec.from = QString::fromStdString(_from);
+        rec.groups = _grpList;
+        rec.doCompress = _doCompress;
+        rec.doPar2 = _doPar2;
+        rec.obfuscateArticles = _obfuscateArticles;
+        rec.obfuscateFileName = _obfuscateFileName;
+        QString err;
+        _historyPostId = history ? history->createPost(rec, &err) : 0;
+        if (!_historyPostId && _ngPost->debugMode())
+            _error(tr("History: could not create post record: %1").arg(err));
+    }
 }
 
 PostingJob::~PostingJob()
@@ -268,6 +451,101 @@ QString PostingJob::sslSupportInfo()
 bool PostingJob::supportsSsl()
 {
     return NntpConnection::supportsSsl();
+}
+
+void PostingJob::_flushHistoryService()
+{
+    PostHistoryService *history = _ngPost->historyService();
+    if (!history)
+        return;
+
+    QString err;
+    if (!history->flush(&err) && _ngPost->debugMode())
+        _error(tr("History: could not flush pending article events: %1").arg(err));
+}
+
+qint64 PostingJob::registerHistoryFile(int ordinal, const QFileInfo &file, NntpFile *nntpFile)
+{
+    PostHistoryService *history = _ngPost->historyService();
+    if (!_historyPostId || !history)
+        return 0;
+
+    if (_resumeFromHistory) {
+        const ResumeFileState state =
+            _resumeFileStatesByPath.value(file.absoluteFilePath());
+        if (state.historyFileId)
+            return state.historyFileId;
+        if (_ngPost->debugMode())
+            _error(tr("History: missing resume state for file %1").arg(file.absoluteFilePath()));
+        return 0;
+    }
+
+    PostHistoryStore::FileRecord rec;
+    rec.postId = _historyPostId;
+    rec.ordinal = ordinal;
+    rec.originalPath = file.absoluteFilePath();
+    rec.postedName = file.fileName();
+    rec.sizeBytes = file.size();
+    rec.mtimeEpoch = file.lastModified().toSecsSinceEpoch();
+    rec.totalArticles = static_cast<int>(nntpFile->nbArticles());
+    rec.groups = QString::fromStdString(nntpFile->groups()).split(',', Qt::SkipEmptyParts);
+    rec.status = QStringLiteral("pending");
+    QString err;
+    const qint64 id = history->upsertFile(rec, &err);
+    if (!id && _ngPost->debugMode())
+        _error(tr("History: could not create file record: %1").arg(err));
+    return id;
+}
+
+void PostingJob::recordHistoryArticlePosting(NntpArticle *article, int attemptNo)
+{
+    PostHistoryService *history = _ngPost->historyService();
+    if (!article || !article->nntpFile() || !history)
+        return;
+    history->enqueueArticlePosting(article->nntpFile()->historyFileId(),
+                                   static_cast<int>(article->part()),
+                                   article->id(),
+                                   attemptNo,
+                                   article->filePos(),
+                                   article->fileBytes());
+}
+
+void PostingJob::recordHistoryArticlePosted(NntpArticle *article)
+{
+    PostHistoryService *history = _ngPost->historyService();
+    if (!article || !article->nntpFile() || !history)
+        return;
+    history->enqueueArticlePosted(article->nntpFile()->historyFileId(),
+                                  static_cast<int>(article->part()),
+                                  article->id(),
+                                  article->filePos(),
+                                  article->fileBytes());
+}
+
+void PostingJob::recordHistoryArticleFailed(NntpArticle *article, const QString &reason)
+{
+    PostHistoryService *history = _ngPost->historyService();
+    if (!article || !article->nntpFile() || !history)
+        return;
+    history->enqueueArticleFailed(article->nntpFile()->historyFileId(),
+                                  static_cast<int>(article->part()),
+                                  article->id(),
+                                  reason,
+                                  article->filePos(),
+                                  article->fileBytes());
+}
+
+void PostingJob::recordHistoryArticleUnknown(NntpArticle *article, const QString &reason)
+{
+    PostHistoryService *history = _ngPost->historyService();
+    if (!article || !article->nntpFile() || !history)
+        return;
+    history->enqueueArticleUnknown(article->nntpFile()->historyFileId(),
+                                   static_cast<int>(article->part()),
+                                   article->id(),
+                                   reason,
+                                   article->filePos(),
+                                   article->fileBytes());
 }
 
 void PostingJob::onResumeTriggered()
@@ -562,9 +840,14 @@ void PostingJob::onDisconnectedConnection(NntpConnection *con)
 
         if (_nntpConnections.isEmpty()) {
             if (con->hasNoMoreFiles()) {
-                _finishPosting();
-                if (!_postFinished)
-                    emit noMoreConnection();
+                // Article/file completion is delivered through queued signals.
+                // The last connection can close before the final file slot has
+                // written its NZB entry, so let that slot finish the job.
+                if (_nbPosted == _nbFiles) {
+                    _finishPosting();
+                    if (!_postFinished)
+                        emit noMoreConnection();
+                }
             } else {
                 _error(tr("we lost all the connections..."));
                 if (_ngPost->_tryResumePostWhenConnectionLost) {
@@ -608,7 +891,16 @@ void PostingJob::onNntpFilePosted()
                  .arg(avgSpeed())
                  .arg(nntpFile->name()));
 
-    nntpFile->writeToNZB(_nzbStream, QString::fromStdString(_from));
+    if (_ngPost->historyService() && nntpFile->historyFileId())
+        _ngPost->historyService()->enqueueUpdateFileStatus(
+            nntpFile->historyFileId(),
+            nntpFile->hasFailedArticles() ? QStringLiteral("partial") : QStringLiteral("posted"));
+    if (!nntpFile->hasFailedArticles())
+        nntpFile->writeToNZB(_nzbStream, QString::fromStdString(_from));
+    else
+        _error(tr("Skipping NZB entry for %1 because it has %2 failed articles")
+                   .arg(nntpFile->name())
+                   .arg(nntpFile->nbFailedArticles()));
     _filesInProgress.remove(nntpFile);
     emit nntpFile->scheduleDeletion();
     if (_nbPosted == _nbFiles) {
@@ -638,6 +930,9 @@ void PostingJob::onNntpErrorReading()
 
     _filesInProgress.remove(nntpFile);
     _filesFailed.insert(nntpFile);
+    if (_ngPost->historyService() && nntpFile->historyFileId())
+        _ngPost->historyService()->enqueueUpdateFileStatus(nntpFile->historyFileId(),
+                                                           QStringLiteral("failed"));
     if (_nbPosted == _nbFiles) {
 #ifdef __DEBUG__
         _log(QString(
@@ -714,14 +1009,8 @@ void PostingJob::_preparePostersArticles()
     if (_ngPost->debugFull())
         _log("PostingJob::_prepareArticles");
 
-    for (int i = 0; i < _ngPost->sNbPreparedArticlePerConnection; ++i) {
-        if (MB_LoadAtomic(_noMoreFiles))
-            break;
-        for (Poster *poster : _posters) {
-            if (!poster->prepareArticlesInAdvance())
-                break;
-        }
-    }
+    for (Poster *poster : _posters)
+        poster->scheduleArticlesInAdvance(_ngPost->sNbPreparedArticlePerConnection);
 }
 
 void PostingJob::_resolveNfoSource()
@@ -827,6 +1116,14 @@ NntpArticle *PostingJob::_readNextArticleIntoBufferPtr(const QString &threadName
                          .arg(pos)
                          .arg(_file->pos()));
             ++_part;
+            if (_resumeFromHistory && _nntpFile->isArticleAlreadyPosted(_part)) {
+                if (_ngPost->debugFull())
+                    _log(tr("[%1] skipping already posted article %2 from %3")
+                             .arg(threadName)
+                             .arg(_part)
+                             .arg(_nntpFile->path()));
+                return _readNextArticleIntoBufferPtr(threadName, bufferPtr);
+            }
             NntpArticle *article = new NntpArticle(_nntpFile,
                                                    _part,
                                                    pos,
@@ -871,27 +1168,37 @@ void PostingJob::_initPosting()
     _nzb = new QFile(_nzbFilePath);
     _nbFiles = static_cast<uint>(_files.size());
 
-    int numPadding = 1;
-    double padding = static_cast<double>(_nbFiles) / 10.;
-    while (padding > 1.) {
-        ++numPadding;
-        padding /= 10.;
-    }
-
     // initialize the NntpFiles (active objects)
     _filesToUpload.reserve(static_cast<int>(_nbFiles));
     uint fileNum = 0;
     int nbGroups = _grpList.size();
     for (const QFileInfo &file : _files) {
+        ++fileNum;
+        const ResumeFileState resumeState =
+            _resumeFileStatesByPath.value(file.absoluteFilePath());
+        const bool useResumeState = _resumeFromHistory && resumeState.historyFileId;
+        const uint displayFileNum = useResumeState && resumeState.ordinal > 0
+            ? static_cast<uint>(resumeState.ordinal)
+            : fileNum;
+        const uint displayNbFiles = useResumeState && resumeState.totalFiles > 0
+            ? static_cast<uint>(resumeState.totalFiles)
+            : _nbFiles;
+        QList<QString> fileGroups;
+        if (useResumeState && !resumeState.groups.isEmpty()) {
+            fileGroups = resumeState.groups;
+        } else {
+            fileGroups = _obfuscateArticles && _ngPost->groupPolicyPerFile()
+                         && nbGroups > 1
+                ? QStringList(_grpList.at(std::rand() % nbGroups))
+                : _grpList;
+        }
+
         NntpFile *nntpFile = new NntpFile(this,
                                           file,
-                                          ++fileNum,
-                                          _nbFiles,
-                                          numPadding,
-                                          _obfuscateArticles && _ngPost->groupPolicyPerFile()
-                                                  && nbGroups > 1
-                                              ? QStringList(_grpList.at(std::rand() % nbGroups))
-                                              : _grpList);
+                                          displayFileNum,
+                                          displayNbFiles,
+                                          decimalPadding(displayNbFiles),
+                                          fileGroups);
         connect(nntpFile,
                 &NntpFile::allArticlesArePosted,
                 this,
@@ -909,6 +1216,11 @@ void PostingJob::_initPosting()
                     &PostingJob::onNntpFileStartPosting,
                     Qt::QueuedConnection);
 
+        nntpFile->setHistoryFileId(registerHistoryFile(static_cast<int>(fileNum), file, nntpFile));
+        if (useResumeState) {
+            for (uint part : resumeState.postedParts)
+                nntpFile->markAlreadyPosted(part);
+        }
         _filesToUpload.enqueue(nntpFile);
         _nbArticlesTotal += nntpFile->nbArticles();
     }
@@ -936,18 +1248,38 @@ void PostingJob::_finishPosting()
     if (_timeStart.isValid())
         _printStats();
 
-    for (NntpConnection *con : _nntpConnections)
-        emit con->killConnection();
-
-    qApp->processEvents();
-
-    // 4.: stop and wait for all threads
-    // 2.: close nzb file
-    _closeNzb();
+    for (NntpConnection *con : _nntpConnections) {
+        if (con->thread() == QThread::currentThread())
+            con->onKillConnection();
+        else
+            QMetaObject::invokeMethod(con, "onKillConnection", Qt::BlockingQueuedConnection);
+    }
 
     // 3.: close all the connections (they're living in the _threadPool)
     for (Poster *poster : _posters)
         poster->stopThreads();
+
+    _flushHistoryService();
+
+    if (_historyPostId && _ngPost->historyService()) {
+        QString status;
+        if (_postFinished)
+            status = _nbArticlesFailed ? QStringLiteral("partial") : QStringLiteral("success");
+        else
+            status = QStringLiteral("failed");
+        QString err;
+        _ngPost->historyService()->updatePostStatus(_historyPostId,
+                                                    status,
+                                                    static_cast<int>(_nbFiles),
+                                                    static_cast<int>(_nbArticlesTotal),
+                                                    static_cast<int>(_nbArticlesFailed),
+                                                    static_cast<qint64>(_totalSize),
+                                                    avgSpeed(),
+                                                    &err);
+    }
+
+    // 2.: close nzb file
+    _closeNzb();
 
     if (_ngPost->debugMode())
         _log("All posters stopped...");
@@ -998,6 +1330,15 @@ void PostingJob::_closeNzb()
         if (_nzb->isOpen()) {
             _nzbStream << "</nzb>\n";
             _nzb->close();
+            if (_historyPostId && _ngPost->historyService()) {
+                QStringList warnings;
+                QString err;
+                if (!_ngPost->historyService()->regenerateNzbToFile(
+                        _historyPostId, _nzbFilePath, true, &warnings, &err))
+                    _error(tr("Could not regenerate final NZB from history: %1").arg(err));
+                for (const QString &warning : warnings)
+                    _error(tr("NZB history warning: %1").arg(warning));
+            }
             _ngPost->doNzbPostCMD(this);
         }
         delete _nzb;
@@ -1091,7 +1432,9 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
 
     // 2.: create rar args (rar a -v50m -ed -ep1 -m0 -hp"$PASS" "$TMP_FOLDER/$RAR_NAME.rar" "${FILES[@]}")
     //    QStringList args = {"a", "-idp", "-ep1", compressLevel, QString("%1/%2.rar").arg(archiveTmpFolder).arg(archiveName)};
-    QStringList args = _rarArgs.split(" ");
+    // Use QProcess::splitCommand so quoted values (paths, switches like -p"my key")
+    // survive intact — plain split(' ') was breaking on any embedded space.
+    QStringList args = QProcess::splitCommand(_rarArgs);
     if (!args.contains("a"))
         args.prepend("a");
     if (!_use7z && !args.contains("-idp"))
@@ -1197,6 +1540,7 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
     else
         _log(QString("%1...\n").arg(tr("Compressing files")));
     _limitProcDisplay = false;
+    _extProcIsPar2 = false;
     _extProc->start(cmdRar, args);
 
 #ifdef __DEBUG__
@@ -1255,18 +1599,18 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
     if (!_canGenPar2())
         return false;
 
-    QStringList args;
-    if (_ngPost->_par2Args.isEmpty())
-        args << "c" << "-l" << "-m1024" << QString("-r%1").arg(redundancy);
-    else
-        args << _ngPost->_par2Args.split(" ");
-
     bool useParPar = _ngPost->useParPar();
+
+    QStringList args = buildPar2Args(_ngPost->_par2Args,
+                                     useParPar,
+                                     _ngPost->useMultiPar(),
+                                     redundancy);
+
     QString archiveTmpFolder = QString("%1/%2").arg(tmpFolder, archiveName);
 
     // we've already compressed => we gen par2 for the files in the archive folder
     if (_extProc) {
-        if (useParPar && args.last().trimmed() != "-o")
+        if (useParPar && (args.isEmpty() || args.last().trimmed() != "-o"))
             args << "-o";
         args << QString("%1/%2.par2").arg(archiveTmpFolder, archiveName);
         if (useParPar)
@@ -1285,7 +1629,7 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
         QString basePath = _files.first().absolutePath();
         if (useParPar) {
             args << "-f" << "basename";
-            if (args.last().trimmed() != "-o")
+            if (args.isEmpty() || args.last().trimmed() != "-o")
                 args << "-o";
             args << QString("%1/%2.par2").arg(archiveTmpFolder, archiveName);
         } else {
@@ -1354,8 +1698,8 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
                  .arg(args.join(" ")));
     else
         _log(QString("%1...\n").arg(tr("Generating par2")));
-    if (!_ngPost->useParPar())
-        _limitProcDisplay = true;
+    _limitProcDisplay = true;
+    _extProcIsPar2 = true;
     _nbProcDisp = 0;
     _extProc->start(_ngPost->_par2Path, args);
 
@@ -1388,6 +1732,7 @@ void PostingJob::_cleanExtProc()
 {
     delete _extProc;
     _extProc = nullptr;
+    _extProcIsPar2 = false;
     if (_ngPost->debugFull())
         _log(tr("External process deleted."));
 }
@@ -1434,7 +1779,19 @@ void PostingJob::onExtProcReadyReadStandardOutput()
 
 void PostingJob::onExtProcReadyReadStandardError()
 {
-    _error(_extProc->readAllStandardError());
+    const QByteArray output = _extProc->readAllStandardError();
+
+    if (_extProcIsPar2 && _ngPost->useParPar()) {
+        if (_ngPost->debugMode())
+            _log(QString::fromLocal8Bit(output), false);
+        else if (_isActiveJob) {
+            if (!_limitProcDisplay || ++_nbProcDisp % 42 == 0)
+                _log("*", false);
+        }
+        return;
+    }
+
+    _error(QString::fromLocal8Bit(output));
 }
 
 bool PostingJob::_checkTmpFolder() const

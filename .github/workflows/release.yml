@@ -84,6 +84,7 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+          modules: 'qtcharts'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
@@ -138,6 +139,7 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2022_64'
+          modules: 'qtcharts'
       - name: Build QtKeychain from source (Phase 4 dependency)
         shell: pwsh
         run: |
@@ -166,11 +168,129 @@ jobs:
           nmake
       - name: Deploy Qt DLLs with windeployqt
         run: windeployqt src/release/ngPost.exe --release --qmldir src --compiler-runtime
+      - name: Ensure third-party Windows DLLs and plugins are deployed
+        shell: pwsh
+        run: |
+          $qtKeychain = Get-ChildItem "$env:QT_ROOT_DIR" -Recurse -File -Include '*qt6keychain*.dll' |
+            Select-Object -First 1
+          if (-not $qtKeychain) {
+            throw "qt6keychain DLL not found under QT_ROOT_DIR"
+          }
+          Copy-Item $qtKeychain.FullName src/release/ -Force
+
+          $sqlitePlugin = Join-Path $env:QT_ROOT_DIR "plugins\sqldrivers\qsqlite.dll"
+          if (-not (Test-Path $sqlitePlugin)) {
+            throw "Qt SQLite plugin not found at $sqlitePlugin"
+          }
+          New-Item -ItemType Directory -Force -Path src/release/sqldrivers | Out-Null
+          Copy-Item $sqlitePlugin src/release/sqldrivers/ -Force
+      - name: Fetch ParPar for optional bundling
+        shell: pwsh
+        run: |
+          # NgPost.cpp auto-detects an "embedded" parpar.exe sitting next to
+          # ngPost.exe (see par2Candidates loop in NgPost::NgPost). We ship
+          # ParPar specifically (not par2cmdline / par2cmdline-turbo) because
+          # ngPost passes wildcard arguments like archive.7z* to the par2
+          # binary on Windows. QProcess invokes CreateProcess directly with
+          # no shell, so the binary has to do its own globbing —
+          # par2cmdline-turbo currently doesn't, while ngPost's ParPar path
+          # uses -R <folder> and avoids globbing entirely. ParPar is
+          # released by animetosho into the public domain (CC0).
+          #
+          # parpar is staged outside src/release/ on purpose: src/release/*
+          # is copied unconditionally by both the ZIP package and the Inno
+          # Setup main [Files] entry. parpar.exe is wired into Inno Setup as
+          # a task-gated extra source instead.
+          $parparVersion = "0.4.5"
+          $asset         = "parpar-v$parparVersion-win64.7z"
+          $url           = "https://github.com/animetosho/ParPar/releases/download/v$parparVersion/$asset"
+          $stage         = Join-Path (Get-Location) "dist\parpar"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP $asset
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          # 7-Zip ships preinstalled on windows-latest runners. PowerShell's
+          # Expand-Archive does not support .7z, so we shell out to 7z.exe.
+          $sevenZip = "C:\Program Files\7-Zip\7z.exe"
+          if (-not (Test-Path $sevenZip)) {
+            throw "7-Zip not found at $sevenZip — runner image changed?"
+          }
+          $extract = Join-Path $env:RUNNER_TEMP "parpar-extract"
+          Remove-Item -Recurse -Force $extract -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $extract | Out-Null
+          & $sevenZip x $archive "-o$extract" -y | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            throw "7-Zip failed to extract $asset (exit $LASTEXITCODE)"
+          }
+          $parpar = Get-ChildItem $extract -Recurse -File -Filter 'parpar.exe' |
+            Select-Object -First 1
+          if (-not $parpar) {
+            throw "parpar.exe not found inside $asset"
+          }
+          Copy-Item $parpar.FullName (Join-Path $stage 'parpar.exe') -Force
       - name: Clean Build Artifacts
         shell: pwsh
         run: |
           cd src/release
           Remove-Item -Force *.obj, *.cpp, *.rc, *.res, *.h, *.qrc -ErrorAction SilentlyContinue
+      - name: Verify Windows deployment
+        shell: pwsh
+        run: |
+          $root = Resolve-Path "src/release"
+
+          # NB: Qt6DBus.dll is intentionally absent — QtKeychain only pulls in
+          # QtDBus on Linux. On Windows it uses wincred, so nothing imports
+          # Qt6DBus and windeployqt does not deploy it.
+          $requiredFiles = @(
+            "ngPost.exe",
+            "Qt6Core.dll",
+            "Qt6Gui.dll",
+            "Qt6Network.dll",
+            "Qt6Sql.dll",
+            "Qt6Widgets.dll",
+            "Qt6Charts.dll",
+            "sqldrivers/qsqlite.dll",
+            "platforms/qwindows.dll",
+            "tls/qschannelbackend.dll"
+          )
+          foreach ($rel in $requiredFiles) {
+            $path = Join-Path $root $rel
+            if (-not (Test-Path $path)) {
+              throw "Missing deployed dependency: $rel"
+            }
+          }
+          if (-not (Get-ChildItem $root -File -Filter '*qt6keychain*.dll')) {
+            throw "Missing deployed dependency: qt6keychain DLL"
+          }
+          # parpar.exe lives in dist/parpar (staged for the optional installer
+          # task), not in src/release — the global Inno Setup [Files] entry
+          # would otherwise copy it unconditionally.
+          if (-not (Test-Path "dist/parpar/parpar.exe")) {
+            throw "Missing staged parpar.exe (dist/parpar/parpar.exe)"
+          }
+
+          $expectedDlls = @(
+            "Qt6Core.dll",
+            "Qt6Gui.dll",
+            "Qt6Network.dll",
+            "Qt6Sql.dll",
+            "Qt6Widgets.dll",
+            "Qt6Charts.dll"
+          )
+          $dump = & dumpbin /DEPENDENTS "$root\ngPost.exe" 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            $dump | Write-Output
+            throw "dumpbin failed for ngPost.exe"
+          }
+          # Collapse the multi-line dumpbin output into one string. Against an
+          # array, PowerShell's -match/-notmatch filter elements instead of
+          # returning a boolean, which made the check always fire on the first
+          # DLL.
+          $dumpText = ($dump | Out-String)
+          foreach ($dll in $expectedDlls) {
+            if ($dumpText -notmatch [regex]::Escape($dll)) {
+              throw "ngPost.exe does not declare expected dependency: $dll"
+            }
+          }
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -181,6 +301,11 @@ jobs:
           $pkg = "ngPost-$version-windows-x86_64"
           New-Item -ItemType Directory -Force -Path "dist/$pkg" | Out-Null
           Copy-Item -Recurse src/release/* "dist/$pkg/"
+          # parpar is staged outside src/release/ so the Inno Setup installer
+          # can gate it behind the optional "installparpar" task. For the
+          # standalone ZIP we always include it — no install wizard to drive
+          # the choice, and users who don't want it can just delete the file.
+          Copy-Item dist/parpar/parpar.exe "dist/$pkg/parpar.exe" -Force
           Copy-Item ngPost.conf, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item THIRD_PARTY_LICENSES.md "dist/$pkg/" -ErrorAction SilentlyContinue
@@ -188,6 +313,11 @@ jobs:
           # tunnel registration. They run under UAC via Start-Process RunAs.
           New-Item -ItemType Directory -Force -Path "dist/$pkg/scripts/win" | Out-Null
           Copy-Item src/vpn/scripts/win/*.ps1 "dist/$pkg/scripts/win/"
+          foreach ($helper in @("install-wg-tunnel.ps1", "uninstall-wg-tunnel.ps1")) {
+            if (-not (Test-Path "dist/$pkg/scripts/win/$helper")) {
+              throw "Missing Windows VPN helper in package: $helper"
+            }
+          }
           Compress-Archive -Path "dist/$pkg" -DestinationPath "dist/$pkg.zip"
           Get-ChildItem dist
       - name: Build Windows Setup
@@ -246,6 +376,17 @@ jobs:
           Full GPL v2 text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
           ------------------------------------------------------------------------
+          3. ParPar (parpar.exe)
+          ------------------------------------------------------------------------
+          Licence  : Public Domain / CC0 1.0 Universal
+          Copyright: released into the public domain by Anime Tosho
+          Source   : https://github.com/animetosho/ParPar
+
+          ParPar is a high-performance PAR2 creation tool released into the public
+          domain. Where public domain is not recognised, the project applies the
+          CC0 1.0 dedication. Full text: https://creativecommons.org/publicdomain/zero/1.0/
+
+          ------------------------------------------------------------------------
 
           These programs are independent products; ngPost does not modify them and
           invokes them as separate processes. Their source code is available at the
@@ -278,11 +419,15 @@ jobs:
 
           [Tasks]
           Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
+          Name: "installparpar"; Description: "Install ParPar (recommended for PAR2 redundancy generation)"; GroupDescription: "Optional tools (recommended):"
           Name: "installopenvpn"; Description: "Install OpenVPN Community (required for OpenVPN profiles)"; GroupDescription: "VPN backends (recommended):"
           Name: "installwireguard"; Description: "Install WireGuard for Windows (required for WireGuard profiles)"; GroupDescription: "VPN backends (recommended):"
 
           [Files]
-          Source: "$source\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          ; parpar.exe is excluded here and re-added below under Tasks:
+          ; installparpar so the user can opt out at install time.
+          Source: "$source\*"; DestDir: "{app}"; Excludes: "parpar.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+          Source: "$source\parpar.exe"; DestDir: "{app}"; Flags: ignoreversion; Tasks: installparpar
           Source: "THIRD_PARTY_LICENSES.md"; DestDir: "{app}"; Flags: ignoreversion
           Source: "$ovpnMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installopenvpn; Check: OpenVpnNeeded
           Source: "$wgMsi"; DestDir: "{tmp}"; Flags: deleteafterinstall; Tasks: installwireguard; Check: WireGuardNeeded
@@ -359,6 +504,57 @@ jobs:
               end;
             end;
           end;
+
+          // After a successful install, if the user opted into ParPar and the
+          // bundled ngPost.conf template has no active PAR2_PATH line, append
+          // one pointing at our bundled parpar.exe. NgPost migrates this
+          // seed template into the per-user config on first launch (see
+          // PathHelper::migrateLegacyConfigIfNeeded), so fresh installs pick
+          // up the path automatically. Existing per-user configs are left
+          // untouched — ngPost's runtime auto-detection of parpar.exe sitting
+          // next to ngPost.exe (see par2Candidates in NgPost::NgPost) covers
+          // that case.
+          function ConfHasActivePar2Path(const Lines: TArrayOfString): Boolean;
+          var
+            j: Integer;
+            trimmed: String;
+          begin
+            Result := False;
+            for j := 0 to GetArrayLength(Lines) - 1 do begin
+              trimmed := Trim(Lines[j]);
+              if (trimmed = '') or (Copy(trimmed, 1, 1) = '#') or (Copy(trimmed, 1, 2) = '//') then
+                continue;
+              if (Pos('PAR2_PATH', Uppercase(trimmed)) = 1) then begin
+                Result := True;
+                exit;
+              end;
+            end;
+          end;
+
+          procedure CurStepChanged(CurStep: TSetupStep);
+          var
+            confPath: String;
+            parparPath: String;
+            lines: TArrayOfString;
+            n: Integer;
+          begin
+            if CurStep <> ssPostInstall then exit;
+            if not IsTaskSelected('installparpar') then exit;
+
+            confPath   := ExpandConstant('{app}\ngPost.conf');
+            parparPath := ExpandConstant('{app}\parpar.exe');
+            if not FileExists(confPath) then exit;
+            if not FileExists(parparPath) then exit;
+            if not LoadStringsFromFile(confPath, lines) then exit;
+            if ConfHasActivePar2Path(lines) then exit;
+
+            n := GetArrayLength(lines);
+            SetArrayLength(lines, n + 3);
+            lines[n]     := '';
+            lines[n + 1] := '## Auto-configured by the ngPost Windows installer (installparpar task)';
+            lines[n + 2] := 'PAR2_PATH = ' + parparPath;
+            SaveStringsToFile(confPath, lines, False);
+          end;
           "@
           Set-Content -Path installer.iss -Value $iss -Encoding ASCII
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
@@ -383,6 +579,7 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'clang_64'
+          modules: 'qtcharts'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
@@ -461,6 +658,7 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+          modules: 'qtcharts'
       - name: Build QtKeychain from source (Phase 4 dependency)
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
@@ -593,6 +791,9 @@ jobs:
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
           # Restrict to Qt's lib dir so unrelated tool-cache libs aren't candidates
           export LD_LIBRARY_PATH="$QT_ROOT_DIR/lib"
+          # Remove Mimer SQL plugin: libqsqlmimer.so requires libmimerapi.so which
+          # is not available on the runner and would cause linuxdeploy to abort.
+          find "$QT_ROOT_DIR" -name 'libqsqlmimer*' -delete
           ./linuxdeploy \
             --appdir AppDir \
             --plugin qt \
@@ -618,9 +819,26 @@ jobs:
           cd dist
           APPIMAGE=$(ls *.AppImage)
           ./"$APPIMAGE" --appimage-extract >/dev/null
+          export LD_LIBRARY_PATH="$PWD/squashfs-root/usr/lib:$PWD/squashfs-root/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+          while IFS= read -r -d '' elf; do
+            if file "$elf" | grep -q 'ELF'; then
+              if ldd "$elf" 2>&1 | grep -q 'not found'; then
+                echo "ERROR: unresolved shared libraries for $elf"
+                ldd "$elf" || true
+                exit 1
+              fi
+            fi
+          done < <(find squashfs-root/usr/bin squashfs-root/usr/plugins -type f -perm -111 -print0)
+          for lib in Core Gui Network Widgets Charts Sql DBus; do
+            ls squashfs-root/usr/lib/libQt6${lib}.so* >/dev/null 2>&1 || {
+              echo "ERROR: libQt6${lib} not bundled"; exit 1;
+            }
+          done
           test -f squashfs-root/usr/lib/libssl.so.3    || { echo "ERROR: libssl.so.3 not bundled";    exit 1; }
           test -f squashfs-root/usr/lib/libcrypto.so.3 || { echo "ERROR: libcrypto.so.3 not bundled"; exit 1; }
           ls squashfs-root/usr/lib/libqt6keychain.so* >/dev/null 2>&1 || { echo "ERROR: libqt6keychain not bundled"; exit 1; }
+          test -f squashfs-root/usr/plugins/sqldrivers/libqsqlite.so || { echo "ERROR: Qt SQLite plugin not bundled"; exit 1; }
+          test -f squashfs-root/usr/plugins/platforms/libqxcb.so     || { echo "ERROR: Qt xcb platform plugin not bundled"; exit 1; }
           ls squashfs-root/usr/plugins/tls/ 2>/dev/null || { echo "ERROR: Qt TLS plugins not bundled"; exit 1; }
           # VPN binaries must be present at the path my code looks up first
           test -x squashfs-root/usr/bin/vpn/openvpn      || { echo "ERROR: openvpn not bundled";      exit 1; }

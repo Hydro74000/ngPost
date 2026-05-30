@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -63,7 +64,7 @@ struct NntpServerParams{
 QString NntpServerParams::str() const
 {
     if (auth)
-        return QString("[%5con%6 on %1:%2@%3:%4 enabled:%7, nzbCheck:%8]").arg(user.c_str()).arg(pass.c_str()).arg(
+        return QString("[%4con%5 on %1@%2:%3 enabled:%6, nzbCheck:%7]").arg(user.c_str()).arg(
                     host).arg(port).arg(nbCons).arg(useSSL?" SSL":"").arg(enabled).arg(nzbCheck);
     else
         return QString("[%3con%4 on %1:%2 enabled:%5, nzbCheck:%6]").arg(host).arg(port).arg(nbCons).arg(

@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -147,6 +148,13 @@ bool Poster::prepareArticlesInAdvance()
 #endif
 
     return canProduceAll;
+}
+
+void Poster::scheduleArticlesInAdvance(int rounds)
+{
+    const int nbArticlesToPrepare = rounds * _nntpConnections.size();
+    for (int i = 0; i < nbArticlesToPrepare; ++i)
+        emit _articleBuilder->scheduleNextArticle();
 }
 
 NntpArticle *Poster::_prepareNextArticle(const QString &threadName, bool fillQueue)

@@ -15,6 +15,23 @@ TODO: include ParPar instead of par2cmdline?
 TODO: auto RAR size and par2 parameters depending on the inputs size?
 
 ####################################################
+###       Release: ngPost LevelUp                ###
+###       date:    2026/05/19                    ###
+####################################################
+
+- Add structured SQLite post history via POST_DB.
+- Track posts, groups, files, articles and NNTP attempts with transactional writes.
+- Add article-level resume for partial/failed/unknown posts; ambiguous network
+  loss is stored as unknown and reposted with a new Message-ID.
+- Regenerate final NZB files from consolidated history, including CLI
+  regeneration to stdout or file.
+- Add CLI history/resume commands with dash and underscore aliases.
+- Add GUI History tab with history, stats and resume views.
+- Store archive passwords in history by default for v1, mask them in UI/CLI/CSV,
+  and include them in regenerated NZBs only when explicitly requested.
+- Add explicit legacy POST_HISTORY CSV import.
+
+####################################################
 ###       Release: ngPost v4.16                  ###
 ###       date:    2021/11/29                    ###
 ####################################################

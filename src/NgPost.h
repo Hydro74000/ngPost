@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+ * Copyright (c) 2024-2026 Hydro74000 <acymap@gmail.com>
  * Licensed under the GNU General Public License v3.0
  */
 
@@ -27,8 +28,10 @@ struct NntpServerParams;
 class NntpFile;
 class NntpArticle;
 class QCoreApplication;
+class QCommandLineParser;
 class MainWindow;
 class PostingJob;
+class PostingWidget;
 class FoldersMonitorForNewFiles;
 #ifdef __USE_TMP_RAM__
 class QStorageInfo;
@@ -36,6 +39,7 @@ class QStorageInfo;
 class NzbCheck;
 class UpdateChecker;
 class VpnManager;
+class PostHistoryService;
 
 #define NB_ARTICLES_TO_PREPARE_PER_CONNECTION 3
 
@@ -82,6 +86,8 @@ public:
         DEBUG_FULL,
         POST_HISTORY,
         FIELD_SEPARATOR,
+        POST_DB,
+        HISTORY_STORE_PASSWORDS,
         NZB_RM_ACCENTS,
         RESUME_WAIT,
         NO_RESUME_AUTO,
@@ -135,6 +141,7 @@ public:
         AUTO_CLOSE_TABS,
         KEEP_NFO_EXTENSION,
         NZB_COPY_NFO,
+        AUTO_INCLUDE_NFO,
         AUTO_COMPRESS,
         GROUP_POLICY,
         LOG_IN_FILE,
@@ -160,7 +167,21 @@ public:
         SERVER_USE_VPN, //!< per-server useVpn flag inside [server] block
         VPN,            //!< CLI-only: master switch on
         NO_VPN,         //!< CLI-only: master switch off
-        VPN_PROFILE     //!< CLI-only: select active profile by name
+        VPN_PROFILE,    //!< CLI-only: select active profile by name
+        HISTORY,
+        HISTORY_SHOW,
+        HISTORY_IMPORT_CSV,
+        REGENERATE_NZB,
+        INCLUDE_PASSWORD,
+        RESUME_LIST,
+        RESUME_CHECK,
+        RESUME_POST,
+        RESUME_ALL,
+        RESUME_ABANDON,
+        RESUME_PURGE,
+        DRY_RUN,
+        YES,
+        JSON
     };
 
 private:
@@ -204,7 +225,8 @@ private:
         ERR_SERVER_REGEX,
         ERR_SERVER_PORT,
         ERR_SERVER_CONS,
-        ERR_INPUT_READ
+        ERR_INPUT_READ,
+        ERR_HISTORY
     };
 
 private:
@@ -279,6 +301,10 @@ private:
 
     QString _historyFieldSeparator;
     QString _postHistoryFile;
+    QString _postDbFile;
+    bool _historyStorePasswords;
+    bool _historyCrashedArticlesChecked;
+    PostHistoryService *_historyService;
     QList<QDir> _autoDirs;
 
     FoldersMonitorForNewFiles *_folderMonitor;
@@ -313,6 +339,7 @@ private:
     bool _rarNoRootFolder;
     bool _keepNfoExtension; //!< when obfuscating file names, keep the .nfo extension visible
     bool _copyNfoWithNzb;   //!< copy the .nfo from the original files next to the generated nzb
+    bool _autoIncludeNfo;   //!< auto-post: include a sibling .nfo (same base name) in the same post
 
     bool _tryResumePostWhenConnectionLost;
     ushort _waitDurationBeforeAutoResume;
@@ -420,6 +447,10 @@ public:
 
     QString parseDefaultConfig();
 
+#if defined(NGPOST_TESTING) && defined(__USE_HMI__)
+    inline MainWindow *mainWindowForTest() const;
+#endif
+
     bool startPostingJob(PostingJob *job);
 
     void updateGroups(const QString &groups);
@@ -440,6 +471,9 @@ public:
     inline bool isPosting() const;
     inline bool hasPostingJobs() const;
     void closeAllPostingJobs();
+
+    bool resumePostGui(qint64 postId, PostingWidget *widget = nullptr, QString *error = nullptr);
+    bool regenerateNzbGui(qint64 postId, const QString &outPath, bool includePassword = false);
 
     bool hasMonitoringPostingJobs() const;
     void closeAllMonitoringJobs();
@@ -492,6 +526,7 @@ public:
     inline void enableAutoPacking(bool enable = true);
 
     VpnManager *vpnManager() const { return _vpnManager; }
+    PostHistoryService *historyService() const { return _historyService; }
 
 signals:
     void log(QString msg, bool newline); //!< in case we signal from another thread
@@ -527,6 +562,13 @@ private:
     void _post(const QFileInfo &fileInfo, const QString &monitorFolder = "");
     void _finishPosting();
 
+    //!< auto-post nfo bundling (cf AUTO_INCLUDE_NFO):
+    //!< return the sibling <completeBaseName>.nfo of a non-nfo file, or an invalid QFileInfo
+    QFileInfo _autoSiblingNfo(const QFileInfo &fileInfo) const;
+    //!< true when fileInfo is a .nfo that has a non-nfo sibling sharing its base name
+    //!< (such a .nfo must not be posted on its own: it is bundled with its sibling)
+    bool _autoIsBundledNfo(const QFileInfo &fileInfo) const;
+
     void _prepareNextPacking();
 
     void _startMonitoring(const QString &folderPath);
@@ -538,12 +580,21 @@ private:
 
     void _syntax(char *appName);
     QString _parseConfig(const QString &configPath);
+    static QStringList defaultPackKeywords();
 
 #ifdef __DEBUG__
     void _dumpParams() const;
 #endif
 
     void _showVersionASCII() const;
+    bool _ensureHistoryStore();
+    bool _handleHistoryCommand(QCommandLineParser &parser, bool *startEventLoop = nullptr);
+    void _printHistory(bool jsonOutput = false);
+    void _printHistoryShow(qint64 postId, bool includePassword);
+    bool _regenerateNzbFromHistory(qint64 postId, const QString &outPath, bool includePassword);
+    void _printResumeList(bool jsonOutput);
+    void _printResumeCheck(qint64 postId);
+    bool _resumePostFromHistory(const QString &ids, bool dryRun, bool assumeYes);
 
     // Static functions
 public:
@@ -660,6 +711,13 @@ int NgPost::errCode() const
 {
     return static_cast<int>(_err);
 }
+
+#if defined(NGPOST_TESTING) && defined(__USE_HMI__)
+MainWindow *NgPost::mainWindowForTest() const
+{
+    return _hmi;
+}
+#endif
 
 int NgPost::nbThreads() const
 {
@@ -827,7 +885,14 @@ QStringList NgPost::parseCombinedArgString(const QString &program)
 void NgPost::enableAutoPacking(bool enable)
 {
     _packAuto = enable;
+    _doCompress = false;
+    _genName = false;
+    _genPass = false;
+    _doPar2 = false;
     if (enable) {
+        if (_packAutoKeywords.isEmpty())
+            _packAutoKeywords = defaultPackKeywords();
+
         for (auto it = _packAutoKeywords.cbegin(), itEnd = _packAutoKeywords.cend(); it != itEnd;
              ++it) {
             QString keyWord = (*it).toLower();
@@ -847,11 +912,6 @@ void NgPost::enableAutoPacking(bool enable)
         if (!_quiet)
 #endif
             _log(tr("PACKing auto using: %1").arg(_packAutoKeywords.join(", ").toUpper()));
-    } else {
-        _doCompress = true;
-        _genName = true;
-        _genPass = true;
-        _doPar2 = true;
     }
 }
 
@@ -869,6 +929,16 @@ int NgPost::immediateSpeedDurationMs()
 QString NgPost::optionName(NgPost::Opt key)
 {
     return sOptionNames.value(key, "");
+}
+
+inline QStringList NgPost::defaultPackKeywords()
+{
+    return {
+        sOptionNames[Opt::COMPRESS],
+        sOptionNames[Opt::GEN_NAME],
+        sOptionNames[Opt::GEN_PASS],
+        sOptionNames[Opt::GEN_PAR2]
+    };
 }
 
 QString NgPost::desc(bool useHTML)

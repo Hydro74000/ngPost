@@ -4,6 +4,16 @@
 <context>
     <name>AutoPostWidget</name>
     <message>
+        <location filename="../hmi/AutoPostWidget.ui" line="294"/>
+        <source>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</source>
+        <translation></translation>
+    </message>
+    <message>
+        <location filename="../hmi/AutoPostWidget.ui" line="297"/>
+        <source>copy nfo alongside other files</source>
+        <translation></translation>
+    </message>
+    <message>
         <location filename="../hmi/AutoPostWidget.ui" line="14"/>
         <source>Form</source>
         <translation></translation>
@@ -272,7 +282,7 @@ Press the Scan button and remove what you don&apos;t want to post ;)
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="116"/>
         <source>You can&apos;t use auto posting without compression on folders... (%1)</source>
-        <translation type="unfinished"></translation>
+        <translation>You can&apos;t use auto posting without compression on folders... (%1)</translation>
     </message>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="152"/>
@@ -326,13 +336,14 @@ Are you sure you want to proceed?</source>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="238"/>
         <source>To be implemented...</source>
-        <translation type="unfinished"></translation>
+        <translation>To be implemented...</translation>
     </message>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="239"/>
         <source>You can&apos;t monitor a folder without compression using the GUI...
 It&apos;s possible in command line if MONITOR_IGNORE_DIR is enabled in your configuration file.</source>
-        <translation type="unfinished"></translation>
+        <translation>You can&apos;t monitor a folder without compression using the GUI...
+It&apos;s possible in command line if MONITOR_IGNORE_DIR is enabled in your configuration file.</translation>
     </message>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="242"/>
@@ -427,82 +438,82 @@ It will be irreversible...</source>
     <message>
         <location filename="../hmi/MainWindow.ui" line="135"/>
         <source>Save Email</source>
-        <translation type="unfinished"></translation>
+        <translation>Save Email</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="145"/>
         <source>New Random Email For Each Post</source>
-        <translation type="unfinished"></translation>
+        <translation>New Random Email For Each Post</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="170"/>
         <source>Archive Password:</source>
-        <translation type="unfinished"></translation>
+        <translation>Archive Password:</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="229"/>
         <source>News Groups:</source>
-        <translation type="unfinished"></translation>
+        <translation>News Groups:</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="289"/>
         <source>No. Retry</source>
-        <translation type="unfinished"></translation>
+        <translation>No. Retry</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="315"/>
         <source>No. Threads:</source>
-        <translation type="unfinished"></translation>
+        <translation>No. Threads:</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="342"/>
         <source>Article&apos;s Obfuscation: Subject changed to be a UUID + Random From</source>
-        <translation type="unfinished"></translation>
+        <translation>Article&apos;s Obfuscation: Subject changed to be a UUID + Random From</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="355"/>
         <source>File Name Obfuscation</source>
-        <translation type="unfinished"></translation>
+        <translation>File Name Obfuscation</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="422"/>
         <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation type="unfinished"></translation>
+        <translation>Check once a day for a new ngPost release on GitHub</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="425"/>
         <source>Check for updates</source>
-        <translation type="unfinished"></translation>
+        <translation>Check for updates</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="399"/>
         <source>Keep .nfo file(s) visible on the post: the nfo stays inside the rar AND is posted alongside (named like the archive)</source>
-        <translation type="unfinished"></translation>
+        <translation>Keep .nfo file(s) visible on the post: the nfo stays inside the rar AND is posted alongside (named like the archive)</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="402"/>
         <source>keep nfo visible</source>
-        <translation type="unfinished"></translation>
+        <translation>keep nfo visible</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="468"/>
         <source>NZB Destination Path: </source>
-        <translation type="unfinished"></translation>
+        <translation>NZB Destination Path: </translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="522"/>
         <source>Shutdown Computer</source>
-        <translation type="unfinished"></translation>
+        <translation>Shutdown Computer</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="565"/>
         <source>Save</source>
-        <translation type="unfinished"></translation>
+        <translation>Save</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="639"/>
         <source>Show Debug Info</source>
-        <translation type="unfinished"></translation>
+        <translation>Show Debug Info</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="142"/>
@@ -597,23 +608,23 @@ It will be irreversible...</source>
     <message>
         <location filename="../hmi/MainWindow.ui" line="432"/>
         <source>Tunnel ngPost connections through OpenVPN or WireGuard (the rest of the system is unaffected)</source>
-        <translation type="unfinished"></translation>
+        <translation>Tunnel ngPost connections through OpenVPN or WireGuard (the rest of the system is unaffected)</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="435"/>
         <source>VPN...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="442"/>
         <source>Current VPN tunnel state</source>
-        <translation type="unfinished"></translation>
+        <translation>Current VPN tunnel state</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="445"/>
         <location filename="../hmi/MainWindow.cpp" line="1030"/>
         <source>VPN: disabled</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: disabled</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="481"/>
@@ -699,7 +710,7 @@ It will be irreversible...</source>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="56"/>
         <source>Use VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>Use VPN</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="57"/>
@@ -767,42 +778,42 @@ It will be irreversible...</source>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="420"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="428"/>
         <source>New version available</source>
-        <translation type="unfinished"></translation>
+        <translation>New version available</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="432"/>
         <source>Install and Restart</source>
-        <translation type="unfinished"></translation>
+        <translation>Install and Restart</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="433"/>
         <source>Later</source>
-        <translation type="unfinished"></translation>
+        <translation>Later</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="439"/>
         <source>Downloading update...</source>
-        <translation type="unfinished"></translation>
+        <translation>Downloading update...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="439"/>
         <source>Cancel</source>
-        <translation type="unfinished"></translation>
+        <translation>Cancel</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="457"/>
         <source>Update failed</source>
-        <translation type="unfinished"></translation>
+        <translation>Update failed</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="530"/>
         <source>VPN required</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN required</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="531"/>
@@ -811,7 +822,11 @@ It will be irreversible...</source>
 %1
 
 The job stays in the queue.</source>
-        <translation type="unfinished"></translation>
+        <translation>This job needs the VPN but it cannot be started:
+
+%1
+
+The job stays in the queue.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="984"/>
@@ -831,22 +846,22 @@ The job stays in the queue.</source>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1031"/>
         <source>VPN: starting...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: starting...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1033"/>
         <source>VPN: connected (%1)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: connected (%1)</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1035"/>
         <source>VPN: stopping...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: stopping...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1036"/>
         <source>VPN: failed</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: failed</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="260"/>
@@ -890,6 +905,222 @@ Are you sure you want to quit?</source>
         <location filename="../hmi/MainWindow.cpp" line="965"/>
         <source>Select a Folder</source>
         <translation></translation>
+    </message>
+    <message>
+        <source>Open Resume â</source>
+        <translation>Open Resume →</translation>
+    </message>
+    <message>
+        <source>All statuses</source>
+        <translation>All statuses</translation>
+    </message>
+    <message>
+        <source>Has password</source>
+        <translation>Has password</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <source>Export CSVâ¦</source>
+        <translation>Export CSV…</translation>
+    </message>
+    <message>
+        <source>Search name, NZB, archiveâ¦</source>
+        <translation>Search name, NZB, archive…</translation>
+    </message>
+    <message>
+        <source>Search:</source>
+        <translation>Search:</translation>
+    </message>
+    <message>
+        <source>Status:</source>
+        <translation>Status:</translation>
+    </message>
+    <message>
+        <source>Any date</source>
+        <translation>Any date</translation>
+    </message>
+    <message>
+        <source>Group filterâ¦</source>
+        <translation>Group filter…</translation>
+    </message>
+    <message>
+        <source>Has errors</source>
+        <translation>Has errors</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>Clear</translation>
+    </message>
+    <message>
+        <source>Clear all filters</source>
+        <translation>Clear all filters</translation>
+    </message>
+    <message>
+        <source>From:</source>
+        <translation>From:</translation>
+    </message>
+    <message>
+        <source>To:</source>
+        <translation>To:</translation>
+    </message>
+    <message>
+        <source>Group:</source>
+        <translation>Group:</translation>
+    </message>
+    <message>
+        <source>Date</source>
+        <translation>Date</translation>
+    </message>
+    <message>
+        <source>Speed</source>
+        <translation>Speed</translation>
+    </message>
+    <message>
+        <source>NZB path</source>
+        <translation>NZB path</translation>
+    </message>
+    <message>
+        <source>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</source>
+        <translation>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</translation>
+    </message>
+    <message>
+        <source>Regenerate NZBâ¦</source>
+        <translation>Regenerate NZB…</translation>
+    </message>
+    <message>
+        <source>Copy password</source>
+        <translation>Copy password</translation>
+    </message>
+    <message>
+        <source>Purge password</source>
+        <translation>Purge password</translation>
+    </message>
+    <message>
+        <source>Open NZB location</source>
+        <translation>Open NZB location</translation>
+    </message>
+    <message>
+        <source>Delete entry</source>
+        <translation>Delete entry</translation>
+    </message>
+    <message>
+        <source>History</source>
+        <translation>History</translation>
+    </message>
+    <message>
+        <source>Last 7 days</source>
+        <translation>Last 7 days</translation>
+    </message>
+    <message>
+        <source>Last 30 days</source>
+        <translation>Last 30 days</translation>
+    </message>
+    <message>
+        <source>Last 90 days</source>
+        <translation>Last 90 days</translation>
+    </message>
+    <message>
+        <source>This year</source>
+        <translation>This year</translation>
+    </message>
+    <message>
+        <source>All time</source>
+        <translation>All time</translation>
+    </message>
+    <message>
+        <source>All groups</source>
+        <translation>All groups</translation>
+    </message>
+    <message>
+        <source>Volume and failures per day</source>
+        <translation>Volume and failures per day</translation>
+    </message>
+    <message>
+        <source>Timeline</source>
+        <translation>Timeline</translation>
+    </message>
+    <message>
+        <source>By group</source>
+        <translation>By group</translation>
+    </message>
+    <message>
+        <source>Top posts</source>
+        <translation>Top posts</translation>
+    </message>
+    <message>
+        <source>Posts by newsgroup</source>
+        <translation>Posts by newsgroup</translation>
+    </message>
+    <message>
+        <source>Stats</source>
+        <translation>Stats</translation>
+    </message>
+    <message>
+        <source>&lt;i&gt;Select a post to see resume details.&lt;/i&gt;</source>
+        <translation>&lt;i&gt;Select a post to see resume details.&lt;/i&gt;</translation>
+    </message>
+    <message>
+        <source>Posted</source>
+        <translation>Posted</translation>
+    </message>
+    <message>
+        <source>To repost</source>
+        <translation>To repost</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation>Unknown</translation>
+    </message>
+    <message>
+        <source>Reason</source>
+        <translation>Reason</translation>
+    </message>
+    <message>
+        <source>Abandon</source>
+        <translation>Abandon</translation>
+    </message>
+    <message>
+        <source>Purge resume data</source>
+        <translation>Purge resume data</translation>
+    </message>
+    <message>
+        <source>Ignore (session)</source>
+        <translation>Ignore (session)</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>Resume</translation>
+    </message>
+    <message>
+        <source>Resume posting the selected post(s) from where they stopped</source>
+        <translation>Resume posting the selected post(s) from where they stopped</translation>
+    </message>
+    <message>
+        <source>Mark selected post(s) as abandoned (keep history entry)</source>
+        <translation>Mark selected post(s) as abandoned (keep history entry)</translation>
+    </message>
+    <message>
+        <source>Delete the technical resume data for selected post(s)</source>
+        <translation>Delete the technical resume data for selected post(s)</translation>
+    </message>
+    <message>
+        <source>Hide selected post(s) from this view for this session</source>
+        <translation>Hide selected post(s) from this view for this session</translation>
+    </message>
+    <message>
+        <source>Permanently delete selected post(s) from the history database</source>
+        <translation>Permanently delete selected post(s) from the history database</translation>
+    </message>
+    <message>
+        <source>%1 post(s) can be resumed.</source>
+        <translation>%1 post(s) can be resumed.</translation>
+    </message>
+    <message>
+        <source>%1 post(s) can be resumed. Open the Resume tab to review them.</source>
+        <translation>%1 post(s) can be resumed. Open the Resume tab to review them.</translation>
     </message>
 </context>
 <context>
@@ -1212,27 +1443,27 @@ To list the available options use: %2 --help
     <message>
         <location filename="../NgPost.cpp" line="204"/>
         <source>Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</source>
-        <translation type="unfinished"></translation>
+        <translation>Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="694"/>
         <source>SSL issue on your system...</source>
-        <translation type="unfinished"></translation>
+        <translation>SSL issue on your system...</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="762"/>
         <source>NZB Post cmd: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>NZB Post cmd: %1</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="926"/>
         <source>no packing needed for next pending job %1</source>
-        <translation type="unfinished"></translation>
+        <translation>no packing needed for next pending job %1</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1015"/>
         <source>start non packing job...</source>
-        <translation type="unfinished"></translation>
+        <translation>start non packing job...</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1073"/>
@@ -1242,7 +1473,7 @@ To list the available options use: %2 --help
     <message>
         <location filename="../NgPost.cpp" line="1080"/>
         <source>Cancelled pending job?</source>
-        <translation type="unfinished"></translation>
+        <translation>Cancelled pending job?</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1326"/>
@@ -1253,18 +1484,19 @@ To list the available options use: %2 --help
     <message>
         <location filename="../NgPost.cpp" line="1403"/>
         <source>Error syntax: --auto only works with --compress or --gen_par2 or --pack with at least the keywords COMPRESS or GEN_PAR2 in PACK config</source>
-        <translation type="unfinished"></translation>
+        <translation>Error syntax: --auto only works with --compress or --gen_par2 or --pack with at least the keywords COMPRESS or GEN_PAR2 in PACK config</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1423"/>
         <source>Error: you can only --auto without compression on folders that DON&apos;T have any subfolders.
 That&apos;s not the case for &apos;%1&apos; which contains folders: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>Error: you can only --auto without compression on folders that DON&apos;T have any subfolders.
+That&apos;s not the case for &apos;%1&apos; which contains folders: %2</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1435"/>
         <source>Error syntax: --monitor only works with --compress or with --gen_par2 ONLY IF MONITOR_IGNORE_DIR is enabled in config (--pack can be used)</source>
-        <translation type="unfinished"></translation>
+        <translation>Error syntax: --monitor only works with --compress or with --gen_par2 ONLY IF MONITOR_IGNORE_DIR is enabled in config (--pack can be used)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1476"/>
@@ -1370,17 +1602,18 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <location filename="../NgPost.cpp" line="2037"/>
         <source>Invalid VPN_BACKEND value: %1 (expected &apos;openvpn&apos; or &apos;wireguard&apos;)
 </source>
-        <translation type="unfinished"></translation>
+        <translation>Invalid VPN_BACKEND value: %1 (expected &apos;openvpn&apos; or &apos;wireguard&apos;)
+</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2070"/>
         <source>ngPost starts logging: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>ngPost starts logging: %1</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2076"/>
         <source>Error opening log file: &apos;%1&apos;</source>
-        <translation type="unfinished"></translation>
+        <translation>Error opening log file: &apos;%1&apos;</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2100"/>
@@ -1433,17 +1666,17 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="2281"/>
         <source>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it.</source>
-        <translation type="unfinished"></translation>
+        <translation>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it.</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2283"/>
         <source>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please refer to the conf example: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please refer to the conf example: %1</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2302"/>
         <source>Wrong keywords for PACK: %1. It should be a subset of (%2)</source>
-        <translation type="unfinished"></translation>
+        <translation>Wrong keywords for PACK: %1. It should be a subset of (%2)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2423"/>
@@ -1568,7 +1801,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="2621"/>
         <source>## Lang for the app. Currently supported: EN, FR, ES, DE, NL, PT, ZH</source>
-        <translation type="unfinished"></translation>
+        <translation>## Lang for the app. Currently supported: EN, FR, ES, DE, NL, PT, ZH</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2624"/>
@@ -1648,12 +1881,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="2647"/>
         <source>## here is the list of the available placeholders</source>
-        <translation type="unfinished"></translation>
+        <translation>## here is the list of the available placeholders</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2648"/>
         <source>full path of the source file</source>
-        <translation type="unfinished"></translation>
+        <translation>full path of the source file</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2649"/>
@@ -1703,32 +1936,32 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="2742"/>
         <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation type="unfinished"></translation>
+        <translation>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2744"/>
         <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation type="unfinished"></translation>
+        <translation>## (internal) last update check timestamp, epoch seconds — managed automatically</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2747"/>
         <source>## tunnel ngPost connections through an embedded VPN (Linux v1)</source>
-        <translation type="unfinished"></translation>
+        <translation>## tunnel ngPost connections through an embedded VPN (Linux v1)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2748"/>
         <source>## the VPN affects ngPost only; the rest of the system is unchanged</source>
-        <translation type="unfinished"></translation>
+        <translation>## the VPN affects ngPost only; the rest of the system is unchanged</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2789"/>
         <source>## Shortcut for automatic packing for both GUI and CMD using --pack</source>
-        <translation type="unfinished"></translation>
+        <translation>## Shortcut for automatic packing for both GUI and CMD using --pack</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2790"/>
         <source>## coma separated list using the keywords COMPRESS, GEN_NAME, GEN_PASS and GEN_PAR2</source>
-        <translation type="unfinished"></translation>
+        <translation>## coma separated list using the keywords COMPRESS, GEN_NAME, GEN_PASS and GEN_PAR2</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2791"/>
@@ -1776,12 +2009,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="2679"/>
         <source>## for monitoring, delay to check the size of an incoming file/folder to make sure it is fully arrived before posting it</source>
-        <translation type="unfinished"></translation>
+        <translation>## for monitoring, delay to check the size of an incoming file/folder to make sure it is fully arrived before posting it</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2680"/>
         <source>## must be between 1sec and 120sec (otherwise default: 1sec)</source>
-        <translation type="unfinished"></translation>
+        <translation>## must be between 1sec and 120sec (otherwise default: 1sec)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2683"/>
@@ -1896,12 +2129,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="2753"/>
         <source>## when obfuscating file names, keep the .nfo extension visible</source>
-        <translation type="unfinished"></translation>
+        <translation>## when obfuscating file names, keep the .nfo extension visible</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2756"/>
         <source>## copy the .nfo file (if present in the original files) next to the generated nzb</source>
-        <translation type="unfinished"></translation>
+        <translation>## copy the .nfo file (if present in the original files) next to the generated nzb</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2760"/>
@@ -1941,22 +2174,22 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="2776"/>
         <source>## For GUI ONLY, save the logs in a file (to debug potential crashes)</source>
-        <translation type="unfinished"></translation>
+        <translation>## For GUI ONLY, save the logs in a file (to debug potential crashes)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2777"/>
         <source>## ~/ngPost.log on Linux and MacOS, in the executable folder for Windows</source>
-        <translation type="unfinished"></translation>
+        <translation>## ~/ngPost.log on Linux and MacOS, in the executable folder for Windows</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2778"/>
         <source>## The log is overwritten each time ngPost is launched</source>
-        <translation type="unfinished"></translation>
+        <translation>## The log is overwritten each time ngPost is launched</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2779"/>
         <source>## =&gt; after a crash, please SAVE the log before relaunching ngPost</source>
-        <translation type="unfinished"></translation>
+        <translation>## =&gt; after a crash, please SAVE the log before relaunching ngPost</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2796"/>
@@ -2147,7 +2380,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.h" line="841"/>
         <source>PACKing auto using: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>PACKing auto using: %1</translation>
     </message>
     <message>
         <location filename="../NgPost.h" line="877"/>
@@ -2210,12 +2443,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NntpCheckCon.cpp" line="74"/>
         <source>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</source>
-        <translation type="unfinished"></translation>
+        <translation>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</translation>
     </message>
     <message>
         <location filename="../NntpCheckCon.cpp" line="82"/>
         <source>VPN bind failed on %1: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN bind failed on %1: %2</translation>
     </message>
     <message>
         <location filename="../NntpCheckCon.cpp" line="145"/>
@@ -2254,12 +2487,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NntpConnection.cpp" line="127"/>
         <source>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</source>
-        <translation type="unfinished"></translation>
+        <translation>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</translation>
     </message>
     <message>
         <location filename="../NntpConnection.cpp" line="134"/>
         <source>VPN bind failed on %1: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN bind failed on %1: %2</translation>
     </message>
     <message>
         <location filename="../NntpConnection.cpp" line="243"/>
@@ -2386,42 +2619,42 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="44"/>
         <source>Config file not found or unreadable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Config file not found or unreadable: %1</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="50"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found. Install it under /usr/lib/ngpost/ or run from the AppImage.</source>
-        <translation type="unfinished"></translation>
+        <translation>Privileged helper script ngpost-vpn-helper.sh not found. Install it under /usr/lib/ngpost/ or run from the AppImage.</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="70"/>
         <source>Launching VPN helper: pkexec %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Launching VPN helper: pkexec %1</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="73"/>
         <source>Failed to start pkexec/helper</source>
-        <translation type="unfinished"></translation>
+        <translation>Failed to start pkexec/helper</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="130"/>
         <source>Malformed READY from helper: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Malformed READY from helper: %1</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="148"/>
         <source>helper exited (code %1) before tunnel was ready</source>
-        <translation type="unfinished"></translation>
+        <translation>helper exited (code %1) before tunnel was ready</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="155"/>
         <source>pkexec/helper failed to start (binary missing or denied)</source>
-        <translation type="unfinished"></translation>
+        <translation>pkexec/helper failed to start (binary missing or denied)</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="157"/>
         <source>helper process crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>helper process crashed</translation>
     </message>
 </context>
 <context>
@@ -2480,19 +2713,19 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../PostingJob.cpp" line="359"/>
         <source>Using TMP_RAM path as temporary folder for par2. Post size: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Using TMP_RAM path as temporary folder for par2. Post size: %1</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="362"/>
         <source>Couldn&apos;t use TMP_RAM as there is not enough space: %1 available for a par2 volume using TMP_RAM_RATIO of %2</source>
-        <translation type="unfinished"></translation>
+        <translation>Couldn&apos;t use TMP_RAM as there is not enough space: %1 available for a par2 volume using TMP_RAM_RATIO of %2</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="415"/>
         <location filename="../PostingJob.cpp" line="747"/>
         <location filename="../PostingJob.cpp" line="755"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
-        <translation type="unfinished"></translation>
+        <translation>Couldn&apos;t copy nfo %1 to %2</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="560"/>
@@ -2523,7 +2756,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../PostingJob.cpp" line="753"/>
         <source>Copied nfo file %1 next to the nzb: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>Copied nfo file %1 next to the nzb: %2</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="762"/>
@@ -2595,12 +2828,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../PostingJob.cpp" line="1298"/>
         <source>you can&apos;t post folders without compression...</source>
-        <translation type="unfinished"></translation>
+        <translation>you can&apos;t post folders without compression...</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="1305"/>
         <source>only ParPar allows to generate par2 for files from different folders... you should consider using it ;)</source>
-        <translation type="unfinished"></translation>
+        <translation>only ParPar allows to generate par2 for files from different folders... you should consider using it ;)</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="1340"/>
@@ -2703,6 +2936,71 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <source>ERROR: par2 is not available...</source>
         <translation></translation>
     </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="237"/>
+        <source>History: could not mark post as resuming: %1</source>
+        <translation>History: could not mark post as resuming: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="264"/>
+        <source>History: could not create post record: %1</source>
+        <translation>History: could not create post record: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="342"/>
+        <source>History: missing resume state for file %1</source>
+        <translation>History: missing resume state for file %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="359"/>
+        <source>History: could not create file record: %1</source>
+        <translation>History: could not create file record: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="370"/>
+        <source>History: could not update article payload: %1</source>
+        <translation>History: could not update article payload: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="386"/>
+        <source>History: could not mark article posting: %1</source>
+        <translation>History: could not mark article posting: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="401"/>
+        <source>History: could not mark article posted: %1</source>
+        <translation>History: could not mark article posted: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="417"/>
+        <source>History: could not mark article failed: %1</source>
+        <translation>History: could not mark article failed: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="433"/>
+        <source>History: could not mark article unknown: %1</source>
+        <translation>History: could not mark article unknown: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1234"/>
+        <source>Could not regenerate final NZB from history: %1</source>
+        <translation>Could not regenerate final NZB from history: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1236"/>
+        <source>NZB history warning: %1</source>
+        <translation>NZB history warning: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1238"/>
+        <source>Could not reopen NZB for history regeneration: %1</source>
+        <translation>Could not reopen NZB for history regeneration: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1013"/>
+        <source>[%1] skipping already posted article %2 from %3</source>
+        <translation>[%1] skipping already posted article %2 from %3</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -2749,27 +3047,27 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="24"/>
         <source>Compress Path: </source>
-        <translation type="unfinished"></translation>
+        <translation>Compress Path: </translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="88"/>
         <source>RAR Path: </source>
-        <translation type="unfinished"></translation>
+        <translation>RAR Path: </translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="122"/>
         <source>Vol Size:</source>
-        <translation type="unfinished"></translation>
+        <translation>Vol Size:</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="148"/>
         <source>Limit RAR Number</source>
-        <translation type="unfinished"></translation>
+        <translation>Limit RAR Number</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="177"/>
         <source>PAR2 Redundancy (%): </source>
-        <translation type="unfinished"></translation>
+        <translation>PAR2 Redundancy (%): </translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="209"/>
@@ -2804,32 +3102,32 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="273"/>
         <source>NZB file:</source>
-        <translation type="unfinished"></translation>
+        <translation>NZB file:</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="326"/>
         <source>NZB Password:</source>
-        <translation type="unfinished"></translation>
+        <translation>NZB Password:</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="393"/>
         <source>Compress</source>
-        <translation type="unfinished"></translation>
+        <translation>Compress</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="456"/>
         <source>Gen PAR2</source>
-        <translation type="unfinished"></translation>
+        <translation>Gen PAR2</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="469"/>
         <source>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</source>
-        <translation type="unfinished"></translation>
+        <translation>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="472"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
-        <translation type="unfinished"></translation>
+        <translation>Copy NFO alongside the nzb file (if available)</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="280"/>
@@ -2889,7 +3187,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="446"/>
         <source>Keep Archives</source>
-        <translation type="unfinished"></translation>
+        <translation>Keep Archives</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="453"/>
@@ -3016,12 +3314,12 @@ Would you like to overwrite it ?</source>
     <message>
         <location filename="../utils/UpdateChecker.cpp" line="176"/>
         <source>Unable to write to install directory %1. Opening release page instead.</source>
-        <translation type="unfinished"></translation>
+        <translation>Unable to write to install directory %1. Opening release page instead.</translation>
     </message>
     <message>
         <location filename="../utils/UpdateChecker.cpp" line="211"/>
         <source>Cannot write to %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Cannot write to %1</translation>
     </message>
 </context>
 <context>
@@ -3029,127 +3327,127 @@ Would you like to overwrite it ?</source>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="86"/>
         <source>VPN: no config file selected</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: no config file selected</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="122"/>
         <source>VPN: tunnel up on %1 (%2)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: tunnel up on %1 (%2)</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="130"/>
         <source>VPN: failed — %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: failed — %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="146"/>
         <source>VPN: tunnel stopped</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: tunnel stopped</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="176"/>
         <source>VPN: backend not supported on this platform yet</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: backend not supported on this platform yet</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="279"/>
         <source>VPN: install script not found at %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: install script not found at %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="283"/>
         <source>Running VPN install: pkexec %1 %2</source>
-        <translation type="unfinished"></translation>
+        <translation>Running VPN install: pkexec %1 %2</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="291"/>
         <source>VPN install: timed out</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN install: timed out</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="308"/>
         <source>VPN: uninstall script not found at %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: uninstall script not found at %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="316"/>
         <source>Running VPN uninstall: pkexec %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Running VPN uninstall: pkexec %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="322"/>
         <source>VPN uninstall: timed out</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN uninstall: timed out</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="348"/>
         <source>Startup: cleaned up stale VPN state</source>
-        <translation type="unfinished"></translation>
+        <translation>Startup: cleaned up stale VPN state</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="379"/>
         <source>The VPN helper is not installed. Open the VPN dialog and click Install.</source>
-        <translation type="unfinished"></translation>
+        <translation>The VPN helper is not installed. Open the VPN dialog and click Install.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="383"/>
         <source>No VPN configuration file is selected.</source>
-        <translation type="unfinished"></translation>
+        <translation>No VPN configuration file is selected.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="388"/>
         <source>The VPN configuration file is missing or unreadable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>The VPN configuration file is missing or unreadable: %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="392"/>
         <source>The last VPN attempt failed. Open the VPN dialog and try again.</source>
-        <translation type="unfinished"></translation>
+        <translation>The last VPN attempt failed. Open the VPN dialog and try again.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="407"/>
         <source>Auto-starting VPN for incoming job...</source>
-        <translation type="unfinished"></translation>
+        <translation>Auto-starting VPN for incoming job...</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="410"/>
         <source>Could not start the VPN.</source>
-        <translation type="unfinished"></translation>
+        <translation>Could not start the VPN.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="433"/>
         <source>No more jobs need the VPN; scheduling auto-disconnect in %1 s</source>
-        <translation type="unfinished"></translation>
+        <translation>No more jobs need the VPN; scheduling auto-disconnect in %1 s</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="446"/>
         <source>Auto-disconnect grace expired — stopping VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>Auto-disconnect grace expired — stopping VPN</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="460"/>
         <source>disabled</source>
-        <translation type="unfinished"></translation>
+        <translation>disabled</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="461"/>
         <source>starting...</source>
-        <translation type="unfinished"></translation>
+        <translation>starting...</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="462"/>
         <source>connected</source>
-        <translation type="unfinished"></translation>
+        <translation>connected</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="463"/>
         <source>stopping...</source>
-        <translation type="unfinished"></translation>
+        <translation>stopping...</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="464"/>
         <source>failed</source>
-        <translation type="unfinished"></translation>
+        <translation>failed</translation>
     </message>
 </context>
 <context>
@@ -3157,162 +3455,162 @@ Would you like to overwrite it ?</source>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="14"/>
         <source>VPN tunnel</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN tunnel</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="20"/>
         <source>Setup</source>
-        <translation type="unfinished"></translation>
+        <translation>Setup</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="26"/>
         <source>VPN tunnel requires a one-time setup.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN tunnel requires a one-time setup.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="49"/>
         <source>Install...</source>
-        <translation type="unfinished"></translation>
+        <translation>Install...</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="52"/>
         <source>Install the privileged VPN helper. After this you won&apos;t be prompted for a password on Connect / Disconnect.</source>
-        <translation type="unfinished"></translation>
+        <translation>Install the privileged VPN helper. After this you won&apos;t be prompted for a password on Connect / Disconnect.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="59"/>
         <source>Uninstall...</source>
-        <translation type="unfinished"></translation>
+        <translation>Uninstall...</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="62"/>
         <source>Remove the privileged VPN helper from the system.</source>
-        <translation type="unfinished"></translation>
+        <translation>Remove the privileged VPN helper from the system.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="72"/>
         <source>Configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>Configuration</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="78"/>
         <source>Backend:</source>
-        <translation type="unfinished"></translation>
+        <translation>Backend:</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="86"/>
         <source>OpenVPN</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="91"/>
         <source>WireGuard</source>
-        <translation type="unfinished"></translation>
+        <translation>WireGuard</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="99"/>
         <source>Config file:</source>
-        <translation type="unfinished"></translation>
+        <translation>Config file:</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="111"/>
         <source>Browse...</source>
-        <translation type="unfinished"></translation>
+        <translation>Browse...</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="120"/>
         <source>Auto-connect VPN when a job starts</source>
-        <translation type="unfinished"></translation>
+        <translation>Auto-connect VPN when a job starts</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="123"/>
         <source>When checked, ngPost will bring up the VPN tunnel automatically when any job starts, and disconnect 30 seconds after the queue is empty. Per-server &quot;Use VPN&quot; still controls which connections route through the tunnel.</source>
-        <translation type="unfinished"></translation>
+        <translation>When checked, ngPost will bring up the VPN tunnel automatically when any job starts, and disconnect 30 seconds after the queue is empty. Per-server &quot;Use VPN&quot; still controls which connections route through the tunnel.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="133"/>
         <source>Status</source>
-        <translation type="unfinished"></translation>
+        <translation>Status</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="139"/>
         <source>disabled</source>
-        <translation type="unfinished"></translation>
+        <translation>disabled</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="159"/>
         <source>Connect</source>
-        <translation type="unfinished"></translation>
+        <translation>Connect</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="166"/>
         <source>Disconnect</source>
-        <translation type="unfinished"></translation>
+        <translation>Disconnect</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="176"/>
         <source>Log</source>
-        <translation type="unfinished"></translation>
+        <translation>Log</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="55"/>
         <source>OpenVPN config (*.ovpn *.conf);;All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN config (*.ovpn *.conf);;All files (*)</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="56"/>
         <source>WireGuard config (*.conf);;All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation>WireGuard config (*.conf);;All files (*)</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="60"/>
         <source>Select VPN config</source>
-        <translation type="unfinished"></translation>
+        <translation>Select VPN config</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="69"/>
         <source>No config file selected.</source>
-        <translation type="unfinished"></translation>
+        <translation>No config file selected.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="86"/>
         <source>VPN install</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN install</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="87"/>
         <source>VPN install failed. See the log for details.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN install failed. See the log for details.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="95"/>
         <source>Uninstall VPN helper</source>
-        <translation type="unfinished"></translation>
+        <translation>Uninstall VPN helper</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="96"/>
         <source>This will remove the privileged VPN helper and its Polkit rule. You will need to install it again before using the VPN. Continue?</source>
-        <translation type="unfinished"></translation>
+        <translation>This will remove the privileged VPN helper and its Polkit rule. You will need to install it again before using the VPN. Continue?</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="105"/>
         <source>VPN uninstall</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN uninstall</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="106"/>
         <source>VPN uninstall failed. See the log for details.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN uninstall failed. See the log for details.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="155"/>
         <source>VPN tunnel is installed. Connect / Disconnect will not prompt.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN tunnel is installed. Connect / Disconnect will not prompt.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="159"/>
         <source>VPN tunnel requires a one-time setup (one password prompt).</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN tunnel requires a one-time setup (one password prompt).</translation>
     </message>
 </context>
 <context>
@@ -3320,42 +3618,114 @@ Would you like to overwrite it ?</source>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="44"/>
         <source>Config file not found or unreadable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Config file not found or unreadable: %1</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="50"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found</source>
-        <translation type="unfinished"></translation>
+        <translation>Privileged helper script ngpost-vpn-helper.sh not found</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="70"/>
         <source>Launching VPN helper: pkexec %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Launching VPN helper: pkexec %1</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="73"/>
         <source>Failed to start pkexec/helper</source>
-        <translation type="unfinished"></translation>
+        <translation>Failed to start pkexec/helper</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="126"/>
         <source>Malformed READY from helper: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Malformed READY from helper: %1</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="143"/>
         <source>helper exited (code %1) before tunnel was ready</source>
-        <translation type="unfinished"></translation>
+        <translation>helper exited (code %1) before tunnel was ready</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="150"/>
         <source>pkexec/helper failed to start</source>
-        <translation type="unfinished"></translation>
+        <translation>pkexec/helper failed to start</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="152"/>
         <source>helper process crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>helper process crashed</translation>
+    </message>
+</context>
+<context>
+    <name>NzbHistoryRegenerator</name>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="118"/>
+        <source>history store is not available</source>
+        <translation>history store is not available</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="127"/>
+        <source>post is partial; regenerated NZB may be incomplete</source>
+        <translation>post is partial; regenerated NZB may be incomplete</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="129"/>
+        <source>post had an archive password, but it is not stored</source>
+        <translation>post had an archive password, but it is not stored</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="166"/>
+        <source>file %1 contains unknown articles</source>
+        <translation>file %1 contains unknown articles</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="168"/>
+        <source>file %1 contains non-posted articles</source>
+        <translation>file %1 contains non-posted articles</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="203"/>
+        <source>%1 article segment sizes were missing in history and rebuilt from file metadata</source>
+        <translation>%1 article segment sizes were missing in history and rebuilt from file metadata</translation>
+    </message>
+</context>
+<context>
+    <name>ResumePlanner</name>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="23"/>
+        <location filename="../history/ResumePlanner.cpp" line="24"/>
+        <source>history store is not available</source>
+        <translation>history store is not available</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="30"/>
+        <source>cannot load post</source>
+        <translation>cannot load post</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="36"/>
+        <source>posting never started; nothing to resume</source>
+        <translation>posting never started; nothing to resume</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="69"/>
+        <source>nothing remains to resume</source>
+        <translation>nothing remains to resume</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="72"/>
+        <source>source files are missing or changed</source>
+        <translation>source files are missing or changed</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="75"/>
+        <source>some articles are already posted</source>
+        <translation>some articles are already posted</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="78"/>
+        <source>post can be resumed</source>
+        <translation>post can be resumed</translation>
     </message>
 </context>
 </TS>

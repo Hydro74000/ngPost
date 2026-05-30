@@ -10,7 +10,7 @@
 
 lessThan(QT_MAJOR_VERSION, 6): error("ngPost requires Qt 6 (qtkeychain-qt6). Use qmake6, not qmake/qmake-qt5.")
 
-QT += core network
+QT += core network sql
 
 # Cross-platform credential store (QtKeychain) for OpenVPN auth.
 # Packages: Fedora qtkeychain-qt6, Ubuntu libqt6keychain1-dev, brew qtkeychain.
@@ -26,9 +26,12 @@ QT_KEYCHAIN_PREFIX = $$(QT_ROOT_DIR)
     LIBS        += -L$$QT_KEYCHAIN_PREFIX/lib
 }
 LIBS    += -lqt6keychain
-QT      += dbus
+# QtKeychain pulls in DBus only on Linux (KWallet/libsecret). On Windows it
+# uses wincred and on macOS the Keychain API — adding QT += dbus there links
+# a DLL that nothing imports, which windeployqt then skips.
+linux:!android: QT += dbus
 
-VERSION = 5.3.0
+VERSION = 5.4.0
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 INCLUDEPATH += $$PWD
@@ -79,6 +82,10 @@ SOURCES += \
         $$PWD/ArticleBuilder.cpp \
         $$PWD/FileUploader.cpp \
         $$PWD/FoldersMonitorForNewFiles.cpp \
+        $$PWD/history/NzbHistoryRegenerator.cpp \
+        $$PWD/history/PostHistoryService.cpp \
+        $$PWD/history/PostHistoryStore.cpp \
+        $$PWD/history/ResumePlanner.cpp \
         $$PWD/NgPost.cpp \
         $$PWD/NntpCheckCon.cpp \
         $$PWD/NntpConnection.cpp \
@@ -104,6 +111,10 @@ HEADERS += \
     $$PWD/ArticleBuilder.h \
     $$PWD/FileUploader.h \
     $$PWD/FoldersMonitorForNewFiles.h \
+    $$PWD/history/NzbHistoryRegenerator.h \
+    $$PWD/history/PostHistoryService.h \
+    $$PWD/history/PostHistoryStore.h \
+    $$PWD/history/ResumePlanner.h \
     $$PWD/NgPost.h \
     $$PWD/NntpCheckCon.h \
     $$PWD/NntpConnection.h \
@@ -137,7 +148,7 @@ HEADERS += \
 # .pro files only have to do `CONFIG += use_hmi ; include(common.pri)` and
 # everything resolves consistently.
 use_hmi {
-QT += gui
+QT += gui charts
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 DEFINES += __USE_HMI__
 

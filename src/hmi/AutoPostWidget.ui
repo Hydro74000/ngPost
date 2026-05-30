@@ -138,9 +138,6 @@
          </item>
          <item>
           <widget class="QCheckBox" name="rarMaxCB">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
            <property name="toolTip">
             <string>Check the configuration file and define or comment RAR_MAX to activate/deactivate this feature</string>
            </property>
@@ -288,6 +285,16 @@
          </property>
          <property name="text">
           <string>post Folders</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="copyNfoCB">
+         <property name="toolTip">
+          <string>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</string>
+         </property>
+         <property name="text">
+          <string>copy nfo alongside other files</string>
          </property>
         </widget>
        </item>

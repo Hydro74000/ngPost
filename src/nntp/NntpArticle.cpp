@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+ * Copyright (c) 2024-2026 Hydro74000 <acymap@gmail.com>
  * Licensed under the GNU General Public License v3.0
  */
 
@@ -12,6 +13,7 @@
 #include <cstring>
 #include <sstream>
 #include <random>
+#include <vector>
 
 ushort NntpArticle::sNbMaxTrySending = 5;
 
@@ -72,9 +74,11 @@ int generateRandomStringLength(int start, int end) {
 
 void NntpArticle::yEncBody(const char data[])
 {
-    quint32 crc32    = 0xFFFFFFFF;
-    uchar  *yencBody = new uchar[_fileBytes*2];
-    Yenc::encode(data, _fileBytes, yencBody, crc32);
+    quint32 crc32 = 0xFFFFFFFF;
+    const size_t encodedCapacity =
+        static_cast<size_t>(_fileBytes > 0 ? _fileBytes : 0) * 4 + 16;
+    std::vector<uchar> yencBody(encodedCapacity);
+    Yenc::encode(data, _fileBytes, yencBody.data(), crc32);
 
     std::stringstream ss;
     std::string filename;
@@ -91,11 +95,9 @@ void NntpArticle::yEncBody(const char data[])
     ss << "=ybegin part=" << _part << " total=" << _nntpFile->nbArticles() << " line=128"
        << " size=" << _nntpFile->fileSize() << " name=" << filename << Nntp::ENDLINE
        << "=ypart begin=" << _filePos + 1 << " end=" << _filePos + _fileBytes << Nntp::ENDLINE
-       << yencBody << Nntp::ENDLINE
+       << reinterpret_cast<const char *>(yencBody.data()) << Nntp::ENDLINE
        << "=yend size=" << _fileBytes << " pcrc32=" << std::hex << crc32 << Nntp::ENDLINE
        << "." << Nntp::ENDLINE;
-
-    delete[] yencBody;
 
     std::string body = ss.str();
     _body = new char[body.size() + 1];
@@ -135,7 +137,9 @@ bool NntpArticle::tryResend()
 void NntpArticle::write(NntpConnection *con, const std::string &idSignature)
 {
     ++_nbTrySending;
-    con->write(header(idSignature).c_str());
+    const std::string articleHeader = header(idSignature);
+    _nntpFile->onArticlePostingStarted(this, _nbTrySending);
+    con->write(articleHeader.c_str());
     con->write(_body);
 }
 

@@ -1,0 +1,190 @@
+name: Unit Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: Linux unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libsecret-1-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.2'
+          arch: 'linux_gcc_64'
+          modules: 'qtcharts'
+
+      - name: Build QtKeychain
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
+                -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
+                -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build /tmp/qtkeychain/build -j"$(nproc)"
+          cmake --install /tmp/qtkeychain/build
+
+      - name: Build ngPost for CLI parser tests
+        run: |
+          cd src
+          mkdir -p resources/lang
+          for ts in lang/ngPost_*.ts; do
+            lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
+          done
+          qmake ngPost.pro CONFIG+=release
+          make -j"$(nproc)"
+
+      - name: Build unit tests
+        run: |
+          cd tests/unit
+          qmake unit.pro CONFIG+=release
+          make -j"$(nproc)"
+
+      - name: Run unit tests
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          bash .github/scripts/run-qt-tests.sh tests/unit "unit"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-logs-linux
+          path: |
+            tests/unit/**/*.log
+            tests/unit/**/*.stdout.log
+            tests/unit/**/Testing/**/*.xml
+          if-no-files-found: ignore
+
+  macos:
+    name: macOS unit tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.2'
+          arch: 'clang_64'
+          modules: 'qtcharts'
+
+      - name: Build QtKeychain
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
+                -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
+                -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build /tmp/qtkeychain/build -j"$(sysctl -n hw.ncpu)"
+          cmake --install /tmp/qtkeychain/build
+
+      - name: Build ngPost for CLI parser tests
+        run: |
+          cd src
+          mkdir -p resources/lang
+          for ts in lang/ngPost_*.ts; do
+            lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
+          done
+          qmake ngPost.pro CONFIG+=release
+          make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Build unit tests
+        run: |
+          cd tests/unit
+          qmake unit.pro CONFIG+=release
+          make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Run unit tests
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost.app/Contents/MacOS/ngPost
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          bash .github/scripts/run-qt-tests.sh tests/unit "unit"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-logs-macos
+          path: |
+            tests/unit/**/*.log
+            tests/unit/**/*.stdout.log
+            tests/unit/**/Testing/**/*.xml
+          if-no-files-found: ignore
+
+  windows-msvc:
+    name: Windows MSVC unit tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: '==3.2.0'
+          version: '6.8.2'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtcharts'
+
+      - name: Build QtKeychain
+        shell: pwsh
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
+          cd $env:TEMP\qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON `
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$env:QT_ROOT_DIR"
+          cmake --build build --config Release
+          cmake --install build --config Release
+
+      - name: Build ngPost for CLI parser tests
+        shell: pwsh
+        run: |
+          cd src
+          New-Item -ItemType Directory -Force -Path resources/lang | Out-Null
+          Get-ChildItem lang/ngPost_*.ts | ForEach-Object {
+            lrelease $_.FullName -qm "resources/lang/$($_.BaseName).qm"
+          }
+          qmake ngPost.pro -spec win32-msvc CONFIG+=release
+          nmake
+
+      - name: Build unit tests
+        shell: pwsh
+        run: |
+          cd tests/unit
+          qmake unit.pro -spec win32-msvc CONFIG+=release
+          nmake
+
+      - name: Run unit tests
+        env:
+          NGPOST_BIN: ${{ github.workspace }}\src\release\ngPost.exe
+          QT_QPA_PLATFORM: offscreen
+        shell: bash
+        run: |
+          bash .github/scripts/run-qt-tests.sh tests/unit "unit"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-logs-windows
+          path: |
+            tests/unit/**/*.log
+            tests/unit/**/*.stdout.log
+            tests/unit/**/Testing/**/*.xml
+          if-no-files-found: ignore

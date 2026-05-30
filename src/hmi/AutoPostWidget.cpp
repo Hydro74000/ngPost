@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -50,6 +51,7 @@ AutoPostWidget::~AutoPostWidget()
 void AutoPostWidget::init()
 {
     _ui->rarMaxCB->setChecked(_ngPost->_useRarMax);
+    _ui->rarMaxCB->setEnabled(true);
 
     _ui->keepRarCB->setChecked(_ngPost->_keepRar);
 
@@ -61,7 +63,7 @@ void AutoPostWidget::init()
 
     _ui->redundancySB->setRange(0, 100);
     _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
-    _ui->redundancySB->setEnabled(_ngPost->_par2Args.isEmpty());
+    _ui->redundancySB->setEnabled(true);
 
     _ui->autoDirEdit->setText(_ngPost->_inputDir);
     _ui->nameLengthSB->setRange(5, 50);
@@ -98,6 +100,7 @@ void AutoPostWidget::init()
 
     _ui->extensionFilterEdit->setText(_ngPost->_monitorExtensions.isEmpty()? "" : _ngPost->_monitorExtensions.join(","));
     _ui->dirAllowedCB->setChecked(!_ngPost->_monitorIgnoreDir);
+    _ui->copyNfoCB->setChecked(_ngPost->_autoIncludeNfo);
 }
 
 
@@ -135,7 +138,18 @@ Press the Scan button and remove what you don't want to post ;)\n\
          useRarMax = _ui->rarMaxCB->isChecked();
     for (const QFileInfo &file : files)
     {
-        PostingWidget *quickPostWidget = _hmi->addNewQuickTab(0, {file});
+        // "copy nfo alongside other files": a lone .nfo that has a sibling is not
+        // posted on its own, and any other file pulls in its sibling .nfo so both
+        // end up in the same post (udatePostingParams() above refreshed the flag)
+        if (_ngPost->_autoIsBundledNfo(file))
+            continue;
+
+        QFileInfoList postFiles{file};
+        QFileInfo nfo = _ngPost->_autoSiblingNfo(file);
+        if (nfo.isFile())
+            postFiles << nfo;
+
+        PostingWidget *quickPostWidget = _hmi->addNewQuickTab(0, postFiles);
         quickPostWidget->init();
         quickPostWidget->genNameAndPassword(_ngPost->_genName, _ngPost->_genPass, _ngPost->_doPar2, useRarMax);
 
@@ -372,6 +386,7 @@ void AutoPostWidget::udatePostingParams()
     _ngPost->_genName    = _ngPost->_doCompress ? _ui->genNameCB->isChecked() : false;
     _ngPost->_genPass    = _ngPost->_doCompress ? _ui->genPassCB->isChecked() : false;
     _ngPost->_doPar2     = _ui->par2CB->isChecked();
+    _ngPost->_packAuto   = _ngPost->_doCompress || _ngPost->_doPar2;
 
     _ngPost->_tmpPath    = _ui->compressPathEdit->text();
     _ngPost->_rarPath    = _ui->rarEdit->text();
@@ -386,10 +401,10 @@ void AutoPostWidget::udatePostingParams()
         if (ok)
             _ngPost->_rarSize = val;
     }
+    _ngPost->_useRarMax = _ui->rarMaxCB->isChecked();
 
     // fetch par2 settings
-    if (_ngPost->_par2Args.isEmpty())
-        _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
+    _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
 
     QFileInfo inputDir(_ui->autoDirEdit->text());
     if (inputDir.exists() && inputDir.isDir() && inputDir.isWritable())
@@ -407,6 +422,7 @@ void AutoPostWidget::udatePostingParams()
     }
 
     _ngPost->_monitorIgnoreDir = !_ui->dirAllowedCB->isChecked();
+    _ngPost->_autoIncludeNfo   = _ui->copyNfoCB->isChecked();
 
     _ngPost->_keepRar = _ui->keepRarCB->isChecked();
 }

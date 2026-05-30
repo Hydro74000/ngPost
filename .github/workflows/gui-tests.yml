@@ -30,13 +30,15 @@ jobs:
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
+          modules: 'qtcharts'
 
       - name: Build QtKeychain from source
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
-                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+                -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
+                -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
           cmake --build build -j$(nproc)
           cmake --install build
 
@@ -57,8 +59,8 @@ jobs:
 
       - name: Build GUI tests
         run: |
-          cd tests
-          qmake tests.pro CONFIG+=release
+          cd tests/gui
+          qmake gui.pro CONFIG+=release
           make -j$(nproc)
 
       - name: Run GUI tests under offscreen QPA
@@ -66,18 +68,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           NGPOST_BIN: ${{ github.workspace }}/src/ngPost
         run: |
-          set -e
-          fail=0
-          for t in tests/gui/tst_*/tst_*; do
-            [ -x "$t" ] || continue
-            echo "::group::$(basename "$t")"
-            "$t" || fail=$((fail+1))
-            echo "::endgroup::"
-          done
-          if [ "$fail" -ne 0 ]; then
-            echo "::error::$fail GUI test binary/binaries failed"
-            exit 1
-          fi
+          bash .github/scripts/run-qt-tests.sh tests/gui "GUI"
 
       - name: Upload Test Logs on Failure
         if: failure()
@@ -86,5 +77,6 @@ jobs:
           name: gui-test-logs
           path: |
             tests/gui/**/*.log
+            tests/gui/**/*.stdout.log
             tests/gui/**/Testing/**/*.xml
           if-no-files-found: ignore

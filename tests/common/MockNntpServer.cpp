@@ -1,3 +1,4 @@
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 //========================================================================
 //
 // tests/common/MockNntpServer.cpp — implementation.
@@ -41,6 +42,13 @@ QString resolvePython()
             return p;
     }
     return QStringLiteral("python3");
+}
+
+int startupTimeoutMs()
+{
+    bool ok = false;
+    const int value = QString::fromLocal8Bit(qgetenv("NGPOST_TEST_SERVER_START_TIMEOUT_MS")).toInt(&ok);
+    return (ok && value > 0) ? value : 15000;
 }
 
 } // namespace
@@ -110,7 +118,8 @@ bool MockNntpServer::start(const QStringList &extraArgs, bool withTls)
 
     QElapsedTimer t;
     t.start();
-    while (t.elapsed() < 5000) {
+    const int timeoutMs = startupTimeoutMs();
+    while (t.elapsed() < timeoutMs) {
         readPort(portFile, _port);
         if (withTls)
             readPort(sslPortFile, _sslPort);

@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -30,6 +31,7 @@ protected:
     enum class AppMode : bool {CMD = 0, HMI = 1}; //!< supposed to be CMD but a simple HMI has been added
 
     QCoreApplication  *_app;  //!< Application instance (either a QCoreApplication or a QApplication in HMI mode)
+    bool               _ownsApp;
 #ifdef __USE_HMI__
     const AppMode      _mode; //!< CMD or HMI (for Windowser...)
     MainWindow        *_hmi;  //!< potential HMI

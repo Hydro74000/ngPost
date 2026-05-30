@@ -1,3 +1,4 @@
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 //========================================================================
 //
 // tests/common/MockDnsServer.h — QProcess wrapper around the Python TCP

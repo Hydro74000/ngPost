@@ -44,6 +44,31 @@ the GNU GPL v2 in all respects.
 
 ---
 
+## par2cmdline (Linux `par2`)
+
+- **How used**: bundled inside the Linux AppImage (from the Debian/Ubuntu
+  `par2` package — par2cmdline upstream)
+- **Licence**: GNU General Public Licence, version 2 or later
+- **Copyright**: © 2003 Peter Brian Clements; © 2019–2024 par2cmdline contributors
+- **Source code**: <https://github.com/Parchive/par2cmdline>
+- **Full licence text**: <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>
+
+---
+
+## ParPar (`parpar.exe`)
+
+- **How used**: shipped in the Windows ZIP and offered as an optional installer
+  task on Windows. ngPost prefers ParPar over par2cmdline on Windows because
+  QProcess invokes CreateProcess directly (no shell), so file-list wildcards
+  must be expanded by the par2 binary itself — ParPar's `-R <folder>` flow
+  avoids the issue entirely.
+- **Licence**: Public Domain / CC0 1.0 Universal
+- **Copyright**: released into the public domain by Anime Tosho
+- **Source code**: <https://github.com/animetosho/ParPar>
+- **Full licence text**: <https://creativecommons.org/publicdomain/zero/1.0/legalcode>
+
+---
+
 ## wireguard-go
 
 - **How used**: bundled inside the Linux AppImage as a fallback userspace WireGuard
@@ -77,8 +102,8 @@ SOFTWARE.
 
 ## GNU General Public Licence v2 — reference
 
-OpenVPN, WireGuard for Windows, and wireguard-tools are distributed under the
-GNU GPL v2. The full licence text is available at:
+OpenVPN, WireGuard for Windows, wireguard-tools, and par2cmdline are
+distributed under the GNU GPL v2. The full licence text is available at:
 <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>
 
 As required by the GPL, source code for these programs is available from their

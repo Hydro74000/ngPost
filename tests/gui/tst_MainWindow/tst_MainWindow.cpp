@@ -1,3 +1,4 @@
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 //========================================================================
 //
 // tst_MainWindow.cpp — offscreen GUI tests for the MainWindow's server
@@ -17,13 +18,23 @@
 #include <QtTest>
 #include <QApplication>
 #include <QCheckBox>
+#include <QFile>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalSpy>
+#include <QSpinBox>
+#include <QTabWidget>
 #include <QTableWidget>
+#include <QTextStream>
 
 #include "hmi/MainWindow.h"
 #include "hmi/CheckBoxCenterWidget.h"
+#include "utils/PathHelper.h"
+#include "NgPost.h"
+#include "TestEnv.h"
+
+using ngpost::tests::HomeSandbox;
 
 class TestMainWindow : public QObject
 {
@@ -42,6 +53,14 @@ private slots:
     //! Toggling the per-row "Use VPN" checkbox via the inner QCheckBox
     //! programmatically fires CheckBoxCenterWidget::toggled.
     void vpn_checkbox_toggled_emits_signal();
+
+    //! Long history details should scroll inside the history panel instead of
+    //! changing the top-level window dimensions.
+    void history_detail_text_does_not_resize_window();
+
+    //! Save Config must persist the active GUI tab's RAR_MAX checkbox and
+    //! PAR2_PCT spinbox, even when PAR2_ARGS is present.
+    void save_config_persists_rar_max_and_par2_pct();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -127,6 +146,104 @@ void TestMainWindow::vpn_checkbox_toggled_emits_signal()
     vpnCb->setChecked(!initial);
     QCOMPARE(spy.count(), 1);
     QCOMPARE(vpnCb->isChecked(), !initial);
+}
+
+void TestMainWindow::history_detail_text_does_not_resize_window()
+{
+    MainWindow window;
+    auto *tabs = window.findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    QVERIFY2(tabs, "postTabWidget not found in MainWindow");
+
+    QWidget *historyTab = window.buildHistoryTabForTest();
+    tabs->addTab(historyTab, QStringLiteral("History"));
+    tabs->setCurrentWidget(historyTab);
+
+    window.resize(900, 600);
+    window.show();
+    QTest::qWait(50);
+    const QSize before = window.size();
+
+    auto *detail = window.findChild<QLabel*>(QStringLiteral("historyDetailInfo"));
+    QVERIFY2(detail, "historyDetailInfo not found");
+
+    QString rows;
+    for (int i = 0; i < 200; ++i) {
+        rows += QStringLiteral("<tr><td>file_%1_with_a_long_name.bin</td>"
+                               "<td align='right'>4 MB</td>"
+                               "<td align='center'>posted</td></tr>").arg(i);
+    }
+    detail->setText(QStringLiteral("<table>%1</table>").arg(rows));
+    QApplication::processEvents();
+
+    QCOMPARE(window.size(), before);
+}
+
+void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
+{
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    {
+        QFile conf(confPath);
+        QVERIFY2(conf.open(QIODevice::WriteOnly | QIODevice::Text),
+                 qPrintable(QStringLiteral("Could not write test config: %1").arg(confPath)));
+        QTextStream s(&conf);
+        s << "GROUPS = alt.binaries.test\n"
+          << "TMP_DIR = " << sandbox.rootPath() << "\n"
+          << "RAR_PATH = /bin/true\n"
+          << "RAR_MAX = 99\n"
+          << "PAR2_PCT = 8\n"
+          << "PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -m2048M --progress stdout -q\n";
+    }
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString parseError = ngPost.parseDefaultConfig();
+    QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY2(window, "NgPost did not create a GUI MainWindow for the test");
+    window->init(&ngPost);
+
+    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    QVERIFY2(tabs, "postTabWidget not found");
+    tabs->setCurrentIndex(0);
+    QWidget *quickTab = tabs->widget(0);
+    QVERIFY(quickTab);
+
+    auto *rarMax = quickTab->findChild<QCheckBox*>(QStringLiteral("rarMaxCB"));
+    auto *redundancy = quickTab->findChild<QSpinBox*>(QStringLiteral("redundancySB"));
+    QVERIFY2(rarMax, "rarMaxCB not found on Quick tab");
+    QVERIFY2(redundancy, "redundancySB not found on Quick tab");
+    QVERIFY(rarMax->isEnabled());
+    QVERIFY(redundancy->isEnabled());
+
+    rarMax->setChecked(false);
+    redundancy->setValue(17);
+    QVERIFY(QMetaObject::invokeMethod(window, "onSaveConfig", Qt::DirectConnection));
+
+    QFile saved(confPath);
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    QString content = QString::fromUtf8(saved.readAll());
+    QVERIFY2(content.contains(QStringLiteral("\n#RAR_MAX = 99\n")),
+             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("\nPAR2_PCT = 17\n")),
+             qPrintable(content));
+
+    saved.close();
+    rarMax->setChecked(true);
+    redundancy->setValue(23);
+    QVERIFY(QMetaObject::invokeMethod(window, "onSaveConfig", Qt::DirectConnection));
+
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    content = QString::fromUtf8(saved.readAll());
+    QVERIFY2(content.contains(QStringLiteral("\nRAR_MAX = 99\n")),
+             qPrintable(content));
+    QVERIFY2(!content.contains(QStringLiteral("\n#RAR_MAX = 99\n")),
+             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("\nPAR2_PCT = 23\n")),
+             qPrintable(content));
 }
 
 QTEST_MAIN(TestMainWindow)

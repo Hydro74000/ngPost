@@ -27,6 +27,16 @@
 <context>
     <name>AutoPostWidget</name>
     <message>
+        <location filename="../hmi/AutoPostWidget.ui" line="294"/>
+        <source>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</source>
+        <translation>Wanneer een geplaatst bestand een naastgelegen .nfo-bestand heeft (zelfde naam, andere extensie), dat .nfo in dezelfde post opnemen (de losse .nfo wordt niet apart geplaatst)</translation>
+    </message>
+    <message>
+        <location filename="../hmi/AutoPostWidget.ui" line="297"/>
+        <source>copy nfo alongside other files</source>
+        <translation>nfo samen met andere bestanden plaatsen</translation>
+    </message>
+    <message>
         <location filename="../hmi/AutoPostWidget.ui" line="14"/>
         <source>Form</source>
         <translatorcomment>Controleren</translatorcomment>
@@ -513,12 +523,12 @@ Bestanden worden definitief verwijderd...</translation>
     <message>
         <location filename="../hmi/MainWindow.ui" line="422"/>
         <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation type="unfinished"></translation>
+        <translation>Eenmaal per dag controleren op een nieuwe ngPost-versie op GitHub</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="425"/>
         <source>Check for updates</source>
-        <translation type="unfinished"></translation>
+        <translation>Controleren op updates</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="399"/>
@@ -533,23 +543,23 @@ Bestanden worden definitief verwijderd...</translation>
     <message>
         <location filename="../hmi/MainWindow.ui" line="432"/>
         <source>Tunnel ngPost connections through OpenVPN or WireGuard (the rest of the system is unaffected)</source>
-        <translation type="unfinished"></translation>
+        <translation>ngPost-verbindingen tunnelen via OpenVPN of WireGuard (de rest van het systeem wordt niet beïnvloed)</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="435"/>
         <source>VPN...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="442"/>
         <source>Current VPN tunnel state</source>
-        <translation type="unfinished"></translation>
+        <translation>Huidige VPN-tunnelstatus</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="445"/>
         <location filename="../hmi/MainWindow.cpp" line="1030"/>
         <source>VPN: disabled</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: uitgeschakeld</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="468"/>
@@ -794,7 +804,7 @@ Bestanden worden definitief verwijderd...</translation>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="56"/>
         <source>Use VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN gebruiken</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="57"/>
@@ -885,42 +895,42 @@ Weet je zeker dat je wilt stoppen?</translation>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="420"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;h3&gt;Nieuwe versie beschikbaar: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Huidig: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;Release bekijken op GitHub&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="428"/>
         <source>New version available</source>
-        <translation type="unfinished">Nieuwe versie beschikbaar</translation>
+        <translation>Nieuwe versie beschikbaar</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="432"/>
         <source>Install and Restart</source>
-        <translation type="unfinished"></translation>
+        <translation>Installeren en herstarten</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="433"/>
         <source>Later</source>
-        <translation type="unfinished"></translation>
+        <translation>Later</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="439"/>
         <source>Downloading update...</source>
-        <translation type="unfinished"></translation>
+        <translation>Update downloaden...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="439"/>
         <source>Cancel</source>
-        <translation type="unfinished"></translation>
+        <translation>Annuleren</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="457"/>
         <source>Update failed</source>
-        <translation type="unfinished"></translation>
+        <translation>Update mislukt</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="530"/>
         <source>VPN required</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN vereist</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="531"/>
@@ -929,7 +939,11 @@ Weet je zeker dat je wilt stoppen?</translation>
 %1
 
 The job stays in the queue.</source>
-        <translation type="unfinished"></translation>
+        <translation>Deze taak heeft VPN nodig maar kan niet worden gestart:
+
+%1
+
+De taak blijft in de wachtrij.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="926"/>
@@ -966,22 +980,238 @@ The job stays in the queue.</source>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1031"/>
         <source>VPN: starting...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: bezig met starten...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1033"/>
         <source>VPN: connected (%1)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: verbonden (%1)</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1035"/>
         <source>VPN: stopping...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: bezig met stoppen...</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1036"/>
         <source>VPN: failed</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: mislukt</translation>
+    </message>
+    <message>
+        <source>Open Resume â</source>
+        <translation>Hervattingen openen →</translation>
+    </message>
+    <message>
+        <source>All statuses</source>
+        <translation>Alle statussen</translation>
+    </message>
+    <message>
+        <source>Has password</source>
+        <translation>Met wachtwoord</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>Vernieuwen</translation>
+    </message>
+    <message>
+        <source>Export CSVâ¦</source>
+        <translation>CSV exporteren…</translation>
+    </message>
+    <message>
+        <source>Search name, NZB, archiveâ¦</source>
+        <translation>Naam, NZB, archief zoeken…</translation>
+    </message>
+    <message>
+        <source>Search:</source>
+        <translation>Zoeken:</translation>
+    </message>
+    <message>
+        <source>Status:</source>
+        <translation>Status:</translation>
+    </message>
+    <message>
+        <source>Any date</source>
+        <translation>Elke datum</translation>
+    </message>
+    <message>
+        <source>Group filterâ¦</source>
+        <translation>Groepsfilter…</translation>
+    </message>
+    <message>
+        <source>Has errors</source>
+        <translation>Met fouten</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>Wissen</translation>
+    </message>
+    <message>
+        <source>Clear all filters</source>
+        <translation>Alle filters wissen</translation>
+    </message>
+    <message>
+        <source>From:</source>
+        <translation>Van:</translation>
+    </message>
+    <message>
+        <source>To:</source>
+        <translation>Tot:</translation>
+    </message>
+    <message>
+        <source>Group:</source>
+        <translation>Groep:</translation>
+    </message>
+    <message>
+        <source>Date</source>
+        <translation>Datum</translation>
+    </message>
+    <message>
+        <source>Speed</source>
+        <translation>Snelheid</translation>
+    </message>
+    <message>
+        <source>NZB path</source>
+        <translation>NZB-pad</translation>
+    </message>
+    <message>
+        <source>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</source>
+        <translation>&lt;i&gt;Selecteer een post om de details te zien.&lt;/i&gt;</translation>
+    </message>
+    <message>
+        <source>Regenerate NZBâ¦</source>
+        <translation>NZB regenereren…</translation>
+    </message>
+    <message>
+        <source>Copy password</source>
+        <translation>Wachtwoord kopiëren</translation>
+    </message>
+    <message>
+        <source>Purge password</source>
+        <translation>Wachtwoord wissen</translation>
+    </message>
+    <message>
+        <source>Open NZB location</source>
+        <translation>NZB-locatie openen</translation>
+    </message>
+    <message>
+        <source>Delete entry</source>
+        <translation>Item verwijderen</translation>
+    </message>
+    <message>
+        <source>History</source>
+        <translation>Geschiedenis</translation>
+    </message>
+    <message>
+        <source>Last 7 days</source>
+        <translation>Laatste 7 dagen</translation>
+    </message>
+    <message>
+        <source>Last 30 days</source>
+        <translation>Laatste 30 dagen</translation>
+    </message>
+    <message>
+        <source>Last 90 days</source>
+        <translation>Laatste 90 dagen</translation>
+    </message>
+    <message>
+        <source>This year</source>
+        <translation>Dit jaar</translation>
+    </message>
+    <message>
+        <source>All time</source>
+        <translation>Altijd</translation>
+    </message>
+    <message>
+        <source>All groups</source>
+        <translation>Alle groepen</translation>
+    </message>
+    <message>
+        <source>Volume and failures per day</source>
+        <translation>Volume en fouten per dag</translation>
+    </message>
+    <message>
+        <source>Timeline</source>
+        <translation>Tijdlijn</translation>
+    </message>
+    <message>
+        <source>By group</source>
+        <translation>Per groep</translation>
+    </message>
+    <message>
+        <source>Top posts</source>
+        <translation>Top posts</translation>
+    </message>
+    <message>
+        <source>Posts by newsgroup</source>
+        <translation>Posts per nieuwsgroep</translation>
+    </message>
+    <message>
+        <source>Stats</source>
+        <translation>Statistieken</translation>
+    </message>
+    <message>
+        <source>&lt;i&gt;Select a post to see resume details.&lt;/i&gt;</source>
+        <translation>&lt;i&gt;Selecteer een post om de hersteldetails te zien.&lt;/i&gt;</translation>
+    </message>
+    <message>
+        <source>Posted</source>
+        <translation>Geplaatst</translation>
+    </message>
+    <message>
+        <source>To repost</source>
+        <translation>Opnieuw plaatsen</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation>Onbekend</translation>
+    </message>
+    <message>
+        <source>Reason</source>
+        <translation>Reden</translation>
+    </message>
+    <message>
+        <source>Abandon</source>
+        <translation>Opgeven</translation>
+    </message>
+    <message>
+        <source>Purge resume data</source>
+        <translation>Herstelgegevens verwijderen</translation>
+    </message>
+    <message>
+        <source>Ignore (session)</source>
+        <translation>Negeren (sessie)</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>Hervattingen</translation>
+    </message>
+    <message>
+        <source>Resume posting the selected post(s) from where they stopped</source>
+        <translation>Het/de geselecteerde post(s) hervatten waar het/ze gebleven is/zijn</translation>
+    </message>
+    <message>
+        <source>Mark selected post(s) as abandoned (keep history entry)</source>
+        <translation>Het/de geselecteerde post(s) als opgegeven markeren (geschiedenisitem bewaren)</translation>
+    </message>
+    <message>
+        <source>Delete the technical resume data for selected post(s)</source>
+        <translation>De technische herstelgegevens voor het/de geselecteerde post(s) verwijderen</translation>
+    </message>
+    <message>
+        <source>Hide selected post(s) from this view for this session</source>
+        <translation>Het/de geselecteerde post(s) voor deze sessie verbergen</translation>
+    </message>
+    <message>
+        <source>Permanently delete selected post(s) from the history database</source>
+        <translation>Het/de geselecteerde post(s) permanent uit de database verwijderen</translation>
+    </message>
+    <message>
+        <source>%1 post(s) can be resumed.</source>
+        <translation>%1 post(s) kunnen worden hervat.</translation>
+    </message>
+    <message>
+        <source>%1 post(s) can be resumed. Open the Resume tab to review them.</source>
+        <translation>%1 post(s) kunnen worden hervat. Open het tabblad Hervattingen om ze te bekijken.</translation>
     </message>
 </context>
 <context>
@@ -1527,7 +1757,8 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <location filename="../NgPost.cpp" line="2037"/>
         <source>Invalid VPN_BACKEND value: %1 (expected &apos;openvpn&apos; or &apos;wireguard&apos;)
 </source>
-        <translation type="unfinished"></translation>
+        <translation>Ongeldige VPN_BACKEND-waarde: %1 (verwacht &apos;openvpn&apos; of &apos;wireguard&apos;)
+</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2070"/>
@@ -2064,22 +2295,22 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NgPost.cpp" line="2742"/>
         <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation type="unfinished"></translation>
+        <translation>## eenmaal per dag controleren op een nieuwe ngPost-versie op GitHub (Hydro74000/ngPost)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2744"/>
         <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation type="unfinished"></translation>
+        <translation>## (intern) tijdstempel van de laatste updatecontrole, epoch-seconden — automatisch beheerd</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2747"/>
         <source>## tunnel ngPost connections through an embedded VPN (Linux v1)</source>
-        <translation type="unfinished"></translation>
+        <translation>## ngPost-verbindingen tunnelen via een ingebouwde VPN (Linux v1)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2748"/>
         <source>## the VPN affects ngPost only; the rest of the system is unchanged</source>
-        <translation type="unfinished"></translation>
+        <translation>## de VPN beïnvloedt alleen ngPost; de rest van het systeem is ongewijzigd</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2753"/>
@@ -2376,12 +2607,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NntpCheckCon.cpp" line="74"/>
         <source>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</source>
-        <translation type="unfinished"></translation>
+        <translation>Server &apos;%1&apos; is gemarkeerd als VPN gebruiken maar de VPN-tunnel is niet verbonden</translation>
     </message>
     <message>
         <location filename="../NntpCheckCon.cpp" line="82"/>
         <source>VPN bind failed on %1: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-binding mislukt op %1: %2</translation>
     </message>
     <message>
         <location filename="../NntpCheckCon.cpp" line="145"/>
@@ -2420,12 +2651,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NntpConnection.cpp" line="127"/>
         <source>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</source>
-        <translation type="unfinished"></translation>
+        <translation>Server &apos;%1&apos; is gemarkeerd als VPN gebruiken maar de VPN-tunnel is niet verbonden</translation>
     </message>
     <message>
         <location filename="../NntpConnection.cpp" line="134"/>
         <source>VPN bind failed on %1: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-binding mislukt op %1: %2</translation>
     </message>
     <message>
         <location filename="../NntpConnection.cpp" line="243"/>
@@ -2553,42 +2784,42 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="44"/>
         <source>Config file not found or unreadable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Configuratiebestand niet gevonden of niet leesbaar: %1</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="50"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found. Install it under /usr/lib/ngpost/ or run from the AppImage.</source>
-        <translation type="unfinished"></translation>
+        <translation>Geprivilegieerd hulpscript ngpost-vpn-helper.sh niet gevonden. Installeer het in /usr/lib/ngpost/ of start vanuit de AppImage.</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="70"/>
         <source>Launching VPN helper: pkexec %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-helper starten: pkexec %1</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="73"/>
         <source>Failed to start pkexec/helper</source>
-        <translation type="unfinished"></translation>
+        <translation>Starten van pkexec/helper mislukt</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="130"/>
         <source>Malformed READY from helper: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Misvormde READY van helper: %1</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="148"/>
         <source>helper exited (code %1) before tunnel was ready</source>
-        <translation type="unfinished"></translation>
+        <translation>helper werd beëindigd (code %1) voordat de tunnel gereed was</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="155"/>
         <source>pkexec/helper failed to start (binary missing or denied)</source>
-        <translation type="unfinished"></translation>
+        <translation>pkexec/helper kon niet starten (binair bestand ontbreekt of geweigerd)</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="157"/>
         <source>helper process crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>helper-proces is gecrasht</translation>
     </message>
 </context>
 <context>
@@ -2875,6 +3106,71 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <location filename="../PostingJob.cpp" line="1483"/>
         <source>ERROR: par2 is not available...</source>
         <translation>FOUT: par2 is niet beschikbaar ...</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="237"/>
+        <source>History: could not mark post as resuming: %1</source>
+        <translation>Geschiedenis: kon post niet markeren als hervattend: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="264"/>
+        <source>History: could not create post record: %1</source>
+        <translation>Geschiedenis: kon geen postrecord aanmaken: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="342"/>
+        <source>History: missing resume state for file %1</source>
+        <translation>Geschiedenis: ontbrekende herstelstatus voor bestand %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="359"/>
+        <source>History: could not create file record: %1</source>
+        <translation>Geschiedenis: kon geen bestandsrecord aanmaken: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="370"/>
+        <source>History: could not update article payload: %1</source>
+        <translation>Geschiedenis: kon artikelpayload niet bijwerken: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="386"/>
+        <source>History: could not mark article posting: %1</source>
+        <translation>Geschiedenis: kon artikel niet markeren als geplaatst wordend: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="401"/>
+        <source>History: could not mark article posted: %1</source>
+        <translation>Geschiedenis: kon artikel niet markeren als geplaatst: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="417"/>
+        <source>History: could not mark article failed: %1</source>
+        <translation>Geschiedenis: kon artikel niet markeren als mislukt: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="433"/>
+        <source>History: could not mark article unknown: %1</source>
+        <translation>Geschiedenis: kon artikel niet markeren als onbekend: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1234"/>
+        <source>Could not regenerate final NZB from history: %1</source>
+        <translation>Kon definitieve NZB niet regenereren uit geschiedenis: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1236"/>
+        <source>NZB history warning: %1</source>
+        <translation>NZB-geschiedeniswaarschuwing: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1238"/>
+        <source>Could not reopen NZB for history regeneration: %1</source>
+        <translation>Kon NZB niet heropenen voor geschiedenisregeneratie: %1</translation>
+    </message>
+    <message>
+        <location filename="../PostingJob.cpp" line="1013"/>
+        <source>[%1] skipping already posted article %2 from %3</source>
+        <translation>[%1] al geplaatst artikel %2 van %3 overgeslagen</translation>
     </message>
 </context>
 <context>
@@ -3242,12 +3538,12 @@ Wil je het overschrijven?</translation>
     <message>
         <location filename="../utils/UpdateChecker.cpp" line="176"/>
         <source>Unable to write to install directory %1. Opening release page instead.</source>
-        <translation type="unfinished"></translation>
+        <translation>Kan niet schrijven naar installatiemap %1. De release-pagina wordt in plaats daarvan geopend.</translation>
     </message>
     <message>
         <location filename="../utils/UpdateChecker.cpp" line="211"/>
         <source>Cannot write to %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Kan niet schrijven naar %1</translation>
     </message>
 </context>
 <context>
@@ -3255,127 +3551,127 @@ Wil je het overschrijven?</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="86"/>
         <source>VPN: no config file selected</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: geen configuratiebestand geselecteerd</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="122"/>
         <source>VPN: tunnel up on %1 (%2)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: tunnel actief op %1 (%2)</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="130"/>
         <source>VPN: failed — %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: mislukt — %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="146"/>
         <source>VPN: tunnel stopped</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: tunnel gestopt</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="176"/>
         <source>VPN: backend not supported on this platform yet</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: backend nog niet ondersteund op dit platform</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="279"/>
         <source>VPN: install script not found at %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: installatiescript niet gevonden op %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="283"/>
         <source>Running VPN install: pkexec %1 %2</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-installatie wordt uitgevoerd: pkexec %1 %2</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="291"/>
         <source>VPN install: timed out</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-installatie: time-out</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="308"/>
         <source>VPN: uninstall script not found at %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: verwijderingsscript niet gevonden op %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="316"/>
         <source>Running VPN uninstall: pkexec %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-verwijdering wordt uitgevoerd: pkexec %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="322"/>
         <source>VPN uninstall: timed out</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-verwijdering: time-out</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="348"/>
         <source>Startup: cleaned up stale VPN state</source>
-        <translation type="unfinished"></translation>
+        <translation>Opstarten: verouderde VPN-status opgeruimd</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="379"/>
         <source>The VPN helper is not installed. Open the VPN dialog and click Install.</source>
-        <translation type="unfinished"></translation>
+        <translation>De VPN-helper is niet geïnstalleerd. Open het VPN-venster en klik op Installeren.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="383"/>
         <source>No VPN configuration file is selected.</source>
-        <translation type="unfinished"></translation>
+        <translation>Geen VPN-configuratiebestand geselecteerd.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="388"/>
         <source>The VPN configuration file is missing or unreadable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Het VPN-configuratiebestand ontbreekt of is niet leesbaar: %1</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="392"/>
         <source>The last VPN attempt failed. Open the VPN dialog and try again.</source>
-        <translation type="unfinished"></translation>
+        <translation>De laatste VPN-poging is mislukt. Open het VPN-venster en probeer het opnieuw.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="407"/>
         <source>Auto-starting VPN for incoming job...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN wordt automatisch gestart voor inkomende taak...</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="410"/>
         <source>Could not start the VPN.</source>
-        <translation type="unfinished"></translation>
+        <translation>Kan de VPN niet starten.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="433"/>
         <source>No more jobs need the VPN; scheduling auto-disconnect in %1 s</source>
-        <translation type="unfinished"></translation>
+        <translation>Geen taken meer hebben VPN nodig; auto-verbreking gepland over %1 s</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="446"/>
         <source>Auto-disconnect grace expired — stopping VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>Auto-verbreking wachttijd verlopen — VPN wordt gestopt</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="460"/>
         <source>disabled</source>
-        <translation type="unfinished"></translation>
+        <translation>uitgeschakeld</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="461"/>
         <source>starting...</source>
-        <translation type="unfinished"></translation>
+        <translation>bezig met starten...</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="462"/>
         <source>connected</source>
-        <translation type="unfinished"></translation>
+        <translation>verbonden</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="463"/>
         <source>stopping...</source>
-        <translation type="unfinished"></translation>
+        <translation>bezig met stoppen...</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="464"/>
         <source>failed</source>
-        <translation type="unfinished"></translation>
+        <translation>mislukt</translation>
     </message>
 </context>
 <context>
@@ -3383,162 +3679,162 @@ Wil je het overschrijven?</translation>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="14"/>
         <source>VPN tunnel</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-tunnel</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="20"/>
         <source>Setup</source>
-        <translation type="unfinished"></translation>
+        <translation>Instellen</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="26"/>
         <source>VPN tunnel requires a one-time setup.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-tunnel vereist eenmalige instelling.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="49"/>
         <source>Install...</source>
-        <translation type="unfinished"></translation>
+        <translation>Installeren...</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="52"/>
         <source>Install the privileged VPN helper. After this you won&apos;t be prompted for a password on Connect / Disconnect.</source>
-        <translation type="unfinished"></translation>
+        <translation>De geprivilegieerde VPN-helper installeren. Daarna wordt u niet meer om een wachtwoord gevraagd bij Verbinden / Verbreken.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="59"/>
         <source>Uninstall...</source>
-        <translation type="unfinished"></translation>
+        <translation>Verwijderen...</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="62"/>
         <source>Remove the privileged VPN helper from the system.</source>
-        <translation type="unfinished"></translation>
+        <translation>De geprivilegieerde VPN-helper van het systeem verwijderen.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="72"/>
         <source>Configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>Configuratie</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="78"/>
         <source>Backend:</source>
-        <translation type="unfinished"></translation>
+        <translation>Backend:</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="86"/>
         <source>OpenVPN</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="91"/>
         <source>WireGuard</source>
-        <translation type="unfinished"></translation>
+        <translation>WireGuard</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="99"/>
         <source>Config file:</source>
-        <translation type="unfinished"></translation>
+        <translation>Configuratiebestand:</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="111"/>
         <source>Browse...</source>
-        <translation type="unfinished"></translation>
+        <translation>Bladeren...</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="120"/>
         <source>Auto-connect VPN when a job starts</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN automatisch verbinden wanneer een taak start</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="123"/>
         <source>When checked, ngPost will bring up the VPN tunnel automatically when any job starts, and disconnect 30 seconds after the queue is empty. Per-server &quot;Use VPN&quot; still controls which connections route through the tunnel.</source>
-        <translation type="unfinished"></translation>
+        <translation>Indien ingeschakeld brengt ngPost automatisch de VPN-tunnel tot stand wanneer een taak start, en verbreekt de verbinding 30 seconden nadat de wachtrij leeg is. De serverinstelling &quot;VPN gebruiken&quot; bepaalt nog steeds welke verbindingen via de tunnel lopen.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="133"/>
         <source>Status</source>
-        <translation type="unfinished"></translation>
+        <translation>Status</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="139"/>
         <source>disabled</source>
-        <translation type="unfinished"></translation>
+        <translation>uitgeschakeld</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="159"/>
         <source>Connect</source>
-        <translation type="unfinished"></translation>
+        <translation>Verbinden</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="166"/>
         <source>Disconnect</source>
-        <translation type="unfinished"></translation>
+        <translation>Verbreken</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="176"/>
         <source>Log</source>
-        <translation type="unfinished"></translation>
+        <translation>Log</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="55"/>
         <source>OpenVPN config (*.ovpn *.conf);;All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN-configuratie (*.ovpn *.conf);;Alle bestanden (*)</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="56"/>
         <source>WireGuard config (*.conf);;All files (*)</source>
-        <translation type="unfinished"></translation>
+        <translation>WireGuard-configuratie (*.conf);;Alle bestanden (*)</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="60"/>
         <source>Select VPN config</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-configuratie selecteren</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="69"/>
         <source>No config file selected.</source>
-        <translation type="unfinished"></translation>
+        <translation>Geen configuratiebestand geselecteerd.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="86"/>
         <source>VPN install</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-installatie</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="87"/>
         <source>VPN install failed. See the log for details.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-installatie mislukt. Zie het log voor details.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="95"/>
         <source>Uninstall VPN helper</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-helper verwijderen</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="96"/>
         <source>This will remove the privileged VPN helper and its Polkit rule. You will need to install it again before using the VPN. Continue?</source>
-        <translation type="unfinished"></translation>
+        <translation>Dit verwijdert de geprivilegieerde VPN-helper en zijn Polkit-regel. U moet deze opnieuw installeren voordat u de VPN kunt gebruiken. Doorgaan?</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="105"/>
         <source>VPN uninstall</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-verwijdering</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="106"/>
         <source>VPN uninstall failed. See the log for details.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-verwijdering mislukt. Zie het log voor details.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="155"/>
         <source>VPN tunnel is installed. Connect / Disconnect will not prompt.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-tunnel is geïnstalleerd. Verbinden / Verbreken vraagt niet om een wachtwoord.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="159"/>
         <source>VPN tunnel requires a one-time setup (one password prompt).</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-tunnel vereist eenmalige instelling (één wachtwoordprompt).</translation>
     </message>
 </context>
 <context>
@@ -3546,42 +3842,114 @@ Wil je het overschrijven?</translation>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="44"/>
         <source>Config file not found or unreadable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Configuratiebestand niet gevonden of niet leesbaar: %1</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="50"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found</source>
-        <translation type="unfinished"></translation>
+        <translation>Geprivilegieerd hulpscript ngpost-vpn-helper.sh niet gevonden</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="70"/>
         <source>Launching VPN helper: pkexec %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-helper starten: pkexec %1</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="73"/>
         <source>Failed to start pkexec/helper</source>
-        <translation type="unfinished"></translation>
+        <translation>Starten van pkexec/helper mislukt</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="126"/>
         <source>Malformed READY from helper: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Misvormde READY van helper: %1</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="143"/>
         <source>helper exited (code %1) before tunnel was ready</source>
-        <translation type="unfinished"></translation>
+        <translation>helper werd beëindigd (code %1) voordat de tunnel gereed was</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="150"/>
         <source>pkexec/helper failed to start</source>
-        <translation type="unfinished"></translation>
+        <translation>pkexec/helper kon niet starten</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="152"/>
         <source>helper process crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>helper-proces is gecrasht</translation>
+    </message>
+</context>
+<context>
+    <name>NzbHistoryRegenerator</name>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="118"/>
+        <source>history store is not available</source>
+        <translation>geschiedenisopslag is niet beschikbaar</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="127"/>
+        <source>post is partial; regenerated NZB may be incomplete</source>
+        <translation>post is gedeeltelijk; geregenereerde NZB is mogelijk onvolledig</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="129"/>
+        <source>post had an archive password, but it is not stored</source>
+        <translation>post had een archiefwachtwoord, maar het is niet opgeslagen</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="166"/>
+        <source>file %1 contains unknown articles</source>
+        <translation>bestand %1 bevat onbekende artikelen</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="168"/>
+        <source>file %1 contains non-posted articles</source>
+        <translation>bestand %1 bevat niet-geposte artikelen</translation>
+    </message>
+    <message>
+        <location filename="../history/NzbHistoryRegenerator.cpp" line="203"/>
+        <source>%1 article segment sizes were missing in history and rebuilt from file metadata</source>
+        <translation>%1 artikelsegmentgroottes ontbraken in de geschiedenis en zijn opnieuw opgebouwd uit bestandsmetadata</translation>
+    </message>
+</context>
+<context>
+    <name>ResumePlanner</name>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="23"/>
+        <location filename="../history/ResumePlanner.cpp" line="24"/>
+        <source>history store is not available</source>
+        <translation>geschiedenisopslag is niet beschikbaar</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="30"/>
+        <source>cannot load post</source>
+        <translation>kan post niet laden</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="36"/>
+        <source>posting never started; nothing to resume</source>
+        <translation>posten is nooit gestart; niets te hervatten</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="69"/>
+        <source>nothing remains to resume</source>
+        <translation>er is niets meer te hervatten</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="72"/>
+        <source>source files are missing or changed</source>
+        <translation>bronbestanden ontbreken of zijn gewijzigd</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="75"/>
+        <source>some articles are already posted</source>
+        <translation>sommige artikelen zijn al geplaatst</translation>
+    </message>
+    <message>
+        <location filename="../history/ResumePlanner.cpp" line="78"/>
+        <source>post can be resumed</source>
+        <translation>post kan worden hervat</translation>
     </message>
 </context>
 </TS>

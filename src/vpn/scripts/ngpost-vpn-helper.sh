@@ -16,6 +16,7 @@
 # The parent closes our stdin to ask us to stop.
 #
 # Args:  $1 = openvpn|wireguard|cleanup    $2 = path to config file (n/a for cleanup)
+#        --bin-dir <path>     optional, directory containing bundled VPN tools
 #        --auth-file <path>   optional, after the config: forwarded to openvpn
 #                             as `--auth-user-pass <path>` (no prompt mode).
 
@@ -27,8 +28,13 @@ shift 2 2>/dev/null || true
 
 # Parse optional flags after backend + config.
 AUTH_FILE=""
+BIN_DIR=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --bin-dir)
+            BIN_DIR="${2:-}"
+            shift 2
+            ;;
         --auth-file)
             AUTH_FILE="${2:-}"
             shift 2
@@ -92,7 +98,21 @@ if [ "$BACKEND" != "cleanup" ]; then
     [ -r "$CONFIG" ] || fail "config not readable: $CONFIG"
 fi
 
+resolve_tool() {
+    local name="$1"
+    if [ -n "$BIN_DIR" ] && [ -x "$BIN_DIR/$name" ]; then
+        printf '%s\n' "$BIN_DIR/$name"
+        return 0
+    fi
+    command -v "$name" 2>/dev/null || true
+}
+
+OPENVPN_BIN=$(resolve_tool openvpn)
+WG_BIN=$(resolve_tool wg)
+WIREGUARD_GO_BIN=$(resolve_tool wireguard-go)
+
 start_openvpn() {
+    [ -n "$OPENVPN_BIN" ] || fail "openvpn not found"
     rm -f "$OVPN_PIDFILE"
     # Optional auth file (--auth-user-pass <file>): forwarded from ngPost when
     # the active profile has credentials in the keychain. openvpn-cli option
@@ -102,7 +122,7 @@ start_openvpn() {
         extra_args+=(--auth-user-pass "$AUTH_FILE")
     fi
 
-    openvpn \
+    "$OPENVPN_BIN" \
         --config "$CONFIG" \
         --route-nopull \
         --script-security 0 \
@@ -201,8 +221,8 @@ start_wireguard() {
     # Fall back to wireguard-go only when the kernel module is absent.
     if ip link add "$TUN_IFACE" type wireguard 2>>"$LOG_FILE"; then
         VPN_PID=""   # kernel iface, nothing to kill on cleanup beyond `ip link del`
-    elif command -v wireguard-go >/dev/null 2>&1; then
-        wireguard-go -f "$TUN_IFACE" > "$LOG_FILE" 2>&1 &
+    elif [ -n "$WIREGUARD_GO_BIN" ]; then
+        "$WIREGUARD_GO_BIN" -f "$TUN_IFACE" > "$LOG_FILE" 2>&1 &
         VPN_PID=$!
         local i
         for i in $(seq 1 30); do
@@ -215,7 +235,8 @@ start_wireguard() {
     fi
 
     write_wg_setconf_config
-    wg setconf "$TUN_IFACE" "$WG_SETCONF_FILE" >>"$LOG_FILE" 2>&1 || {
+    [ -n "$WG_BIN" ] || fail "wg not found"
+    "$WG_BIN" setconf "$TUN_IFACE" "$WG_SETCONF_FILE" >>"$LOG_FILE" 2>&1 || {
         tail -30 "$LOG_FILE" | sed 's/^/LOG /'
         fail "wg setconf failed"
     }

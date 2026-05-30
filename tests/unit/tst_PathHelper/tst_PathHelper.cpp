@@ -1,7 +1,8 @@
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 //========================================================================
 //
 // tst_PathHelper.cpp — XDG / appdata directory resolution, vpn dir layout,
-// legacy ~/.ngPost migration.
+// non-destructive legacy config migration.
 //
 //========================================================================
 
@@ -34,9 +35,9 @@ private slots:
     //! (regression guard for the Windows openvpn breakage fixed in 31c4a8c).
     void vpnRuntimeDir_no_leading_dot_in_basename();
 
-    //! migrateLegacyConfigIfNeeded() copies ~/.ngPost into the XDG location
-    //! and removes the legacy file. New config wins if both exist.
-    void migrateLegacyConfigIfNeeded_moves_and_keeps_content();
+    //! migrateLegacyConfigIfNeeded() copies the legacy config into the modern
+    //! location and keeps the legacy file for ngPost 4.16.
+    void migrateLegacyConfigIfNeeded_copies_and_keeps_legacy();
 
     //! Called twice in a row: the second call must be a no-op (no exception,
     //! no overwrite of the migrated file).
@@ -49,6 +50,19 @@ private slots:
     //! If the new config already exists, the legacy file (if any) is left
     //! alone — we do not overwrite a configured user.
     void migrateLegacyConfigIfNeeded_keeps_new_when_both_present();
+
+    //! backupPathFor() uses .bak first, then an available timestamped path.
+    void backupPathFor_prefers_simple_then_timestamped();
+
+    //! If source and destination resolve to the same path, migration requires
+    //! explicit confirmation and leaves the file untouched otherwise.
+    void migrateLegacyConfigIfNeeded_same_path_requires_confirmation();
+
+    //! A confirmed same-path migration creates a backup before continuing.
+    void migrateLegacyConfigIfNeeded_same_path_confirmed_creates_backup();
+
+    //! Test override lets us simulate the Windows legacy ngPost.conf path.
+    void legacyConfigFilePath_honors_test_override();
 };
 
 void TestPathHelper::configDir_under_sandbox_and_created()
@@ -94,7 +108,7 @@ void TestPathHelper::vpnRuntimeDir_no_leading_dot_in_basename()
     QCOMPARE(basename, QStringLiteral("runtime"));
 }
 
-void TestPathHelper::migrateLegacyConfigIfNeeded_moves_and_keeps_content()
+void TestPathHelper::migrateLegacyConfigIfNeeded_copies_and_keeps_legacy()
 {
     HomeSandbox sandbox;
     const QString legacy = PathHelper::legacyConfigFilePath();
@@ -105,11 +119,13 @@ void TestPathHelper::migrateLegacyConfigIfNeeded_moves_and_keeps_content()
     f.close();
     QVERIFY(QFile::exists(legacy));
 
-    PathHelper::migrateLegacyConfigIfNeeded();
+    const PathHelper::ConfigMigrationResult r = PathHelper::migrateLegacyConfigIfNeeded();
+    QVERIFY(r.status == PathHelper::ConfigMigrationStatus::CopiedAndKeptLegacy);
+    QCOMPARE(r.legacyPath, legacy);
 
     const QString newConf = PathHelper::configFilePath();
     QVERIFY2(QFile::exists(newConf), "new config not created");
-    QVERIFY2(!QFile::exists(legacy), "legacy config not removed");
+    QVERIFY2(QFile::exists(legacy), "legacy config should be kept for ngPost 4.16");
 
     QFile g(newConf);
     QVERIFY(g.open(QIODevice::ReadOnly));
@@ -126,18 +142,20 @@ void TestPathHelper::migrateLegacyConfigIfNeeded_is_idempotent()
     f.write("lang = FR\n");
     f.close();
 
-    PathHelper::migrateLegacyConfigIfNeeded();
+    PathHelper::ConfigMigrationResult r = PathHelper::migrateLegacyConfigIfNeeded();
+    QVERIFY(r.status == PathHelper::ConfigMigrationStatus::CopiedAndKeptLegacy);
 
     const QString newConf = PathHelper::configFilePath();
     QVERIFY(QFile::exists(newConf));
     const qint64 sizeAfterFirst = QFileInfo(newConf).size();
 
     // Second call should not modify anything.
-    PathHelper::migrateLegacyConfigIfNeeded();
+    r = PathHelper::migrateLegacyConfigIfNeeded();
+    QVERIFY(r.status == PathHelper::ConfigMigrationStatus::SkippedNewExists);
 
     QVERIFY(QFile::exists(newConf));
     QCOMPARE(QFileInfo(newConf).size(), sizeAfterFirst);
-    QVERIFY(!QFile::exists(legacy));
+    QVERIFY(QFile::exists(legacy));
 }
 
 void TestPathHelper::migrateLegacyConfigIfNeeded_no_legacy_no_op()
@@ -149,7 +167,8 @@ void TestPathHelper::migrateLegacyConfigIfNeeded_no_legacy_no_op()
     QVERIFY(!QFile::exists(legacy));
     QVERIFY(!QFile::exists(newConf));
 
-    PathHelper::migrateLegacyConfigIfNeeded();
+    const PathHelper::ConfigMigrationResult r = PathHelper::migrateLegacyConfigIfNeeded();
+    QVERIFY(r.status == PathHelper::ConfigMigrationStatus::NoLegacy);
 
     QVERIFY2(!QFile::exists(newConf),
              "migrate created an empty config when no legacy existed");
@@ -173,7 +192,8 @@ void TestPathHelper::migrateLegacyConfigIfNeeded_keeps_new_when_both_present()
         l.write("from_legacy = true\n");
     }
 
-    PathHelper::migrateLegacyConfigIfNeeded();
+    const PathHelper::ConfigMigrationResult r = PathHelper::migrateLegacyConfigIfNeeded();
+    QVERIFY(r.status == PathHelper::ConfigMigrationStatus::SkippedNewExists);
 
     QFile n(newConf);
     QVERIFY(n.open(QIODevice::ReadOnly));
@@ -182,6 +202,86 @@ void TestPathHelper::migrateLegacyConfigIfNeeded_keeps_new_when_both_present()
              "new config was overwritten by the migration");
     QVERIFY2(!content.contains("from_legacy"),
              "legacy content leaked into pre-existing new config");
+    QVERIFY2(QFile::exists(legacy), "legacy config should be kept");
+}
+
+void TestPathHelper::backupPathFor_prefers_simple_then_timestamped()
+{
+    HomeSandbox sandbox;
+    const QString conf = PathHelper::configFilePath();
+    QDir().mkpath(QFileInfo(conf).absolutePath());
+
+    QCOMPARE(PathHelper::backupPathFor(conf), conf + QStringLiteral(".bak"));
+
+    QFile bak(conf + QStringLiteral(".bak"));
+    QVERIFY(bak.open(QIODevice::WriteOnly));
+    bak.write("existing backup\n");
+    bak.close();
+
+    const QString timestamped = PathHelper::backupPathFor(conf);
+    QVERIFY(timestamped != conf + QStringLiteral(".bak"));
+    QVERIFY(timestamped.endsWith(QStringLiteral(".bak")));
+    QVERIFY(timestamped.contains(QFileInfo(conf).fileName() + QStringLiteral(".")));
+}
+
+void TestPathHelper::migrateLegacyConfigIfNeeded_same_path_requires_confirmation()
+{
+    HomeSandbox sandbox;
+    const QString conf = PathHelper::configFilePath();
+    qputenv("NGPOST_TEST_LEGACY_CONFIG", conf.toLocal8Bit());
+
+    QDir().mkpath(QFileInfo(conf).absolutePath());
+    QFile f(conf);
+    QVERIFY(f.open(QIODevice::WriteOnly));
+    f.write("same_path = true\n");
+    f.close();
+
+    const PathHelper::ConfigMigrationResult r = PathHelper::migrateLegacyConfigIfNeeded();
+    QVERIFY(r.status == PathHelper::ConfigMigrationStatus::NeedsOverwriteConfirmation);
+    QVERIFY(QFile::exists(conf));
+    QVERIFY(!QFile::exists(conf + QStringLiteral(".bak")));
+}
+
+void TestPathHelper::migrateLegacyConfigIfNeeded_same_path_confirmed_creates_backup()
+{
+    HomeSandbox sandbox;
+    const QString conf = PathHelper::configFilePath();
+    qputenv("NGPOST_TEST_LEGACY_CONFIG", conf.toLocal8Bit());
+
+    QDir().mkpath(QFileInfo(conf).absolutePath());
+    QFile f(conf);
+    QVERIFY(f.open(QIODevice::WriteOnly));
+    f.write("same_path = true\n");
+    f.close();
+
+    const PathHelper::ConfigMigrationResult r = PathHelper::migrateLegacyConfigIfNeeded(true);
+    QVERIFY(r.status == PathHelper::ConfigMigrationStatus::AlreadyMigrated);
+    QVERIFY(!r.backupPath.isEmpty());
+    QVERIFY(QFile::exists(r.backupPath));
+
+    QFile backup(r.backupPath);
+    QVERIFY(backup.open(QIODevice::ReadOnly));
+    QVERIFY(backup.readAll().contains("same_path = true"));
+}
+
+void TestPathHelper::legacyConfigFilePath_honors_test_override()
+{
+    HomeSandbox sandbox;
+    const QString injected = sandbox.rootPath() + QStringLiteral("/app/ngPost.conf");
+    qputenv("NGPOST_TEST_LEGACY_CONFIG", injected.toLocal8Bit());
+
+    QCOMPARE(PathHelper::legacyConfigFilePath(), injected);
+
+    QDir().mkpath(QFileInfo(injected).absolutePath());
+    QFile legacy(injected);
+    QVERIFY(legacy.open(QIODevice::WriteOnly));
+    legacy.write("windows_legacy = true\n");
+    legacy.close();
+
+    const PathHelper::ConfigMigrationResult r = PathHelper::migrateLegacyConfigIfNeeded();
+    QVERIFY(r.status == PathHelper::ConfigMigrationStatus::CopiedAndKeptLegacy);
+    QVERIFY(QFile::exists(injected));
+    QVERIFY(QFile::exists(PathHelper::configFilePath()));
 }
 
 QTEST_APPLESS_MAIN(TestPathHelper)

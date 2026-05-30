@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -34,6 +35,7 @@ NntpFile::NntpFile(PostingJob *postingJob, const QFileInfo &file,
     _grpList(grpList), _groups(grpList.join(",").toStdString()),
     _nbAticles(static_cast<uint>(std::ceil(static_cast<float>(file.size())/NgPost::articleSize()))),
     _articles(),
+    _historyFileId(0),
     _posted(), _failed()
 {
 #if defined(__DEBUG__) && defined(LOG_CONSTRUCTORS)
@@ -71,6 +73,7 @@ void NntpFile::onArticlePosted(quint64 size)
              << ", id: " << article->id();
 #endif
     _posted.insert(part);
+    _postingJob->recordHistoryArticlePosted(article);
     article->freeMemory(); // free resources
 
     if (_posted.size() + _failed.size() == static_cast<int>(_nbAticles))
@@ -94,6 +97,7 @@ void NntpFile::onArticleFailed(quint64 size)
              << ", id: " << article->id();
 #endif
     _failed.insert(part);
+    _postingJob->recordHistoryArticleFailed(article, QStringLiteral("article failed after retry"));
     article->freeMemory(); // free resources
 
     if (_posted.size() + _failed.size() == static_cast<int>(_nbAticles))
@@ -124,7 +128,7 @@ void NntpFile::writeToNZB(QTextStream &stream, const QString &from)
 //      <groups>    </groups>    <segments>      <segment bytes="716800" number="1">{1c502e51-ab9c-4ec6-bd0a-17377ed8a0a7}</segment>
 //        <segment bytes="307286" number="2">{ebae6f34-37e7-4df2-91b8-850f82f3cc47}</segment>
 //      <segments>  </file>
-    if (_nbAticles)
+    if (_nbAticles && !hasFailedArticles())
     {
         QString tab = NgPost::space();
         stream << tab << "<file poster=\"" << from << "\""
@@ -157,6 +161,16 @@ void NntpFile::writeToNZB(QTextStream &stream, const QString &from)
 
         stream << tab << "</file>\n" << MB_FLUSH;
     }
+}
+
+void NntpFile::onArticlePostingStarted(NntpArticle *article, int attemptNo)
+{
+    _postingJob->recordHistoryArticlePosting(article, attemptNo);
+}
+
+void NntpFile::markArticleUnknown(NntpArticle *article, const QString &reason)
+{
+    _postingJob->recordHistoryArticleUnknown(article, reason);
 }
 
 QString NntpFile::missingArticles() const

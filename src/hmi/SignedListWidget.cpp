@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -19,6 +20,7 @@
 
 #include "SignedListWidget.h"
 #include <QLabel>
+#include <QKeyEvent>
 #include <QResizeEvent>
 
 SignedListWidget::SignedListWidget(QWidget *parent) :
@@ -61,14 +63,12 @@ bool SignedListWidget::addPathIfNotInList(const QString &path, int lastIndexToCh
 void SignedListWidget::removeItemWidget2(QListWidgetItem *item)
 {
 //    qDebug() << "[removeItemWidget2] count: " << count();
-    if (count() == 1)
+    takeItem(row(item));
+    if (count() == 0)
     {
-        removeItemWidget(item);
         _asciiLbl->show();
         emit empty();
     }
-    else
-        removeItemWidget(item);
 }
 
 void SignedListWidget::clear2()
@@ -94,6 +94,17 @@ void SignedListWidget::resizeEvent(QResizeEvent *e)
                            listSize.height() - _sizeAscii.height(),
                            _sizeAscii.width(),
                            _sizeAscii.height());
+}
+
+void SignedListWidget::keyPressEvent(QKeyEvent *e)
+{
+    if (e->key() == Qt::Key_Delete || e->key() == Qt::Key_Backspace)
+    {
+        onDeleteSelectedItems();
+        e->accept();
+        return;
+    }
+    QListWidget::keyPressEvent(e);
 }
 
 void SignedListWidget::mousePressEvent(QMouseEvent *e)

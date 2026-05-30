@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -18,30 +19,35 @@
 //========================================================================
 
 #include "CmdOrGuiApp.h"
+#include <QCoreApplication>
 #ifdef __USE_HMI__
   #include "hmi/MainWindow.h"
   #include <QApplication>
-#else
-  #include <QCoreApplication>
 #endif
 
 CmdOrGuiApp::CmdOrGuiApp(int &argc, char *argv[]):
 #ifdef __USE_HMI__
-    _app(nullptr),
+    _app(QCoreApplication::instance()),
+    _ownsApp(_app == nullptr),
     _mode(argc > 1 ? AppMode::CMD : AppMode::HMI),
     _hmi(nullptr)
 #else
-    _app(new QCoreApplication(argc, argv))
+    _app(QCoreApplication::instance()),
+    _ownsApp(_app == nullptr)
 #endif
 {
 #ifdef __USE_HMI__
-    if (_mode == AppMode::CMD)
-        _app = new QCoreApplication(argc, argv);
-    else
-    {
-        _app = new QApplication(argc, argv);
-        _hmi = new MainWindow();
+    if (!_app) {
+        if (_mode == AppMode::CMD)
+            _app = new QCoreApplication(argc, argv);
+        else
+            _app = new QApplication(argc, argv);
     }
+    if (_mode == AppMode::HMI)
+        _hmi = new MainWindow();
+#else
+    if (!_app)
+        _app = new QCoreApplication(argc, argv);
 #endif
 }
 
@@ -51,7 +57,8 @@ CmdOrGuiApp::~CmdOrGuiApp()
     if (_hmi)
         delete  _hmi;
 #endif
-    delete _app;
+    if (_ownsApp)
+        delete _app;
 }
 
 void CmdOrGuiApp::checkForNewVersion()

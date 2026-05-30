@@ -1,3 +1,4 @@
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 //========================================================================
 //
 // tst_Yenc.cpp — coverage of Yenc::encode (yEnc body encoding).

@@ -1,6 +1,6 @@
 //========================================================================
 //
-// Copyright (C) 2026 ngPost contributors
+// Copyright (C) 2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // GNU General Public License v3.
@@ -11,6 +11,7 @@
 
 #include "VpnManager.h"
 
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <QHostAddress>
 #include <QRegularExpression>
@@ -28,6 +29,20 @@ WireGuardBackend::WireGuardBackend(QObject *parent)
     , _winPollTimer(nullptr)
 #endif
 {}
+
+namespace
+{
+QString bundledVpnBinDir()
+{
+#ifdef Q_OS_LINUX
+    QString const dir = QCoreApplication::applicationDirPath() + QStringLiteral("/vpn");
+    if (QFileInfo::exists(dir + QStringLiteral("/wg"))
+        || QFileInfo::exists(dir + QStringLiteral("/wireguard-go")))
+        return dir;
+#endif
+    return QString();
+}
+}
 
 QString WireGuardBackend::serviceNameFromConfig(QString const &configPath)
 {
@@ -138,6 +153,9 @@ bool WireGuardBackend::start(QString const &configPathPacked)
 
     QStringList helperArgs;
     helperArgs << helper << "wireguard" << fi.absoluteFilePath();
+    QString const binDir = bundledVpnBinDir();
+    if (!binDir.isEmpty())
+        helperArgs << "--bin-dir" << binDir;
 
     QString const launcher = VpnManager::helperLauncherProgram();
     QStringList args = VpnManager::helperLauncherPrefixArgs();

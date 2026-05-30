@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -21,15 +22,31 @@
 #define MAINWINDOW_H
 
 #include "vpn/VpnManager.h"
+#include "history/PostHistoryStore.h"
 
 #include <QMainWindow>
 #include <QFileInfoList>
+#include <QSet>
 #include <QUrl>
 class NgPost;
 struct NntpServerParams;
 class NntpFile;
 class PostingWidget;
 class AutoPostWidget;
+class QCheckBox;
+class QComboBox;
+class QDateEdit;
+class QLabel;
+class QLineEdit;
+class QPushButton;
+class QTableWidget;
+class QTabWidget;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+class QChart;
+#else
+namespace QtCharts { class QChart; }
+using QtCharts::QChart;
+#endif
 
 namespace Ui {
 class MainWindow;
@@ -56,6 +73,55 @@ private:
     static const QList<const char *> sServerListHeaders;
     static const QVector<int> sServerListSizes;
 
+    // History tab widgets and state
+    QTabWidget   *_innerHistoryTabs   = nullptr;  //!< inner tabs (History/Stats/Resume)
+    QTableWidget *_historyTable       = nullptr;
+    QTableWidget *_resumeTable        = nullptr;
+    QLineEdit    *_historySearchEdit  = nullptr;
+    QComboBox    *_historyStatusFilter = nullptr;
+    QCheckBox    *_historyPassFilter  = nullptr;
+    QDateEdit    *_historyDateFrom    = nullptr;
+    QDateEdit    *_historyDateTo      = nullptr;
+    QLineEdit    *_historyGroupEdit   = nullptr;
+    QCheckBox    *_historyErrorsFilter = nullptr;
+    QLabel       *_historyDetailInfo  = nullptr;
+    QPushButton  *_histRegenNzbBtn    = nullptr;
+    QPushButton  *_histCopyPassBtn    = nullptr;
+    QPushButton  *_histPurgePassBtn   = nullptr;
+    QPushButton  *_histDeleteBtn      = nullptr;
+    QPushButton  *_histOpenNzbBtn     = nullptr;
+    QPushButton  *_resumeResumeBtn    = nullptr;
+    QPushButton  *_resumeAbandonBtn   = nullptr;
+    QPushButton  *_resumePurgeBtn     = nullptr;
+    QPushButton  *_resumeIgnoreBtn    = nullptr;
+    QPushButton  *_resumeDeleteBtn    = nullptr;
+    QLabel       *_resumeDetailInfo   = nullptr;
+    QLabel       *_statsLabel         = nullptr;
+    QComboBox    *_statsPeriodFilter  = nullptr;
+    QComboBox    *_statsGroupFilter   = nullptr;
+    QChart       *_statsTimelineChart = nullptr;
+    QChart       *_statsGroupChart    = nullptr;
+    QTableWidget *_statsTopTable      = nullptr;
+    qint64        _selectedHistoryId  = 0;
+    QSet<qint64>  _ignoredResumeIds;
+
+    // Additional history tab widgets needed for retranslation
+    QLabel       *_bannerLabel        = nullptr;
+    QPushButton  *_bannerResumeBtn    = nullptr;
+    QLabel       *_histSearchLabel    = nullptr;
+    QLabel       *_histStatusLabel    = nullptr;
+    QPushButton  *_histRefreshBtn     = nullptr;
+    QPushButton  *_histExportCsvBtn   = nullptr;
+    QLabel       *_histFromLabel      = nullptr;
+    QLabel       *_histToLabel        = nullptr;
+    QLabel       *_histGroupLabel     = nullptr;
+    QPushButton  *_histClearBtn       = nullptr;
+    QLabel       *_statsPeriodLabel   = nullptr;
+    QLabel       *_statsGroupLabel    = nullptr;
+    QPushButton  *_statsRefreshBtn    = nullptr;
+    QTabWidget   *_statsInnerTabs     = nullptr;
+    QPushButton  *_resumeRefreshBtn   = nullptr;
+
 
 
 public:
@@ -63,6 +129,9 @@ public:
     ~MainWindow() override;
 
     void init(NgPost *ngPost);
+#ifdef NGPOST_TESTING
+    QWidget *buildHistoryTabForTest();
+#endif
 
     void updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded, const QString &avgSpeed = "0 B/s"
                        #ifdef __COMPUTE_IMMEDIATE_SPEED__
@@ -73,6 +142,7 @@ public:
     void updateServers();
     void updateParams();
     void updateAutoPostingParams();
+    void updateConfigFromUi();
 
     QString fixedArchivePassword() const;
 
@@ -160,6 +230,25 @@ private slots:
     void onVpnSettingsClicked();
     void onVpnStateChanged(VpnManager::State newState);
 
+    void _onHistoryRefresh();
+    void _onHistoryRowSelected(int row);
+    void _onHistoryRegenNzb();
+    void _onHistoryExportCsv();
+    void _onHistoryCopyPassword();
+    void _onHistoryPurgePassword();
+    void _onHistoryDeleteEntry();
+    void _onHistoryOpenNzb();
+    void _onHistoryResumePost();
+    void _onStatsRefresh();
+    void _onResumeSelectionChanged();
+    void _onResumePost();
+    void _onResumeAbandon();
+    void _onResumePurge();
+    void _onResumeIgnore();
+    void _onResumeDeleteEntries();
+
+    void _onHistoryContextMenu(const QPoint &pos);
+
     //! Phase 5d: a per-server "Use VPN" checkbox in the server table got
     //! toggled. Persist the change immediately so it survives a restart
     //! without forcing the user through "Save Config".
@@ -168,6 +257,11 @@ private slots:
 private:
     void _initServerBox();
     void _initPostingBox();
+    QWidget *_buildHistoryTab();
+    void     _retranslateHistoryTab();
+    void _refreshHistoryViews();
+    void _showHistoryDetails(const PostHistoryStore::PostDetails &details);
+    bool _startResumePost(qint64 postId, bool askConfirmation = true);
 
     void _addServer(NntpServerParams *serverParam);
     int  _serverRow(QObject *delButton);

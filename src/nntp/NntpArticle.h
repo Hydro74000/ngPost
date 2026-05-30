@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+ * Copyright (c) 2024-2026 Hydro74000 <acymap@gmail.com>
  * Licensed under the GNU General Public License v3.0
  */
 
@@ -75,6 +76,8 @@ public:
     inline QString id() const;
     inline uint part() const;
     inline NntpFile *nntpFile() const;
+    inline qint64 filePos() const;
+    inline qint64 fileBytes() const;
 
     inline bool isFirstArticle() const;
 
@@ -97,7 +100,7 @@ void NntpArticle::freeMemory()
 {
     if (_subject)
     {
-        delete _subject;
+        delete[] _subject;
         _subject = nullptr;
     }
     if (_body)
@@ -112,6 +115,8 @@ std::string NntpArticle::body() const { return _body; }
 QString NntpArticle::id() const { return _msgId; }
 uint NntpArticle::part() const{ return _part; }
 NntpFile *NntpArticle::nntpFile() const { return _nntpFile; }
+qint64 NntpArticle::filePos() const { return _filePos; }
+qint64 NntpArticle::fileBytes() const { return _fileBytes; }
 
 bool NntpArticle::isFirstArticle() const { return _part == 1; }
 

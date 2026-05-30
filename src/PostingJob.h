@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -23,10 +24,13 @@
 
 #include <QElapsedTimer>
 #include <QFileInfoList>
+#include <QMap>
 #include <QMutex>
 #include <QQueue>
 #include <QSet>
+#include <QStringList>
 #include <QTextStream>
+#include <QThread>
 #include <QTime>
 #include <QTimer>
 #include <QVector>
@@ -55,6 +59,15 @@ class PostingJob : public QObject
     friend class ArticleBuilder;
     friend class NgPost;
 
+public:
+    struct ResumeFileState {
+        qint64 historyFileId = 0;
+        int ordinal = 0;
+        int totalFiles = 0;
+        QStringList groups;
+        QSet<uint> postedParts;
+    };
+
 private:
     NgPost *const _ngPost; //!< handle on the application to access global configs
     QFileInfoList _files;  //!< populated on constuction using a QStringList of paths
@@ -64,6 +77,7 @@ private:
     QProcess *_extProc;
     QDir *_compressDir;
     bool _limitProcDisplay;
+    bool _extProcIsPar2;
     ushort _nbProcDisp;
 
 #ifdef __USE_TMP_RAM__
@@ -151,6 +165,9 @@ private:
     QTimer _resumeTimer;
 
     bool _isActiveJob;
+    qint64 _historyPostId;
+    const bool _resumeFromHistory;
+    const QMap<QString, ResumeFileState> _resumeFileStatesByPath;
 
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     quint64 _immediateSize; //!< bytes posted (to compute the avg speed)
@@ -181,6 +198,9 @@ public:
                bool keepRar = false,
                bool delFilesAfterPost = false,
                bool overwriteNzb = true,
+               qint64 resumeHistoryPostId = 0,
+               const QMap<QString, ResumeFileState> &resumeFileStatesByPath =
+                   QMap<QString, ResumeFileState>(),
                QObject *parent = nullptr);
     ~PostingJob();
 
@@ -233,6 +253,19 @@ public:
 
     static QString sslSupportInfo();
     static bool supportsSsl();
+
+    qint64 registerHistoryFile(int ordinal, const QFileInfo &file, NntpFile *nntpFile);
+    void recordHistoryArticlePosting(NntpArticle *article, int attemptNo);
+    void recordHistoryArticlePosted(NntpArticle *article);
+    void recordHistoryArticleFailed(NntpArticle *article, const QString &reason);
+    void recordHistoryArticleUnknown(NntpArticle *article, const QString &reason);
+
+#ifdef NGPOST_TESTING
+    static QStringList buildPar2ArgsForTest(const QString &configuredArgs,
+                                            bool useParPar,
+                                            bool useMultiPar,
+                                            uint redundancy);
+#endif
 
 signals:
     void startPosting(
@@ -292,6 +325,8 @@ private:
     void _initPosting();
     void _postFiles();
     void _finishPosting();
+
+    void _flushHistoryService();
 
     void _closeNzb();
     void _printStats() const;

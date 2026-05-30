@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -57,8 +58,14 @@ public:
     inline uint nbFailedArticles() const;
     inline bool hasFailedArticles() const;
     inline const std::string &groups() const;
+    inline qint64 historyFileId() const;
+    inline void setHistoryFileId(qint64 id);
+    inline bool isArticleAlreadyPosted(uint part) const;
+    inline void markAlreadyPosted(uint part);
 
     QString missingArticles() const;
+    void onArticlePostingStarted(NntpArticle *article, int attemptNo);
+    void markArticleUnknown(NntpArticle *article, const QString &reason);
 
 signals:
     void allArticlesArePosted();
@@ -81,6 +88,7 @@ private:
     const std::string       _groups;
     const uint              _nbAticles; //!< total number of articles
     QVector<NntpArticle*>   _articles;  //!< all articles (that are yEnc encoded)
+    qint64                  _historyFileId;
 
     QSet<uint> _posted; //!< part number of the Articles that have been posted (uploaded on the socket)
     QSet<uint> _failed; //!< part number of the Articles that FAILED to be posted (uploaded on the socket)
@@ -117,5 +125,9 @@ uint NntpFile::nbArticles() const { return _nbAticles; }
 uint NntpFile::nbFailedArticles() const { return static_cast<uint>(_failed.size()); }
 bool NntpFile::hasFailedArticles() const { return _failed.size() != 0; }
 const std::string &NntpFile::groups() const { return _groups; }
+qint64 NntpFile::historyFileId() const { return _historyFileId; }
+void NntpFile::setHistoryFileId(qint64 id) { _historyFileId = id; }
+bool NntpFile::isArticleAlreadyPosted(uint part) const { return _posted.contains(part); }
+void NntpFile::markAlreadyPosted(uint part) { _posted.insert(part); }
 
 #endif // NntpFile_H

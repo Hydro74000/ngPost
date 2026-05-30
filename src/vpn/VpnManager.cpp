@@ -1,6 +1,6 @@
 //========================================================================
 //
-// Copyright (C) 2026 ngPost contributors
+// Copyright (C) 2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // GNU General Public License v3.
@@ -910,7 +910,17 @@ VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
     // gate must agree with them, otherwise a dev/CI build with a valid
     // in-tree helper gets blocked here and the job hangs forever in the
     // pending queue.
-    if (helperScriptPath().isEmpty()) {
+    //
+    // Windows has no .sh helper at all (OpenVPN/WireGuard are launched
+    // directly), so helperScriptPath() would always be empty there and every
+    // VPN-requiring job would be blocked. Use isHelperInstalled() instead,
+    // which is OS-aware (checks for the OpenVPN / WireGuard binaries).
+#ifdef Q_OS_WIN
+    bool const capabilityMissing = !isHelperInstalled();
+#else
+    bool const capabilityMissing = helperScriptPath().isEmpty();
+#endif
+    if (capabilityMissing) {
         reason = JobBlockReason::HelperNotInstalled;
         detail = tr("The VPN helper is not installed. Open the VPN dialog "
                     "and click Install.");

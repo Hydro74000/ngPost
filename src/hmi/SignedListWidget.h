@@ -1,6 +1,7 @@
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
+// Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 // This file is a part of ngPost : https://github.com/Hydro74000/ngPost
 //
 // This program is free software: you can redistribute it and/or modify
@@ -48,7 +49,8 @@ public slots:
 
 protected:
     void resizeEvent(QResizeEvent *e) override;
-    void mousePressEvent(QMouseEvent * e) override;    
+    void mousePressEvent(QMouseEvent * e) override;
+    void keyPressEvent(QKeyEvent *e) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 
