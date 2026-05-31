@@ -44,10 +44,11 @@ the GNU GPL v2 in all respects.
 
 ---
 
-## par2cmdline (Linux `par2`)
+## par2cmdline (`par2` / `par2.exe`)
 
 - **How used**: bundled inside the Linux AppImage (from the Debian/Ubuntu
-  `par2` package — par2cmdline upstream)
+  `par2` package) and shipped on Windows as `par2.exe` (par2cmdline 0.8.0), the
+  always-installed PAR2 fallback used when ParPar is not present.
 - **Licence**: GNU General Public Licence, version 2 or later
 - **Copyright**: © 2003 Peter Brian Clements; © 2019–2024 par2cmdline contributors
 - **Source code**: <https://github.com/Parchive/par2cmdline>
@@ -66,6 +67,18 @@ the GNU GPL v2 in all respects.
 - **Copyright**: released into the public domain by Anime Tosho
 - **Source code**: <https://github.com/animetosho/ParPar>
 - **Full licence text**: <https://creativecommons.org/publicdomain/zero/1.0/legalcode>
+
+---
+
+## MultiPar (`par2j64.exe`)
+
+- **How used**: shipped on Windows as `par2j64.exe` (MultiPar 1.3.3.6), bundled
+  as an alternative PAR2 backend selectable via the `PAR2_PATH` config option.
+  ngPost passes par2j its native `/`-prefixed switches (e.g. `/rr` for redundancy).
+- **Licence**: GNU General Public Licence
+- **Copyright**: © Yutaka Sawada
+- **Source code**: <https://github.com/Yutaka-Sawada/MultiPar>
+- **Full licence text**: <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>
 
 ---
 
@@ -102,7 +115,7 @@ SOFTWARE.
 
 ## GNU General Public Licence v2 — reference
 
-OpenVPN, WireGuard for Windows, wireguard-tools, and par2cmdline are
+OpenVPN, WireGuard for Windows, wireguard-tools, par2cmdline, and MultiPar are
 distributed under the GNU GPL v2. The full licence text is available at:
 <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>
 

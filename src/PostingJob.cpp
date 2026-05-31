@@ -131,6 +131,11 @@ QStringList buildPar2Args(const QString &configuredArgs,
                      QStringLiteral("--auto-slice-size"),
                      QStringLiteral("-m1024M"),
                      redundancyArg };
+        // MultiPar (par2j) only understands '/'-prefixed switches; the
+        // par2cmdline flags -l / -m1024 are rejected ("invalid option, -l").
+        // par2j auto-tunes memory, so create + redundancy is all we need.
+        if (useMultiPar)
+            return { QStringLiteral("c"), redundancyArg };
         return { QStringLiteral("c"),
                  QStringLiteral("-l"),
                  QStringLiteral("-m1024"),
@@ -1622,7 +1627,10 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
             else
                 args << QString("%1/%2*rar").arg(archiveTmpFolder, archiveName);
 
-            if (_ngPost->_par2Args.isEmpty() && (_ngPost->debugMode() || !_postWidget))
+            // -q (quiet) is a par2cmdline flag; MultiPar's par2j rejects it
+            // ("invalid option, -q"), so only add it for par2cmdline.
+            if (!_ngPost->useMultiPar() && _ngPost->_par2Args.isEmpty()
+                && (_ngPost->debugMode() || !_postWidget))
                 args << "-q"; // remove the progressbar bar
         }
     } else { // par2 generation only => can't use folders or files from different drive (Windows)

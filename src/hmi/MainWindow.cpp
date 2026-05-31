@@ -61,6 +61,7 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QSizePolicy>
+#include <QSettings>
 #include <QStatusBar>
 #include <QtCharts/QAbstractAxis>
 #include <QtCharts/QBarCategoryAxis>
@@ -73,10 +74,22 @@
 #include <QDateEdit>
 #include <QDesktopServices>
 #include "utils/UpdateChecker.h"
+#include "utils/PathHelper.h"
 
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 QT_CHARTS_USE_NAMESPACE
 #endif
+
+namespace {
+//! GUI-only preferences (window geometry, ...). Stored in an INI next to
+//! ngPost.conf so it follows the per-user config, but stays separate from
+//! the posting configuration the user edits by hand.
+QString guiSettingsFilePath()
+{
+    return PathHelper::configDir() + QStringLiteral("/ngPost_gui.ini");
+}
+const QString kMainWindowGeometryKey = QStringLiteral("MainWindow/geometry");
+}
 
 
 const QColor  MainWindow::sPostingColor = QColor(255,162, 0); // gold (#FFA200)
@@ -139,6 +152,13 @@ MainWindow::MainWindow(QWidget *parent) :
     resize(screenSize * 0.8);
     setWindowIcon(QIcon(":/icons/ngPost.png"));
     setGeometry((screenSize.width() - width())/2,  (screenSize.height() - height())/2, width(), height());
+
+    // Restore the previous session's window size/position. The centered 80%
+    // default computed just above is the fallback for the very first run.
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    const QByteArray savedGeometry = guiSettings.value(kMainWindowGeometryKey).toByteArray();
+    if (!savedGeometry.isEmpty())
+        restoreGeometry(savedGeometry);
 
     connect(_ui->clearLogButton, &QAbstractButton::clicked, _ui->logBrowser, &QTextEdit::clear);
     connect(_ui->debugBox,       &QAbstractButton::toggled, this,            &MainWindow::onDebugToggled);
@@ -305,6 +325,11 @@ void MainWindow::dropEvent(QDropEvent *e)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    // Persist the current window geometry so the next run reopens at the
+    // same size/position (saveGeometry also captures the maximized state).
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    guiSettings.setValue(kMainWindowGeometryKey, saveGeometry());
+
     if (_ngPost->hasPostingJobs())
     {
         int res = QMessageBox::question(this,

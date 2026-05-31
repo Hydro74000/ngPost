@@ -45,6 +45,7 @@
 #include <QRegularExpression>
 #include <QDir>
 #include <QNetworkProxy>
+#include <QStandardPaths>
 
 #include "nntp/NntpFile.h"
 #ifdef __USE_TMP_RAM__
@@ -395,8 +396,16 @@ NgPost::NgPost(int &argc, char *argv[]):
     const QString appDir = QCoreApplication::applicationDirPath();
     QStringList par2Candidates;
 #if defined(WIN32) || defined(__MINGW64__)
+    // Fallback order: ParPar (preferred — no shell globbing needed via -R),
+    // then par2cmdline (par2.exe), then MultiPar (par2j64/par2j). All three are
+    // bundled by the Windows installer so par2 generation keeps working even if
+    // the user opts out of ParPar. par2cmdline 0.8.0 and par2j self-expand the
+    // archive.7z* / archive*rar wildcards ngPost passes (verified), so they are
+    // safe under QProcess's shell-less CreateProcess.
     par2Candidates << QString("%1/parpar.exe").arg(appDir)
-                   << QString("%1/par2.exe").arg(appDir);
+                   << QString("%1/par2.exe").arg(appDir)
+                   << QString("%1/par2j64.exe").arg(appDir)
+                   << QString("%1/par2j.exe").arg(appDir);
 #else
     par2Candidates << QString("%1/parpar").arg(appDir)
                    << QString("%1/par2").arg(appDir);
@@ -408,6 +417,38 @@ NgPost::NgPost(int &argc, char *argv[]):
             break;
         }
     }
+
+#if defined(WIN32) || defined(__MINGW64__)
+    // Fall back to system-wide installations when no bundled binary was found.
+    // Search order: PATH (parpar first, then par2), then QuickPar typical paths.
+    if (_par2Path.isEmpty()) {
+        for (const QString &name : {QStringLiteral("parpar.exe"), QStringLiteral("par2.exe")}) {
+            const QString found = QStandardPaths::findExecutable(name);
+            if (!found.isEmpty()) {
+                _par2Path = found;
+                break;
+            }
+        }
+    }
+    if (_par2Path.isEmpty()) {
+        for (const char *envVar : {"PROGRAMFILES", "PROGRAMFILES(X86)"}) {
+            const QString pf = QString::fromLocal8Bit(qgetenv(envVar));
+            if (pf.isEmpty())
+                continue;
+            // Some QuickPar installs ship the par2cmdline-compatible par2.exe in
+            // their folder; use it when present. We deliberately do NOT fall back
+            // to QuickPar.exe itself: it is a GUI-only tool (no headless creation
+            // mode — verified empirically), so launching it would just pop a
+            // window and hang the posting job forever.
+            const QString candidate = QString("%1/QuickPar/par2.exe").arg(pf);
+            QFileInfo fi(candidate);
+            if (fi.exists() && fi.isFile() && fi.isExecutable()) {
+                _par2Path = candidate;
+                break;
+            }
+        }
+    }
+#endif
 
     // check if an embedded rar is available (windows or appImage)
     QString rarEmbedded;
@@ -3193,7 +3234,7 @@ QString NgPost::_parseConfig(const QString &configPath)
                             _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it."));
                         else
                             _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please refer to the conf example: %1").arg(
-                                     "https://github.com/Hydro74000/ngPost/blob/master/ngPost.conf#L140"));
+                                     "https://github.com/Hydro74000/ngPost/blob/master/ngPost.conf.example#L140"));
                     }
                     else if (opt == sOptionNames[Opt::PACK])
                     {
