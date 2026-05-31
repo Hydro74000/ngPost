@@ -45,6 +45,7 @@
 #include <QRegularExpression>
 #include <QDir>
 #include <QNetworkProxy>
+#include <QStandardPaths>
 
 #include "nntp/NntpFile.h"
 #ifdef __USE_TMP_RAM__
@@ -408,6 +409,39 @@ NgPost::NgPost(int &argc, char *argv[]):
             break;
         }
     }
+
+#if defined(WIN32) || defined(__MINGW64__)
+    // Fall back to system-wide installations when no bundled binary was found.
+    // Search order: PATH (parpar first, then par2), then QuickPar typical paths.
+    if (_par2Path.isEmpty()) {
+        for (const QString &name : {QStringLiteral("parpar.exe"), QStringLiteral("par2.exe")}) {
+            const QString found = QStandardPaths::findExecutable(name);
+            if (!found.isEmpty()) {
+                _par2Path = found;
+                break;
+            }
+        }
+    }
+    if (_par2Path.isEmpty()) {
+        for (const char *envVar : {"PROGRAMFILES", "PROGRAMFILES(X86)"}) {
+            const QString pf = QString::fromLocal8Bit(qgetenv(envVar));
+            if (pf.isEmpty())
+                continue;
+            // QuickPar ships par2.exe (CLI) and QuickPar.exe (GUI) in the same directory.
+            // Prefer par2.exe for reliable headless operation.
+            for (const QString &name : {QStringLiteral("par2.exe"), QStringLiteral("QuickPar.exe")}) {
+                const QString candidate = QString("%1/QuickPar/%2").arg(pf, name);
+                QFileInfo fi(candidate);
+                if (fi.exists() && fi.isFile() && fi.isExecutable()) {
+                    _par2Path = candidate;
+                    break;
+                }
+            }
+            if (!_par2Path.isEmpty())
+                break;
+        }
+    }
+#endif
 
     // check if an embedded rar is available (windows or appImage)
     QString rarEmbedded;
