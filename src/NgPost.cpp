@@ -427,18 +427,17 @@ NgPost::NgPost(int &argc, char *argv[]):
             const QString pf = QString::fromLocal8Bit(qgetenv(envVar));
             if (pf.isEmpty())
                 continue;
-            // QuickPar ships par2.exe (CLI) and QuickPar.exe (GUI) in the same directory.
-            // Prefer par2.exe for reliable headless operation.
-            for (const QString &name : {QStringLiteral("par2.exe"), QStringLiteral("QuickPar.exe")}) {
-                const QString candidate = QString("%1/QuickPar/%2").arg(pf, name);
-                QFileInfo fi(candidate);
-                if (fi.exists() && fi.isFile() && fi.isExecutable()) {
-                    _par2Path = candidate;
-                    break;
-                }
-            }
-            if (!_par2Path.isEmpty())
+            // Some QuickPar installs ship the par2cmdline-compatible par2.exe in
+            // their folder; use it when present. We deliberately do NOT fall back
+            // to QuickPar.exe itself: it is a GUI-only tool (no headless creation
+            // mode — verified empirically), so launching it would just pop a
+            // window and hang the posting job forever.
+            const QString candidate = QString("%1/QuickPar/par2.exe").arg(pf);
+            QFileInfo fi(candidate);
+            if (fi.exists() && fi.isFile() && fi.isExecutable()) {
+                _par2Path = candidate;
                 break;
+            }
         }
     }
 #endif

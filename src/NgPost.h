@@ -522,7 +522,6 @@ public:
 
     inline bool useParPar() const;
     inline bool useMultiPar() const;
-    inline bool useQuickPar() const;
 
     inline void enableAutoPacking(bool enable = true);
 
@@ -697,10 +696,6 @@ inline bool NgPost::useParPar() const
 inline bool NgPost::useMultiPar() const
 {
     return _par2Path.toLower().contains("par2j");
-}
-inline bool NgPost::useQuickPar() const
-{
-    return _par2Path.toLower().contains("quickpar");
 }
 
 const std::string &NgPost::aticleSignature()
