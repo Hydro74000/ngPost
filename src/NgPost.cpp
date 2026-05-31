@@ -3234,7 +3234,7 @@ QString NgPost::_parseConfig(const QString &configPath)
                             _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it."));
                         else
                             _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please refer to the conf example: %1").arg(
-                                     "https://github.com/Hydro74000/ngPost/blob/master/ngPost.conf#L140"));
+                                     "https://github.com/Hydro74000/ngPost/blob/master/ngPost.conf.example#L140"));
                     }
                     else if (opt == sOptionNames[Opt::PACK])
                     {

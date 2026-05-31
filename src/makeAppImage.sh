@@ -34,7 +34,7 @@ chmod 755 ../release/ngPost/ngpost-vpn-*.sh
 chmod 644 ../release/ngPost/49-ngpost-vpn.rules.in
 
 cd ..
-cp  ngPost.conf release_notes.txt README* release/ngPost/
+cp  ngPost.conf.example release_notes.txt README* release/ngPost/
 cd ..
 /home/mb/apps/bin/linuxdeployqt-6-x86_64.AppImage ngPost/ngPost.desktop -appimage -qmake=$MB_QMAKE
 ls -alrt

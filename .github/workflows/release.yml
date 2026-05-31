@@ -8,9 +8,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g., v1.2.3)"
-        required: true
+        description: "Release version (e.g., v1.2.3). Leave empty for a build-only (no release) run."
+        required: false
         type: string
+      publish:
+        description: "Publish a GitHub release with the built artifacts. Leave unchecked to only build + upload run artifacts."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -126,7 +131,7 @@ jobs:
           PKG="ngPost-${VERSION}-linux-x86_64"
           mkdir -p "dist/${PKG}"
           cp src/ngPost "dist/${PKG}/"
-          cp ngPost.conf release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
+          cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
           tar -C dist -czf "dist/${PKG}.tar.gz" "${PKG}"
           rm -rf "dist/${PKG}"
           ls -la dist/
@@ -361,7 +366,7 @@ jobs:
           # standalone ZIP we always include it — no install wizard to drive
           # the choice, and users who don't want it can just delete the file.
           Copy-Item dist/parpar/parpar.exe "dist/$pkg/parpar.exe" -Force
-          Copy-Item ngPost.conf, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
+          Copy-Item ngPost.conf.example, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item THIRD_PARTY_LICENSES.md "dist/$pkg/" -ErrorAction SilentlyContinue
           # Phase 5b: bundle PowerShell helpers for Windows-only WireGuard
@@ -582,56 +587,12 @@ jobs:
             end;
           end;
 
-          // After a successful install, if the user opted into ParPar and the
-          // bundled ngPost.conf template has no active PAR2_PATH line, append
-          // one pointing at our bundled parpar.exe. NgPost migrates this
-          // seed template into the per-user config on first launch (see
-          // PathHelper::migrateLegacyConfigIfNeeded), so fresh installs pick
-          // up the path automatically. Existing per-user configs are left
-          // untouched — ngPost's runtime auto-detection of parpar.exe sitting
-          // next to ngPost.exe (see par2Candidates in NgPost::NgPost) covers
-          // that case.
-          function ConfHasActivePar2Path(const Lines: TArrayOfString): Boolean;
-          var
-            j: Integer;
-            trimmed: String;
-          begin
-            Result := False;
-            for j := 0 to GetArrayLength(Lines) - 1 do begin
-              trimmed := Trim(Lines[j]);
-              if (trimmed = '') or (Copy(trimmed, 1, 1) = '#') or (Copy(trimmed, 1, 2) = '//') then
-                continue;
-              if (Pos('PAR2_PATH', Uppercase(trimmed)) = 1) then begin
-                Result := True;
-                exit;
-              end;
-            end;
-          end;
-
-          procedure CurStepChanged(CurStep: TSetupStep);
-          var
-            confPath: String;
-            parparPath: String;
-            lines: TArrayOfString;
-            n: Integer;
-          begin
-            if CurStep <> ssPostInstall then exit;
-            if not IsTaskSelected('installparpar') then exit;
-
-            confPath   := ExpandConstant('{app}\ngPost.conf');
-            parparPath := ExpandConstant('{app}\parpar.exe');
-            if not FileExists(confPath) then exit;
-            if not FileExists(parparPath) then exit;
-            if not LoadStringsFromFile(confPath, lines) then exit;
-            if ConfHasActivePar2Path(lines) then exit;
-
-            n := GetArrayLength(lines);
-            SetArrayLength(lines, n + 3);
-            lines[n]     := '';
-            lines[n + 1] := '## Auto-configured by the ngPost Windows installer (installparpar task)';
-            lines[n + 2] := 'PAR2_PATH = ' + parparPath;
-            SaveStringsToFile(confPath, lines, False);
-          end;
+          // No PAR2_PATH seeding is needed: the installer ships only
+          // ngPost.conf.example (a reference template, not an active config),
+          // so ngPost regenerates a fresh ngPost.conf in the per-user config
+          // dir on first launch. Its runtime auto-detection then picks up the
+          // bundled parpar.exe / par2.exe / par2j64.exe sitting next to
+          // ngPost.exe (see par2Candidates in NgPost::NgPost).
           "@
           Set-Content -Path installer.iss -Value $iss -Encoding ASCII
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
@@ -822,7 +783,7 @@ jobs:
           cp src/resources/icons/ngPost.png AppDir/usr/share/icons/hicolor/256x256/apps/
           cp src/resources/icons/ngPost.png AppDir/
           cp ngPost.desktop AppDir/
-          cp ngPost.conf release_notes.txt README* THIRD_PARTY_LICENSES.md AppDir/ || true
+          cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md AppDir/ || true
       - name: Locate OpenSSL libraries
         id: openssl
         run: |
@@ -948,6 +909,10 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     needs: [release-metadata, build-linux, build-windows, build-macos, build-appimage]
+    # Push to master/devel always publishes. A manual workflow_dispatch only
+    # publishes when its "publish" input is checked — leaving it unchecked
+    # gives a build-only run (artifacts uploaded, no GitHub release created).
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
     steps:
       - uses: actions/checkout@v4
         with:
