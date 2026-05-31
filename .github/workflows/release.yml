@@ -240,6 +240,42 @@ jobs:
             throw "parpar.exe not found inside $asset"
           }
           Copy-Item $parpar.FullName (Join-Path $stage 'parpar.exe') -Force
+      - name: Bundle par2cmdline and MultiPar fallback tools
+        shell: pwsh
+        run: |
+          # NgPost auto-detects parpar.exe -> par2.exe -> par2j64.exe sitting
+          # next to ngPost.exe (see par2Candidates in NgPost::NgPost). ParPar is
+          # the preferred, opt-out tool (staged in dist/parpar above). par2cmdline
+          # and MultiPar are dropped UNCONDITIONALLY into src/release so PAR2
+          # generation keeps working even when the user unticks ParPar at install
+          # time. Both self-expand the archive.7z* / archive*rar wildcards ngPost
+          # passes under QProcess's shell-less CreateProcess (verified).
+          $release = "src/release"
+
+          # par2cmdline 0.8.0 - vendored in-repo (release/libs), self-globs.
+          $par2Zip = "release/libs/par2cmdline-0.8.0-win-x64.zip"
+          if (-not (Test-Path $par2Zip)) { throw "Missing vendored $par2Zip" }
+          $tmpPar2 = Join-Path $env:RUNNER_TEMP "par2cmdline"
+          Remove-Item -Recurse -Force $tmpPar2 -ErrorAction SilentlyContinue
+          Expand-Archive -Path $par2Zip -DestinationPath $tmpPar2 -Force
+          $par2 = Get-ChildItem $tmpPar2 -Recurse -File -Filter 'par2.exe' |
+            Select-Object -First 1
+          if (-not $par2) { throw "par2.exe not found in $par2Zip" }
+          Copy-Item $par2.FullName (Join-Path $release 'par2.exe') -Force
+
+          # MultiPar (par2j64.exe) - GPL, official GitHub release.
+          $mpVersion = "1.3.3.6"
+          $mpAsset   = "MultiPar1336.zip"
+          $mpUrl     = "https://github.com/Yutaka-Sawada/MultiPar/releases/download/v$mpVersion/$mpAsset"
+          $mpArchive = Join-Path $env:RUNNER_TEMP $mpAsset
+          Invoke-WebRequest -Uri $mpUrl -OutFile $mpArchive
+          $tmpMp = Join-Path $env:RUNNER_TEMP "multipar"
+          Remove-Item -Recurse -Force $tmpMp -ErrorAction SilentlyContinue
+          Expand-Archive -Path $mpArchive -DestinationPath $tmpMp -Force
+          $par2j = Get-ChildItem $tmpMp -Recurse -File -Filter 'par2j64.exe' |
+            Select-Object -First 1
+          if (-not $par2j) { throw "par2j64.exe not found in $mpAsset" }
+          Copy-Item $par2j.FullName (Join-Path $release 'par2j64.exe') -Force
       - name: Clean Build Artifacts
         shell: pwsh
         run: |
@@ -279,6 +315,12 @@ jobs:
           # would otherwise copy it unconditionally.
           if (-not (Test-Path "dist/parpar/parpar.exe")) {
             throw "Missing staged parpar.exe (dist/parpar/parpar.exe)"
+          }
+          # par2cmdline + MultiPar are the always-installed PAR2 fallbacks.
+          foreach ($fallback in @("par2.exe", "par2j64.exe")) {
+            if (-not (Test-Path (Join-Path $root $fallback))) {
+              throw "Missing bundled PAR2 fallback: $fallback"
+            }
           }
 
           $expectedDlls = @(
@@ -398,6 +440,28 @@ jobs:
           ParPar is a high-performance PAR2 creation tool released into the public
           domain. Where public domain is not recognised, the project applies the
           CC0 1.0 dedication. Full text: https://creativecommons.org/publicdomain/zero/1.0/
+
+          ------------------------------------------------------------------------
+          4. par2cmdline (par2.exe)
+          ------------------------------------------------------------------------
+          Licence  : GNU General Public Licence, version 2 or later
+          Copyright: (c) 2003 Peter Brian Clements and contributors
+          Source   : https://github.com/Parchive/par2cmdline
+
+          par2cmdline is the reference PAR2 creation/verification tool. It is bundled
+          as the always-available fallback used when ParPar is not installed.
+          Full GPL v2 text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+          ------------------------------------------------------------------------
+          5. MultiPar (par2j64.exe)
+          ------------------------------------------------------------------------
+          Licence  : GNU General Public Licence
+          Copyright: (c) Yutaka Sawada
+          Source   : https://github.com/Yutaka-Sawada/MultiPar
+
+          MultiPar's par2j64.exe is a fast PAR2 client bundled as an alternative
+          PAR2 backend (selectable via PAR2_PATH).
+          Full GPL text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
           ------------------------------------------------------------------------
 

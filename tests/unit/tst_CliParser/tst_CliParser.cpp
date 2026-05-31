@@ -156,6 +156,11 @@ private slots:
 
     //! GUI PAR2_PCT must override PAR2_ARGS redundancy for par2cmdline too.
     void par2_args_redundancy_override_for_par2cmdline();
+
+    //! MultiPar (par2j) defaults must not leak par2cmdline-only flags (-l/-m).
+    void multipar_default_args_use_only_slash_switches();
+    //! GUI PAR2_PCT must override PAR2_ARGS redundancy for MultiPar (/rr) too.
+    void par2_args_redundancy_override_for_multipar();
 };
 
 void TestCliParser::initTestCase()
@@ -418,6 +423,37 @@ void TestCliParser::par2_args_redundancy_override_for_par2cmdline()
         QStringLiteral("-m1024"),
         QStringLiteral("-r12"),
         QStringLiteral("-s768000"),
+    }));
+}
+
+void TestCliParser::multipar_default_args_use_only_slash_switches()
+{
+    // useMultiPar=true. par2j rejects par2cmdline's -l / -m1024, so the
+    // default must be just the create verb + the /rr redundancy switch.
+    const QStringList args = PostingJob::buildPar2ArgsForTest(
+        QString(),
+        false,
+        true,
+        8);
+
+    QCOMPARE(args, QStringList({
+        QStringLiteral("c"),
+        QStringLiteral("/rr8"),
+    }));
+}
+
+void TestCliParser::par2_args_redundancy_override_for_multipar()
+{
+    const QStringList args = PostingJob::buildPar2ArgsForTest(
+        QStringLiteral("c /rr8 /lc4"),
+        false,
+        true,
+        12);
+
+    QCOMPARE(args, QStringList({
+        QStringLiteral("c"),
+        QStringLiteral("/rr12"),
+        QStringLiteral("/lc4"),
     }));
 }
 

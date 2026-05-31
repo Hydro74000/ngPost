@@ -396,8 +396,16 @@ NgPost::NgPost(int &argc, char *argv[]):
     const QString appDir = QCoreApplication::applicationDirPath();
     QStringList par2Candidates;
 #if defined(WIN32) || defined(__MINGW64__)
+    // Fallback order: ParPar (preferred — no shell globbing needed via -R),
+    // then par2cmdline (par2.exe), then MultiPar (par2j64/par2j). All three are
+    // bundled by the Windows installer so par2 generation keeps working even if
+    // the user opts out of ParPar. par2cmdline 0.8.0 and par2j self-expand the
+    // archive.7z* / archive*rar wildcards ngPost passes (verified), so they are
+    // safe under QProcess's shell-less CreateProcess.
     par2Candidates << QString("%1/parpar.exe").arg(appDir)
-                   << QString("%1/par2.exe").arg(appDir);
+                   << QString("%1/par2.exe").arg(appDir)
+                   << QString("%1/par2j64.exe").arg(appDir)
+                   << QString("%1/par2j.exe").arg(appDir);
 #else
     par2Candidates << QString("%1/parpar").arg(appDir)
                    << QString("%1/par2").arg(appDir);
