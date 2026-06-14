@@ -30,6 +30,7 @@
 #include <QNetworkInterface>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTimer>
 
@@ -643,37 +644,61 @@ bool VpnManager::isHelperInstalled() const
 #endif
 }
 
-QString VpnManager::bundledResourcesDir() const
+bool VpnManager::stageBundledResources(QString const &destination,
+                                       QString *error) const
 {
-    // The installer needs a directory containing the 3 scripts + polkit
-    // template. In the AppImage everything lands in usr/bin/ next to the
-    // binary; for dev builds the in-tree sources live one level deeper.
     QString const appDir = QCoreApplication::applicationDirPath();
+    bool const appImageLayout =
+        QFileInfo::exists(appDir + QStringLiteral("/ngpost-vpn-install.sh"));
+    QStringList const files = {
+        QStringLiteral("ngpost-vpn-helper.sh"),
+        QStringLiteral("ngpost-vpn-install.sh"),
+        QStringLiteral("ngpost-vpn-uninstall.sh"),
+        QStringLiteral("49-ngpost-vpn.rules.in"),
+    };
 
-    // AppImage layout: helper.sh + install.sh + uninstall.sh + rules.in
-    // all directly next to the ngPost binary.
-    QFileInfo bundled(appDir + QStringLiteral("/ngpost-vpn-install.sh"));
-    if (bundled.exists())
-        return appDir;
+    for (QString const &file : files) {
+        QString source;
+        if (appImageLayout) {
+            source = appDir + QLatin1Char('/') + file;
+        } else if (file.endsWith(QStringLiteral(".rules.in"))) {
+            source = appDir + QStringLiteral("/vpn/polkit/") + file;
+        } else {
+            source = appDir + QStringLiteral("/vpn/scripts/") + file;
+        }
 
-    // Dev layout: install.sh in vpn/scripts/, rules.in in vpn/polkit/.
-    // For the installer to find everything in one place we have to stage a
-    // temp directory. Build it under the user's runtime dir.
-    QString stage = QDir::tempPath() + QStringLiteral("/ngpost-vpn-install-stage");
-    QDir().mkpath(stage);
-    QFile::remove(stage + "/ngpost-vpn-helper.sh");
-    QFile::remove(stage + "/ngpost-vpn-install.sh");
-    QFile::remove(stage + "/ngpost-vpn-uninstall.sh");
-    QFile::remove(stage + "/49-ngpost-vpn.rules.in");
-    QString const src = appDir + QStringLiteral("/vpn");
-    QFile::copy(src + "/scripts/ngpost-vpn-helper.sh",    stage + "/ngpost-vpn-helper.sh");
-    QFile::copy(src + "/scripts/ngpost-vpn-install.sh",   stage + "/ngpost-vpn-install.sh");
-    QFile::copy(src + "/scripts/ngpost-vpn-uninstall.sh", stage + "/ngpost-vpn-uninstall.sh");
-    QFile::copy(src + "/polkit/49-ngpost-vpn.rules.in",   stage + "/49-ngpost-vpn.rules.in");
-    QFile::setPermissions(stage + "/ngpost-vpn-helper.sh",    QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner|QFileDevice::ReadGroup|QFileDevice::ExeGroup|QFileDevice::ReadOther|QFileDevice::ExeOther);
-    QFile::setPermissions(stage + "/ngpost-vpn-install.sh",   QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner|QFileDevice::ReadGroup|QFileDevice::ExeGroup|QFileDevice::ReadOther|QFileDevice::ExeOther);
-    QFile::setPermissions(stage + "/ngpost-vpn-uninstall.sh", QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner|QFileDevice::ReadGroup|QFileDevice::ExeGroup|QFileDevice::ReadOther|QFileDevice::ExeOther);
-    return stage;
+        QFileInfo const sourceInfo(source);
+        if (!sourceInfo.isFile() || !sourceInfo.isReadable()) {
+            if (error)
+                *error = tr("required VPN resource is missing or unreadable: %1")
+                             .arg(source);
+            return false;
+        }
+
+        QString const target = destination + QLatin1Char('/') + file;
+        if (!QFile::copy(source, target)) {
+            if (error)
+                *error = tr("could not stage VPN resource: %1").arg(file);
+            return false;
+        }
+    }
+
+    QFileDevice::Permissions const scriptPermissions =
+        QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
+        QFileDevice::ReadGroup | QFileDevice::ExeGroup |
+        QFileDevice::ReadOther | QFileDevice::ExeOther;
+    for (QString const &file : files) {
+        if (!file.endsWith(QStringLiteral(".sh")))
+            continue;
+        QString const target = destination + QLatin1Char('/') + file;
+        if (!QFile::setPermissions(target, scriptPermissions)) {
+            if (error)
+                *error = tr("could not make staged VPN resource executable: %1")
+                             .arg(file);
+            return false;
+        }
+    }
+    return true;
 }
 
 bool VpnManager::runInstall()
@@ -695,20 +720,30 @@ bool VpnManager::runInstall()
     }
 #endif
 
-    QString const resDir = bundledResourcesDir();
-    QString const installer = resDir + QStringLiteral("/ngpost-vpn-install.sh");
-    if (!QFileInfo::exists(installer)) {
-        emit logLine(tr("VPN: install script not found at %1").arg(installer));
+    QTemporaryDir stage(QDir::tempPath()
+                        + QStringLiteral("/ngpost-vpn-install-XXXXXX"));
+    if (!stage.isValid()) {
+        emit logLine(tr("VPN: could not create a temporary install directory"));
         return false;
     }
 
+    QString error;
+    if (!stageBundledResources(stage.path(), &error)) {
+        emit logLine(tr("VPN: %1").arg(error));
+        return false;
+    }
+
+    QString const resDir = stage.path();
+    QString const installer = resDir + QStringLiteral("/ngpost-vpn-install.sh");
     QString const launcher = helperLauncherProgram();
-    emit logLine(tr("Running VPN install: %1 %2 %3").arg(launcher, installer, resDir));
+    QString const shell = QStringLiteral("/bin/bash");
+    emit logLine(tr("Running VPN install: %1 %2 %3")
+                     .arg(launcher, shell + QLatin1Char(' ') + installer, resDir));
 
     QProcess p;
     p.setProcessChannelMode(QProcess::MergedChannels);
     QStringList args = helperLauncherPrefixArgs();
-    args << installer << resDir;
+    args << shell << installer << resDir;
     p.start(launcher, args);
     if (!p.waitForFinished(60000)) {
         emit logLine(tr("VPN install: timed out"));

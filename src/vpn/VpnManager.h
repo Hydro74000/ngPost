@@ -118,9 +118,11 @@ public:
     //! Did the user run "Install" at some point on this machine?
     bool isHelperInstalled() const;
 
-    //! Source dir bundled with ngPost containing the 3 scripts + polkit
-    //! template that the installer needs as input.
-    QString bundledResourcesDir() const;
+    //! Copy the bundled VPN scripts and polkit template into a private
+    //! temporary directory. This keeps pkexec away from AppImage/FUSE paths,
+    //! which some systems refuse to execute after security updates.
+    bool stageBundledResources(QString const &destination,
+                               QString *error = nullptr) const;
 
     //! 1 pkexec → copies helper + uninstaller to /var/lib/ngpost/ and writes
     //! the per-user polkit rule. Returns true on success.
