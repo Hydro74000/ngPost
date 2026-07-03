@@ -644,6 +644,15 @@ bool VpnManager::isHelperInstalled() const
 #endif
 }
 
+bool VpnManager::vpnFeatureAvailable() const
+{
+#ifdef Q_OS_WIN
+    return isHelperInstalled();
+#else
+    return !helperScriptPath().isEmpty();
+#endif
+}
+
 bool VpnManager::stageBundledResources(QString const &destination,
                                        QString *error) const
 {
@@ -933,6 +942,15 @@ bool VpnManager::jobNeedsVpn(QList<NntpServerParams *> const &activeServers) con
 VpnManager::Admission
 VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
 {
+    // The master switch was requested (config VPN_AUTO_CONNECT) but no helper
+    // can be spawned on this machine: we ignore the switch and post directly
+    // rather than blocking. Say so in the post log so the fallback isn't a
+    // silent surprise. Per-server `useVpn` is handled below (still fail-closed).
+    if (_autoConnect && !vpnFeatureAvailable())
+        emit statusLine(tr("Master switch (VPN_AUTO_CONNECT) is ON but no VPN "
+                           "helper is installed — ignoring it and posting "
+                           "directly. Per-server 'useVpn' is still enforced."));
+
     if (!jobNeedsVpn(activeServers))
         return Admission::Proceed;
 
@@ -942,22 +960,11 @@ VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
     VpnProfile const *active = activeProfile();
     QString activeCfgPath = active ? active->absoluteConfigPath() : QString();
 
-    // The real capability check is "can we locate a helper script we can
-    // spawn", not "did the user run Install". The backends use
-    // helperScriptPath() — which also resolves the in-tree dev copy — so this
-    // gate must agree with them, otherwise a dev/CI build with a valid
-    // in-tree helper gets blocked here and the job hangs forever in the
-    // pending queue.
-    //
-    // Windows has no .sh helper at all (OpenVPN/WireGuard are launched
-    // directly), so helperScriptPath() would always be empty there and every
-    // VPN-requiring job would be blocked. Use isHelperInstalled() instead,
-    // which is OS-aware (checks for the OpenVPN / WireGuard binaries).
-#ifdef Q_OS_WIN
-    bool const capabilityMissing = !isHelperInstalled();
-#else
-    bool const capabilityMissing = helperScriptPath().isEmpty();
-#endif
+    // capabilityMissing mirrors vpnFeatureAvailable() — "can we spawn a helper",
+    // not "did the user run Install" — so admission agrees with the master
+    // switch and per-connection routing. See vpnFeatureAvailable() for the
+    // platform rationale (in-tree dev/CI helper on *nix, binaries on Windows).
+    bool const capabilityMissing = !vpnFeatureAvailable();
     if (capabilityMissing) {
         reason = JobBlockReason::HelperNotInstalled;
         detail = tr("The VPN helper is not installed. Open the VPN dialog "

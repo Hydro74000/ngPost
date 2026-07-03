@@ -56,14 +56,16 @@ public:
     //! regardless of per-server `useVpn`. When false, per-server `useVpn`
     //! decides which servers route through the tunnel.
     //!
-    //! The master switch is *neutralised at runtime when the VPN helper is not
-    //! installed*: a `VPN_AUTO_CONNECT = true` hand-edited into the config (the
-    //! GUI already prevents ticking it without a helper) must NOT block posting
-    //! — it silently falls back to direct connections. The per-server `useVpn`
-    //! checkbox stays the real fail-closed guard. `autoConnect()` returns the
-    //! raw stored value and is preserved for the config plumbing that persists
-    //! the `VPN_AUTO_CONNECT` key, so the user's choice survives a save.
-    bool          forceAllConnectionsThroughVpn() const { return _autoConnect && isHelperInstalled(); }
+    //! The master switch is *neutralised at runtime when no VPN helper can be
+    //! spawned* (`vpnFeatureAvailable()` — the same capability gate admitJob
+    //! uses, which also resolves the in-tree / dev helper, so CI and dev
+    //! builds keep working). A `VPN_AUTO_CONNECT = true` hand-edited into the
+    //! config on a machine with no helper must NOT block posting — it silently
+    //! falls back to direct connections. The per-server `useVpn` checkbox stays
+    //! the real fail-closed guard. `autoConnect()` returns the raw stored value
+    //! and is preserved for the config plumbing that persists the
+    //! `VPN_AUTO_CONNECT` key, so the user's choice survives a save.
+    bool          forceAllConnectionsThroughVpn() const { return _autoConnect && vpnFeatureAvailable(); }
     bool          autoConnect() const { return _autoConnect; }
     bool          isConnected() const { return _state == State::Connected; }
 
@@ -123,6 +125,13 @@ public:
 
     //! Did the user run "Install" at some point on this machine?
     bool isHelperInstalled() const;
+
+    //! True when the VPN feature can actually be used on this platform, i.e. a
+    //! helper we can spawn is reachable. This is the capability gate shared by
+    //! admitJob (job admission), forceAllConnectionsThroughVpn (routing) and
+    //! jobNeedsVpn, so all three agree. Non-Windows: a helper script resolves
+    //! (installed OR in-tree/dev copy). Windows: OpenVPN/WireGuard present.
+    bool vpnFeatureAvailable() const;
 
     //! Copy the bundled VPN scripts and polkit template into a private
     //! temporary directory. This keeps pkexec away from AppImage/FUSE paths,
