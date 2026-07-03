@@ -919,7 +919,10 @@ void VpnManager::runStartupCleanup()
 
 bool VpnManager::jobNeedsVpn(QList<NntpServerParams *> const &activeServers) const
 {
-    if (_autoConnect)
+    // Use the effective master switch (forceAllConnectionsThroughVpn), which
+    // is neutralised when the helper is not installed — a hand-edited
+    // VPN_AUTO_CONNECT must not force the job to need the VPN in that case.
+    if (forceAllConnectionsThroughVpn())
         return true;
     for (NntpServerParams *srv : activeServers)
         if (srv && srv->enabled && srv->useVpn)

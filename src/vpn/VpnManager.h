@@ -54,10 +54,16 @@ public:
     //! Global override: when true, the VPN auto-starts on every
     //! job AND every NNTP connection (across all servers) binds to the tun,
     //! regardless of per-server `useVpn`. When false, per-server `useVpn`
-    //! decides which servers route through the tunnel. The legacy
-    //! `autoConnect()` accessor is preserved as an alias for the config
-    //! plumbing that still uses the `VPN_AUTO_CONNECT` key.
-    bool          forceAllConnectionsThroughVpn() const { return _autoConnect; }
+    //! decides which servers route through the tunnel.
+    //!
+    //! The master switch is *neutralised at runtime when the VPN helper is not
+    //! installed*: a `VPN_AUTO_CONNECT = true` hand-edited into the config (the
+    //! GUI already prevents ticking it without a helper) must NOT block posting
+    //! — it silently falls back to direct connections. The per-server `useVpn`
+    //! checkbox stays the real fail-closed guard. `autoConnect()` returns the
+    //! raw stored value and is preserved for the config plumbing that persists
+    //! the `VPN_AUTO_CONNECT` key, so the user's choice survives a save.
+    bool          forceAllConnectionsThroughVpn() const { return _autoConnect && isHelperInstalled(); }
     bool          autoConnect() const { return _autoConnect; }
     bool          isConnected() const { return _state == State::Connected; }
 
