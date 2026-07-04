@@ -62,6 +62,12 @@ private slots:
     //! PAR2_PCT spinbox, even when PAR2_ARGS is present.
     void save_config_persists_rar_max_and_par2_pct();
 
+    //! Regression test for the reported bug: filling in a newly-added
+    //! server row and leaving the fields (editingFinished) must persist to
+    //! ngPost.conf on its own — the user should never have to find and
+    //! click the separate "Save" button just to keep a server they added.
+    void add_server_and_edit_fields_persists_without_save_button();
+
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
     //! offscreen QPA + nested-cell widgets do not deliver those reliably.
@@ -243,6 +249,53 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
     QVERIFY2(!content.contains(QStringLiteral("\n#RAR_MAX = 99\n")),
              qPrintable(content));
     QVERIFY2(content.contains(QStringLiteral("\nPAR2_PCT = 23\n")),
+             qPrintable(content));
+}
+
+void TestMainWindow::add_server_and_edit_fields_persists_without_save_button()
+{
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    {
+        QFile conf(confPath);
+        QVERIFY2(conf.open(QIODevice::WriteOnly | QIODevice::Text),
+                 qPrintable(QStringLiteral("Could not write test config: %1").arg(confPath)));
+        QTextStream s(&conf);
+        s << "GROUPS = alt.binaries.test\n";
+    }
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString parseError = ngPost.parseDefaultConfig();
+    QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY2(window, "NgPost did not create a GUI MainWindow for the test");
+    window->init(&ngPost);
+
+    QVERIFY(QMetaObject::invokeMethod(window, "onAddServer", Qt::DirectConnection));
+
+    auto *hostEdit = window->findChild<QLineEdit*>(QStringLiteral("serverHostEdit_0"));
+    auto *userEdit = window->findChild<QLineEdit*>(QStringLiteral("serverUserEdit_0"));
+    QVERIFY2(hostEdit, "serverHostEdit_0 not found");
+    QVERIFY2(userEdit, "serverUserEdit_0 not found");
+
+    // This is exactly what happens interactively: the user types into the
+    // field then moves focus away (Tab / click elsewhere), which fires
+    // editingFinished. Note we deliberately never call onSaveConfig.
+    hostEdit->setText(QStringLiteral("news.example.com"));
+    emit hostEdit->editingFinished();
+    userEdit->setText(QStringLiteral("bob"));
+    emit userEdit->editingFinished();
+
+    QFile saved(confPath);
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString content = QString::fromUtf8(saved.readAll());
+    QVERIFY2(content.contains(QStringLiteral("host = news.example.com")),
+             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("user = bob")),
              qPrintable(content));
 }
 

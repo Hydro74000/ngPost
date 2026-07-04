@@ -249,10 +249,10 @@ private slots:
 
     void _onHistoryContextMenu(const QPoint &pos);
 
-    //! Phase 5d: a per-server "Use VPN" checkbox in the server table got
-    //! toggled. Persist the change immediately so it survives a restart
-    //! without forcing the user through "Save Config".
-    void _onUseVpnToggled(bool checked);
+    //! Phase 5d/6: a per-row server field (checkbox or text field) changed.
+    //! Persist immediately so adding, editing or toggling a server survives
+    //! a restart without forcing the user through "Save Config".
+    void _onServerFieldEdited();
 
 private:
     void _initServerBox();

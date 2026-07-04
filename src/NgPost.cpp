@@ -3526,22 +3526,41 @@ QString NgPost::parseDefaultConfig()
     switch (migration.status)
     {
     case PathHelper::ConfigMigrationStatus::CopiedAndKeptLegacy:
-        if (!_quiet)
-            _cout << tr("Migrated legacy config to: %1\nLegacy config kept at: %2")
-                         .arg(migration.newPath, migration.legacyPath)
-                  << "\n" << MB_FLUSH;
+        // Use _log() rather than a raw _cout so this also lands in the GUI
+        // log panel: on Windows a windowed build has no console, so this
+        // message was previously invisible to HMI users entirely.
+        if (useHMI() || !_quiet)
+            _log(tr("Migrated legacy config to: %1\nLegacy config kept at: %2")
+                     .arg(migration.newPath, migration.legacyPath));
         break;
     case PathHelper::ConfigMigrationStatus::SkippedNewExists:
-        if (!_quiet)
-            _cout << tr("New config already exists: %1\nLegacy config kept at: %2")
-                         .arg(migration.newPath, migration.legacyPath)
-                  << "\n" << MB_FLUSH;
+        if (useHMI() || !_quiet)
+            _log(tr("New config already exists: %1\nLegacy config kept at: %2")
+                     .arg(migration.newPath, migration.legacyPath));
+        if (migration.legacyModifiedAfterMigration)
+        {
+            // The legacy file (e.g. ngPost.conf next to ngPost.exe) was
+            // touched after we stopped reading it: whoever is editing it by
+            // hand is silently wasting their time. Always surface this,
+            // regardless of --quiet, since it points at a real user mistake.
+            const QString warning = tr(
+                "A configuration file was found next to the application:\n%1\n\n"
+                "It was modified after ngPost switched to a per-user configuration "
+                "folder, but it is no longer read — your changes there are being "
+                "ignored.\n\nYour active configuration file is:\n%2")
+                .arg(migration.legacyPath, migration.newPath);
+#ifdef __USE_HMI__
+            if (useHMI())
+                QMessageBox::warning(nullptr, tr("Ignored configuration file"), warning);
+            else
+#endif
+                _cout << tr("WARNING: ") << warning << "\n" << MB_FLUSH;
+        }
         break;
     case PathHelper::ConfigMigrationStatus::AlreadyMigrated:
-        if (!migration.backupPath.isEmpty() && !_quiet)
-            _cout << tr("Config backup created before migration: %1")
-                         .arg(migration.backupPath)
-                  << "\n" << MB_FLUSH;
+        if (!migration.backupPath.isEmpty() && (useHMI() || !_quiet))
+            _log(tr("Config backup created before migration: %1")
+                     .arg(migration.backupPath));
         break;
     case PathHelper::ConfigMigrationStatus::BackupFailed:
         return tr("Config migration failed: could not create backup '%1'.")

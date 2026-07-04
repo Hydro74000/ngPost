@@ -46,6 +46,13 @@ struct ConfigMigrationResult
     QString newPath;
     QString backupPath;
     QString error;
+
+    //! Only meaningful when status == SkippedNewExists: true when the
+    //! legacy file (e.g. next to the executable on Windows) was modified
+    //! more recently than the active config. This is the "someone is
+    //! editing the wrong file by hand" signal — their edits are being
+    //! silently ignored.
+    bool legacyModifiedAfterMigration = false;
 };
 
 //! Absolute path to the user's ngPost config directory. Creates it if missing.
