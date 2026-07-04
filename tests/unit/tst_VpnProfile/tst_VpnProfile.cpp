@@ -7,13 +7,52 @@
 
 #include <QtTest>
 #include <QDir>
+#include <QFile>
+#include <QFileDevice>
+#include <QFileInfo>
 
+#include "nntp/NntpServerParams.h"
 #include "TestEnv.h"
 #include "utils/PathHelper.h"
 #include "vpn/VpnManager.h"
 #include "vpn/VpnProfile.h"
 
 using ngpost::tests::HomeSandbox;
+
+namespace {
+struct TestVpnHelperFile
+{
+    QString path;
+    bool created;
+
+    TestVpnHelperFile()
+        : path(), created(false)
+    {
+        QDir appDir(QCoreApplication::applicationDirPath());
+        appDir.mkpath(QStringLiteral("vpn/scripts"));
+        path = appDir.filePath(QStringLiteral("vpn/scripts/ngpost-vpn-helper.sh"));
+        if (QFileInfo::exists(path))
+            return;
+
+        QFile f(path);
+        if (f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            f.write("#!/bin/sh\nexit 0\n");
+            f.close();
+            QFile::setPermissions(path,
+                QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
+                QFileDevice::ReadGroup | QFileDevice::ExeGroup |
+                QFileDevice::ReadOther | QFileDevice::ExeOther);
+            created = true;
+        }
+    }
+
+    ~TestVpnHelperFile()
+    {
+        if (created)
+            QFile::remove(path);
+    }
+};
+}
 
 class TestVpnProfile : public QObject
 {
@@ -42,6 +81,14 @@ private slots:
 
     //! Unknown backend strings set ok=false and fall back to OpenVPN.
     void backendFromString_unknown_sets_ok_false();
+
+    //! The global VPN_AUTO_CONNECT switch is ignored when no active VPN profile
+    //! is selected/configured.
+    void master_switch_ignored_without_active_vpn_profile();
+
+    //! Per-server Use VPN remains fail-closed and logs clear guidance when VPN
+    //! setup is incomplete.
+    void per_server_useVpn_blocks_and_logs_guidance_when_vpn_incomplete();
 };
 
 void TestVpnProfile::default_profile_is_invalid()
@@ -151,6 +198,67 @@ void TestVpnProfile::backendFromString_unknown_sets_ok_false()
     ok = true;
     VpnManager::backendFromString(QString(), &ok);
     QVERIFY(!ok);
+}
+
+void TestVpnProfile::master_switch_ignored_without_active_vpn_profile()
+{
+    HomeSandbox sandbox;
+    TestVpnHelperFile helper;
+
+    VpnManager manager;
+    manager.setAutoConnect(true);
+    if (!manager.vpnFeatureAvailable())
+        QSKIP("No VPN helper/prerequisite available on this platform");
+
+    QVERIFY2(!manager.forceAllConnectionsThroughVpn(),
+             "VPN_AUTO_CONNECT must be neutral when no active profile is selected");
+
+    NntpServerParams server(QStringLiteral("news.example.org"));
+    QList<NntpServerParams *> servers;
+    servers << &server;
+
+    QVERIFY(!manager.jobNeedsVpn(servers));
+    QCOMPARE(manager.admitJob(servers), VpnManager::Admission::Proceed);
+}
+
+void TestVpnProfile::per_server_useVpn_blocks_and_logs_guidance_when_vpn_incomplete()
+{
+    HomeSandbox sandbox;
+    VpnManager manager;
+
+    NntpServerParams server(QStringLiteral("news.example.org"));
+    server.useVpn = true;
+    QList<NntpServerParams *> servers;
+    servers << &server;
+
+    int unavailableCount = 0;
+    QString unavailableDetail;
+    QObject::connect(&manager, &VpnManager::vpnRequiredButUnavailable,
+                     &manager,
+                     [&](VpnManager::JobBlockReason, QString const &detail) {
+        ++unavailableCount;
+        unavailableDetail = detail;
+    });
+
+    int statusCount = 0;
+    QString statusLine;
+    QObject::connect(&manager, &VpnManager::statusLine,
+                     &manager,
+                     [&](QString const &line) {
+        ++statusCount;
+        statusLine = line;
+    });
+
+    QCOMPARE(manager.admitJob(servers), VpnManager::Admission::Blocked);
+    QCOMPARE(unavailableCount, 1);
+    QVERIFY2(statusCount > 0, "per-server Use VPN refusal must be written to the post log");
+
+    QVERIFY(unavailableDetail.contains(QStringLiteral("Use VPN is enabled")));
+    QVERIFY(unavailableDetail.contains(QStringLiteral("news.example.org")));
+    QVERIFY(unavailableDetail.contains(QStringLiteral("VPN is not correctly configured")));
+    QVERIFY(unavailableDetail.contains(QStringLiteral("VPN button")));
+    QVERIFY(unavailableDetail.contains(QStringLiteral("Use VPN checkbox")));
+    QCOMPARE(statusLine, unavailableDetail);
 }
 
 QTEST_APPLESS_MAIN(TestVpnProfile)

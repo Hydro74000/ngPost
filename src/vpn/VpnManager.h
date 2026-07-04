@@ -56,16 +56,15 @@ public:
     //! regardless of per-server `useVpn`. When false, per-server `useVpn`
     //! decides which servers route through the tunnel.
     //!
-    //! The master switch is *neutralised at runtime when no VPN helper can be
-    //! spawned* (`vpnFeatureAvailable()` — the same capability gate admitJob
-    //! uses, which also resolves the in-tree / dev helper, so CI and dev
-    //! builds keep working). A `VPN_AUTO_CONNECT = true` hand-edited into the
-    //! config on a machine with no helper must NOT block posting — it silently
-    //! falls back to direct connections. The per-server `useVpn` checkbox stays
-    //! the real fail-closed guard. `autoConnect()` returns the raw stored value
-    //! and is preserved for the config plumbing that persists the
-    //! `VPN_AUTO_CONNECT` key, so the user's choice survives a save.
-    bool          forceAllConnectionsThroughVpn() const { return _autoConnect && vpnFeatureAvailable(); }
+    //! The master switch is *neutralised at runtime when the VPN cannot be used*
+    //! (`vpnFeatureAvailable()` plus a selected/readable active profile). A
+    //! `VPN_AUTO_CONNECT = true` hand-edited into the config on a machine with no
+    //! helper or no VPN profile must NOT block posting — it falls back to direct
+    //! connections. The per-server `useVpn` checkbox stays the real fail-closed
+    //! guard. `autoConnect()` returns the raw stored value and is preserved for
+    //! the config plumbing that persists the `VPN_AUTO_CONNECT` key, so the
+    //! user's choice survives a save.
+    bool          forceAllConnectionsThroughVpn() const;
     bool          autoConnect() const { return _autoConnect; }
     bool          isConnected() const { return _state == State::Connected; }
 
@@ -173,8 +172,8 @@ public:
     };
     Q_ENUM(Admission)
 
-    //! Does this server set require the tunnel? True if global autoConnect
-    //! OR any of the given enabled servers has useVpn=true.
+    //! Does this server set require the tunnel? True if the effective global
+    //! autoConnect applies OR any of the given enabled servers has useVpn=true.
     bool jobNeedsVpn(QList<NntpServerParams *> const &activeServers) const;
 
     //! Decide whether a job can start now. Side-effect: if VPN is needed but
@@ -239,6 +238,8 @@ private:
     void _cancelAutoDisconnect();
     //! Declare the tunnel up once `_tunIp` is confirmed usable.
     void _completeReady();
+    //! True when a VPN profile is selected and its config file can be read.
+    bool _activeProfileUsable(QString *detail = nullptr) const;
 
     bool         _autoConnect;
     State        _state;

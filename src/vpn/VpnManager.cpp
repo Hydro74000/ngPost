@@ -30,6 +30,7 @@
 #include <QNetworkInterface>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QStringList>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTimer>
@@ -94,6 +95,34 @@ QString VpnManager::configPath() const
 {
     VpnProfile const *p = activeProfile();
     return p ? p->absoluteConfigPath() : QString();
+}
+
+bool VpnManager::forceAllConnectionsThroughVpn() const
+{
+    return _autoConnect && vpnFeatureAvailable() && _activeProfileUsable();
+}
+
+bool VpnManager::_activeProfileUsable(QString *detail) const
+{
+    VpnProfile const *active = activeProfile();
+    QString const activeCfgPath = active ? active->absoluteConfigPath() : QString();
+    if (!active || activeCfgPath.isEmpty()) {
+        if (detail)
+            *detail = tr("No active VPN profile / configuration is selected.");
+        return false;
+    }
+
+    QFileInfo const cfg(activeCfgPath);
+    if (!cfg.exists() || !cfg.isReadable()) {
+        if (detail)
+            *detail = tr("The VPN configuration file is missing or unreadable: %1")
+                         .arg(activeCfgPath);
+        return false;
+    }
+
+    if (detail)
+        detail->clear();
+    return true;
 }
 
 // --- Profile management ---------------------------------------------------
@@ -929,8 +958,9 @@ void VpnManager::runStartupCleanup()
 bool VpnManager::jobNeedsVpn(QList<NntpServerParams *> const &activeServers) const
 {
     // Use the effective master switch (forceAllConnectionsThroughVpn), which
-    // is neutralised when the helper is not installed — a hand-edited
-    // VPN_AUTO_CONNECT must not force the job to need the VPN in that case.
+    // is neutralised when the VPN is not installed/configured/selected -- a
+    // hand-edited VPN_AUTO_CONNECT must not force the job to need the VPN in
+    // that case. Per-server useVpn remains fail-closed below.
     if (forceAllConnectionsThroughVpn())
         return true;
     for (NntpServerParams *srv : activeServers)
@@ -942,14 +972,35 @@ bool VpnManager::jobNeedsVpn(QList<NntpServerParams *> const &activeServers) con
 VpnManager::Admission
 VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
 {
-    // The master switch was requested (config VPN_AUTO_CONNECT) but no helper
-    // can be spawned on this machine: we ignore the switch and post directly
-    // rather than blocking. Say so in the post log so the fallback isn't a
-    // silent surprise. Per-server `useVpn` is handled below (still fail-closed).
-    if (_autoConnect && !vpnFeatureAvailable())
-        emit statusLine(tr("Master switch (VPN_AUTO_CONNECT) is ON but no VPN "
-                           "helper is installed — ignoring it and posting "
-                           "directly. Per-server 'useVpn' is still enforced."));
+    QStringList serverUseVpnNames;
+    for (NntpServerParams *srv : activeServers) {
+        if (!srv || !srv->enabled || !srv->useVpn)
+            continue;
+        QString name = srv->host.trimmed();
+        serverUseVpnNames << (name.isEmpty() ? tr("(unnamed server)") : name);
+    }
+    bool const perServerVpnRequested = !serverUseVpnNames.isEmpty();
+
+    // The master switch was requested (config VPN_AUTO_CONNECT) but the VPN
+    // cannot be used on this machine or has no usable selected profile: ignore
+    // the global switch rather than blocking. Per-server `useVpn` is handled
+    // below and remains fail-closed.
+    if (_autoConnect) {
+        if (!vpnFeatureAvailable()) {
+            emit statusLine(tr("Master switch (VPN_AUTO_CONNECT) is ON but no VPN "
+                               "helper is installed - ignoring the master switch. "
+                               "Per-server 'Use VPN' is still enforced."));
+        } else {
+            QString profileDetail;
+            if (!_activeProfileUsable(&profileDetail)) {
+                emit statusLine(tr("Master switch (VPN_AUTO_CONNECT) is ON but the "
+                                   "VPN is not correctly configured (%1) - ignoring "
+                                   "the master switch. Per-server 'Use VPN' is still "
+                                   "enforced.")
+                                .arg(profileDetail));
+            }
+        }
+    }
 
     if (!jobNeedsVpn(activeServers))
         return Admission::Proceed;
@@ -984,6 +1035,15 @@ VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
         }
     }
     if (reason != JobBlockReason::None) {
+        if (perServerVpnRequested) {
+            detail = tr("Use VPN is enabled for NNTP server(s): %1.\n\n"
+                        "The VPN is not correctly configured: %2\n\n"
+                        "Open the VPN options with the VPN button and check the "
+                        "VPN configuration, or edit the server configuration and "
+                        "disable VPN by clearing its Use VPN checkbox.")
+                     .arg(serverUseVpnNames.join(QStringLiteral(", ")), detail);
+            emit statusLine(detail);
+        }
         emit vpnRequiredButUnavailable(reason, detail);
         return Admission::Blocked;
     }
