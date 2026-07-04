@@ -102,6 +102,18 @@ bool VpnManager::forceAllConnectionsThroughVpn() const
     return _autoConnect && vpnFeatureAvailable() && _activeProfileUsable();
 }
 
+bool VpnManager::shouldConfirmMasterSwitchWithoutProfile(QString *detail) const
+{
+    if (!_autoConnect || !isHelperInstalled())
+        return false;
+    if (_activeProfileUsable(detail))
+        return false;
+
+    if (detail && detail->isEmpty())
+        *detail = tr("No active VPN profile / configuration is selected.");
+    return true;
+}
+
 bool VpnManager::_activeProfileUsable(QString *detail) const
 {
     VpnProfile const *active = activeProfile();

@@ -67,6 +67,10 @@ public:
     bool          forceAllConnectionsThroughVpn() const;
     bool          autoConnect() const { return _autoConnect; }
     bool          isConnected() const { return _state == State::Connected; }
+    //! True when the master switch is enabled but would be ignored because the
+    //! VPN helper/prerequisites are present while no usable active profile is
+    //! selected/configured. GUI callers use this to warn before posting direct.
+    bool          shouldConfirmMasterSwitchWithoutProfile(QString *detail = nullptr) const;
 
     void setAutoConnect(bool v);
 

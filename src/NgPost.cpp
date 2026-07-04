@@ -28,6 +28,7 @@
 #ifdef __USE_HMI__
   #include <QApplication>
   #include <QMessageBox>
+  #include <QPushButton>
 #else
   #include <QCoreApplication>
 #endif
@@ -375,6 +376,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _nzbCheck(nullptr), _quiet(false),
     _proxySocks5(QNetworkProxy::NoProxy), _proxyUrl(),
     _vpnManager(nullptr),
+    _lastPostingStartCanceled(false),
     _logFile(nullptr), _logStream(nullptr)
 {
     QThread::currentThread()->setObjectName(sMainThreadName);
@@ -1190,6 +1192,11 @@ bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
                                      resumePlan.statesByPath);
 #ifdef __USE_HMI__
     const bool hasStarted = startPostingJob(job);
+    if (lastPostingStartCanceled()) {
+        if (error)
+            *error = tr("Posting canceled by user.");
+        return false;
+    }
     if (widget)
         widget->attachResumeJob(job, resumePlan.files, hasStarted);
 #else
@@ -3563,8 +3570,41 @@ QString NgPost::parseDefaultConfig()
     return err;
 }
 
+bool NgPost::_confirmMasterSwitchWithoutVpnProfileIfNeeded()
+{
+#ifdef __USE_HMI__
+    if (!useHMI() || !_vpnManager)
+        return true;
+
+    QString detail;
+    if (!_vpnManager->shouldConfirmMasterSwitchWithoutProfile(&detail)
+        || _vpnManager->jobNeedsVpn(_nntpServers))
+        return true;
+
+    QMessageBox msgBox(_hmi);
+    msgBox.setIcon(QMessageBox::Warning);
+    msgBox.setWindowTitle(tr("VPN warning"));
+    msgBox.setText(tr("VPN is enabled globally, but no VPN profile is configured or selected."));
+    msgBox.setInformativeText(
+        tr("%1\n\nIf you continue, this post will run without VPN.\n\n"
+           "Setting: Button 'VPN...' -> 'Profiles' & "
+           "'Route all ngPost connections through the VPN'")
+            .arg(detail));
+    QPushButton *continueButton = msgBox.addButton(tr("Continue"), QMessageBox::AcceptRole);
+    QPushButton *cancelButton = msgBox.addButton(tr("Cancel"), QMessageBox::RejectRole);
+    msgBox.setDefaultButton(cancelButton);
+    msgBox.exec();
+
+    return msgBox.clickedButton() == continueButton;
+#else
+    return true;
+#endif
+}
+
 bool NgPost::startPostingJob(PostingJob *job)
 {
+    _lastPostingStartCanceled = false;
+
 #ifdef __DEBUG__
 qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
          << ", file: " << job->nzbName();
@@ -3577,6 +3617,12 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
             connect(job, &PostingJob::postingStarted,  _hmi->autoWidget(), &AutoPostWidget::onMonitorJobStart);
     }
 #endif
+
+    if (!_confirmMasterSwitchWithoutVpnProfileIfNeeded()) {
+        _lastPostingStartCanceled = true;
+        job->deleteLater();
+        return false;
+    }
 
     // VPN gate (Phase 3): ask the VpnManager whether this job can run NOW.
     //   Proceed: the job activates (or queues behind another active job)

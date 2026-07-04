@@ -1622,6 +1622,44 @@ Para listar as opções disponíveis use: %2 --help
         <translation>Tarefa pendente cancelada?</translation>
     </message>
     <message>
+        <location filename="../NgPost.cpp" line="1197"/>
+        <source>Posting canceled by user.</source>
+        <translation>Postagem cancelada pelo usuário.</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3586"/>
+        <source>VPN warning</source>
+        <translation>Aviso de VPN</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3587"/>
+        <source>VPN is enabled globally, but no VPN profile is configured or selected.</source>
+        <translation>A VPN está ativada globalmente, mas nenhum perfil VPN está configurado ou selecionado.</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3589"/>
+        <source>%1
+
+If you continue, this post will run without VPN.
+
+Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route all ngPost connections through the VPN&apos;</source>
+        <translation>%1
+
+Se continuar, esta postagem será executada sem VPN.
+
+Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route all ngPost connections through the VPN&apos;</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3593"/>
+        <source>Continue</source>
+        <translation>Continuar</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3594"/>
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+    <message>
         <location filename="../NgPost.cpp" line="1326"/>
         <source>Full debug logs are ON
 </source>
@@ -3626,6 +3664,11 @@ Deseja substituí-lo?</translation>
         <location filename="../vpn/VpnManager.cpp" line="383"/>
         <source>No VPN configuration file is selected.</source>
         <translation>Nenhum ficheiro de configuração VPN selecionado.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="123"/>
+        <source>No active VPN profile / configuration is selected.</source>
+        <translation>Nenhum perfil VPN ativo / configuração VPN selecionado.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="388"/>

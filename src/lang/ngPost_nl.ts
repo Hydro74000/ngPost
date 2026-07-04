@@ -1627,6 +1627,44 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
         <translation>Geannuleerde taak in behandeling?</translation>
     </message>
     <message>
+        <location filename="../NgPost.cpp" line="1197"/>
+        <source>Posting canceled by user.</source>
+        <translation>Posting geannuleerd door gebruiker.</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3586"/>
+        <source>VPN warning</source>
+        <translation>VPN-waarschuwing</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3587"/>
+        <source>VPN is enabled globally, but no VPN profile is configured or selected.</source>
+        <translation>VPN is globaal ingeschakeld, maar er is geen VPN-profiel geconfigureerd of geselecteerd.</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3589"/>
+        <source>%1
+
+If you continue, this post will run without VPN.
+
+Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route all ngPost connections through the VPN&apos;</source>
+        <translation>%1
+
+Als je doorgaat, wordt deze post zonder VPN uitgevoerd.
+
+Instelling: Knop &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route all ngPost connections through the VPN&apos;</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3593"/>
+        <source>Continue</source>
+        <translation>Doorgaan</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3594"/>
+        <source>Cancel</source>
+        <translation>Annuleren</translation>
+    </message>
+    <message>
         <location filename="../NgPost.cpp" line="1326"/>
         <source>Full debug logs are ON
 </source>
@@ -3617,6 +3655,11 @@ Wil je het overschrijven?</translation>
         <location filename="../vpn/VpnManager.cpp" line="383"/>
         <source>No VPN configuration file is selected.</source>
         <translation>Geen VPN-configuratiebestand geselecteerd.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="123"/>
+        <source>No active VPN profile / configuration is selected.</source>
+        <translation>Er is geen actief VPN-profiel / VPN-configuratie geselecteerd.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="388"/>
