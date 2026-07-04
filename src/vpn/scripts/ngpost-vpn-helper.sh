@@ -114,6 +114,11 @@ WIREGUARD_GO_BIN=$(resolve_tool wireguard-go)
 start_openvpn() {
     [ -n "$OPENVPN_BIN" ] || fail "openvpn not found"
     rm -f "$OVPN_PIDFILE"
+    local before_ifaces
+    before_ifaces=$(ip -o link show 2>/dev/null \
+                    | awk -F': ' '{print $2}' \
+                    | cut -d@ -f1 \
+                    | sort -u)
     # Optional auth file (--auth-user-pass <file>): forwarded from ngPost when
     # the active profile has credentials in the keychain. openvpn-cli option
     # overrides any matching directive in the .ovpn.
@@ -150,17 +155,87 @@ start_openvpn() {
     TUN_IFACE=$(grep -oE 'TUN/TAP device [^ ]+ opened' "$LOG_FILE" \
                 | head -1 | awk '{print $3}')
     # OpenVPN 2.6+ uses netlink and logs net_addr_v4_add: <ip>/<prefix> dev <iface>
-    TUN_IP=$(grep -oE 'net_addr_v4_add: [0-9.]+(/[0-9]+)? dev [^ ]+' "$LOG_FILE" \
-             | head -1 | awk '{print $2}' | cut -d/ -f1)
+    # Some builds include extra fields (for example "peer <ip>") before "dev",
+    # so parse the whole line by tokens instead of depending on one exact shape.
+    local net_addr_line
+    net_addr_line=$(grep -E 'net_addr_v4_add: .* dev [^ ]+' "$LOG_FILE" | head -1)
+    if [ -z "$TUN_IFACE" ]; then
+        TUN_IFACE=$(printf '%s\n' "$net_addr_line" \
+                    | awk '{for (i = 1; i < NF; ++i) if ($i == "dev") {print $(i + 1); exit}}')
+    fi
+    TUN_IP=$(printf '%s\n' "$net_addr_line" \
+             | awk '{
+                   for (i = 1; i <= NF; ++i)
+                       if ($i ~ /^[0-9.]+(\/[0-9]+)?$/) {print $i; exit}
+               }' \
+             | cut -d/ -f1)
+    if [ -z "$TUN_IFACE" ]; then
+        # OpenVPN 2.4 fallback: /sbin/ip addr add dev <iface> local <ip>
+        TUN_IFACE=$(grep -oE 'ip addr add dev [^ ]+ local [0-9.]+' "$LOG_FILE" \
+                    | head -1 | awk '{print $5}')
+    fi
     if [ -z "$TUN_IP" ]; then
         # OpenVPN 2.4 fallback: /sbin/ip addr add dev <iface> local <ip>
         TUN_IP=$(grep -oE 'ip addr add dev [^ ]+ local [0-9.]+' "$LOG_FILE" \
-                 | head -1 | awk '{print $6}')
+                 | head -1 | awk '{print $7}')
+    fi
+    if [ -z "$TUN_IFACE" ]; then
+        # /sbin/ifconfig <iface> <ip>
+        TUN_IFACE=$(grep -oE 'ifconfig [^ ]+ [0-9.]+' "$LOG_FILE" \
+                    | head -1 | awk '{print $2}')
     fi
     if [ -z "$TUN_IP" ]; then
         # /sbin/ifconfig <iface> <ip>
         TUN_IP=$(grep -oE 'ifconfig [^ ]+ [0-9.]+' "$LOG_FILE" \
                  | head -1 | awk '{print $3}')
+    fi
+
+    if [ -n "$TUN_IP" ] && [ -z "$TUN_IFACE" ]; then
+        # Last-mile fallback: OpenVPN told us the tunnel IP, so ask the kernel
+        # which interface owns it. This covers log format drift and DCO builds
+        # that don't emit the old "TUN/TAP device ..." line.
+        TUN_IFACE=$(ip -o -4 addr show 2>/dev/null \
+                    | awk -v target="$TUN_IP" '{
+                          split($4, addr, "/")
+                          if (addr[1] == target) {
+                              iface = $2
+                              sub(/@.*/, "", iface)
+                              print iface
+                              exit
+                          }
+                      }')
+    fi
+
+    if [ -n "$TUN_IFACE" ] && [ -z "$TUN_IP" ]; then
+        TUN_IP=$(ip -o -4 addr show dev "$TUN_IFACE" 2>/dev/null \
+                 | awk '{split($4, addr, "/"); print addr[1]; exit}')
+    fi
+
+    if [ -z "$TUN_IFACE" ]; then
+        # If log parsing failed entirely, find a new tun/tap-looking link that
+        # appeared after OpenVPN started. This deliberately only inspects
+        # kernel state after OpenVPN reported Initialization Sequence Completed.
+        local iface
+        for iface in $(ip -o link show 2>/dev/null \
+                       | awk -F': ' '{print $2}' \
+                       | cut -d@ -f1 \
+                       | sort -u); do
+            echo "$before_ifaces" | grep -qx "$iface" && continue
+            case "$iface" in
+                tun*|tap*|ovpn*|dco*)
+                    TUN_IFACE="$iface"
+                    break
+                    ;;
+            esac
+            [ -e "/sys/class/net/$iface/tun_flags" ] || continue
+            TUN_IFACE="$iface"
+            break
+        done
+    fi
+
+    if [ -n "$TUN_IFACE" ] && [ -z "$TUN_IP" ]; then
+        TUN_IP=$(ip -o -4 addr show dev "$TUN_IFACE" 2>/dev/null \
+                 | awk '{split($4, addr, "/"); print addr[1]; exit}')
     fi
 
     # Extract the DNS server pushed by the VPN (PUSH_REPLY ... dhcp-option DNS X.X.X.X).
