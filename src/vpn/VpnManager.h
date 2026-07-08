@@ -54,12 +54,23 @@ public:
     //! Global override: when true, the VPN auto-starts on every
     //! job AND every NNTP connection (across all servers) binds to the tun,
     //! regardless of per-server `useVpn`. When false, per-server `useVpn`
-    //! decides which servers route through the tunnel. The legacy
-    //! `autoConnect()` accessor is preserved as an alias for the config
-    //! plumbing that still uses the `VPN_AUTO_CONNECT` key.
-    bool          forceAllConnectionsThroughVpn() const { return _autoConnect; }
+    //! decides which servers route through the tunnel.
+    //!
+    //! The master switch is *neutralised at runtime when the VPN cannot be used*
+    //! (`vpnFeatureAvailable()` plus a selected/readable active profile). A
+    //! `VPN_AUTO_CONNECT = true` hand-edited into the config on a machine with no
+    //! helper or no VPN profile must NOT block posting — it falls back to direct
+    //! connections. The per-server `useVpn` checkbox stays the real fail-closed
+    //! guard. `autoConnect()` returns the raw stored value and is preserved for
+    //! the config plumbing that persists the `VPN_AUTO_CONNECT` key, so the
+    //! user's choice survives a save.
+    bool          forceAllConnectionsThroughVpn() const;
     bool          autoConnect() const { return _autoConnect; }
     bool          isConnected() const { return _state == State::Connected; }
+    //! True when the master switch is enabled but would be ignored because the
+    //! VPN helper/prerequisites are present while no usable active profile is
+    //! selected/configured. GUI callers use this to warn before posting direct.
+    bool          shouldConfirmMasterSwitchWithoutProfile(QString *detail = nullptr) const;
 
     void setAutoConnect(bool v);
 
@@ -118,9 +129,18 @@ public:
     //! Did the user run "Install" at some point on this machine?
     bool isHelperInstalled() const;
 
-    //! Source dir bundled with ngPost containing the 3 scripts + polkit
-    //! template that the installer needs as input.
-    QString bundledResourcesDir() const;
+    //! True when the VPN feature can actually be used on this platform, i.e. a
+    //! helper we can spawn is reachable. This is the capability gate shared by
+    //! admitJob (job admission), forceAllConnectionsThroughVpn (routing) and
+    //! jobNeedsVpn, so all three agree. Non-Windows: a helper script resolves
+    //! (installed OR in-tree/dev copy). Windows: OpenVPN/WireGuard present.
+    bool vpnFeatureAvailable() const;
+
+    //! Copy the bundled VPN scripts and polkit template into a private
+    //! temporary directory. This keeps pkexec away from AppImage/FUSE paths,
+    //! which some systems refuse to execute after security updates.
+    bool stageBundledResources(QString const &destination,
+                               QString *error = nullptr) const;
 
     //! 1 pkexec → copies helper + uninstaller to /var/lib/ngpost/ and writes
     //! the per-user polkit rule. Returns true on success.
@@ -156,8 +176,8 @@ public:
     };
     Q_ENUM(Admission)
 
-    //! Does this server set require the tunnel? True if global autoConnect
-    //! OR any of the given enabled servers has useVpn=true.
+    //! Does this server set require the tunnel? True if the effective global
+    //! autoConnect applies OR any of the given enabled servers has useVpn=true.
     bool jobNeedsVpn(QList<NntpServerParams *> const &activeServers) const;
 
     //! Decide whether a job can start now. Side-effect: if VPN is needed but
@@ -222,6 +242,8 @@ private:
     void _cancelAutoDisconnect();
     //! Declare the tunnel up once `_tunIp` is confirmed usable.
     void _completeReady();
+    //! True when a VPN profile is selected and its config file can be read.
+    bool _activeProfileUsable(QString *detail = nullptr) const;
 
     bool         _autoConnect;
     State        _state;

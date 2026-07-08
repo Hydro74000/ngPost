@@ -7,6 +7,7 @@
 //========================================================================
 
 #include <QtTest>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -63,6 +64,15 @@ private slots:
 
     //! Test override lets us simulate the Windows legacy ngPost.conf path.
     void legacyConfigFilePath_honors_test_override();
+
+    //! If both configs exist and the legacy one (e.g. next to ngPost.exe)
+    //! was modified more recently than the active one, migration must flag
+    //! it: it's the "user is hand-editing a file we no longer read" case.
+    void migrateLegacyConfigIfNeeded_flags_legacy_edited_after_migration();
+
+    //! The common case: the legacy file predates the active config (it's
+    //! just what it was copied from originally) — no warning warranted.
+    void migrateLegacyConfigIfNeeded_does_not_flag_untouched_legacy();
 };
 
 void TestPathHelper::configDir_under_sandbox_and_created()
@@ -282,6 +292,70 @@ void TestPathHelper::legacyConfigFilePath_honors_test_override()
     QVERIFY(r.status == PathHelper::ConfigMigrationStatus::CopiedAndKeptLegacy);
     QVERIFY(QFile::exists(injected));
     QVERIFY(QFile::exists(PathHelper::configFilePath()));
+}
+
+void TestPathHelper::migrateLegacyConfigIfNeeded_flags_legacy_edited_after_migration()
+{
+    HomeSandbox sandbox;
+    const QString newConf = PathHelper::configFilePath();
+    const QString legacy  = PathHelper::legacyConfigFilePath();
+
+    QDir().mkpath(QFileInfo(newConf).absolutePath());
+    {
+        QFile n(newConf);
+        QVERIFY(n.open(QIODevice::WriteOnly));
+        n.write("from_new = true\n");
+    }
+    {
+        QFile l(legacy);
+        QVERIFY(l.open(QIODevice::WriteOnly));
+        l.write("from_legacy = true\n");
+    }
+
+    // Force the legacy file's mtime strictly after the active config's, as
+    // if the user had just hand-edited it (filesystem mtime resolution is
+    // too coarse to rely on write ordering alone).
+    const QDateTime newerThanNew = QFileInfo(newConf).lastModified().addSecs(60);
+    QFile legacyFile(legacy);
+    QVERIFY(legacyFile.open(QIODevice::ReadWrite));
+    QVERIFY(legacyFile.setFileTime(newerThanNew, QFileDevice::FileModificationTime));
+    legacyFile.close();
+
+    const PathHelper::ConfigMigrationResult r = PathHelper::migrateLegacyConfigIfNeeded();
+    QVERIFY(r.status == PathHelper::ConfigMigrationStatus::SkippedNewExists);
+    QVERIFY2(r.legacyModifiedAfterMigration,
+             "legacy file modified after the active config was not flagged");
+}
+
+void TestPathHelper::migrateLegacyConfigIfNeeded_does_not_flag_untouched_legacy()
+{
+    HomeSandbox sandbox;
+    const QString newConf = PathHelper::configFilePath();
+    const QString legacy  = PathHelper::legacyConfigFilePath();
+
+    QDir().mkpath(QFileInfo(newConf).absolutePath());
+    {
+        QFile l(legacy);
+        QVERIFY(l.open(QIODevice::WriteOnly));
+        l.write("from_legacy = true\n");
+    }
+    {
+        QFile n(newConf);
+        QVERIFY(n.open(QIODevice::WriteOnly));
+        n.write("from_new = true\n");
+    }
+    // Force the active config's mtime strictly after the legacy one, so the
+    // assertion doesn't depend on filesystem mtime resolution.
+    const QDateTime newerThanLegacy = QFileInfo(legacy).lastModified().addSecs(60);
+    QFile newFile(newConf);
+    QVERIFY(newFile.open(QIODevice::ReadWrite));
+    QVERIFY(newFile.setFileTime(newerThanLegacy, QFileDevice::FileModificationTime));
+    newFile.close();
+
+    const PathHelper::ConfigMigrationResult r = PathHelper::migrateLegacyConfigIfNeeded();
+    QVERIFY(r.status == PathHelper::ConfigMigrationStatus::SkippedNewExists);
+    QVERIFY2(!r.legacyModifiedAfterMigration,
+             "untouched legacy file should not be flagged");
 }
 
 QTEST_APPLESS_MAIN(TestPathHelper)

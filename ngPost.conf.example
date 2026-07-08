@@ -1,5 +1,13 @@
 # ngPost configuration file
 #
+# NOTE: this file is a TEMPLATE, it is not read directly by ngPost, even if
+# you rename it to "ngPost.conf" and keep it next to the executable.
+# ngPost reads/writes its actual config in a per-user folder:
+#   Windows: %LOCALAPPDATA%\ngPost\ngPost.conf
+#   Linux:   ~/.config/ngPost/ngPost.conf
+#   macOS:   ~/Library/Application Support/ngPost/ngPost.conf
+# Edit that file (or use the GUI, which saves there automatically), not a
+# copy of this one sitting next to the binary.
 #
 
 ## Lang for the app. Currently supported: EN, FR, ES, DE, NL, PT, ZH

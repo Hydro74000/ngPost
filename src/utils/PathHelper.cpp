@@ -201,9 +201,14 @@ ConfigMigrationResult migrateLegacyConfigIfNeeded(bool overwriteConfirmed)
     }
 
     if (QFile::exists(newPath))
-        return result(ConfigMigrationStatus::SkippedNewExists,
-                      legacyPath,
-                      newPath);
+    {
+        ConfigMigrationResult r = result(ConfigMigrationStatus::SkippedNewExists,
+                                          legacyPath,
+                                          newPath);
+        r.legacyModifiedAfterMigration =
+            legacy.lastModified() > QFileInfo(newPath).lastModified();
+        return r;
+    }
 
     // Make sure the parent dir exists (configDir() already does it via mkpath
     // when called above, but be explicit).

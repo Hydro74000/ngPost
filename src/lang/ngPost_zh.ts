@@ -1623,6 +1623,44 @@ To list the available options use: %2 --help
         <translation>取消待处理的任务?</translation>
     </message>
     <message>
+        <location filename="../NgPost.cpp" line="1197"/>
+        <source>Posting canceled by user.</source>
+        <translation>用户已取消发布。</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3586"/>
+        <source>VPN warning</source>
+        <translation>VPN 警告</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3587"/>
+        <source>VPN is enabled globally, but no VPN profile is configured or selected.</source>
+        <translation>VPN 已全局启用，但未配置或选择任何 VPN 配置文件。</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3589"/>
+        <source>%1
+
+If you continue, this post will run without VPN.
+
+Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route all ngPost connections through the VPN&apos;</source>
+        <translation>%1
+
+如果继续，此发布将不通过 VPN 运行。
+
+设置：按钮 &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route all ngPost connections through the VPN&apos;</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3593"/>
+        <source>Continue</source>
+        <translation>继续</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="3594"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+    <message>
         <location filename="../NgPost.cpp" line="1326"/>
         <source>Full debug logs are ON
 </source>
@@ -3615,6 +3653,11 @@ Would you like to overwrite it ?</source>
         <location filename="../vpn/VpnManager.cpp" line="383"/>
         <source>No VPN configuration file is selected.</source>
         <translation>未选择 VPN 配置文件。</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="123"/>
+        <source>No active VPN profile / configuration is selected.</source>
+        <translation>未选择有效的 VPN 配置文件/配置。</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="388"/>

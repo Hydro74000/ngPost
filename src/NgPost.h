@@ -356,6 +356,7 @@ private:
     QString _proxyUrl;
 
     VpnManager *_vpnManager; //!< app-scoped VPN (OpenVPN / WireGuard), bound to NNTP sockets only
+    bool _lastPostingStartCanceled;
 
     QFile *_logFile;
     QTextStream *_logStream;
@@ -522,6 +523,7 @@ public:
 
     inline bool useParPar() const;
     inline bool useMultiPar() const;
+    inline bool lastPostingStartCanceled() const;
 
     inline void enableAutoPacking(bool enable = true);
 
@@ -577,6 +579,7 @@ private:
     void _log(const QString &aMsg, bool newline = true) const; //!< log function for QString
     void _error(const QString &error) const;
     void _error(const QString &error, ERROR_CODE code);
+    bool _confirmMasterSwitchWithoutVpnProfileIfNeeded();
 
     void _syntax(char *appName);
     QString _parseConfig(const QString &configPath);
@@ -696,6 +699,11 @@ inline bool NgPost::useParPar() const
 inline bool NgPost::useMultiPar() const
 {
     return _par2Path.toLower().contains("par2j");
+}
+
+inline bool NgPost::lastPostingStartCanceled() const
+{
+    return _lastPostingStartCanceled;
 }
 
 const std::string &NgPost::aticleSignature()

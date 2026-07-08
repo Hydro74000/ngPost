@@ -188,6 +188,13 @@ void PostingWidget::postFiles(bool updateMainParams)
                                      _ngPost->_keepRar);
 
         bool hasStarted = _ngPost->startPostingJob(_postingJob);
+        if (_ngPost->lastPostingStartCanceled())
+        {
+            _postingJob = nullptr;
+            _postingFinished = false;
+            setIDLE();
+            return;
+        }
 
         QString buttonTxt;
         QColor  tabColor;

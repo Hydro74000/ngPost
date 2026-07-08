@@ -28,6 +28,7 @@
 #ifdef __USE_HMI__
   #include <QApplication>
   #include <QMessageBox>
+  #include <QPushButton>
 #else
   #include <QCoreApplication>
 #endif
@@ -375,6 +376,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _nzbCheck(nullptr), _quiet(false),
     _proxySocks5(QNetworkProxy::NoProxy), _proxyUrl(),
     _vpnManager(nullptr),
+    _lastPostingStartCanceled(false),
     _logFile(nullptr), _logStream(nullptr)
 {
     QThread::currentThread()->setObjectName(sMainThreadName);
@@ -1190,6 +1192,11 @@ bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
                                      resumePlan.statesByPath);
 #ifdef __USE_HMI__
     const bool hasStarted = startPostingJob(job);
+    if (lastPostingStartCanceled()) {
+        if (error)
+            *error = tr("Posting canceled by user.");
+        return false;
+    }
     if (widget)
         widget->attachResumeJob(job, resumePlan.files, hasStarted);
 #else
@@ -3519,22 +3526,41 @@ QString NgPost::parseDefaultConfig()
     switch (migration.status)
     {
     case PathHelper::ConfigMigrationStatus::CopiedAndKeptLegacy:
-        if (!_quiet)
-            _cout << tr("Migrated legacy config to: %1\nLegacy config kept at: %2")
-                         .arg(migration.newPath, migration.legacyPath)
-                  << "\n" << MB_FLUSH;
+        // Use _log() rather than a raw _cout so this also lands in the GUI
+        // log panel: on Windows a windowed build has no console, so this
+        // message was previously invisible to HMI users entirely.
+        if (useHMI() || !_quiet)
+            _log(tr("Migrated legacy config to: %1\nLegacy config kept at: %2")
+                     .arg(migration.newPath, migration.legacyPath));
         break;
     case PathHelper::ConfigMigrationStatus::SkippedNewExists:
-        if (!_quiet)
-            _cout << tr("New config already exists: %1\nLegacy config kept at: %2")
-                         .arg(migration.newPath, migration.legacyPath)
-                  << "\n" << MB_FLUSH;
+        if (useHMI() || !_quiet)
+            _log(tr("New config already exists: %1\nLegacy config kept at: %2")
+                     .arg(migration.newPath, migration.legacyPath));
+        if (migration.legacyModifiedAfterMigration)
+        {
+            // The legacy file (e.g. ngPost.conf next to ngPost.exe) was
+            // touched after we stopped reading it: whoever is editing it by
+            // hand is silently wasting their time. Always surface this,
+            // regardless of --quiet, since it points at a real user mistake.
+            const QString warning = tr(
+                "A configuration file was found next to the application:\n%1\n\n"
+                "It was modified after ngPost switched to a per-user configuration "
+                "folder, but it is no longer read — your changes there are being "
+                "ignored.\n\nYour active configuration file is:\n%2")
+                .arg(migration.legacyPath, migration.newPath);
+#ifdef __USE_HMI__
+            if (useHMI())
+                QMessageBox::warning(nullptr, tr("Ignored configuration file"), warning);
+            else
+#endif
+                _cout << tr("WARNING: ") << warning << "\n" << MB_FLUSH;
+        }
         break;
     case PathHelper::ConfigMigrationStatus::AlreadyMigrated:
-        if (!migration.backupPath.isEmpty() && !_quiet)
-            _cout << tr("Config backup created before migration: %1")
-                         .arg(migration.backupPath)
-                  << "\n" << MB_FLUSH;
+        if (!migration.backupPath.isEmpty() && (useHMI() || !_quiet))
+            _log(tr("Config backup created before migration: %1")
+                     .arg(migration.backupPath));
         break;
     case PathHelper::ConfigMigrationStatus::BackupFailed:
         return tr("Config migration failed: could not create backup '%1'.")
@@ -3563,8 +3589,41 @@ QString NgPost::parseDefaultConfig()
     return err;
 }
 
+bool NgPost::_confirmMasterSwitchWithoutVpnProfileIfNeeded()
+{
+#ifdef __USE_HMI__
+    if (!useHMI() || !_vpnManager)
+        return true;
+
+    QString detail;
+    if (!_vpnManager->shouldConfirmMasterSwitchWithoutProfile(&detail)
+        || _vpnManager->jobNeedsVpn(_nntpServers))
+        return true;
+
+    QMessageBox msgBox(_hmi);
+    msgBox.setIcon(QMessageBox::Warning);
+    msgBox.setWindowTitle(tr("VPN warning"));
+    msgBox.setText(tr("VPN is enabled globally, but no VPN profile is configured or selected."));
+    msgBox.setInformativeText(
+        tr("%1\n\nIf you continue, this post will run without VPN.\n\n"
+           "Setting: Button 'VPN...' -> 'Profiles' & "
+           "'Route all ngPost connections through the VPN'")
+            .arg(detail));
+    QPushButton *continueButton = msgBox.addButton(tr("Continue"), QMessageBox::AcceptRole);
+    QPushButton *cancelButton = msgBox.addButton(tr("Cancel"), QMessageBox::RejectRole);
+    msgBox.setDefaultButton(cancelButton);
+    msgBox.exec();
+
+    return msgBox.clickedButton() == continueButton;
+#else
+    return true;
+#endif
+}
+
 bool NgPost::startPostingJob(PostingJob *job)
 {
+    _lastPostingStartCanceled = false;
+
 #ifdef __DEBUG__
 qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
          << ", file: " << job->nzbName();
@@ -3577,6 +3636,12 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
             connect(job, &PostingJob::postingStarted,  _hmi->autoWidget(), &AutoPostWidget::onMonitorJobStart);
     }
 #endif
+
+    if (!_confirmMasterSwitchWithoutVpnProfileIfNeeded()) {
+        _lastPostingStartCanceled = true;
+        job->deleteLater();
+        return false;
+    }
 
     // VPN gate (Phase 3): ask the VpnManager whether this job can run NOW.
     //   Proceed: the job activates (or queues behind another active job)

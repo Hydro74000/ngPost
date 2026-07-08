@@ -619,7 +619,8 @@ jobs:
 
   build-macos:
     name: Build macOS
-    runs-on: macos-latest
+    # Qt 6.8.2/qmake links AGL; the macOS 26 SDK no longer ships it.
+    runs-on: macos-15
     needs: release-metadata
     steps:
       - uses: actions/checkout@v4

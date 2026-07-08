@@ -351,6 +351,12 @@ void MainWindow::closeEvent(QCloseEvent *event)
     else
         event->accept();
 
+    // Flush any server field still mid-edit (focus still in a QLineEdit
+    // means editingFinished never fired) so nothing typed just before
+    // closing is silently lost, mirroring _onServerFieldEdited.
+    updateServers();
+    _ngPost->saveConfig();
+
     // Phase 3 — tear down the VPN here, while the event loop is still
     // alive (waitForFinished needs it). If we let ~VpnManager handle it
     // in the destructor chain, the event loop is already gone and the
@@ -450,6 +456,9 @@ void MainWindow::onDelServer()
         _ngPost->removeNntpServer(serverParam);
         delete serverParam;
     }
+    // Persist the deletion immediately, same as any other server edit
+    // (see _onServerFieldEdited): don't require an explicit "Save Config".
+    _ngPost->saveConfig();
 }
 
 void MainWindow::onObfucateToggled(bool checked)
@@ -1509,6 +1518,8 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
                                                serverParam ? serverParam->enabled : true);
     enabledCb->setObjectName(QStringLiteral("serverEnabledCb") + suffix);
     _ui->serversTable->setCellWidget(nbRows, col++, enabledCb);
+    connect(enabledCb, &CheckBoxCenterWidget::toggled,
+            this, &MainWindow::_onServerFieldEdited);
 
     QLineEdit *hostEdit = new QLineEdit(_ui->serversTable);
     hostEdit->setObjectName(QStringLiteral("serverHostEdit") + suffix);
@@ -1516,6 +1527,8 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
         hostEdit->setText(serverParam->host);
     hostEdit->setFrame(false);
     _ui->serversTable->setCellWidget(nbRows, col++, hostEdit);
+    connect(hostEdit, &QLineEdit::editingFinished,
+            this, &MainWindow::_onServerFieldEdited);
 
     QLineEdit *portEdit = new QLineEdit(_ui->serversTable);
     portEdit->setObjectName(QStringLiteral("serverPortEdit") + suffix);
@@ -1524,23 +1537,28 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     portEdit->setText(QString::number(serverParam ? serverParam->port : sDefaultServerPort));
     portEdit->setAlignment(Qt::AlignCenter);
     _ui->serversTable->setCellWidget(nbRows, col++, portEdit);
+    connect(portEdit, &QLineEdit::editingFinished,
+            this, &MainWindow::_onServerFieldEdited);
 
     auto *sslCb = new CheckBoxCenterWidget(_ui->serversTable,
                                            serverParam ? serverParam->useSSL : sDefaultServerSSL);
     sslCb->setObjectName(QStringLiteral("serverSslCb") + suffix);
     _ui->serversTable->setCellWidget(nbRows, col++, sslCb);
+    connect(sslCb, &CheckBoxCenterWidget::toggled,
+            this, &MainWindow::_onServerFieldEdited);
 
     // Phase 3: per-server "Use VPN" — when checked, the server's NNTP
     // sockets are bound to the VPN tun (and the VPN is auto-started for
     // any job that uses this server).
-    // Phase 5d: persist immediately on toggle so the user doesn't have to
-    // hit "Save Config" after each tweak.
+    // Phase 5d/6: persist immediately on any field change so the user
+    // doesn't have to hit "Save Config" after each tweak (see
+    // _onServerFieldEdited).
     CheckBoxCenterWidget *vpnCb = new CheckBoxCenterWidget(
         _ui->serversTable, serverParam ? serverParam->useVpn : false);
     vpnCb->setObjectName(QStringLiteral("serverUseVpnCb") + suffix);
     _ui->serversTable->setCellWidget(nbRows, col++, vpnCb);
     connect(vpnCb, &CheckBoxCenterWidget::toggled,
-            this, &MainWindow::_onUseVpnToggled);
+            this, &MainWindow::_onServerFieldEdited);
 
     QLineEdit *nbConsEdit = new QLineEdit(_ui->serversTable);
     nbConsEdit->setObjectName(QStringLiteral("serverNbConsEdit") + suffix);
@@ -1549,6 +1567,8 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     nbConsEdit->setText(QString::number(serverParam ? serverParam->nbCons : sDefaultConnections));
     nbConsEdit->setAlignment(Qt::AlignCenter);
     _ui->serversTable->setCellWidget(nbRows, col++, nbConsEdit);
+    connect(nbConsEdit, &QLineEdit::editingFinished,
+            this, &MainWindow::_onServerFieldEdited);
 
 
     QLineEdit *userEdit = new QLineEdit(_ui->serversTable);
@@ -1557,6 +1577,8 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
         userEdit->setText(serverParam->user.c_str());
     userEdit->setFrame(false);
     _ui->serversTable->setCellWidget(nbRows, col++, userEdit);
+    connect(userEdit, &QLineEdit::editingFinished,
+            this, &MainWindow::_onServerFieldEdited);
 
     QLineEdit *passEdit = new QLineEdit(_ui->serversTable);
     passEdit->setObjectName(QStringLiteral("serverPassEdit") + suffix);
@@ -1565,6 +1587,8 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
         passEdit->setText(serverParam->pass.c_str());
     passEdit->setFrame(false);
     _ui->serversTable->setCellWidget(nbRows, col++, passEdit);
+    connect(passEdit, &QLineEdit::editingFinished,
+            this, &MainWindow::_onServerFieldEdited);
 
     QPushButton *delButton = new QPushButton(_ui->serversTable);
     delButton->setObjectName(QStringLiteral("serverDelButton") + suffix);
@@ -1677,14 +1701,16 @@ void MainWindow::onDebugValue(int value)
 }
 
 
-void MainWindow::_onUseVpnToggled(bool checked)
+void MainWindow::_onServerFieldEdited()
 {
-    // Pull the current state of every "Use VPN" checkbox in the table back
-    // into the in-memory NntpServerParams list, then flush to disk. We can't
-    // target a single server here because the sender CheckBoxCenterWidget
-    // doesn't carry its row index — `updateServers()` is cheap enough that
-    // doing the full sync is simpler than introducing per-row bookkeeping.
-    Q_UNUSED(checked);
+    // A per-row server field (checkbox toggled, or a text field losing
+    // focus) changed. Pull the current state of the whole table back into
+    // the in-memory NntpServerParams list, then flush to disk. We can't
+    // target a single row here because the sender widget doesn't carry its
+    // row index — `updateServers()` is cheap enough that doing the full
+    // sync is simpler than introducing per-row bookkeeping. This is what
+    // makes adding/editing/deleting a server survive a restart without the
+    // user having to find and click the separate "Save Config" button.
     updateServers();
     _ngPost->saveConfig();
 }

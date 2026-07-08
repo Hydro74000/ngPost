@@ -30,6 +30,8 @@
 #include <QNetworkInterface>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QStringList>
+#include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QTimer>
 
@@ -93,6 +95,46 @@ QString VpnManager::configPath() const
 {
     VpnProfile const *p = activeProfile();
     return p ? p->absoluteConfigPath() : QString();
+}
+
+bool VpnManager::forceAllConnectionsThroughVpn() const
+{
+    return _autoConnect && vpnFeatureAvailable() && _activeProfileUsable();
+}
+
+bool VpnManager::shouldConfirmMasterSwitchWithoutProfile(QString *detail) const
+{
+    if (!_autoConnect || !isHelperInstalled())
+        return false;
+    if (_activeProfileUsable(detail))
+        return false;
+
+    if (detail && detail->isEmpty())
+        *detail = tr("No active VPN profile / configuration is selected.");
+    return true;
+}
+
+bool VpnManager::_activeProfileUsable(QString *detail) const
+{
+    VpnProfile const *active = activeProfile();
+    QString const activeCfgPath = active ? active->absoluteConfigPath() : QString();
+    if (!active || activeCfgPath.isEmpty()) {
+        if (detail)
+            *detail = tr("No active VPN profile / configuration is selected.");
+        return false;
+    }
+
+    QFileInfo const cfg(activeCfgPath);
+    if (!cfg.exists() || !cfg.isReadable()) {
+        if (detail)
+            *detail = tr("The VPN configuration file is missing or unreadable: %1")
+                         .arg(activeCfgPath);
+        return false;
+    }
+
+    if (detail)
+        detail->clear();
+    return true;
 }
 
 // --- Profile management ---------------------------------------------------
@@ -643,37 +685,70 @@ bool VpnManager::isHelperInstalled() const
 #endif
 }
 
-QString VpnManager::bundledResourcesDir() const
+bool VpnManager::vpnFeatureAvailable() const
 {
-    // The installer needs a directory containing the 3 scripts + polkit
-    // template. In the AppImage everything lands in usr/bin/ next to the
-    // binary; for dev builds the in-tree sources live one level deeper.
+#ifdef Q_OS_WIN
+    return isHelperInstalled();
+#else
+    return !helperScriptPath().isEmpty();
+#endif
+}
+
+bool VpnManager::stageBundledResources(QString const &destination,
+                                       QString *error) const
+{
     QString const appDir = QCoreApplication::applicationDirPath();
+    bool const appImageLayout =
+        QFileInfo::exists(appDir + QStringLiteral("/ngpost-vpn-install.sh"));
+    QStringList const files = {
+        QStringLiteral("ngpost-vpn-helper.sh"),
+        QStringLiteral("ngpost-vpn-install.sh"),
+        QStringLiteral("ngpost-vpn-uninstall.sh"),
+        QStringLiteral("49-ngpost-vpn.rules.in"),
+    };
 
-    // AppImage layout: helper.sh + install.sh + uninstall.sh + rules.in
-    // all directly next to the ngPost binary.
-    QFileInfo bundled(appDir + QStringLiteral("/ngpost-vpn-install.sh"));
-    if (bundled.exists())
-        return appDir;
+    for (QString const &file : files) {
+        QString source;
+        if (appImageLayout) {
+            source = appDir + QLatin1Char('/') + file;
+        } else if (file.endsWith(QStringLiteral(".rules.in"))) {
+            source = appDir + QStringLiteral("/vpn/polkit/") + file;
+        } else {
+            source = appDir + QStringLiteral("/vpn/scripts/") + file;
+        }
 
-    // Dev layout: install.sh in vpn/scripts/, rules.in in vpn/polkit/.
-    // For the installer to find everything in one place we have to stage a
-    // temp directory. Build it under the user's runtime dir.
-    QString stage = QDir::tempPath() + QStringLiteral("/ngpost-vpn-install-stage");
-    QDir().mkpath(stage);
-    QFile::remove(stage + "/ngpost-vpn-helper.sh");
-    QFile::remove(stage + "/ngpost-vpn-install.sh");
-    QFile::remove(stage + "/ngpost-vpn-uninstall.sh");
-    QFile::remove(stage + "/49-ngpost-vpn.rules.in");
-    QString const src = appDir + QStringLiteral("/vpn");
-    QFile::copy(src + "/scripts/ngpost-vpn-helper.sh",    stage + "/ngpost-vpn-helper.sh");
-    QFile::copy(src + "/scripts/ngpost-vpn-install.sh",   stage + "/ngpost-vpn-install.sh");
-    QFile::copy(src + "/scripts/ngpost-vpn-uninstall.sh", stage + "/ngpost-vpn-uninstall.sh");
-    QFile::copy(src + "/polkit/49-ngpost-vpn.rules.in",   stage + "/49-ngpost-vpn.rules.in");
-    QFile::setPermissions(stage + "/ngpost-vpn-helper.sh",    QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner|QFileDevice::ReadGroup|QFileDevice::ExeGroup|QFileDevice::ReadOther|QFileDevice::ExeOther);
-    QFile::setPermissions(stage + "/ngpost-vpn-install.sh",   QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner|QFileDevice::ReadGroup|QFileDevice::ExeGroup|QFileDevice::ReadOther|QFileDevice::ExeOther);
-    QFile::setPermissions(stage + "/ngpost-vpn-uninstall.sh", QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner|QFileDevice::ReadGroup|QFileDevice::ExeGroup|QFileDevice::ReadOther|QFileDevice::ExeOther);
-    return stage;
+        QFileInfo const sourceInfo(source);
+        if (!sourceInfo.isFile() || !sourceInfo.isReadable()) {
+            if (error)
+                *error = tr("required VPN resource is missing or unreadable: %1")
+                             .arg(source);
+            return false;
+        }
+
+        QString const target = destination + QLatin1Char('/') + file;
+        if (!QFile::copy(source, target)) {
+            if (error)
+                *error = tr("could not stage VPN resource: %1").arg(file);
+            return false;
+        }
+    }
+
+    QFileDevice::Permissions const scriptPermissions =
+        QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner |
+        QFileDevice::ReadGroup | QFileDevice::ExeGroup |
+        QFileDevice::ReadOther | QFileDevice::ExeOther;
+    for (QString const &file : files) {
+        if (!file.endsWith(QStringLiteral(".sh")))
+            continue;
+        QString const target = destination + QLatin1Char('/') + file;
+        if (!QFile::setPermissions(target, scriptPermissions)) {
+            if (error)
+                *error = tr("could not make staged VPN resource executable: %1")
+                             .arg(file);
+            return false;
+        }
+    }
+    return true;
 }
 
 bool VpnManager::runInstall()
@@ -695,20 +770,30 @@ bool VpnManager::runInstall()
     }
 #endif
 
-    QString const resDir = bundledResourcesDir();
-    QString const installer = resDir + QStringLiteral("/ngpost-vpn-install.sh");
-    if (!QFileInfo::exists(installer)) {
-        emit logLine(tr("VPN: install script not found at %1").arg(installer));
+    QTemporaryDir stage(QDir::tempPath()
+                        + QStringLiteral("/ngpost-vpn-install-XXXXXX"));
+    if (!stage.isValid()) {
+        emit logLine(tr("VPN: could not create a temporary install directory"));
         return false;
     }
 
+    QString error;
+    if (!stageBundledResources(stage.path(), &error)) {
+        emit logLine(tr("VPN: %1").arg(error));
+        return false;
+    }
+
+    QString const resDir = stage.path();
+    QString const installer = resDir + QStringLiteral("/ngpost-vpn-install.sh");
     QString const launcher = helperLauncherProgram();
-    emit logLine(tr("Running VPN install: %1 %2 %3").arg(launcher, installer, resDir));
+    QString const shell = QStringLiteral("/bin/bash");
+    emit logLine(tr("Running VPN install: %1 %2 %3")
+                     .arg(launcher, shell + QLatin1Char(' ') + installer, resDir));
 
     QProcess p;
     p.setProcessChannelMode(QProcess::MergedChannels);
     QStringList args = helperLauncherPrefixArgs();
-    args << installer << resDir;
+    args << shell << installer << resDir;
     p.start(launcher, args);
     if (!p.waitForFinished(60000)) {
         emit logLine(tr("VPN install: timed out"));
@@ -884,7 +969,11 @@ void VpnManager::runStartupCleanup()
 
 bool VpnManager::jobNeedsVpn(QList<NntpServerParams *> const &activeServers) const
 {
-    if (_autoConnect)
+    // Use the effective master switch (forceAllConnectionsThroughVpn), which
+    // is neutralised when the VPN is not installed/configured/selected -- a
+    // hand-edited VPN_AUTO_CONNECT must not force the job to need the VPN in
+    // that case. Per-server useVpn remains fail-closed below.
+    if (forceAllConnectionsThroughVpn())
         return true;
     for (NntpServerParams *srv : activeServers)
         if (srv && srv->enabled && srv->useVpn)
@@ -895,6 +984,36 @@ bool VpnManager::jobNeedsVpn(QList<NntpServerParams *> const &activeServers) con
 VpnManager::Admission
 VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
 {
+    QStringList serverUseVpnNames;
+    for (NntpServerParams *srv : activeServers) {
+        if (!srv || !srv->enabled || !srv->useVpn)
+            continue;
+        QString name = srv->host.trimmed();
+        serverUseVpnNames << (name.isEmpty() ? tr("(unnamed server)") : name);
+    }
+    bool const perServerVpnRequested = !serverUseVpnNames.isEmpty();
+
+    // The master switch was requested (config VPN_AUTO_CONNECT) but the VPN
+    // cannot be used on this machine or has no usable selected profile: ignore
+    // the global switch rather than blocking. Per-server `useVpn` is handled
+    // below and remains fail-closed.
+    if (_autoConnect) {
+        if (!vpnFeatureAvailable()) {
+            emit statusLine(tr("Master switch (VPN_AUTO_CONNECT) is ON but no VPN "
+                               "helper is installed - ignoring the master switch. "
+                               "Per-server 'Use VPN' is still enforced."));
+        } else {
+            QString profileDetail;
+            if (!_activeProfileUsable(&profileDetail)) {
+                emit statusLine(tr("Master switch (VPN_AUTO_CONNECT) is ON but the "
+                                   "VPN is not correctly configured (%1) - ignoring "
+                                   "the master switch. Per-server 'Use VPN' is still "
+                                   "enforced.")
+                                .arg(profileDetail));
+            }
+        }
+    }
+
     if (!jobNeedsVpn(activeServers))
         return Admission::Proceed;
 
@@ -904,22 +1023,11 @@ VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
     VpnProfile const *active = activeProfile();
     QString activeCfgPath = active ? active->absoluteConfigPath() : QString();
 
-    // The real capability check is "can we locate a helper script we can
-    // spawn", not "did the user run Install". The backends use
-    // helperScriptPath() — which also resolves the in-tree dev copy — so this
-    // gate must agree with them, otherwise a dev/CI build with a valid
-    // in-tree helper gets blocked here and the job hangs forever in the
-    // pending queue.
-    //
-    // Windows has no .sh helper at all (OpenVPN/WireGuard are launched
-    // directly), so helperScriptPath() would always be empty there and every
-    // VPN-requiring job would be blocked. Use isHelperInstalled() instead,
-    // which is OS-aware (checks for the OpenVPN / WireGuard binaries).
-#ifdef Q_OS_WIN
-    bool const capabilityMissing = !isHelperInstalled();
-#else
-    bool const capabilityMissing = helperScriptPath().isEmpty();
-#endif
+    // capabilityMissing mirrors vpnFeatureAvailable() — "can we spawn a helper",
+    // not "did the user run Install" — so admission agrees with the master
+    // switch and per-connection routing. See vpnFeatureAvailable() for the
+    // platform rationale (in-tree dev/CI helper on *nix, binaries on Windows).
+    bool const capabilityMissing = !vpnFeatureAvailable();
     if (capabilityMissing) {
         reason = JobBlockReason::HelperNotInstalled;
         detail = tr("The VPN helper is not installed. Open the VPN dialog "
@@ -939,6 +1047,15 @@ VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
         }
     }
     if (reason != JobBlockReason::None) {
+        if (perServerVpnRequested) {
+            detail = tr("Use VPN is enabled for NNTP server(s): %1.\n\n"
+                        "The VPN is not correctly configured: %2\n\n"
+                        "Open the VPN options with the VPN button and check the "
+                        "VPN configuration, or edit the server configuration and "
+                        "disable VPN by clearing its Use VPN checkbox.")
+                     .arg(serverUseVpnNames.join(QStringLiteral(", ")), detail);
+            emit statusLine(detail);
+        }
         emit vpnRequiredButUnavailable(reason, detail);
         return Admission::Blocked;
     }

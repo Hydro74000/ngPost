@@ -68,7 +68,8 @@ jobs:
 
   macos:
     name: macOS unit tests
-    runs-on: macos-latest
+    # Qt 6.8.2/qmake links AGL; the macOS 26 SDK no longer ships it.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 

@@ -31,11 +31,13 @@ LIBS    += -lqt6keychain
 # a DLL that nothing imports, which windeployqt then skips.
 linux:!android: QT += dbus
 
-VERSION = 5.4.1
+VERSION = 5.4.2
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 INCLUDEPATH += $$PWD
 CONFIG += c++17
+
+macx: QMAKE_CXXFLAGS += -Wno-error=implicit-function-declaration
 
 DEFINES += __USE_CONNECTION_TIMEOUT__
 DEFINES += __COMPUTE_IMMEDIATE_SPEED__
