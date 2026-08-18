@@ -68,8 +68,14 @@ struct PostingJobOptions
     bool    delFilesAfterPost = false;
     bool    overwriteNzb      = true;
 
-    //! User metadata of this post, frozen with the rest of the options.
+    //! User metadata of this post, frozen with the rest of the options. The
+    //! password is never in here: it is a secret, see declaredPassword.
     QMap<QString, MetaValue> meta;
+
+    //! Password announced with -m "password=...", when ngPost did not compress
+    //! itself and therefore has no rarPass of its own. It is stored, purged and
+    //! published exactly like an archive password, never as a metadata.
+    QString declaredPassword;
 
     // resume
     qint64                                       resumeHistoryPostId = 0;

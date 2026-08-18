@@ -106,6 +106,7 @@ public:
         MONITOR_SEC_DELAY_SCAN,
         MSG_ID,
         META,
+        POST_META,
         ARTICLE_SIZE,
         FROM,
         GROUPS,
@@ -251,7 +252,13 @@ private:
     bool _saveFrom;
     std::string _from; //!< email of poster (if empty, random one will be used for each file)
 
-    QMap<QString, QString> _meta; //!< list of meta to add in the nzb header (typically a password)
+    //! User metadata, with the scope deciding whether it may be published in
+    //! the nzb header. Stored raw: the XML escaping happens where the nzb is
+    //! written, not here, so a template gets the value the user typed.
+    QMap<QString, MetaValue> _meta;
+    //! Password announced with -m "password=...", kept apart from _meta because
+    //! it is a secret and follows the archive password rules.
+    QString _declaredPassword;
     QList<QString>
         _grpList; //!< Newsgroup where we're posting in a list format to write in the nzb file
     int _nbGroups;
@@ -497,6 +504,11 @@ public:
 
     void doNzbPostCMD(PostingJob *job);
 
+    //! Splits a "key=value" metadata pair on the FIRST '=' only, so a value can
+    //! itself hold '=' signs (URLs usually do). Returns false when there is no
+    //! separator or no name.
+    static bool splitMetaPair(const QString &keyValue, QString *key, QString *value);
+
     inline std::string from() const;
 
     inline bool removeRarRootFolder() const;
@@ -564,6 +576,10 @@ private:
 
     void _post(const QFileInfo &fileInfo, const QString &monitorFolder = "");
     void _finishPosting();
+
+    //! Parses one key=value metadata. Returns false (and reports) on a malformed
+    //! pair or on a key claimed by both --meta and --post_meta.
+    bool _addMeta(const QString &keyValue, MetaScope scope);
 
     //! Snapshot of the current global settings, frozen into a new job so that a
     //! queued post is sent with the settings it was queued with. Callers still

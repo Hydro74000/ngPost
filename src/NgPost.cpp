@@ -120,6 +120,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 
     {Opt::MSG_ID,       "msg_id"},
     {Opt::META,         "meta"},
+    {Opt::POST_META,    "post_meta"},
     {Opt::ARTICLE_SIZE, "article_size"},
     {Opt::FROM,         "from"},
     {Opt::GROUPS,       "groups"},
@@ -238,7 +239,8 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
 // general options
     {{"x", sOptionNames[Opt::OBFUSCATE]},     tr("obfuscate the subjects of the articles (CAREFUL you won't find your post if you lose the nzb file)")},
     {{"g", sOptionNames[Opt::GROUPS]},        tr("newsgroups where to post the files (coma separated without space)"), sOptionNames[Opt::GROUPS]},
-    {{"m", sOptionNames[Opt::META]},          tr("extra meta data in header (typically \"password=qwerty42\")"), sOptionNames[Opt::META]},
+    {{"m", sOptionNames[Opt::META]},          tr("extra meta data published in the nzb header (typically \"password=qwerty42\")"), sOptionNames[Opt::META]},
+    {QStringList{sOptionNames[Opt::POST_META], "post-meta"}, tr("private meta data for the post info file, never published in the nzb (ex: \"titre=My Movie\")"), sOptionNames[Opt::POST_META]},
     {{"f", sOptionNames[Opt::FROM]},          tr("poster email (random one if not provided)"), sOptionNames[Opt::FROM]},
     {{"a", sOptionNames[Opt::ARTICLE_SIZE]},  tr("article size (default one: %1)").arg(sDefaultArticleSize), sOptionNames[Opt::ARTICLE_SIZE]},
     {{"z", sOptionNames[Opt::MSG_ID]},        tr("msg id signature, after the @ (default one: %1)").arg(sDefaultMsgIdSignature), sOptionNames[Opt::MSG_ID]},
@@ -1489,7 +1491,7 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
         if (!_rarPassFixed.isEmpty()) // rar pass fixed would take other
             _rarPass = _rarPassFixed;
         if (!_rarPass.isEmpty())
-            _meta.remove("password");
+            _declaredPassword.clear(); // the real archive password wins
     }
 
     qDebug() << "Start posting job for " << _nzbName
@@ -1512,6 +1514,55 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
     startPostingJob(new PostingJob(this, options));
 }
 
+bool NgPost::splitMetaPair(const QString &keyValue, QString *key, QString *value)
+{
+    // Split on the FIRST '=' only: a value is very often a URL, and
+    // "portail1=https://x.fr/fichefilm_gen_cfilm=326598.html" used to be
+    // dropped without a word because it holds two of them.
+    const int sep = keyValue.indexOf(QLatin1Char('='));
+    if (sep < 0)
+        return false;
+
+    const QString parsedKey = keyValue.left(sep).trimmed();
+    if (parsedKey.isEmpty())
+        return false;
+
+    if (key)
+        *key = parsedKey;
+    if (value)
+        *value = keyValue.mid(sep + 1);
+    return true;
+}
+
+bool NgPost::_addMeta(const QString &keyValue, MetaScope scope)
+{
+    QString key, value;
+    if (!splitMetaPair(keyValue, &key, &value)) {
+        _error(tr("Error: metadata must be given as key=value, got '%1'").arg(keyValue),
+               ERROR_CODE::ERR_WRONG_ARG);
+        return false;
+    }
+
+    // "password" is not a metadata: it announces the archive password, so it
+    // follows the password rules (stored, purged and published as such).
+    if (key.compare(QStringLiteral("password"), Qt::CaseInsensitive) == 0) {
+        _declaredPassword = value;
+        return true;
+    }
+
+    auto const existing = _meta.constFind(key);
+    if (existing != _meta.cend() && existing->scope != scope) {
+        _error(tr("Error: metadata '%1' is given both as public (--meta) and private "
+                  "(--post_meta); choose one.")
+                   .arg(key),
+               ERROR_CODE::ERR_WRONG_ARG);
+        return false;
+    }
+
+    _meta.insert(key, MetaValue(value, scope));
+    return true;
+}
+
 PostingJobOptions NgPost::_baseJobOptions() const
 {
     PostingJobOptions opt;
@@ -1532,8 +1583,8 @@ PostingJobOptions NgPost::_baseJobOptions() const
     opt.keepRar           = _keepRar;
     opt.delFilesAfterPost = _delAuto;
     opt.overwriteNzb      = false;
-    for (auto it = _meta.cbegin(); it != _meta.cend(); ++it)
-        opt.meta.insert(it.key(), MetaValue(it.value(), MetaScope::Nzb));
+    opt.meta              = _meta;
+    opt.declaredPassword  = _declaredPassword;
     return opt;
 }
 
@@ -2277,9 +2328,17 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     {
         for (const QString &meta : parser.values(sOptionNames[Opt::META]))
         {
-            QStringList mList = meta.split("=");
-            if (mList.size() == 2)
-                _meta.insert(escapeXML(mList[0]), escapeXML(mList[1]));
+            if (!_addMeta(meta, MetaScope::Nzb))
+                return false;
+        }
+    }
+
+    if (parser.isSet(sOptionNames[Opt::POST_META]))
+    {
+        for (const QString &meta : parser.values(sOptionNames[Opt::POST_META]))
+        {
+            if (!_addMeta(meta, MetaScope::Local))
+                return false;
         }
     }
 
@@ -2602,7 +2661,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         if (_genPass)
         {
             _rarPass = randomPass(_lengthPass);
-            _meta.remove("password");
+            _declaredPassword.clear(); // the real archive password wins
         }
     }
 

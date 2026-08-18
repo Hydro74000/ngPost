@@ -359,10 +359,15 @@ PostingJob::PostingJob(NgPost *ngPost,
         rec.nzbName = _nzbName;
         rec.nzbPath = _nzbFilePath;
         rec.rarName = _rarName;
-        rec.rarPass = _rarPass;
-        rec.hasPassword = !_rarPass.isEmpty();
-        if (_rarPass.isEmpty())
+        // -m "password=..." announces the password of an archive ngPost did not
+        // build itself. It is a secret like any other: stored, purged and
+        // published under the same rules, never as a metadata.
+        rec.rarPass = _rarPass.isEmpty() ? _options.declaredPassword : _rarPass;
+        rec.hasPassword = !rec.rarPass.isEmpty();
+        if (rec.rarPass.isEmpty())
             rec.passwordOrigin = QStringLiteral("absent");
+        else if (_rarPass.isEmpty())
+            rec.passwordOrigin = QStringLiteral("declared");
         else if (_ngPost->_genPass && _ngPost->_rarPassFixed.isEmpty())
             rec.passwordOrigin = QStringLiteral("generated");
         else if (!_ngPost->_rarPassFixed.isEmpty())
@@ -763,13 +768,23 @@ void PostingJob::_postFiles()
                       "\"http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd\">\n"
                    << "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n";
 
-        if (!_rarPass.isEmpty() || _ngPost->_meta.size()) {
+        // Only the metadata the user chose to publish: an nzb circulates, and
+        // a portal link or a private note has no business travelling with it.
+        QMap<QString, MetaValue> publishedMeta;
+        for (auto it = _options.meta.cbegin(); it != _options.meta.cend(); ++it) {
+            if (it.value().scope == MetaScope::Nzb)
+                publishedMeta.insert(it.key(), it.value());
+        }
+        const QString declaredPass = _rarPass.isEmpty() ? _options.declaredPassword : _rarPass;
+
+        if (!declaredPass.isEmpty() || !publishedMeta.isEmpty()) {
             _nzbStream << tab << "<head>\n";
-            for (auto itMeta = _ngPost->_meta.cbegin(); itMeta != _ngPost->_meta.cend(); ++itMeta)
-                _nzbStream << tab << tab << "<meta type=\"" << itMeta.key() << "\">"
-                           << itMeta.value() << "</meta>\n";
-            if (!_rarPass.isEmpty())
-                _nzbStream << tab << tab << "<meta type=\"password\">" << _rarPass << "</meta>\n";
+            for (auto it = publishedMeta.cbegin(); it != publishedMeta.cend(); ++it)
+                _nzbStream << tab << tab << "<meta type=\"" << NgPost::escapeXML(it.key()) << "\">"
+                           << NgPost::escapeXML(it.value().value) << "</meta>\n";
+            if (!declaredPass.isEmpty())
+                _nzbStream << tab << tab << "<meta type=\"password\">"
+                           << NgPost::escapeXML(declaredPass) << "</meta>\n";
             _nzbStream << tab << "</head>\n\n";
         }
         _nzbStream << MB_FLUSH;

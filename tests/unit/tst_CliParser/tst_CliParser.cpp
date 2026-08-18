@@ -23,6 +23,7 @@
 #include <QProcessEnvironment>
 
 #include "history/PostHistoryStore.h"
+#include "NgPost.h"
 #include "PostingJob.h"
 #include "TestEnv.h"
 
@@ -165,6 +166,17 @@ private slots:
     //! A file that could not be read makes the post partial, not successful:
     //! such a file never produces a failed article, it is simply set aside.
     void unreadable_file_makes_the_post_not_successful();
+
+    //! A metadata value very often holds a URL with its own '=' signs; the
+    //! pair must be split on the first one only.
+    void meta_value_may_contain_equal_signs();
+
+    //! Claiming the same key as public and private at once is refused instead
+    //! of silently resolved one way or the other.
+    void meta_key_cannot_be_public_and_private_at_once();
+
+    //! A pair without '=' is reported rather than silently dropped.
+    void malformed_meta_is_reported();
 };
 
 void TestCliParser::initTestCase()
@@ -459,6 +471,75 @@ void TestCliParser::par2_args_redundancy_override_for_multipar()
         QStringLiteral("/rr12"),
         QStringLiteral("/lc4"),
     }));
+}
+
+namespace
+{
+//! Runs ngPost with the given metadata options on a stub input file, without
+//! any server configured: the run fails later on, what matters here is whether
+//! the metadata itself was accepted.
+RunResult runWithMeta(const QString &bin, const QStringList &metaArgs, HomeSandbox &sandbox)
+{
+    const QString stub = sandbox.rootPath() + QStringLiteral("/in.bin");
+    QFile f(stub);
+    f.open(QIODevice::WriteOnly);
+    f.write("hello");
+    f.close();
+
+    QStringList args{ "-i", stub };
+    args += metaArgs;
+    return run(bin, args, sandbox.rootPath());
+}
+} // namespace
+
+void TestCliParser::meta_value_may_contain_equal_signs()
+{
+    QString key, value;
+
+    // the case that used to be dropped without a word: an Allocine URL
+    QVERIFY(NgPost::splitMetaPair(
+        QStringLiteral("portail1=https://www.allocine.fr/film/fichefilm_gen_cfilm=326598.html"),
+        &key,
+        &value));
+    QCOMPARE(key, QStringLiteral("portail1"));
+    QCOMPARE(value,
+             QStringLiteral("https://www.allocine.fr/film/fichefilm_gen_cfilm=326598.html"));
+
+    // an empty value is a legitimate way to blank a field of a record sheet
+    QVERIFY(NgPost::splitMetaPair(QStringLiteral("portail2="), &key, &value));
+    QCOMPARE(key, QStringLiteral("portail2"));
+    QVERIFY(value.isEmpty());
+
+    // spaces around the name are forgiven, the value is kept verbatim
+    QVERIFY(NgPost::splitMetaPair(QStringLiteral(" titre = Mon Film "), &key, &value));
+    QCOMPARE(key, QStringLiteral("titre"));
+    QCOMPARE(value, QStringLiteral(" Mon Film "));
+
+    QVERIFY(!NgPost::splitMetaPair(QStringLiteral("noEqualSignHere"), &key, &value));
+    QVERIFY(!NgPost::splitMetaPair(QStringLiteral("=orphanValue"), &key, &value));
+}
+
+void TestCliParser::meta_key_cannot_be_public_and_private_at_once()
+{
+    HomeSandbox sandbox;
+    const RunResult r =
+        runWithMeta(_bin, { "--meta", "titre=Public", "--post_meta", "titre=Private" }, sandbox);
+
+    QVERIFY2(!r.timedOut, "process timed out");
+    QVERIFY2(r.exitCode != 0, qPrintable(QStringLiteral("expected a failure, got %1").arg(r.exitCode)));
+    const QString out = r.stdoutText + r.stderrText;
+    QVERIFY2(out.contains(QStringLiteral("titre")), qPrintable(out));
+}
+
+void TestCliParser::malformed_meta_is_reported()
+{
+    HomeSandbox sandbox;
+    const RunResult r = runWithMeta(_bin, { "--meta", "noEqualSignHere" }, sandbox);
+
+    QVERIFY2(!r.timedOut, "process timed out");
+    QVERIFY2(r.exitCode != 0, qPrintable(QStringLiteral("expected a failure, got %1").arg(r.exitCode)));
+    const QString out = r.stdoutText + r.stderrText;
+    QVERIFY2(out.contains(QStringLiteral("noEqualSignHere")), qPrintable(out));
 }
 
 void TestCliParser::unreadable_file_makes_the_post_not_successful()
