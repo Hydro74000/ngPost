@@ -28,6 +28,9 @@ All the features are [highlighted here](https://github.com/Hydro74000/ngPost/wik
 - Optional VPN tunnel for ngPost NNTP traffic only (OpenVPN/WireGuard, per-server opt-in — Linux & Windows).
 - Structured SQLite posting history with resume support, searchable GUI history,
   stats, legacy CSV import and NZB regeneration from history.
+- Post info files: a small text file describing each post, written from a model
+  you provide, so any Usenet index can be served without ngPost knowing its
+  format ([guide](https://github.com/Hydro74000/ngPost/wiki/Post-Info-Files)).
 - Multithreading.
 - And many more.
 

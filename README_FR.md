@@ -47,6 +47,14 @@ Sinon vous pouvez éditer le fichier à la main. Il vous faut remplir:
   - useVpn dans chaque section Server pour indiquer si ce serveur doit passer par le VPN
   - la ou les sections Server
 
+Facultatif, si un index Usenet vous réclame une fiche pour chaque post :
+  - POST_INFO_TEMPLATE (votre modèle de fiche : ngPost ne connaît aucun format
+    d'index, vous lui donnez le modèle, il remplit les trous)
+  - POST_INFO_OUTPUT (où écrire la fiche, par défaut à côté du nzb)
+
+Des modèles prêts à copier sont dans le dossier [templates/](https://github.com/Hydro74000/ngPost/tree/master/templates),
+et le guide complet pour débuter est sur le wiki : [Fiches de post](https://github.com/Hydro74000/ngPost/wiki/Post-Info-Files-fr).
+
 
 ### En ligne de commande
 <pre>

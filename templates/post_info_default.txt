@@ -1,0 +1,29 @@
+# Generic post info file.
+#
+# Every __word__ is replaced by ngPost when the post is done.
+# Delete the lines you do not need, add your own, the format is yours.
+#
+# The archive password is deliberately NOT written here: this file would
+# then have to be protected like a password file. Add "password =__rarPass__"
+# yourself if you really want it in there.
+
+date        =__date__
+name        =__originalName__
+nzb         =__nzbFileName__
+size        =__postSize__
+size human  =__postSizeHuman__
+archive     =__rarName__
+par2        =__par2Pct__
+groups      =__groups__
+poster      =__nzbPoster__
+status      =__status__
+files       =__nbFiles__
+articles    =__nbArticles__
+failed      =__nbArticlesFailed__
+speed       =__avgSpeed__
+ngPost      =__appVersion__
+
+# Your own information, typed in the posting tab or given with
+# --post_meta "title=..." on the command line. An empty one stays empty.
+title       =__meta:title__
+category    =__meta:category__

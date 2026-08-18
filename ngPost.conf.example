@@ -35,16 +35,40 @@ nzbPath  = /tmp
 
 ## execute a command or script at the end of each post (see examples)
 ## you can use several post commands by defining several NZB_POST_CMD
-## here is the list of the available placehoders
-##   __nzbPath__          : full path of the written nzb file
-##   __nzbName__          : name of the nzb without the extension (original source name)
-##   __rarName__          : name of the archive files (in case of obfuscation)
-##   __rarPass__          : archive password
-##   __sizeInByte__       : size of the post (before yEnc encoding)
-##   __groups__           : list of groups (coma separated)
-##   __nbFiles__          : number of files in the post
-##   __nbArticles__       : number of Articles
-##   __nbArticlesFailed__ : number of Articles that failed to be posted
+## they run one after the other, and ngPost waits for them before quitting
+## here is the list of the available variables
+##   __originalPath__       : folder of the posted files (legacy, unchanged)
+##   __sourcePath__         : first file or folder you asked to post
+##   __originalName__       : name of that file or folder
+##   __nzbPath__            : full path of the nzb file
+##   __nzbDir__             : folder holding the nzb file
+##   __nzbName__            : nzb name without the .nzb extension
+##   __nzbFileName__        : nzb name with the .nzb extension
+##   __rarName__            : name of the archive, the one to search for on Usenet
+##   __rarPass__            : archive password
+##   __groups__             : newsgroups the post was sent to, coma separated
+##   __nzbPoster__          : poster declared in the nzb (not the random per article From:)
+##   __par2Pct__            : par2 redundancy percentage, empty when par2 is disabled
+##   __postSize__           : bytes of rar + par2 actually posted, before yEnc encoding
+##   __postSizeHuman__      : same size, human readable
+##   __sizeInByte__         : legacy size, kept unchanged for existing scripts
+##   __nbFiles__            : number of posted files
+##   __nbArticles__         : number of articles
+##   __nbArticlesPosted__   : number of articles successfully posted
+##   __nbArticlesFailed__   : number of articles that failed
+##   __avgSpeed__           : average upload speed
+##   __durationSec__        : upload duration in seconds
+##   __status__             : success, partial or failed
+##   __postId__             : history database id, 0 when there is no history
+##   __appVersion__         : ngPost version that made the post
+##   __postInfoPath__       : path of the generated post info file
+##   __jsonPath__           : path of the temporary json file (post commands only)
+##   __date:<format>__      : date of the post, ex: __date:dd/MM/yyyy__
+##   __meta:<name>__        : one of your own metadata (--meta / --post_meta)
+##
+## the same values are also available as environment variables (NGPOST_NZB_PATH,
+## NGPOST_POST_SIZE, ...), so a script can be called with no argument at all,
+## and your metadata are in the json file pointed at by $NGPOST_JSON
 #
 #NZB_POST_CMD = scp "__nzbPath__" myBox.com:~/nzbs/
 #NZB_POST_CMD = zip "__nzbPath__.zip" "__nzbPath__"
@@ -52,6 +76,47 @@ nzbPath  = /tmp
 #NZB_POST_CMD = mysql -h localhost -D myDB -u myUser -pmyPass-e "INSERT INTO POST (release, rarName, rarPass, size) VALUES('__nzbName__', '__rarName__', '__rarPass__', '__sizeInByte__')"
 #NZB_POST_CMD = cmd.exe /C move "__nzbPath__" "C:\ngPost\nzb\__nzbName__{{__rarPass__}}.nzb"
 #NZB_POST_CMD = curl -X POST -F "file=@__nzbPath__" -F "api=12345" -F "cat=45" -F "private=no" https://usenet.com/post-api
+
+## kill a post command that hangs, in seconds (0 = wait forever)
+## ngPost waits for its post commands before quitting, so a stuck one keeps it
+## alive; Ctrl+C always interrupts
+#POST_CMD_TIMEOUT = 300
+
+## same for the nzb upload, which would otherwise block the exit
+#NZB_UPLOAD_TIMEOUT = 300
+
+## a post command that fails is reported but does not fail the run;
+## set this to true if you automate and want a non zero exit code
+#POST_CMD_FAIL_IS_ERROR = true
+
+## the archive password is never put in the environment nor in the json given
+## to a post command; __rarPass__ in the arguments still works
+#POST_CMD_EXPOSE_PASSWORD = true
+
+
+## write a post info file next to the nzb after each post
+## you give the model, ngPost fills in the blanks: it knows no index format.
+## Some Usenet indexes ask for such a file to reference your post.
+##
+## the model is a plain text file where the values are written as __variables__
+## (the same ones as NZB_POST_CMD above), for instance:
+##      date =__date:dd/MM/yyyy__
+##      name =__originalName__
+##      size =__postSize__
+##
+## ready made models are in the templates/ folder of the ngPost sources, and
+## the full beginner guide is on the wiki, page "Post info files".
+##
+## the model can live anywhere you can read, the file anywhere you can write.
+## a relative path is understood from the folder of this configuration file.
+#POST_INFO_TEMPLATE = my_record_sheet.txt
+
+## where to write it (the variables above work here too)
+#POST_INFO_OUTPUT = __nzbDir__/__nzbName__.info.txt
+
+## by default no post info file is written for a failed or partial post,
+## which is what you want when an index imports them automatically
+#POST_INFO_ONLY_ON_SUCCESS = false
 
 
 ## nzb files are normally all created in nzbPath

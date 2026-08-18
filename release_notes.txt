@@ -15,6 +15,67 @@ TODO: include ParPar instead of par2cmdline?
 TODO: auto RAR size and par2 parameters depending on the inputs size?
 
 ####################################################
+###       Release: ngPost API Update             ###
+###       date:    2026/08/18                    ###
+####################################################
+
+- Post info files: after each post ngPost can write a small text file
+  describing it, filled in from a model you provide. ngPost knows no index
+  format, so an index just ships its own model. Off until POST_INFO_TEMPLATE
+  is set. New keys: POST_INFO_TEMPLATE, POST_INFO_OUTPUT and
+  POST_INFO_ONLY_ON_SUCCESS (true by default).
+- Per post metadata (title, portal link, category...), typed in the posting
+  tab or given with --post_meta. They stay private by default: publishing one
+  in the nzb, which circulates, is an explicit choice (a checkbox, or -m).
+- --export_post_info <id> writes the record sheet of a post already in the
+  history, to a file or to stdout. Also available from the History tab.
+- Many more variables for NZB_POST_CMD and the models: __postSize__,
+  __par2Pct__, __nzbPoster__, __originalName__, __sourcePath__, __status__,
+  __avgSpeed__, __date:<format>__, __meta:<name>__ and others. All of them are
+  also passed as NGPOST_* environment variables, and the metadata in a json
+  file, so a script can be called with no argument at all.
+
+Changes that affect everyone, even without a post info file:
+
+- The history database migrates from schema v1 to v2 on first launch (two new
+  tables). A database written by a NEWER ngPost is now refused instead of
+  being used blindly.
+- Post commands now run one after the other, in the order declared, and ngPost
+  WAITS for them before quitting or shutting the machine down. They used to be
+  killed halfway in command line mode.
+- A post command that fails, crashes or cannot even start is reported with its
+  exit code and its error output; it used to say nothing at all. The exit code
+  of ngPost is unchanged unless POST_CMD_FAIL_IS_ERROR = true.
+- A post command line is split into arguments BEFORE the variables are
+  replaced, so a value holding spaces or quotes stays one single argument. A
+  variable can no longer expand into several arguments.
+- The archive password is masked in the logs, and kept out of the environment
+  and the json given to post commands (POST_CMD_EXPOSE_PASSWORD to opt in).
+  __rarPass__ as an argument still works.
+- New: POST_CMD_TIMEOUT (0, no limit) and NZB_UPLOAD_TIMEOUT (300s).
+
+Bug fixes:
+
+- A post missing a whole unreadable file was recorded as "success". Such a
+  file never produces a failed ARTICLE, and only articles were counted. It is
+  now reported as "partial".
+- --meta was split on every '=' and the pair dropped unless there were exactly
+  two parts, so any value holding a URL was silently ignored. It is now split
+  on the first '=' only, and a malformed pair is reported.
+- Custom <meta> tags never reached the delivered nzb, because the file is
+  regenerated from the history at the end of the post and the regenerator only
+  wrote the password.
+- -m "password=..." now follows the password rules: stored under
+  HISTORY_STORE_PASSWORDS, removed by purgePassword, published only when asked.
+- started_at was stamped when a job was created rather than when its transfer
+  began, which was wrong for every queued post. A resume no longer rewrites the
+  date of the first attempt.
+- The nzb path kept in the history was stale whenever the file was renamed to
+  <name>_1.nzb.
+- Resuming a post took the obfuscation and the par2 percentage from the CURRENT
+  settings instead of those of the post being resumed.
+
+####################################################
 ###       Release: ngPost LevelUp                ###
 ###       date:    2026/05/19                    ###
 ####################################################
