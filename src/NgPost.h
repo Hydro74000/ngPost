@@ -182,6 +182,7 @@ public:
         HISTORY_SHOW,
         HISTORY_IMPORT_CSV,
         REGENERATE_NZB,
+        EXPORT_POST_INFO,
         INCLUDE_PASSWORD,
         RESUME_LIST,
         RESUME_CHECK,
@@ -501,6 +502,14 @@ public:
 
     bool resumePostGui(qint64 postId, PostingWidget *widget = nullptr, QString *error = nullptr);
     bool regenerateNzbGui(qint64 postId, const QString &outPath, bool includePassword = false);
+    //! Renders the post info file of an existing post from the GUI. Sets
+    //! \a incomplete when the post predates the facts a record sheet needs.
+    bool exportPostInfoGui(qint64 postId,
+                           const QString &templatePath,
+                           const QString &outPath,
+                           bool includePassword,
+                           QString *error,
+                           bool *incomplete);
 
     bool hasMonitoringPostingJobs() const;
     void closeAllMonitoringJobs();
@@ -614,6 +623,16 @@ private:
     PostingJobOptions _baseJobOptions() const;
 
     void _startShutdown();
+
+    //! True when the command line asks for a history command rather than a
+    //! post: it both dispatches and tells that no input file is needed.
+    bool _isHistoryCommand(QCommandLineParser &parser) const;
+    //! Renders the post info file of an existing post. Writes to outPath, or
+    //! to stdout when it is empty.
+    bool _exportPostInfo(qint64 postId,
+                         const QString &templatePath,
+                         const QString &outPath,
+                         bool includePassword);
 
     //!< auto-post nfo bundling (cf AUTO_INCLUDE_NFO):
     //!< return the sibling <completeBaseName>.nfo of a non-nfo file, or an invalid QFileInfo

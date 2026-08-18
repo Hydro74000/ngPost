@@ -177,6 +177,10 @@ private slots:
 
     //! A pair without '=' is reported rather than silently dropped.
     void malformed_meta_is_reported();
+
+    //! --export_post_info writes the record sheet of an old post: to a file,
+    //! or to stdout with nothing else mixed in. An unknown id fails.
+    void export_post_info_writes_to_file_or_stdout();
 };
 
 void TestCliParser::initTestCase()
@@ -540,6 +544,62 @@ void TestCliParser::malformed_meta_is_reported()
     QVERIFY2(r.exitCode != 0, qPrintable(QStringLiteral("expected a failure, got %1").arg(r.exitCode)));
     const QString out = r.stdoutText + r.stderrText;
     QVERIFY2(out.contains(QStringLiteral("noEqualSignHere")), qPrintable(out));
+}
+
+void TestCliParser::export_post_info_writes_to_file_or_stdout()
+{
+    HomeSandbox sandbox;
+
+    const QString sourcePath = sandbox.rootPath() + QStringLiteral("/export.bin");
+    QFile source(sourcePath);
+    QVERIFY(source.open(QIODevice::WriteOnly));
+    source.write("export me");
+    source.close();
+
+    const QString dbPath = sandbox.rootPath() + QStringLiteral("/history.sqlite");
+    QString err;
+    const qint64 postId = createResumablePost(dbPath, sourcePath, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    QFile tmpl(tmplPath);
+    QVERIFY(tmpl.open(QIODevice::WriteOnly));
+    tmpl.write("name =__nzbName__\nid =__postId__\n");
+    tmpl.close();
+
+    const QString outPath = sandbox.rootPath() + QStringLiteral("/sheet.txt");
+    const RunResult toFile = run(_bin,
+                                 { "--export_post_info", QString::number(postId),
+                                   "--post_info_template", tmplPath, "-o", outPath,
+                                   "--post_db", dbPath },
+                                 sandbox.rootPath());
+    QVERIFY2(!toFile.timedOut, "export to file timed out");
+    QCOMPARE(toFile.exitCode, 0);
+    QVERIFY2(QFileInfo::exists(outPath),
+             qPrintable(toFile.stdoutText + toFile.stderrText));
+
+    QFile written(outPath);
+    QVERIFY(written.open(QIODevice::ReadOnly));
+    const QString content = QString::fromUtf8(written.readAll());
+    QVERIFY2(content.contains(QStringLiteral("id =%1").arg(postId)), qPrintable(content));
+
+    const RunResult toStdout = run(_bin,
+                                   { "--export-post-info", QString::number(postId),
+                                     "--post_info_template", tmplPath, "--post_db", dbPath },
+                                   sandbox.rootPath());
+    QVERIFY2(!toStdout.timedOut, "export to stdout timed out");
+    QCOMPARE(toStdout.exitCode, 0);
+    // stdout carries the record sheet and nothing else: a caller pipes it
+    QCOMPARE(toStdout.stdoutText, content);
+
+    const RunResult unknown = run(_bin,
+                                  { "--export_post_info", "999999",
+                                    "--post_info_template", tmplPath, "--post_db", dbPath },
+                                  sandbox.rootPath());
+    QVERIFY2(!unknown.timedOut, "export of an unknown id timed out");
+    QVERIFY2(unknown.exitCode != 0,
+             qPrintable(QStringLiteral("an unknown id should fail, got %1").arg(unknown.exitCode)));
+    QVERIFY(unknown.stdoutText.isEmpty());
 }
 
 void TestCliParser::unreadable_file_makes_the_post_not_successful()

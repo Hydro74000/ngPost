@@ -196,6 +196,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::HISTORY_SHOW,            "history_show"},
     {Opt::HISTORY_IMPORT_CSV,      "history_import_csv"},
     {Opt::REGENERATE_NZB,          "regenerate_nzb"},
+    {Opt::EXPORT_POST_INFO,        "export_post_info"},
     {Opt::INCLUDE_PASSWORD,        "include_password"},
     {Opt::RESUME_LIST,             "resume_list"},
     {Opt::RESUME_CHECK,            "resume_check"},
@@ -224,6 +225,7 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { QStringList{sOptionNames[Opt::HISTORY_SHOW], "history-show"}, tr("show one history post"), sOptionNames[Opt::HISTORY_SHOW]},
     { QStringList{sOptionNames[Opt::HISTORY_IMPORT_CSV], "history-import-csv"}, tr("import a legacy POST_HISTORY csv"), sOptionNames[Opt::HISTORY_IMPORT_CSV]},
     { QStringList{sOptionNames[Opt::REGENERATE_NZB], "regenerate-nzb"}, tr("regenerate an nzb from history"), sOptionNames[Opt::REGENERATE_NZB]},
+    { QStringList{sOptionNames[Opt::EXPORT_POST_INFO], "export-post-info"}, tr("write the post info file of a post from history (-o file, or stdout)"), sOptionNames[Opt::EXPORT_POST_INFO]},
     { QStringList{sOptionNames[Opt::INCLUDE_PASSWORD], "include-password"}, tr("include stored archive password in generated output")},
     { QStringList{sOptionNames[Opt::RESUME_LIST], "resume-list"}, tr("list resumable or partial posts")},
     { QStringList{sOptionNames[Opt::RESUME_CHECK], "resume-check"}, tr("show resume status for one post"), sOptionNames[Opt::RESUME_CHECK]},
@@ -704,31 +706,33 @@ bool NgPost::_ensureHistoryStore()
     return true;
 }
 
+//! Whether the command line asks for a history command rather than a post.
+//! Used twice: to dispatch, and to know that no input file is required. The
+//! two used to be copy pasted, and forgetting one gave "Nothing to do...".
+bool NgPost::_isHistoryCommand(QCommandLineParser &parser) const
+{
+    static const QList<Opt> sHistoryOpts = { Opt::HISTORY,        Opt::HISTORY_SHOW,
+                                             Opt::HISTORY_IMPORT_CSV, Opt::REGENERATE_NZB,
+                                             Opt::EXPORT_POST_INFO,   Opt::RESUME_LIST,
+                                             Opt::RESUME_CHECK,   Opt::RESUME_POST,
+                                             Opt::RESUME_ALL,     Opt::RESUME_ABANDON,
+                                             Opt::RESUME_PURGE };
+    for (Opt opt : sHistoryOpts) {
+        const QString name = sOptionNames[opt];
+        // both spellings: the options are declared with an underscore name and
+        // a dashed alias
+        if (parser.isSet(name) || parser.isSet(QString(name).replace('_', '-')))
+            return true;
+    }
+    return false;
+}
+
 bool NgPost::_handleHistoryCommand(QCommandLineParser &parser, bool *startEventLoop)
 {
     if (startEventLoop)
         *startEventLoop = false;
 
-    const bool hasHistoryCommand =
-        parser.isSet(sOptionNames[Opt::HISTORY])
-        || parser.isSet(sOptionNames[Opt::HISTORY_SHOW])
-        || parser.isSet(QStringLiteral("history-show"))
-        || parser.isSet(sOptionNames[Opt::HISTORY_IMPORT_CSV])
-        || parser.isSet(QStringLiteral("history-import-csv"))
-        || parser.isSet(sOptionNames[Opt::REGENERATE_NZB])
-        || parser.isSet(QStringLiteral("regenerate-nzb"))
-        || parser.isSet(sOptionNames[Opt::RESUME_LIST])
-        || parser.isSet(QStringLiteral("resume-list"))
-        || parser.isSet(sOptionNames[Opt::RESUME_CHECK])
-        || parser.isSet(QStringLiteral("resume-check"))
-        || parser.isSet(sOptionNames[Opt::RESUME_POST])
-        || parser.isSet(QStringLiteral("resume-post"))
-        || parser.isSet(sOptionNames[Opt::RESUME_ALL])
-        || parser.isSet(QStringLiteral("resume-all"))
-        || parser.isSet(sOptionNames[Opt::RESUME_ABANDON])
-        || parser.isSet(QStringLiteral("resume-abandon"))
-        || parser.isSet(sOptionNames[Opt::RESUME_PURGE])
-        || parser.isSet(QStringLiteral("resume-purge"));
+    const bool hasHistoryCommand = _isHistoryCommand(parser);
     if (!hasHistoryCommand)
         return false;
 
@@ -771,6 +775,23 @@ bool NgPost::_handleHistoryCommand(QCommandLineParser &parser, bool *startEventL
                                     ? parser.value(sOptionNames[Opt::OUTPUT])
                                     : QString();
         _regenerateNzbFromHistory(postId, outPath, includePassword);
+        return true;
+    }
+
+    if (parser.isSet(sOptionNames[Opt::EXPORT_POST_INFO])
+        || parser.isSet(QStringLiteral("export-post-info"))) {
+        const qint64 postId = parser.value(sOptionNames[Opt::EXPORT_POST_INFO]).toLongLong();
+        const QString outPath = parser.isSet(sOptionNames[Opt::OUTPUT])
+                                    ? parser.value(sOptionNames[Opt::OUTPUT])
+                                    : QString();
+        const QString templatePath = postInfoTemplatePath();
+        if (templatePath.isEmpty()) {
+            _error(tr("No template: give one with --post_info_template, or set "
+                      "POST_INFO_TEMPLATE in your configuration."),
+                   ERROR_CODE::ERR_WRONG_ARG);
+            return true;
+        }
+        _exportPostInfo(postId, templatePath, outPath, includePassword);
         return true;
     }
 
@@ -1126,6 +1147,100 @@ bool NgPost::regenerateNzbGui(qint64 postId, const QString &outPath, bool includ
     if (!_ensureHistoryStore())
         return false;
     return _regenerateNzbFromHistory(postId, outPath, includePassword);
+}
+
+//! Shared by the GUI and the command line. \a outPath empty means stdout, so
+//! only the record sheet goes there: everything else is a diagnostic and
+//! belongs on stderr.
+bool NgPost::_exportPostInfo(qint64 postId,
+                             const QString &templatePath,
+                             const QString &outPath,
+                             bool includePassword)
+{
+    if (!_ensureHistoryStore())
+        return false;
+
+    PostHistoryStore::PostInfoRecord record;
+    QString err;
+    if (!_historyService->loadPostInfoRecord(postId, &record, &err)) {
+        _error(tr("Could not load post %1: %2").arg(postId).arg(err), ERROR_CODE::ERR_HISTORY);
+        return false;
+    }
+
+    PostInfoData data = record.toPostInfoData();
+    if (!includePassword)
+        data.rarPass.clear();
+
+    if (data.partial) {
+        _cerr << tr("Warning: post %1 was made before ngPost recorded these facts; "
+                    "the par2 percentage, the source name and the metadata are empty.")
+                     .arg(postId)
+              << "\n"
+              << MB_FLUSH;
+    }
+
+    if (outPath.isEmpty()) {
+        QFile tmpl(templatePath);
+        if (!tmpl.open(QIODevice::ReadOnly)) {
+            _error(tr("Cannot read the template %1: %2").arg(templatePath, tmpl.errorString()),
+                   ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+        QStringList unknown;
+        const QString rendered = PostInfoTemplate::render(QString::fromUtf8(tmpl.readAll()),
+                                                          data,
+                                                          false,
+                                                          PostInfoTemplate::OnUnknown::KeepVerbatim,
+                                                          &unknown);
+        for (const QString &token : unknown)
+            _cerr << tr("Warning: unknown variable %1").arg(token) << "\n" << MB_FLUSH;
+        _cout << rendered << MB_FLUSH; // stdout carries the record sheet, nothing else
+        return true;
+    }
+
+    const PostInfoTemplate::Result result =
+        PostInfoTemplate::renderToFile(templatePath, outPath, data, QStringList());
+    for (const QString &warning : result.warnings)
+        _cerr << tr("Warning: %1").arg(warning) << "\n" << MB_FLUSH;
+    if (!result.ok) {
+        _error(result.error, ERROR_CODE::ERR_WRONG_ARG);
+        return false;
+    }
+    _cerr << tr("Post info file written: %1").arg(result.outPath) << "\n" << MB_FLUSH;
+    return true;
+}
+
+bool NgPost::exportPostInfoGui(qint64 postId,
+                               const QString &templatePath,
+                               const QString &outPath,
+                               bool includePassword,
+                               QString *error,
+                               bool *incomplete)
+{
+    if (!_ensureHistoryStore())
+        return false;
+
+    PostHistoryStore::PostInfoRecord record;
+    QString err;
+    if (!_historyService->loadPostInfoRecord(postId, &record, &err)) {
+        if (error)
+            *error = err;
+        return false;
+    }
+
+    PostInfoData data = record.toPostInfoData();
+    if (!includePassword)
+        data.rarPass.clear();
+    if (incomplete)
+        *incomplete = data.partial;
+
+    const PostInfoTemplate::Result result =
+        PostInfoTemplate::renderToFile(templatePath, outPath, data, QStringList());
+    if (!result.ok && error)
+        *error = result.error;
+    else if (error && !result.warnings.isEmpty())
+        *error = result.warnings.join(QStringLiteral("\n"));
+    return result.ok;
 }
 
 void NgPost::updateGroups(const QString &groups)
@@ -2091,26 +2206,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (_historyService)
         _historyService->configure(_postDbFile, _historyStorePasswords);
 
-    const bool hasHistoryCommand =
-        parser.isSet(sOptionNames[Opt::HISTORY])
-        || parser.isSet(sOptionNames[Opt::HISTORY_SHOW])
-        || parser.isSet(QStringLiteral("history-show"))
-        || parser.isSet(sOptionNames[Opt::HISTORY_IMPORT_CSV])
-        || parser.isSet(QStringLiteral("history-import-csv"))
-        || parser.isSet(sOptionNames[Opt::REGENERATE_NZB])
-        || parser.isSet(QStringLiteral("regenerate-nzb"))
-        || parser.isSet(sOptionNames[Opt::RESUME_LIST])
-        || parser.isSet(QStringLiteral("resume-list"))
-        || parser.isSet(sOptionNames[Opt::RESUME_CHECK])
-        || parser.isSet(QStringLiteral("resume-check"))
-        || parser.isSet(sOptionNames[Opt::RESUME_POST])
-        || parser.isSet(QStringLiteral("resume-post"))
-        || parser.isSet(sOptionNames[Opt::RESUME_ALL])
-        || parser.isSet(QStringLiteral("resume-all"))
-        || parser.isSet(sOptionNames[Opt::RESUME_ABANDON])
-        || parser.isSet(QStringLiteral("resume-abandon"))
-        || parser.isSet(sOptionNames[Opt::RESUME_PURGE])
-        || parser.isSet(QStringLiteral("resume-purge"));
+    const bool hasHistoryCommand = _isHistoryCommand(parser);
 
     if (parser.isSet(sOptionNames[Opt::LANG]))
     {
