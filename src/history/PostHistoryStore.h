@@ -133,6 +133,8 @@ public:
         bool onlyWithErrors   = false;
         QString dateFrom; //!< ISO date "YYYY-MM-DD"
         QString dateTo;   //!< ISO date "YYYY-MM-DD"
+        int limit = 0;    //!< <= 0 means unlimited
+        int offset = 0;   //!< ignored when limit <= 0
     };
 
     //! Aggregated stats for one calendar day.
@@ -233,6 +235,7 @@ public:
 
     // Primary query with full filter support.
     QList<PostSummary> listPosts(const ListFilter &filter, QString *error = nullptr);
+    bool hasPostsAfter(const ListFilter &filter, QString *error = nullptr);
 
     // Backward-compatible overload delegating to the primary.
     QList<PostSummary> listPosts(const QString &status = QString(),

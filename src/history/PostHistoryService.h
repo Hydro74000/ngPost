@@ -42,6 +42,10 @@ public:
         QList<PostHistoryStore::PostSummary> posts;
         QList<ResumeRow> resumeRows;
         QString error;
+        int pageOffset = 0;
+        int pageLimit = 0;
+        bool hasPreviousPage = false;
+        bool hasNextPage = false;
     };
 
     struct StatsSnapshot {

@@ -876,6 +876,8 @@ void MainWindow::_retranslateHistoryTab()
         _histClearBtn->setText(tr("Clear"));
         _histClearBtn->setToolTip(tr("Clear all filters"));
     }
+    if (_histPrevPageBtn) _histPrevPageBtn->setText(tr("Previous"));
+    if (_histNextPageBtn) _histNextPageBtn->setText(tr("Next"));
     if (_historyDateFrom) _historyDateFrom->setSpecialValueText(tr("Any date"));
     if (_historyDateTo)   _historyDateTo->setSpecialValueText(tr("Any date"));
 
@@ -1112,6 +1114,20 @@ QWidget *MainWindow::_buildHistoryTab()
     histSplitter->setStretchFactor(0, 3);
     histSplitter->setStretchFactor(1, 1);
 
+    QHBoxLayout *historyPageRow = new QHBoxLayout();
+    _histPrevPageBtn = new QPushButton(tr("Previous"), histTab);
+    _histNextPageBtn = new QPushButton(tr("Next"), histTab);
+    _histPageLabel = new QLabel(histTab);
+    _histPrevPageBtn->setEnabled(false);
+    _histNextPageBtn->setEnabled(false);
+    _histPageLabel->setAlignment(Qt::AlignCenter);
+    historyPageRow->addStretch();
+    historyPageRow->addWidget(_histPrevPageBtn);
+    historyPageRow->addWidget(_histPageLabel);
+    historyPageRow->addWidget(_histNextPageBtn);
+    historyPageRow->addStretch();
+    histLayout->addLayout(historyPageRow);
+
     _innerHistoryTabs->addTab(histTab, tr("History"));
 
     // ===== Tab 1: Stats =====
@@ -1224,17 +1240,27 @@ QWidget *MainWindow::_buildHistoryTab()
     _innerHistoryTabs->addTab(resumeTab, tr("Resume"));
 
     // ===== Connect signals =====
+    auto refreshFirstHistoryPage = [this]() {
+        _historyPageOffset = 0;
+        _refreshHistoryViews();
+    };
     connect(_histRefreshBtn,      &QPushButton::clicked,  this, &MainWindow::_onHistoryRefresh);
     connect(_resumeRefreshBtn,    &QPushButton::clicked,  this, &MainWindow::_onHistoryRefresh);
     connect(_histExportCsvBtn,    &QPushButton::clicked,  this, &MainWindow::_onHistoryExportCsv);
-    connect(_historySearchEdit,   &QLineEdit::returnPressed, this, &MainWindow::_onHistoryRefresh);
+    connect(_historySearchEdit,   &QLineEdit::returnPressed, this, refreshFirstHistoryPage);
     connect(_historyStatusFilter, qOverload<int>(&QComboBox::currentIndexChanged),
-            this, &MainWindow::_onHistoryRefresh);
-    connect(_historyPassFilter,   &QCheckBox::toggled,    this, &MainWindow::_onHistoryRefresh);
-    connect(_historyErrorsFilter, &QCheckBox::toggled,    this, &MainWindow::_onHistoryRefresh);
-    connect(_historyDateFrom,     &QDateEdit::dateChanged, this, &MainWindow::_onHistoryRefresh);
-    connect(_historyDateTo,       &QDateEdit::dateChanged, this, &MainWindow::_onHistoryRefresh);
-    connect(_historyGroupEdit,    &QLineEdit::returnPressed, this, &MainWindow::_onHistoryRefresh);
+            this, [refreshFirstHistoryPage](int) { refreshFirstHistoryPage(); });
+    connect(_historyPassFilter,   &QCheckBox::toggled,
+            this, [refreshFirstHistoryPage](bool) { refreshFirstHistoryPage(); });
+    connect(_historyErrorsFilter, &QCheckBox::toggled,
+            this, [refreshFirstHistoryPage](bool) { refreshFirstHistoryPage(); });
+    connect(_historyDateFrom,     &QDateEdit::dateChanged,
+            this, [refreshFirstHistoryPage](const QDate &) { refreshFirstHistoryPage(); });
+    connect(_historyDateTo,       &QDateEdit::dateChanged,
+            this, [refreshFirstHistoryPage](const QDate &) { refreshFirstHistoryPage(); });
+    connect(_historyGroupEdit,    &QLineEdit::returnPressed, this, refreshFirstHistoryPage);
+    connect(_histPrevPageBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryPreviousPage);
+    connect(_histNextPageBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryNextPage);
     connect(_histClearBtn,        &QPushButton::clicked,  this, [this]() {
         _historySearchEdit->clear();
         _historyStatusFilter->setCurrentIndex(0);
@@ -1243,6 +1269,7 @@ QWidget *MainWindow::_buildHistoryTab()
         _historyDateFrom->setDate(_historyDateFrom->minimumDate());
         _historyDateTo->setDate(_historyDateTo->minimumDate());
         _historyGroupEdit->clear();
+        _historyPageOffset = 0;
         _onHistoryRefresh();
     });
     connect(_historyTable,        &QTableWidget::currentCellChanged,
@@ -1278,27 +1305,10 @@ QWidget *MainWindow::_buildHistoryTab()
     // ===== Initial data load =====
     _refreshHistoryViews();
 
-    // Banner: show if resumable posts exist.
-    if (_ngPost && _ngPost->historyService()) {
-        _ngPost->historyService()->requestHistorySnapshot(PostHistoryStore::ListFilter(),
-                                                          _ignoredResumeIds,
-                                                          this,
-                                                          [this](const PostHistoryService::HistorySnapshot &snapshot) {
-            if (!snapshot.error.isEmpty() || snapshot.resumeRows.isEmpty())
-                return;
-            _bannerLabel->setText(tr("%1 post(s) can be resumed.").arg(snapshot.resumeRows.size()));
-            _bannerLabel->setVisible(true);
-            _bannerResumeBtn->setVisible(true);
-            statusBar()->showMessage(
-                tr("%1 post(s) can be resumed. Open the Resume tab to review them.")
-                    .arg(snapshot.resumeRows.size()), 10000);
-        });
-    }
-
     return root;
 }
 
-void MainWindow::_refreshHistoryViews()
+void MainWindow::_refreshHistoryViews(bool rewindEmptyPage)
 {
     PostHistoryService *history = _ngPost ? _ngPost->historyService() : nullptr;
     if (!history)
@@ -1317,9 +1327,15 @@ void MainWindow::_refreshHistoryViews()
         filter.dateFrom = _historyDateFrom->date().toString(Qt::ISODate);
     if (_historyDateTo && _historyDateTo->date() > _historyDateTo->minimumDate())
         filter.dateTo = _historyDateTo->date().toString(Qt::ISODate);
+    filter.limit = sHistoryPageSize;
+    filter.offset = _historyPageOffset > 0 ? _historyPageOffset : 0;
+    _historyPageOffset = filter.offset;
 
     const QSet<qint64> ignoredResumeIds = _ignoredResumeIds;
-    history->requestHistorySnapshot(filter, ignoredResumeIds, this, [this](const PostHistoryService::HistorySnapshot &snapshot) {
+    const int generation = ++_historyRefreshGeneration;
+    history->requestHistorySnapshot(filter, ignoredResumeIds, this, [this, generation, rewindEmptyPage](const PostHistoryService::HistorySnapshot &snapshot) {
+        if (generation != _historyRefreshGeneration)
+            return;
         if (!snapshot.error.isEmpty()) {
             statusBar()->showMessage(tr("History refresh failed: %1").arg(snapshot.error), 6000);
             return;
@@ -1327,6 +1343,12 @@ void MainWindow::_refreshHistoryViews()
 
         if (!_historyTable || !_resumeTable)
             return;
+
+        if (rewindEmptyPage && snapshot.posts.isEmpty() && snapshot.hasPreviousPage) {
+            _historyPageOffset = qMax(0, _historyPageOffset - sHistoryPageSize);
+            _refreshHistoryViews();
+            return;
+        }
 
         _historyTable->setSortingEnabled(false);
         const QList<PostHistoryStore::PostSummary> posts = snapshot.posts;
@@ -1357,6 +1379,27 @@ void MainWindow::_refreshHistoryViews()
         _historyTable->resizeColumnsToContents();
         _historyTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
         _historyTable->setSortingEnabled(true);
+
+        if (_histPrevPageBtn)
+            _histPrevPageBtn->setEnabled(snapshot.hasPreviousPage);
+        if (_histNextPageBtn)
+            _histNextPageBtn->setEnabled(snapshot.hasNextPage);
+        if (_histPageLabel) {
+            if (posts.isEmpty())
+                _histPageLabel->setText(tr("No entries"));
+            else
+                _histPageLabel->setText(tr("Entries %1-%2")
+                                            .arg(snapshot.pageOffset + 1)
+                                            .arg(snapshot.pageOffset + posts.size()));
+        }
+
+        const int resumableCount = snapshot.resumeRows.size();
+        if (_bannerLabel) {
+            _bannerLabel->setText(tr("%1 post(s) can be resumed.").arg(resumableCount));
+            _bannerLabel->setVisible(resumableCount > 0);
+        }
+        if (_bannerResumeBtn)
+            _bannerResumeBtn->setVisible(resumableCount > 0);
 
         _resumeTable->setRowCount(0);
         for (const PostHistoryService::ResumeRow &resume : snapshot.resumeRows) {
@@ -1839,6 +1882,18 @@ void MainWindow::onPauseClicked()
 
 void MainWindow::_onHistoryRefresh()
 {
+    _refreshHistoryViews();
+}
+
+void MainWindow::_onHistoryPreviousPage()
+{
+    _historyPageOffset = qMax(0, _historyPageOffset - sHistoryPageSize);
+    _refreshHistoryViews();
+}
+
+void MainWindow::_onHistoryNextPage()
+{
+    _historyPageOffset += sHistoryPageSize;
     _refreshHistoryViews();
 }
 

@@ -1116,6 +1116,42 @@ PostHistoryStore::PostSummary summaryFromQuery(const QSqlQuery &q, bool forceRes
     return s;
 }
 
+void appendListFilterSql(QString *sql, const PostHistoryStore::ListFilter &f)
+{
+    if (!f.status.isEmpty())
+        *sql += QStringLiteral(" AND p.status=:status");
+    if (!f.search.isEmpty())
+        *sql += QStringLiteral(
+                    " AND (p.nzb_name LIKE :search OR p.rar_name LIKE :search "
+                    "OR p.nzb_path LIKE :search)");
+    if (!f.group.isEmpty())
+        *sql += QStringLiteral(
+                    " AND EXISTS (SELECT 1 FROM post_groups pg "
+                    "WHERE pg.post_id=p.id AND pg.group_name=:group)");
+    if (f.onlyWithPassword)
+        *sql += QStringLiteral(" AND p.has_password=1");
+    if (f.onlyWithErrors)
+        *sql += QStringLiteral(" AND p.nb_failed_articles>0");
+    if (!f.dateFrom.isEmpty())
+        *sql += QStringLiteral(" AND p.created_at>=:dateFrom");
+    if (!f.dateTo.isEmpty())
+        *sql += QStringLiteral(" AND p.created_at<=:dateTo");
+}
+
+void bindListFilterValues(QSqlQuery *q, const PostHistoryStore::ListFilter &f)
+{
+    if (!f.status.isEmpty())
+        q->bindValue(QStringLiteral(":status"), f.status);
+    if (!f.search.isEmpty())
+        q->bindValue(QStringLiteral(":search"), QStringLiteral("%%1%").arg(f.search));
+    if (!f.group.isEmpty())
+        q->bindValue(QStringLiteral(":group"), f.group);
+    if (!f.dateFrom.isEmpty())
+        q->bindValue(QStringLiteral(":dateFrom"), f.dateFrom);
+    if (!f.dateTo.isEmpty())
+        q->bindValue(QStringLiteral(":dateTo"), f.dateTo + QStringLiteral("T23:59:59"));
+}
+
 } // anonymous namespace
 
 QList<PostHistoryStore::PostSummary> PostHistoryStore::listPosts(const ListFilter &f,
@@ -1130,42 +1166,22 @@ QList<PostHistoryStore::PostSummary> PostHistoryStore::listPosts(const ListFilte
         "SELECT p.*, COALESCE(group_concat(DISTINCT g.group_name), '') AS groups_text "
         "FROM posts p LEFT JOIN post_groups g ON g.post_id=p.id WHERE 1=1");
 
-    if (!f.status.isEmpty())
-        sql += QStringLiteral(" AND p.status=:status");
-    if (!f.search.isEmpty())
-        sql += QStringLiteral(
-                   " AND (p.nzb_name LIKE :search OR p.rar_name LIKE :search "
-                   "OR p.nzb_path LIKE :search)");
-    if (!f.group.isEmpty())
-        sql += QStringLiteral(
-                   " AND EXISTS (SELECT 1 FROM post_groups pg "
-                   "WHERE pg.post_id=p.id AND pg.group_name=:group)");
-    if (f.onlyWithPassword)
-        sql += QStringLiteral(" AND p.has_password=1");
-    if (f.onlyWithErrors)
-        sql += QStringLiteral(" AND p.nb_failed_articles>0");
-    if (!f.dateFrom.isEmpty())
-        sql += QStringLiteral(" AND p.created_at>=:dateFrom");
-    if (!f.dateTo.isEmpty())
-        sql += QStringLiteral(" AND p.created_at<=:dateTo");
+    appendListFilterSql(&sql, f);
 
-    sql += QStringLiteral(" GROUP BY p.id ORDER BY p.created_at DESC");
+    sql += QStringLiteral(" GROUP BY p.id ORDER BY p.created_at DESC, p.id DESC");
+    if (f.limit > 0)
+        sql += QStringLiteral(" LIMIT :limit OFFSET :offset");
 
     QSqlQuery q(db);
     if (!q.prepare(sql)) {
         setError(error, q);
         return out;
     }
-    if (!f.status.isEmpty())
-        q.bindValue(QStringLiteral(":status"), f.status);
-    if (!f.search.isEmpty())
-        q.bindValue(QStringLiteral(":search"), QStringLiteral("%%1%").arg(f.search));
-    if (!f.group.isEmpty())
-        q.bindValue(QStringLiteral(":group"), f.group);
-    if (!f.dateFrom.isEmpty())
-        q.bindValue(QStringLiteral(":dateFrom"), f.dateFrom);
-    if (!f.dateTo.isEmpty())
-        q.bindValue(QStringLiteral(":dateTo"), f.dateTo + QStringLiteral("T23:59:59"));
+    bindListFilterValues(&q, f);
+    if (f.limit > 0) {
+        q.bindValue(QStringLiteral(":limit"), f.limit);
+        q.bindValue(QStringLiteral(":offset"), f.offset > 0 ? f.offset : 0);
+    }
     if (!q.exec()) {
         setError(error, q);
         return out;
@@ -1178,6 +1194,40 @@ QList<PostHistoryStore::PostSummary> PostHistoryStore::listPosts(const ListFilte
     }
     q.finish();
     return out;
+}
+
+bool PostHistoryStore::hasPostsAfter(const ListFilter &f, QString *error)
+{
+    if (!initialize(error))
+        return false;
+    if (f.limit <= 0)
+        return false;
+
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+
+    QString sql = QStringLiteral("SELECT 1 FROM posts p WHERE 1=1");
+    appendListFilterSql(&sql, f);
+    sql += QStringLiteral(" ORDER BY p.created_at DESC, p.id DESC LIMIT 1 OFFSET :offset");
+
+    QSqlQuery q(db);
+    if (!q.prepare(sql)) {
+        setError(error, q);
+        return false;
+    }
+    bindListFilterValues(&q, f);
+    q.bindValue(QStringLiteral(":offset"), (f.offset > 0 ? f.offset : 0) + f.limit);
+    if (!q.exec()) {
+        setError(error, q);
+        return false;
+    }
+
+    const bool hasMore = q.next();
+    if (q.lastError().isValid()) {
+        setError(error, q);
+        return false;
+    }
+    q.finish();
+    return hasMore;
 }
 
 QList<PostHistoryStore::PostSummary> PostHistoryStore::listPosts(const QString &status,

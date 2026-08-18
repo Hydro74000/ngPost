@@ -295,12 +295,23 @@ public:
                                                         const QSet<qint64> &ignoredResumeIds)
     {
         PostHistoryService::HistorySnapshot snapshot;
+        snapshot.pageOffset = filter.offset > 0 ? filter.offset : 0;
+        snapshot.pageLimit = filter.limit > 0 ? filter.limit : 0;
+        snapshot.hasPreviousPage = snapshot.pageLimit > 0 && snapshot.pageOffset > 0;
+
         QString err;
         flushArticleEventsBlocking(&err);
         err.clear();
         snapshot.posts = _store.listPosts(filter, &err);
         if (!err.isEmpty())
             snapshot.error = err;
+
+        if (snapshot.error.isEmpty() && snapshot.pageLimit > 0) {
+            err.clear();
+            snapshot.hasNextPage = _store.hasPostsAfter(filter, &err);
+            if (!err.isEmpty())
+                snapshot.error = err;
+        }
 
         err.clear();
         const QList<PostHistoryStore::PostSummary> candidates = _store.resumeCandidates(&err);

@@ -11,7 +11,9 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QSqlDatabase>
+#include <QSqlError>
 #include <QSqlQuery>
+#include <QSet>
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QTimer>
@@ -34,7 +36,10 @@ private slots:
     void mark_article_status_keeps_payload_when_row_is_missing();
     void apply_article_events_batches_ordered_status_changes();
     void terminal_status_purges_attempt_audit_rows();
+    void list_posts_paginates_with_stable_order();
+    void list_posts_applies_filters_before_pagination();
     void service_flushes_batches_and_returns_snapshots();
+    void service_snapshot_paginates_history_but_stats_are_complete();
     void nzb_regeneration_keeps_prior_files_after_resume();
     void nzb_regeneration_repairs_missing_article_bytes();
     void nzb_regeneration_masks_password_by_default();
@@ -89,6 +94,82 @@ int countAttemptRows(const QString &dbPath, qint64 postId)
     }
     QSqlDatabase::removeDatabase(conn);
     return n;
+}
+
+qint64 createStoredPost(PostHistoryStore &store,
+                        const QString &name,
+                        const QString &status,
+                        const QStringList &groups,
+                        QString *error)
+{
+    PostHistoryStore::PostRecord post;
+    post.nzbName = name;
+    post.nzbPath = QStringLiteral("/tmp/%1").arg(name);
+    post.rarName = name + QStringLiteral(".rar");
+    post.from = QStringLiteral("poster@example.invalid");
+    post.groups = groups;
+    const qint64 postId = store.createPost(post, error);
+    if (postId <= 0)
+        return 0;
+    if (status != QStringLiteral("posting")
+        && !store.updatePostStatus(postId, status, 0, 0, 0, 0, QString(), error))
+        return 0;
+    return postId;
+}
+
+bool updateCreatedAt(const QString &dbPath,
+                     const QList<qint64> &postIds,
+                     const QString &createdAt,
+                     QString *error)
+{
+    if (postIds.isEmpty())
+        return true;
+
+    static int sConnectionCounter = 0;
+    const QString conn = QStringLiteral("tst_update_created_at_%1").arg(++sConnectionCounter);
+    bool ok = true;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conn);
+        db.setDatabaseName(dbPath);
+        if (!db.open()) {
+            if (error)
+                *error = db.lastError().text();
+            ok = false;
+        } else if (!db.transaction()) {
+            if (error)
+                *error = db.lastError().text();
+            ok = false;
+        } else {
+            QSqlQuery q(db);
+            if (!q.prepare(QStringLiteral("UPDATE posts SET created_at=? WHERE id=?"))) {
+                if (error)
+                    *error = q.lastError().text();
+                ok = false;
+            }
+            for (const qint64 postId : postIds) {
+                if (!ok)
+                    break;
+                q.bindValue(0, createdAt);
+                q.bindValue(1, postId);
+                if (!q.exec()) {
+                    if (error)
+                        *error = q.lastError().text();
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok && !db.commit()) {
+                if (error)
+                    *error = db.lastError().text();
+                ok = false;
+            }
+            if (!ok)
+                db.rollback();
+        }
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(conn);
+    return ok;
 }
 
 } // namespace
@@ -428,6 +509,132 @@ void TestPostHistory::terminal_status_purges_attempt_audit_rows()
     QVERIFY(nzb.contains(QStringLiteral("a2@ngpost")));
 }
 
+void TestPostHistory::list_posts_paginates_with_stable_order()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString err;
+    QVERIFY2(store.initialize(&err), qPrintable(err));
+
+    QList<qint64> ids;
+    for (int i = 0; i < 405; ++i) {
+        const qint64 id = createStoredPost(store,
+                                           QStringLiteral("bulk-%1.nzb").arg(i, 3, 10, QLatin1Char('0')),
+                                           QStringLiteral("success"),
+                                           { QStringLiteral("alt.binaries.bulk") },
+                                           &err);
+        QVERIFY2(id > 0, qPrintable(err));
+        ids << id;
+    }
+
+    PostHistoryStore::ListFilter filter;
+    filter.limit = 200;
+
+    QList<PostHistoryStore::PostSummary> page1 = store.listPosts(filter, &err);
+    QVERIFY2(err.isEmpty(), qPrintable(err));
+    QCOMPARE(page1.size(), 200);
+    QCOMPARE(page1.first().id, ids.last());
+    QCOMPARE(page1.last().id, ids.at(205));
+    QVERIFY2(store.hasPostsAfter(filter, &err), qPrintable(err));
+
+    filter.offset = 200;
+    QList<PostHistoryStore::PostSummary> page2 = store.listPosts(filter, &err);
+    QVERIFY2(err.isEmpty(), qPrintable(err));
+    QCOMPARE(page2.size(), 200);
+    QCOMPARE(page2.first().id, ids.at(204));
+    QCOMPARE(page2.last().id, ids.at(5));
+    QVERIFY2(store.hasPostsAfter(filter, &err), qPrintable(err));
+
+    filter.offset = 400;
+    QList<PostHistoryStore::PostSummary> page3 = store.listPosts(filter, &err);
+    QVERIFY2(err.isEmpty(), qPrintable(err));
+    QCOMPARE(page3.size(), 5);
+    QCOMPARE(page3.first().id, ids.at(4));
+    QCOMPARE(page3.last().id, ids.first());
+    QVERIFY2(!store.hasPostsAfter(filter, &err), qPrintable(err));
+
+    QSet<qint64> seen;
+    for (const QList<PostHistoryStore::PostSummary> &page : { page1, page2, page3 }) {
+        for (const PostHistoryStore::PostSummary &summary : page) {
+            QVERIFY2(!seen.contains(summary.id), "duplicate post across history pages");
+            seen.insert(summary.id);
+        }
+    }
+    QCOMPARE(seen.size(), ids.size());
+}
+
+void TestPostHistory::list_posts_applies_filters_before_pagination()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString dbPath = dir.filePath(QStringLiteral("history.sqlite"));
+    PostHistoryStore store(dbPath, true);
+    QString err;
+    QVERIFY2(store.initialize(&err), qPrintable(err));
+
+    QList<qint64> filteredIds;
+    for (int i = 0; i < 260; ++i) {
+        const qint64 id = createStoredPost(store,
+                                           QStringLiteral("keep-%1.nzb").arg(i, 3, 10, QLatin1Char('0')),
+                                           QStringLiteral("success"),
+                                           { QStringLiteral("alt.keep") },
+                                           &err);
+        QVERIFY2(id > 0, qPrintable(err));
+        filteredIds << id;
+    }
+    for (int i = 0; i < 50; ++i) {
+        QVERIFY2(createStoredPost(store,
+                                  QStringLiteral("keep-failed-%1.nzb").arg(i, 2, 10, QLatin1Char('0')),
+                                  QStringLiteral("failed"),
+                                  { QStringLiteral("alt.keep") },
+                                  &err) > 0,
+                 qPrintable(err));
+        QVERIFY2(createStoredPost(store,
+                                  QStringLiteral("keep-other-%1.nzb").arg(i, 2, 10, QLatin1Char('0')),
+                                  QStringLiteral("success"),
+                                  { QStringLiteral("alt.other") },
+                                  &err) > 0,
+                 qPrintable(err));
+    }
+
+    const QList<qint64> oldIds = filteredIds.mid(0, 10);
+    QVERIFY2(updateCreatedAt(dbPath, oldIds, QStringLiteral("2001-01-01T00:00:00"), &err),
+             qPrintable(err));
+
+    PostHistoryStore::ListFilter filter;
+    filter.status = QStringLiteral("success");
+    filter.search = QStringLiteral("keep-");
+    filter.group = QStringLiteral("alt.keep");
+    filter.dateFrom = QStringLiteral("2002-01-01");
+    filter.limit = 200;
+
+    QList<PostHistoryStore::PostSummary> page1 = store.listPosts(filter, &err);
+    QVERIFY2(err.isEmpty(), qPrintable(err));
+    QCOMPARE(page1.size(), 200);
+    QVERIFY2(store.hasPostsAfter(filter, &err), qPrintable(err));
+    for (const PostHistoryStore::PostSummary &summary : page1) {
+        QCOMPARE(summary.status, QStringLiteral("success"));
+        QCOMPARE(summary.groups, QStringLiteral("alt.keep"));
+        QVERIFY(summary.nzbName.startsWith(QStringLiteral("keep-")));
+        QVERIFY(summary.createdAt >= filter.dateFrom);
+    }
+
+    filter.offset = 200;
+    QList<PostHistoryStore::PostSummary> page2 = store.listPosts(filter, &err);
+    QVERIFY2(err.isEmpty(), qPrintable(err));
+    QCOMPARE(page2.size(), 50);
+    QVERIFY2(!store.hasPostsAfter(filter, &err), qPrintable(err));
+    for (const PostHistoryStore::PostSummary &summary : page2) {
+        QCOMPARE(summary.status, QStringLiteral("success"));
+        QCOMPARE(summary.groups, QStringLiteral("alt.keep"));
+        QVERIFY(summary.nzbName.startsWith(QStringLiteral("keep-")));
+        QVERIFY(summary.createdAt >= filter.dateFrom);
+    }
+}
+
 void TestPostHistory::service_flushes_batches_and_returns_snapshots()
 {
     QTemporaryDir dir;
@@ -489,6 +696,104 @@ void TestPostHistory::service_flushes_batches_and_returns_snapshots()
     QCOMPARE(snapshot.posts.size(), 1);
     QCOMPARE(snapshot.resumeRows.size(), 1);
     QCOMPARE(snapshot.resumeRows.first().failedArticles, 1);
+}
+
+void TestPostHistory::service_snapshot_paginates_history_but_stats_are_complete()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString dbPath = dir.filePath(QStringLiteral("history.sqlite"));
+    QString err;
+    {
+        PostHistoryStore store(dbPath, true);
+        QVERIFY2(store.initialize(&err), qPrintable(err));
+        for (int i = 0; i < 205; ++i) {
+            const qint64 id = createStoredPost(store,
+                                               QStringLiteral("stats-%1.nzb").arg(i, 3, 10, QLatin1Char('0')),
+                                               QStringLiteral("success"),
+                                               { QStringLiteral("alt.stats") },
+                                               &err);
+            QVERIFY2(id > 0, qPrintable(err));
+        }
+        store.closeConnection();
+    }
+
+    PostHistoryService service(dbPath, true);
+    QVERIFY2(service.initialize(&err), qPrintable(err));
+
+    PostHistoryStore::ListFilter pageFilter;
+    pageFilter.limit = 200;
+
+    QEventLoop pageLoop1;
+    bool page1Called = false;
+    PostHistoryService::HistorySnapshot page1;
+    service.requestHistorySnapshot(pageFilter, QSet<qint64>(), &pageLoop1,
+                                   [&](const PostHistoryService::HistorySnapshot &snapshot) {
+        page1 = snapshot;
+        page1Called = true;
+        pageLoop1.quit();
+    });
+    QTimer::singleShot(3000, &pageLoop1, &QEventLoop::quit);
+    pageLoop1.exec();
+
+    QVERIFY(page1Called);
+    QVERIFY2(page1.error.isEmpty(), qPrintable(page1.error));
+    QCOMPARE(page1.posts.size(), 200);
+    QCOMPARE(page1.pageOffset, 0);
+    QCOMPARE(page1.pageLimit, 200);
+    QVERIFY(!page1.hasPreviousPage);
+    QVERIFY(page1.hasNextPage);
+
+    pageFilter.offset = 200;
+    QEventLoop pageLoop2;
+    bool page2Called = false;
+    PostHistoryService::HistorySnapshot page2;
+    service.requestHistorySnapshot(pageFilter, QSet<qint64>(), &pageLoop2,
+                                   [&](const PostHistoryService::HistorySnapshot &snapshot) {
+        page2 = snapshot;
+        page2Called = true;
+        pageLoop2.quit();
+    });
+    QTimer::singleShot(3000, &pageLoop2, &QEventLoop::quit);
+    pageLoop2.exec();
+
+    QVERIFY(page2Called);
+    QVERIFY2(page2.error.isEmpty(), qPrintable(page2.error));
+    QCOMPARE(page2.posts.size(), 5);
+    QCOMPARE(page2.pageOffset, 200);
+    QCOMPARE(page2.pageLimit, 200);
+    QVERIFY(page2.hasPreviousPage);
+    QVERIFY(!page2.hasNextPage);
+
+    QEventLoop statsLoop;
+    bool statsCalled = false;
+    PostHistoryService::StatsSnapshot stats;
+    service.requestStatsSnapshot(QString(), QString(), QString(), &statsLoop,
+                                 [&](const PostHistoryService::StatsSnapshot &snapshot) {
+        stats = snapshot;
+        statsCalled = true;
+        statsLoop.quit();
+    });
+    QTimer::singleShot(3000, &statsLoop, &QEventLoop::quit);
+    statsLoop.exec();
+
+    QVERIFY(statsCalled);
+    QVERIFY2(stats.error.isEmpty(), qPrintable(stats.error));
+    int totalPosts = 0;
+    for (const PostHistoryStore::DayStats &day : stats.days)
+        totalPosts += day.nbPosts;
+    QCOMPARE(totalPosts, 205);
+
+    bool foundStatsGroup = false;
+    for (const PostHistoryStore::GroupStats &group : stats.groupStats) {
+        if (group.group == QStringLiteral("alt.stats")) {
+            foundStatsGroup = true;
+            QCOMPARE(group.nbPosts, 205);
+        }
+    }
+    QVERIFY(foundStatsGroup);
+    QCOMPARE(stats.topPosts.size(), 20);
 }
 
 void TestPostHistory::nzb_regeneration_keeps_prior_files_after_resume()
