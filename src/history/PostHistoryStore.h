@@ -120,6 +120,13 @@ public:
         QString rarPass;
         QString passwordOrigin;
         QString from;
+        //! How the original post was made. A resume must replay the obfuscation
+        //! (it changes the poster and the group policy), but must NOT replay
+        //! doCompress/doPar2: those are orders, and the archive already exists.
+        bool obfuscateArticles = false;
+        bool obfuscateFileName = false;
+        bool doCompress = false;
+        bool doPar2 = false;
         QList<FileSummary> files;
         QMap<qint64, QList<ArticleSummary>> articlesByFile;
     };

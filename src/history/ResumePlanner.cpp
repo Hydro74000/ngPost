@@ -80,3 +80,97 @@ ResumePlanner::Decision ResumePlanner::check(qint64 postId, QString *error)
     }
     return decision;
 }
+
+namespace
+{
+QStringList splitStoredGroups(const QString &groups)
+{
+    return groups.split(',', Qt::SkipEmptyParts);
+}
+} // namespace
+
+ResumePlanner::JobPlan ResumePlanner::buildJobPlan(const PostHistoryStore::PostDetails &details)
+{
+    JobPlan plan;
+    const int fileRows = static_cast<int>(details.files.size());
+    const int originalTotalFiles = details.post.nbFiles > fileRows
+        ? details.post.nbFiles
+        : fileRows;
+    const QStringList postGroups = splitStoredGroups(details.post.groups);
+
+    for (const PostHistoryStore::FileSummary &file : details.files) {
+        QSet<uint> postedParts;
+        bool hasRemaining = false;
+        const QList<PostHistoryStore::ArticleSummary> articles =
+            details.articlesByFile.value(file.id);
+        for (const PostHistoryStore::ArticleSummary &article : articles) {
+            if (article.status == QStringLiteral("posted"))
+                postedParts.insert(static_cast<uint>(article.part));
+            else
+                hasRemaining = true;
+        }
+        if (file.totalArticles > articles.size())
+            hasRemaining = true;
+        if (!hasRemaining)
+            continue;
+
+        QFileInfo source(file.originalPath);
+        if (!source.exists()
+            || source.size() != file.sizeBytes
+            || (file.mtimeEpoch
+                && source.lastModified().toSecsSinceEpoch() != file.mtimeEpoch)) {
+            plan.unavailableSources << file.originalPath;
+            continue;
+        }
+
+        PostingJobResumeFileState state;
+        state.historyFileId = file.id;
+        state.ordinal = file.ordinal;
+        state.totalFiles = originalTotalFiles;
+        state.groups = splitStoredGroups(file.groups);
+        if (state.groups.isEmpty())
+            state.groups = postGroups;
+        state.postedParts = postedParts;
+
+        plan.files << source;
+        plan.statesByPath.insert(source.absoluteFilePath(), state);
+    }
+
+    return plan;
+}
+
+PostingJobOptions ResumePlanner::jobOptions(PostingJobOptions base,
+                                            const PostHistoryStore::PostDetails &details,
+                                            const QString &nzbPath,
+                                            const QList<QString> &groups,
+                                            const JobPlan &plan,
+                                            const std::string &fallbackFrom)
+{
+    base.nzbFilePath = nzbPath;
+    base.files       = plan.files;
+    base.grpList     = groups;
+    base.from        = details.from.isEmpty() ? fallbackFrom : details.from.toStdString();
+
+    // settings of the original post, not the current globals
+    base.obfuscateArticles = details.obfuscateArticles;
+    base.obfuscateFileName = details.obfuscateFileName;
+
+    // orders: the archive and the par2 volumes are already on disk
+    base.doCompress = false;
+    base.doPar2     = false;
+    base.rarName    = details.rarName;
+    base.rarPass    = details.rarPass;
+    base.keepRar    = false;
+
+    base.delFilesAfterPost = false;
+    base.overwriteNzb      = true;
+
+    base.resumeHistoryPostId    = details.post.id;
+    base.resumeFileStatesByPath = plan.statesByPath;
+
+    // facts about what the original post did, to describe it later
+    base.originalDidCompress = details.doCompress;
+    base.originalDidPar2     = details.doPar2;
+
+    return base;
+}

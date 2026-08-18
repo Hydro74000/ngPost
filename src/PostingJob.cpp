@@ -183,32 +183,13 @@ QStringList PostingJob::buildPar2ArgsForTest(const QString &configuredArgs,
 #endif
 
 PostingJob::PostingJob(NgPost *ngPost,
-                       const QString &nzbFilePath,
-                       const QFileInfoList &files,
+                       const PostingJobOptions &options,
                        PostingWidget *postWidget,
-                       const QList<QString> &grpList,
-                       const std::string &from,
-                       bool obfuscateArticles,
-                       bool obfuscateFileName,
-                       const QString &tmpPath,
-                       const QString &rarPath,
-                       const QString &rarArgs,
-                       uint rarSize,
-                       bool useRarMax,
-                       uint par2Pct,
-                       bool doCompress,
-                       bool doPar2,
-                       const QString &rarName,
-                       const QString &rarPass,
-                       bool keepRar,
-                       bool delFilesAfterPost,
-                       bool overwriteNzb,
-                       qint64 resumeHistoryPostId,
-                       const QMap<QString, PostingJob::ResumeFileState> &resumeFileStatesByPath,
                        QObject *parent)
     : QObject(parent)
     , _ngPost(ngPost)
-    , _files(files)
+    , _options(options)
+    , _files(options.files)
     , _postWidget(postWidget)
     ,
 
@@ -219,17 +200,17 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _nbProcDisp(42)
     ,
 
-    _tmpPath(tmpPath)
-    , _rarPath(rarPath)
-    , _rarArgs(rarArgs)
-    , _rarSize(rarSize)
-    , _useRarMax(useRarMax)
-    , _par2Pct(par2Pct)
-    , _doCompress(doCompress)
-    , _doPar2(doPar2)
-    , _rarName(rarName)
-    , _rarPass(rarPass)
-    , _keepRar(keepRar)
+    _tmpPath(options.tmpPath)
+    , _rarPath(options.rarPath)
+    , _rarArgs(options.rarArgs)
+    , _rarSize(options.rarSize)
+    , _useRarMax(options.useRarMax)
+    , _par2Pct(options.par2Pct)
+    , _doCompress(options.doCompress)
+    , _doPar2(options.doPar2)
+    , _rarName(options.rarName)
+    , _rarPass(options.rarPass)
+    , _keepRar(options.keepRar)
     , _splitArchive(false)
     ,
 
@@ -237,7 +218,7 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _closedConnections()
     ,
 
-    _nzbName(QFileInfo(nzbFilePath).fileName())
+    _nzbName(QFileInfo(options.nzbFilePath).fileName())
     , _filesToUpload()
     , _filesInProgress()
     , _filesFailed()
@@ -245,7 +226,7 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _nbPosted(0)
     ,
 
-    _nzbFilePath(nzbFilePath)
+    _nzbFilePath(options.nzbFilePath)
     , _nzb(nullptr)
     , _nzbStream()
     , _nntpFile(nullptr)
@@ -268,22 +249,24 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _postStarted(false)
     , _packed(false)
     , _postFinished(false)
-    , _obfuscateArticles(obfuscateArticles)
-    , _obfuscateFileName(obfuscateFileName)
-    , _delFilesAfterPost(delFilesAfterPost ? 0x1 : 0x0)
-    , _originalFiles(!postWidget || delFilesAfterPost || obfuscateFileName ? files : QFileInfoList())
+    , _obfuscateArticles(options.obfuscateArticles)
+    , _obfuscateFileName(options.obfuscateFileName)
+    , _delFilesAfterPost(options.delFilesAfterPost ? 0x1 : 0x0)
+    , _originalFiles(!postWidget || options.delFilesAfterPost || options.obfuscateFileName
+                         ? options.files
+                         : QFileInfoList())
     , _secureDiskAccess()
     , _posters()
-    , _overwriteNzb(overwriteNzb)
-    , _grpList(grpList)
-    , _from(from)
+    , _overwriteNzb(options.overwriteNzb)
+    , _grpList(options.grpList)
+    , _from(options.from)
     , _use7z(false)
     , _isPaused(false)
     , _resumeTimer()
     , _isActiveJob(false)
-    , _historyPostId(resumeHistoryPostId)
-    , _resumeFromHistory(resumeHistoryPostId != 0)
-    , _resumeFileStatesByPath(resumeFileStatesByPath)
+    , _historyPostId(options.resumeHistoryPostId)
+    , _resumeFromHistory(options.resumeHistoryPostId != 0)
+    , _resumeFileStatesByPath(options.resumeFileStatesByPath)
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     , _immediateSize(0)
     , _immediateSpeedTimer()

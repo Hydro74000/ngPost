@@ -14,6 +14,7 @@
 #include "NzbCheck.h"
 #include "history/PostHistoryService.h"
 #include "history/PostHistoryStore.h"
+#include "history/ResumePlanner.h"
 #include "utils/PathHelper.h"
 #include "utils/UpdateChecker.h"
 #include "vpn/VpnManager.h"
@@ -960,72 +961,6 @@ void NgPost::_printResumeCheck(qint64 postId)
           << "unknown: " << d.unknownArticles << "\n";
 }
 
-namespace
-{
-
-struct ResumeJobPlan {
-    QFileInfoList files;
-    QMap<QString, PostingJob::ResumeFileState> statesByPath;
-    QStringList unavailableSources;
-};
-
-QStringList splitStoredGroups(const QString &groups)
-{
-    return groups.split(',', Qt::SkipEmptyParts);
-}
-
-ResumeJobPlan buildResumeJobPlan(const PostHistoryStore::PostDetails &details)
-{
-    ResumeJobPlan plan;
-    const int fileRows = static_cast<int>(details.files.size());
-    const int originalTotalFiles = details.post.nbFiles > fileRows
-        ? details.post.nbFiles
-        : fileRows;
-    const QStringList postGroups = splitStoredGroups(details.post.groups);
-
-    for (const PostHistoryStore::FileSummary &file : details.files) {
-        QSet<uint> postedParts;
-        bool hasRemaining = false;
-        const QList<PostHistoryStore::ArticleSummary> articles =
-            details.articlesByFile.value(file.id);
-        for (const PostHistoryStore::ArticleSummary &article : articles) {
-            if (article.status == QStringLiteral("posted"))
-                postedParts.insert(static_cast<uint>(article.part));
-            else
-                hasRemaining = true;
-        }
-        if (file.totalArticles > articles.size())
-            hasRemaining = true;
-        if (!hasRemaining)
-            continue;
-
-        QFileInfo source(file.originalPath);
-        if (!source.exists()
-            || source.size() != file.sizeBytes
-            || (file.mtimeEpoch
-                && source.lastModified().toSecsSinceEpoch() != file.mtimeEpoch)) {
-            plan.unavailableSources << file.originalPath;
-            continue;
-        }
-
-        PostingJob::ResumeFileState state;
-        state.historyFileId = file.id;
-        state.ordinal = file.ordinal;
-        state.totalFiles = originalTotalFiles;
-        state.groups = splitStoredGroups(file.groups);
-        if (state.groups.isEmpty())
-            state.groups = postGroups;
-        state.postedParts = postedParts;
-
-        plan.files << source;
-        plan.statesByPath.insert(source.absoluteFilePath(), state);
-    }
-
-    return plan;
-}
-
-} // namespace
-
 bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assumeYes)
 {
     if (!dryRun && !assumeYes) {
@@ -1069,7 +1004,7 @@ bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assume
             continue;
         }
 
-        const ResumeJobPlan resumePlan = buildResumeJobPlan(details);
+        const ResumePlanner::JobPlan resumePlan = ResumePlanner::buildJobPlan(details);
         for (const QString &source : resumePlan.unavailableSources) {
             _error(tr("Source missing or changed for post %1: %2").arg(postId).arg(source),
                    ERROR_CODE::ERR_HISTORY);
@@ -1092,29 +1027,8 @@ bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assume
         if (groups.isEmpty())
             groups = getPostingGroups();
 
-        PostingJob *job = new PostingJob(this,
-                                         nzbPath,
-                                         resumePlan.files,
-                                         nullptr,
-                                         groups,
-                                         details.from.isEmpty() ? from() : details.from.toStdString(),
-                                         _obfuscateArticles,
-                                         _obfuscateFileName,
-                                         _tmpPath,
-                                         _rarPath,
-                                         _rarArgs,
-                                         _rarSize,
-                                         _useRarMax,
-                                         _par2Pct,
-                                         false,
-                                         false,
-                                         details.rarName,
-                                         details.rarPass,
-                                         false,
-                                         false,
-                                         true,
-                                         postId,
-                                         resumePlan.statesByPath);
+        PostingJob *job = new PostingJob(
+            this, ResumePlanner::jobOptions(_baseJobOptions(), details, nzbPath, groups, resumePlan, from()));
         startPostingJob(job);
         scheduled = true;
     }
@@ -1145,7 +1059,7 @@ bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
         return false;
     }
 
-    const ResumeJobPlan resumePlan = buildResumeJobPlan(details);
+    const ResumePlanner::JobPlan resumePlan = ResumePlanner::buildJobPlan(details);
     if (!resumePlan.unavailableSources.isEmpty()) {
         if (error)
             *error = tr("source files are missing or changed");
@@ -1167,29 +1081,10 @@ bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
     if (groups.isEmpty())
         groups = getPostingGroups();
 
-    PostingJob *job = new PostingJob(this,
-                                     nzbPath,
-                                     resumePlan.files,
-                                     widget,
-                                     groups,
-                                     details.from.isEmpty() ? from() : details.from.toStdString(),
-                                     _obfuscateArticles,
-                                     _obfuscateFileName,
-                                     _tmpPath,
-                                     _rarPath,
-                                     _rarArgs,
-                                     _rarSize,
-                                     _useRarMax,
-                                     _par2Pct,
-                                     false,
-                                     false,
-                                     details.rarName,
-                                     details.rarPass,
-                                     false,
-                                     false,
-                                     true,
-                                     postId,
-                                     resumePlan.statesByPath);
+    PostingJob *job = new PostingJob(
+        this,
+        ResumePlanner::jobOptions(_baseJobOptions(), details, nzbPath, groups, resumePlan, from()),
+        widget);
 #ifdef __USE_HMI__
     const bool hasStarted = startPostingJob(job);
     if (lastPostingStartCanceled()) {
@@ -1610,13 +1505,36 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
                  .arg(nfo.fileName(), fileInfo.fileName()));
     }
 
-    startPostingJob(new PostingJob(this, nzbFilePath, postFiles, nullptr,
-                                   getPostingGroups(), from(),
-                                   _obfuscateArticles, _obfuscateFileName,
-                                   _tmpPath, _rarPath, _rarArgs,
-                                   _rarSize, _useRarMax, _par2Pct,
-                                   _doCompress, _doPar2, _rarName, _rarPass,
-                                   _keepRar, _delAuto, false));
+    PostingJobOptions options = _baseJobOptions();
+    options.nzbFilePath       = nzbFilePath;
+    options.files             = postFiles;
+    options.inputPaths        = QStringList{ fileInfo.absoluteFilePath() };
+    startPostingJob(new PostingJob(this, options));
+}
+
+PostingJobOptions NgPost::_baseJobOptions() const
+{
+    PostingJobOptions opt;
+    opt.grpList           = getPostingGroups();
+    opt.from              = from();
+    opt.obfuscateArticles = _obfuscateArticles;
+    opt.obfuscateFileName = _obfuscateFileName;
+    opt.tmpPath           = _tmpPath;
+    opt.rarPath           = _rarPath;
+    opt.rarArgs           = _rarArgs;
+    opt.rarSize           = _rarSize;
+    opt.useRarMax         = _useRarMax;
+    opt.par2Pct           = _par2Pct;
+    opt.doCompress        = _doCompress;
+    opt.doPar2            = _doPar2;
+    opt.rarName           = _rarName;
+    opt.rarPass           = _rarPass;
+    opt.keepRar           = _keepRar;
+    opt.delFilesAfterPost = _delAuto;
+    opt.overwriteNzb      = false;
+    for (auto it = _meta.cbegin(); it != _meta.cend(); ++it)
+        opt.meta.insert(it.key(), MetaValue(it.value(), MetaScope::Nzb));
+    return opt;
 }
 
 QFileInfo NgPost::_autoSiblingNfo(const QFileInfo &fileInfo) const
@@ -2601,8 +2519,13 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
 
     QList<QFileInfo> filesToUpload;
     QStringList filesPath;
+    // The raw -i values, before a folder is expanded into its files: this is
+    // what the user actually asked to post, and the only thing that can feed
+    // __sourcePath__ or protect a source file from being overwritten.
+    QStringList rawInputPaths;
     for (const QString &filePath : parser.values(sOptionNames[Opt::INPUT]))
     {
+        rawInputPaths << QFileInfo(filePath).absoluteFilePath();
         QFileInfo fileInfo(filePath);
         if (!fileInfo.exists() || !fileInfo.isReadable())
         {
@@ -2699,13 +2622,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         QString nzbFilePath = nzbPath();
         if (!nzbFilePath.endsWith(".nzb"))
             nzbFilePath += ".nzb";
-        startPostingJob(new PostingJob(this, nzbFilePath, filesToUpload, nullptr,
-                                       getPostingGroups(), from(),
-                                       _obfuscateArticles, _obfuscateFileName,
-                                       _tmpPath, _rarPath, _rarArgs,
-                                       _rarSize, _useRarMax, _par2Pct,
-                                       _doCompress, _doPar2, _rarName, _rarPass,
-                                       _keepRar, _delAuto, false));
+        PostingJobOptions options = _baseJobOptions();
+        options.nzbFilePath       = nzbFilePath;
+        options.files             = filesToUpload;
+        options.inputPaths        = rawInputPaths;
+        startPostingJob(new PostingJob(this, options));
     }
 
     if (_autoDirs.size())

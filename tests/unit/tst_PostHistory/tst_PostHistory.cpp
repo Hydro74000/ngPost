@@ -40,6 +40,15 @@ private slots:
     void list_posts_applies_filters_before_pagination();
     void service_flushes_batches_and_returns_snapshots();
     void service_snapshot_paginates_history_but_stats_are_complete();
+    //! A resume must not rebuild the archive: doCompress and doPar2 are orders,
+    //! and the rar/par2 volumes are already on disk. What the original post did
+    //! is carried as facts instead.
+    void resume_options_never_replay_compression_or_par2();
+
+    //! The obfuscation of the original post is replayed from the history, not
+    //! taken from the globals, which may have changed since.
+    void resume_options_take_obfuscation_from_history();
+
     void nzb_regeneration_keeps_prior_files_after_resume();
     void nzb_regeneration_repairs_missing_article_bytes();
     void nzb_regeneration_masks_password_by_default();
@@ -794,6 +803,75 @@ void TestPostHistory::service_snapshot_paginates_history_but_stats_are_complete(
     }
     QVERIFY(foundStatsGroup);
     QCOMPARE(stats.topPosts.size(), 20);
+}
+
+void TestPostHistory::resume_options_never_replay_compression_or_par2()
+{
+    PostHistoryStore::PostDetails details;
+    details.post.id = 12;
+    details.rarName = QStringLiteral("obfuscated");
+    details.rarPass = QStringLiteral("s3cr3t");
+    details.doCompress = true; // the original post did compress...
+    details.doPar2 = true;     // ...and did generate par2
+
+    // globals currently ask for compression and par2
+    PostingJobOptions base;
+    base.doCompress = true;
+    base.doPar2 = true;
+    base.par2Pct = 15;
+    base.delFilesAfterPost = true;
+
+    ResumePlanner::JobPlan plan;
+    const PostingJobOptions resumed = ResumePlanner::jobOptions(
+        base, details, QStringLiteral("/tmp/out.nzb"), QList<QString>(), plan, std::string("me@x.y"));
+
+    // orders are off: rar and par2 must not run again on the leftovers
+    QVERIFY(!resumed.doCompress);
+    QVERIFY(!resumed.doPar2);
+    // and the sources of a resumed post are never deleted
+    QVERIFY(!resumed.delFilesAfterPost);
+
+    // but what the original post did is kept, as a fact
+    QVERIFY(resumed.originalDidCompress);
+    QVERIFY(resumed.originalDidPar2);
+    QCOMPARE(resumed.resumeHistoryPostId, static_cast<qint64>(12));
+    QCOMPARE(resumed.rarName, QStringLiteral("obfuscated"));
+}
+
+void TestPostHistory::resume_options_take_obfuscation_from_history()
+{
+    PostHistoryStore::PostDetails details;
+    details.post.id = 3;
+    details.obfuscateArticles = true;
+    details.obfuscateFileName = false;
+    details.from = QStringLiteral("original@poster.net");
+
+    PostingJobOptions base; // globals say the opposite of the original post
+    base.obfuscateArticles = false;
+    base.obfuscateFileName = true;
+
+    const PostingJobOptions resumed =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  QStringLiteral("/tmp/out.nzb"),
+                                  QList<QString>(),
+                                  ResumePlanner::JobPlan(),
+                                  std::string("fallback@x.y"));
+
+    QVERIFY(resumed.obfuscateArticles);
+    QVERIFY(!resumed.obfuscateFileName);
+    QCOMPARE(QString::fromStdString(resumed.from), QStringLiteral("original@poster.net"));
+
+    // no poster recorded: fall back on the current one rather than posting anonymously
+    details.from.clear();
+    const PostingJobOptions fallback =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  QStringLiteral("/tmp/out.nzb"),
+                                  QList<QString>(),
+                                  ResumePlanner::JobPlan(),
+                                  std::string("fallback@x.y"));
+    QCOMPARE(QString::fromStdString(fallback.from), QStringLiteral("fallback@x.y"));
 }
 
 void TestPostHistory::nzb_regeneration_keeps_prior_files_after_resume()

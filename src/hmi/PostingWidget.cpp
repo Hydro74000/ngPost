@@ -177,15 +177,18 @@ void PostingWidget::postFiles(bool updateMainParams)
 
         _postingFinished = false;
         _state = STATE::POSTING;
-        _postingJob = new PostingJob(_ngPost, nzbPath, files, this,
-                                     _ngPost->getPostingGroups(),
-                                     _ngPost->from(),
-                                     _ngPost->_obfuscateArticles, _ngPost->_obfuscateFileName,
-                                     _ngPost->_tmpPath, _ngPost->_rarPath, _ngPost->_rarArgs,
-                                     _ngPost->_rarSize, _ngPost->_useRarMax, _ngPost->_par2Pct,
-                                     _ngPost->_doCompress, _ngPost->_doPar2,
-                                     _ngPost->_rarName, _ngPost->_rarPass,
-                                     _ngPost->_keepRar);
+        PostingJobOptions options = _ngPost->_baseJobOptions();
+        options.nzbFilePath       = nzbPath;
+        options.files             = files;
+        // in the GUI the list holds exactly what the user dropped, folders included
+        options.inputPaths.reserve(files.size());
+        for (QFileInfo const &file : files)
+            options.inputPaths << file.absoluteFilePath();
+        // the GUI already asked about overwriting, and never deletes the sources
+        options.overwriteNzb      = true;
+        options.delFilesAfterPost = false;
+
+        _postingJob = new PostingJob(_ngPost, options, this);
 
         bool hasStarted = _ngPost->startPostingJob(_postingJob);
         if (_ngPost->lastPostingStartCanceled())

@@ -1485,6 +1485,10 @@ bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QStr
     details->rarPass = valueString(p, "rar_pass");
     details->passwordOrigin = valueString(p, "password_origin");
     details->from = valueString(p, "from_addr");
+    details->obfuscateArticles = valueBool(p, "obfuscate_articles");
+    details->obfuscateFileName = valueBool(p, "obfuscate_file_name");
+    details->doCompress = valueBool(p, "do_compress");
+    details->doPar2 = valueBool(p, "do_par2");
     p.finish();
 
     QSqlQuery f(db);

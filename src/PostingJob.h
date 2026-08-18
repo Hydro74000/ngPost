@@ -20,6 +20,7 @@
 
 #ifndef POSTINGJOB_H
 #define POSTINGJOB_H
+#include "PostingJobOptions.h"
 #include "utils/Macros.h"
 
 #include <QElapsedTimer>
@@ -60,16 +61,19 @@ class PostingJob : public QObject
     friend class NgPost;
 
 public:
-    struct ResumeFileState {
-        qint64 historyFileId = 0;
-        int ordinal = 0;
-        int totalFiles = 0;
-        QStringList groups;
-        QSet<uint> postedParts;
-    };
+    //! Kept as a nested name for the existing call sites; the definition lives
+    //! in PostingJobOptions.h so that the options can carry it.
+    using ResumeFileState = PostingJobResumeFileState;
 
 private:
     NgPost *const _ngPost; //!< handle on the application to access global configs
+
+    //! Frozen at construction: a job may wait in the queue while the global
+    //! settings change, and it must be posted with the settings it was queued
+    //! with. Also carries the facts (raw input paths, metadata, what the
+    //! original post did) that describe the job without driving it.
+    const PostingJobOptions _options;
+
     QFileInfoList _files;  //!< populated on constuction using a QStringList of paths
 
     PostingWidget *const _postWidget;
@@ -178,29 +182,8 @@ private:
 
 public:
     PostingJob(NgPost *ngPost,
-               const QString &nzbFilePath,
-               const QFileInfoList &files,
-               PostingWidget *postWidget,
-               const QList<QString> &grpList,
-               const std::string &from,
-               bool obfuscateArticles,
-               bool obfuscateFileName,
-               const QString &tmpPath,
-               const QString &rarPath,
-               const QString &rarArgs,
-               uint rarSize,
-               bool useRarMax,
-               uint par2Pct,
-               bool doCompress,
-               bool doPar2,
-               const QString &rarName,
-               const QString &rarPass,
-               bool keepRar = false,
-               bool delFilesAfterPost = false,
-               bool overwriteNzb = true,
-               qint64 resumeHistoryPostId = 0,
-               const QMap<QString, ResumeFileState> &resumeFileStatesByPath =
-                   QMap<QString, ResumeFileState>(),
+               const PostingJobOptions &options,
+               PostingWidget *postWidget = nullptr,
                QObject *parent = nullptr);
     ~PostingJob();
 

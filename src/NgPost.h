@@ -7,6 +7,7 @@
 
 #ifndef NGPOST_H
 #define NGPOST_H
+#include "PostingJobOptions.h"
 #include "utils/CmdOrGuiApp.h"
 #include "utils/Macros.h"
 
@@ -563,6 +564,11 @@ private:
 
     void _post(const QFileInfo &fileInfo, const QString &monitorFolder = "");
     void _finishPosting();
+
+    //! Snapshot of the current global settings, frozen into a new job so that a
+    //! queued post is sent with the settings it was queued with. Callers still
+    //! have to fill nzbFilePath, files and inputPaths.
+    PostingJobOptions _baseJobOptions() const;
 
     //!< auto-post nfo bundling (cf AUTO_INCLUDE_NFO):
     //!< return the sibling <completeBaseName>.nfo of a non-nfo file, or an invalid QFileInfo
