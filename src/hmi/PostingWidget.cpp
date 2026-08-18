@@ -20,12 +20,21 @@
 
 #include "PostingWidget.h"
 #include "ui_PostingWidget.h"
+#include "CheckBoxCenterWidget.h"
 #include "MainWindow.h"
 #include "NgPost.h"
 #include "PostingJob.h"
 #include "nntp/NntpFile.h"
 
+#include <QCheckBox>
 #include <QDebug>
+#include <QGroupBox>
+#include <QHeaderView>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QTableWidget>
+#include <QToolButton>
+#include <QVBoxLayout>
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QDir>
@@ -43,9 +52,15 @@ PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber) :
     _jobNumber(jobNumber),
     _postingJob(nullptr),
     _state(STATE::IDLE),
-    _postingFinished(false)
+    _postingFinished(false),
+    _metaBox(nullptr),
+    _metaToggle(nullptr),
+    _metaContent(nullptr),
+    _metaTable(nullptr),
+    _metaAddButton(nullptr)
 {
     _ui->setupUi(this);
+    _buildPostMetaBox();
 
     connect(_ui->postButton, &QAbstractButton::clicked, this, &PostingWidget::onPostFiles);
     connect(_ui->nzbPassCB,  &QAbstractButton::toggled, this, &PostingWidget::onNzbPassToggled);
@@ -187,6 +202,8 @@ void PostingWidget::postFiles(bool updateMainParams)
         // the GUI already asked about overwriting, and never deletes the sources
         options.overwriteNzb      = true;
         options.delFilesAfterPost = false;
+        // per post, deliberately not copied into the NgPost globals
+        options.meta = postMeta();
 
         _postingJob = new PostingJob(_ngPost, options, this);
 
@@ -542,9 +559,156 @@ void PostingWidget::udatePostingParams()
     _ngPost->_copyNfoWithNzb = _ui->copyNfoWithNzbCB->isChecked();
 }
 
+namespace
+{
+//! Deterministic object names, like the servers table does, so the GUI tests
+//! can reach the cells.
+QString metaObjectName(const char *role, int row)
+{
+    return QStringLiteral("%1_%2").arg(QLatin1String(role)).arg(row);
+}
+} // namespace
+
+void PostingWidget::_buildPostMetaBox()
+{
+    _metaBox = new QGroupBox(this);
+    QVBoxLayout *boxLayout = new QVBoxLayout(_metaBox);
+    boxLayout->setContentsMargins(6, 2, 6, 2);
+
+    // A checkable QGroupBox would only disable its children; folding means
+    // hiding them and letting the layout shrink back.
+    _metaToggle = new QToolButton(_metaBox);
+    _metaToggle->setObjectName(QStringLiteral("postMetaToggle"));
+    _metaToggle->setCheckable(true);
+    _metaToggle->setChecked(false);
+    _metaToggle->setAutoRaise(true);
+    _metaToggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    _metaToggle->setArrowType(Qt::RightArrow);
+    boxLayout->addWidget(_metaToggle);
+
+    _metaContent = new QWidget(_metaBox);
+    _metaContent->setObjectName(QStringLiteral("postMetaContent"));
+    QVBoxLayout *contentLayout = new QVBoxLayout(_metaContent);
+    contentLayout->setContentsMargins(0, 0, 0, 0);
+
+    _metaTable = new QTableWidget(_metaContent);
+    _metaTable->setObjectName(QStringLiteral("postMetaTable"));
+    _metaTable->setColumnCount(4);
+    _metaTable->verticalHeader()->hide();
+    _metaTable->setColumnWidth(2, 60);
+    _metaTable->setColumnWidth(3, 30);
+    _metaTable->horizontalHeader()->setStretchLastSection(false);
+    _metaTable->setMaximumHeight(140);
+    contentLayout->addWidget(_metaTable);
+
+    _metaAddButton = new QPushButton(_metaContent);
+    _metaAddButton->setObjectName(QStringLiteral("postMetaAddButton"));
+    contentLayout->addWidget(_metaAddButton, 0, Qt::AlignLeft);
+
+    boxLayout->addWidget(_metaContent);
+    _metaContent->setVisible(false);
+
+    connect(_metaToggle, &QToolButton::toggled, this, &PostingWidget::onTogglePostMeta);
+    connect(_metaAddButton, &QAbstractButton::clicked, this, &PostingWidget::onAddPostMetaRow);
+
+    // just above the post button, and robust to future edits of the .ui
+    _ui->verticalLayout->insertWidget(_ui->verticalLayout->count() - 1, _metaBox);
+    retranslatePostMetaTexts();
+}
+
+void PostingWidget::retranslatePostMetaTexts()
+{
+    if (!_metaBox)
+        return;
+    _metaBox->setTitle(tr("Post information (optional)"));
+    _metaToggle->setText(tr("Your own information about this post"));
+    _metaToggle->setToolTip(tr("Title, portal link, category... used by your post info file.\n"
+                               "Nothing is published in the nzb unless you tick the NZB box."));
+    _metaAddButton->setText(tr("Add"));
+    _metaTable->setHorizontalHeaderLabels(
+        QStringList{ tr("Name"), tr("Value"), tr("NZB"), QString() });
+}
+
+void PostingWidget::onTogglePostMeta(bool expanded)
+{
+    _metaContent->setVisible(expanded);
+    _metaToggle->setArrowType(expanded ? Qt::DownArrow : Qt::RightArrow);
+    if (expanded && _metaTable->rowCount() == 0)
+        onAddPostMetaRow();
+    _metaBox->adjustSize();
+}
+
+void PostingWidget::onAddPostMetaRow() { _addPostMetaRow(QString(), QString(), false); }
+
+void PostingWidget::_addPostMetaRow(const QString &key, const QString &value, bool publish)
+{
+    const int row = _metaTable->rowCount();
+    _metaTable->insertRow(row);
+
+    QLineEdit *keyEdit = new QLineEdit(key, _metaTable);
+    keyEdit->setObjectName(metaObjectName("postMetaKeyEdit", row));
+    keyEdit->setPlaceholderText(tr("titre"));
+    _metaTable->setCellWidget(row, 0, keyEdit);
+
+    QLineEdit *valueEdit = new QLineEdit(value, _metaTable);
+    valueEdit->setObjectName(metaObjectName("postMetaValueEdit", row));
+    _metaTable->setCellWidget(row, 1, valueEdit);
+
+    // unticked by default: an nzb circulates, so publishing is a choice
+    QCheckBox *publishCB = new QCheckBox(_metaTable);
+    publishCB->setObjectName(metaObjectName("postMetaNzbCB", row));
+    publishCB->setChecked(publish);
+    publishCB->setToolTip(tr("Publish this information in the nzb, which circulates.\n"
+                             "Leave it off to keep it in your post info file only."));
+    _metaTable->setCellWidget(row, 2, new CheckBoxCenterWidget(publishCB));
+
+    QPushButton *delButton = new QPushButton(QStringLiteral("X"), _metaTable);
+    delButton->setObjectName(metaObjectName("postMetaDelButton", row));
+    delButton->setMaximumWidth(30);
+    connect(delButton, &QAbstractButton::clicked, this, [this, delButton]() {
+        for (int i = 0; i < _metaTable->rowCount(); ++i) {
+            if (_metaTable->cellWidget(i, 3) == delButton) {
+                _metaTable->removeRow(i);
+                break;
+            }
+        }
+    });
+    _metaTable->setCellWidget(row, 3, delButton);
+}
+
+QMap<QString, MetaValue> PostingWidget::postMeta() const
+{
+    QMap<QString, MetaValue> meta;
+    if (!_metaTable)
+        return meta;
+
+    for (int row = 0; row < _metaTable->rowCount(); ++row) {
+        QLineEdit *keyEdit = qobject_cast<QLineEdit *>(_metaTable->cellWidget(row, 0));
+        QLineEdit *valueEdit = qobject_cast<QLineEdit *>(_metaTable->cellWidget(row, 1));
+        if (!keyEdit || !valueEdit)
+            continue;
+        const QString key = keyEdit->text().trimmed();
+        if (key.isEmpty())
+            continue; // an empty line is just an unused one
+        // "password" is a secret, it goes through the password field
+        if (key.compare(QStringLiteral("password"), Qt::CaseInsensitive) == 0)
+            continue;
+
+        bool publish = false;
+        if (QWidget *cell = _metaTable->cellWidget(row, 2)) {
+            if (QCheckBox *cb = cell->findChild<QCheckBox *>())
+                publish = cb->isChecked();
+        }
+        meta.insert(key, MetaValue(valueEdit->text(), publish ? MetaScope::Nzb : MetaScope::Local));
+    }
+    return meta;
+}
+
 void PostingWidget::retranslate()
 {
     _ui->retranslateUi(this);
+    // code built widgets are not touched by retranslateUi()
+    retranslatePostMetaTexts();
     _ui->rarMaxCB->setToolTip(tr("limit the number of archive volume to %1 (cf config RAR_MAX)").arg(_ngPost->_rarMax));
     _ui->redundancySB->setToolTip(tr("Using PAR2_ARGS from config file: %1").arg(_ngPost->_par2Args));
     _ui->filesList->setToolTip(QString("%1<ul><li>%2</li><li>%3</li><li>%4</li></ul>%5").arg(

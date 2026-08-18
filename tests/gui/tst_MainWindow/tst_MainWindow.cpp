@@ -18,6 +18,7 @@
 #include <QtTest>
 #include <QApplication>
 #include <QCheckBox>
+#include <QToolButton>
 #include <QFile>
 #include <QLabel>
 #include <QLineEdit>
@@ -61,6 +62,11 @@ private slots:
     //! Save Config must persist the active GUI tab's RAR_MAX checkbox and
     //! PAR2_PCT spinbox, even when PAR2_ARGS is present.
     void save_config_persists_rar_max_and_par2_pct();
+
+    //! The post metadata group really folds (children hidden), it does not
+    //! merely grey its children out the way a checkable QGroupBox does, and a
+    //! row exposes named widgets so a value can be typed and read back.
+    void post_meta_table_folds_and_exposes_named_widgets();
 
     //! Regression test for the reported bug: filling in a newly-added
     //! server row and leaving the fields (editingFinished) must persist to
@@ -115,6 +121,61 @@ void TestMainWindow::add_server_row_creates_named_widgets()
     auto *portEdit = window.findChild<QLineEdit*>(QStringLiteral("serverPortEdit_0"));
     QVERIFY(portEdit);
     QCOMPARE(portEdit->text(), QStringLiteral("563"));
+}
+
+void TestMainWindow::post_meta_table_folds_and_exposes_named_widgets()
+{
+    HomeSandbox sandbox;
+    {
+        QFile conf(PathHelper::configFilePath());
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "GROUPS = alt.binaries.test\n";
+    }
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QVERIFY(ngPost.parseDefaultConfig().isEmpty());
+
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY(window);
+    window->init(&ngPost);
+
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    QVERIFY(tabs);
+    QWidget *quickTab = tabs->widget(0);
+    QVERIFY(quickTab);
+
+    auto *content = quickTab->findChild<QWidget *>(QStringLiteral("postMetaContent"));
+    QVERIFY2(content, "post metadata section not found in the posting tab");
+    auto *toggle = quickTab->findChild<QToolButton *>(QStringLiteral("postMetaToggle"));
+    QVERIFY(toggle);
+
+    // folded by default: it must not eat vertical space of the posting tab
+    QVERIFY(content->isHidden());
+
+    toggle->setChecked(true);
+    QVERIFY(!content->isHidden());
+
+    auto *table = quickTab->findChild<QTableWidget *>(QStringLiteral("postMetaTable"));
+    QVERIFY(table);
+    QCOMPARE(table->rowCount(), 1); // unfolding offers a first empty row
+
+    for (const char *name : { "postMetaKeyEdit_0", "postMetaValueEdit_0",
+                              "postMetaNzbCB_0", "postMetaDelButton_0" }) {
+        QVERIFY2(quickTab->findChild<QWidget *>(QString::fromLatin1(name)),
+                 qPrintable(QStringLiteral("widget not found: %1").arg(QString::fromLatin1(name))));
+    }
+
+    // private by default: publishing in the nzb is an explicit choice
+    auto *nzbCB = quickTab->findChild<QCheckBox *>(QStringLiteral("postMetaNzbCB_0"));
+    QVERIFY(nzbCB);
+    QVERIFY(!nzbCB->isChecked());
+
+    toggle->setChecked(false);
+    QVERIFY(content->isHidden());
 }
 
 void TestMainWindow::add_two_servers_yields_unique_object_names()
