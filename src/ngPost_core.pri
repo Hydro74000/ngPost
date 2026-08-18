@@ -97,6 +97,7 @@ SOURCES += \
         $$PWD/nntp/Nntp.cpp \
         $$PWD/nntp/NntpArticle.cpp \
         $$PWD/nntp/NntpFile.cpp \
+        $$PWD/postinfo/PostInfoTemplate.cpp \
         $$PWD/utils/CmdOrGuiApp.cpp \
         $$PWD/utils/PathHelper.cpp \
         $$PWD/utils/UpdateChecker.cpp \
@@ -127,6 +128,8 @@ HEADERS += \
     $$PWD/nntp/NntpArticle.h \
     $$PWD/nntp/NntpFile.h \
     $$PWD/nntp/NntpServerParams.h \
+    $$PWD/postinfo/PostInfoData.h \
+    $$PWD/postinfo/PostInfoTemplate.h \
     $$PWD/utils/CmdOrGuiApp.h \
     $$PWD/utils/Macros.h \
     $$PWD/utils/PathHelper.h \
