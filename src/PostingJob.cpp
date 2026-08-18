@@ -375,8 +375,18 @@ PostingJob::PostingJob(NgPost *ngPost,
         rec.doPar2 = _doPar2;
         rec.obfuscateArticles = _obfuscateArticles;
         rec.obfuscateFileName = _obfuscateFileName;
+
+        // Facts known right now. The size and the transfer time are not among
+        // them: the archive does not exist yet, and nothing has been sent.
+        PostHistoryStore::PostInfo info;
+        info.par2Pct      = _options.describedPar2Pct();
+        info.sourcePath   = _options.inputPaths.isEmpty() ? QString() : _options.inputPaths.first();
+        info.originalName = info.sourcePath.isEmpty() ? QString()
+                                                      : QFileInfo(info.sourcePath).fileName();
+        info.appVersion   = QString(APP_VERSION);
+
         QString err;
-        _historyPostId = history ? history->createPost(rec, &err) : 0;
+        _historyPostId = history ? history->createPost(rec, info, _options.meta, &err) : 0;
         if (!_historyPostId && _ngPost->debugMode())
             _error(tr("History: could not create post record: %1").arg(err));
     }
@@ -769,6 +779,10 @@ void PostingJob::_postFiles()
     // created: it may have waited in the queue, and been packed meanwhile.
     _timeStart.start();
     _startedAtWall = QDateTime::currentDateTime();
+    if (_historyPostId && _ngPost->historyService()) {
+        QString err;
+        _ngPost->historyService()->markPostStarted(_historyPostId, &err);
+    }
 
     //    QMutexLocker lock(&_secureArticles); // start the connections but they must wait _prepareArticles
 
@@ -1178,6 +1192,18 @@ void PostingJob::_initPosting()
         _postSizeBytes += static_cast<quint64>(QFileInfo(path).size());
     }
 
+    if (_historyPostId && _ngPost->historyService()) {
+        PostHistoryService *history = _ngPost->historyService();
+        QString err;
+        // The nzb may just have been renamed to <name>_1.nzb, after the history
+        // row was created with the original path.
+        if (_nzbFilePath != _options.nzbFilePath)
+            history->updatePostNzbPath(_historyPostId, _nzbFilePath, &err);
+        // Only the first attempt knows the size of the whole post: a resume
+        // only sees the leftovers, so this write is a no-op there.
+        history->setPostSizeIfUnset(_historyPostId, static_cast<qint64>(_postSizeBytes), &err);
+    }
+
     // initialize the NntpFiles (active objects)
     _filesToUpload.reserve(static_cast<int>(_nbFiles));
     uint fileNum = 0;
@@ -1294,6 +1320,12 @@ void PostingJob::_finishPosting()
                                                     static_cast<qint64>(_totalSize),
                                                     avgSpeed(),
                                                     &err);
+        // Added, not set: a resumed post transfers in several sittings.
+        if (_timeStart.isValid()) {
+            const qint64 activeMs = _timeStart.elapsed() - _pauseDuration;
+            if (activeMs > 0)
+                _ngPost->historyService()->addActiveSeconds(_historyPostId, activeMs / 1000, &err);
+        }
     }
 
     // 2.: close nzb file

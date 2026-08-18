@@ -72,6 +72,20 @@ public:
     bool cleanupInvalidResumePosts(QString *error = nullptr);
 
     qint64 createPost(const PostHistoryStore::PostRecord &record, QString *error = nullptr);
+    qint64 createPost(const PostHistoryStore::PostRecord &record,
+                      const PostHistoryStore::PostInfo &info,
+                      const QMap<QString, MetaValue> &meta,
+                      QString *error = nullptr);
+    bool markPostStarted(qint64 postId, QString *error = nullptr);
+    bool updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error = nullptr);
+    bool setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error = nullptr);
+    bool addActiveSeconds(qint64 postId, qint64 seconds, QString *error = nullptr);
+    bool setPostMeta(qint64 postId,
+                     const QMap<QString, MetaValue> &meta,
+                     QString *error = nullptr);
+    bool loadPostInfoRecord(qint64 postId,
+                            PostHistoryStore::PostInfoRecord *record,
+                            QString *error = nullptr);
     bool updatePostStatus(qint64 postId,
                           const QString &status,
                           int nbFiles,
