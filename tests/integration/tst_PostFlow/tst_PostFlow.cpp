@@ -158,6 +158,11 @@ private slots:
     //! Config values are split on the first '=' only: server passwords,
     //! NZB paths and RAR passwords may legally contain '='.
     void config_values_keep_equals();
+
+    //! End to end record sheet: the "taille post" written in it must be the
+    //! bytes of the archive and its parity, WITHOUT the .nfo copied next to
+    //! the rar volumes, and the private metadata must not reach the nzb.
+    void post_info_file_reports_archive_and_par2_size_only();
 };
 
 void TestPostFlow::initTestCase()
@@ -540,6 +545,129 @@ void TestPostFlow::config_values_keep_equals()
              qPrintable(QStringLiteral("RAR_PASS with '=' was not preserved in NZB:\n%1")
                             .arg(QString::fromUtf8(nzbContent))));
     QCOMPARE(mock.receivedArticles().size(), 1);
+}
+
+namespace
+{
+//! Deterministic stand-ins for rar and par2: CI has neither (and rar is not
+//! free software), yet the size contract of a record sheet is exactly what
+//! needs testing. Each writes files of a known size where ngPost expects them.
+bool writeFakeTool(const QString &path, const QString &script)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly))
+        return false;
+    f.write(script.toUtf8());
+    f.close();
+    return f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                            | QFileDevice::ExeOwner);
+}
+} // namespace
+
+void TestPostFlow::post_info_file_reports_archive_and_par2_size_only()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("the fake rar/par2 tools are shell scripts");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    const QString root = sandbox.rootPath();
+
+    // 120000 bytes of archive...
+    QVERIFY(writeFakeTool(root + "/fakerar",
+                          QStringLiteral("#!/bin/sh\n"
+                                         "for a in \"$@\"; do case \"$a\" in *.rar) t=\"$a\";; esac; done\n"
+                                         "head -c 120000 /dev/zero > \"$t\"\n"
+                                         "exit 0\n")));
+    // ...and 30000 bytes of parity
+    QVERIFY(writeFakeTool(root + "/fakepar2",
+                          QStringLiteral("#!/bin/sh\n"
+                                         "for a in \"$@\"; do case \"$a\" in *.par2) t=\"$a\";; esac; done\n"
+                                         "head -c 30000 /dev/zero > \"$t\"\n"
+                                         "exit 0\n")));
+
+    const QString inPath = root + QStringLiteral("/Movie.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write(QByteArray(5000, 'x'));
+    }
+    // the .nfo is posted too, but it is not part of the archive
+    const QString nfoPath = root + QStringLiteral("/Movie.nfo");
+    {
+        QFile nfo(nfoPath);
+        QVERIFY(nfo.open(QIODevice::WriteOnly));
+        nfo.write(QByteArray(7777, 'n'));
+    }
+
+    const QString tmplPath = root + QStringLiteral("/sheet.tpl");
+    {
+        QFile tmpl(tmplPath);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("taille post =__postSize__\n"
+                   "titre =__meta:titre__\n"
+                   "prive =__meta:portail1__\n");
+    }
+
+    const QString nzbDir = root + QStringLiteral("/nzb");
+    QVERIFY(QDir().mkpath(nzbDir));
+    const QString confPath = root + QStringLiteral("/ngPost.conf");
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "nzbPath = " << nzbDir << "\n"
+          << "TMP_DIR = " << root << "\n"
+          << "RAR_PATH = " << root << "/fakerar\n"
+          << "PAR2_PATH = " << root << "/fakepar2\n"
+          << "PAR2_PCT = 8\n"
+          << "PACK = compress,gen_par2\n"
+          << "KEEP_NFO_EXTENSION = true\n"
+          << "POST_INFO_TEMPLATE = " << tmplPath << "\n"
+          << "POST_INFO_OUTPUT = " << nzbDir << "/sheet.txt\n"
+          << "[server]\n"
+          << "host = 127.0.0.1\n"
+          << "port = " << mock.port() << "\n"
+          << "ssl = false\n"
+          << "connection = 1\n"
+          << "enabled = true\n"
+          << "nzbcheck = false\n";
+    }
+
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c", confPath, "-i", inPath, "-i", nfoPath,
+                                 "-g", "alt.binaries.test", "--quiet",
+                                 "--pack", // the config PACK line only defines the set
+                                 "--disp_progress", "none",
+                                 "--meta", QString::fromUtf8("titre=Mon \xC3\x89t\xC3\xA9"),
+                                 "--post_meta", "portail1=https://x.fr/f=326598.html" },
+                               sandbox.rootPath(), out);
+    QVERIFY2(code == 0, qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(code).arg(out)));
+
+    QFile sheet(nzbDir + QStringLiteral("/sheet.txt"));
+    QVERIFY2(sheet.open(QIODevice::ReadOnly), qPrintable(out));
+    const QString content = QString::fromUtf8(sheet.readAll());
+
+    // 120000 (rar) + 30000 (par2), and NOT the 7777 bytes of the copied .nfo
+    QVERIFY2(content.contains(QStringLiteral("taille post =150000")), qPrintable(content));
+    QVERIFY2(content.contains(QString::fromUtf8("titre =Mon \xC3\x89t\xC3\xA9")),
+             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("prive =https://x.fr/f=326598.html")),
+             qPrintable(content));
+
+    // the published metadata reaches the nzb, the private one never does
+    QDir dir(nzbDir);
+    const QStringList nzbs = dir.entryList(QStringList{ QStringLiteral("*.nzb") }, QDir::Files);
+    QCOMPARE(nzbs.size(), 1);
+    QFile nzb(dir.filePath(nzbs.first()));
+    QVERIFY(nzb.open(QIODevice::ReadOnly));
+    const QString nzbContent = QString::fromUtf8(nzb.readAll());
+    QVERIFY2(nzbContent.contains(QStringLiteral("<meta type=\"titre\">")), qPrintable(nzbContent));
+    QVERIFY2(!nzbContent.contains(QStringLiteral("326598")), "private metadata leaked into the nzb");
+#endif
 }
 
 QTEST_MAIN(TestPostFlow)
