@@ -15,6 +15,7 @@
 #include "history/PostHistoryService.h"
 #include "history/PostHistoryStore.h"
 #include "history/ResumePlanner.h"
+#include "postinfo/PostInfoTemplate.h"
 #include "utils/PathHelper.h"
 #include "utils/UpdateChecker.h"
 #include "vpn/VpnManager.h"
@@ -89,6 +90,9 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::HISTORY_STORE_PASSWORDS, "history_store_passwords"},
     {Opt::NZB_UPLOAD_URL, "nzb_upload_url"},
     {Opt::NZB_POST_CMD,   "nzb_post_cmd"},
+    {Opt::POST_INFO_TEMPLATE, "post_info_template"},
+    {Opt::POST_INFO_OUTPUT,   "post_info_output"},
+    {Opt::POST_INFO_ONLY_ON_SUCCESS, "post_info_only_on_success"},
     {Opt::NZB_RM_ACCENTS, "nzb_rm_accents"},
     {Opt::AUTO_CLOSE_TABS,"auto_close_tabs"},
     {Opt::KEEP_NFO_EXTENSION, "keep_nfo_extension"},
@@ -241,6 +245,8 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     {{"g", sOptionNames[Opt::GROUPS]},        tr("newsgroups where to post the files (coma separated without space)"), sOptionNames[Opt::GROUPS]},
     {{"m", sOptionNames[Opt::META]},          tr("extra meta data published in the nzb header (typically \"password=qwerty42\")"), sOptionNames[Opt::META]},
     {QStringList{sOptionNames[Opt::POST_META], "post-meta"}, tr("private meta data for the post info file, never published in the nzb (ex: \"titre=My Movie\")"), sOptionNames[Opt::POST_META]},
+    {QStringList{sOptionNames[Opt::POST_INFO_TEMPLATE], "post-info-template"}, tr("template file used to write a post info file next to the nzb"), sOptionNames[Opt::POST_INFO_TEMPLATE]},
+    {QStringList{sOptionNames[Opt::POST_INFO_OUTPUT], "post-info-output"}, tr("where to write the post info file (variables allowed)"), sOptionNames[Opt::POST_INFO_OUTPUT]},
     {{"f", sOptionNames[Opt::FROM]},          tr("poster email (random one if not provided)"), sOptionNames[Opt::FROM]},
     {{"a", sOptionNames[Opt::ARTICLE_SIZE]},  tr("article size (default one: %1)").arg(sDefaultArticleSize), sOptionNames[Opt::ARTICLE_SIZE]},
     {{"z", sOptionNames[Opt::MSG_ID]},        tr("msg id signature, after the @ (default one: %1)").arg(sDefaultMsgIdSignature), sOptionNames[Opt::MSG_ID]},
@@ -374,7 +380,10 @@ NgPost::NgPost(int &argc, char *argv[]):
     _autoIncludeNfo(false),
     _tryResumePostWhenConnectionLost(true),
     _waitDurationBeforeAutoResume(sDefaultResumeWaitInSec),
-    _nzbPostCmd(), _preparePacking(false),
+    _nzbPostCmd(), _postInfoTemplate(), _postInfoTemplateFromCli(false),
+    _postInfoOutput(NgPost::sDefaultPostInfoOutput), _postInfoOnlySuccess(true),
+    _loadedConfigDir(),
+    _preparePacking(false),
     _groupPolicy(GROUP_POLICY::ALL),
     _nzbCheck(nullptr), _quiet(false),
     _proxySocks5(QNetworkProxy::NoProxy), _proxyUrl(),
@@ -1534,6 +1543,21 @@ bool NgPost::splitMetaPair(const QString &keyValue, QString *key, QString *value
     return true;
 }
 
+QString NgPost::postInfoTemplatePath() const
+{
+    if (_postInfoTemplate.isEmpty())
+        return QString();
+
+    // Two bases, no ambiguous fallback: what the configuration file says is
+    // relative to the configuration, what the command line says is relative to
+    // where the user stands.
+    const QString baseDir = _postInfoTemplateFromCli
+                                ? QDir::currentPath()
+                                : (_loadedConfigDir.isEmpty() ? PathHelper::configDir()
+                                                              : _loadedConfigDir);
+    return PostInfoTemplate::resolveTemplatePath(_postInfoTemplate, baseDir);
+}
+
 bool NgPost::_addMeta(const QString &keyValue, MetaScope scope)
 {
     QString key, value;
@@ -2324,6 +2348,24 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         }
     }
 
+    if (parser.isSet(sOptionNames[Opt::POST_INFO_TEMPLATE]))
+    {
+        // From the command line a relative path is relative to where the user
+        // stands, not to the configuration folder.
+        _postInfoTemplate        = parser.value(sOptionNames[Opt::POST_INFO_TEMPLATE]);
+        _postInfoTemplateFromCli = true;
+    }
+    if (parser.isSet(sOptionNames[Opt::POST_INFO_OUTPUT]))
+    {
+        const QString val = parser.value(sOptionNames[Opt::POST_INFO_OUTPUT]);
+        if (val.trimmed().isEmpty())
+        {
+            _error(tr("Error: --post_info_output can't be empty"), ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+        _postInfoOutput = val;
+    }
+
     if (parser.isSet(sOptionNames[Opt::META]))
     {
         for (const QString &meta : parser.values(sOptionNames[Opt::META]))
@@ -2752,6 +2794,8 @@ QString NgPost::_parseConfig(const QString &configPath)
     QFileInfo fileInfo(configPath);
     if (!fileInfo.exists() || !fileInfo.isFile() || !fileInfo.isReadable())
         err = tr("The config file '%1' is not readable...").arg(configPath);
+    else
+        _loadedConfigDir = fileInfo.absolutePath();
 
     // CRITICAL: while we are LOADING a config, the VpnManager setters
     // (setConfigPath / setAutoConnect / setBackend) would emit configChanged,
@@ -3117,6 +3161,21 @@ QString NgPost::_parseConfig(const QString &configPath)
 
                     else if (opt == sOptionNames[Opt::NZB_POST_CMD])
                         _nzbPostCmd << val;
+
+                    else if (opt == sOptionNames[Opt::POST_INFO_TEMPLATE])
+                    {
+                        _postInfoTemplate        = val;
+                        _postInfoTemplateFromCli = false;
+                    }
+                    else if (opt == sOptionNames[Opt::POST_INFO_OUTPUT])
+                    {
+                        if (val.trimmed().isEmpty())
+                            err += tr("POST_INFO_OUTPUT can't be empty\n");
+                        else
+                            _postInfoOutput = val;
+                    }
+                    else if (opt == sOptionNames[Opt::POST_INFO_ONLY_ON_SUCCESS])
+                        _postInfoOnlySuccess = (val.toLower() == "true");
 
                     else if (opt == sOptionNames[Opt::INPUT_DIR])
                         _inputDir = val;
@@ -3759,17 +3818,15 @@ void NgPost::saveConfig()
                << "\n"
                << tr("## execute a command or script at the end of each post (see examples)") << "\n"
                << tr("## you can use several post commands by defining several NZB_POST_CMD") << "\n"
-               << tr("## here is the list of the available placeholders") << "\n"
-    		   << "##   "<< sPostCmdPlaceHolders[PostCmdPlaceHolders::originalPath] << "    : " << tr("full path of the source file") << "\n"
-               << "##   "<< sPostCmdPlaceHolders[PostCmdPlaceHolders::nzbPath] <<"          : " << tr("full path of the written nzb file") << "\n"
-               << "##   "<< sPostCmdPlaceHolders[PostCmdPlaceHolders::nzbName] <<"          : " << tr("name of the nzb without the extension (original source name)") << "\n"
-               << "##   "<< sPostCmdPlaceHolders[PostCmdPlaceHolders::rarName] <<"          : " << tr("name of the archive files (in case of obfuscation)") << "\n"
-               << "##   "<< sPostCmdPlaceHolders[PostCmdPlaceHolders::rarPass] <<"          : " << tr("archive password") << "\n"
-               << "##   "<< sPostCmdPlaceHolders[PostCmdPlaceHolders::sizeInByte] <<"       : " << tr("size of the post (before yEnc encoding)") << "\n"
-               << "##   "<< sPostCmdPlaceHolders[PostCmdPlaceHolders::groups] <<"           : " << tr("list of groups (comma separated)") << "\n"
-               << "##   "<< sPostCmdPlaceHolders[PostCmdPlaceHolders::nbFiles] <<"          : " << tr("number of files in the post") << "\n"
-               << "##   "<< sPostCmdPlaceHolders[PostCmdPlaceHolders::nbArticles] <<"       : " << tr("number of Articles") << "\n"
-               << "##   "<< sPostCmdPlaceHolders[PostCmdPlaceHolders::nbArticlesFailed] <<" : " << tr("number of Articles that failed to be posted") << "\n"
+               << tr("## here is the list of the available variables") << "\n"
+               << "" ;
+        for (PostInfoTemplate::FieldDoc const &field : PostInfoTemplate::fields())
+            stream << "##   " << QString::fromLatin1(field.placeholder).leftJustified(22)
+                   << ": " << tr(field.description) << "\n";
+        stream << "##   " << QString(QStringLiteral("__date:<format>__")).leftJustified(22)
+               << ": " << tr("date of the post, ex: __date:dd/MM/yyyy__") << "\n"
+               << "##   " << QString(QStringLiteral("__meta:<name>__")).leftJustified(22)
+               << ": " << tr("one of your own metadata (--meta / --post_meta)") << "\n"
                << "#\n"
                << "#NZB_POST_CMD = scp \"__nzbPath__\" myBox.com:~/nzbs/\n"
                << "#NZB_POST_CMD = zip \"__nzbPath__.zip\" \"__nzbPath__\"\n"
@@ -3781,6 +3838,25 @@ void NgPost::saveConfig()
         for (const QString &nzbPostCmd : _nzbPostCmd)
             stream << "NZB_POST_CMD = " << nzbPostCmd << "\n";
         stream << "\n"
+               << "\n"
+               << tr("## write a post info file next to the nzb after each post") << "\n"
+               << tr("## you give the model, ngPost fills in the blanks: it knows no index format") << "\n"
+               << tr("## the model can live anywhere you can read, the file anywhere you can write") << "\n"
+               << tr("## a relative path is understood from the configuration folder") << "\n"
+               << "#POST_INFO_TEMPLATE = my_record_sheet.txt\n"
+               << (_postInfoTemplate.isEmpty()
+                       ? QString()
+                       : QString("POST_INFO_TEMPLATE = %1\n").arg(_postInfoTemplate))
+               << "\n"
+               << tr("## where to write it (the variables above work here too)") << "\n"
+               << (_postInfoOutput == QString(sDefaultPostInfoOutput) ? "#" : "")
+               << "POST_INFO_OUTPUT = " << _postInfoOutput << "\n"
+               << "\n"
+               << tr("## by default no post info file is written for a failed or partial post,") << "\n"
+               << tr("## which is what you want when an index imports them automatically") << "\n"
+               << (_postInfoOnlySuccess ? "#" : "") << "POST_INFO_ONLY_ON_SUCCESS = "
+               << (_postInfoOnlySuccess ? "true" : "false") << "\n"
+               << "\n"
                << tr("## nzb files are normally all created in nzbPath") << "\n"
                << tr("## but using this option, the nzb of each monitoring folder will be stored in their own folder (created in nzbPath)") << "\n"
                << (_monitor_nzb_folders  ? "" : "#") << "MONITOR_NZB_FOLDERS = true\n"

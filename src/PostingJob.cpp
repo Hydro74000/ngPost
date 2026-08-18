@@ -26,6 +26,7 @@
 #include "nntp/NntpArticle.h"
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
+#include "postinfo/PostInfoTemplate.h"
 #ifdef __USE_HMI__
 #include "hmi/PostingWidget.h"
 #endif
@@ -985,6 +986,11 @@ void PostingJob::_error(const QString &error) const
     emit _ngPost->error(error);
 }
 
+void PostingJob::_warn(const QString &warning) const
+{
+    emit _ngPost->log(tr("Warning: %1").arg(warning), true);
+}
+
 int PostingJob::_createNntpConnections()
 {
     _nbConnections = 0;
@@ -1404,11 +1410,132 @@ void PostingJob::_closeNzb()
                 for (const QString &warning : warnings)
                     _error(tr("NZB history warning: %1").arg(warning));
             }
+            // Written before the post commands so a script can pick it up with
+            // __postInfoPath__, and only when an nzb exists: a post info file
+            // without its nzb would describe nothing.
+            _writePostInfoFile();
             _ngPost->doNzbPostCMD(this);
         }
         delete _nzb;
         _nzb = nullptr;
     }
+}
+
+PostInfoData PostingJob::_livePostInfoData() const
+{
+    PostInfoData data;
+    data.originalPath = _originalDirectory;
+    data.sourcePath   = sourcePath();
+    data.originalName = sourceName();
+
+    const QFileInfo nzbFi(_nzbFilePath);
+    data.nzbPath     = _nzbFilePath;
+    data.nzbDir      = nzbFi.absolutePath();
+    data.nzbName     = nzbFi.completeBaseName();
+    data.nzbFileName = nzbFi.fileName();
+
+    data.rarName = _rarName;
+    data.rarPass = _rarPass.isEmpty() ? _options.declaredPassword : _rarPass;
+    data.groups  = groups();
+    // the poster declared in the nzb; under article obfuscation the real From:
+    // of each article is random and differs from this one
+    data.nzbPoster = nzbPoster();
+    data.status    = _postFinished
+                         ? (hasPostFinishedSuccessfully() ? QStringLiteral("success")
+                                                          : QStringLiteral("partial"))
+                         : QStringLiteral("failed");
+    data.avgSpeed   = avgSpeed();
+    data.appVersion = QString(APP_VERSION);
+
+    data.postSizeBytes    = _postSizeBytes;
+    data.legacySizeBytes  = _totalSize;
+    data.par2Pct          = _options.describedPar2Pct();
+    data.nbFiles          = _nbFiles;
+    data.nbArticles       = _nbArticlesTotal;
+    data.nbArticlesFailed = _nbArticlesFailed;
+    data.nbArticlesPosted = _nbArticlesUploaded > _nbArticlesFailed
+                                ? _nbArticlesUploaded - _nbArticlesFailed
+                                : 0;
+    data.durationSec = _timeStart.isValid() ? (_timeStart.elapsed() - _pauseDuration) / 1000 : 0;
+    data.historyPostId = _historyPostId;
+
+    data.startedAt  = _startedAtWall;
+    data.finishedAt = _finishedAtWall.isValid() ? _finishedAtWall : QDateTime::currentDateTime();
+
+    data.meta       = _options.meta;
+    data.inputPaths = _options.inputPaths;
+    return data;
+}
+
+void PostingJob::_writePostInfoFile()
+{
+    if (_ngPost->_postInfoTemplate.isEmpty())
+        return; // feature off: nothing written, nothing said
+
+    if (_ngPost->_postInfoOnlySuccess && !hasPostFinishedSuccessfully()) {
+        if (_ngPost->debugMode())
+            _log(tr("Post info: skipped, the post did not fully succeed "
+                    "(POST_INFO_ONLY_ON_SUCCESS)"));
+        return;
+    }
+
+    PostInfoData data = _livePostInfoData();
+
+    // The history holds the consolidated counters, and for a resume it is the
+    // only place that knows the whole post rather than the leftovers. The live
+    // job stays authoritative for the final nzb path and for a password that
+    // HISTORY_STORE_PASSWORDS chose not to keep.
+    if (_historyPostId && _ngPost->historyService()) {
+        PostHistoryStore::PostInfoRecord record;
+        QString err;
+        if (_ngPost->historyService()->loadPostInfoRecord(_historyPostId, &record, &err)) {
+            PostInfoData fromHistory = record.toPostInfoData();
+            fromHistory.nzbPath      = data.nzbPath;
+            fromHistory.nzbDir       = data.nzbDir;
+            fromHistory.nzbName      = data.nzbName;
+            fromHistory.nzbFileName  = data.nzbFileName;
+            fromHistory.originalPath = data.originalPath;
+            fromHistory.legacySizeBytes = data.legacySizeBytes;
+            fromHistory.inputPaths      = data.inputPaths;
+            if (fromHistory.rarPass.isEmpty())
+                fromHistory.rarPass = data.rarPass;
+            if (fromHistory.meta.isEmpty())
+                fromHistory.meta = data.meta;
+            data = fromHistory;
+        } else if (_resumeFromHistory) {
+            // A resumed job only holds the leftovers: describing them as if
+            // they were the whole post would be a lie, so write nothing.
+            _warn(tr("Post info: could not read the history of post %1 (%2); no post info file "
+                     "was written, because a resumed post cannot be described without it.")
+                      .arg(_historyPostId)
+                      .arg(err));
+            return;
+        } else {
+            _warn(tr("Post info: could not read the history (%1); falling back on what this "
+                     "post knows.")
+                      .arg(err));
+        }
+    }
+
+    QStringList protectedPaths = _options.inputPaths;
+    protectedPaths << _nzbFilePath;
+
+    const QString templatePath = _ngPost->postInfoTemplatePath();
+    protectedPaths << templatePath;
+
+    const PostInfoTemplate::Result result = PostInfoTemplate::renderToFile(
+        templatePath, _ngPost->_postInfoOutput, data, protectedPaths);
+
+    for (const QString &warning : result.warnings)
+        _warn(tr("Post info: %1").arg(warning));
+
+    if (!result.ok) {
+        _warn(tr("Post info: %1").arg(result.error));
+        return;
+    }
+
+    _postInfoFilePath = result.outPath;
+    _log(tr("Post info file written: %1").arg(result.outPath));
 }
 
 void PostingJob::_printStats() const

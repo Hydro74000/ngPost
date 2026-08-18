@@ -160,6 +160,7 @@ private:
     const QFileInfoList _originalFiles;
 
     QString _nfoSrcToCopy; //!< absolute path of the .nfo to copy next to the nzb (resolved at job start, copied on success)
+    QString _postInfoFilePath; //!< post info file once written, empty otherwise
 
     QMutex _secureDiskAccess;
 
@@ -326,6 +327,17 @@ private slots:
 private:
     void _log(const QString &aMsg, bool newline = true) const; //!< log function for QString
     void _error(const QString &error) const;
+    //! Description of this post as the job itself knows it.
+    PostInfoData _livePostInfoData() const;
+    //! Writes the post info file if one was asked for. Never fails a post:
+    //! every problem is reported as a warning.
+    void _writePostInfoFile();
+
+    //! Visible in the log, but does NOT mark the run as failed. _error() sets
+    //! COMPLETED_WITH_ERRORS, which would be wrong for something that did not
+    //! harm the post itself, such as a post info file that could not be
+    //! written.
+    void _warn(const QString &warning) const;
 
     int _createNntpConnections();
     void _preparePostersArticles();

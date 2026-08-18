@@ -100,6 +100,9 @@ public:
         THREAD,
         NZB_UPLOAD_URL,
         NZB_POST_CMD,
+        POST_INFO_TEMPLATE,
+        POST_INFO_OUTPUT,
+        POST_INFO_ONLY_ON_SUCCESS,
         MONITOR_FOLDERS,
         MONITOR_EXT,
         MONITOR_IGNORE_DIR,
@@ -353,6 +356,19 @@ private:
     ushort _waitDurationBeforeAutoResume;
 
     QStringList _nzbPostCmd;
+    //! Path of the post info template. Empty means the feature is off: no
+    //! file, no message, nothing changes for whoever does not want it.
+    QString _postInfoTemplate;
+    //! True when _postInfoTemplate came from the command line, since a relative
+    //! path is then resolved against the current directory instead of the
+    //! folder of the configuration file.
+    bool _postInfoTemplateFromCli;
+    //! Folder of the configuration file actually loaded, which is where a
+    //! relative POST_INFO_TEMPLATE is looked up: "next to my conf" is what a
+    //! user means, even when the conf was given with -c.
+    QString _loadedConfigDir;
+    QString _postInfoOutput;
+    bool _postInfoOnlySuccess;
     bool _preparePacking;
 
     GROUP_POLICY _groupPolicy;
@@ -389,6 +405,9 @@ private:
     static const int sDefaultArticleSize = 716800;
     static constexpr const char *sDefaultSpace = "  ";
     static constexpr const char *sDefaultMsgIdSignature = "ngPost";
+    //! ".info.txt" and not ".txt": with nzbPath pointing at the source folder,
+    //! __nzbName__.txt could silently overwrite a source file.
+    static constexpr const char *sDefaultPostInfoOutput = "__nzbDir__/__nzbName__.info.txt";
 #if defined(WIN32) || defined(__MINGW64__)
     static constexpr const char *sDefaultNzbPath = ""; //!< local folder
     static constexpr const char *sDefaultConfig = "ngPost.conf";
@@ -508,6 +527,11 @@ public:
     //! itself hold '=' signs (URLs usually do). Returns false when there is no
     //! separator or no name.
     static bool splitMetaPair(const QString &keyValue, QString *key, QString *value);
+
+    //! Absolute path of the post info template, empty when the feature is off.
+    //! A relative path is understood from the configuration folder, or from the
+    //! current directory when it was given on the command line.
+    QString postInfoTemplatePath() const;
 
     inline std::string from() const;
 
