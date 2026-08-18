@@ -234,6 +234,10 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _part(0)
     , _timeStart()
     , _totalSize(0)
+    , _postSizeBytes(0)
+    , _copiedNfoPaths()
+    , _startedAtWall()
+    , _finishedAtWall()
     , _pauseTimer()
     , _pauseDuration(0)
     ,
@@ -676,9 +680,12 @@ void PostingJob::_postFiles()
                     ? QString("%1.nfo").arg(_rarName)
                     : QString("%1_%2.nfo").arg(_rarName).arg(nfoCount);
             QString destPath = _compressDir->filePath(destName);
-            if (QFile::copy(srcPath, destPath))
+            if (QFile::copy(srcPath, destPath)) {
+                // remembered, not guessed from the extension later: this is what
+                // keeps __postSize__ on "rar + par2" only
+                _copiedNfoPaths.insert(QFileInfo(destPath).absoluteFilePath());
                 ++nfoCount;
-            else
+            } else
                 _error(tr("Couldn't copy nfo %1 to %2").arg(srcPath, destPath));
         }
     }
@@ -758,7 +765,10 @@ void PostingJob::_postFiles()
         _nzbStream << MB_FLUSH;
     }
 
+    // The transfer really starts here, which can be long after the job was
+    // created: it may have waited in the queue, and been packed meanwhile.
     _timeStart.start();
+    _startedAtWall = QDateTime::currentDateTime();
 
     //    QMutexLocker lock(&_secureArticles); // start the connections but they must wait _prepareArticles
 
@@ -1156,6 +1166,18 @@ void PostingJob::_initPosting()
     _nzb = new QFile(_nzbFilePath);
     _nbFiles = static_cast<uint>(_files.size());
 
+    // Size of what is really posted, known here because _files is now the final
+    // upload list (rar + par2, or the sources + par2 without compression). The
+    // QFileInfo entries carry a cached stat and the rar/par2 volumes were just
+    // written by an external process, so ask the filesystem again.
+    _postSizeBytes = 0;
+    for (QFileInfo const &file : _files) {
+        QString const path = file.absoluteFilePath();
+        if (_copiedNfoPaths.contains(path))
+            continue; // posted, but not part of the archive
+        _postSizeBytes += static_cast<quint64>(QFileInfo(path).size());
+    }
+
     // initialize the NntpFiles (active objects)
     _filesToUpload.reserve(static_cast<int>(_nbFiles));
     uint fileNum = 0;
@@ -1220,6 +1242,13 @@ void PostingJob::_finishPosting()
 #ifdef __DEBUG__
     qDebug() << "[MB_TRACE][PostingJob::_finishPosting]";
 #endif
+    // Finalising twice would count the transfer duration twice and rewrite the
+    // final status; several paths can reach here (last file posted, read error
+    // on the last file, connection lost, user stop).
+    if (_finishedAtWall.isValid())
+        return;
+    _finishedAtWall = QDateTime::currentDateTime();
+
     _stopPosting = 0x1;
 
     if (_timeStart.isValid() && _postFinished) {
@@ -1252,7 +1281,8 @@ void PostingJob::_finishPosting()
     if (_historyPostId && _ngPost->historyService()) {
         QString status;
         if (_postFinished)
-            status = _nbArticlesFailed ? QStringLiteral("partial") : QStringLiteral("success");
+            status = hasPostFinishedSuccessfully() ? QStringLiteral("success")
+                                                   : QStringLiteral("partial");
         else
             status = QStringLiteral("failed");
         QString err;

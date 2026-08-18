@@ -161,6 +161,10 @@ private slots:
     void multipar_default_args_use_only_slash_switches();
     //! GUI PAR2_PCT must override PAR2_ARGS redundancy for MultiPar (/rr) too.
     void par2_args_redundancy_override_for_multipar();
+
+    //! A file that could not be read makes the post partial, not successful:
+    //! such a file never produces a failed article, it is simply set aside.
+    void unreadable_file_makes_the_post_not_successful();
 };
 
 void TestCliParser::initTestCase()
@@ -455,6 +459,19 @@ void TestCliParser::par2_args_redundancy_override_for_multipar()
         QStringLiteral("/rr12"),
         QStringLiteral("/lc4"),
     }));
+}
+
+void TestCliParser::unreadable_file_makes_the_post_not_successful()
+{
+    // every article went through and nothing was set aside
+    QVERIFY(PostingJob::postSucceeded(true, 0, false));
+
+    // a whole file could not be read: no article failed, yet the post is not complete
+    QVERIFY(!PostingJob::postSucceeded(true, 0, true));
+
+    // the usual failure modes still count
+    QVERIFY(!PostingJob::postSucceeded(true, 3, false));
+    QVERIFY(!PostingJob::postSucceeded(false, 0, false));
 }
 
 QTEST_MAIN(TestCliParser)
