@@ -92,6 +92,7 @@ SOURCES += \
         $$PWD/NntpCheckCon.cpp \
         $$PWD/NntpConnection.cpp \
         $$PWD/NzbCheck.cpp \
+        $$PWD/PostCmdRunner.cpp \
         $$PWD/Poster.cpp \
         $$PWD/PostingJob.cpp \
         $$PWD/nntp/Nntp.cpp \
@@ -122,6 +123,7 @@ HEADERS += \
     $$PWD/NntpCheckCon.h \
     $$PWD/NntpConnection.h \
     $$PWD/NzbCheck.h \
+    $$PWD/PostCmdRunner.h \
     $$PWD/Poster.h \
     $$PWD/PostingJob.h \
     $$PWD/nntp/Nntp.h \

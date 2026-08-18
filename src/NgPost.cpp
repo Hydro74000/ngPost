@@ -6,6 +6,7 @@
 
 
 #include "NgPost.h"
+#include "PostCmdRunner.h"
 #include "PostingJob.h"
 #include "FoldersMonitorForNewFiles.h"
 #include "nntp/NntpArticle.h"
@@ -93,6 +94,10 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::POST_INFO_TEMPLATE, "post_info_template"},
     {Opt::POST_INFO_OUTPUT,   "post_info_output"},
     {Opt::POST_INFO_ONLY_ON_SUCCESS, "post_info_only_on_success"},
+    {Opt::POST_CMD_TIMEOUT,     "post_cmd_timeout"},
+    {Opt::POST_CMD_FAIL_IS_ERROR, "post_cmd_fail_is_error"},
+    {Opt::POST_CMD_EXPOSE_PASSWORD, "post_cmd_expose_password"},
+    {Opt::NZB_UPLOAD_TIMEOUT,   "nzb_upload_timeout"},
     {Opt::NZB_RM_ACCENTS, "nzb_rm_accents"},
     {Opt::AUTO_CLOSE_TABS,"auto_close_tabs"},
     {Opt::KEEP_NFO_EXTENSION, "keep_nfo_extension"},
@@ -296,19 +301,6 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::VPN_PROFILE],         tr("select the active VPN profile by name (must already exist in the config)"), sOptionNames[Opt::VPN_PROFILE]},
 };
 
-const QMap<NgPost::PostCmdPlaceHolders, QString> NgPost::sPostCmdPlaceHolders = {
-	{PostCmdPlaceHolders::originalPath,     "__originalPath__"},
-    {PostCmdPlaceHolders::nzbPath,          "__nzbPath__"},
-    {PostCmdPlaceHolders::nzbName,          "__nzbName__"},
-    {PostCmdPlaceHolders::rarName,          "__rarName__"},
-    {PostCmdPlaceHolders::rarPass,          "__rarPass__"},
-    {PostCmdPlaceHolders::nbArticles,       "__nbArticles__"},
-    {PostCmdPlaceHolders::nbArticlesFailed, "__nbArticlesFailed__"},
-    {PostCmdPlaceHolders::sizeInByte,       "__sizeInByte__"},
-    {PostCmdPlaceHolders::nbFiles,          "__nbFiles__"},
-    {PostCmdPlaceHolders::groups,           "__groups__"}
-};
-
 const QMap<NgPost::GROUP_POLICY, QString> NgPost::sGroupPolicies = {
     {GROUP_POLICY::ALL,       "all"},
     {GROUP_POLICY::EACH_POST, "each_post"},
@@ -382,6 +374,9 @@ NgPost::NgPost(int &argc, char *argv[]):
     _waitDurationBeforeAutoResume(sDefaultResumeWaitInSec),
     _nzbPostCmd(), _postInfoTemplate(), _postInfoTemplateFromCli(false),
     _postInfoOutput(NgPost::sDefaultPostInfoOutput), _postInfoOnlySuccess(true),
+    _postCmdTimeoutSec(0), _postCmdFailIsError(false), _postCmdExposePassword(false),
+    _nzbUploadTimeoutSec(sDefaultNzbUploadTimeoutSec), _postCmdRunner(nullptr),
+    _waitingForPostCmds(false),
     _loadedConfigDir(),
     _preparePacking(false),
     _groupPolicy(GROUP_POLICY::ALL),
@@ -479,6 +474,21 @@ NgPost::NgPost(int &argc, char *argv[]):
     connect(this, &NgPost::error, this, &NgPost::onError, Qt::QueuedConnection);
 
     _updateChecker = new UpdateChecker(this, &_netMgr, this);
+
+    _postCmdRunner = new PostCmdRunner(_netMgr, this);
+    connect(_postCmdRunner,
+            &PostCmdRunner::log,
+            this,
+            [this](QString const &msg) { onLog(msg, true); },
+            Qt::QueuedConnection);
+    connect(_postCmdRunner, &PostCmdRunner::error, this, &NgPost::onError, Qt::QueuedConnection);
+    // The last post command of the last post is what finally releases the exit.
+    connect(_postCmdRunner,
+            &PostCmdRunner::idle,
+            this,
+            &NgPost::maybeFinishApplication,
+            Qt::QueuedConnection);
+
     _vpnManager    = new VpnManager(this);
     // Best-effort sweep of any stale VPN state from a previous crashed run.
     // No-op (and no prompt) if the VPN helper hasn't been installed yet.
@@ -1342,71 +1352,54 @@ bool NgPost::checkSupportSSL()
 
 void NgPost::doNzbPostCMD(PostingJob *job)
 {
-    // first NZB_UPLOAD_URL
-    if (_urlNzbUpload)
-    {
-        FileUploader *testUpload = new FileUploader(_netMgr, job->nzbFilePath());
-        connect(testUpload, &FileUploader::error,      this,       &NgPost::onError,      Qt::DirectConnection);
-        connect(testUpload, &FileUploader::log,        this,       &NgPost::onLog,        Qt::DirectConnection);
-        connect(testUpload, &FileUploader::readyToDie, testUpload, &QObject::deleteLater, Qt::QueuedConnection);
-        testUpload->startUpload(*_urlNzbUpload);
-    }
+    if (!_postCmdRunner)
+        return;
 
-    // second NZB_POST_CMD
-    if (!_nzbPostCmd.isEmpty())
-    {
-        for (const QString &nzbPostCmd : _nzbPostCmd)
-        {
-            QString fullCmd(nzbPostCmd);
-            fullCmd.replace("%1",                   job->nzbFilePath()); // for backwards compatibility
+    PostCmdRunner::Settings settings;
+    settings.cmdTimeoutSec    = _postCmdTimeoutSec;
+    settings.uploadTimeoutSec = _nzbUploadTimeoutSec;
+    settings.failIsError      = _postCmdFailIsError;
+    settings.exposeSecrets    = _postCmdExposePassword;
+    _postCmdRunner->setSettings(settings);
 
-            fullCmd.replace(sPostCmdPlaceHolders[PostCmdPlaceHolders::originalPath],
-#if defined( Q_OS_WIN )
-                QString(job->originalDirectory()).replace("/", "\\")
-#else
-                job->originalDirectory()
-#endif
-            );
+    // A copy of everything the commands may need: the job is deleted long
+    // before they are done.
+    _postCmdRunner->enqueue(job->postInfoData(),
+                            _nzbPostCmd,
+                            _urlNzbUpload ? *_urlNzbUpload : QUrl());
+}
 
-            fullCmd.replace(sPostCmdPlaceHolders[PostCmdPlaceHolders::nzbPath],
-        #if defined( Q_OS_WIN )
-                    QString(job->nzbFilePath()).replace("/", "\\")
-        #else
-                    job->nzbFilePath()
-        #endif
-                    );
-            fullCmd.replace(sPostCmdPlaceHolders[PostCmdPlaceHolders::nzbName],          QFileInfo(job->nzbFilePath()).completeBaseName());
-            fullCmd.replace(sPostCmdPlaceHolders[PostCmdPlaceHolders::rarName],          job->rarName());
-            fullCmd.replace(sPostCmdPlaceHolders[PostCmdPlaceHolders::rarPass],          job->rarPass());
-            fullCmd.replace(sPostCmdPlaceHolders[PostCmdPlaceHolders::nbArticles],       QString::number(job->nbArticlesTotal()));
-            fullCmd.replace(sPostCmdPlaceHolders[PostCmdPlaceHolders::nbArticlesFailed], QString::number(job->nbArticlesFailed()));
-            fullCmd.replace(sPostCmdPlaceHolders[PostCmdPlaceHolders::sizeInByte],       QString::number(job->_totalSize));
-            fullCmd.replace(sPostCmdPlaceHolders[PostCmdPlaceHolders::nbFiles],          QString::number(job->_nbFiles));
-            fullCmd.replace(sPostCmdPlaceHolders[PostCmdPlaceHolders::groups],           job->groups());
-#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
-            QStringList args = parseCombinedArgString(fullCmd);
-#else
-            QStringList args = QProcess::splitCommand(fullCmd);
-#endif
-            QString     cmd  = args.takeFirst();
-            qDebug() << "cmd: " << cmd << ", args: " << args;
-
-            QProcess* process = new QProcess(this);
-
-            connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), [=](int exitCode, QProcess::ExitStatus exitStatus) {
-                qDebug() << "Process finished with code:" << exitCode << "and status:" << exitStatus;
-                process->deleteLater();
-            });
-
-            process->start(cmd, args);
-
-            if (debugMode())
-                _log(tr("NZB Post cmd: %1").arg(fullCmd));
-            else
-                _log(fullCmd);
+//! The only place allowed to end the run. It waits for the posts, for the
+//! commands that follow them and for the nzb uploads, because quitting or
+//! powering off in the middle of those used to kill them silently.
+void NgPost::maybeFinishApplication()
+{
+    if (_activeJob || !_pendingJobs.isEmpty())
+        return;
+    if (_postCmdRunner && !_postCmdRunner->isIdle()) {
+        if (!_waitingForPostCmds) {
+            _waitingForPostCmds = true;
+            _log(tr("Waiting for the post commands to finish..."));
         }
+        return;
+    }
+    _waitingForPostCmds = false;
+
+    if (_doShutdownWhenDone && !_shutdownCmd.isEmpty()) {
+        _startShutdown();
+        return;
     }
 
+#ifdef __USE_HMI__
+    if (!_folderMonitor && !_hmi)
+#else
+    if (!_folderMonitor)
+#endif
+    {
+        if (debugFull())
+            _error(tr(" => closing application"));
+        QCoreApplication::quit();
+    }
 }
 
 bool NgPost::isPaused() const
@@ -1824,44 +1817,12 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
             else
                 emit _activeJob->startPosting(true);
         }
-        else if (_doShutdownWhenDone && !_shutdownCmd.isEmpty())
+        else
         {
-            //cf https://forum.qt.io/topic/111602/qprocess-signals-not-received-in-slots-except-in-debug-with-breakpoints/
-//            int exitCode = QProcess::execute("echo \\\"toto\\\" | /usr/bin/sudo -S /bin/ls -al");
-//            qDebug() << QString("Shutdown exit code: %1").arg(exitCode);
-            _shutdownProc = new QProcess();
-            connect(_shutdownProc, &QProcess::readyReadStandardOutput, this, &NgPost::onShutdownProcReadyReadStandardOutput, Qt::DirectConnection);
-            connect(_shutdownProc, &QProcess::readyReadStandardError,  this, &NgPost::onShutdownProcReadyReadStandardError,  Qt::DirectConnection);
-            connect(_shutdownProc, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this, &NgPost::onShutdownProcFinished, Qt::QueuedConnection);
-//            connect(_shutdownProc, &QProcess::started, this, &NgPost::onShutdownProcStarted, Qt::DirectConnection);
-//            connect(_shutdownProc, &QProcess::stateChanged,  this, &NgPost::onShutdownProcStateChanged,  Qt::DirectConnection);
-#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
-            connect(_shutdownProc, &QProcess::errorOccurred,  this, &NgPost::onShutdownProcError, Qt::DirectConnection);
-#endif
-//            _shutdownProc->start("/bin/ls", QStringList() << "-al");
-//            _shutdownProc->start("/usr/bin/sudo", QStringList() << "-n" << "/sbin/poweroff");
-
-//            qDebug() << " cmd: " << _shutdownCmd;
-
-//            QStringList args = _shutdownCmd.split(QRegularExpression("\\s+"));
-#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
-            QStringList args = parseCombinedArgString(_shutdownCmd);
-#else
-            QStringList args = QProcess::splitCommand(_shutdownCmd);
-#endif
-            QString     cmd  = args.takeFirst();
-            qDebug() << "cmd: " << cmd << ", args: " << args;
-            _shutdownProc->start(cmd, args);
-        }
-#ifdef __USE_HMI__
-        else if (!_folderMonitor && !_hmi)
-#else
-        else if (!_folderMonitor)
-#endif
-        {
-	    if( debugFull())
-                _error(tr(" => closing application"));
-            QCoreApplication::quit();
+            // Everything that had to be posted is out; the barrier decides
+            // when it is safe to quit or to power the machine off, because
+            // the post commands and the nzb uploads may still be running.
+            maybeFinishApplication();
         }
     }
     else if (_preparePacking && job ==_packingJob)
@@ -1880,6 +1841,36 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
         _pendingJobs.removeOne(job);
         job->deleteLater();
     }
+}
+
+void NgPost::_startShutdown()
+{
+    //cf https://forum.qt.io/topic/111602/qprocess-signals-not-received-in-slots-except-in-debug-with-breakpoints/
+//    int exitCode = QProcess::execute("echo \\\"toto\\\" | /usr/bin/sudo -S /bin/ls -al");
+//    qDebug() << QString("Shutdown exit code: %1").arg(exitCode);
+    _shutdownProc = new QProcess();
+    connect(_shutdownProc, &QProcess::readyReadStandardOutput, this, &NgPost::onShutdownProcReadyReadStandardOutput, Qt::DirectConnection);
+    connect(_shutdownProc, &QProcess::readyReadStandardError,  this, &NgPost::onShutdownProcReadyReadStandardError,  Qt::DirectConnection);
+    connect(_shutdownProc, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this, &NgPost::onShutdownProcFinished, Qt::QueuedConnection);
+//    connect(_shutdownProc, &QProcess::started, this, &NgPost::onShutdownProcStarted, Qt::DirectConnection);
+//    connect(_shutdownProc, &QProcess::stateChanged,  this, &NgPost::onShutdownProcStateChanged,  Qt::DirectConnection);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
+    connect(_shutdownProc, &QProcess::errorOccurred,  this, &NgPost::onShutdownProcError, Qt::DirectConnection);
+#endif
+//    _shutdownProc->start("/bin/ls", QStringList() << "-al");
+//    _shutdownProc->start("/usr/bin/sudo", QStringList() << "-n" << "/sbin/poweroff");
+
+//    qDebug() << " cmd: " << _shutdownCmd;
+
+//    QStringList args = _shutdownCmd.split(QRegularExpression("\\s+"));
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+    QStringList args = parseCombinedArgString(_shutdownCmd);
+#else
+    QStringList args = QProcess::splitCommand(_shutdownCmd);
+#endif
+    QString     cmd  = args.takeFirst();
+    qDebug() << "cmd: " << cmd << ", args: " << args;
+    _shutdownProc->start(cmd, args);
 }
 
 void NgPost::onShutdownProcReadyReadStandardOutput()
@@ -3176,6 +3167,28 @@ QString NgPost::_parseConfig(const QString &configPath)
                     }
                     else if (opt == sOptionNames[Opt::POST_INFO_ONLY_ON_SUCCESS])
                         _postInfoOnlySuccess = (val.toLower() == "true");
+                    else if (opt == sOptionNames[Opt::POST_CMD_TIMEOUT])
+                    {
+                        bool ok = false;
+                        int nb = val.toInt(&ok);
+                        if (ok && nb >= 0)
+                            _postCmdTimeoutSec = nb;
+                        else
+                            err += tr("POST_CMD_TIMEOUT must be a number of seconds (0 = no limit)\n");
+                    }
+                    else if (opt == sOptionNames[Opt::POST_CMD_FAIL_IS_ERROR])
+                        _postCmdFailIsError = (val.toLower() == "true");
+                    else if (opt == sOptionNames[Opt::POST_CMD_EXPOSE_PASSWORD])
+                        _postCmdExposePassword = (val.toLower() == "true");
+                    else if (opt == sOptionNames[Opt::NZB_UPLOAD_TIMEOUT])
+                    {
+                        bool ok = false;
+                        int nb = val.toInt(&ok);
+                        if (ok && nb >= 0)
+                            _nzbUploadTimeoutSec = nb;
+                        else
+                            err += tr("NZB_UPLOAD_TIMEOUT must be a number of seconds (0 = no limit)\n");
+                    }
 
                     else if (opt == sOptionNames[Opt::INPUT_DIR])
                         _inputDir = val;
@@ -3856,6 +3869,24 @@ void NgPost::saveConfig()
                << tr("## which is what you want when an index imports them automatically") << "\n"
                << (_postInfoOnlySuccess ? "#" : "") << "POST_INFO_ONLY_ON_SUCCESS = "
                << (_postInfoOnlySuccess ? "true" : "false") << "\n"
+               << "\n"
+               << tr("## kill a post command that hangs, in seconds (0 = wait forever)") << "\n"
+               << tr("## ngPost waits for its post commands before quitting, so a stuck one") << "\n"
+               << tr("## keeps it alive; Ctrl+C always interrupts") << "\n"
+               << (_postCmdTimeoutSec == 0 ? "#" : "") << "POST_CMD_TIMEOUT = "
+               << (_postCmdTimeoutSec == 0 ? 300 : _postCmdTimeoutSec) << "\n"
+               << "\n"
+               << tr("## same for the nzb upload, which would otherwise block the exit") << "\n"
+               << (_nzbUploadTimeoutSec == sDefaultNzbUploadTimeoutSec ? "#" : "")
+               << "NZB_UPLOAD_TIMEOUT = " << _nzbUploadTimeoutSec << "\n"
+               << "\n"
+               << tr("## a post command that fails is reported but does not fail the run;") << "\n"
+               << tr("## set this to true if you automate and want a non zero exit code") << "\n"
+               << (_postCmdFailIsError ? "" : "#") << "POST_CMD_FAIL_IS_ERROR = true\n"
+               << "\n"
+               << tr("## the archive password is never put in the environment nor in the json") << "\n"
+               << tr("## given to a post command; __rarPass__ in the arguments still works") << "\n"
+               << (_postCmdExposePassword ? "" : "#") << "POST_CMD_EXPOSE_PASSWORD = true\n"
                << "\n"
                << tr("## nzb files are normally all created in nzbPath") << "\n"
                << tr("## but using this option, the nzb of each monitoring folder will be stored in their own folder (created in nzbPath)") << "\n"

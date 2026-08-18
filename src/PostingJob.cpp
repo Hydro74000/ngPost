@@ -1421,7 +1421,7 @@ void PostingJob::_closeNzb()
     }
 }
 
-PostInfoData PostingJob::_livePostInfoData() const
+PostInfoData PostingJob::postInfoData() const
 {
     PostInfoData data;
     data.originalPath = _originalDirectory;
@@ -1479,7 +1479,7 @@ void PostingJob::_writePostInfoFile()
         return;
     }
 
-    PostInfoData data = _livePostInfoData();
+    PostInfoData data = postInfoData();
 
     // The history holds the consolidated counters, and for a resume it is the
     // only place that knows the whole post rather than the leftovers. The live

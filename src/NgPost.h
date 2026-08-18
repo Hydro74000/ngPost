@@ -41,6 +41,7 @@ class NzbCheck;
 class UpdateChecker;
 class VpnManager;
 class PostHistoryService;
+class PostCmdRunner;
 
 #define NB_ARTICLES_TO_PREPARE_PER_CONNECTION 3
 
@@ -103,6 +104,10 @@ public:
         POST_INFO_TEMPLATE,
         POST_INFO_OUTPUT,
         POST_INFO_ONLY_ON_SUCCESS,
+        POST_CMD_TIMEOUT,
+        POST_CMD_FAIL_IS_ERROR,
+        POST_CMD_EXPOSE_PASSWORD,
+        NZB_UPLOAD_TIMEOUT,
         MONITOR_FOLDERS,
         MONITOR_EXT,
         MONITOR_IGNORE_DIR,
@@ -194,21 +199,6 @@ private:
     static const QMap<GROUP_POLICY, QString> sGroupPolicies;
 
     static const QMap<Opt, QString> sOptionNames;
-
-    enum class PostCmdPlaceHolders {
-        originalPath,
-        nzbPath,
-        nzbName,
-        rarName,
-        rarPass,
-        groups,
-        nbArticles,
-        nbArticlesFailed,
-        sizeInByte,
-        nbFiles
-    };
-
-    static const QMap<PostCmdPlaceHolders, QString> sPostCmdPlaceHolders;
 
     enum class AppMode { CMD = 0, HMI = 1 }; //!< supposed to be CMD but a simple HMI has been added
 
@@ -369,6 +359,12 @@ private:
     QString _loadedConfigDir;
     QString _postInfoOutput;
     bool _postInfoOnlySuccess;
+    int _postCmdTimeoutSec;      //!< per command, 0 = no limit
+    bool _postCmdFailIsError;    //!< should a failed post command fail the run?
+    bool _postCmdExposePassword; //!< password in the env and the json of a hook
+    int _nzbUploadTimeoutSec;    //!< keeps a stalled upload from blocking the exit
+    PostCmdRunner *_postCmdRunner;
+    bool _waitingForPostCmds;    //!< so the wait is announced only once
     bool _preparePacking;
 
     GROUP_POLICY _groupPolicy;
@@ -408,6 +404,9 @@ private:
     //! ".info.txt" and not ".txt": with nzbPath pointing at the source folder,
     //! __nzbName__.txt could silently overwrite a source file.
     static constexpr const char *sDefaultPostInfoOutput = "__nzbDir__/__nzbName__.info.txt";
+    //! An upload has no reason to take longer, and it is the only thing that
+    //! keeps ngPost from quitting or powering off.
+    static const int sDefaultNzbUploadTimeoutSec = 300;
 #if defined(WIN32) || defined(__MINGW64__)
     static constexpr const char *sDefaultNzbPath = ""; //!< local folder
     static constexpr const char *sDefaultConfig = "ngPost.conf";
@@ -523,6 +522,10 @@ public:
 
     void doNzbPostCMD(PostingJob *job);
 
+    //! The only place allowed to quit or to power the machine off. Waits for
+    //! the posts, the post commands and the nzb uploads.
+    void maybeFinishApplication();
+
     //! Splits a "key=value" metadata pair on the FIRST '=' only, so a value can
     //! itself hold '=' signs (URLs usually do). Returns false when there is no
     //! separator or no name.
@@ -609,6 +612,8 @@ private:
     //! queued post is sent with the settings it was queued with. Callers still
     //! have to fill nzbFilePath, files and inputPaths.
     PostingJobOptions _baseJobOptions() const;
+
+    void _startShutdown();
 
     //!< auto-post nfo bundling (cf AUTO_INCLUDE_NFO):
     //!< return the sibling <completeBaseName>.nfo of a non-nfo file, or an invalid QFileInfo

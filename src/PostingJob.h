@@ -234,6 +234,10 @@ public:
     inline const QStringList &inputPaths() const;
     inline const QMap<QString, MetaValue> &postMeta() const;
     inline qint64 historyPostId() const;
+
+    //! Description of this post, for a post info file or a post command. The
+    //! history refines it when available, see _writePostInfoFile().
+    PostInfoData postInfoData() const;
     inline const QDateTime &startedAtWall() const;
     inline const QDateTime &finishedAtWall() const;
 
@@ -327,8 +331,6 @@ private slots:
 private:
     void _log(const QString &aMsg, bool newline = true) const; //!< log function for QString
     void _error(const QString &error) const;
-    //! Description of this post as the job itself knows it.
-    PostInfoData _livePostInfoData() const;
     //! Writes the post info file if one was asked for. Never fails a post:
     //! every problem is reported as a warning.
     void _writePostInfoFile();
