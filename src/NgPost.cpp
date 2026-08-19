@@ -254,7 +254,7 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     {{"x", sOptionNames[Opt::OBFUSCATE]},     tr("obfuscate the subjects of the articles (CAREFUL you won't find your post if you lose the nzb file)")},
     {{"g", sOptionNames[Opt::GROUPS]},        tr("newsgroups where to post the files (coma separated without space)"), sOptionNames[Opt::GROUPS]},
     {{"m", sOptionNames[Opt::META]},          tr("extra meta data published in the nzb header (typically \"password=qwerty42\")"), sOptionNames[Opt::META]},
-    {QStringList{sOptionNames[Opt::POST_META], "post-meta"}, tr("private meta data for the post info file, never published in the nzb (ex: \"titre=My Movie\")"), sOptionNames[Opt::POST_META]},
+    {QStringList{sOptionNames[Opt::POST_META], "post-meta"}, tr("private meta data for the post info file, never published in the nzb (ex: \"title=Photo backup 2026\")"), sOptionNames[Opt::POST_META]},
     {QStringList{sOptionNames[Opt::POST_INFO_TEMPLATE], "post-info-template"}, tr("template file used to write a post info file next to the nzb"), sOptionNames[Opt::POST_INFO_TEMPLATE]},
     {QStringList{sOptionNames[Opt::POST_INFO_OUTPUT], "post-info-output"}, tr("where to write the post info file (variables allowed)"), sOptionNames[Opt::POST_INFO_OUTPUT]},
     {QStringList{sOptionNames[Opt::POST_INFO_ONLY_ON_SUCCESS], "post-info-only-on-success"}, tr("only write the post info file when the post fully succeeded (default)")},

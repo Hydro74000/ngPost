@@ -512,24 +512,23 @@ void TestCliParser::meta_value_may_contain_equal_signs()
 {
     QString key, value;
 
-    // the case that used to be dropped without a word: an Allocine URL
+    // the case that used to be dropped without a word: a URL of its own
     QVERIFY(NgPost::splitMetaPair(
-        QStringLiteral("portail1=https://www.allocine.fr/film/fichefilm_gen_cfilm=326598.html"),
+        QStringLiteral("gallery=https://example.org/albums/view?id=326598&size=full"),
         &key,
         &value));
-    QCOMPARE(key, QStringLiteral("portail1"));
-    QCOMPARE(value,
-             QStringLiteral("https://www.allocine.fr/film/fichefilm_gen_cfilm=326598.html"));
+    QCOMPARE(key, QStringLiteral("gallery"));
+    QCOMPARE(value, QStringLiteral("https://example.org/albums/view?id=326598&size=full"));
 
     // an empty value is a legitimate way to blank a field of a record sheet
-    QVERIFY(NgPost::splitMetaPair(QStringLiteral("portail2="), &key, &value));
-    QCOMPARE(key, QStringLiteral("portail2"));
+    QVERIFY(NgPost::splitMetaPair(QStringLiteral("comment="), &key, &value));
+    QCOMPARE(key, QStringLiteral("comment"));
     QVERIFY(value.isEmpty());
 
     // spaces around the name are forgiven, the value is kept verbatim
-    QVERIFY(NgPost::splitMetaPair(QStringLiteral(" titre = Mon Film "), &key, &value));
-    QCOMPARE(key, QStringLiteral("titre"));
-    QCOMPARE(value, QStringLiteral(" Mon Film "));
+    QVERIFY(NgPost::splitMetaPair(QStringLiteral(" album = Mes photos "), &key, &value));
+    QCOMPARE(key, QStringLiteral("album"));
+    QCOMPARE(value, QStringLiteral(" Mes photos "));
 
     QVERIFY(!NgPost::splitMetaPair(QStringLiteral("noEqualSignHere"), &key, &value));
     QVERIFY(!NgPost::splitMetaPair(QStringLiteral("=orphanValue"), &key, &value));
@@ -539,12 +538,12 @@ void TestCliParser::meta_key_cannot_be_public_and_private_at_once()
 {
     HomeSandbox sandbox;
     const RunResult r =
-        runWithMeta(_bin, { "--meta", "titre=Public", "--post_meta", "titre=Private" }, sandbox);
+        runWithMeta(_bin, { "--meta", "album=Public", "--post_meta", "album=Private" }, sandbox);
 
     QVERIFY2(!r.timedOut, "process timed out");
     QVERIFY2(r.exitCode != 0, qPrintable(QStringLiteral("expected a failure, got %1").arg(r.exitCode)));
     const QString out = r.stdoutText + r.stderrText;
-    QVERIFY2(out.contains(QStringLiteral("titre")), qPrintable(out));
+    QVERIFY2(out.contains(QStringLiteral("album")), qPrintable(out));
 }
 
 void TestCliParser::malformed_meta_is_reported()

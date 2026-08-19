@@ -588,14 +588,14 @@ void TestPostFlow::post_info_file_reports_archive_and_par2_size_only()
                                          "head -c 30000 /dev/zero > \"$t\"\n"
                                          "exit 0\n")));
 
-    const QString inPath = root + QStringLiteral("/Movie.bin");
+    const QString inPath = root + QStringLiteral("/Photos-2026.bin");
     {
         QFile in(inPath);
         QVERIFY(in.open(QIODevice::WriteOnly));
         in.write(QByteArray(5000, 'x'));
     }
     // the .nfo is posted too, but it is not part of the archive
-    const QString nfoPath = root + QStringLiteral("/Movie.nfo");
+    const QString nfoPath = root + QStringLiteral("/Photos-2026.nfo");
     {
         QFile nfo(nfoPath);
         QVERIFY(nfo.open(QIODevice::WriteOnly));

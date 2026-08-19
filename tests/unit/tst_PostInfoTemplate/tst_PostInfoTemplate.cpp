@@ -81,16 +81,16 @@ namespace
 PostInfoData sampleData()
 {
     PostInfoData d;
-    d.originalPath  = QStringLiteral("/data/in");
-    d.sourcePath    = QStringLiteral("/data/in/Fuze.2026.mkv");
-    d.originalName  = QStringLiteral("Fuze.2026.mkv");
-    d.nzbPath       = QStringLiteral("/data/nzb/Fuze.nzb");
+    d.originalPath  = QStringLiteral("/data/backup");
+    d.sourcePath    = QStringLiteral("/data/backup/Rando-Mercantour-2026.mkv");
+    d.originalName  = QStringLiteral("Rando-Mercantour-2026.mkv");
+    d.nzbPath       = QStringLiteral("/data/nzb/Rando.nzb");
     d.nzbDir        = QStringLiteral("/data/nzb");
-    d.nzbName       = QStringLiteral("Fuze");
-    d.nzbFileName   = QStringLiteral("Fuze.nzb");
+    d.nzbName       = QStringLiteral("Rando");
+    d.nzbFileName   = QStringLiteral("Rando.nzb");
     d.rarName       = QStringLiteral("876EFID5Y22SH1CO5C7C");
     d.rarPass       = QStringLiteral("s3cr3t");
-    d.groups        = QStringLiteral("alt.binaries.cores,alt.binaries.mom");
+    d.groups        = QStringLiteral("alt.binaries.test,alt.binaries.misc");
     d.nzbPoster     = QStringLiteral("h0wsef7@8xw81s.r7");
     d.status        = QStringLiteral("success");
     d.avgSpeed      = QStringLiteral("12.5 MB/s");
@@ -107,13 +107,13 @@ PostInfoData sampleData()
     d.startedAt        = QDateTime(QDate(2026, 8, 15), QTime(21, 30, 0));
     d.finishedAt       = QDateTime(QDate(2026, 8, 15), QTime(22, 0, 0));
     d.meta.insert(QStringLiteral("titre"),
-                  MetaValue(QStringLiteral("The Criminals - \"Fuze\" (2026)"), MetaScope::Local));
+                  MetaValue(QStringLiteral("Randonnee au Mercantour, \"2026\""), MetaScope::Local));
     d.meta.insert(QStringLiteral("portail1"),
-                  MetaValue(QStringLiteral("https://www.allocine.fr/film/fichefilm_gen_cfilm=326598.html"),
+                  MetaValue(QStringLiteral("https://example.org/albums/view?id=326598&size=full"),
                             MetaScope::Local));
-    d.meta.insert(QStringLiteral("categorie"), MetaValue(QStringLiteral("Film")));
-    d.meta.insert(QStringLiteral("qualite"), MetaValue(QStringLiteral("HD 1080p")));
-    d.meta.insert(QStringLiteral("genre"), MetaValue(QStringLiteral("Thriller")));
+    d.meta.insert(QStringLiteral("categorie"), MetaValue(QStringLiteral("Video perso")));
+    d.meta.insert(QStringLiteral("qualite"), MetaValue(QStringLiteral("1080p")));
+    d.meta.insert(QStringLiteral("genre"), MetaValue(QStringLiteral("Nature")));
     return d;
 }
 
@@ -218,7 +218,7 @@ void TestPostInfoTemplate::date_default_and_custom_format()
 void TestPostInfoTemplate::meta_present_and_missing()
 {
     PostInfoData const d = sampleData();
-    QCOMPARE(PostInfoTemplate::render("__meta:genre__", d, false), QStringLiteral("Thriller"));
+    QCOMPARE(PostInfoTemplate::render("__meta:genre__", d, false), QStringLiteral("Nature"));
 
     QStringList unknown;
     QCOMPARE(PostInfoTemplate::render("[__meta:absent__]",
@@ -256,7 +256,7 @@ void TestPostInfoTemplate::legacy_percent_one_is_substituted()
 
     // a post command line: %1 is the historical alias of the nzb path
     QCOMPARE(PostInfoTemplate::renderArguments({ QStringLiteral("%1") }, d, false),
-             QStringList{ QStringLiteral("/data/nzb/Fuze.nzb") });
+             QStringList{ QStringLiteral("/data/nzb/Rando.nzb") });
 
     // a record sheet: it is text, and must be left alone
     QCOMPARE(PostInfoTemplate::render("remise =50%1 sur tout", d, false),
@@ -323,8 +323,8 @@ void TestPostInfoTemplate::render_to_file_creates_parent_folder_and_keeps_utf8()
                                        QStringList());
 
     QVERIFY2(res.ok, qPrintable(res.error));
-    QCOMPARE(QFileInfo(res.outPath).fileName(), QStringLiteral("Fuze.info.txt"));
-    QCOMPARE(QFileInfo(res.outPath).absoluteDir().dirName(), QStringLiteral("Film"));
+    QCOMPARE(QFileInfo(res.outPath).fileName(), QStringLiteral("Rando.info.txt"));
+    QCOMPARE(QFileInfo(res.outPath).absoluteDir().dirName(), QStringLiteral("Video perso"));
     QCOMPARE(readFile(res.outPath),
              QString::fromUtf8("titre =L'\xC3\x89t\xC3\xA9 & Cie\nete =Mon \xC3\x89t\xC3\xA9\n"));
 }
@@ -423,18 +423,18 @@ void TestPostInfoTemplate::baselien_template_golden()
 
     QString const expected = QString::fromUtf8(
         "date =15/08/2026\n"
-        "nom du post =Fuze.2026.mkv\n"
+        "nom du post =Rando-Mercantour-2026.mkv\n"
         "taille post =2505484398\n"
         "mot de passe =s3cr3t\n"
         "nom a rechercher =876EFID5Y22SH1CO5C7C\n"
         "posteur =h0wsef7@8xw81s.r7\n"
-        "groupe =alt.binaries.cores,alt.binaries.mom\n"
+        "groupe =alt.binaries.test,alt.binaries.misc\n"
         "pourcent =8\n"
-        "portail1 =https://www.allocine.fr/film/fichefilm_gen_cfilm=326598.html\n"
-        "titre =The Criminals - \"Fuze\" (2026)\n"
-        "categorie =Film\n"
-        "qualite =HD 1080p\n"
-        "genre =Thriller\n");
+        "portail1 =https://example.org/albums/view?id=326598&size=full\n"
+        "titre =Randonnee au Mercantour, \"2026\"\n"
+        "categorie =Video perso\n"
+        "qualite =1080p\n"
+        "genre =Nature\n");
     QCOMPARE(readFile(res.outPath), expected);
 }
 

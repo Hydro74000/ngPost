@@ -971,8 +971,8 @@ void TestPostHistory::post_size_is_written_once_and_active_seconds_accumulate()
     post.nzbPath = dir.filePath("big.nzb");
     PostHistoryStore::PostInfo info;
     info.par2Pct = 8;
-    info.sourcePath = QStringLiteral("/data/in/Movie.mkv");
-    info.originalName = QStringLiteral("Movie.mkv");
+    info.sourcePath = QStringLiteral("/data/backup/Photos-2026.tar");
+    info.originalName = QStringLiteral("Photos-2026.tar");
     const qint64 postId = store.createPost(post, info, {}, &error);
     QVERIFY2(postId > 0, qPrintable(error));
 
@@ -989,7 +989,7 @@ void TestPostHistory::post_size_is_written_once_and_active_seconds_accumulate()
     QCOMPARE(record.info.postSizeBytes, 2505484398LL);
     QCOMPARE(record.info.activeSeconds, static_cast<qint64>(250));
     QCOMPARE(record.info.par2Pct, 8);
-    QCOMPARE(record.info.originalName, QStringLiteral("Movie.mkv"));
+    QCOMPARE(record.info.originalName, QStringLiteral("Photos-2026.tar"));
 }
 
 void TestPostHistory::post_meta_keeps_scope_and_refuses_the_password_key()

@@ -647,7 +647,7 @@ void PostingWidget::_addPostMetaRow(const QString &key, const QString &value, bo
 
     QLineEdit *keyEdit = new QLineEdit(key, _metaTable);
     keyEdit->setObjectName(metaObjectName("postMetaKeyEdit", row));
-    keyEdit->setPlaceholderText(tr("titre"));
+    keyEdit->setPlaceholderText(tr("album"));
     _metaTable->setCellWidget(row, 0, keyEdit);
 
     QLineEdit *valueEdit = new QLineEdit(value, _metaTable);
