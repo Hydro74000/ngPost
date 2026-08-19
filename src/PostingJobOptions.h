@@ -16,7 +16,9 @@
 
 #include "postinfo/PostInfoData.h"
 
+#include <QFileInfo>
 #include <QFileInfoList>
+#include <QDateTime>
 #include <QList>
 #include <QMap>
 #include <QSet>
@@ -33,6 +35,20 @@ struct PostingJobResumeFileState
     int         totalFiles    = 0;
     QStringList groups;
     QSet<uint>  postedParts;
+    //! Size and modification time the file had when it was first posted. Kept
+    //! so the source can be checked again just before it is read: a job may
+    //! wait a long time in the queue after its plan was built.
+    qint64      sizeBytes  = 0;
+    qint64      mtimeEpoch = 0;
+
+    //! The one rule deciding whether a source still matches what was posted.
+    //! Re-posting parts of a file that changed meanwhile would produce an nzb
+    //! nobody can reassemble.
+    bool matches(QFileInfo const &file) const
+    {
+        return file.exists() && file.size() == sizeBytes
+               && (mtimeEpoch == 0 || file.lastModified().toSecsSinceEpoch() == mtimeEpoch);
+    }
 };
 
 struct PostingJobOptions

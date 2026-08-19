@@ -73,6 +73,14 @@ private slots:
     //! taken from the globals, which may have changed since.
     void resume_options_take_obfuscation_from_history();
 
+    //! A resumed post still describes the par2 redundancy of the ORIGINAL
+    //! post: it is a fact about the archive, not an order to redo anything.
+    void resume_describes_the_original_par2_percentage();
+
+    //! A source is checked again right before being read, not only when the
+    //! resume plan was built: a job can wait a long time in the queue.
+    void resume_file_state_detects_a_source_that_changed();
+
     void nzb_regeneration_keeps_prior_files_after_resume();
     void nzb_regeneration_repairs_missing_article_bytes();
     void nzb_regeneration_masks_password_by_default();
@@ -1130,6 +1138,71 @@ void TestPostHistory::resume_options_take_obfuscation_from_history()
                                   ResumePlanner::JobPlan(),
                                   std::string("fallback@x.y"));
     QCOMPARE(QString::fromStdString(fallback.from), QStringLiteral("fallback@x.y"));
+}
+
+void TestPostHistory::resume_describes_the_original_par2_percentage()
+{
+    PostHistoryStore::PostDetails details;
+    details.post.id = 7;
+    details.doPar2 = true;
+    details.par2Pct = 8; // what the original post really used
+
+    PostingJobOptions base;
+    base.doPar2 = true;
+    base.par2Pct = 15; // the globals moved on since then
+
+    const PostingJobOptions resumed =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  QStringLiteral("/tmp/out.nzb"),
+                                  QList<QString>(),
+                                  ResumePlanner::JobPlan(),
+                                  std::string("me@x.y"));
+
+    QCOMPARE(resumed.originalPar2Pct, 8);
+    QCOMPARE(resumed.describedPar2Pct(), 8);
+
+    // a post that had no par2 describes none, whatever the globals say
+    details.doPar2 = false;
+    details.par2Pct = -1;
+    const PostingJobOptions noPar2 =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  QStringLiteral("/tmp/out.nzb"),
+                                  QList<QString>(),
+                                  ResumePlanner::JobPlan(),
+                                  std::string("me@x.y"));
+    QCOMPARE(noPar2.describedPar2Pct(), -1);
+}
+
+void TestPostHistory::resume_file_state_detects_a_source_that_changed()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath("source.bin");
+    {
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(QByteArray(1000, 'a'));
+    }
+
+    QFileInfo fi(path);
+    PostingJobResumeFileState state;
+    state.sizeBytes  = fi.size();
+    state.mtimeEpoch = fi.lastModified().toSecsSinceEpoch();
+    QVERIFY(state.matches(QFileInfo(path)));
+
+    // the file grew while the job waited in the queue
+    {
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::Append));
+        f.write(QByteArray(10, 'b'));
+    }
+    QVERIFY(!state.matches(QFileInfo(path)));
+
+    // and a source that vanished is not usable either
+    QVERIFY(QFile::remove(path));
+    QVERIFY(!state.matches(QFileInfo(path)));
 }
 
 void TestPostHistory::nzb_regeneration_keeps_prior_files_after_resume()

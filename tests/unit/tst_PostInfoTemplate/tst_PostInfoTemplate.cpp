@@ -42,7 +42,8 @@ private slots:
     //! contain __nzbPath__ must NOT be expanded a second time.
     void substitution_is_single_pass();
 
-    //! The legacy %1 goes through the same protected pass.
+    //! The legacy %1 goes through the same protected pass, but ONLY for post
+    //! commands: in a record sheet "50%1 off" is prose.
     void legacy_percent_one_is_substituted();
 
     //! Splitting first then substituting keeps a value with spaces as one
@@ -245,12 +246,19 @@ void TestPostInfoTemplate::substitution_is_single_pass()
 void TestPostInfoTemplate::legacy_percent_one_is_substituted()
 {
     PostInfoData d = sampleData();
-    QCOMPARE(PostInfoTemplate::render("scp %1 box:", d, false),
-             QStringLiteral("scp /data/nzb/Fuze.nzb box:"));
+
+    // a post command line: %1 is the historical alias of the nzb path
+    QCOMPARE(PostInfoTemplate::renderArguments({ QStringLiteral("%1") }, d, false),
+             QStringList{ QStringLiteral("/data/nzb/Fuze.nzb") });
+
+    // a record sheet: it is text, and must be left alone
+    QCOMPARE(PostInfoTemplate::render("remise =50%1 sur tout", d, false),
+             QStringLiteral("remise =50%1 sur tout"));
 
     // and a value containing %1 is not re-expanded either
     d.rarName = QStringLiteral("%1");
-    QCOMPARE(PostInfoTemplate::render("__rarName__", d, false), QStringLiteral("%1"));
+    QCOMPARE(PostInfoTemplate::renderArguments({ QStringLiteral("__rarName__") }, d, false),
+             QStringList{ QStringLiteral("%1") });
 }
 
 void TestPostInfoTemplate::arguments_with_spaces_stay_one_argument()

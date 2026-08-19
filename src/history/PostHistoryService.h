@@ -80,6 +80,11 @@ public:
     bool updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error = nullptr);
     bool setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error = nullptr);
     bool addActiveSeconds(qint64 postId, qint64 seconds, QString *error = nullptr);
+    bool finalizePost(qint64 postId,
+                      const QString &status,
+                      const QString &avgSpeed,
+                      qint64 activeSeconds,
+                      QString *error = nullptr);
     bool setPostMeta(qint64 postId,
                      const QMap<QString, MetaValue> &meta,
                      QString *error = nullptr);

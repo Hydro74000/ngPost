@@ -67,8 +67,10 @@ nzbPath  = /tmp
 ##   __meta:<name>__        : one of your own metadata (--meta / --post_meta)
 ##
 ## the same values are also available as environment variables (NGPOST_NZB_PATH,
-## NGPOST_POST_SIZE, ...), so a script can be called with no argument at all,
-## and your metadata are in the json file pointed at by $NGPOST_JSON
+## NGPOST_POST_SIZE, ...), so a script can be called with no argument at all.
+## the date comes as NGPOST_DATE / NGPOST_DATE_START (ISO 8601, local time) and
+## NGPOST_DATE_EPOCH, and your metadata are in the json file pointed at by
+## $NGPOST_JSON
 #
 #NZB_POST_CMD = scp "__nzbPath__" myBox.com:~/nzbs/
 #NZB_POST_CMD = zip "__nzbPath__.zip" "__nzbPath__"

@@ -156,7 +156,8 @@ QString render(QString const      &tmpl,
                PostInfoData const &data,
                bool                nativeSeparators,
                OnUnknown           onUnknown,
-               QStringList        *unknown)
+               QStringList        *unknown,
+               bool                legacyPercentOne)
 {
     QMap<QString, QString> const fixed = values(data, nativeSeparators);
 
@@ -169,8 +170,8 @@ QString render(QString const      &tmpl,
         out += tmpl.mid(last, m.capturedStart() - last);
         last = m.capturedEnd();
 
-        if (m.capturedStart(3) >= 0) { // legacy %1
-            out += pathValue(data.nzbPath, nativeSeparators);
+        if (m.capturedStart(3) >= 0) { // legacy %1 of NZB_POST_CMD
+            out += legacyPercentOne ? pathValue(data.nzbPath, nativeSeparators) : m.captured(0);
             continue;
         }
 
@@ -206,7 +207,12 @@ QStringList renderArguments(QStringList const  &args,
     QStringList rendered;
     rendered.reserve(args.size());
     for (QString const &arg : args)
-        rendered << render(arg, data, nativeSeparators, OnUnknown::KeepVerbatim, unknown);
+        rendered << render(arg,
+                           data,
+                           nativeSeparators,
+                           OnUnknown::KeepVerbatim,
+                           unknown,
+                           /*legacyPercentOne*/ true);
     return rendered;
 }
 
@@ -233,6 +239,16 @@ void applyEnvironment(QProcessEnvironment &env, PostInfoData const &data, bool e
             continue;
         env.insert(QString::fromLatin1(field.envName), v.value(bareName(field.placeholder)));
     }
+    // The parameterized variables have no fixed placeholder, but a script
+    // still needs the date: give it in ISO, plus the epoch for arithmetic.
+    if (data.finishedAt.isValid()) {
+        env.insert(QStringLiteral("NGPOST_DATE"), data.finishedAt.toString(Qt::ISODate));
+        env.insert(QStringLiteral("NGPOST_DATE_EPOCH"),
+                   QString::number(data.finishedAt.toSecsSinceEpoch()));
+    }
+    if (data.startedAt.isValid())
+        env.insert(QStringLiteral("NGPOST_DATE_START"), data.startedAt.toString(Qt::ISODate));
+
     // Metadata deliberately does not go through the environment: normalizing
     // arbitrary keys into variable names collides and mangles unicode. It is
     // passed through the json file instead.

@@ -478,6 +478,16 @@ public:
 #if defined(NGPOST_TESTING) && defined(__USE_HMI__)
     inline MainWindow *mainWindowForTest() const;
 #endif
+#ifdef NGPOST_TESTING
+    //! Read back what the configuration parsing produced, so a test can check
+    //! that saveConfig() writes something that parses back to the same thing.
+    QString postInfoOutputForTest() const { return _postInfoOutput; }
+    bool postInfoOnlyOnSuccessForTest() const { return _postInfoOnlySuccess; }
+    int postCmdTimeoutSecForTest() const { return _postCmdTimeoutSec; }
+    bool postCmdFailIsErrorForTest() const { return _postCmdFailIsError; }
+    bool postCmdExposePasswordForTest() const { return _postCmdExposePassword; }
+    int nzbUploadTimeoutSecForTest() const { return _nzbUploadTimeoutSec; }
+#endif
 
     bool startPostingJob(PostingJob *job);
 

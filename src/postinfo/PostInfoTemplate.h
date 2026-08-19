@@ -62,11 +62,16 @@ enum class OnUnknown
 };
 
 //! Renders one string. Unknown variables are reported through \a unknown.
+//!
+//! \a legacyPercentOne enables the historical "%1" of NZB_POST_CMD. It is off
+//! everywhere else: in a record sheet, "50%1 off" is prose, not a request for
+//! the nzb path.
 QString render(QString const &tmpl,
                PostInfoData const &data,
                bool                nativeSeparators,
-               OnUnknown           onUnknown = OnUnknown::KeepVerbatim,
-               QStringList        *unknown   = nullptr);
+               OnUnknown           onUnknown        = OnUnknown::KeepVerbatim,
+               QStringList        *unknown          = nullptr,
+               bool                legacyPercentOne = false);
 
 //! Renders each argument of an already split command line, so that a value
 //! containing spaces or quotes stays exactly one argument.

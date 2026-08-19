@@ -1,11 +1,15 @@
 # Generic post info file.
 #
-# Every __word__ is replaced by ngPost when the post is done.
+# There is no comment syntax here: EVERY line is written as is, and every name
+# wrapped in two underscores is replaced by its value. Which also means a line
+# like this one is copied into the produced file, so delete this header once
+# you have read it.
+#
 # Delete the lines you do not need, add your own, the format is yours.
 #
-# The archive password is deliberately NOT written here: this file would
-# then have to be protected like a password file. Add "password =__rarPass__"
-# yourself if you really want it in there.
+# The archive password is deliberately not written by this model: the file
+# would then have to be protected like a password file. If you really want it,
+# add a line with rarPass wrapped in two underscores.
 
 date        =__date__
 name        =__originalName__

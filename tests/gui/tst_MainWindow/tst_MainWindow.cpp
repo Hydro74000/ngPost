@@ -63,6 +63,10 @@ private slots:
     //! PAR2_PCT spinbox, even when PAR2_ARGS is present.
     void save_config_persists_rar_max_and_par2_pct();
 
+    //! Every new post info / post command key survives a full round trip:
+    //! written in a conf, parsed, saved back by saveConfig, parsed again.
+    void save_config_round_trips_post_info_keys();
+
     //! The post metadata group really folds (children hidden), it does not
     //! merely grey its children out the way a checkable QGroupBox does, and a
     //! row exposes named widgets so a value can be typed and read back.
@@ -121,6 +125,54 @@ void TestMainWindow::add_server_row_creates_named_widgets()
     auto *portEdit = window.findChild<QLineEdit*>(QStringLiteral("serverPortEdit_0"));
     QVERIFY(portEdit);
     QCOMPARE(portEdit->text(), QStringLiteral("563"));
+}
+
+void TestMainWindow::save_config_round_trips_post_info_keys()
+{
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    const QString outPattern = QStringLiteral("/data/sheets/__nzbName__.txt");
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "GROUPS = alt.binaries.test\n"
+          << "POST_INFO_TEMPLATE = " << tmplPath << "\n"
+          << "POST_INFO_OUTPUT = " << outPattern << "\n"
+          << "POST_INFO_ONLY_ON_SUCCESS = false\n"
+          << "POST_CMD_TIMEOUT = 120\n"
+          << "POST_CMD_FAIL_IS_ERROR = true\n"
+          << "POST_CMD_EXPOSE_PASSWORD = true\n"
+          << "NZB_UPLOAD_TIMEOUT = 45\n";
+    }
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+
+    // 1st pass: parse, then let saveConfig rewrite the whole file
+    {
+        NgPost ngPost(argc, argv);
+        QVERIFY2(ngPost.parseDefaultConfig().isEmpty(), "first parse failed");
+        MainWindow *window = ngPost.mainWindowForTest();
+        QVERIFY(window);
+        window->init(&ngPost);
+        ngPost.saveConfig();
+    }
+
+    // 2nd pass: what was written must parse back to the same values
+    {
+        NgPost ngPost(argc, argv);
+        QVERIFY2(ngPost.parseDefaultConfig().isEmpty(), "reparse of the saved config failed");
+        QCOMPARE(ngPost.postInfoTemplatePath(), QDir::cleanPath(tmplPath));
+        QCOMPARE(ngPost.postInfoOutputForTest(), outPattern);
+        QCOMPARE(ngPost.postInfoOnlyOnSuccessForTest(), false);
+        QCOMPARE(ngPost.postCmdTimeoutSecForTest(), 120);
+        QCOMPARE(ngPost.postCmdFailIsErrorForTest(), true);
+        QCOMPARE(ngPost.postCmdExposePasswordForTest(), true);
+        QCOMPARE(ngPost.nzbUploadTimeoutSecForTest(), 45);
+    }
 }
 
 void TestMainWindow::post_meta_table_folds_and_exposes_named_widgets()

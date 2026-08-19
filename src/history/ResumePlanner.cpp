@@ -114,16 +114,16 @@ ResumePlanner::JobPlan ResumePlanner::buildJobPlan(const PostHistoryStore::PostD
         if (!hasRemaining)
             continue;
 
+        PostingJobResumeFileState state;
+        state.sizeBytes  = file.sizeBytes;
+        state.mtimeEpoch = file.mtimeEpoch;
+
         QFileInfo source(file.originalPath);
-        if (!source.exists()
-            || source.size() != file.sizeBytes
-            || (file.mtimeEpoch
-                && source.lastModified().toSecsSinceEpoch() != file.mtimeEpoch)) {
+        if (!state.matches(source)) {
             plan.unavailableSources << file.originalPath;
             continue;
         }
 
-        PostingJobResumeFileState state;
         state.historyFileId = file.id;
         state.ordinal = file.ordinal;
         state.totalFiles = originalTotalFiles;
@@ -171,6 +171,7 @@ PostingJobOptions ResumePlanner::jobOptions(PostingJobOptions base,
     // facts about what the original post did, to describe it later
     base.originalDidCompress = details.doCompress;
     base.originalDidPar2     = details.doPar2;
+    base.originalPar2Pct     = details.par2Pct;
 
     return base;
 }

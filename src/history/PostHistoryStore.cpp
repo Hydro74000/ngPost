@@ -617,6 +617,33 @@ bool PostHistoryStore::addActiveSeconds(qint64 postId, qint64 seconds, QString *
     return true;
 }
 
+bool PostHistoryStore::finalizePost(qint64 postId,
+                                   const QString &status,
+                                   const QString &avgSpeed,
+                                   qint64 activeSeconds,
+                                   QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    if (!db.transaction()) {
+        setError(error, db);
+        return false;
+    }
+    // updatePostStatus() recomputes its counters from post_files/post_articles,
+    // so the sizes and counts it is given are ignored on purpose.
+    if (!updatePostStatus(postId, status, 0, 0, 0, 0, avgSpeed, error)
+        || !addActiveSeconds(postId, activeSeconds, error)) {
+        db.rollback();
+        return false;
+    }
+    if (!db.commit()) {
+        setError(error, db);
+        return false;
+    }
+    return true;
+}
+
 bool PostHistoryStore::updatePostStatus(qint64 postId,
                                         const QString &status,
                                         int nbFiles,
@@ -1834,8 +1861,10 @@ bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QStr
         return false;
     QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
     QSqlQuery p(db);
-    p.prepare(QStringLiteral("SELECT p.*, COALESCE(group_concat(g.group_name, ','), '') AS groups_text "
+    p.prepare(QStringLiteral("SELECT p.*, COALESCE(group_concat(g.group_name, ','), '') AS groups_text,"
+                             "i.par2_pct AS info_par2_pct "
                              "FROM posts p LEFT JOIN post_groups g ON g.post_id=p.id "
+                             "LEFT JOIN post_info i ON i.post_id=p.id "
                              "WHERE p.id=? GROUP BY p.id"));
     p.addBindValue(postId);
     if (!p.exec() || !p.next()) {
@@ -1865,6 +1894,10 @@ bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QStr
     details->obfuscateFileName = valueBool(p, "obfuscate_file_name");
     details->doCompress = valueBool(p, "do_compress");
     details->doPar2 = valueBool(p, "do_par2");
+    {
+        const QVariant par2 = p.value(p.record().indexOf(QStringLiteral("info_par2_pct")));
+        details->par2Pct = par2.isNull() ? -1 : par2.toInt();
+    }
     p.finish();
 
     QSqlQuery f(db);

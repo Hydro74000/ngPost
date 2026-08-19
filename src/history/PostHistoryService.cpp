@@ -136,6 +136,16 @@ public:
         return _store.addActiveSeconds(postId, seconds, error);
     }
 
+    bool finalizePost(qint64 postId,
+                      const QString &status,
+                      const QString &avgSpeed,
+                      qint64 activeSeconds,
+                      QString *error)
+    {
+        flushArticleEventsBlocking(error);
+        return _store.finalizePost(postId, status, avgSpeed, activeSeconds, error);
+    }
+
     bool setPostMeta(qint64 postId, const QMap<QString, MetaValue> &meta, QString *error)
     {
         return _store.setPostMeta(postId, meta, error);
@@ -687,6 +697,22 @@ bool PostHistoryService::loadPostInfoRecord(qint64 postId,
     bool ok = false;
     _invokeBlocking(
         [&](PostHistoryWorker *worker) { ok = worker->loadPostInfoRecord(postId, record, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::finalizePost(qint64 postId,
+                                      const QString &status,
+                                      const QString &avgSpeed,
+                                      qint64 activeSeconds,
+                                      QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->finalizePost(postId, status, avgSpeed, activeSeconds, &err);
+    });
     if (error)
         *error = err;
     return ok;

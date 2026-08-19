@@ -1199,6 +1199,26 @@ void PostingJob::_initPosting()
         }
     }
     _nzb = new QFile(_nzbFilePath);
+
+    // A resumed job can wait a long time in the queue after its plan was built,
+    // so the sources are checked again here, right before being read. Posting
+    // the remaining parts of a file that changed meanwhile would produce an nzb
+    // nobody can reassemble.
+    if (_resumeFromHistory) {
+        QFileInfoList stillValid;
+        stillValid.reserve(_files.size());
+        for (QFileInfo const &file : _files) {
+            const QString path = file.absoluteFilePath();
+            if (_resumeFileStatesByPath.value(path).matches(QFileInfo(path)))
+                stillValid << file;
+            else
+                _error(tr("Resume: %1 changed or disappeared since the post was interrupted, "
+                          "it is left out")
+                           .arg(path));
+        }
+        _files = stillValid;
+    }
+
     _nbFiles = static_cast<uint>(_files.size());
 
     // Size of what is really posted, known here because _files is now the final
@@ -1332,21 +1352,18 @@ void PostingJob::_finishPosting()
                                                    : QStringLiteral("partial");
         else
             status = QStringLiteral("failed");
-        QString err;
-        _ngPost->historyService()->updatePostStatus(_historyPostId,
-                                                    status,
-                                                    static_cast<int>(_nbFiles),
-                                                    static_cast<int>(_nbArticlesTotal),
-                                                    static_cast<int>(_nbArticlesFailed),
-                                                    static_cast<qint64>(_totalSize),
-                                                    avgSpeed(),
-                                                    &err);
         // Added, not set: a resumed post transfers in several sittings.
+        qint64 activeSeconds = 0;
         if (_timeStart.isValid()) {
             const qint64 activeMs = _timeStart.elapsed() - _pauseDuration;
             if (activeMs > 0)
-                _ngPost->historyService()->addActiveSeconds(_historyPostId, activeMs / 1000, &err);
+                activeSeconds = activeMs / 1000;
         }
+        // One transaction: a crash in between must not leave a finished post
+        // whose duration was never recorded.
+        QString err;
+        _ngPost->historyService()->finalizePost(_historyPostId, status, avgSpeed(), activeSeconds,
+                                                &err);
     }
 
     // 2.: close nzb file
@@ -1464,6 +1481,9 @@ PostInfoData PostingJob::postInfoData() const
 
     data.meta       = _options.meta;
     data.inputPaths = _options.inputPaths;
+    // Empty while the post info file itself is being rendered (it does not
+    // exist yet), filled in for the post commands that run right after.
+    data.postInfoPath = _postInfoFilePath;
     return data;
 }
 

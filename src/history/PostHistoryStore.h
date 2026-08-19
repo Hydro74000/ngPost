@@ -130,6 +130,9 @@ public:
         bool obfuscateFileName = false;
         bool doCompress = false;
         bool doPar2 = false;
+        //! par2 percentage of the original post, < 0 when it had none. Read
+        //! from post_info, so it stays -1 for a post made before that table.
+        int par2Pct = -1;
         QList<FileSummary> files;
         QMap<qint64, QList<ArticleSummary>> articlesByFile;
     };
@@ -228,6 +231,14 @@ public:
 
     //! Adds to the transfer time already recorded, so resumes accumulate.
     bool addActiveSeconds(qint64 postId, qint64 seconds, QString *error = nullptr);
+
+    //! Terminal state of one attempt: the status and the time it took, written
+    //! together so a crash in between cannot leave one without the other.
+    bool finalizePost(qint64 postId,
+                      const QString &status,
+                      const QString &avgSpeed,
+                      qint64 activeSeconds,
+                      QString *error = nullptr);
 
     //! Upsert of the user metadata. The reserved key "password" is refused: it
     //! is a secret, handled like the archive password, not a metadata.
