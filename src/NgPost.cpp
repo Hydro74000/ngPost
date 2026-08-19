@@ -98,6 +98,9 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::POST_CMD_FAIL_IS_ERROR, "post_cmd_fail_is_error"},
     {Opt::POST_CMD_EXPOSE_PASSWORD, "post_cmd_expose_password"},
     {Opt::NZB_UPLOAD_TIMEOUT,   "nzb_upload_timeout"},
+    {Opt::NO_POST_INFO_ONLY_ON_SUCCESS, "no_post_info_only_on_success"},
+    {Opt::NO_POST_CMD_FAIL_IS_ERROR,    "no_post_cmd_fail_is_error"},
+    {Opt::NO_POST_CMD_EXPOSE_PASSWORD,  "no_post_cmd_expose_password"},
     {Opt::NZB_RM_ACCENTS, "nzb_rm_accents"},
     {Opt::AUTO_CLOSE_TABS,"auto_close_tabs"},
     {Opt::KEEP_NFO_EXTENSION, "keep_nfo_extension"},
@@ -254,6 +257,17 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     {QStringList{sOptionNames[Opt::POST_META], "post-meta"}, tr("private meta data for the post info file, never published in the nzb (ex: \"titre=My Movie\")"), sOptionNames[Opt::POST_META]},
     {QStringList{sOptionNames[Opt::POST_INFO_TEMPLATE], "post-info-template"}, tr("template file used to write a post info file next to the nzb"), sOptionNames[Opt::POST_INFO_TEMPLATE]},
     {QStringList{sOptionNames[Opt::POST_INFO_OUTPUT], "post-info-output"}, tr("where to write the post info file (variables allowed)"), sOptionNames[Opt::POST_INFO_OUTPUT]},
+    {QStringList{sOptionNames[Opt::POST_INFO_ONLY_ON_SUCCESS], "post-info-only-on-success"}, tr("only write the post info file when the post fully succeeded (default)")},
+    {QStringList{sOptionNames[Opt::NO_POST_INFO_ONLY_ON_SUCCESS], "no-post-info-only-on-success"}, tr("write the post info file even for a failed or partial post")},
+    {QStringList{sOptionNames[Opt::NZB_POST_CMD], "nzb-post-cmd"}, tr("command to run at the end of each post, repeatable; replaces the ones from the config file"), sOptionNames[Opt::NZB_POST_CMD]},
+    {QStringList{sOptionNames[Opt::POST_CMD_TIMEOUT], "post-cmd-timeout"}, tr("seconds before a stuck post command is killed (0: no limit)"), sOptionNames[Opt::POST_CMD_TIMEOUT]},
+    {QStringList{sOptionNames[Opt::POST_CMD_FAIL_IS_ERROR], "post-cmd-fail-is-error"}, tr("a failed post command makes ngPost exit with an error")},
+    {QStringList{sOptionNames[Opt::NO_POST_CMD_FAIL_IS_ERROR], "no-post-cmd-fail-is-error"}, tr("a failed post command is only reported (default)")},
+    {QStringList{sOptionNames[Opt::POST_CMD_EXPOSE_PASSWORD], "post-cmd-expose-password"}, tr("put the archive password in the environment and json given to post commands")},
+    {QStringList{sOptionNames[Opt::NO_POST_CMD_EXPOSE_PASSWORD], "no-post-cmd-expose-password"}, tr("keep the archive password out of them (default)")},
+    {QStringList{sOptionNames[Opt::NZB_UPLOAD_URL], "nzb-upload-url"}, tr("upload the nzb to this URL (ftp, http or https)"), sOptionNames[Opt::NZB_UPLOAD_URL]},
+    {QStringList{sOptionNames[Opt::NZB_UPLOAD_TIMEOUT], "nzb-upload-timeout"}, tr("seconds before a stuck nzb upload is given up (0: no limit)"), sOptionNames[Opt::NZB_UPLOAD_TIMEOUT]},
+    {QStringList{sOptionNames[Opt::POST_HISTORY], "post-history"}, tr("legacy csv history file, one line appended per post"), sOptionNames[Opt::POST_HISTORY]},
     {{"f", sOptionNames[Opt::FROM]},          tr("poster email (random one if not provided)"), sOptionNames[Opt::FROM]},
     {{"a", sOptionNames[Opt::ARTICLE_SIZE]},  tr("article size (default one: %1)").arg(sDefaultArticleSize), sOptionNames[Opt::ARTICLE_SIZE]},
     {{"z", sOptionNames[Opt::MSG_ID]},        tr("msg id signature, after the @ (default one: %1)").arg(sDefaultMsgIdSignature), sOptionNames[Opt::MSG_ID]},
@@ -1651,6 +1665,66 @@ bool NgPost::splitMetaPair(const QString &keyValue, QString *key, QString *value
     return true;
 }
 
+void NgPost::_setNzbUploadUrl(const QString &url, QString &error)
+{
+    if (_urlNzbUpload) {
+        delete _urlNzbUpload;
+        _urlNzbUpload = nullptr;
+    }
+    _urlNzbUploadStr = url;
+    _urlNzbUpload    = new QUrl(url);
+
+    static const QStringList sAllowedProtocols = { "ftp", "http", "https" };
+    if (!sAllowedProtocols.contains(_urlNzbUpload->scheme())) {
+        error += tr("Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2\n")
+                     .arg(_urlNzbUpload->toString(QUrl::RemoveUserInfo))
+                     .arg(sAllowedProtocols.join(", "));
+        delete _urlNzbUpload;
+        _urlNzbUpload = nullptr;
+    }
+}
+
+void NgPost::_setPostHistoryFile(const QString &path, QString &error)
+{
+    _postHistoryFile = path;
+    QFileInfo fi(path);
+    if (fi.isDir()) {
+        error += tr("the post history '%1' can't be a directory...\n").arg(path);
+        return;
+    }
+    if (fi.exists()) {
+        if (!fi.isWritable())
+            error += tr("the post history file '%1' is not writable...\n").arg(path);
+        return;
+    }
+    if (!QFileInfo(fi.absolutePath()).isWritable())
+        error += tr("the post history file '%1' is not writable...\n").arg(path);
+}
+
+//! Creates the legacy csv with its column names, once every setting is known.
+//! Deliberately not done while parsing: FIELD_SEPARATOR may well be read after
+//! POST_HISTORY, and the header must use the same separator as the rows.
+void NgPost::_ensurePostHistoryHeader()
+{
+    if (_postHistoryFile.isEmpty())
+        return;
+
+    QFile file(_postHistoryFile);
+    if (file.exists() || !file.open(QIODevice::WriteOnly | QIODevice::Text))
+        return;
+
+    QTextStream stream(&file);
+    stream << tr("date")
+           << _historyFieldSeparator << tr("nzb name")
+           << _historyFieldSeparator << tr("size")
+           << _historyFieldSeparator << tr("avg. speed")
+           << _historyFieldSeparator << tr("archive name")
+           << _historyFieldSeparator << tr("archive pass")
+           << _historyFieldSeparator << tr("groups")
+           << _historyFieldSeparator << tr("from") << "\n";
+    file.close();
+}
+
 QString NgPost::postInfoTemplatePath() const
 {
     if (_postInfoTemplate.isEmpty())
@@ -2453,6 +2527,79 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _postInfoOutput = val;
     }
 
+    if (parser.isSet(sOptionNames[Opt::POST_INFO_ONLY_ON_SUCCESS]))
+        _postInfoOnlySuccess = true;
+    if (parser.isSet(sOptionNames[Opt::NO_POST_INFO_ONLY_ON_SUCCESS]))
+        _postInfoOnlySuccess = false;
+
+    if (parser.isSet(sOptionNames[Opt::NZB_POST_CMD]))
+    {
+        // Replace rather than append: the command line overrides the
+        // configuration file, it does not add to it.
+        _nzbPostCmd = parser.values(sOptionNames[Opt::NZB_POST_CMD]);
+    }
+
+    if (parser.isSet(sOptionNames[Opt::POST_CMD_TIMEOUT]))
+    {
+        bool ok = false;
+        int nb = parser.value(sOptionNames[Opt::POST_CMD_TIMEOUT]).toInt(&ok);
+        if (!ok || nb < 0)
+        {
+            _error(tr("Error: --post_cmd_timeout expects a number of seconds (0 = no limit)"),
+                   ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+        _postCmdTimeoutSec = nb;
+    }
+
+    if (parser.isSet(sOptionNames[Opt::POST_CMD_FAIL_IS_ERROR]))
+        _postCmdFailIsError = true;
+    if (parser.isSet(sOptionNames[Opt::NO_POST_CMD_FAIL_IS_ERROR]))
+        _postCmdFailIsError = false;
+
+    if (parser.isSet(sOptionNames[Opt::POST_CMD_EXPOSE_PASSWORD]))
+        _postCmdExposePassword = true;
+    if (parser.isSet(sOptionNames[Opt::NO_POST_CMD_EXPOSE_PASSWORD]))
+        _postCmdExposePassword = false;
+
+    if (parser.isSet(sOptionNames[Opt::NZB_UPLOAD_TIMEOUT]))
+    {
+        bool ok = false;
+        int nb = parser.value(sOptionNames[Opt::NZB_UPLOAD_TIMEOUT]).toInt(&ok);
+        if (!ok || nb < 0)
+        {
+            _error(tr("Error: --nzb_upload_timeout expects a number of seconds (0 = no limit)"),
+                   ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+        _nzbUploadTimeoutSec = nb;
+    }
+
+    if (parser.isSet(sOptionNames[Opt::NZB_UPLOAD_URL]))
+    {
+        QString urlError;
+        _setNzbUploadUrl(parser.value(sOptionNames[Opt::NZB_UPLOAD_URL]), urlError);
+        if (!urlError.isEmpty())
+        {
+            _error(urlError.trimmed(), ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+    }
+
+    if (parser.isSet(sOptionNames[Opt::POST_HISTORY]))
+    {
+        QString histError;
+        _setPostHistoryFile(parser.value(sOptionNames[Opt::POST_HISTORY]), histError);
+        if (!histError.isEmpty())
+        {
+            _error(histError.trimmed(), ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+    }
+
+    // Both paths converge here: the separator is final by now.
+    _ensurePostHistoryHeader();
+
     if (parser.isSet(sOptionNames[Opt::META]))
     {
         for (const QString &meta : parser.values(sOptionNames[Opt::META]))
@@ -2974,18 +3121,7 @@ QString NgPost::_parseConfig(const QString &configPath)
                         }
                     }
                     else if (opt == sOptionNames[Opt::NZB_UPLOAD_URL])
-                    {
-                        _urlNzbUploadStr = val;
-                        _urlNzbUpload    = new QUrl(_urlNzbUploadStr);
-                        QStringList allowedProtocols = {"ftp", "http", "https"};
-                        if (!allowedProtocols.contains(_urlNzbUpload->scheme()))
-                        {
-                            err += tr("Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2\n").arg(
-                                        _urlNzbUpload->toString(QUrl::RemoveUserInfo)).arg(allowedProtocols.join(", "));
-                            delete _urlNzbUpload;
-                            _urlNzbUpload = nullptr;
-                        }
-                    }
+                        _setNzbUploadUrl(val, err);
                     else if (opt == sOptionNames[Opt::RESUME_WAIT])
                     {
                         ushort nb = val.toUShort(&ok);
@@ -3290,22 +3426,7 @@ QString NgPost::_parseConfig(const QString &configPath)
                         _inputDir = val;
 
                     else if (opt == sOptionNames[Opt::POST_HISTORY])
-                    {
-                        _postHistoryFile = val;
-                        QFileInfo fi(val);
-                        if (fi.isDir())
-                            err += tr("the post history '%1' can't be a directory...\n").arg(val);
-                        else
-                        {
-                            if (fi.exists())
-                            {
-                                if (!fi.isWritable())
-                                    err += tr("the post history file '%1' is not writable...\n").arg(val);
-                            }
-                            else if (!QFileInfo(fi.absolutePath()).isWritable())
-                                err += tr("the post history file '%1' is not writable...\n").arg(val);
-                        }
-                    }
+                        _setPostHistoryFile(val, err);
 
                     else if (opt == sOptionNames[Opt::FIELD_SEPARATOR])
                         _historyFieldSeparator = val;
@@ -3563,24 +3684,8 @@ QString NgPost::_parseConfig(const QString &configPath)
     if (_vpnManager)
         _vpnManager->setProfilesFromConfig(parsedVpnProfiles, parsedActiveVpnProfile);
 
-    if (err.isEmpty() && !_postHistoryFile.isEmpty())
-    {
-        QFile file(_postHistoryFile);
-        if (!file.exists() && file.open(QIODevice::WriteOnly|QIODevice::Text))
-        {
-            QTextStream stream(&file);
-            stream << tr("date")
-                   << _historyFieldSeparator << tr("nzb name")
-                   << _historyFieldSeparator << tr("size")
-                   << _historyFieldSeparator << tr("avg. speed")
-                   << _historyFieldSeparator << tr("archive name")
-                   << _historyFieldSeparator << tr("archive pass")
-                   << _historyFieldSeparator << tr("groups")
-                   << _historyFieldSeparator << tr("from") << "\n";
-
-            file.close();
-        }
-    }
+    if (err.isEmpty())
+        _ensurePostHistoryHeader();
 
     // Restore VpnManager signal emission. From here on, setters can validly
     // notify NgPost::saveConfig().

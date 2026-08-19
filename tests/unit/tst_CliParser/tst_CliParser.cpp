@@ -181,6 +181,18 @@ private slots:
     //! --export_post_info writes the record sheet of an old post: to a file,
     //! or to stdout with nothing else mixed in. An unknown id fails.
     void export_post_info_writes_to_file_or_stdout();
+
+    //! Every post automation setting is reachable from the command line, in
+    //! both directions for the booleans, so ngPost can be driven without a
+    //! configuration file at all.
+    void post_automation_settings_are_reachable_from_the_cli();
+
+    //! A timeout must be a number of seconds, and a bad one is refused rather
+    //! than silently ignored.
+    void post_cmd_timeout_rejects_a_non_numeric_value();
+
+    //! Only ftp, http and https can receive an nzb.
+    void nzb_upload_url_rejects_an_unsupported_scheme();
 };
 
 void TestCliParser::initTestCase()
@@ -600,6 +612,58 @@ void TestCliParser::export_post_info_writes_to_file_or_stdout()
     QVERIFY2(unknown.exitCode != 0,
              qPrintable(QStringLiteral("an unknown id should fail, got %1").arg(unknown.exitCode)));
     QVERIFY(unknown.stdoutText.isEmpty());
+}
+
+void TestCliParser::post_automation_settings_are_reachable_from_the_cli()
+{
+    HomeSandbox sandbox;
+    const RunResult r = run(_bin, { "--help" }, sandbox.rootPath());
+    QVERIFY2(!r.timedOut, "ngPost --help timed out");
+
+    const QString out = r.stdoutText + r.stderrText;
+    for (const char *flag : { "--post_info_only_on_success", "--no_post_info_only_on_success",
+                              "--nzb_post_cmd", "--post_cmd_timeout",
+                              "--post_cmd_fail_is_error", "--no_post_cmd_fail_is_error",
+                              "--post_cmd_expose_password", "--no_post_cmd_expose_password",
+                              "--nzb_upload_url", "--nzb_upload_timeout", "--post_history" }) {
+        QVERIFY2(out.contains(QString::fromLatin1(flag)),
+                 qPrintable(QStringLiteral("help does not mention '%1'").arg(QString::fromLatin1(flag))));
+    }
+
+    // and they are accepted together on a real command line
+    const RunResult accepted = runWithMeta(_bin,
+                                           { "--no_post_info_only_on_success",
+                                             "--post_cmd_timeout", "30",
+                                             "--post_cmd_fail_is_error",
+                                             "--no_post_cmd_expose_password",
+                                             "--nzb_upload_timeout", "60",
+                                             "--nzb_post_cmd", "/bin/true" },
+                                           sandbox);
+    QVERIFY2(!accepted.timedOut, "process timed out");
+    const QString acceptedOut = accepted.stdoutText + accepted.stderrText;
+    QVERIFY2(!acceptedOut.contains(QStringLiteral("Unknown option")), qPrintable(acceptedOut));
+}
+
+void TestCliParser::post_cmd_timeout_rejects_a_non_numeric_value()
+{
+    HomeSandbox sandbox;
+    const RunResult r = runWithMeta(_bin, { "--post_cmd_timeout", "soon" }, sandbox);
+
+    QVERIFY2(!r.timedOut, "process timed out");
+    QVERIFY2(r.exitCode != 0, qPrintable(QStringLiteral("expected a failure, got %1").arg(r.exitCode)));
+    const QString out = r.stdoutText + r.stderrText;
+    QVERIFY2(out.contains(QStringLiteral("post_cmd_timeout")), qPrintable(out));
+}
+
+void TestCliParser::nzb_upload_url_rejects_an_unsupported_scheme()
+{
+    HomeSandbox sandbox;
+    const RunResult r = runWithMeta(_bin, { "--nzb_upload_url", "sftp://box/nzbs" }, sandbox);
+
+    QVERIFY2(!r.timedOut, "process timed out");
+    QVERIFY2(r.exitCode != 0, qPrintable(QStringLiteral("expected a failure, got %1").arg(r.exitCode)));
+    const QString out = r.stdoutText + r.stderrText;
+    QVERIFY2(out.contains(QStringLiteral("ftp")), qPrintable(out));
 }
 
 void TestCliParser::unreadable_file_makes_the_post_not_successful()

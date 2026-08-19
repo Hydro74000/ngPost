@@ -108,6 +108,11 @@ public:
         POST_CMD_FAIL_IS_ERROR,
         POST_CMD_EXPOSE_PASSWORD,
         NZB_UPLOAD_TIMEOUT,
+        //! CLI-only negatives, so a boolean set in the configuration file can
+        //! be turned off for a single run (same idea as --vpn / --no_vpn).
+        NO_POST_INFO_ONLY_ON_SUCCESS,
+        NO_POST_CMD_FAIL_IS_ERROR,
+        NO_POST_CMD_EXPOSE_PASSWORD,
         MONITOR_FOLDERS,
         MONITOR_EXT,
         MONITOR_IGNORE_DIR,
@@ -626,6 +631,14 @@ private:
     //! Parses one key=value metadata. Returns false (and reports) on a malformed
     //! pair or on a key claimed by both --meta and --post_meta.
     bool _addMeta(const QString &keyValue, MetaScope scope);
+
+    //! Validate and apply the two settings that need checking, shared by the
+    //! configuration file and the command line so the rules cannot diverge.
+    //! They append to \a error rather than reporting, since the config parser
+    //! accumulates its errors.
+    void _setNzbUploadUrl(const QString &url, QString &error);
+    void _setPostHistoryFile(const QString &path, QString &error);
+    void _ensurePostHistoryHeader();
 
     //! Snapshot of the current global settings, frozen into a new job so that a
     //! queued post is sent with the settings it was queued with. Callers still

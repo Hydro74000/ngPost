@@ -29,6 +29,13 @@ TODO: auto RAR size and par2 parameters depending on the inputs size?
   in the nzb, which circulates, is an explicit choice (a checkbox, or -m).
 - --export_post_info <id> writes the record sheet of a post already in the
   history, to a file or to stdout. Also available from the History tab.
+- Post automation is now fully reachable from the command line, so ngPost can
+  be driven without any ngPost.conf: --post_info_template, --post_info_output,
+  --post_info_only_on_success / --no_..., --nzb_post_cmd (repeatable, replaces
+  the config ones), --post_cmd_timeout, --post_cmd_fail_is_error / --no_...,
+  --post_cmd_expose_password / --no_..., --nzb_upload_url,
+  --nzb_upload_timeout and --post_history. Each boolean comes as a pair so a
+  value set in the config can be turned around for a single run.
 - Many more variables for NZB_POST_CMD and the models: __postSize__,
   __par2Pct__, __nzbPoster__, __originalName__, __sourcePath__, __status__,
   __avgSpeed__, __date:<format>__, __meta:<name>__ and others. All of them are
