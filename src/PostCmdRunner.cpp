@@ -165,8 +165,11 @@ void PostCmdRunner::_runNextCommand()
     QStringList unknown;
     args = PostInfoTemplate::renderArguments(args, _current.data, true, &unknown);
 
+    // Log what is really run, not the template: seeing the substituted values
+    // is the whole point of the line, and it is what ngPost used to print.
+    _runningCmd = _redact(args.join(QLatin1Char(' ')));
+
     QString const cmd = args.takeFirst();
-    _runningCmd       = _redact(tmpl);
 
     _process = new QProcess(this);
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();

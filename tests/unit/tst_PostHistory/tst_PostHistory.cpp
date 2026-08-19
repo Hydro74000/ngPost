@@ -903,7 +903,8 @@ void TestPostHistory::schema_migrates_v1_database_without_losing_posts()
         QVERIFY(record.partial);
         QCOMPARE(record.info.par2Pct, -1);
         QCOMPARE(record.info.postSizeBytes, static_cast<qint64>(-1));
-        QCOMPARE(record.toPostInfoData().postSizeBytes, static_cast<quint64>(0));
+        // stays unknown all the way to the sheet, where it renders empty
+        QCOMPARE(record.toPostInfoData().postSizeBytes, static_cast<qint64>(-1));
     }
 }
 

@@ -1464,7 +1464,7 @@ PostInfoData PostingJob::postInfoData() const
     data.avgSpeed   = avgSpeed();
     data.appVersion = QString(APP_VERSION);
 
-    data.postSizeBytes    = _postSizeBytes;
+    data.postSizeBytes    = static_cast<qint64>(_postSizeBytes);
     data.legacySizeBytes  = _totalSize;
     data.par2Pct          = _options.describedPar2Pct();
     data.nbFiles          = _nbFiles;

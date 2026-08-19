@@ -1757,7 +1757,7 @@ PostInfoData PostHistoryStore::PostInfoRecord::toPostInfoData() const
     data.originalName = info.originalName;
     data.appVersion   = info.appVersion;
 
-    data.postSizeBytes = info.postSizeBytes < 0 ? 0 : static_cast<quint64>(info.postSizeBytes);
+    data.postSizeBytes = info.postSizeBytes; // < 0 stays "not recorded" 
     data.legacySizeBytes = post.sizeBytes < 0 ? 0 : static_cast<quint64>(post.sizeBytes);
     data.par2Pct         = info.par2Pct;
     data.nbFiles          = static_cast<uint>(post.nbFiles < 0 ? 0 : post.nbFiles);

@@ -57,7 +57,10 @@ struct PostInfoData
     QString appVersion;
 
     // sizes and counters
-    quint64 postSizeBytes   = 0;  //!< rar + par2, copied .nfo excluded, before yEnc
+    //! rar + par2, copied .nfo excluded, before yEnc. < 0 means "not recorded",
+    //! which is how a post made before this existed comes back: it then renders
+    //! empty rather than as a very wrong zero.
+    qint64  postSizeBytes   = -1;
     quint64 legacySizeBytes = 0;  //!< __sizeInByte__, kept as-is for existing scripts
     int     par2Pct         = -1; //!< < 0 means no par2 at all, rendered as empty
     uint    nbFiles          = 0;

@@ -188,6 +188,13 @@ void TestPostInfoTemplate::fixed_variables_resolve()
     d.par2Pct = -1;
     QCOMPARE(PostInfoTemplate::render("__par2Pct__", d, false), QString());
 
+    // a size that was never recorded renders empty, not as a very wrong zero:
+    // an index importing the sheet would take 0 bytes at face value
+    d.postSizeBytes = -1;
+    QCOMPARE(PostInfoTemplate::render("__postSize__", d, false), QString());
+    QCOMPARE(PostInfoTemplate::render("__postSizeHuman__", d, false), QString());
+    d.postSizeBytes = 2505484398LL;
+
     // the legacy size keeps its own value, it is not aliased to postSize
     d.legacySizeBytes = 42;
     QCOMPARE(PostInfoTemplate::render("__sizeInByte__", d, false), QStringLiteral("42"));

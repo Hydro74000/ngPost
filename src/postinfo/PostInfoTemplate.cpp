@@ -135,8 +135,10 @@ QMap<QString, QString> values(PostInfoData const &data, bool nativeSeparators)
     v["groups"]            = data.groups;
     v["nzbPoster"]         = data.nzbPoster;
     v["par2Pct"]           = numberOrEmpty(data.par2Pct);
-    v["postSize"]          = QString::number(data.postSizeBytes);
-    v["postSizeHuman"]     = PostingJob::humanSize(static_cast<double>(data.postSizeBytes));
+    v["postSize"]      = data.postSizeBytes < 0 ? QString() : QString::number(data.postSizeBytes);
+    v["postSizeHuman"] = data.postSizeBytes < 0
+                             ? QString()
+                             : PostingJob::humanSize(static_cast<double>(data.postSizeBytes));
     v["sizeInByte"]        = QString::number(data.legacySizeBytes);
     v["nbFiles"]           = QString::number(data.nbFiles);
     v["nbArticles"]        = QString::number(data.nbArticles);
