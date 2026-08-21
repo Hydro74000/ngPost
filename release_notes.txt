@@ -15,8 +15,8 @@ TODO: include ParPar instead of par2cmdline?
 TODO: auto RAR size and par2 parameters depending on the inputs size?
 
 ####################################################
-###       Release: ngPost API Update             ###
-###       date:    2026/08/18                    ###
+###       Release: ngPost v5.4.3                 ###
+###       date:    2026/08/21                    ###
 ####################################################
 
 - Post info files: after each post ngPost can write a small text file
@@ -63,6 +63,27 @@ Changes that affect everyone, even without a post info file:
 
 Bug fixes:
 
+- A resume could be recorded as a success while one of its files was
+  missing: a source that changed since the post was interrupted was simply
+  left out. One bad source now aborts the whole resume without posting
+  anything, and the post stays resumable.
+- The post commands of a resume described the leftovers rather than the
+  whole post. They now read the same finalised description as the record
+  sheet.
+- A resume inherited the metadata and the announced password of whatever run
+  happened to be going on, and handed them to its hooks.
+- A generated record sheet could overwrite what it describes: the exports
+  protected nothing, and a resume had no source list. The comparison also
+  now resolves symlinks and ignores case where the filesystem does.
+- setPostSizeIfUnset() was called during a resume and could record the size
+  of the leftovers as the size of the whole post. The final writes to the
+  history no longer ignore their result either.
+- A chatty post command could grow in memory without bound: its output was
+  only read once it had exited.
+- A post command could find the nzb still open, because the upload was
+  released asynchronously; on Windows a hook moving the nzb would fail.
+- A VPN failure exited immediately and killed the post commands of posts
+  that had already gone out.
 - A post missing a whole unreadable file was recorded as "success". Such a
   file never produces a failed ARTICLE, and only articles were counted. It is
   now reported as "partial".
