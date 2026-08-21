@@ -5278,7 +5278,7 @@ Het model nu opslaan?</translation>
         <translation type="vanished">vol size:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="416"/>
+        <location filename="../hmi/PostingWidget.ui" line="149"/>
         <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
         <translation>om het rar-archief in verschillende delen te splitsen (0 om niet te splitsen)</translation>
     </message>
@@ -5305,7 +5305,7 @@ Het model nu opslaan?</translation>
         <translation type="vanished">Volumegrootte:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="423"/>
+        <location filename="../hmi/PostingWidget.ui" line="156"/>
         <source>Limit RAR Number</source>
         <translation>Beperk aantal RAR</translation>
     </message>
@@ -5314,37 +5314,37 @@ Het model nu opslaan?</translation>
         <translation type="vanished">PAR2 redundantie (%): </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="186"/>
+        <location filename="../hmi/PostingWidget.ui" line="195"/>
         <source>Select the files to post (they may be compressed if needed) you can also right click on the files area just above</source>
         <translation>Selecteer de bestanden die je wilt posten (ze kunnen indien nodig worden gecomprimeerd). U kunt ook met de rechtermuisknop klikken op het bestandsgedeelte net erboven</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="189"/>
+        <location filename="../hmi/PostingWidget.ui" line="198"/>
         <source>Select Files</source>
         <translation>Selecteer bestanden</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="200"/>
+        <location filename="../hmi/PostingWidget.ui" line="209"/>
         <source>remove all files</source>
         <translation>verwijder alle bestanden</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="203"/>
+        <location filename="../hmi/PostingWidget.ui" line="212"/>
         <source>Remove All</source>
         <translation>Verwijder alles</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="214"/>
+        <location filename="../hmi/PostingWidget.ui" line="223"/>
         <source>select a folder (only if you use compression)</source>
         <translation>selecteer een map (alleen als je compressie gebruikt)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="217"/>
+        <location filename="../hmi/PostingWidget.ui" line="226"/>
         <source>Select Folder</source>
         <translation>Selecteer map</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="250"/>
+        <location filename="../hmi/PostingWidget.ui" line="259"/>
         <source>NZB file:</source>
         <translation>NZB bestand:</translation>
     </message>
@@ -5353,42 +5353,40 @@ Het model nu opslaan?</translation>
         <translation type="vanished">NZB wachtwoord:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="309"/>
+        <location filename="../hmi/PostingWidget.ui" line="318"/>
         <source>Compress</source>
         <translation>Comprimeren</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="453"/>
+        <location filename="../hmi/PostingWidget.ui" line="441"/>
         <source>Gen PAR2</source>
         <translation>Genereer PAR2</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="292"/>
+        <location filename="../hmi/PostingWidget.ui" line="301"/>
         <source>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</source>
         <translation>Als een .nfo bestand aanwezig is in de originele bestanden (voor rar/hernoemingen), kopieer het naast de gegenereerde nzb (met dezelfde basisnaam)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="136"/>
         <source>Random name length:</source>
-        <translation>Lengte van de willekeurige naam:</translation>
+        <translation type="vanished">Lengte van de willekeurige naam:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="143"/>
+        <location filename="../hmi/PostingWidget.ui" line="338"/>
         <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
         <translation>lengte van de archiefnaam die de dobbelsteenknop trekt (configuratie LENGTH_NAME)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="150"/>
         <source>Random password length:</source>
-        <translation>Lengte van het willekeurige wachtwoord:</translation>
+        <translation type="vanished">Lengte van het willekeurige wachtwoord:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="157"/>
+        <location filename="../hmi/PostingWidget.ui" line="401"/>
         <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
         <translation>lengte van het wachtwoord dat de dobbelsteenknop trekt (configuratie LENGTH_PASS)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="295"/>
+        <location filename="../hmi/PostingWidget.ui" line="304"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
         <translation>Kopieer NFO naast het nzb bestand (indien beschikbaar)</translation>
     </message>
@@ -5397,22 +5395,22 @@ Het model nu opslaan?</translation>
         <translation type="vanished">nzb bestand: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="257"/>
+        <location filename="../hmi/PostingWidget.ui" line="266"/>
         <source>full path of the nzb file that would be created (check the nzbPath keyword in the config file to set the default directory)</source>
         <translation>volledig pad van het nzb-bestand dat zou worden gemaakt (controleer het sleutelwoord nzbPath in het configuratiebestand om de standaardmap in te stellen)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="270"/>
+        <location filename="../hmi/PostingWidget.ui" line="279"/>
         <source>select the nzb file absolute file name</source>
         <translation>selecteer de absolute bestandsnaam van het nzb-bestand</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="273"/>
+        <location filename="../hmi/PostingWidget.ui" line="282"/>
         <source> ... </source>
         <translation> ... </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="353"/>
+        <location filename="../hmi/PostingWidget.ui" line="375"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation>Dit moet het wachtwoord zijn van het archief dat je plaatst</translation>
     </message>
@@ -5421,7 +5419,7 @@ Het model nu opslaan?</translation>
         <translation type="vanished">nzb wachtwoord:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="366"/>
+        <location filename="../hmi/PostingWidget.ui" line="388"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>wachtwoord van het archief dat ook word toegevoegd in de koptekst van het nzb-bestand</translation>
     </message>
@@ -5430,12 +5428,12 @@ Het model nu opslaan?</translation>
         <translation type="vanished">lengte van het wachtwoord</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="379"/>
+        <location filename="../hmi/PostingWidget.ui" line="414"/>
         <source>generate random password</source>
         <translation>maak willekeurig wachtwoord</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="306"/>
+        <location filename="../hmi/PostingWidget.ui" line="315"/>
         <source>compress the selected files using rar before posting</source>
         <translation>pak de geselecteerde bestanden in met rar voordat je ze plaatst</translation>
     </message>
@@ -5444,7 +5442,7 @@ Het model nu opslaan?</translation>
         <translation type="vanished">comprimeer</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="316"/>
+        <location filename="../hmi/PostingWidget.ui" line="325"/>
         <source>archive name (file name obfuscation)</source>
         <translation>archiefnaam (versleuteld)</translation>
     </message>
@@ -5453,27 +5451,27 @@ Het model nu opslaan?</translation>
         <translation type="vanished">lengte van de archief naam</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="329"/>
+        <location filename="../hmi/PostingWidget.ui" line="351"/>
         <source>generate random archive name</source>
         <translation>genereer willekeurige archiefnaam</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="356"/>
+        <location filename="../hmi/PostingWidget.ui" line="378"/>
         <source>Archive password</source>
         <translation>Archiefwachtwoord</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="403"/>
+        <location filename="../hmi/PostingWidget.ui" line="136"/>
         <source>Vol size (MB):</source>
         <translation>Volumegrootte (MB):</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="433"/>
+        <location filename="../hmi/PostingWidget.ui" line="166"/>
         <source>Keep Archives</source>
         <translation>Behoud archieven</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="450"/>
+        <location filename="../hmi/PostingWidget.ui" line="438"/>
         <source>generate the par2 (the compress option must be selected)</source>
         <translation>genereer par2 (de compressie-optie moet geselecteerd zijn)</translation>
     </message>
@@ -5482,7 +5480,7 @@ Het model nu opslaan?</translation>
         <translation type="vanished">maak par2</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="430"/>
+        <location filename="../hmi/PostingWidget.ui" line="163"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation>standaard worden rar en par2-bestanden verwijderd na het posten, maar je kunt ervoor kiezen om ze te behouden</translation>
     </message>
@@ -5499,12 +5497,12 @@ Het model nu opslaan?</translation>
         <translation type="vanished">Over</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="496"/>
+        <location filename="../hmi/PostingWidget.ui" line="475"/>
         <source>Let&apos;s Post!</source>
         <translation>Nu Posten!</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="499"/>
+        <location filename="../hmi/PostingWidget.ui" line="478"/>
         <location filename="../hmi/PostingWidget.cpp" line="826"/>
         <source>Post Files</source>
         <translation>Post Bestanden</translation>

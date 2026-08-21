@@ -129,32 +129,41 @@
       </spacer>
      </item>
      <item>
-      <layout class="QHBoxLayout" name="genLengthLayout">
+      <layout class="QHBoxLayout" name="rarSizeLayout">
        <item>
-        <widget class="QLabel" name="nameLengthLbl">
+        <widget class="QLabel" name="rarSizeLbl">
          <property name="text">
-          <string>Random name length:</string>
+          <string>Vol size (MB):</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QSpinBox" name="nameLengthSB">
+        <widget class="QLineEdit" name="rarSizeEdit">
+         <property name="maximumSize">
+          <size>
+           <width>50</width>
+           <height>16777215</height>
+          </size>
+         </property>
          <property name="toolTip">
-          <string>length of the archive name drawn by the dice button (config LENGTH_NAME)</string>
+          <string>to split the rar archive in several volumes (0 to don't split)</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QLabel" name="passLengthLbl">
+        <widget class="QCheckBox" name="rarMaxCB">
          <property name="text">
-          <string>Random password length:</string>
+          <string>Limit RAR Number</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QSpinBox" name="passLengthSB">
+        <widget class="QCheckBox" name="keepRarCB">
          <property name="toolTip">
-          <string>length of the password drawn by the dice button (config LENGTH_PASS)</string>
+          <string>by default archives and par2 files are deleted uppon post success but you can choose to keep them</string>
+         </property>
+         <property name="text">
+          <string>Keep Archives</string>
          </property>
         </widget>
        </item>
@@ -318,6 +327,19 @@
       </widget>
      </item>
      <item>
+      <widget class="QSpinBox" name="nameLengthSB">
+       <property name="maximumSize">
+        <size>
+         <width>60</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="toolTip">
+        <string>length of the archive name drawn by the dice button (config LENGTH_NAME)</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="genCompressName">
        <property name="maximumSize">
         <size>
@@ -368,6 +390,19 @@
       </widget>
      </item>
      <item>
+      <widget class="QSpinBox" name="passLengthSB">
+       <property name="maximumSize">
+        <size>
+         <width>60</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="toolTip">
+        <string>length of the password drawn by the dice button (config LENGTH_PASS)</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="genPass">
        <property name="maximumSize">
         <size>
@@ -384,53 +419,6 @@
        <property name="icon">
         <iconset resource="../resources/resources.qrc">
          <normaloff>:/icons/genKey.png</normaloff>:/icons/genKey.png</iconset>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QFrame" name="sepVol">
-       <property name="frameShape">
-        <enum>QFrame::Shape::VLine</enum>
-       </property>
-       <property name="frameShadow">
-        <enum>QFrame::Shadow::Sunken</enum>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="rarSizeLbl">
-       <property name="text">
-        <string>Vol size (MB):</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="rarSizeEdit">
-       <property name="maximumSize">
-        <size>
-         <width>50</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="toolTip">
-        <string>to split the rar archive in several volumes (0 to don't split)</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="rarMaxCB">
-       <property name="text">
-        <string>Limit RAR Number</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="keepRarCB">
-       <property name="toolTip">
-        <string>by default archives and par2 files are deleted uppon post success but you can choose to keep them</string>
-       </property>
-       <property name="text">
-        <string>Keep Archives</string>
        </property>
       </widget>
      </item>
@@ -455,23 +443,14 @@
       </widget>
      </item>
      <item>
-      <widget class="QSpinBox" name="redundancySB"/>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer_packing">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeType">
-        <enum>QSizePolicy::Policy::Expanding</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
+      <widget class="QSpinBox" name="redundancySB">
+       <property name="maximumSize">
         <size>
-         <width>40</width>
-         <height>20</height>
+         <width>70</width>
+         <height>16777215</height>
         </size>
        </property>
-      </spacer>
+      </widget>
      </item>
     </layout>
    </item>
