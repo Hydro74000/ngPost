@@ -616,7 +616,11 @@ void PostingWidget::_buildPostInfoRow()
     _ui->horizontalLayout_9->addWidget(sep);
     _ui->horizontalLayout_9->addWidget(_postInfoCB);
     _ui->horizontalLayout_9->addWidget(_postInfoButton);
-    _ui->horizontalLayout_9->addStretch();
+
+    // No trailing stretch: the spare width goes to the nzb path, which is the
+    // only field on the line long enough to need it. A stretch here would eat
+    // it instead and leave the path showing "...do.nzb".
+    _ui->horizontalLayout_9->setStretchFactor(_ui->nzbFileLayout, 1);
 
     retranslatePostInfoTexts();
 }

@@ -262,6 +262,18 @@
        </item>
        <item>
         <widget class="QLineEdit" name="nzbFileEdit">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+           <horstretch>1</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>120</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="toolTip">
           <string>full path of the nzb file that would be created (check the nzbPath keyword in the config file to set the default directory)</string>
          </property>
