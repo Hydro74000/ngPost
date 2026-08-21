@@ -49,6 +49,11 @@ TODO: auto RAR size and par2 parameters depending on the inputs size?
 - A "?" button lists every __variable__ ngPost knows and whether it exists
   before or after the post. It is generated from the renderer's own table, so
   it cannot describe something ngPost does not support.
+- Every interface string is translated again in all seven languages (English,
+  French, Spanish, German, Dutch, Portuguese, Chinese). 449 entries per
+  language had drifted untranslated over several releases, not only the ones
+  added here; the .ts files and the embedded .qm catalogues are back to zero
+  unfinished entries.
 - --export_post_info <id> writes the record sheet of a post already in the
   history, to a file or to stdout. Also available from the History tab.
 - Post automation is now fully reachable from the command line, so ngPost can
