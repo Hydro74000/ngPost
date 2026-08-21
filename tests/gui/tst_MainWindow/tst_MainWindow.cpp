@@ -31,6 +31,7 @@
 #include <QSignalSpy>
 #include <QSpinBox>
 #include <QTabWidget>
+#include <QDateTime>
 #include <QTableWidget>
 #include <QTextStream>
 
@@ -87,9 +88,12 @@ private slots:
 
     //! The model from the configuration is the default: it is marked as such,
     //! selected, and selecting it is not an override.
-    //! Values already known while preparing the post are shown; the ones that
-    //! only exist afterwards stay blank, and a secret is never printed.
-    void post_info_dialog_shows_what_is_already_known();
+    //! The preview column is the sheet: known values, blanks for what only
+    //! exists after the post, and free text mixed with variables.
+    void post_info_dialog_previews_every_line();
+
+    //! Lines and fields can be added and removed to compose a model.
+    void post_info_dialog_edits_and_saves_a_model();
 
     void post_info_dialog_marks_the_configured_model_as_default();
 
@@ -371,27 +375,35 @@ void TestMainWindow::post_info_dialog_offers_the_fields_of_the_model()
     {
         QFile tmpl(tmplPath);
         QVERIFY(tmpl.open(QIODevice::WriteOnly));
-        tmpl.write("titre =__meta:titre__\ncat =__meta:categorie__\ntaille =__postSize__\n");
+        tmpl.write("# une note\n"
+                   "titre =__meta:titre__\n"
+                   "cat =__meta:categorie__\n"
+                   "taille =__postSize__\n");
     }
 
-    // Opening on a model shows every line it will produce, in its own order:
-    // the two fields to fill in, and the size ngPost works out by itself.
     PostInfoData preview;
     preview.rarName = QStringLiteral("my-archive");
     PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>(), QStringList(), preview);
+
+    // The model table is the file: every line of it, comment included, in order.
+    auto *model = dlg.findChild<QTableWidget *>(QStringLiteral("postInfoModelTable"));
+    QVERIFY(model);
+    QCOMPARE(model->rowCount(), 5); // four lines plus the final empty one
+    auto *comment = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelRaw_0"));
+    QVERIFY(comment);
+    QCOMPARE(comment->text(), QStringLiteral("# une note"));
+    auto *label = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelLabel_1"));
+    QVERIFY(label);
+    QCOMPARE(label->text(), QStringLiteral("titre"));
+    auto *expr = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelExpr_1"));
+    QVERIFY(expr);
+    QCOMPARE(expr->text(), QStringLiteral("__meta:titre__"));
+
+    // The values table holds only what the user has to answer: the two metas,
+    // never the comment nor the size ngPost works out by itself.
     auto *table = dlg.findChild<QTableWidget *>(QStringLiteral("postInfoFieldsTable"));
     QVERIFY(table);
-    QCOMPARE(table->rowCount(), 3); // titre, categorie, and __postSize__
-
-    // the automatic line is shown, but is neither editable nor one of "yours"
-    auto *autoName = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoAutoName_2"));
-    QVERIFY(autoName);
-    QCOMPARE(autoName->text(), QStringLiteral("__postSize__"));
-    QVERIFY(autoName->isReadOnly());
-    auto *autoValue = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoAutoValue_2"));
-    QVERIFY(autoValue);
-    QVERIFY(autoValue->text().isEmpty()); // a size only exists once the post is over
-    QVERIFY(!autoValue->placeholderText().isEmpty());
+    QCOMPARE(table->rowCount(), 2);
 
     auto *firstName = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoFieldName_0"));
     QVERIFY(firstName);
@@ -416,45 +428,113 @@ void TestMainWindow::post_info_dialog_offers_the_fields_of_the_model()
     QCOMPARE(meta.value(QStringLiteral("categorie")).scope, MetaScope::Local);
 }
 
-void TestMainWindow::post_info_dialog_shows_what_is_already_known()
+void TestMainWindow::post_info_dialog_previews_every_line()
 {
     HomeSandbox sandbox;
     const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
     {
         QFile tmpl(tmplPath);
         QVERIFY(tmpl.open(QIODevice::WriteOnly));
-        tmpl.write("nom =__rarName__\npass =__rarPass__\nstatut =__status__\n");
+        // a mixed line: free text and a variable on the same line
+        tmpl.write("# ignoree\n"
+                   "nom =__rarName__\n"
+                   "pass =__rarPass__\n"
+                   "statut =__status__\n"
+                   "commentaire =moi __originalName__ et la suite\n"
+                   "titre =__meta:titre__\n");
     }
 
     PostInfoData preview;
-    preview.rarName = QStringLiteral("my-archive");
-    preview.rarPass = QStringLiteral("qwerty42");
+    preview.rarName      = QStringLiteral("my-archive");
+    preview.rarPass      = QStringLiteral("qwerty42");
+    preview.originalName = QStringLiteral("rando.mkv");
 
     PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>(), QStringList(), preview);
-    auto *table = dlg.findChild<QTableWidget *>(QStringLiteral("postInfoFieldsTable"));
-    QVERIFY(table);
-    QCOMPARE(table->rowCount(), 3);
+
+    // a comment produces nothing
+    auto *p0 = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelPreview_0"));
+    QVERIFY(p0);
+    QVERIFY(p0->text().isEmpty());
+
+    // a date is knowable while preparing the post: it previews as today, so
+    // the chosen format can be checked before posting
+    {
+        HomeSandbox dateBox;
+        const QString datePath = dateBox.rootPath() + QStringLiteral("/date.tpl");
+        QFile dateTmpl(datePath);
+        QVERIFY(dateTmpl.open(QIODevice::WriteOnly));
+        dateTmpl.write("date =__date:dd/MM/yyyy__\n");
+        dateTmpl.close();
+
+        PostInfoDialog dateDlg(datePath, QString(), QMap<QString, MetaValue>());
+        auto *dp = dateDlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelPreview_0"));
+        QVERIFY(dp);
+        QCOMPARE(dp->text(),
+                 QDateTime::currentDateTime().toString(QStringLiteral("dd/MM/yyyy")));
+    }
 
     // a value already known while preparing the post is shown as it will be
-    auto *name = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoAutoValue_0"));
-    QVERIFY(name);
-    QCOMPARE(name->text(), QStringLiteral("my-archive"));
+    auto *p1 = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelPreview_1"));
+    QVERIFY(p1);
+    QCOMPARE(p1->text(), QStringLiteral("my-archive"));
 
-    // a secret is not printed on screen: knowing it is there is enough
-    auto *pass = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoAutoValue_1"));
-    QVERIFY(pass);
-    QVERIFY(!pass->text().isEmpty());
-    QVERIFY(!pass->text().contains(QStringLiteral("qwerty42")));
+    // the password is rendered like everything else: this column is the sheet,
+    // and the sheet will hold it
+    auto *p2 = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelPreview_2"));
+    QVERIFY(p2);
+    QCOMPARE(p2->text(), QStringLiteral("qwerty42"));
 
-    // and a value that only exists after the post stays blank
-    auto *status = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoAutoValue_2"));
-    QVERIFY(status);
-    QVERIFY(status->text().isEmpty());
+    // a value that only exists after the post stays blank, and says so
+    auto *p3 = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelPreview_3"));
+    QVERIFY(p3);
+    QVERIFY(p3->text().isEmpty());
+    QVERIFY(!p3->placeholderText().isEmpty());
 
-    // none of these three is a field of the user
-    QString duplicate;
-    QVERIFY(dlg.meta(&duplicate).isEmpty());
-    QVERIFY(duplicate.isEmpty());
+    // text and variables mix freely on one line
+    auto *p4 = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelPreview_4"));
+    QVERIFY(p4);
+    QCOMPARE(p4->text(), QStringLiteral("moi rando.mkv et la suite"));
+
+    // and typing a value updates the preview of the line that uses it
+    auto *value = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoFieldValue_0"));
+    QVERIFY(value);
+    value->setText(QStringLiteral("Mercantour"));
+    emit value->textEdited(QStringLiteral("Mercantour"));
+    auto *p5 = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelPreview_5"));
+    QVERIFY(p5);
+    QCOMPARE(p5->text(), QStringLiteral("Mercantour"));
+}
+
+void TestMainWindow::post_info_dialog_edits_and_saves_a_model()
+{
+    HomeSandbox sandbox;
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    {
+        QFile tmpl(tmplPath);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("# entete\ndate        =__date:yyyy__\ntitre =__meta:titre__\n");
+    }
+
+    PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>());
+    auto *model = dlg.findChild<QTableWidget *>(QStringLiteral("postInfoModelTable"));
+    QVERIFY(model);
+    QCOMPARE(model->rowCount(), 4); // three lines plus the final empty one
+
+    // adding a field adds both the value row and the line that writes it
+    auto *fields = dlg.findChild<QTableWidget *>(QStringLiteral("postInfoFieldsTable"));
+    QVERIFY(fields);
+    const int fieldsBefore = fields->rowCount();
+    auto *addField = dlg.findChild<QPushButton *>(QStringLiteral("postInfoAddFieldButton"));
+    QVERIFY(addField);
+    addField->click();
+    QCOMPARE(fields->rowCount(), fieldsBefore + 1);
+    QCOMPARE(model->rowCount(), 5);
+
+    // a line can be dropped from the model
+    auto *del = dlg.findChild<QPushButton *>(QStringLiteral("postInfoModelDel_0"));
+    QVERIFY(del);
+    del->click();
+    QCOMPARE(model->rowCount(), 4);
 }
 
 void TestMainWindow::post_info_dialog_marks_the_configured_model_as_default()

@@ -243,8 +243,9 @@ QStringList renderArguments(QStringList const  &args,
 
 QStringList metaNamesIn(QString const &tmpl)
 {
-    QStringList names;
-    QRegularExpressionMatchIterator it = tokenRegExp().globalMatch(tmpl);
+    QStringList                     names;
+    QString const                   body = stripComments(tmpl);
+    QRegularExpressionMatchIterator it   = tokenRegExp().globalMatch(body);
     while (it.hasNext()) {
         QRegularExpressionMatch const m = it.next();
         if (m.captured(1) != QLatin1String("meta"))
@@ -256,10 +257,86 @@ QStringList metaNamesIn(QString const &tmpl)
     return names;
 }
 
+bool usesCrLf(QString const &tmpl) { return tmpl.contains(QLatin1String("\r\n")); }
+
+QVector<SheetLine> parseTemplate(QString const &tmpl)
+{
+    QVector<SheetLine> lines;
+    // Split on '\n' and drop the '\r' of a CRLF file: keeping it would leave a
+    // stray carriage return at the end of every expression, and buildTemplate()
+    // puts the right ending back.
+    QString normalized = tmpl;
+    normalized.replace(QLatin1String("\r\n"), QLatin1String("\n"));
+
+    for (QString const &line : normalized.split(QLatin1Char('\n'))) {
+        SheetLine parsed;
+
+        // Column 0 only, deliberately: a line indented by one space is written
+        // out, which is the escape hatch for a sheet that really starts with a
+        // '#'. No backslash escaping, no second rule to remember.
+        if (line.startsWith(QLatin1Char('#'))) {
+            parsed.kind = SheetLine::Kind::Comment;
+            parsed.raw  = line;
+            lines << parsed;
+            continue;
+        }
+
+        qsizetype const eq = line.indexOf(QLatin1Char('='));
+        if (eq < 0) {
+            parsed.kind = SheetLine::Kind::Raw;
+            parsed.raw  = line;
+            lines << parsed;
+            continue;
+        }
+
+        // Split on the FIRST '=': a value can hold others, an url usually does.
+        // The spaces around it are kept apart so that an aligned model stays
+        // aligned when it is saved again.
+        qsizetype labelEnd = eq;
+        while (labelEnd > 0 && line.at(labelEnd - 1).isSpace())
+            --labelEnd;
+        qsizetype valueStart = eq + 1;
+        while (valueStart < line.size() && line.at(valueStart).isSpace())
+            ++valueStart;
+
+        parsed.kind       = SheetLine::Kind::Field;
+        parsed.label      = line.left(labelEnd);
+        parsed.separator  = line.mid(labelEnd, valueStart - labelEnd);
+        parsed.expression = line.mid(valueStart);
+        lines << parsed;
+    }
+
+    // A file ending with a newline splits into a last empty piece; it is a real
+    // line of the model as far as the round trip is concerned.
+    return lines;
+}
+
+QString buildTemplate(QVector<SheetLine> const &lines, bool crlf)
+{
+    QStringList texts;
+    texts.reserve(lines.size());
+    for (SheetLine const &line : lines)
+        texts << line.text();
+    return texts.join(crlf ? QLatin1String("\r\n") : QLatin1String("\n"));
+}
+
+QString stripComments(QString const &tmpl)
+{
+    QVector<SheetLine> const lines = parseTemplate(tmpl);
+    QVector<SheetLine>       kept;
+    kept.reserve(lines.size());
+    for (SheetLine const &line : lines) {
+        if (line.kind != SheetLine::Kind::Comment)
+            kept << line;
+    }
+    return buildTemplate(kept, usesCrLf(tmpl));
+}
+
 QVector<Token> tokensIn(QString const &tmpl)
 {
     QVector<Token>                  tokens;
-    QRegularExpressionMatchIterator it = tokenRegExp().globalMatch(tmpl);
+    QString const                   body = stripComments(tmpl);
+    QRegularExpressionMatchIterator it   = tokenRegExp().globalMatch(body);
     while (it.hasNext()) {
         QRegularExpressionMatch const m = it.next();
         if (m.captured(1).isEmpty())
@@ -456,7 +533,7 @@ Result renderToFile(QString const      &templatePath,
 
     QStringList unknownInBody;
     QString const body =
-        render(tmpl, data, true, OnUnknown::KeepVerbatim, &unknownInBody);
+        render(stripComments(tmpl), data, true, OnUnknown::KeepVerbatim, &unknownInBody);
     if (!unknownInBody.isEmpty())
         res.warnings << tr("unknown variable(s) left as-is: %1").arg(unknownInBody.join(", "));
 

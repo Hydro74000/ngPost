@@ -6,7 +6,6 @@
 #include "postinfo/PostInfoTemplate.h"
 
 #include <QCheckBox>
-#include <QSignalBlocker>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -14,12 +13,15 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QFormLayout>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
+#include <QSaveFile>
+#include <QSignalBlocker>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTextBrowser>
@@ -28,20 +30,40 @@
 namespace
 {
 //! Deterministic names, so the GUI tests can reach the cells.
-QString fieldName(char const *role, int row)
+QString cellName(char const *role, int row)
 {
     return QStringLiteral("%1_%2").arg(QLatin1String(role)).arg(row);
 }
+
+//! Columns of the model table.
+enum ModelCol
+{
+    ColLabel = 0,
+    ColExpression,
+    ColPreview,
+    ColDelLine
+};
+
+//! Columns of the values table.
+enum FieldCol
+{
+    ColName = 0,
+    ColValue,
+    ColNzb,
+    ColDelField
+};
 } // namespace
 
-PostInfoDialog::PostInfoDialog(const QString &configuredTemplate,
-                               const QString &templateOverride,
+PostInfoDialog::PostInfoDialog(const QString                  &configuredTemplate,
+                               const QString                  &templateOverride,
                                const QMap<QString, MetaValue> &meta,
-                               const QStringList &sessionTemplates,
-                               const PostInfoData &preview,
-                               QWidget *parent)
-    : QDialog(parent), _configuredTemplate(configuredTemplate), _preview(preview),
-      _sessionTemplates(sessionTemplates)
+                               const QStringList              &sessionTemplates,
+                               const PostInfoData             &preview,
+                               QWidget                        *parent)
+    : QDialog(parent)
+    , _configuredTemplate(configuredTemplate)
+    , _preview(preview)
+    , _sessionTemplates(sessionTemplates)
 {
     setObjectName(QStringLiteral("postInfoDialog"));
     setWindowTitle(tr("Post information"));
@@ -54,7 +76,7 @@ PostInfoDialog::PostInfoDialog(const QString &configuredTemplate,
                                   "blanks."),
                                this));
 
-    // ---- the model -------------------------------------------------------
+    // ---- which model -----------------------------------------------------
     QHBoxLayout *tmplRow = new QHBoxLayout();
     tmplRow->addWidget(new QLabel(tr("Model:"), this));
 
@@ -71,10 +93,10 @@ PostInfoDialog::PostInfoDialog(const QString &configuredTemplate,
     _forgetButton->setToolTip(tr("Remove this model from the list"));
     tmplRow->addWidget(_forgetButton);
 
-    _loadFieldsButton = new QPushButton(tr("Read its fields"), this);
-    _loadFieldsButton->setObjectName(QStringLiteral("postInfoLoadFieldsButton"));
-    _loadFieldsButton->setToolTip(tr("Offer exactly the fields this model asks for."));
-    tmplRow->addWidget(_loadFieldsButton);
+    _reloadButton = new QPushButton(tr("Reload"), this);
+    _reloadButton->setObjectName(QStringLiteral("postInfoLoadFieldsButton"));
+    _reloadButton->setToolTip(tr("Read the file again, dropping the changes made here."));
+    tmplRow->addWidget(_reloadButton);
 
     root->addLayout(tmplRow);
 
@@ -90,56 +112,97 @@ PostInfoDialog::PostInfoDialog(const QString &configuredTemplate,
     _templateHint->setWordWrap(true);
     root->addWidget(_templateHint);
 
-    // ---- the fields ------------------------------------------------------
-    root->addWidget(new QLabel(tr("Below is the sheet this model produces. The lines named "
-                                  "__like_this__ are filled in by ngPost;\nthe others are yours. "
-                                  "A field of yours always goes into the file \342\200\224 tick "
-                                  "\302\253 Also in NZB \302\273 to publish it in the nzb too."),
-                               this));
+    // ---- the model: the file, line by line -------------------------------
+    QGroupBox   *modelBox    = new QGroupBox(tr("The model \342\200\224 the file, line by line"), this);
+    QVBoxLayout *modelLayout = new QVBoxLayout(modelBox);
+    modelLayout->addWidget(new QLabel(
+        tr("This is the file itself. Anything in a line is written as it is, and every "
+           "__variable__ is replaced by its value.\nA line starting with # is a comment: it is "
+           "never written. Changes here only reach the file through \302\253 Save as\342\200\246 \302\273."),
+        modelBox));
 
-    _fields = new QTableWidget(this);
+    _model = new QTableWidget(modelBox);
+    _model->setObjectName(QStringLiteral("postInfoModelTable"));
+    _model->setColumnCount(4);
+    _model->verticalHeader()->hide();
+    _model->setHorizontalHeaderLabels(
+        QStringList{ tr("Field"), tr("Content of the line"), tr("What will come out"), QString() });
+    _model->horizontalHeader()->setSectionResizeMode(ColExpression, QHeaderView::Stretch);
+    _model->horizontalHeader()->setSectionResizeMode(ColPreview, QHeaderView::Stretch);
+    _model->setColumnWidth(ColLabel, 150);
+    _model->setColumnWidth(ColDelLine, 34);
+    modelLayout->addWidget(_model, 1);
+
+    QHBoxLayout *modelActions = new QHBoxLayout();
+    _addLineButton            = new QPushButton(tr("Add a line"), modelBox);
+    _addLineButton->setObjectName(QStringLiteral("postInfoAddLineButton"));
+    _addLineButton->setToolTip(tr("Inserts a line under the selected one, at the end otherwise."));
+    modelActions->addWidget(_addLineButton);
+
+    _saveAsButton = new QPushButton(tr("Save as\342\200\246"), modelBox);
+    _saveAsButton->setObjectName(QStringLiteral("postInfoSaveAsButton"));
+    _saveAsButton->setToolTip(tr("Writes these lines to a model file of your own."));
+    modelActions->addWidget(_saveAsButton);
+    modelActions->addStretch();
+    modelLayout->addLayout(modelActions);
+
+    root->addWidget(modelBox, 3);
+
+    // ---- your fields: the values of THIS post ----------------------------
+    QGroupBox   *fieldsBox    = new QGroupBox(tr("Your fields \342\200\224 the values of this post"), this);
+    QVBoxLayout *fieldsLayout = new QVBoxLayout(fieldsBox);
+    fieldsLayout->addWidget(new QLabel(
+        tr("One line per __meta:name__ the model uses. These values belong to this post, not to "
+           "the model:\nthey are never written into the file above. A field always goes into the "
+           "post info file \342\200\224 tick \302\253 Also in NZB \302\273 to publish it in the nzb too."),
+        fieldsBox));
+
+    _fields = new QTableWidget(fieldsBox);
     _fields->setObjectName(QStringLiteral("postInfoFieldsTable"));
     _fields->setColumnCount(4);
     _fields->verticalHeader()->hide();
     _fields->setHorizontalHeaderLabels(
         QStringList{ tr("Name"), tr("Value"), tr("Also in NZB"), QString() });
-    _fields->horizontalHeaderItem(2)->setToolTip(
+    _fields->horizontalHeaderItem(ColNzb)->setToolTip(
         tr("Off: the field is written in the post info file only.\n"
            "On: it is written there AND published in the nzb, which circulates."));
-    _fields->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    // Wide enough for the longest variable name: a truncated "__nbArticl..."
-    // tells the user nothing.
-    _fields->setColumnWidth(0, 200);
-    _fields->setColumnWidth(2, 90);
-    _fields->setColumnWidth(3, 30);
-    root->addWidget(_fields, 1);
+    _fields->horizontalHeader()->setSectionResizeMode(ColValue, QHeaderView::Stretch);
+    _fields->setColumnWidth(ColName, 150);
+    _fields->setColumnWidth(ColNzb, 90);
+    _fields->setColumnWidth(ColDelField, 34);
+    fieldsLayout->addWidget(_fields, 1);
 
-    QHBoxLayout *actionRow = new QHBoxLayout();
-    _addButton = new QPushButton(tr("Add a field"), this);
-    _addButton->setObjectName(QStringLiteral("postInfoAddFieldButton"));
-    actionRow->addWidget(_addButton);
-    actionRow->addStretch();
+    QHBoxLayout *fieldActions = new QHBoxLayout();
+    _addFieldButton           = new QPushButton(tr("Add a field"), fieldsBox);
+    _addFieldButton->setObjectName(QStringLiteral("postInfoAddFieldButton"));
+    _addFieldButton->setToolTip(tr("Adds a field of yours, and the line that writes it."));
+    fieldActions->addWidget(_addFieldButton);
+    fieldActions->addStretch();
+    fieldsLayout->addLayout(fieldActions);
 
-    _helpButton = new QPushButton(tr("?  What can I put in a model"), this);
+    root->addWidget(fieldsBox, 2);
+
+    // ---- the way out -----------------------------------------------------
+    QHBoxLayout *bottom = new QHBoxLayout();
+    _helpButton         = new QPushButton(tr("?  What can I put in a model"), this);
     _helpButton->setObjectName(QStringLiteral("postInfoHelpButton"));
     _helpButton->setToolTip(tr("Every __variable__ ngPost knows, and what it holds."));
-    actionRow->addWidget(_helpButton);
-    root->addLayout(actionRow);
-
+    bottom->addWidget(_helpButton);
+    bottom->addStretch();
 
     QDialogButtonBox *buttons =
         new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-    root->addWidget(buttons);
+    bottom->addWidget(buttons);
+    root->addLayout(bottom);
 
-    connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::accepted, this, &PostInfoDialog::onAccept);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    connect(_addButton, &QAbstractButton::clicked, this, &PostInfoDialog::onAddField);
     connect(_forgetButton, &QAbstractButton::clicked, this, &PostInfoDialog::onForgetTemplate);
     connect(_helpButton, &QAbstractButton::clicked, this, &PostInfoDialog::onShowHelp);
-    connect(_loadFieldsButton,
-            &QAbstractButton::clicked,
-            this,
-            &PostInfoDialog::onLoadFieldsFromTemplate);
+    connect(_reloadButton, &QAbstractButton::clicked, this, &PostInfoDialog::onReloadModel);
+    connect(_addLineButton, &QAbstractButton::clicked, this, &PostInfoDialog::onAddModelLine);
+    connect(_saveAsButton, &QAbstractButton::clicked, this, &PostInfoDialog::onSaveModelAs);
+    connect(_addFieldButton, &QAbstractButton::clicked, this, &PostInfoDialog::onAddField);
 
     _fillTemplateList(templateOverride);
     connect(_templateList,
@@ -147,20 +210,19 @@ PostInfoDialog::PostInfoDialog(const QString &configuredTemplate,
             this,
             &PostInfoDialog::onTemplateChosen);
 
+    // The values of the post come first: loading the model then completes them
+    // with whatever it asks for and this post has not answered yet.
     for (auto it = meta.cbegin(); it != meta.cend(); ++it)
         _addField(it.key(), it.value().value, it.value().scope == MetaScope::Nzb);
 
-    // Opening on an empty editor with a model already known is the common case:
-    // show what it asks for straight away.
-    if (meta.isEmpty() && !_effectiveTemplatePath().isEmpty())
-        onLoadFieldsFromTemplate();
-    else
-        _templateHint->setText(_effectiveTemplatePath().isEmpty()
-                                   ? tr("No model: nothing will be written for this post.")
-                                   : tr("Model in use: %1").arg(_effectiveTemplatePath()));
+    _loadModel();
 
-    resize(620, 420);
+    resize(900, 760);
 }
+
+// ======================================================================
+//  which model
+// ======================================================================
 
 QString PostInfoDialog::templateOverride() const
 {
@@ -177,7 +239,8 @@ bool PostInfoDialog::setAsDefault() const
 
 QString PostInfoDialog::_effectiveTemplatePath() const
 {
-    return _templateList->currentData().toString();
+    QString const data = _templateList->currentData().toString();
+    return data == QLatin1String("__browse__") ? QString() : data;
 }
 
 //! The configured model first, marked as such, then the ones opened earlier in
@@ -230,8 +293,7 @@ void PostInfoDialog::_rememberTemplate(const QString &path)
 void PostInfoDialog::_updateForgetButton()
 {
     QString const current = _effectiveTemplatePath();
-    _forgetButton->setEnabled(!current.isEmpty() && current != QLatin1String("__browse__")
-                              && _sessionTemplates.contains(current));
+    _forgetButton->setEnabled(!current.isEmpty() && _sessionTemplates.contains(current));
 }
 
 void PostInfoDialog::onForgetTemplate()
@@ -240,7 +302,7 @@ void PostInfoDialog::onForgetTemplate()
     if (!_sessionTemplates.removeAll(current))
         return;
     _fillTemplateList(QString()); // falls back on the default
-    onLoadFieldsFromTemplate();
+    _loadModel();
 }
 
 void PostInfoDialog::onTemplateChosen(int index)
@@ -250,7 +312,7 @@ void PostInfoDialog::onTemplateChosen(int index)
 
     if (_templateList->itemData(index).toString() != QLatin1String("__browse__")) {
         _updateForgetButton();
-        onLoadFieldsFromTemplate();
+        _loadModel();
         return;
     }
 
@@ -261,94 +323,392 @@ void PostInfoDialog::onTemplateChosen(int index)
         return;
     }
     _rememberTemplate(path);
-    onLoadFieldsFromTemplate();
+    _loadModel();
 }
 
-void PostInfoDialog::onLoadFieldsFromTemplate()
+void PostInfoDialog::onReloadModel() { _loadModel(); }
+
+// ======================================================================
+//  the model: the file, line by line
+// ======================================================================
+
+void PostInfoDialog::_loadModel()
 {
     QString const path = _effectiveTemplatePath();
+    _lines.clear();
+    _crlf = false;
+
     if (path.isEmpty()) {
         _templateHint->setText(tr("No model: nothing will be written for this post."));
-        return;
-    }
-
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) {
-        _templateHint->setText(tr("Cannot read %1").arg(path));
-        return;
-    }
-    QVector<PostInfoTemplate::Token> const tokens =
-        PostInfoTemplate::tokensIn(QString::fromUtf8(file.readAll()));
-    file.close();
-
-    // What the user already typed survives a change of model: it is keyed by
-    // name, so a field both models ask for keeps its value and its NZB box.
-    QString                  duplicate;
-    QMap<QString, MetaValue> typed = meta(&duplicate);
-
-    // Rebuilt rather than completed, so the table follows the order of the
-    // model: read top to bottom it is the sheet that will be produced.
-    _fields->setRowCount(0);
-
-    QMap<QString, QString> const values = PostInfoTemplate::values(_preview, false);
-
-    int asked = 0;
-    for (PostInfoTemplate::Token const &token : tokens) {
-        if (token.isMeta()) {
-            if (token.arg.isEmpty())
-                continue; // "__meta__" with no name asks for nothing
-            _addField(token.arg, typed.value(token.arg).value,
-                      typed.value(token.arg).scope == MetaScope::Nzb);
-            typed.remove(token.arg);
-            ++asked;
-            continue;
+    } else {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            _templateHint->setText(tr("Cannot read %1").arg(path));
+        } else {
+            QString const text = QString::fromUtf8(file.readAll());
+            file.close();
+            _crlf  = PostInfoTemplate::usesCrLf(text);
+            _lines = PostInfoTemplate::parseTemplate(text);
+            _templateHint->setText(tr("Model in use: %1").arg(path));
         }
-
-        QString const description = PostInfoTemplate::describe(token);
-        if (description.isEmpty()) {
-            _addAutoField(token.raw, QString(), tr("unknown variable, copied as it is"));
-            continue;
-        }
-        _addAutoField(token.raw, _previewValue(token, values), description);
     }
 
-    // Fields the previous model asked for and this one does not: kept at the
-    // end rather than dropped, because throwing away typed text is worse than
-    // showing a line the model ignores.
-    for (auto it = typed.cbegin(); it != typed.cend(); ++it)
-        _addField(it.key(), it.value().value, it.value().scope == MetaScope::Nzb);
-
-    if (asked == 0)
-        _templateHint->setText(tr("Model in use: %1 (it asks for no field of yours)").arg(path));
-    else
-        _templateHint->setText(tr("Model in use: %1 \342\200\224 %n field(s) to fill in", "", asked)
-                                   .arg(path));
+    _setModelDirty(false);
+    _fillModelTable();
+    _syncFieldsFromModel();
+    _refreshPreviews();
 }
 
-//! The values that already exist while the post is being prepared. The others
-//! only exist once it is over, and are announced as such: showing "0 articles"
-//! before posting would read as a result rather than as "not yet".
-QString PostInfoDialog::_previewValue(PostInfoTemplate::Token const  &token,
-                                      QMap<QString, QString> const &values) const
+void PostInfoDialog::_fillModelTable()
 {
-    if (token.name == QLatin1String("date") || token.name == QLatin1String("dateStart"))
-        return QDateTime::currentDateTime().toString(
-            token.arg.isEmpty() ? QStringLiteral("yyyy-MM-dd") : token.arg);
+    _building = true;
+    _model->clearSpans();
+    _model->setRowCount(0);
 
-    QString const placeholder = QStringLiteral("__%1__").arg(token.name);
-    for (PostInfoTemplate::FieldDoc const &field : PostInfoTemplate::fields()) {
-        if (placeholder != QLatin1String(field.placeholder))
-            continue;
-        if (!field.knownBeforePost)
-            return QString();
-        // A secret is not printed on screen just to preview a layout: knowing
-        // it is there is what the user needs.
-        if (field.isSecret)
-            return values.value(token.name).isEmpty() ? QString()
-                                                      : QStringLiteral("\342\200\242\342\200\242\342\200\242\342\200\242\342\200\242\342\200\242");
-        return values.value(token.name);
+    for (int i = 0; i < _lines.size(); ++i) {
+        PostInfoTemplate::SheetLine const &line = _lines.at(i);
+        int const                          row  = _model->rowCount();
+        _model->insertRow(row);
+
+        if (line.kind == PostInfoTemplate::SheetLine::Kind::Field) {
+            QLineEdit *label = new QLineEdit(line.label, _model);
+            label->setObjectName(cellName("postInfoModelLabel", row));
+            label->setPlaceholderText(tr("name of the line"));
+            connect(label, &QLineEdit::textEdited, this, [this, i](QString const &text) {
+                if (i < _lines.size()) {
+                    _lines[i].label = text;
+                    _setModelDirty(true);
+                }
+            });
+            _model->setCellWidget(row, ColLabel, label);
+
+            QLineEdit *expr = new QLineEdit(line.expression, _model);
+            expr->setObjectName(cellName("postInfoModelExpr", row));
+            expr->setPlaceholderText(tr("text, __variables__, or both"));
+            connect(expr, &QLineEdit::textEdited, this, [this, i](QString const &text) {
+                if (i < _lines.size()) {
+                    _lines[i].expression = text;
+                    _setModelDirty(true);
+                    _syncFieldsFromModel();
+                    _refreshPreviews();
+                }
+            });
+            _model->setCellWidget(row, ColExpression, expr);
+
+            QLineEdit *preview = new QLineEdit(_model);
+            preview->setObjectName(cellName("postInfoModelPreview", row));
+            preview->setReadOnly(true);
+            preview->setFrame(false);
+            _model->setCellWidget(row, ColPreview, preview);
+        } else {
+            // A comment or a free line has no label and no value: it is one
+            // piece of text, so it gets one cell across the two columns.
+            QLineEdit *raw = new QLineEdit(line.raw, _model);
+            raw->setObjectName(cellName("postInfoModelRaw", row));
+            bool const isComment = line.kind == PostInfoTemplate::SheetLine::Kind::Comment;
+            raw->setPlaceholderText(isComment ? tr("comment, never written")
+                                              : tr("free text, written as it is"));
+            raw->setToolTip(isComment
+                                ? tr("A line starting with # is a comment. Indent it by one "
+                                     "space to have it written.")
+                                : tr("Written to the sheet exactly as it reads here."));
+            connect(raw, &QLineEdit::textEdited, this, [this, i](QString const &text) {
+                if (i >= _lines.size())
+                    return;
+                _lines[i].raw = text;
+                // Typing a '#' in the first column turns the line into a
+                // comment straight away, and removing it brings it back.
+                _lines[i].kind = text.startsWith(QLatin1Char('#'))
+                                     ? PostInfoTemplate::SheetLine::Kind::Comment
+                                     : PostInfoTemplate::SheetLine::Kind::Raw;
+                _setModelDirty(true);
+                _refreshPreviews();
+            });
+            _model->setCellWidget(row, ColLabel, raw);
+            _model->setSpan(row, ColLabel, 1, 2);
+
+            QLineEdit *preview = new QLineEdit(_model);
+            preview->setObjectName(cellName("postInfoModelPreview", row));
+            preview->setReadOnly(true);
+            preview->setFrame(false);
+            _model->setCellWidget(row, ColPreview, preview);
+        }
+
+        QPushButton *del = new QPushButton(QString(QChar(0x2715)), _model);
+        del->setObjectName(cellName("postInfoModelDel", row));
+        del->setFixedWidth(30);
+        del->setToolTip(tr("Remove this line from the model"));
+        connect(del, &QAbstractButton::clicked, this, [this, i]() { _removeModelLine(i); });
+        _model->setCellWidget(row, ColDelLine, del);
     }
-    return QString();
+
+    _building = false;
+}
+
+void PostInfoDialog::_removeModelLine(int lineIndex)
+{
+    if (lineIndex < 0 || lineIndex >= _lines.size())
+        return;
+    _lines.remove(lineIndex);
+    _setModelDirty(true);
+    _fillModelTable();
+    _syncFieldsFromModel();
+    _refreshPreviews();
+}
+
+void PostInfoDialog::onAddModelLine()
+{
+    PostInfoTemplate::SheetLine line;
+    line.kind      = PostInfoTemplate::SheetLine::Kind::Field;
+    line.separator = QStringLiteral(" =");
+
+    // Under the selected line, so a model can be composed in the order it will
+    // be read; at the end when nothing is selected.
+    int const current = _model->currentRow();
+    int const at      = (current >= 0 && current < _lines.size()) ? current + 1 : _lines.size();
+    _lines.insert(at, line);
+
+    _setModelDirty(true);
+    _fillModelTable();
+    _refreshPreviews();
+
+    _model->setCurrentCell(at, ColLabel);
+    if (auto *edit = qobject_cast<QLineEdit *>(_model->cellWidget(at, ColLabel)))
+        edit->setFocus();
+}
+
+//! Renders every line with the values of this post, so the third column is
+//! literally what the sheet will hold.
+void PostInfoDialog::_refreshPreviews()
+{
+    PostInfoData data = _preview;
+    data.meta         = meta(); // what is typed right now, duplicates ignored here
+
+    // A date is knowable while the post is being prepared: previewing today
+    // shows the shape of the line, which is what the format is chosen for.
+    if (!data.finishedAt.isValid())
+        data.finishedAt = QDateTime::currentDateTime();
+    if (!data.startedAt.isValid())
+        data.startedAt = data.finishedAt;
+
+    for (int row = 0; row < _model->rowCount() && row < _lines.size(); ++row) {
+        auto *preview = qobject_cast<QLineEdit *>(_model->cellWidget(row, ColPreview));
+        if (!preview)
+            continue;
+
+        PostInfoTemplate::SheetLine const &line = _lines.at(row);
+        if (line.kind == PostInfoTemplate::SheetLine::Kind::Comment) {
+            preview->clear();
+            preview->setPlaceholderText(tr("(not written)"));
+            continue;
+        }
+
+        QString const source =
+            line.kind == PostInfoTemplate::SheetLine::Kind::Field ? line.expression : line.raw;
+        QString const rendered = PostInfoTemplate::render(source, data, false);
+
+        preview->setText(rendered);
+        preview->setCursorPosition(0);
+        preview->setPlaceholderText(_onlyKnownAfterPost(source) ? tr("filled in after the post")
+                                                                : QString());
+    }
+}
+
+bool PostInfoDialog::_onlyKnownAfterPost(const QString &expression) const
+{
+    for (PostInfoTemplate::Token const &token : PostInfoTemplate::tokensIn(expression)) {
+        if (token.isMeta() || token.name == QLatin1String("date")
+            || token.name == QLatin1String("dateStart"))
+            continue;
+        QString const placeholder = QStringLiteral("__%1__").arg(token.name);
+        for (PostInfoTemplate::FieldDoc const &field : PostInfoTemplate::fields()) {
+            if (placeholder == QLatin1String(field.placeholder) && !field.knownBeforePost)
+                return true;
+        }
+    }
+    return false;
+}
+
+void PostInfoDialog::onSaveModelAs()
+{
+    QString const suggested = _effectiveTemplatePath();
+    QString const path      = QFileDialog::getSaveFileName(
+        this,
+        tr("Save the model as"),
+        suggested,
+        tr("Text files (*.txt *.tpl);;All files (*)"));
+    if (path.isEmpty())
+        return;
+
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        QMessageBox::warning(this, tr("Post information"), tr("Cannot write %1").arg(path));
+        return;
+    }
+    file.write(PostInfoTemplate::buildTemplate(_lines, _crlf).toUtf8());
+    if (!file.commit()) {
+        QMessageBox::warning(this, tr("Post information"), tr("Cannot write %1").arg(path));
+        return;
+    }
+
+    // Saved models join the list of the session, and the post switches to the
+    // one just written: what you see is then what will be used.
+    _setModelDirty(false);
+    _rememberTemplate(path);
+    _templateHint->setText(tr("Model in use: %1").arg(path));
+}
+
+void PostInfoDialog::_setModelDirty(bool dirty)
+{
+    _modelDirty = dirty;
+    _saveAsButton->setText(dirty ? tr("Save as\342\200\246 *") : tr("Save as\342\200\246"));
+}
+
+// ======================================================================
+//  your fields: the values of THIS post
+// ======================================================================
+
+//! Every __meta:name__ the model uses gets a row, wherever it appears: alone on
+//! a line, or in the middle of a sentence like "me __originalName__ and more".
+void PostInfoDialog::_syncFieldsFromModel()
+{
+    QStringList wanted;
+    for (PostInfoTemplate::SheetLine const &line : _lines) {
+        if (line.kind != PostInfoTemplate::SheetLine::Kind::Field)
+            continue;
+        for (PostInfoTemplate::Token const &token : PostInfoTemplate::tokensIn(line.expression)) {
+            if (token.isMeta() && !token.arg.isEmpty() && !wanted.contains(token.arg))
+                wanted << token.arg;
+        }
+    }
+
+    QStringList existing;
+    for (int row = 0; row < _fields->rowCount(); ++row) {
+        if (auto *edit = qobject_cast<QLineEdit *>(_fields->cellWidget(row, ColName)))
+            existing << edit->text().trimmed();
+    }
+
+    // Only the missing ones are added: a value already typed for a field this
+    // model does not ask for is kept rather than thrown away.
+    for (QString const &name : wanted) {
+        if (!existing.contains(name))
+            _addField(name, QString(), false);
+    }
+}
+
+void PostInfoDialog::onAddField()
+{
+    // A field of yours is only useful if a line writes it, so both are created:
+    // the value row here, and the line that carries it in the model.
+    PostInfoTemplate::SheetLine line;
+    line.kind       = PostInfoTemplate::SheetLine::Kind::Field;
+    line.separator  = QStringLiteral(" =");
+    line.expression = QStringLiteral("__meta:__");
+    _lines << line;
+    _setModelDirty(true);
+    _fillModelTable();
+
+    _addField(QString(), QString(), false);
+    _refreshPreviews();
+
+    int const row = _fields->rowCount() - 1;
+    _fields->setCurrentCell(row, ColName);
+    if (auto *edit = qobject_cast<QLineEdit *>(_fields->cellWidget(row, ColName)))
+        edit->setFocus();
+}
+
+void PostInfoDialog::_addField(const QString &name, const QString &value, bool publish)
+{
+    int const row = _fields->rowCount();
+    _fields->insertRow(row);
+
+    QLineEdit *nameEdit = new QLineEdit(name, _fields);
+    nameEdit->setObjectName(cellName("postInfoFieldName", row));
+    nameEdit->setPlaceholderText(tr("album"));
+    connect(nameEdit, &QLineEdit::textEdited, this, [this]() { _refreshPreviews(); });
+    _fields->setCellWidget(row, ColName, nameEdit);
+
+    QLineEdit *valueEdit = new QLineEdit(value, _fields);
+    valueEdit->setObjectName(cellName("postInfoFieldValue", row));
+    connect(valueEdit, &QLineEdit::textEdited, this, [this]() { _refreshPreviews(); });
+    _fields->setCellWidget(row, ColValue, valueEdit);
+
+    auto *publishCell = new CheckBoxCenterWidget(_fields, publish);
+    publishCell->setObjectName(cellName("postInfoFieldNzb", row));
+    _fields->setCellWidget(row, ColNzb, publishCell);
+
+    QPushButton *del = new QPushButton(QString(QChar(0x2715)), _fields);
+    del->setObjectName(cellName("postInfoFieldDel", row));
+    del->setFixedWidth(30);
+    del->setToolTip(tr("Remove this field. The line that uses it stays in the model."));
+    connect(del, &QAbstractButton::clicked, this, [this, del]() {
+        for (int i = 0; i < _fields->rowCount(); ++i) {
+            if (_fields->cellWidget(i, ColDelField) == del) {
+                _fields->removeRow(i);
+                break;
+            }
+        }
+        _refreshPreviews();
+    });
+    _fields->setCellWidget(row, ColDelField, del);
+}
+
+QMap<QString, MetaValue> PostInfoDialog::meta(QString *duplicate) const
+{
+    QMap<QString, MetaValue> meta;
+    for (int row = 0; row < _fields->rowCount(); ++row) {
+        auto *nameEdit  = qobject_cast<QLineEdit *>(_fields->cellWidget(row, ColName));
+        auto *valueEdit = qobject_cast<QLineEdit *>(_fields->cellWidget(row, ColValue));
+        if (!nameEdit || !valueEdit)
+            continue;
+
+        QString const name = nameEdit->text().trimmed();
+        if (name.isEmpty())
+            continue; // an empty line is just an unused one
+        // "password" is a secret and travels through the password field
+        if (name.compare(QStringLiteral("password"), Qt::CaseInsensitive) == 0)
+            continue;
+        if (duplicate && meta.contains(name)) {
+            *duplicate = name;
+            return meta;
+        }
+
+        bool publish = false;
+        if (auto *cell = qobject_cast<CheckBoxCenterWidget *>(_fields->cellWidget(row, ColNzb)))
+            publish = cell->isChecked();
+
+        meta.insert(name, MetaValue(valueEdit->text(), publish ? MetaScope::Nzb : MetaScope::Local));
+    }
+    return meta;
+}
+
+// ======================================================================
+//  the way out
+// ======================================================================
+
+void PostInfoDialog::onAccept()
+{
+    if (_modelDirty) {
+        // The post uses the file, not this table. Leaving without saying so
+        // would show one sheet here and write another one on disk.
+        QMessageBox::StandardButton const answer = QMessageBox::question(
+            this,
+            tr("Post information"),
+            tr("The model has been changed here, but not written to a file.\n\n"
+               "The post uses the file, so these changes would be lost.\n"
+               "Save the model now?"),
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
+            QMessageBox::Save);
+
+        if (answer == QMessageBox::Cancel)
+            return;
+        if (answer == QMessageBox::Save) {
+            onSaveModelAs();
+            if (_modelDirty)
+                return; // the save was cancelled or failed: stay here
+        }
+    }
+    accept();
 }
 
 //! The reference of every variable, built from the engine table so it cannot
@@ -359,19 +719,29 @@ void PostInfoDialog::onShowHelp()
                        .arg(tr("What can I put in a model"),
                             tr("A model is a plain text file. Write it as you want the sheet to "
                                "read, and put a variable wherever ngPost should fill something "
-                               "in. Anything ngPost does not recognise is copied as it is."));
+                               "in. Anything ngPost does not recognise is copied as it is, and a "
+                               "line starting with # is a comment that is never written."));
 
     html += QStringLiteral("<pre>%1</pre>")
-                .arg(QStringLiteral("name  =__originalName__\n"
-                                    "size  =__postSize__\n"
-                                    "title =__meta:title__"));
+                .arg(QStringLiteral("# this line is a comment\n"
+                                    "name    =__originalName__\n"
+                                    "size    =__postSize__\n"
+                                    "title   =__meta:title__\n"
+                                    "comment =mine, __originalName__, and more text")
+                         .toHtmlEscaped());
+
+    html += QStringLiteral("<h4>%1</h4><p>%2</p>")
+                .arg(tr("Mixing text and variables"),
+                     tr("A line is free text: <b>comment =mine, __originalName__, and more</b> "
+                        "writes the sentence with the name in the middle. You can mix as many "
+                        "variables and as much text as you like on one line."));
 
     html += QStringLiteral("<h4>%1</h4><p>%2</p>")
                 .arg(tr("Your own fields"),
-                     tr("<b>__meta:name__</b> is a field of yours. Every name you use here "
-                        "appears in the table of this window, waiting for a value. It always "
-                        "goes into the post info file; tick <i>Also in NZB</i> to publish it "
-                        "in the nzb as well."));
+                     tr("<b>__meta:name__</b> is a field of yours. Every name you use appears in "
+                        "<i>Your fields</i> at the bottom of the window, waiting for a value. It "
+                        "always goes into the post info file; tick <i>Also in NZB</i> to publish "
+                        "it in the nzb as well."));
 
     html += QStringLiteral("<h4>%1</h4><p>%2</p>")
                 .arg(tr("Dates"),
@@ -403,8 +773,8 @@ void PostInfoDialog::onShowHelp()
 
     html += QStringLiteral("<p>%1</p>")
                 .arg(tr("<i>before the post</i> means the value is already known while you "
-                        "prepare it, so this window shows it. <i>after the post</i> means it "
-                        "only exists once the post is over, which is why it is blank here."));
+                        "prepare it, so the preview column shows it. <i>after the post</i> means "
+                        "it only exists once the post is over, which is why it is blank here."));
 
     if (anySecret)
         html += QStringLiteral("<p>\342\232\240 %1</p>")
@@ -428,113 +798,6 @@ void PostInfoDialog::onShowHelp()
     connect(buttons, &QDialogButtonBox::accepted, &help, &QDialog::accept);
     layout->addWidget(buttons);
 
-    help.resize(720, 560);
+    help.resize(760, 600);
     help.exec();
-}
-
-void PostInfoDialog::onAddField() { _addField(QString(), QString(), false); }
-
-void PostInfoDialog::_addField(const QString &name, const QString &value, bool publish)
-{
-    int const row = _fields->rowCount();
-    _fields->insertRow(row);
-
-    QLineEdit *nameEdit = new QLineEdit(name, _fields);
-    nameEdit->setObjectName(fieldName("postInfoFieldName", row));
-    nameEdit->setPlaceholderText(tr("album"));
-    _fields->setCellWidget(row, 0, nameEdit);
-
-    QLineEdit *valueEdit = new QLineEdit(value, _fields);
-    valueEdit->setObjectName(fieldName("postInfoFieldValue", row));
-    _fields->setCellWidget(row, 1, valueEdit);
-
-    auto *publishCell = new CheckBoxCenterWidget(_fields, publish);
-    publishCell->setObjectName(fieldName("postInfoFieldNzb", row));
-    _fields->setCellWidget(row, 2, publishCell);
-
-    QPushButton *del = new QPushButton(QString(QChar(0x2715)), _fields);
-    del->setObjectName(fieldName("postInfoFieldDel", row));
-    del->setMaximumWidth(30);
-    connect(del, &QAbstractButton::clicked, this, [this, del]() {
-        for (int i = 0; i < _fields->rowCount(); ++i) {
-            if (_fields->cellWidget(i, 3) == del) {
-                _fields->removeRow(i);
-                break;
-            }
-        }
-    });
-    _fields->setCellWidget(row, 3, del);
-}
-
-//! A line the model asks for and ngPost fills in on its own. It is shown so
-//! the table is the sheet, not just the blanks in it; it cannot be edited or
-//! removed, because only the model decides whether it is there.
-void PostInfoDialog::_addAutoField(const QString &placeholder,
-                                   const QString &value,
-                                   const QString &description)
-{
-    int const row = _fields->rowCount();
-    _fields->insertRow(row);
-
-    QLineEdit *nameEdit = new QLineEdit(placeholder, _fields);
-    nameEdit->setObjectName(fieldName("postInfoAutoName", row));
-    nameEdit->setReadOnly(true);
-    nameEdit->setFrame(false);
-    nameEdit->setToolTip(description);
-    nameEdit->setCursorPosition(0); // show the start, not the tail
-    _fields->setCellWidget(row, 0, nameEdit);
-
-    QLineEdit *valueEdit = new QLineEdit(_fields);
-    valueEdit->setObjectName(fieldName("postInfoAutoValue", row));
-    valueEdit->setReadOnly(true);
-    valueEdit->setFrame(false);
-    valueEdit->setToolTip(description);
-    if (value.isEmpty()) {
-        // The description alone, not "filled in after the post — <description>"
-        // on every line: repeated ten times it stops being read at all. The
-        // point is carried once by the sentence above the table.
-        valueEdit->setPlaceholderText(description);
-    } else {
-        valueEdit->setText(value);
-        valueEdit->setCursorPosition(0);
-    }
-    _fields->setCellWidget(row, 1, valueEdit);
-
-    // Columns 2 and 3 stay empty: an automatic line is not published on
-    // request, and cannot be removed from here.
-    _fields->setItem(row, 2, new QTableWidgetItem(QString()));
-    _fields->item(row, 2)->setFlags(Qt::NoItemFlags);
-    _fields->setItem(row, 3, new QTableWidgetItem(QString()));
-    _fields->item(row, 3)->setFlags(Qt::NoItemFlags);
-}
-
-QMap<QString, MetaValue> PostInfoDialog::meta(QString *duplicate) const
-{
-    QMap<QString, MetaValue> meta;
-    for (int row = 0; row < _fields->rowCount(); ++row) {
-        auto *nameEdit  = qobject_cast<QLineEdit *>(_fields->cellWidget(row, 0));
-        auto *valueEdit = qobject_cast<QLineEdit *>(_fields->cellWidget(row, 1));
-        if (!nameEdit || !valueEdit)
-            continue;
-        if (nameEdit->isReadOnly())
-            continue; // a line ngPost fills in by itself, not one of yours
-
-        QString const name = nameEdit->text().trimmed();
-        if (name.isEmpty())
-            continue; // an empty line is just an unused one
-        // "password" is a secret and travels through the password field
-        if (name.compare(QStringLiteral("password"), Qt::CaseInsensitive) == 0)
-            continue;
-        if (duplicate && meta.contains(name)) {
-            *duplicate = name;
-            return meta;
-        }
-
-        bool publish = false;
-        if (auto *cell = qobject_cast<CheckBoxCenterWidget *>(_fields->cellWidget(row, 2)))
-            publish = cell->isChecked();
-
-        meta.insert(name, MetaValue(valueEdit->text(), publish ? MetaScope::Nzb : MetaScope::Local));
-    }
-    return meta;
 }

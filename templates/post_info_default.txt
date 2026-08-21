@@ -1,11 +1,11 @@
 # Generic post info file.
 #
-# There is no comment syntax here: EVERY line is written as is, and every name
-# wrapped in two underscores is replaced by its value. Which also means a line
-# like this one is copied into the produced file, so delete this header once
-# you have read it.
+# A line starting with '#' is a comment: it is NOT written to the produced
+# sheet. Indent it by one space if you really want it written.
 #
-# Delete the lines you do not need, add your own, the format is yours.
+# Every name wrapped in two underscores is replaced by its value. Delete the
+# lines you do not need, add your own, mix text and variables freely: the
+# format is yours.
 #
 # The archive password is deliberately not written by this model: the file
 # would then have to be protected like a password file. If you really want it,

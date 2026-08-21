@@ -104,6 +104,44 @@ struct Token
 //! by itself, so an editor can show the whole sheet and not just the blanks.
 QVector<Token> tokensIn(QString const &tmpl);
 
+//! A line of a template, as the editor sees it. Every line of a file maps to
+//! exactly one of these, and buildTemplate() is the exact inverse of
+//! parseTemplate(): a model opened and saved again is unchanged.
+struct SheetLine
+{
+    enum class Kind
+    {
+        Field, //!< "label =value", the only kind that produces a sheet entry
+        Comment, //!< starts with '#' in the first column, never written out
+        Raw //!< anything else: separators, blank lines, free prose
+    };
+
+    Kind    kind = Kind::Raw;
+    QString label;      //!< Field: what is left of the first '='
+    QString separator;  //!< Field: the exact "  =" in between, alignment kept
+    QString expression; //!< Field: what is right of it, variables included
+    QString raw;        //!< Comment and Raw: the line, untouched
+
+    QString text() const
+    {
+        return kind == Kind::Field ? label + separator + expression : raw;
+    }
+};
+
+//! Splits a template into its lines. Never fails: an unparsable line is Raw.
+QVector<SheetLine> parseTemplate(QString const &tmpl);
+
+//! Rebuilds the file from its lines, keeping the line ending style of the
+//! original. buildTemplate(parseTemplate(t)) == t, for any t.
+QString buildTemplate(QVector<SheetLine> const &lines, bool crlf = false);
+
+//! True when \a tmpl uses CRLF, so a rewrite can keep the file as it was.
+bool usesCrLf(QString const &tmpl);
+
+//! Drops the comment lines. A line whose FIRST character is '#' is a comment
+//! and is not written to the sheet; indent it by one space to have it written.
+QString stripComments(QString const &tmpl);
+
 //! Description of \a token, ready to show: the table entry for a fixed
 //! variable, a sentence built on the spot for the parameterized ones. Empty
 //! when the variable does not exist.

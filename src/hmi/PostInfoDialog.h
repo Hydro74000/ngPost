@@ -1,8 +1,13 @@
 // Copyright (C) 2024-2026 Hydro74000 <acymap@gmail.com>
 //========================================================================
 //
-// Per post editor for the record sheet: which model to use, and what to
-// fill it with.
+// Per post editor for the record sheet.
+//
+// Two things live here, and they are deliberately not mixed: the MODEL, which
+// is a file on disk shared by every post that uses it, and YOUR FIELDS, which
+// are the values of this post alone. Editing a label belongs to the first,
+// typing a title belongs to the second, and only the first is ever written
+// back to a .txt.
 //
 //========================================================================
 
@@ -15,6 +20,7 @@
 #include <QDialog>
 #include <QMap>
 #include <QString>
+#include <QVector>
 
 class QCheckBox;
 class QComboBox;
@@ -31,14 +37,15 @@ public:
     //! \a configuredTemplate is what ngPost.conf provides, used when the post
     //! does not pick one of its own. \a sessionTemplates are the ones already
     //! opened during this run, offered again here.
-    PostInfoDialog(const QString &configuredTemplate,
-                   const QString &templateOverride,
+    PostInfoDialog(const QString                  &configuredTemplate,
+                   const QString                  &templateOverride,
                    const QMap<QString, MetaValue> &meta,
-                   const QStringList &sessionTemplates = QStringList(),
-                   const PostInfoData &preview = PostInfoData(),
-                   QWidget *parent = nullptr);
+                   const QStringList              &sessionTemplates = QStringList(),
+                   const PostInfoData             &preview          = PostInfoData(),
+                   QWidget                        *parent           = nullptr);
 
-    //! Models the dialog ended up offering, minus the ones the user dropped.
+    //! Models the dialog ended up offering, minus the ones the user dropped,
+    //! plus any it saved.
     QStringList sessionTemplates() const { return _sessionTemplates; }
 
     //! Empty when the post uses the model from the configuration.
@@ -52,42 +59,65 @@ public:
 private slots:
     void onTemplateChosen(int index);
     void onForgetTemplate();
-    void onAddField();
-    //! Reads the model and lays out every line it will produce.
-    void onLoadFieldsFromTemplate();
+    //! Re-reads the model from disk, dropping any unsaved change to it.
+    void onReloadModel();
     //! Opens the reference of every __variable__, built from the engine table.
     void onShowHelp();
 
+    void onAddModelLine();
+    void onAddField();
+    void onSaveModelAs();
+
+    void onAccept();
+
 private:
+    // ---- the model, i.e. the file ---------------------------------------
+    void _loadModel();
+    void _fillModelTable();
+    void _removeModelLine(int lineIndex);
+    //! Re-renders the preview column from the current lines and values.
+    void _refreshPreviews();
+    //! True when a line only exists once the post is over, so an empty preview
+    //! means "not yet" rather than "you left it blank".
+    bool _onlyKnownAfterPost(const QString &expression) const;
+
+    // ---- your fields, i.e. this post ------------------------------------
+    //! One value row per __meta:name__ the model uses, keeping what is typed.
+    void _syncFieldsFromModel();
     void _addField(const QString &name, const QString &value, bool publish);
-    //! A line ngPost fills in by itself: shown, never edited, never deleted.
-    void _addAutoField(const QString &placeholder,
-                       const QString &value,
-                       const QString &description);
-    //! Value to show for a variable ngPost fills in, empty when it will only
-    //! exist once the post is over.
-    QString _previewValue(const PostInfoTemplate::Token &token,
-                          const QMap<QString, QString> &values) const;
+
+    // ---- the model list --------------------------------------------------
     QString _effectiveTemplatePath() const;
+    void    _fillTemplateList(const QString &selected);
+    void    _rememberTemplate(const QString &path);
+    void    _updateForgetButton();
+
+    void _setModelDirty(bool dirty);
 
     QString      _configuredTemplate;
     PostInfoData _preview;
-
-    void _fillTemplateList(const QString &override);
-    void _rememberTemplate(const QString &path);
-    void _updateForgetButton();
-
     QStringList  _sessionTemplates;
-    bool         _fillingList = false;
+
+    QVector<PostInfoTemplate::SheetLine> _lines;
+    bool                                 _crlf        = false;
+    bool                                 _modelDirty  = false;
+    bool                                 _fillingList = false;
+    bool                                 _building    = false;
 
     QComboBox    *_templateList;
     QPushButton  *_forgetButton;
-    QLabel       *_templateHint;
+    QPushButton  *_reloadButton;
     QCheckBox    *_setAsDefault;
-    QPushButton  *_loadFieldsButton;
-    QPushButton  *_helpButton;
+    QLabel       *_templateHint;
+
+    QTableWidget *_model;
+    QPushButton  *_addLineButton;
+    QPushButton  *_saveAsButton;
+
     QTableWidget *_fields;
-    QPushButton  *_addButton;
+    QPushButton  *_addFieldButton;
+
+    QPushButton  *_helpButton;
 };
 
 #endif // POSTINFODIALOG_H

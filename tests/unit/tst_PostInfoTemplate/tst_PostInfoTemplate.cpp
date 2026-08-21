@@ -24,6 +24,8 @@ private slots:
     //! The variable table is the single source of truth: no duplicate name, no
     //! duplicate environment variable, never an empty description.
     void fields_table_is_consistent();
+    void template_lines_round_trip();
+    void comment_lines_are_not_written();
     void tokens_in_lists_every_variable_of_a_model();
 
     //! Every fixed variable resolves, and the tricky contracts hold: par2Pct is
@@ -190,6 +192,71 @@ void TestPostInfoTemplate::fields_table_is_consistent()
         token.name = placeholder.mid(2, placeholder.size() - 4);
         QVERIFY2(!PostInfoTemplate::describe(token).isEmpty(), qPrintable(placeholder));
     }
+}
+
+void TestPostInfoTemplate::template_lines_round_trip()
+{
+    QString const tmpl = QStringLiteral("# a header, never written out\n"
+                                        "\n"
+                                        "date        =__date:dd/MM/yyyy__\n"
+                                        "size human  =__postSizeHuman__\n"
+                                        "url =http://x/y=z&a=b\n"
+                                        " # written, it is indented\n"
+                                        "----------\n"
+                                        "titre =__meta:titre__\n");
+
+    QVector<PostInfoTemplate::SheetLine> const lines = PostInfoTemplate::parseTemplate(tmpl);
+
+    // Opened and saved again, a model is unchanged. That is what makes an
+    // editor safe to point at somebody else's file.
+    QCOMPARE(PostInfoTemplate::buildTemplate(lines), tmpl);
+
+    QCOMPARE(lines.at(0).kind, PostInfoTemplate::SheetLine::Kind::Comment);
+    QCOMPARE(lines.at(1).kind, PostInfoTemplate::SheetLine::Kind::Raw); // blank
+    QCOMPARE(lines.at(2).kind, PostInfoTemplate::SheetLine::Kind::Field);
+    QCOMPARE(lines.at(2).label, QStringLiteral("date"));
+    QCOMPARE(lines.at(2).expression, QStringLiteral("__date:dd/MM/yyyy__"));
+
+    // alignment is part of the file, so it survives
+    QCOMPARE(lines.at(3).label, QStringLiteral("size human"));
+    QCOMPARE(lines.at(3).separator, QStringLiteral("  ="));
+
+    // split on the FIRST '=' only: an url keeps its own
+    QCOMPARE(lines.at(4).label, QStringLiteral("url"));
+    QCOMPARE(lines.at(4).expression, QStringLiteral("http://x/y=z&a=b"));
+
+    // '#' is a comment in the first column only; one space and it is content
+    QCOMPARE(lines.at(5).kind, PostInfoTemplate::SheetLine::Kind::Raw);
+    QCOMPARE(lines.at(6).kind, PostInfoTemplate::SheetLine::Kind::Raw); // "----------"
+
+    // a CRLF model comes back as a CRLF model
+    QString const crlf = QStringLiteral("date =__date__\r\ntitre =__meta:titre__\r\n");
+    QVERIFY(PostInfoTemplate::usesCrLf(crlf));
+    QCOMPARE(PostInfoTemplate::buildTemplate(PostInfoTemplate::parseTemplate(crlf), true), crlf);
+    QCOMPARE(PostInfoTemplate::parseTemplate(crlf).at(0).expression, QStringLiteral("__date__"));
+}
+
+void TestPostInfoTemplate::comment_lines_are_not_written()
+{
+    QString const tmpl = QStringLiteral("# mot de passe =__rarPass__\n"
+                                        "date =__date:yyyy__\n"
+                                        " # gardez cette ligne\n");
+
+    QCOMPARE(PostInfoTemplate::stripComments(tmpl),
+             QStringLiteral("date =__date:yyyy__\n # gardez cette ligne\n"));
+
+    // A variable quoted in a comment asks for nothing: the editor must not
+    // offer a field the sheet will never carry, and __rarPass__ in a comment
+    // must not turn the file into a secret one.
+    QCOMPARE(PostInfoTemplate::metaNamesIn(QStringLiteral("# titre =__meta:titre__\n")),
+             QStringList());
+    QVERIFY(PostInfoTemplate::tokensIn(QStringLiteral("# x =__rarPass__\n")).isEmpty());
+
+    PostInfoData d = sampleData();
+    QString const rendered = PostInfoTemplate::render(PostInfoTemplate::stripComments(tmpl), d, false);
+    QVERIFY(!rendered.contains(QStringLiteral("mot de passe")));
+    QVERIFY(!rendered.contains(d.rarPass));
+    QVERIFY(rendered.contains(QStringLiteral("gardez cette ligne")));
 }
 
 void TestPostInfoTemplate::tokens_in_lists_every_variable_of_a_model()
