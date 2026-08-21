@@ -9,8 +9,8 @@ changes its format, only its model changes.
 
 ## Use one
 
-1. Copy the model you want (or its content) anywhere you can write, for
-   instance next to your `ngPost.conf`.
+1. Copy the model you want (or its content) **anywhere you can read it**. It
+   does not have to be in this folder, nor in any particular one.
 2. Add two lines to your `ngPost.conf`:
 
 ```ini
@@ -18,7 +18,17 @@ POST_INFO_TEMPLATE = my_sheet.txt
 POST_INFO_OUTPUT = __nzbDir__/__nzbName__.info.txt
 ```
 
-A relative path is understood from the folder of your `ngPost.conf`.
+A bare file name is understood from the folder of your `ngPost.conf`. **If the
+model lives anywhere else, write its full path**, ngPost will not go looking
+for it:
+
+```ini
+POST_INFO_TEMPLATE = /home/me/models/my_sheet.txt
+POST_INFO_TEMPLATE = C:\Users\me\models\my_sheet.txt
+```
+
+On the command line, `--post_info_template` reads a relative path from the
+folder you are standing in instead.
 
 3. Post something, and look next to your `.nzb`.
 

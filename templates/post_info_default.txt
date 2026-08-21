@@ -7,6 +7,10 @@
 # lines you do not need, add your own, mix text and variables freely: the
 # format is yours.
 #
+# This file may live anywhere you can read it. POST_INFO_TEMPLATE understands a
+# bare file name as "next to ngPost.conf", so write the full path if you keep
+# it somewhere else.
+#
 # The archive password is deliberately not written by this model: the file
 # would then have to be protected like a password file. If you really want it,
 # add a line with rarPass wrapped in two underscores.

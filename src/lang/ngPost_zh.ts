@@ -2912,8 +2912,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4134"/>
+        <source>## a bare file name means &quot;next to this file&quot;; write the full path otherwise</source>
+        <translation>## 只写文件名表示“与本文件同目录”；否则请写完整路径</translation>
+    </message>
+    <message>
         <source>## a relative path is understood from the configuration folder</source>
-        <translation>## 相对路径以配置文件夹为基准</translation>
+        <translation type="vanished">## 相对路径以配置文件夹为基准</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4140"/>
@@ -5351,17 +5355,17 @@ Save the model now?</source>
         <translation type="vanished">NZB密码：</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="318"/>
+        <location filename="../hmi/PostingWidget.ui" line="330"/>
         <source>Compress</source>
         <translation>压缩</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="441"/>
+        <location filename="../hmi/PostingWidget.ui" line="453"/>
         <source>Gen PAR2</source>
         <translation>生成PAR2</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="301"/>
+        <location filename="../hmi/PostingWidget.ui" line="313"/>
         <source>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</source>
         <translation>如果原始文件中存在.nfo文件（在rar/重命名之前），则将其复制到生成的nzb旁边（使用相同的基名）</translation>
     </message>
@@ -5370,7 +5374,7 @@ Save the model now?</source>
         <translation type="vanished">随机名称长度：</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="338"/>
+        <location filename="../hmi/PostingWidget.ui" line="350"/>
         <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
         <translation>骰子按钮抽取的压缩包名称长度（配置项 LENGTH_NAME）</translation>
     </message>
@@ -5379,12 +5383,12 @@ Save the model now?</source>
         <translation type="vanished">随机密码长度：</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="401"/>
+        <location filename="../hmi/PostingWidget.ui" line="413"/>
         <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
         <translation>骰子按钮抽取的密码长度（配置项 LENGTH_PASS）</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="304"/>
+        <location filename="../hmi/PostingWidget.ui" line="316"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
         <translation>将NFO复制到nzb文件旁边（如果可用）</translation>
     </message>
@@ -5393,22 +5397,22 @@ Save the model now?</source>
         <translation type="vanished">nzb文件: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="266"/>
+        <location filename="../hmi/PostingWidget.ui" line="278"/>
         <source>full path of the nzb file that would be created (check the nzbPath keyword in the config file to set the default directory)</source>
         <translation>将创建的nzb文件的完整路径（请检查配置文件中的nzbPath关键词以设置默认目录）</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="279"/>
+        <location filename="../hmi/PostingWidget.ui" line="291"/>
         <source>select the nzb file absolute file name</source>
         <translation>选择nzb文件的绝对文件名</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="282"/>
+        <location filename="../hmi/PostingWidget.ui" line="294"/>
         <source> ... </source>
         <translation> ... </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="375"/>
+        <location filename="../hmi/PostingWidget.ui" line="387"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation>这应该是您要发布的压缩文件的密码</translation>
     </message>
@@ -5417,7 +5421,7 @@ Save the model now?</source>
         <translation type="vanished">nzb密码:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="388"/>
+        <location filename="../hmi/PostingWidget.ui" line="400"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>压缩文件中使用的密码，该密码也将添加到nzb文件的标头中</translation>
     </message>
@@ -5426,12 +5430,12 @@ Save the model now?</source>
         <translation type="vanished">密码长度</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="414"/>
+        <location filename="../hmi/PostingWidget.ui" line="426"/>
         <source>generate random password</source>
         <translation>生成随机密码</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="315"/>
+        <location filename="../hmi/PostingWidget.ui" line="327"/>
         <source>compress the selected files using rar before posting</source>
         <translation>在发布前使用rar压缩选中的文件</translation>
     </message>
@@ -5440,7 +5444,7 @@ Save the model now?</source>
         <translation type="vanished">压缩</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="325"/>
+        <location filename="../hmi/PostingWidget.ui" line="337"/>
         <source>archive name (file name obfuscation)</source>
         <translation>压缩包文件名（文件名混淆）</translation>
     </message>
@@ -5449,12 +5453,12 @@ Save the model now?</source>
         <translation type="vanished">压缩包文件名长度</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="351"/>
+        <location filename="../hmi/PostingWidget.ui" line="363"/>
         <source>generate random archive name</source>
         <translation>生成随机压缩包文件名</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="378"/>
+        <location filename="../hmi/PostingWidget.ui" line="390"/>
         <source>Archive password</source>
         <translation>压缩包密码</translation>
     </message>
@@ -5469,7 +5473,7 @@ Save the model now?</source>
         <translation>保留压缩包</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="438"/>
+        <location filename="../hmi/PostingWidget.ui" line="450"/>
         <source>generate the par2 (the compress option must be selected)</source>
         <translation>生成par2文件（必须使用压缩选项）</translation>
     </message>
@@ -5495,13 +5499,13 @@ Save the model now?</source>
         <translation type="vanished">关于</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="475"/>
+        <location filename="../hmi/PostingWidget.ui" line="487"/>
         <source>Let&apos;s Post!</source>
         <translation>让我们开始发布吧！</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="478"/>
-        <location filename="../hmi/PostingWidget.cpp" line="826"/>
+        <location filename="../hmi/PostingWidget.ui" line="490"/>
+        <location filename="../hmi/PostingWidget.cpp" line="830"/>
         <source>Post Files</source>
         <translation>发布文件</translation>
     </message>
@@ -5538,14 +5542,14 @@ Would you like to overwrite it ?</source>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="234"/>
-        <location filename="../hmi/PostingWidget.cpp" line="833"/>
-        <location filename="../hmi/PostingWidget.cpp" line="852"/>
+        <location filename="../hmi/PostingWidget.cpp" line="837"/>
+        <location filename="../hmi/PostingWidget.cpp" line="856"/>
         <source>Stop Posting</source>
         <translation>停止发布</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="240"/>
-        <location filename="../hmi/PostingWidget.cpp" line="855"/>
+        <location filename="../hmi/PostingWidget.cpp" line="859"/>
         <source>Cancel Posting</source>
         <translation>取消发布</translation>
     </message>
@@ -5576,69 +5580,69 @@ Would you like to overwrite it ?</source>
         <translation>选中的不是可执行文件...</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="628"/>
+        <location filename="../hmi/PostingWidget.cpp" line="632"/>
         <source>Create a post info file</source>
         <translation>创建信息文件</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="629"/>
+        <location filename="../hmi/PostingWidget.cpp" line="633"/>
         <source>Write a small text file describing this post next to the nzb.
 Some Usenet indexes ask for one.</source>
         <translation>在 nzb 旁边写一个描述此贴的小文本文件。
 某些 Usenet 索引站会要求提供。</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="631"/>
+        <location filename="../hmi/PostingWidget.cpp" line="635"/>
         <source>Post information…</source>
         <translation>发贴信息…</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="632"/>
+        <location filename="../hmi/PostingWidget.cpp" line="636"/>
         <source>Choose the model and fill in your own fields, for this post.</source>
         <translation>为此贴选择模板并填写您自己的字段。</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="663"/>
+        <location filename="../hmi/PostingWidget.cpp" line="667"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>发贴信息中“%1”出现了两次。请删除其中一行。</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="680"/>
+        <location filename="../hmi/PostingWidget.cpp" line="684"/>
         <source>Post info model saved as the default: %1</source>
         <translation>信息文件模板已保存为默认：%1</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="746"/>
+        <location filename="../hmi/PostingWidget.cpp" line="750"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation>限制压缩卷数目为%1（配置文件中参数RAR_MAX）</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="747"/>
+        <location filename="../hmi/PostingWidget.cpp" line="751"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>从配置文件中使用参数PAR2_ARGS: %1</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="749"/>
+        <location filename="../hmi/PostingWidget.cpp" line="753"/>
         <source>You can add files or folder by:</source>
         <translation>您可以通过以下方法来添加文件或文件夹:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="750"/>
+        <location filename="../hmi/PostingWidget.cpp" line="754"/>
         <source>Drag &amp; Drop files/folders</source>
         <translation>拖放文件/文件夹</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="751"/>
+        <location filename="../hmi/PostingWidget.cpp" line="755"/>
         <source>Right Click to add Files</source>
         <translation>右键单击来添加文件</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="752"/>
+        <location filename="../hmi/PostingWidget.cpp" line="756"/>
         <source>Click on Select Files/Folder buttons</source>
         <translation>点击选择文件/文件夹按钮</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="753"/>
+        <location filename="../hmi/PostingWidget.cpp" line="757"/>
         <source>Bare in mind you can select items in the list and press DEL to remove them</source>
         <translation>请记住，您可以选择列表中的项目，然后按DEL删除它们</translation>
     </message>

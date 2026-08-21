@@ -110,7 +110,8 @@ nzbPath  = /tmp
 ## the full beginner guide is on the wiki, page "Post info files".
 ##
 ## the model can live anywhere you can read, the file anywhere you can write.
-## a relative path is understood from the folder of this configuration file.
+## a bare file name means "next to this file"; write the full path otherwise,
+## for instance /home/me/models/my_record_sheet.txt
 #POST_INFO_TEMPLATE = my_record_sheet.txt
 
 ## where to write it (the variables above work here too)

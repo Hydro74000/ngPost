@@ -2564,8 +2564,12 @@ Pour obtenir la liste des options disponibles : %2 --help
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4134"/>
+        <source>## a bare file name means &quot;next to this file&quot;; write the full path otherwise</source>
+        <translation>## un simple nom de fichier veut dire « à côté de ce fichier » ; sinon, chemin complet</translation>
+    </message>
+    <message>
         <source>## a relative path is understood from the configuration folder</source>
-        <translation>## un chemin relatif est compris depuis le dossier de configuration</translation>
+        <translation type="vanished">## un chemin relatif est compris depuis le dossier de configuration</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4140"/>
@@ -5425,17 +5429,17 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">Mot de passe NZB :</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="318"/>
+        <location filename="../hmi/PostingWidget.ui" line="330"/>
         <source>Compress</source>
         <translation>Compresser</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="441"/>
+        <location filename="../hmi/PostingWidget.ui" line="453"/>
         <source>Gen PAR2</source>
         <translation>Générer PAR2</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="301"/>
+        <location filename="../hmi/PostingWidget.ui" line="313"/>
         <source>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</source>
         <translation>Si un fichier .nfo est présent dans les fichiers d&apos;origine (avant rar/renommage), le copier à côté du nzb généré (avec le même nom de base)</translation>
     </message>
@@ -5444,7 +5448,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">Longueur du nom tiré :</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="338"/>
+        <location filename="../hmi/PostingWidget.ui" line="350"/>
         <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
         <translation>longueur du nom d&apos;archive tiré par le bouton dé (config LENGTH_NAME)</translation>
     </message>
@@ -5453,12 +5457,12 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">Longueur du mot de passe tiré :</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="401"/>
+        <location filename="../hmi/PostingWidget.ui" line="413"/>
         <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
         <translation>longueur du mot de passe tiré par le bouton dé (config LENGTH_PASS)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="304"/>
+        <location filename="../hmi/PostingWidget.ui" line="316"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
         <translation>Copier le NFO à côté du fichier nzb (si disponible)</translation>
     </message>
@@ -5467,22 +5471,22 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">fichier NZB: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="266"/>
+        <location filename="../hmi/PostingWidget.ui" line="278"/>
         <source>full path of the nzb file that would be created (check the nzbPath keyword in the config file to set the default directory)</source>
         <translation>chemin d&apos;accès complet du fichier nzb qui sera créé (cf le mot clef nzbPath du fichier conf pour définir le dossier de destination par défaut)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="279"/>
+        <location filename="../hmi/PostingWidget.ui" line="291"/>
         <source>select the nzb file absolute file name</source>
         <translation>définir le chemin d&apos;accès complet du fichier nzb</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="282"/>
+        <location filename="../hmi/PostingWidget.ui" line="294"/>
         <source> ... </source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="375"/>
+        <location filename="../hmi/PostingWidget.ui" line="387"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation>mot de passe de l&apos;archive que vous postez (ou de celle qui sera créée)</translation>
     </message>
@@ -5491,7 +5495,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">mot de passe:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="388"/>
+        <location filename="../hmi/PostingWidget.ui" line="400"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>mot de passe de l&apos;archive (il sera ajouté dans l&apos;entête du fichier nzb)</translation>
     </message>
@@ -5500,12 +5504,12 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">longueur du mot de passe aléatoire</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="414"/>
+        <location filename="../hmi/PostingWidget.ui" line="426"/>
         <source>generate random password</source>
         <translation>générer un mot de passe aléatoire</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="315"/>
+        <location filename="../hmi/PostingWidget.ui" line="327"/>
         <source>compress the selected files using rar before posting</source>
         <translation>compresser les fichiers sélectionnés avant de poster</translation>
     </message>
@@ -5514,7 +5518,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">compression</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="325"/>
+        <location filename="../hmi/PostingWidget.ui" line="337"/>
         <source>archive name (file name obfuscation)</source>
         <translation>nom de l&apos;archive (obfuscation)</translation>
     </message>
@@ -5523,12 +5527,12 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">longueur du nom aléatoire de l&apos;archive</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="351"/>
+        <location filename="../hmi/PostingWidget.ui" line="363"/>
         <source>generate random archive name</source>
         <translation>générer un nom d&apos;archive aléatoire</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="378"/>
+        <location filename="../hmi/PostingWidget.ui" line="390"/>
         <source>Archive password</source>
         <translation>Mot de passe de l&apos;archive</translation>
     </message>
@@ -5543,7 +5547,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation>Garder les archives</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="438"/>
+        <location filename="../hmi/PostingWidget.ui" line="450"/>
         <source>generate the par2 (the compress option must be selected)</source>
         <translation>générer les fichiers par2 (la compression doit être sélectionnée)</translation>
     </message>
@@ -5569,13 +5573,13 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">À propos</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="475"/>
+        <location filename="../hmi/PostingWidget.ui" line="487"/>
         <source>Let&apos;s Post!</source>
         <translation>Poster les fichiers!</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="478"/>
-        <location filename="../hmi/PostingWidget.cpp" line="826"/>
+        <location filename="../hmi/PostingWidget.ui" line="490"/>
+        <location filename="../hmi/PostingWidget.cpp" line="830"/>
         <source>Post Files</source>
         <translation>Poster Fichiers</translation>
     </message>
@@ -5584,27 +5588,27 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">Faire un don</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="749"/>
+        <location filename="../hmi/PostingWidget.cpp" line="753"/>
         <source>You can add files or folder by:</source>
         <translation>Vous pouvez ajoutez fichiers ou dossiers:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="750"/>
+        <location filename="../hmi/PostingWidget.cpp" line="754"/>
         <source>Drag &amp; Drop files/folders</source>
         <translation>Glisser/Déposer de fichiers ou dossiers</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="751"/>
+        <location filename="../hmi/PostingWidget.cpp" line="755"/>
         <source>Right Click to add Files</source>
         <translation>Click droit sur la zone pour ajouter des Fichiers</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="752"/>
+        <location filename="../hmi/PostingWidget.cpp" line="756"/>
         <source>Click on Select Files/Folder buttons</source>
         <translation>Click sur les boutons Choisir Fichiers ou Choisir Dossier</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="753"/>
+        <location filename="../hmi/PostingWidget.cpp" line="757"/>
         <source>Bare in mind you can select items in the list and press DEL to remove them</source>
         <translation>Vous pouvez sélectionner dans la liste et appuyer sur SUPPR pour enlever fichiers/dossiers</translation>
     </message>
@@ -5636,14 +5640,14 @@ Would you like to overwrite it ?</source>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="234"/>
-        <location filename="../hmi/PostingWidget.cpp" line="833"/>
-        <location filename="../hmi/PostingWidget.cpp" line="852"/>
+        <location filename="../hmi/PostingWidget.cpp" line="837"/>
+        <location filename="../hmi/PostingWidget.cpp" line="856"/>
         <source>Stop Posting</source>
         <translation>Stop Post</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="240"/>
-        <location filename="../hmi/PostingWidget.cpp" line="855"/>
+        <location filename="../hmi/PostingWidget.cpp" line="859"/>
         <source>Cancel Posting</source>
         <translation>Annuler Post</translation>
     </message>
@@ -5674,44 +5678,44 @@ Would you like to overwrite it ?</source>
         <translation>le fichier sélectionné n&apos;est pas exécutable...</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="628"/>
+        <location filename="../hmi/PostingWidget.cpp" line="632"/>
         <source>Create a post info file</source>
         <translation>Créer une fiche de post</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="629"/>
+        <location filename="../hmi/PostingWidget.cpp" line="633"/>
         <source>Write a small text file describing this post next to the nzb.
 Some Usenet indexes ask for one.</source>
         <translation>Écrire à côté du nzb un petit fichier texte décrivant ce post.
 Certains index Usenet en demandent un.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="631"/>
+        <location filename="../hmi/PostingWidget.cpp" line="635"/>
         <source>Post information…</source>
         <translation>Informations du post…</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="632"/>
+        <location filename="../hmi/PostingWidget.cpp" line="636"/>
         <source>Choose the model and fill in your own fields, for this post.</source>
         <translation>Choisir le modèle et remplir vos propres champs, pour ce post.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="663"/>
+        <location filename="../hmi/PostingWidget.cpp" line="667"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>Les informations du post citent « %1 » deux fois. Supprimez l&apos;une des deux lignes.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="680"/>
+        <location filename="../hmi/PostingWidget.cpp" line="684"/>
         <source>Post info model saved as the default: %1</source>
         <translation>Modèle de fiche enregistré comme modèle par défaut : %1</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="746"/>
+        <location filename="../hmi/PostingWidget.cpp" line="750"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation>limite le nombre maximum de volumes à %1 (cf RAR_MAX conf)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="747"/>
+        <location filename="../hmi/PostingWidget.cpp" line="751"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>utilisation de fichier de configuration pour PAR2_ARGS: %1</translation>
     </message>

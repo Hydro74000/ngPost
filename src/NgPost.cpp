@@ -4131,7 +4131,7 @@ void NgPost::saveConfig()
                << tr("## write a post info file next to the nzb after each post") << "\n"
                << tr("## you give the model, ngPost fills in the blanks: it knows no index format") << "\n"
                << tr("## the model can live anywhere you can read, the file anywhere you can write") << "\n"
-               << tr("## a relative path is understood from the configuration folder") << "\n"
+               << tr("## a bare file name means \"next to this file\"; write the full path otherwise") << "\n"
                << "#POST_INFO_TEMPLATE = my_record_sheet.txt\n"
                << (_postInfoTemplate.isEmpty()
                        ? QString()

@@ -10,8 +10,8 @@ si un index change son format, seul son modèle change.
 
 ## S'en servir
 
-1. Copiez le modèle voulu (ou son contenu) là où vous pouvez écrire, par
-   exemple à côté de votre `ngPost.conf`.
+1. Copiez le modèle voulu (ou son contenu) **là où vous pouvez le lire**. Il
+   n'a pas besoin d'être dans ce dossier, ni dans aucun dossier particulier.
 2. Ajoutez deux lignes à votre `ngPost.conf` :
 
 ```ini
@@ -19,7 +19,17 @@ POST_INFO_TEMPLATE = ma_fiche.txt
 POST_INFO_OUTPUT = __nzbDir__/__nzbName__.info.txt
 ```
 
-Un chemin relatif est compris depuis le dossier de votre `ngPost.conf`.
+Un simple nom de fichier est compris depuis le dossier de votre `ngPost.conf`.
+**Si le modèle est ailleurs, écrivez son chemin complet**, ngPost n'ira pas le
+chercher :
+
+```ini
+POST_INFO_TEMPLATE = /home/moi/modeles/ma_fiche.txt
+POST_INFO_TEMPLATE = C:\Users\moi\modeles\ma_fiche.txt
+```
+
+En ligne de commande, `--post_info_template` comprend au contraire un chemin
+relatif depuis le dossier où vous vous trouvez.
 
 3. Postez quelque chose, et regardez à côté de votre `.nzb`.
 
