@@ -91,6 +91,8 @@ public:
 
     //! True when this post asks for a record sheet.
     bool writesPostInfoFile() const;
+    //! Values the record sheet can already show while the post is prepared.
+    PostInfoData _postInfoPreview() const;
     //! Applied by the auto-post tab to every post it launches.
     void setPostInfo(bool enabled,
                      const QString &templateOverride,

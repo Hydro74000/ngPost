@@ -34,6 +34,10 @@ struct FieldDoc
     char const *description; //!< plain English, translated at the point of use
     bool        isPath;      //!< native separators on Windows
     bool        isSecret;    //!< masked in logs, kept out of env/json by default
+    //! True when the value already exists while the post is being prepared, so
+    //! an editor can show it. The others only exist once the post is over:
+    //! showing a 0 for them would read as a result, not as "not yet".
+    bool knownBeforePost;
 };
 
 //! The fixed variables. Parameterized ones (__date__, __dateStart__,
@@ -84,6 +88,26 @@ QStringList renderArguments(QStringList const  &args,
 //! appear, without duplicates. Lets an editor offer exactly the fields the
 //! chosen model asks for instead of leaving the user to guess them.
 QStringList metaNamesIn(QString const &tmpl);
+
+//! One variable as written in a template.
+struct Token
+{
+    QString raw;  //!< "__date:dd/MM/yyyy__", exactly as the model spells it
+    QString name; //!< "date"
+    QString arg;  //!< "dd/MM/yyyy", empty when the variable takes none
+
+    bool isMeta() const { return name == QLatin1String("meta"); }
+};
+
+//! Every variable a template uses, in the order it appears, without
+//! duplicates. Unlike metaNamesIn() this also reports the ones ngPost fills in
+//! by itself, so an editor can show the whole sheet and not just the blanks.
+QVector<Token> tokensIn(QString const &tmpl);
+
+//! Description of \a token, ready to show: the table entry for a fixed
+//! variable, a sentence built on the spot for the parameterized ones. Empty
+//! when the variable does not exist.
+QString describe(Token const &token);
 
 //! Replaces the secret values by "****". Used before logging a command.
 QString redactSecrets(QString const &text, PostInfoData const &data);

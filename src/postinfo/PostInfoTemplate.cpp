@@ -105,33 +105,33 @@ QVector<FieldDoc> const &fields()
 {
     // clang-format off
     static QVector<FieldDoc> const sFields = {
-        // placeholder             env name                       description                                                        path  secret
-        { "__originalPath__",      "NGPOST_ORIGINAL_PATH",        "folder of the posted files (legacy, unchanged)",                  true,  false },
-        { "__sourcePath__",        "NGPOST_SOURCE_PATH",          "first file or folder you asked to post",                          true,  false },
-        { "__originalName__",      "NGPOST_ORIGINAL_NAME",        "name of that file or folder",                                     false, false },
-        { "__nzbPath__",           "NGPOST_NZB_PATH",             "full path of the nzb file",                                       true,  false },
-        { "__nzbDir__",            "NGPOST_NZB_DIR",              "folder holding the nzb file",                                     true,  false },
-        { "__nzbName__",           "NGPOST_NZB_NAME",             "nzb name without the .nzb extension",                             false, false },
-        { "__nzbFileName__",       "NGPOST_NZB_FILE_NAME",        "nzb name with the .nzb extension",                                false, false },
-        { "__rarName__",           "NGPOST_RAR_NAME",             "name of the archive, the one to search for on Usenet",            false, false },
-        { "__rarPass__",           "NGPOST_RAR_PASS",             "archive password",                                                false, true  },
-        { "__groups__",            "NGPOST_GROUPS",               "newsgroups the post was sent to, coma separated",                 false, false },
-        { "__nzbPoster__",         "NGPOST_NZB_POSTER",           "poster declared in the nzb (not the random per article From:)",   false, false },
-        { "__par2Pct__",           "NGPOST_PAR2_PCT",             "par2 redundancy percentage, empty when par2 is disabled",         false, false },
-        { "__postSize__",          "NGPOST_POST_SIZE",            "bytes of rar + par2 actually posted, before yEnc encoding",       false, false },
-        { "__postSizeHuman__",     "NGPOST_POST_SIZE_HUMAN",      "same size, human readable",                                       false, false },
-        { "__sizeInByte__",        "NGPOST_SIZE_IN_BYTE",         "legacy size, kept unchanged for existing scripts",                false, false },
-        { "__nbFiles__",           "NGPOST_NB_FILES",             "number of posted files",                                          false, false },
-        { "__nbArticles__",        "NGPOST_NB_ARTICLES",          "number of articles",                                              false, false },
-        { "__nbArticlesPosted__",  "NGPOST_NB_ARTICLES_POSTED",   "number of articles successfully posted",                          false, false },
-        { "__nbArticlesFailed__",  "NGPOST_NB_ARTICLES_FAILED",   "number of articles that failed",                                  false, false },
-        { "__avgSpeed__",          "NGPOST_AVG_SPEED",            "average upload speed",                                            false, false },
-        { "__durationSec__",       "NGPOST_DURATION_SEC",         "upload duration in seconds",                                      false, false },
-        { "__status__",            "NGPOST_STATUS",               "success, partial or failed",                                      false, false },
-        { "__postId__",            "NGPOST_POST_ID",              "history database id, 0 when there is no history",                 false, false },
-        { "__appVersion__",        "NGPOST_APP_VERSION",          "ngPost version that made the post",                               false, false },
-        { "__postInfoPath__",      "NGPOST_POST_INFO_PATH",       "path of the generated post info file",                            true,  false },
-        { "__jsonPath__",          "NGPOST_JSON",                 "path of the temporary json file (post commands only)",            true,  false },
+        // placeholder             env name                       description                                                        path  secret  known
+        { "__originalPath__",      "NGPOST_ORIGINAL_PATH",        "folder of the posted files (legacy, unchanged)",                  true,  false, true  },
+        { "__sourcePath__",        "NGPOST_SOURCE_PATH",          "first file or folder you asked to post",                          true,  false, true  },
+        { "__originalName__",      "NGPOST_ORIGINAL_NAME",        "name of that file or folder",                                     false, false, true  },
+        { "__nzbPath__",           "NGPOST_NZB_PATH",             "full path of the nzb file",                                       true,  false, true  },
+        { "__nzbDir__",            "NGPOST_NZB_DIR",              "folder holding the nzb file",                                     true,  false, true  },
+        { "__nzbName__",           "NGPOST_NZB_NAME",             "nzb name without the .nzb extension",                             false, false, true  },
+        { "__nzbFileName__",       "NGPOST_NZB_FILE_NAME",        "nzb name with the .nzb extension",                                false, false, true  },
+        { "__rarName__",           "NGPOST_RAR_NAME",             "name of the archive, the one to search for on Usenet",            false, false, true  },
+        { "__rarPass__",           "NGPOST_RAR_PASS",             "archive password",                                                false, true, true   },
+        { "__groups__",            "NGPOST_GROUPS",               "newsgroups the post was sent to, coma separated",                 false, false, true  },
+        { "__nzbPoster__",         "NGPOST_NZB_POSTER",           "poster declared in the nzb (not the random per article From:)",   false, false, true  },
+        { "__par2Pct__",           "NGPOST_PAR2_PCT",             "par2 redundancy percentage, empty when par2 is disabled",         false, false, true  },
+        { "__postSize__",          "NGPOST_POST_SIZE",            "bytes of rar + par2 actually posted, before yEnc encoding",       false, false, false },
+        { "__postSizeHuman__",     "NGPOST_POST_SIZE_HUMAN",      "same size, human readable",                                       false, false, false },
+        { "__sizeInByte__",        "NGPOST_SIZE_IN_BYTE",         "legacy size, kept unchanged for existing scripts",                false, false, false },
+        { "__nbFiles__",           "NGPOST_NB_FILES",             "number of posted files",                                          false, false, false },
+        { "__nbArticles__",        "NGPOST_NB_ARTICLES",          "number of articles",                                              false, false, false },
+        { "__nbArticlesPosted__",  "NGPOST_NB_ARTICLES_POSTED",   "number of articles successfully posted",                          false, false, false },
+        { "__nbArticlesFailed__",  "NGPOST_NB_ARTICLES_FAILED",   "number of articles that failed",                                  false, false, false },
+        { "__avgSpeed__",          "NGPOST_AVG_SPEED",            "average upload speed",                                            false, false, false },
+        { "__durationSec__",       "NGPOST_DURATION_SEC",         "upload duration in seconds",                                      false, false, false },
+        { "__status__",            "NGPOST_STATUS",               "success, partial or failed",                                      false, false, false },
+        { "__postId__",            "NGPOST_POST_ID",              "history database id, 0 when there is no history",                 false, false, false },
+        { "__appVersion__",        "NGPOST_APP_VERSION",          "ngPost version that made the post",                               false, false, true  },
+        { "__postInfoPath__",      "NGPOST_POST_INFO_PATH",       "path of the generated post info file",                            true,  false, false },
+        { "__jsonPath__",          "NGPOST_JSON",                 "path of the temporary json file (post commands only)",            true,  false, false },
     };
     // clang-format on
     return sFields;
@@ -254,6 +254,56 @@ QStringList metaNamesIn(QString const &tmpl)
             names << name;
     }
     return names;
+}
+
+QVector<Token> tokensIn(QString const &tmpl)
+{
+    QVector<Token>                  tokens;
+    QRegularExpressionMatchIterator it = tokenRegExp().globalMatch(tmpl);
+    while (it.hasNext()) {
+        QRegularExpressionMatch const m = it.next();
+        if (m.captured(1).isEmpty())
+            continue; // the legacy "%1", which names no variable
+
+        Token token;
+        token.name = m.captured(1);
+        token.arg  = m.captured(2);
+        token.raw  = m.captured(0);
+
+        // Same variable, same argument, listed once. "__date:dd/MM__" and
+        // "__date:yyyy__" are two different lines of the sheet though.
+        bool known = false;
+        for (Token const &seen : tokens) {
+            if (seen.name == token.name && seen.arg == token.arg) {
+                known = true;
+                break;
+            }
+        }
+        if (!known)
+            tokens << token;
+    }
+    return tokens;
+}
+
+QString describe(Token const &token)
+{
+    if (token.isMeta())
+        return QCoreApplication::translate("PostInfoTemplate",
+                                           "your own field, you fill it in below");
+
+    if (token.name == QLatin1String("date"))
+        return QCoreApplication::translate("PostInfoTemplate",
+                                           "date the post finished, in the format you give");
+    if (token.name == QLatin1String("dateStart"))
+        return QCoreApplication::translate("PostInfoTemplate",
+                                           "date the post started, in the format you give");
+
+    QString const placeholder = QStringLiteral("__%1__").arg(token.name);
+    for (FieldDoc const &field : fields()) {
+        if (placeholder == QLatin1String(field.placeholder))
+            return QCoreApplication::translate("PostInfoTemplate", field.description);
+    }
+    return QString();
 }
 
 QString redactSecrets(QString const &text, PostInfoData const &data)

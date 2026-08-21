@@ -87,6 +87,10 @@ private slots:
 
     //! The model from the configuration is the default: it is marked as such,
     //! selected, and selecting it is not an override.
+    //! Values already known while preparing the post are shown; the ones that
+    //! only exist afterwards stay blank, and a secret is never printed.
+    void post_info_dialog_shows_what_is_already_known();
+
     void post_info_dialog_marks_the_configured_model_as_default();
 
     //! A model opened during the session is offered again to the next posts,
@@ -370,11 +374,24 @@ void TestMainWindow::post_info_dialog_offers_the_fields_of_the_model()
         tmpl.write("titre =__meta:titre__\ncat =__meta:categorie__\ntaille =__postSize__\n");
     }
 
-    // Opening on a model with nothing typed yet offers exactly its fields.
-    PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>());
+    // Opening on a model shows every line it will produce, in its own order:
+    // the two fields to fill in, and the size ngPost works out by itself.
+    PostInfoData preview;
+    preview.rarName = QStringLiteral("my-archive");
+    PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>(), QStringList(), preview);
     auto *table = dlg.findChild<QTableWidget *>(QStringLiteral("postInfoFieldsTable"));
     QVERIFY(table);
-    QCOMPARE(table->rowCount(), 2); // titre and categorie, not __postSize__
+    QCOMPARE(table->rowCount(), 3); // titre, categorie, and __postSize__
+
+    // the automatic line is shown, but is neither editable nor one of "yours"
+    auto *autoName = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoAutoName_2"));
+    QVERIFY(autoName);
+    QCOMPARE(autoName->text(), QStringLiteral("__postSize__"));
+    QVERIFY(autoName->isReadOnly());
+    auto *autoValue = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoAutoValue_2"));
+    QVERIFY(autoValue);
+    QVERIFY(autoValue->text().isEmpty()); // a size only exists once the post is over
+    QVERIFY(!autoValue->placeholderText().isEmpty());
 
     auto *firstName = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoFieldName_0"));
     QVERIFY(firstName);
@@ -397,6 +414,47 @@ void TestMainWindow::post_info_dialog_offers_the_fields_of_the_model()
     QCOMPARE(meta.value(QStringLiteral("titre")).value, QStringLiteral("Mercantour"));
     QCOMPARE(meta.value(QStringLiteral("titre")).scope, MetaScope::Nzb);
     QCOMPARE(meta.value(QStringLiteral("categorie")).scope, MetaScope::Local);
+}
+
+void TestMainWindow::post_info_dialog_shows_what_is_already_known()
+{
+    HomeSandbox sandbox;
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    {
+        QFile tmpl(tmplPath);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("nom =__rarName__\npass =__rarPass__\nstatut =__status__\n");
+    }
+
+    PostInfoData preview;
+    preview.rarName = QStringLiteral("my-archive");
+    preview.rarPass = QStringLiteral("qwerty42");
+
+    PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>(), QStringList(), preview);
+    auto *table = dlg.findChild<QTableWidget *>(QStringLiteral("postInfoFieldsTable"));
+    QVERIFY(table);
+    QCOMPARE(table->rowCount(), 3);
+
+    // a value already known while preparing the post is shown as it will be
+    auto *name = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoAutoValue_0"));
+    QVERIFY(name);
+    QCOMPARE(name->text(), QStringLiteral("my-archive"));
+
+    // a secret is not printed on screen: knowing it is there is enough
+    auto *pass = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoAutoValue_1"));
+    QVERIFY(pass);
+    QVERIFY(!pass->text().isEmpty());
+    QVERIFY(!pass->text().contains(QStringLiteral("qwerty42")));
+
+    // and a value that only exists after the post stays blank
+    auto *status = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoAutoValue_2"));
+    QVERIFY(status);
+    QVERIFY(status->text().isEmpty());
+
+    // none of these three is a field of the user
+    QString duplicate;
+    QVERIFY(dlg.meta(&duplicate).isEmpty());
+    QVERIFY(duplicate.isEmpty());
 }
 
 void TestMainWindow::post_info_dialog_marks_the_configured_model_as_default()

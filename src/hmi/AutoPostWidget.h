@@ -84,6 +84,12 @@ public slots:
 private slots:
     void onPostInfoToggled(bool checked);
     void onEditPostInfo();
+
+private:
+    //! Values the record sheet can already show for the whole run.
+    PostInfoData _postInfoPreview() const;
+
+private slots:
     void onSelectFilesClicked();
     void onGenQuickPosts();
     void onCompressPathClicked();

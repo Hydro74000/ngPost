@@ -566,6 +566,20 @@ void AutoPostWidget::retranslatePostInfoTexts()
     _postInfoButton->setToolTip(tr("Model and fields used by all the posts of this run."));
 }
 
+//! An auto posting run knows none of the per post names yet: every post it
+//! creates gets its own nzb and archive. Only the settings shared by the whole
+//! run can be shown.
+PostInfoData AutoPostWidget::_postInfoPreview() const
+{
+    PostInfoData data;
+    data.appVersion = QString(APP_VERSION);
+    data.groups     = _ngPost->groups();
+    if (!_ngPost->_genFrom && !_ngPost->_from.empty())
+        data.nzbPoster = QString::fromStdString(_ngPost->_from);
+    data.par2Pct = _ngPost->_doPar2 ? static_cast<int>(_ngPost->_par2Pct) : -1;
+    return data;
+}
+
 void AutoPostWidget::onPostInfoToggled(bool checked) { _postInfoButton->setEnabled(checked); }
 
 void AutoPostWidget::onEditPostInfo()
@@ -574,6 +588,7 @@ void AutoPostWidget::onEditPostInfo()
                        _postInfoTemplate,
                        _postInfoMeta,
                        _ngPost->sessionPostInfoTemplates(),
+                       _postInfoPreview(),
                        this);
     int const answer = dlg.exec();
 

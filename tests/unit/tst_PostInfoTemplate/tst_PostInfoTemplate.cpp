@@ -24,6 +24,7 @@ private slots:
     //! The variable table is the single source of truth: no duplicate name, no
     //! duplicate environment variable, never an empty description.
     void fields_table_is_consistent();
+    void tokens_in_lists_every_variable_of_a_model();
 
     //! Every fixed variable resolves, and the tricky contracts hold: par2Pct is
     //! empty when par2 is off, sizeInByte stays the legacy value.
@@ -179,6 +180,60 @@ void TestPostInfoTemplate::fields_table_is_consistent()
         envNames.insert(envName);
     }
     QVERIFY(placeholders.contains(PostInfoTemplate::passwordPlaceholder()));
+
+    // The help panel is generated from this table, so every entry must be
+    // describable: a variable added without a description would show a blank
+    // line to the user instead of failing here.
+    for (QString const &placeholder : placeholders) {
+        PostInfoTemplate::Token token;
+        token.raw  = placeholder;
+        token.name = placeholder.mid(2, placeholder.size() - 4);
+        QVERIFY2(!PostInfoTemplate::describe(token).isEmpty(), qPrintable(placeholder));
+    }
+}
+
+void TestPostInfoTemplate::tokens_in_lists_every_variable_of_a_model()
+{
+    QString const tmpl = QStringLiteral("nom =__originalName__\n"
+                                        "titre =__meta:titre__\n"
+                                        "date =__date:dd/MM/yyyy__\n"
+                                        "annee =__date:yyyy__\n"
+                                        "encore =__originalName__\n"
+                                        "libre =50%1 off\n"
+                                        "inconnu =__nawak__\n");
+
+    QVector<PostInfoTemplate::Token> const tokens = PostInfoTemplate::tokensIn(tmpl);
+
+    QStringList raws;
+    for (PostInfoTemplate::Token const &t : tokens)
+        raws << t.raw;
+
+    // in the order of the model, without duplicates, and the legacy "%1" is
+    // not a variable so it is not listed
+    QCOMPARE(raws,
+             (QStringList{ QStringLiteral("__originalName__"),
+                           QStringLiteral("__meta:titre__"),
+                           QStringLiteral("__date:dd/MM/yyyy__"),
+                           QStringLiteral("__date:yyyy__"),
+                           QStringLiteral("__nawak__") }));
+
+    // same variable, two formats: two lines of the sheet, two entries
+    QCOMPARE(tokens.at(2).name, QStringLiteral("date"));
+    QCOMPARE(tokens.at(2).arg, QStringLiteral("dd/MM/yyyy"));
+    QCOMPARE(tokens.at(3).arg, QStringLiteral("yyyy"));
+
+    QVERIFY(tokens.at(1).isMeta());
+    QCOMPARE(tokens.at(1).arg, QStringLiteral("titre"));
+    QVERIFY(!tokens.at(0).isMeta());
+
+    // an unknown variable has no description, which is how the editor tells
+    // the user it will be copied as it is
+    QVERIFY(PostInfoTemplate::describe(tokens.at(4)).isEmpty());
+    QVERIFY(!PostInfoTemplate::describe(tokens.at(0)).isEmpty());
+    QVERIFY(!PostInfoTemplate::describe(tokens.at(2)).isEmpty());
+
+    // metaNamesIn stays the subset the editor uses for the blanks
+    QCOMPARE(PostInfoTemplate::metaNamesIn(tmpl), QStringList{ QStringLiteral("titre") });
 }
 
 void TestPostInfoTemplate::fixed_variables_resolve()

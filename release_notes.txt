@@ -34,6 +34,11 @@ TODO: auto RAR size and par2 parameters depending on the inputs size?
   application. Auto Post has the same pair, applying to its whole run. Models
   opened during the session stay in the list for the next posts, and a small
   cross drops one from it.
+- That editor shows the whole sheet, not just the blanks: every line the model
+  produces, in its order, with the value already known when there is one. A "?"
+  button lists every __variable__ ngPost knows and whether it exists before or
+  after the post. It is generated from the renderer's own table, so it cannot
+  describe something ngPost does not support.
 - --export_post_info <id> writes the record sheet of a post already in the
   history, to a file or to stdout. Also available from the History tab.
 - Post automation is now fully reachable from the command line, so ngPost can
