@@ -401,7 +401,7 @@ It will be irreversible...</source>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="606"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
-        <translation>The post information lists '%1' twice. Remove one of the two lines.</translation>
+        <translation>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</translation>
     </message>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="621"/>
@@ -1336,17 +1336,17 @@ This also removes all associated file and article records.</translation>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2391"/>
         <source>&lt;span style=&apos;color:darkgreen&apos;&gt;Resumable&lt;/span&gt;</source>
-        <translation>&lt;span style='color:darkgreen'&gt;Resumable&lt;/span&gt;</translation>
+        <translation>&lt;span style=&apos;color:darkgreen&apos;&gt;Resumable&lt;/span&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2393"/>
         <source>&lt;span style=&apos;color:#FFA200&apos;&gt;Partially resumable&lt;/span&gt;</source>
-        <translation>&lt;span style='color:#FFA200'&gt;Partially resumable&lt;/span&gt;</translation>
+        <translation>&lt;span style=&apos;color:#FFA200&apos;&gt;Partially resumable&lt;/span&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2394"/>
         <source>&lt;span style=&apos;color:darkred&apos;&gt;Not resumable&lt;/span&gt;</source>
-        <translation>&lt;span style='color:darkred'&gt;Not resumable&lt;/span&gt;</translation>
+        <translation>&lt;span style=&apos;color:darkred&apos;&gt;Not resumable&lt;/span&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2412"/>
@@ -2472,12 +2472,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="257"/>
         <source>one of your fields, written in the post info file AND published in the nzb header (typically &quot;password=qwerty42&quot;)</source>
-        <translation>one of your fields, written in the post info file AND published in the nzb header (typically "password=qwerty42")</translation>
+        <translation>one of your fields, written in the post info file AND published in the nzb header (typically &quot;password=qwerty42&quot;)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="258"/>
         <source>one of your fields, written in the post info file only, never published in the nzb (ex: &quot;title=Photo backup 2026&quot;)</source>
-        <translation>one of your fields, written in the post info file only, never published in the nzb (ex: "title=Photo backup 2026")</translation>
+        <translation>one of your fields, written in the post info file only, never published in the nzb (ex: &quot;title=Photo backup 2026&quot;)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="259"/>
@@ -2806,17 +2806,17 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="1795"/>
         <source>Error: metadata must be given as key=value, got &apos;%1&apos;</source>
-        <translation>Error: metadata must be given as key=value, got '%1'</translation>
+        <translation>Error: metadata must be given as key=value, got &apos;%1&apos;</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1809"/>
         <source>Error: metadata &apos;%1&apos; is given both as public (--meta) and private (--post_meta); choose one.</source>
-        <translation>Error: metadata '%1' is given both as public (--meta) and private (--post_meta); choose one.</translation>
+        <translation>Error: metadata &apos;%1&apos; is given both as public (--meta) and private (--post_meta); choose one.</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2048"/>
         <source>Recovering: starting next job that wasn&apos;t pre-packed</source>
-        <translation>Recovering: starting next job that wasn't pre-packed</translation>
+        <translation>Recovering: starting next job that wasn&apos;t pre-packed</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2437"/>
@@ -2831,12 +2831,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="2475"/>
         <source>Error syntax: --vpn_profile &apos;%1&apos; does not match any profile defined in the config</source>
-        <translation>Error syntax: --vpn_profile '%1' does not match any profile defined in the config</translation>
+        <translation>Error syntax: --vpn_profile &apos;%1&apos; does not match any profile defined in the config</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2594"/>
         <source>Error: --post_info_output can&apos;t be empty</source>
-        <translation>Error: --post_info_output can't be empty</translation>
+        <translation>Error: --post_info_output can&apos;t be empty</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2622"/>
@@ -2852,7 +2852,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <location filename="../NgPost.cpp" line="3470"/>
         <source>POST_INFO_OUTPUT can&apos;t be empty
 </source>
-        <translation>POST_INFO_OUTPUT can't be empty
+        <translation>POST_INFO_OUTPUT can&apos;t be empty
 </translation>
     </message>
     <message>
@@ -2872,7 +2872,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     <message>
         <location filename="../NgPost.cpp" line="3754"/>
         <source>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</source>
-        <translation>VPN: migrated legacy VPN_CONFIG_PATH into profile 'Default'</translation>
+        <translation>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="3776"/>
@@ -3028,12 +3028,12 @@ Your active configuration file is:
     <message>
         <location filename="../NgPost.cpp" line="3893"/>
         <source>Config migration failed: could not create backup &apos;%1&apos;.</source>
-        <translation>Config migration failed: could not create backup '%1'.</translation>
+        <translation>Config migration failed: could not create backup &apos;%1&apos;.</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="3896"/>
         <source>Config migration failed: could not copy legacy config &apos;%1&apos; to &apos;%2&apos;.</source>
-        <translation>Config migration failed: could not copy legacy config '%1' to '%2'.</translation>
+        <translation>Config migration failed: could not copy legacy config &apos;%1&apos; to &apos;%2&apos;.</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="3910"/>
@@ -3761,7 +3761,7 @@ Your active configuration file is:
     <message>
         <location filename="../NntpCheckCon.cpp" line="77"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
-        <translation>Server '%1' must route through the VPN but the tunnel is not connected</translation>
+        <translation>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</translation>
     </message>
     <message>
         <location filename="../NntpCheckCon.cpp" line="87"/>
@@ -3797,7 +3797,7 @@ Your active configuration file is:
     <message>
         <location filename="../NntpCheckCon.cpp" line="257"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
-        <translation>[Connection #%1] Error authentication to server %2:%3 with user '%4'</translation>
+        <translation>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</translation>
     </message>
     <message>
         <location filename="../NntpCheckCon.cpp" line="307"/>
@@ -3823,7 +3823,7 @@ Your active configuration file is:
     <message>
         <location filename="../NntpConnection.cpp" line="132"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
-        <translation>Server '%1' must route through the VPN but the tunnel is not connected</translation>
+        <translation>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</translation>
     </message>
     <message>
         <location filename="../NntpConnection.cpp" line="141"/>
@@ -3924,7 +3924,7 @@ Your active configuration file is:
     <message>
         <location filename="../NntpConnection.cpp" line="590"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
-        <translation>[Connection #%1] Error authentication to server %2:%3 with user '%4'</translation>
+        <translation>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</translation>
     </message>
     <message>
         <location filename="../NntpConnection.cpp" line="616"/>
@@ -4081,7 +4081,7 @@ Your active configuration file is:
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="349"/>
         <source>Cannot reach OpenVPNServiceInteractive pipe. Open Services.msc, set &quot;OpenVPN Interactive Service&quot; to Automatic, and start it. If it is not present, re-run the ngPost setup with the OpenVPN Community option.</source>
-        <translation>Cannot reach OpenVPNServiceInteractive pipe. Open Services.msc, set "OpenVPN Interactive Service" to Automatic, and start it. If it is not present, re-run the ngPost setup with the OpenVPN Community option.</translation>
+        <translation>Cannot reach OpenVPNServiceInteractive pipe. Open Services.msc, set &quot;OpenVPN Interactive Service&quot; to Automatic, and start it. If it is not present, re-run the ngPost setup with the OpenVPN Community option.</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="373"/>
@@ -4143,7 +4143,7 @@ Your active configuration file is:
     <message>
         <location filename="../PostCmdRunner.cpp" line="264"/>
         <source>NZB_POST_CMD could not run &apos;%1&apos;: %2</source>
-        <translation>NZB_POST_CMD could not run '%1': %2</translation>
+        <translation>NZB_POST_CMD could not run &apos;%1&apos;: %2</translation>
     </message>
     <message>
         <location filename="../PostCmdRunner.cpp" line="289"/>
@@ -5028,22 +5028,52 @@ Save the model now?</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="59"/>
-        <location filename="../hmi/PostingWidget.ui" line="111"/>
+        <location filename="../hmi/PostingWidget.ui" line="109"/>
         <source>...</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="95"/>
+        <location filename="../hmi/PostingWidget.ui" line="93"/>
         <source>full path of the rar executable</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="108"/>
+        <location filename="../hmi/PostingWidget.ui" line="106"/>
         <source>select rar executable</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="135"/>
+        <location filename="../hmi/PostingWidget.ui" line="136"/>
+        <source>Random name length:</source>
+        <translation>Random name length:</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="143"/>
+        <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
+        <translation>length of the archive name drawn by the dice button (config LENGTH_NAME)</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="150"/>
+        <source>Random password length:</source>
+        <translation>Random password length:</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="157"/>
+        <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
+        <translation>length of the password drawn by the dice button (config LENGTH_PASS)</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="356"/>
+        <source>Archive password</source>
+        <translation>Archive password</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="403"/>
+        <source>Vol size (MB):</source>
+        <translation>Vol size (MB):</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="416"/>
         <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
         <translation></translation>
     </message>
@@ -5053,67 +5083,64 @@ Save the model now?</translation>
         <translation>Compress Path: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="88"/>
+        <location filename="../hmi/PostingWidget.ui" line="86"/>
         <source>RAR Path: </source>
         <translation>RAR Path: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="122"/>
         <source>Vol Size:</source>
-        <translation>Vol Size:</translation>
+        <translation type="vanished">Vol Size:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="145"/>
+        <location filename="../hmi/PostingWidget.ui" line="423"/>
         <source>Limit RAR Number</source>
         <translation>Limit RAR Number</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="174"/>
         <source>PAR2 Redundancy (%): </source>
-        <translation>PAR2 Redundancy (%): </translation>
+        <translation type="vanished">PAR2 Redundancy (%): </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="206"/>
+        <location filename="../hmi/PostingWidget.ui" line="186"/>
         <source>Select the files to post (they may be compressed if needed) you can also right click on the files area just above</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="209"/>
+        <location filename="../hmi/PostingWidget.ui" line="189"/>
         <source>Select Files</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="220"/>
+        <location filename="../hmi/PostingWidget.ui" line="200"/>
         <source>remove all files</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="223"/>
+        <location filename="../hmi/PostingWidget.ui" line="203"/>
         <source>Remove All</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="234"/>
+        <location filename="../hmi/PostingWidget.ui" line="214"/>
         <source>select a folder (only if you use compression)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="237"/>
+        <location filename="../hmi/PostingWidget.ui" line="217"/>
         <source>Select Folder</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="270"/>
+        <location filename="../hmi/PostingWidget.ui" line="250"/>
         <source>NZB file:</source>
         <translation>NZB file:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="323"/>
         <source>NZB Password:</source>
-        <translation>NZB Password:</translation>
+        <translation type="vanished">NZB Password:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="390"/>
+        <location filename="../hmi/PostingWidget.ui" line="309"/>
         <source>Compress</source>
         <translation>Compress</translation>
     </message>
@@ -5123,72 +5150,62 @@ Save the model now?</translation>
         <translation>Gen PAR2</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="466"/>
+        <location filename="../hmi/PostingWidget.ui" line="292"/>
         <source>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</source>
         <translation>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="469"/>
+        <location filename="../hmi/PostingWidget.ui" line="295"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
         <translation>Copy NFO alongside the nzb file (if available)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="277"/>
+        <location filename="../hmi/PostingWidget.ui" line="257"/>
         <source>full path of the nzb file that would be created (check the nzbPath keyword in the config file to set the default directory)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="290"/>
+        <location filename="../hmi/PostingWidget.ui" line="270"/>
         <source>select the nzb file absolute file name</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="293"/>
+        <location filename="../hmi/PostingWidget.ui" line="273"/>
         <source> ... </source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="320"/>
+        <location filename="../hmi/PostingWidget.ui" line="353"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="333"/>
+        <location filename="../hmi/PostingWidget.ui" line="366"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="340"/>
-        <source>length of the password</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="../hmi/PostingWidget.ui" line="353"/>
+        <location filename="../hmi/PostingWidget.ui" line="379"/>
         <source>generate random password</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="387"/>
+        <location filename="../hmi/PostingWidget.ui" line="306"/>
         <source>compress the selected files using rar before posting</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="406"/>
+        <location filename="../hmi/PostingWidget.ui" line="316"/>
         <source>archive name (file name obfuscation)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="413"/>
-        <source>length of the archive name</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location filename="../hmi/PostingWidget.ui" line="426"/>
+        <location filename="../hmi/PostingWidget.ui" line="329"/>
         <source>generate random archive name</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="443"/>
+        <location filename="../hmi/PostingWidget.ui" line="433"/>
         <source>Keep Archives</source>
         <translation>Keep Archives</translation>
     </message>
@@ -5198,150 +5215,150 @@ Save the model now?</translation>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="440"/>
+        <location filename="../hmi/PostingWidget.ui" line="430"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="506"/>
+        <location filename="../hmi/PostingWidget.ui" line="496"/>
         <source>Let&apos;s Post!</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="509"/>
-        <location filename="../hmi/PostingWidget.cpp" line="802"/>
+        <location filename="../hmi/PostingWidget.ui" line="499"/>
+        <location filename="../hmi/PostingWidget.cpp" line="826"/>
         <source>Post Files</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="725"/>
+        <location filename="../hmi/PostingWidget.cpp" line="749"/>
         <source>You can add files or folder by:</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="726"/>
+        <location filename="../hmi/PostingWidget.cpp" line="750"/>
         <source>Drag &amp; Drop files/folders</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="727"/>
+        <location filename="../hmi/PostingWidget.cpp" line="751"/>
         <source>Right Click to add Files</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="728"/>
+        <location filename="../hmi/PostingWidget.cpp" line="752"/>
         <source>Click on Select Files/Folder buttons</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="729"/>
+        <location filename="../hmi/PostingWidget.cpp" line="753"/>
         <source>Bare in mind you can select items in the list and press DEL to remove them</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="150"/>
+        <location filename="../hmi/PostingWidget.cpp" line="152"/>
         <source>There are no selected files to post...</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="159"/>
+        <location filename="../hmi/PostingWidget.cpp" line="161"/>
         <source>There are no existing files to post...</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="165"/>
+        <location filename="../hmi/PostingWidget.cpp" line="167"/>
         <source>You can&apos;t post folders without using compression...</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="185"/>
+        <location filename="../hmi/PostingWidget.cpp" line="187"/>
         <source>Overwrite existing nzb file?</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="186"/>
+        <location filename="../hmi/PostingWidget.cpp" line="188"/>
         <source>The nzb file &apos;%1&apos; already exists.
 Would you like to overwrite it ?</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="232"/>
-        <location filename="../hmi/PostingWidget.cpp" line="809"/>
-        <location filename="../hmi/PostingWidget.cpp" line="828"/>
+        <location filename="../hmi/PostingWidget.cpp" line="234"/>
+        <location filename="../hmi/PostingWidget.cpp" line="833"/>
+        <location filename="../hmi/PostingWidget.cpp" line="852"/>
         <source>Stop Posting</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="238"/>
-        <location filename="../hmi/PostingWidget.cpp" line="831"/>
+        <location filename="../hmi/PostingWidget.cpp" line="240"/>
+        <location filename="../hmi/PostingWidget.cpp" line="855"/>
         <source>Cancel Posting</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="269"/>
+        <location filename="../hmi/PostingWidget.cpp" line="271"/>
         <source>Select one or more files to Post</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="281"/>
-        <location filename="../hmi/PostingWidget.cpp" line="326"/>
+        <location filename="../hmi/PostingWidget.cpp" line="283"/>
+        <location filename="../hmi/PostingWidget.cpp" line="344"/>
         <source>Select a Folder</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="338"/>
+        <location filename="../hmi/PostingWidget.cpp" line="356"/>
         <source>Create nzb file</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="351"/>
+        <location filename="../hmi/PostingWidget.cpp" line="369"/>
         <source>Select rar executable</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="361"/>
+        <location filename="../hmi/PostingWidget.cpp" line="379"/>
         <source>the selected file is not executable...</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="604"/>
+        <location filename="../hmi/PostingWidget.cpp" line="628"/>
         <source>Create a post info file</source>
         <translation>Create a post info file</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="605"/>
+        <location filename="../hmi/PostingWidget.cpp" line="629"/>
         <source>Write a small text file describing this post next to the nzb.
 Some Usenet indexes ask for one.</source>
         <translation>Write a small text file describing this post next to the nzb.
 Some Usenet indexes ask for one.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="607"/>
+        <location filename="../hmi/PostingWidget.cpp" line="631"/>
         <source>Post information…</source>
         <translation>Post information…</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="608"/>
+        <location filename="../hmi/PostingWidget.cpp" line="632"/>
         <source>Choose the model and fill in your own fields, for this post.</source>
         <translation>Choose the model and fill in your own fields, for this post.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="639"/>
+        <location filename="../hmi/PostingWidget.cpp" line="663"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
-        <translation>The post information lists '%1' twice. Remove one of the two lines.</translation>
+        <translation>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="656"/>
+        <location filename="../hmi/PostingWidget.cpp" line="680"/>
         <source>Post info model saved as the default: %1</source>
         <translation>Post info model saved as the default: %1</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="722"/>
+        <location filename="../hmi/PostingWidget.cpp" line="746"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="723"/>
+        <location filename="../hmi/PostingWidget.cpp" line="747"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation></translation>
     </message>
@@ -5514,7 +5531,7 @@ Some Usenet indexes ask for one.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="327"/>
         <source>VPN: config file missing for profile &apos;%1&apos; (%2)</source>
-        <translation>VPN: config file missing for profile '%1' (%2)</translation>
+        <translation>VPN: config file missing for profile &apos;%1&apos; (%2)</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="348"/>
@@ -5524,12 +5541,12 @@ Some Usenet indexes ask for one.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="350"/>
         <source>VPN: no credentials in keychain for &apos;%1&apos; (relying on .ovpn inline)</source>
-        <translation>VPN: no credentials in keychain for '%1' (relying on .ovpn inline)</translation>
+        <translation>VPN: no credentials in keychain for &apos;%1&apos; (relying on .ovpn inline)</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="357"/>
         <source>VPN: connecting profile &apos;%1&apos; (%2)…</source>
-        <translation>VPN: connecting profile '%1' (%2)…</translation>
+        <translation>VPN: connecting profile &apos;%1&apos; (%2)…</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="414"/>
@@ -5614,7 +5631,7 @@ Some Usenet indexes ask for one.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="818"/>
         <source>On Windows, uninstall OpenVPN Community / WireGuard for Windows from &quot;Add or Remove Programs&quot; if you want to fully remove VPN support.</source>
-        <translation>On Windows, uninstall OpenVPN Community / WireGuard for Windows from "Add or Remove Programs" if you want to fully remove VPN support.</translation>
+        <translation>On Windows, uninstall OpenVPN Community / WireGuard for Windows from &quot;Add or Remove Programs&quot; if you want to fully remove VPN support.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="836"/>
@@ -5659,12 +5676,12 @@ Some Usenet indexes ask for one.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1002"/>
         <source>Master switch (VPN_AUTO_CONNECT) is ON but no VPN helper is installed - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</source>
-        <translation>Master switch (VPN_AUTO_CONNECT) is ON but no VPN helper is installed - ignoring the master switch. Per-server 'Use VPN' is still enforced.</translation>
+        <translation>Master switch (VPN_AUTO_CONNECT) is ON but no VPN helper is installed - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1008"/>
         <source>Master switch (VPN_AUTO_CONNECT) is ON but the VPN is not correctly configured (%1) - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</source>
-        <translation>Master switch (VPN_AUTO_CONNECT) is ON but the VPN is not correctly configured (%1) - ignoring the master switch. Per-server 'Use VPN' is still enforced.</translation>
+        <translation>Master switch (VPN_AUTO_CONNECT) is ON but the VPN is not correctly configured (%1) - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1046"/>
@@ -5882,7 +5899,7 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="231"/>
         <source>Another VPN profile is already named &apos;%1&apos;.</source>
-        <translation>Another VPN profile is already named '%1'.</translation>
+        <translation>Another VPN profile is already named &apos;%1&apos;.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="240"/>
@@ -6020,7 +6037,7 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="122"/>
         <source>When checked: every NNTP connection from ngPost is forced through the VPN tunnel, regardless of each server&apos;s &quot;Use VPN&quot; flag. The VPN auto-starts when a job begins and disconnects 30 s after the queue is empty. Use this if you want a single global switch instead of fiddling with the per-server column.&lt;br/&gt;&lt;br/&gt;When unchecked: only the servers whose &quot;Use VPN&quot; column is ticked route through the tunnel; the others connect directly.</source>
-        <translation>When checked: every NNTP connection from ngPost is forced through the VPN tunnel, regardless of each server's "Use VPN" flag. The VPN auto-starts when a job begins and disconnects 30 s after the queue is empty. Use this if you want a single global switch instead of fiddling with the per-server column.&lt;br/&gt;&lt;br/&gt;When unchecked: only the servers whose "Use VPN" column is ticked route through the tunnel; the others connect directly.</translation>
+        <translation>When checked: every NNTP connection from ngPost is forced through the VPN tunnel, regardless of each server&apos;s &quot;Use VPN&quot; flag. The VPN auto-starts when a job begins and disconnects 30 s after the queue is empty. Use this if you want a single global switch instead of fiddling with the per-server column.&lt;br/&gt;&lt;br/&gt;When unchecked: only the servers whose &quot;Use VPN&quot; column is ticked route through the tunnel; the others connect directly.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="132"/>
@@ -6050,7 +6067,7 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="193"/>
         <source>&lt;a href=&quot;about:licences&quot;&gt;About licences&lt;/a&gt;</source>
-        <translation>&lt;a href="about:licences"&gt;About licences&lt;/a&gt;</translation>
+        <translation>&lt;a href=&quot;about:licences&quot;&gt;About licences&lt;/a&gt;</translation>
     </message>
     <message>
         <source>OpenVPN config (*.ovpn *.conf);;All files (*)</source>
@@ -6093,7 +6110,7 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
         <source>Delete profile &apos;%1&apos;?
 
 Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain will be removed.</source>
-        <translation>Delete profile '%1'?
+        <translation>Delete profile &apos;%1&apos;?
 
 Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain will be removed.</translation>
     </message>

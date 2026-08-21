@@ -412,7 +412,7 @@ It will be irreversible...</source>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="564"/>
         <source>Applies to every post this auto posting launches.</source>
-        <translation>S'applique à tous les posts que ce post auto va lancer.</translation>
+        <translation>S&apos;applique à tous les posts que ce post auto va lancer.</translation>
     </message>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="565"/>
@@ -427,7 +427,7 @@ It will be irreversible...</source>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="606"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
-        <translation>Les informations du post citent « %1 » deux fois. Supprimez l'une des deux lignes.</translation>
+        <translation>Les informations du post citent « %1 » deux fois. Supprimez l&apos;une des deux lignes.</translation>
     </message>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="621"/>
@@ -1051,7 +1051,7 @@ Le job reste dans la file d&apos;attente.</translation>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1344"/>
         <source>History refresh failed: %1</source>
-        <translation>Échec du rafraîchissement de l'historique : %1</translation>
+        <translation>Échec du rafraîchissement de l&apos;historique : %1</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1393"/>
@@ -1084,13 +1084,13 @@ Seuls les articles manquants ou échoués seront renvoyés.</translation>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1493"/>
         <source>This post could not be resumed.</source>
-        <translation>Ce post n'a pas pu être repris.</translation>
+        <translation>Ce post n&apos;a pas pu être repris.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="1494"/>
         <source>This post could not be resumed:
 %1</source>
-        <translation>Ce post n'a pas pu être repris :
+        <translation>Ce post n&apos;a pas pu être repris :
 %1</translation>
     </message>
     <message>
@@ -1232,7 +1232,7 @@ Inclure le mot de passe dans le NZB régénéré ?</translation>
         <source>Could not regenerate the NZB.
 Check that the post has complete article history.</source>
         <translation>Impossible de régénérer le NZB.
-Vérifiez que le post a un historique d'articles complet.</translation>
+Vérifiez que le post a un historique d&apos;articles complet.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2051"/>
@@ -1244,7 +1244,7 @@ Vérifiez que le post a un historique d'articles complet.</translation>
         <source>A post info file is written from a model you provide: a small text file where the values are written as __variables__.
 
 Pick one now, or set POST_INFO_TEMPLATE in your configuration to always use the same.</source>
-        <translation>Une fiche de post est écrite à partir d'un modèle que vous fournissez : un petit fichier texte où les valeurs s'écrivent __entre_deux_soulignés__.
+        <translation>Une fiche de post est écrite à partir d&apos;un modèle que vous fournissez : un petit fichier texte où les valeurs s&apos;écrivent __entre_deux_soulignés__.
 
 Choisissez-en un maintenant, ou renseignez POST_INFO_TEMPLATE dans votre configuration pour toujours utiliser le même.</translation>
     </message>
@@ -1262,8 +1262,8 @@ Choisissez-en un maintenant, ou renseignez POST_INFO_TEMPLATE dans votre configu
         <location filename="../hmi/MainWindow.cpp" line="2070"/>
         <source>This model writes the archive password into the file.
 Include it?</source>
-        <translation>Ce modèle écrit le mot de passe de l'archive dans le fichier.
-L'inclure ?</translation>
+        <translation>Ce modèle écrit le mot de passe de l&apos;archive dans le fichier.
+L&apos;inclure ?</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2078"/>
@@ -1289,7 +1289,7 @@ L'inclure ?</translation>
 This post was made before ngPost recorded these details, so the par2 percentage, the source name and your own information are empty.</source>
         <translation>
 
-Ce post a été fait avant que ngPost n'enregistre ces informations : le pourcentage par2, le nom de la source et vos propres informations sont donc vides.</translation>
+Ce post a été fait avant que ngPost n&apos;enregistre ces informations : le pourcentage par2, le nom de la source et vos propres informations sont donc vides.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2094"/>
@@ -1301,17 +1301,17 @@ Ce post a été fait avant que ngPost n'enregistre ces informations : le pourcen
         <location filename="../hmi/MainWindow.cpp" line="2112"/>
         <location filename="../hmi/MainWindow.cpp" line="2122"/>
         <source>Export failed</source>
-        <translation>Échec de l'export</translation>
+        <translation>Échec de l&apos;export</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2097"/>
         <source>Could not write the post info file.</source>
-        <translation>Impossible d'écrire la fiche de post.</translation>
+        <translation>Impossible d&apos;écrire la fiche de post.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2107"/>
         <source>Export history as CSV</source>
-        <translation>Exporter l'historique en CSV</translation>
+        <translation>Exporter l&apos;historique en CSV</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2107"/>
@@ -1322,7 +1322,7 @@ Ce post a été fait avant que ngPost n'enregistre ces informations : le pourcen
         <location filename="../hmi/MainWindow.cpp" line="2113"/>
         <source>Cannot write file:
 %1</source>
-        <translation>Impossible d'écrire le fichier :
+        <translation>Impossible d&apos;écrire le fichier :
 %1</translation>
     </message>
     <message>
@@ -1348,7 +1348,7 @@ Ce post a été fait avant que ngPost n'enregistre ces informations : le pourcen
         <source>Remove the stored password for this post?
 The history entry is kept; only the password value is erased.</source>
         <translation>Supprimer le mot de passe enregistré pour ce post ?
-L'entrée d'historique est conservée ; seule la valeur du mot de passe est effacée.</translation>
+L&apos;entrée d&apos;historique est conservée ; seule la valeur du mot de passe est effacée.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2153"/>
@@ -1365,14 +1365,14 @@ L'entrée d'historique est conservée ; seule la valeur du mot de passe est effa
         <location filename="../hmi/MainWindow.cpp" line="2175"/>
         <location filename="../hmi/MainWindow.cpp" line="2495"/>
         <source>Delete history entries</source>
-        <translation>Supprimer des entrées d'historique</translation>
+        <translation>Supprimer des entrées d&apos;historique</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2176"/>
         <source>Permanently delete %1 selected post(s) from the history?
 This also removes all associated file and article records.</source>
-        <translation>Supprimer définitivement %1 post(s) sélectionné(s) de l'historique ?
-Cela supprime aussi tous les enregistrements de fichiers et d'articles associés.</translation>
+        <translation>Supprimer définitivement %1 post(s) sélectionné(s) de l&apos;historique ?
+Cela supprime aussi tous les enregistrements de fichiers et d&apos;articles associés.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2198"/>
@@ -1407,17 +1407,17 @@ Cela supprime aussi tous les enregistrements de fichiers et d'articles associés
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2391"/>
         <source>&lt;span style=&apos;color:darkgreen&apos;&gt;Resumable&lt;/span&gt;</source>
-        <translation>&lt;span style='color:darkgreen'&gt;Reprenable&lt;/span&gt;</translation>
+        <translation>&lt;span style=&apos;color:darkgreen&apos;&gt;Reprenable&lt;/span&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2393"/>
         <source>&lt;span style=&apos;color:#FFA200&apos;&gt;Partially resumable&lt;/span&gt;</source>
-        <translation>&lt;span style='color:#FFA200'&gt;Partiellement reprenable&lt;/span&gt;</translation>
+        <translation>&lt;span style=&apos;color:#FFA200&apos;&gt;Partiellement reprenable&lt;/span&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2394"/>
         <source>&lt;span style=&apos;color:darkred&apos;&gt;Not resumable&lt;/span&gt;</source>
-        <translation>&lt;span style='color:darkred'&gt;Non reprenable&lt;/span&gt;</translation>
+        <translation>&lt;span style=&apos;color:darkred&apos;&gt;Non reprenable&lt;/span&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2412"/>
@@ -1435,7 +1435,7 @@ Seuls les articles manquants ou échoués seront renvoyés.</translation>
         <location filename="../hmi/MainWindow.cpp" line="2425"/>
         <source>%1 post(s) could not be resumed.
 Source files may be missing.</source>
-        <translation>%1 post(s) n'ont pas pu être repris.
+        <translation>%1 post(s) n&apos;ont pas pu être repris.
 Des fichiers source sont peut-être manquants.</translation>
     </message>
     <message>
@@ -1448,21 +1448,21 @@ Des fichiers source sont peut-être manquants.</translation>
         <source>Mark %1 selected post(s) as abandoned?
 The history entries are kept but the posts will no longer be offered for resume.</source>
         <translation>Marquer %1 post(s) sélectionné(s) comme abandonné(s) ?
-Les entrées d'historique sont conservées mais les posts ne seront plus proposés à la reprise.</translation>
+Les entrées d&apos;historique sont conservées mais les posts ne seront plus proposés à la reprise.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2461"/>
         <source>Delete the technical resume data for %1 selected post(s)?
 The posts will no longer be resumable but the history entries are kept.</source>
         <translation>Supprimer les données techniques de reprise de %1 post(s) sélectionné(s) ?
-Les posts ne seront plus reprenables mais les entrées d'historique sont conservées.</translation>
+Les posts ne seront plus reprenables mais les entrées d&apos;historique sont conservées.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2496"/>
         <source>Permanently delete %1 selected post(s) from the history database?
 This also removes all associated file and article records.</source>
-        <translation>Supprimer définitivement %1 post(s) sélectionné(s) de la base d'historique ?
-Cela supprime aussi tous les enregistrements de fichiers et d'articles associés.</translation>
+        <translation>Supprimer définitivement %1 post(s) sélectionné(s) de la base d&apos;historique ?
+Cela supprime aussi tous les enregistrements de fichiers et d&apos;articles associés.</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2553"/>
@@ -1472,7 +1472,7 @@ Cela supprime aussi tous les enregistrements de fichiers et d'articles associés
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2569"/>
         <source>Archive password</source>
-        <translation>Mot de passe de l'archive</translation>
+        <translation>Mot de passe de l&apos;archive</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2570"/>
@@ -2268,7 +2268,7 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="232"/>
         <source>write the post info file of a post from history (-o file, or stdout)</source>
-        <translation>écrire la fiche de post d'un post de l'historique (-o fichier, ou stdout)</translation>
+        <translation>écrire la fiche de post d&apos;un post de l&apos;historique (-o fichier, ou stdout)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="233"/>
@@ -2328,7 +2328,7 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="257"/>
         <source>one of your fields, written in the post info file AND published in the nzb header (typically &quot;password=qwerty42&quot;)</source>
-        <translation>un de vos champs, écrit dans la fiche de post ET publié dans l'en-tête du nzb (typiquement « password=qwerty42 »)</translation>
+        <translation>un de vos champs, écrit dans la fiche de post ET publié dans l&apos;en-tête du nzb (typiquement « password=qwerty42 »)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="258"/>
@@ -2348,12 +2348,12 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="261"/>
         <source>write no post info file for this run, whatever the config says (your --meta fields are still published in the nzb)</source>
-        <translation>n'écrire aucune fiche de post pour ce lancement, quoi que dise la configuration (vos champs --meta restent publiés dans le nzb)</translation>
+        <translation>n&apos;écrire aucune fiche de post pour ce lancement, quoi que dise la configuration (vos champs --meta restent publiés dans le nzb)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="262"/>
         <source>only write the post info file when the post fully succeeded (default)</source>
-        <translation>n'écrire la fiche de post que si le post a totalement réussi (défaut)</translation>
+        <translation>n&apos;écrire la fiche de post que si le post a totalement réussi (défaut)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="263"/>
@@ -2383,12 +2383,12 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="268"/>
         <source>put the archive password in the environment and json given to post commands</source>
-        <translation>mettre le mot de passe de l'archive dans l'environnement et le json donnés aux post-commandes</translation>
+        <translation>mettre le mot de passe de l&apos;archive dans l&apos;environnement et le json donnés aux post-commandes</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="269"/>
         <source>keep the archive password out of them (default)</source>
-        <translation>les en tenir à l'écart (défaut)</translation>
+        <translation>les en tenir à l&apos;écart (défaut)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="270"/>
@@ -2398,12 +2398,12 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="271"/>
         <source>seconds before a stuck nzb upload is given up (0: no limit)</source>
-        <translation>secondes avant d'abandonner un envoi de nzb bloqué (0 : sans limite)</translation>
+        <translation>secondes avant d&apos;abandonner un envoi de nzb bloqué (0 : sans limite)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="272"/>
         <source>legacy csv history file, one line appended per post</source>
-        <translation>ancien fichier d'historique csv, une ligne ajoutée par post</translation>
+        <translation>ancien fichier d&apos;historique csv, une ligne ajoutée par post</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="289"/>
@@ -2413,17 +2413,17 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="290"/>
         <source>alias of --pack: enable auto-packing using the config PACK definition</source>
-        <translation>alias de --pack : active l'empaquetage automatique avec la définition PACK de la configuration</translation>
+        <translation>alias de --pack : active l&apos;empaquetage automatique avec la définition PACK de la configuration</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="312"/>
         <source>when obfuscating file names, keep the .nfo extension visible</source>
-        <translation>lors de l'obfuscation des noms de fichiers, garder l'extension .nfo visible</translation>
+        <translation>lors de l&apos;obfuscation des noms de fichiers, garder l&apos;extension .nfo visible</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="313"/>
         <source>copy the .nfo from the original files next to the generated nzb</source>
-        <translation>copier le .nfo des fichiers d'origine à côté du nzb généré</translation>
+        <translation>copier le .nfo des fichiers d&apos;origine à côté du nzb généré</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="314"/>
@@ -2448,7 +2448,7 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="545"/>
         <source>VPN could not be established — aborting pending jobs</source>
-        <translation>Le VPN n'a pas pu être établi — abandon des travaux en attente</translation>
+        <translation>Le VPN n&apos;a pas pu être établi — abandon des travaux en attente</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="556"/>
@@ -2555,7 +2555,7 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="4132"/>
         <source>## you give the model, ngPost fills in the blanks: it knows no index format</source>
-        <translation>## vous donnez le modèle, ngPost remplit les trous : il ne connaît aucun format d'index</translation>
+        <translation>## vous donnez le modèle, ngPost remplit les trous : il ne connaît aucun format d&apos;index</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4133"/>
@@ -2570,12 +2570,12 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="4140"/>
         <source>## where to write it (the variables above work here too)</source>
-        <translation>## où l'écrire (les variables ci-dessus fonctionnent aussi ici)</translation>
+        <translation>## où l&apos;écrire (les variables ci-dessus fonctionnent aussi ici)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4144"/>
         <source>## by default no post info file is written for a failed or partial post,</source>
-        <translation>## par défaut aucune fiche n'est écrite pour un post échoué ou partiel,</translation>
+        <translation>## par défaut aucune fiche n&apos;est écrite pour un post échoué ou partiel,</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4145"/>
@@ -2600,7 +2600,7 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="4155"/>
         <source>## same for the nzb upload, which would otherwise block the exit</source>
-        <translation>## idem pour l'envoi du nzb, qui bloquerait sinon la sortie</translation>
+        <translation>## idem pour l&apos;envoi du nzb, qui bloquerait sinon la sortie</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4159"/>
@@ -2615,7 +2615,7 @@ Pour obtenir la liste des options disponibles : %2 --help
     <message>
         <location filename="../NgPost.cpp" line="4163"/>
         <source>## the archive password is never put in the environment nor in the json</source>
-        <translation>## le mot de passe de l'archive n'est jamais mis dans l'environnement ni dans le json</translation>
+        <translation>## le mot de passe de l&apos;archive n&apos;est jamais mis dans l&apos;environnement ni dans le json</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4164"/>
@@ -2759,7 +2759,7 @@ Réglage : Bouton &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Rout
     <message>
         <location filename="../NgPost.cpp" line="1204"/>
         <source>Warning: post %1 was made before ngPost recorded these facts; the par2 percentage, the source name and the metadata are empty.</source>
-        <translation>Avertissement : le post %1 a été fait avant que ngPost n'enregistre ces faits ; le pourcentage par2, le nom de la source et les métadonnées sont vides.</translation>
+        <translation>Avertissement : le post %1 a été fait avant que ngPost n&apos;enregistre ces faits ; le pourcentage par2, le nom de la source et les métadonnées sont vides.</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1214"/>
@@ -2805,7 +2805,7 @@ Réglage : Bouton &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Rout
     <message>
         <location filename="../NgPost.cpp" line="1809"/>
         <source>Error: metadata &apos;%1&apos; is given both as public (--meta) and private (--post_meta); choose one.</source>
-        <translation>Erreur : la métadonnée « %1 » est donnée à la fois en public (--meta) et en privé (--post_meta) ; choisissez l'un des deux.</translation>
+        <translation>Erreur : la métadonnée « %1 » est donnée à la fois en public (--meta) et en privé (--post_meta) ; choisissez l&apos;un des deux.</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2048"/>
@@ -2815,12 +2815,12 @@ Réglage : Bouton &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Rout
     <message>
         <location filename="../NgPost.cpp" line="2437"/>
         <source>Error syntax: --rm_posted option is only available with --auto or --monitor</source>
-        <translation>Erreur de syntaxe : l'option --rm_posted n'est disponible qu'avec --auto ou --monitor</translation>
+        <translation>Erreur de syntaxe : l&apos;option --rm_posted n&apos;est disponible qu&apos;avec --auto ou --monitor</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2457"/>
         <source>Error syntax: --vpn and --no_vpn are mutually exclusive</source>
-        <translation>Erreur de syntaxe : --vpn et --no_vpn s'excluent mutuellement</translation>
+        <translation>Erreur de syntaxe : --vpn et --no_vpn s&apos;excluent mutuellement</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2475"/>
@@ -3135,7 +3135,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
 
 ngPost must create a backup before this file can be reused by the new config layout.
 Create a .bak backup and continue?</source>
-        <translation>L'ancienne configuration et la nouvelle désignent le même fichier :
+        <translation>L&apos;ancienne configuration et la nouvelle désignent le même fichier :
 %1
 
 ngPost doit créer une sauvegarde avant que ce fichier puisse être réutilisé par la nouvelle organisation.
@@ -3145,8 +3145,8 @@ Créer une sauvegarde .bak et continuer ?</translation>
         <location filename="../NgPost.cpp" line="3845"/>
         <source>Config migration requires confirmation because legacy and new config paths are the same: %1
 No file was overwritten. Re-run with --yes in CLI mode to create a .bak backup and continue.</source>
-        <translation>La migration de la configuration demande une confirmation car l'ancien et le nouveau chemin désignent le même fichier : %1
-Aucun fichier n'a été écrasé. Relancez avec --yes en mode CLI pour créer une sauvegarde .bak et continuer.</translation>
+        <translation>La migration de la configuration demande une confirmation car l&apos;ancien et le nouveau chemin désignent le même fichier : %1
+Aucun fichier n&apos;a été écrasé. Relancez avec --yes en mode CLI pour créer une sauvegarde .bak et continuer.</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="3860"/>
@@ -3171,10 +3171,10 @@ It was modified after ngPost switched to a per-user configuration folder, but it
 
 Your active configuration file is:
 %2</source>
-        <translation>Un fichier de configuration a été trouvé à côté de l'application :
+        <translation>Un fichier de configuration a été trouvé à côté de l&apos;application :
 %1
 
-Il a été modifié après le passage de ngPost à un dossier de configuration par utilisateur, mais il n'est plus lu — vos modifications y sont ignorées.
+Il a été modifié après le passage de ngPost à un dossier de configuration par utilisateur, mais il n&apos;est plus lu — vos modifications y sont ignorées.
 
 Votre fichier de configuration actif est :
 %2</translation>
@@ -3202,7 +3202,7 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../NgPost.cpp" line="3896"/>
         <source>Config migration failed: could not copy legacy config &apos;%1&apos; to &apos;%2&apos;.</source>
-        <translation>Échec de la migration : impossible de copier l'ancienne configuration « %1 » vers « %2 ».</translation>
+        <translation>Échec de la migration : impossible de copier l&apos;ancienne configuration « %1 » vers « %2 ».</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4083"/>
@@ -3580,12 +3580,12 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../NgPost.cpp" line="4192"/>
         <source>## Structured SQLite history database</source>
-        <translation>## Base d'historique SQLite structurée</translation>
+        <translation>## Base d&apos;historique SQLite structurée</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4194"/>
         <source>## Store archive passwords in the structured history database</source>
-        <translation>## Enregistrer les mots de passe des archives dans la base d'historique</translation>
+        <translation>## Enregistrer les mots de passe des archives dans la base d&apos;historique</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4199"/>
@@ -3989,7 +3989,7 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../NntpCheckCon.cpp" line="77"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
-        <translation>Le serveur « %1 » doit passer par le VPN mais le tunnel n'est pas connecté</translation>
+        <translation>Le serveur « %1 » doit passer par le VPN mais le tunnel n&apos;est pas connecté</translation>
     </message>
     <message>
         <location filename="../NntpCheckCon.cpp" line="87"/>
@@ -4025,7 +4025,7 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../NntpCheckCon.cpp" line="257"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
-        <translation>[Connexion n°%1] Erreur d'authentification au serveur %2:%3 avec l'utilisateur « %4 »</translation>
+        <translation>[Connexion n°%1] Erreur d&apos;authentification au serveur %2:%3 avec l&apos;utilisateur « %4 »</translation>
     </message>
     <message>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos; and pass &apos;%5&apos;</source>
@@ -4063,7 +4063,7 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../NntpConnection.cpp" line="132"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
-        <translation>Le serveur « %1 » doit passer par le VPN mais le tunnel n'est pas connecté</translation>
+        <translation>Le serveur « %1 » doit passer par le VPN mais le tunnel n&apos;est pas connecté</translation>
     </message>
     <message>
         <location filename="../NntpConnection.cpp" line="141"/>
@@ -4165,7 +4165,7 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../NntpConnection.cpp" line="590"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
-        <translation>[Connexion n°%1] Erreur d'authentification au serveur %2:%3 avec l'utilisateur « %4 »</translation>
+        <translation>[Connexion n°%1] Erreur d&apos;authentification au serveur %2:%3 avec l&apos;utilisateur « %4 »</translation>
     </message>
     <message>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos; and pass &apos;%5&apos;</source>
@@ -4281,17 +4281,17 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="90"/>
         <source>Native VPN integration is currently Linux/Windows-only. macOS support is in progress.</source>
-        <translation>L'intégration VPN native est pour l'instant réservée à Linux et Windows. Le support macOS est en cours.</translation>
+        <translation>L&apos;intégration VPN native est pour l&apos;instant réservée à Linux et Windows. Le support macOS est en cours.</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="118"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found. Install it under /var/lib/ngpost/ or run from the AppImage.</source>
-        <translation>Le script d'assistance privilégié ngpost-vpn-helper.sh est introuvable. Installez-le sous /var/lib/ngpost/ ou lancez ngPost depuis l'AppImage.</translation>
+        <translation>Le script d&apos;assistance privilégié ngpost-vpn-helper.sh est introuvable. Installez-le sous /var/lib/ngpost/ ou lancez ngPost depuis l&apos;AppImage.</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="155"/>
         <source>Launching VPN helper: %1 %2</source>
-        <translation>Lancement de l'assistant VPN : %1 %2</translation>
+        <translation>Lancement de l&apos;assistant VPN : %1 %2</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="159"/>
@@ -4326,7 +4326,7 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="349"/>
         <source>Cannot reach OpenVPNServiceInteractive pipe. Open Services.msc, set &quot;OpenVPN Interactive Service&quot; to Automatic, and start it. If it is not present, re-run the ngPost setup with the OpenVPN Community option.</source>
-        <translation>Impossible d'atteindre le tube OpenVPNServiceInteractive. Ouvrez Services.msc, passez « OpenVPN Interactive Service » en Automatique et démarrez-le. S'il est absent, relancez l'installateur ngPost avec l'option OpenVPN Community.</translation>
+        <translation>Impossible d&apos;atteindre le tube OpenVPNServiceInteractive. Ouvrez Services.msc, passez « OpenVPN Interactive Service » en Automatique et démarrez-le. S&apos;il est absent, relancez l&apos;installateur ngPost avec l&apos;option OpenVPN Community.</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="373"/>
@@ -4336,7 +4336,7 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="378"/>
         <source>Failed to send startup data to OpenVPN service pipe</source>
-        <translation>Échec de l'envoi des données de démarrage au tube du service OpenVPN</translation>
+        <translation>Échec de l&apos;envoi des données de démarrage au tube du service OpenVPN</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="411"/>
@@ -4366,7 +4366,7 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="556"/>
         <source>openvpn exited before the tunnel was ready</source>
-        <translation>openvpn s'est arrêté avant que le tunnel soit prêt</translation>
+        <translation>openvpn s&apos;est arrêté avant que le tunnel soit prêt</translation>
     </message>
 </context>
 <context>
@@ -4388,7 +4388,7 @@ Votre fichier de configuration actif est :
     <message>
         <location filename="../PostCmdRunner.cpp" line="264"/>
         <source>NZB_POST_CMD could not run &apos;%1&apos;: %2</source>
-        <translation>NZB_POST_CMD n'a pas pu lancer « %1 » : %2</translation>
+        <translation>NZB_POST_CMD n&apos;a pas pu lancer « %1 » : %2</translation>
     </message>
     <message>
         <location filename="../PostCmdRunner.cpp" line="289"/>
@@ -4461,8 +4461,8 @@ Vous donnez le modèle, ngPost remplit les trous.</translation>
         <location filename="../hmi/PostInfoDialog.cpp" line="106"/>
         <source>Writes it in your configuration as POST_INFO_TEMPLATE, so it becomes
 the model offered by default. This post uses it either way.</source>
-        <translation>L'écrit dans votre configuration en POST_INFO_TEMPLATE : il devient
-le modèle proposé par défaut. Ce post l'utilise de toute façon.</translation>
+        <translation>L&apos;écrit dans votre configuration en POST_INFO_TEMPLATE : il devient
+le modèle proposé par défaut. Ce post l&apos;utilise de toute façon.</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="116"/>
@@ -4474,7 +4474,7 @@ le modèle proposé par défaut. Ce post l'utilise de toute façon.</translation
         <source>This is the file itself. Anything in a line is written as it is, and every __variable__ is replaced by its value.
 A line starting with # is a comment: it is never written. Changes here only reach the file through « Save as… ».</source>
         <translation>Ceci est le fichier lui-même. Tout ce qui est dans une ligne est écrit tel quel, et chaque __variable__ est remplacée par sa valeur.
-Une ligne commençant par # est un commentaire : elle n'est jamais écrite. Les modifications faites ici n'atteignent le fichier que par « Enregistrer sous… ».</translation>
+Une ligne commençant par # est un commentaire : elle n&apos;est jamais écrite. Les modifications faites ici n&apos;atteignent le fichier que par « Enregistrer sous… ».</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="129"/>
@@ -4543,7 +4543,7 @@ elles ne sont jamais écrites dans le fichier ci-dessus. Un champ part toujours 
         <location filename="../hmi/PostInfoDialog.cpp" line="167"/>
         <source>Off: the field is written in the post info file only.
 On: it is written there AND published in the nzb, which circulates.</source>
-        <translation>Décoché : le champ n'est écrit que dans la fiche de post.
+        <translation>Décoché : le champ n&apos;est écrit que dans la fiche de post.
 Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
     </message>
     <message>
@@ -4554,7 +4554,7 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="178"/>
         <source>Adds a field of yours, and the line that writes it.</source>
-        <translation>Ajoute un champ à vous, et la ligne qui l'écrit.</translation>
+        <translation>Ajoute un champ à vous, et la ligne qui l&apos;écrit.</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="187"/>
@@ -4564,7 +4564,7 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="189"/>
         <source>Every __variable__ ngPost knows, and what it holds.</source>
-        <translation>Toutes les __variables__ que ngPost connaît, et ce qu'elles contiennent.</translation>
+        <translation>Toutes les __variables__ que ngPost connaît, et ce qu&apos;elles contiennent.</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="258"/>
@@ -4574,7 +4574,7 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="261"/>
         <source>(no model yet)</source>
-        <translation>(aucun modèle pour l'instant)</translation>
+        <translation>(aucun modèle pour l&apos;instant)</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="271"/>
@@ -4631,7 +4631,7 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="412"/>
         <source>A line starting with # is a comment. Indent it by one space to have it written.</source>
-        <translation>Une ligne commençant par # est un commentaire. Décalez-la d'une espace pour qu'elle soit écrite.</translation>
+        <translation>Une ligne commençant par # est un commentaire. Décalez-la d&apos;une espace pour qu&apos;elle soit écrite.</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="414"/>
@@ -4662,7 +4662,7 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
         <location filename="../hmi/PostInfoDialog.cpp" line="545"/>
         <location filename="../hmi/PostInfoDialog.cpp" line="550"/>
         <source>Cannot write %1</source>
-        <translation>Impossible d'écrire %1</translation>
+        <translation>Impossible d&apos;écrire %1</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="564"/>
@@ -4677,7 +4677,7 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="643"/>
         <source>Remove this field. The line that uses it stays in the model.</source>
-        <translation>Retirer ce champ. La ligne qui l'utilise reste dans le modèle.</translation>
+        <translation>Retirer ce champ. La ligne qui l&apos;utilise reste dans le modèle.</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="697"/>
@@ -4685,7 +4685,7 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
 
 The post uses the file, so these changes would be lost.
 Save the model now?</source>
-        <translation>Le modèle a été modifié ici, mais n'a pas été écrit dans un fichier.
+        <translation>Le modèle a été modifié ici, mais n&apos;a pas été écrit dans un fichier.
 
 Le post utilise le fichier : ces modifications seraient perdues.
 Enregistrer le modèle maintenant ?</translation>
@@ -4698,7 +4698,7 @@ Enregistrer le modèle maintenant ?</translation>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="720"/>
         <source>A model is a plain text file. Write it as you want the sheet to read, and put a variable wherever ngPost should fill something in. Anything ngPost does not recognise is copied as it is, and a line starting with # is a comment that is never written.</source>
-        <translation>Un modèle est un simple fichier texte. Écrivez-le comme vous voulez lire la fiche, et mettez une variable là où ngPost doit remplir quelque chose. Tout ce que ngPost ne reconnaît pas est recopié tel quel, et une ligne commençant par # est un commentaire qui n'est jamais écrit.</translation>
+        <translation>Un modèle est un simple fichier texte. Écrivez-le comme vous voulez lire la fiche, et mettez une variable là où ngPost doit remplir quelque chose. Tout ce que ngPost ne reconnaît pas est recopié tel quel, et une ligne commençant par # est un commentaire qui n&apos;est jamais écrit.</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="734"/>
@@ -4718,7 +4718,7 @@ Enregistrer le modèle maintenant ?</translation>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="741"/>
         <source>&lt;b&gt;__meta:name__&lt;/b&gt; is a field of yours. Every name you use appears in &lt;i&gt;Your fields&lt;/i&gt; at the bottom of the window, waiting for a value. It always goes into the post info file; tick &lt;i&gt;Also in NZB&lt;/i&gt; to publish it in the nzb as well.</source>
-        <translation>&lt;b&gt;__meta:nom__&lt;/b&gt; est un champ à vous. Chaque nom que vous utilisez apparaît dans &lt;i&gt;Vos champs&lt;/i&gt; en bas de la fenêtre, en attente d'une valeur. Il part toujours dans la fiche de post ; cochez &lt;i&gt;Aussi dans le NZB&lt;/i&gt; pour le publier aussi dans le nzb.</translation>
+        <translation>&lt;b&gt;__meta:nom__&lt;/b&gt; est un champ à vous. Chaque nom que vous utilisez apparaît dans &lt;i&gt;Vos champs&lt;/i&gt; en bas de la fenêtre, en attente d&apos;une valeur. Il part toujours dans la fiche de post ; cochez &lt;i&gt;Aussi dans le NZB&lt;/i&gt; pour le publier aussi dans le nzb.</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="747"/>
@@ -4728,7 +4728,7 @@ Enregistrer le modèle maintenant ?</translation>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="748"/>
         <source>&lt;b&gt;__date__&lt;/b&gt; and &lt;b&gt;__dateStart__&lt;/b&gt; are the end and the start of the post. Give them a format after a colon, for instance &lt;b&gt;__date:dd/MM/yyyy__&lt;/b&gt; or &lt;b&gt;__date:yyyy-MM-dd HH:mm__&lt;/b&gt;. Without a format you get &lt;b&gt;yyyy-MM-dd&lt;/b&gt;. The time is yours, not UTC.</source>
-        <translation>&lt;b&gt;__date__&lt;/b&gt; et &lt;b&gt;__dateStart__&lt;/b&gt; sont la fin et le début du post. Donnez-leur un format après un deux-points, par exemple &lt;b&gt;__date:dd/MM/yyyy__&lt;/b&gt; ou &lt;b&gt;__date:yyyy-MM-dd HH:mm__&lt;/b&gt;. Sans format vous obtenez &lt;b&gt;yyyy-MM-dd&lt;/b&gt;. L'heure est la vôtre, pas UTC.</translation>
+        <translation>&lt;b&gt;__date__&lt;/b&gt; et &lt;b&gt;__dateStart__&lt;/b&gt; sont la fin et le début du post. Donnez-leur un format après un deux-points, par exemple &lt;b&gt;__date:dd/MM/yyyy__&lt;/b&gt; ou &lt;b&gt;__date:yyyy-MM-dd HH:mm__&lt;/b&gt;. Sans format vous obtenez &lt;b&gt;yyyy-MM-dd&lt;/b&gt;. L&apos;heure est la vôtre, pas UTC.</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="753"/>
@@ -4743,7 +4743,7 @@ Enregistrer le modèle maintenant ?</translation>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="757"/>
         <source>What it holds</source>
-        <translation>Ce qu'elle contient</translation>
+        <translation>Ce qu&apos;elle contient</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="757"/>
@@ -4763,12 +4763,12 @@ Enregistrer le modèle maintenant ?</translation>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="775"/>
         <source>&lt;i&gt;before the post&lt;/i&gt; means the value is already known while you prepare it, so the preview column shows it. &lt;i&gt;after the post&lt;/i&gt; means it only exists once the post is over, which is why it is blank here.</source>
-        <translation>&lt;i&gt;avant le post&lt;/i&gt; signifie que la valeur est déjà connue pendant que vous le préparez : la colonne d'aperçu l'affiche. &lt;i&gt;après le post&lt;/i&gt; signifie qu'elle n'existera qu'une fois le post terminé, d'où la case vide ici.</translation>
+        <translation>&lt;i&gt;avant le post&lt;/i&gt; signifie que la valeur est déjà connue pendant que vous le préparez : la colonne d&apos;aperçu l&apos;affiche. &lt;i&gt;après le post&lt;/i&gt; signifie qu&apos;elle n&apos;existera qu&apos;une fois le post terminé, d&apos;où la case vide ici.</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="781"/>
         <source>A variable marked with a warning sign holds a secret. Putting it in a model makes the produced file as sensitive as the password itself: write it in a folder only you can read.</source>
-        <translation>Une variable marquée d'un panneau d'avertissement contient un secret. La mettre dans un modèle rend le fichier produit aussi sensible que le mot de passe lui-même : écrivez-le dans un dossier que vous seul pouvez lire.</translation>
+        <translation>Une variable marquée d&apos;un panneau d&apos;avertissement contient un secret. La mettre dans un modèle rend le fichier produit aussi sensible que le mot de passe lui-même : écrivez-le dans un dossier que vous seul pouvez lire.</translation>
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="787"/>
@@ -4811,7 +4811,7 @@ Enregistrer le modèle maintenant ?</translation>
     <message>
         <location filename="../postinfo/PostInfoTemplate.cpp" line="521"/>
         <source>refusing to overwrite %1</source>
-        <translation>refus d'écraser %1</translation>
+        <translation>refus d&apos;écraser %1</translation>
     </message>
     <message>
         <location filename="../postinfo/PostInfoTemplate.cpp" line="529"/>
@@ -4827,17 +4827,17 @@ Enregistrer le modèle maintenant ?</translation>
         <location filename="../postinfo/PostInfoTemplate.cpp" line="554"/>
         <location filename="../postinfo/PostInfoTemplate.cpp" line="575"/>
         <source>cannot write %1: %2</source>
-        <translation>impossible d'écrire %1 : %2</translation>
+        <translation>impossible d&apos;écrire %1 : %2</translation>
     </message>
     <message>
         <location filename="../postinfo/PostInfoTemplate.cpp" line="563"/>
         <source>could not restrict the permissions of %1; it holds the archive password, put it in a folder only you can read</source>
-        <translation>impossible de restreindre les droits de %1 ; il contient le mot de passe de l'archive, mettez-le dans un dossier que vous seul pouvez lire</translation>
+        <translation>impossible de restreindre les droits de %1 ; il contient le mot de passe de l&apos;archive, mettez-le dans un dossier que vous seul pouvez lire</translation>
     </message>
     <message>
         <location filename="../postinfo/PostInfoTemplate.cpp" line="568"/>
         <source>on Windows the post info file inherits the permissions of its folder; it holds the archive password, so keep it in a restricted folder</source>
-        <translation>sous Windows la fiche de post hérite des droits de son dossier ; elle contient le mot de passe de l'archive, gardez-la donc dans un dossier restreint</translation>
+        <translation>sous Windows la fiche de post hérite des droits de son dossier ; elle contient le mot de passe de l&apos;archive, gardez-la donc dans un dossier restreint</translation>
     </message>
 </context>
 <context>
@@ -4895,7 +4895,7 @@ Start posting: %1</translation>
     <message>
         <location filename="../PostingJob.cpp" line="472"/>
         <source>History: could not flush pending article events: %1</source>
-        <translation>Historique : impossible d'écrire les évènements d'articles en attente : %1</translation>
+        <translation>Historique : impossible d&apos;écrire les évènements d&apos;articles en attente : %1</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="487"/>
@@ -5062,7 +5062,7 @@ Start posting: %1</translation>
     <message>
         <location filename="../PostingJob.cpp" line="1223"/>
         <source>Resume aborted: %1 changed or disappeared since the post was interrupted. Nothing was posted; restore the file and resume again.</source>
-        <translation>Reprise abandonnée : %1 a changé ou disparu depuis l'interruption du post. Rien n'a été posté ; restaurez le fichier et reprenez à nouveau.</translation>
+        <translation>Reprise abandonnée : %1 a changé ou disparu depuis l&apos;interruption du post. Rien n&apos;a été posté ; restaurez le fichier et reprenez à nouveau.</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="1252"/>
@@ -5072,7 +5072,7 @@ Start posting: %1</translation>
     <message>
         <location filename="../PostingJob.cpp" line="1262"/>
         <source>History: could not record the size of post %1: %2</source>
-        <translation>Historique : impossible d'enregistrer la taille du post %1 : %2</translation>
+        <translation>Historique : impossible d&apos;enregistrer la taille du post %1 : %2</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="1340"/>
@@ -5082,7 +5082,7 @@ Start posting: %1</translation>
     <message>
         <location filename="../PostingJob.cpp" line="1410"/>
         <source>History: could not record the outcome of post %1: %2</source>
-        <translation>Historique : impossible d'enregistrer le résultat du post %1 : %2</translation>
+        <translation>Historique : impossible d&apos;enregistrer le résultat du post %1 : %2</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="1430"/>
@@ -5097,22 +5097,22 @@ Start posting: %1</translation>
     <message>
         <location filename="../PostingJob.cpp" line="1588"/>
         <source>Post info: could not read the history of post %1 (%2); a resumed post cannot be described without it.</source>
-        <translation>Fiche de post : impossible de lire l'historique du post %1 (%2) ; un post repris ne peut pas être décrit sans lui.</translation>
+        <translation>Fiche de post : impossible de lire l&apos;historique du post %1 (%2) ; un post repris ne peut pas être décrit sans lui.</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="1594"/>
         <source>Post info: could not read the history (%1); falling back on what this post knows.</source>
-        <translation>Fiche de post : impossible de lire l'historique (%1) ; repli sur ce que ce post connaît.</translation>
+        <translation>Fiche de post : impossible de lire l&apos;historique (%1) ; repli sur ce que ce post connaît.</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="1619"/>
         <source>Post info: skipped, the post did not fully succeed (POST_INFO_ONLY_ON_SUCCESS)</source>
-        <translation>Fiche de post : ignorée, le post n'a pas totalement réussi (POST_INFO_ONLY_ON_SUCCESS)</translation>
+        <translation>Fiche de post : ignorée, le post n&apos;a pas totalement réussi (POST_INFO_ONLY_ON_SUCCESS)</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="1625"/>
         <source>Post info: no post info file was written, the post could not be described.</source>
-        <translation>Fiche de post : aucune fiche n'a été écrite, le post n'a pas pu être décrit.</translation>
+        <translation>Fiche de post : aucune fiche n&apos;a été écrite, le post n&apos;a pas pu être décrit.</translation>
     </message>
     <message>
         <location filename="../PostingJob.cpp" line="1640"/>
@@ -5327,7 +5327,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="59"/>
-        <location filename="../hmi/PostingWidget.ui" line="111"/>
+        <location filename="../hmi/PostingWidget.ui" line="109"/>
         <source>...</source>
         <translation></translation>
     </message>
@@ -5336,12 +5336,12 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">chemin de RAR: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="95"/>
+        <location filename="../hmi/PostingWidget.ui" line="93"/>
         <source>full path of the rar executable</source>
         <translation>chemin d&apos;accès complet de l&apos;exécutable RAR</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="108"/>
+        <location filename="../hmi/PostingWidget.ui" line="106"/>
         <source>select rar executable</source>
         <translation>sélectionner l&apos;exécutable RAR</translation>
     </message>
@@ -5350,7 +5350,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">taille archive:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="135"/>
+        <location filename="../hmi/PostingWidget.ui" line="416"/>
         <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
         <translation>pour découper l&apos;archive en plusieurs volumes de même tailles (0 pour ne faire qu&apos;un seul fichier)</translation>
     </message>
@@ -5368,67 +5368,64 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation>Chemin de compression : </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="88"/>
+        <location filename="../hmi/PostingWidget.ui" line="86"/>
         <source>RAR Path: </source>
         <translation>Chemin de RAR : </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="122"/>
         <source>Vol Size:</source>
-        <translation>Taille des Volumes :</translation>
+        <translation type="vanished">Taille des Volumes :</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="145"/>
+        <location filename="../hmi/PostingWidget.ui" line="423"/>
         <source>Limit RAR Number</source>
         <translation>Limiter le nombre de RAR</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="174"/>
         <source>PAR2 Redundancy (%): </source>
-        <translation>Redondance PAR2 (%) : </translation>
+        <translation type="vanished">Redondance PAR2 (%) : </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="206"/>
+        <location filename="../hmi/PostingWidget.ui" line="186"/>
         <source>Select the files to post (they may be compressed if needed) you can also right click on the files area just above</source>
         <translation>sélectionner les fichiers à poster (ils peuvent être compressés si besoin). Vous pouvez aussi faire un clic droit sur la zone des fichiers ci-dessus</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="209"/>
+        <location filename="../hmi/PostingWidget.ui" line="189"/>
         <source>Select Files</source>
         <translation>Choisir Fichiers</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="220"/>
+        <location filename="../hmi/PostingWidget.ui" line="200"/>
         <source>remove all files</source>
         <translation>Supprimer tous les fichiers</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="223"/>
+        <location filename="../hmi/PostingWidget.ui" line="203"/>
         <source>Remove All</source>
         <translation>Supprimer tout</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="234"/>
+        <location filename="../hmi/PostingWidget.ui" line="214"/>
         <source>select a folder (only if you use compression)</source>
         <translation>sélectionner un dossier (uniquement pour l&apos;option compression)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="237"/>
+        <location filename="../hmi/PostingWidget.ui" line="217"/>
         <source>Select Folder</source>
         <translation>Choisir Dossier</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="270"/>
+        <location filename="../hmi/PostingWidget.ui" line="250"/>
         <source>NZB file:</source>
         <translation>Fichier NZB :</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="323"/>
         <source>NZB Password:</source>
-        <translation>Mot de passe NZB :</translation>
+        <translation type="vanished">Mot de passe NZB :</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="390"/>
+        <location filename="../hmi/PostingWidget.ui" line="309"/>
         <source>Compress</source>
         <translation>Compresser</translation>
     </message>
@@ -5438,12 +5435,32 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation>Générer PAR2</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="466"/>
+        <location filename="../hmi/PostingWidget.ui" line="292"/>
         <source>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</source>
         <translation>Si un fichier .nfo est présent dans les fichiers d&apos;origine (avant rar/renommage), le copier à côté du nzb généré (avec le même nom de base)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="469"/>
+        <location filename="../hmi/PostingWidget.ui" line="136"/>
+        <source>Random name length:</source>
+        <translation>Longueur du nom tiré :</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="143"/>
+        <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
+        <translation>longueur du nom d'archive tiré par le bouton dé (config LENGTH_NAME)</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="150"/>
+        <source>Random password length:</source>
+        <translation>Longueur du mot de passe tiré :</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="157"/>
+        <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
+        <translation>longueur du mot de passe tiré par le bouton dé (config LENGTH_PASS)</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="295"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
         <translation>Copier le NFO à côté du fichier nzb (si disponible)</translation>
     </message>
@@ -5452,22 +5469,22 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">fichier NZB: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="277"/>
+        <location filename="../hmi/PostingWidget.ui" line="257"/>
         <source>full path of the nzb file that would be created (check the nzbPath keyword in the config file to set the default directory)</source>
         <translation>chemin d&apos;accès complet du fichier nzb qui sera créé (cf le mot clef nzbPath du fichier conf pour définir le dossier de destination par défaut)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="290"/>
+        <location filename="../hmi/PostingWidget.ui" line="270"/>
         <source>select the nzb file absolute file name</source>
         <translation>définir le chemin d&apos;accès complet du fichier nzb</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="293"/>
+        <location filename="../hmi/PostingWidget.ui" line="273"/>
         <source> ... </source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="320"/>
+        <location filename="../hmi/PostingWidget.ui" line="353"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation>mot de passe de l&apos;archive que vous postez (ou de celle qui sera créée)</translation>
     </message>
@@ -5476,22 +5493,21 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">mot de passe:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="333"/>
+        <location filename="../hmi/PostingWidget.ui" line="366"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>mot de passe de l&apos;archive (il sera ajouté dans l&apos;entête du fichier nzb)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="340"/>
         <source>length of the password</source>
-        <translation>longueur du mot de passe aléatoire</translation>
+        <translation type="vanished">longueur du mot de passe aléatoire</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="353"/>
+        <location filename="../hmi/PostingWidget.ui" line="379"/>
         <source>generate random password</source>
         <translation>générer un mot de passe aléatoire</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="387"/>
+        <location filename="../hmi/PostingWidget.ui" line="306"/>
         <source>compress the selected files using rar before posting</source>
         <translation>compresser les fichiers sélectionnés avant de poster</translation>
     </message>
@@ -5500,22 +5516,31 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">compression</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="406"/>
+        <location filename="../hmi/PostingWidget.ui" line="316"/>
         <source>archive name (file name obfuscation)</source>
         <translation>nom de l&apos;archive (obfuscation)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="413"/>
         <source>length of the archive name</source>
-        <translation>longueur du nom aléatoire de l&apos;archive</translation>
+        <translation type="vanished">longueur du nom aléatoire de l&apos;archive</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="426"/>
+        <location filename="../hmi/PostingWidget.ui" line="329"/>
         <source>generate random archive name</source>
         <translation>générer un nom d&apos;archive aléatoire</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="443"/>
+        <location filename="../hmi/PostingWidget.ui" line="356"/>
+        <source>Archive password</source>
+        <translation>Mot de passe de l'archive</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="403"/>
+        <source>Vol size (MB):</source>
+        <translation>Taille des volumes (Mo) :</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="433"/>
         <source>Keep Archives</source>
         <translation>Garder les archives</translation>
     </message>
@@ -5529,7 +5554,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">créer par2</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="440"/>
+        <location filename="../hmi/PostingWidget.ui" line="430"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation>par défaut les archives et par2 sont supprimés en fin de post réussi mais vous pouvez choisir de les garder</translation>
     </message>
@@ -5546,13 +5571,13 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">À propos</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="506"/>
+        <location filename="../hmi/PostingWidget.ui" line="496"/>
         <source>Let&apos;s Post!</source>
         <translation>Poster les fichiers!</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="509"/>
-        <location filename="../hmi/PostingWidget.cpp" line="802"/>
+        <location filename="../hmi/PostingWidget.ui" line="499"/>
+        <location filename="../hmi/PostingWidget.cpp" line="826"/>
         <source>Post Files</source>
         <translation>Poster Fichiers</translation>
     </message>
@@ -5561,134 +5586,134 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">Faire un don</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="725"/>
+        <location filename="../hmi/PostingWidget.cpp" line="749"/>
         <source>You can add files or folder by:</source>
         <translation>Vous pouvez ajoutez fichiers ou dossiers:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="726"/>
+        <location filename="../hmi/PostingWidget.cpp" line="750"/>
         <source>Drag &amp; Drop files/folders</source>
         <translation>Glisser/Déposer de fichiers ou dossiers</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="727"/>
+        <location filename="../hmi/PostingWidget.cpp" line="751"/>
         <source>Right Click to add Files</source>
         <translation>Click droit sur la zone pour ajouter des Fichiers</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="728"/>
+        <location filename="../hmi/PostingWidget.cpp" line="752"/>
         <source>Click on Select Files/Folder buttons</source>
         <translation>Click sur les boutons Choisir Fichiers ou Choisir Dossier</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="729"/>
+        <location filename="../hmi/PostingWidget.cpp" line="753"/>
         <source>Bare in mind you can select items in the list and press DEL to remove them</source>
         <translation>Vous pouvez sélectionner dans la liste et appuyer sur SUPPR pour enlever fichiers/dossiers</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="150"/>
+        <location filename="../hmi/PostingWidget.cpp" line="152"/>
         <source>There are no selected files to post...</source>
         <translation>Il n&apos;y a aucun fichier séléctionné à poster...</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="159"/>
+        <location filename="../hmi/PostingWidget.cpp" line="161"/>
         <source>There are no existing files to post...</source>
         <translation>Aucun fichier séléctionné n&apos;existe...</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="165"/>
+        <location filename="../hmi/PostingWidget.cpp" line="167"/>
         <source>You can&apos;t post folders without using compression...</source>
         <translation>Impossible de poster un Dossier sans l&apos;option de compression...</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="185"/>
+        <location filename="../hmi/PostingWidget.cpp" line="187"/>
         <source>Overwrite existing nzb file?</source>
         <translation>Écraser le fichier nzb existant?</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="186"/>
+        <location filename="../hmi/PostingWidget.cpp" line="188"/>
         <source>The nzb file &apos;%1&apos; already exists.
 Would you like to overwrite it ?</source>
         <translation>Le fichier nzb &apos;%1&apos; existe déjà. Voulez vous l&apos;écraser?</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="232"/>
-        <location filename="../hmi/PostingWidget.cpp" line="809"/>
-        <location filename="../hmi/PostingWidget.cpp" line="828"/>
+        <location filename="../hmi/PostingWidget.cpp" line="234"/>
+        <location filename="../hmi/PostingWidget.cpp" line="833"/>
+        <location filename="../hmi/PostingWidget.cpp" line="852"/>
         <source>Stop Posting</source>
         <translation>Stop Post</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="238"/>
-        <location filename="../hmi/PostingWidget.cpp" line="831"/>
+        <location filename="../hmi/PostingWidget.cpp" line="240"/>
+        <location filename="../hmi/PostingWidget.cpp" line="855"/>
         <source>Cancel Posting</source>
         <translation>Annuler Post</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="269"/>
+        <location filename="../hmi/PostingWidget.cpp" line="271"/>
         <source>Select one or more files to Post</source>
         <translation>Sélectionner un ou plusieurs fichiers à poster</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="281"/>
-        <location filename="../hmi/PostingWidget.cpp" line="326"/>
+        <location filename="../hmi/PostingWidget.cpp" line="283"/>
+        <location filename="../hmi/PostingWidget.cpp" line="344"/>
         <source>Select a Folder</source>
         <translation>Sélectionner un dossier</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="338"/>
+        <location filename="../hmi/PostingWidget.cpp" line="356"/>
         <source>Create nzb file</source>
         <translation>Créer fichier nzb</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="351"/>
+        <location filename="../hmi/PostingWidget.cpp" line="369"/>
         <source>Select rar executable</source>
         <translation>Sélectionner l&apos;exécutable RAR</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="361"/>
+        <location filename="../hmi/PostingWidget.cpp" line="379"/>
         <source>the selected file is not executable...</source>
         <translation>le fichier sélectionné n&apos;est pas exécutable...</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="604"/>
+        <location filename="../hmi/PostingWidget.cpp" line="628"/>
         <source>Create a post info file</source>
         <translation>Créer une fiche de post</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="605"/>
+        <location filename="../hmi/PostingWidget.cpp" line="629"/>
         <source>Write a small text file describing this post next to the nzb.
 Some Usenet indexes ask for one.</source>
         <translation>Écrire à côté du nzb un petit fichier texte décrivant ce post.
 Certains index Usenet en demandent un.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="607"/>
+        <location filename="../hmi/PostingWidget.cpp" line="631"/>
         <source>Post information…</source>
         <translation>Informations du post…</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="608"/>
+        <location filename="../hmi/PostingWidget.cpp" line="632"/>
         <source>Choose the model and fill in your own fields, for this post.</source>
         <translation>Choisir le modèle et remplir vos propres champs, pour ce post.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="639"/>
+        <location filename="../hmi/PostingWidget.cpp" line="663"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
-        <translation>Les informations du post citent « %1 » deux fois. Supprimez l'une des deux lignes.</translation>
+        <translation>Les informations du post citent « %1 » deux fois. Supprimez l&apos;une des deux lignes.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="656"/>
+        <location filename="../hmi/PostingWidget.cpp" line="680"/>
         <source>Post info model saved as the default: %1</source>
         <translation>Modèle de fiche enregistré comme modèle par défaut : %1</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="722"/>
+        <location filename="../hmi/PostingWidget.cpp" line="746"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation>limite le nombre maximum de volumes à %1 (cf RAR_MAX conf)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="723"/>
+        <location filename="../hmi/PostingWidget.cpp" line="747"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>utilisation de fichier de configuration pour PAR2_ARGS: %1</translation>
     </message>
@@ -5699,27 +5724,27 @@ Certains index Usenet en demandent un.</translation>
         <location filename="../history/PostHistoryService.cpp" line="66"/>
         <location filename="../history/PostHistoryService.cpp" line="441"/>
         <source>History service initialization failed: %1</source>
-        <translation>Échec de l'initialisation du service d'historique : %1</translation>
+        <translation>Échec de l&apos;initialisation du service d&apos;historique : %1</translation>
     </message>
     <message>
         <location filename="../history/PostHistoryService.cpp" line="226"/>
         <source>History file status update failed: %1</source>
-        <translation>Échec de la mise à jour du statut de fichier dans l'historique : %1</translation>
+        <translation>Échec de la mise à jour du statut de fichier dans l&apos;historique : %1</translation>
     </message>
     <message>
         <location filename="../history/PostHistoryService.cpp" line="319"/>
         <source>Could not open file for writing: %1</source>
-        <translation>Impossible d'ouvrir le fichier en écriture : %1</translation>
+        <translation>Impossible d&apos;ouvrir le fichier en écriture : %1</translation>
     </message>
     <message>
         <location filename="../history/PostHistoryService.cpp" line="459"/>
         <source>History service busy, retrying: %1</source>
-        <translation>Service d'historique occupé, nouvelle tentative : %1</translation>
+        <translation>Service d&apos;historique occupé, nouvelle tentative : %1</translation>
     </message>
     <message>
         <location filename="../history/PostHistoryService.cpp" line="461"/>
         <source>History service flush failed: %1</source>
-        <translation>Échec de l'écriture différée du service d'historique : %1</translation>
+        <translation>Échec de l&apos;écriture différée du service d&apos;historique : %1</translation>
     </message>
 </context>
 <context>
@@ -5866,7 +5891,7 @@ Certains index Usenet en demandent un.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="348"/>
         <source>VPN: could not create auth file — openvpn will prompt</source>
-        <translation>VPN : impossible de créer le fichier d'authentification — openvpn demandera les identifiants</translation>
+        <translation>VPN : impossible de créer le fichier d&apos;authentification — openvpn demandera les identifiants</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="350"/>
@@ -5881,22 +5906,22 @@ Certains index Usenet en demandent un.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="414"/>
         <source>VPN: backend reports ready (%1, %2) — waiting for the address to become bindable</source>
-        <translation>VPN : le moteur se déclare prêt (%1, %2) — en attente que l'adresse devienne utilisable</translation>
+        <translation>VPN : le moteur se déclare prêt (%1, %2) — en attente que l&apos;adresse devienne utilisable</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="435"/>
         <source>VPN: tun IP %1 became bindable after %2 ms</source>
-        <translation>VPN : l'IP tun %1 est devenue utilisable après %2 ms</translation>
+        <translation>VPN : l&apos;IP tun %1 est devenue utilisable après %2 ms</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="445"/>
         <source>VPN: kernel acknowledged tun IP %1 after %2 ms</source>
-        <translation>VPN : le noyau a confirmé l'IP tun %1 après %2 ms</translation>
+        <translation>VPN : le noyau a confirmé l&apos;IP tun %1 après %2 ms</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="461"/>
         <source>VPN: tun IP %1 was reported by the backend but Winsock never accepted bind() (waited %2 ms; last error: %3). Visible local addresses: %4. Aborting to avoid a leaking bind.</source>
-        <translation>VPN : l'IP tun %1 a été signalée par le moteur mais Winsock n'a jamais accepté le bind() (attente de %2 ms ; dernière erreur : %3). Adresses locales visibles : %4. Abandon pour éviter un bind qui fuit.</translation>
+        <translation>VPN : l&apos;IP tun %1 a été signalée par le moteur mais Winsock n&apos;a jamais accepté le bind() (attente de %2 ms ; dernière erreur : %3). Adresses locales visibles : %4. Abandon pour éviter un bind qui fuit.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="467"/>
@@ -5906,7 +5931,7 @@ Certains index Usenet en demandent un.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="470"/>
         <source>VPN: tun IP %1 was reported by the backend but the kernel never bound it to an interface (waited %2 ms). Visible local addresses: %3. Aborting to avoid a leaking bind.</source>
-        <translation>VPN : l'IP tun %1 a été signalée par le moteur mais le noyau ne l'a jamais liée à une interface (attente de %2 ms). Adresses locales visibles : %3. Abandon pour éviter un bind qui fuit.</translation>
+        <translation>VPN : l&apos;IP tun %1 a été signalée par le moteur mais le noyau ne l&apos;a jamais liée à une interface (attente de %2 ms). Adresses locales visibles : %3. Abandon pour éviter un bind qui fuit.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="488"/>
@@ -5941,12 +5966,12 @@ Certains index Usenet en demandent un.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="766"/>
         <source>Install OpenVPN Community and/or WireGuard for Windows, then re-check. These are normally bundled with the ngPost setup.</source>
-        <translation>Installez OpenVPN Community et/ou WireGuard for Windows, puis revérifiez. Ils sont normalement fournis avec l'installateur ngPost.</translation>
+        <translation>Installez OpenVPN Community et/ou WireGuard for Windows, puis revérifiez. Ils sont normalement fournis avec l&apos;installateur ngPost.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="776"/>
         <source>VPN: could not create a temporary install directory</source>
-        <translation>VPN : impossible de créer un dossier d'installation temporaire</translation>
+        <translation>VPN : impossible de créer un dossier d&apos;installation temporaire</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="782"/>
@@ -5971,12 +5996,12 @@ Certains index Usenet en demandent un.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="913"/>
         <source>install-wg-tunnel.ps1 not found in app bundle</source>
-        <translation>install-wg-tunnel.ps1 introuvable dans le paquet de l'application</translation>
+        <translation>install-wg-tunnel.ps1 introuvable dans le paquet de l&apos;application</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="921"/>
         <source>WireGuard tunnel install failed (exit %1)</source>
-        <translation>Échec de l'installation du tunnel WireGuard (sortie %1)</translation>
+        <translation>Échec de l&apos;installation du tunnel WireGuard (sortie %1)</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="924"/>
@@ -5986,7 +6011,7 @@ Certains index Usenet en demandent un.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="932"/>
         <source>uninstall-wg-tunnel.ps1 not found in app bundle</source>
-        <translation>uninstall-wg-tunnel.ps1 introuvable dans le paquet de l'application</translation>
+        <translation>uninstall-wg-tunnel.ps1 introuvable dans le paquet de l&apos;application</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="938"/>
@@ -6006,12 +6031,12 @@ Certains index Usenet en demandent un.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1002"/>
         <source>Master switch (VPN_AUTO_CONNECT) is ON but no VPN helper is installed - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</source>
-        <translation>L'interrupteur général (VPN_AUTO_CONNECT) est activé mais aucun assistant VPN n'est installé — interrupteur ignoré. Le « Utiliser le VPN » par serveur reste appliqué.</translation>
+        <translation>L&apos;interrupteur général (VPN_AUTO_CONNECT) est activé mais aucun assistant VPN n&apos;est installé — interrupteur ignoré. Le « Utiliser le VPN » par serveur reste appliqué.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1008"/>
         <source>Master switch (VPN_AUTO_CONNECT) is ON but the VPN is not correctly configured (%1) - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</source>
-        <translation>L'interrupteur général (VPN_AUTO_CONNECT) est activé mais le VPN n'est pas correctement configuré (%1) — interrupteur ignoré. Le « Utiliser le VPN » par serveur reste appliqué.</translation>
+        <translation>L&apos;interrupteur général (VPN_AUTO_CONNECT) est activé mais le VPN n&apos;est pas correctement configuré (%1) — interrupteur ignoré. Le « Utiliser le VPN » par serveur reste appliqué.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1046"/>
@@ -6027,7 +6052,7 @@ The VPN is not correctly configured: %2
 Open the VPN options with the VPN button and check the VPN configuration, or edit the server configuration and disable VPN by clearing its Use VPN checkbox.</source>
         <translation>« Utiliser le VPN » est activé pour le ou les serveurs NNTP : %1.
 
-Le VPN n'est pas correctement configuré : %2
+Le VPN n&apos;est pas correctement configuré : %2
 
 Ouvrez les options VPN avec le bouton VPN et vérifiez la configuration, ou modifiez la configuration du serveur et désactivez le VPN en décochant sa case « Utiliser le VPN ».</translation>
     </message>
@@ -6044,7 +6069,7 @@ Ouvrez les options VPN avec le bouton VPN et vérifiez la configuration, ou modi
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1113"/>
         <source>Queue empty for %1 s — disconnecting VPN</source>
-        <translation>File d'attente vide depuis %1 s — déconnexion du VPN</translation>
+        <translation>File d&apos;attente vide depuis %1 s — déconnexion du VPN</translation>
     </message>
     <message>
         <source>No more jobs need the VPN; scheduling auto-disconnect in %1 s</source>
@@ -6150,7 +6175,7 @@ Ouvrez les options VPN avec le bouton VPN et vérifiez la configuration, ou modi
     <message>
         <location filename="../hmi/VpnProfileEditDialog.ui" line="122"/>
         <source>Credentials are stored in your system keychain (GNOME Keyring / KWallet / Windows Credential Vault / macOS Keychain). If the keychain is unavailable, ngPost will ask before falling back to writing credentials into the .ovpn copy (mode 600).</source>
-        <translation>Les identifiants sont stockés dans le trousseau de votre système (GNOME Keyring / KWallet / Windows Credential Vault / trousseau macOS). Si le trousseau est indisponible, ngPost demandera avant de se rabattre sur l'écriture des identifiants dans la copie du .ovpn (mode 600).</translation>
+        <translation>Les identifiants sont stockés dans le trousseau de votre système (GNOME Keyring / KWallet / Windows Credential Vault / trousseau macOS). Si le trousseau est indisponible, ngPost demandera avant de se rabattre sur l&apos;écriture des identifiants dans la copie du .ovpn (mode 600).</translation>
     </message>
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="58"/>
@@ -6189,11 +6214,11 @@ Ouvrez les options VPN avec le bouton VPN et vérifiez la configuration, ou modi
 Do you want to store the credentials directly inside the VPN config file (%2, mode 600)?
 
 If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then either prompt at connection time (and fail in the non-interactive helper) or use whatever auth-user-pass directive is already in the .ovpn.</source>
-        <translation>ngPost n'arrive pas à joindre le trousseau du système (%1).
+        <translation>ngPost n&apos;arrive pas à joindre le trousseau du système (%1).
 
 Voulez-vous stocker les identifiants directement dans le fichier de configuration VPN (%2, mode 600) ?
 
-Si vous refusez, le profil sera enregistré SANS identifiants. OpenVPN les demandera alors à la connexion (et échouera dans l'assistant non interactif) ou utilisera la directive auth-user-pass déjà présente dans le .ovpn.</translation>
+Si vous refusez, le profil sera enregistré SANS identifiants. OpenVPN les demandera alors à la connexion (et échouera dans l&apos;assistant non interactif) ou utilisera la directive auth-user-pass déjà présente dans le .ovpn.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="184"/>
@@ -6204,12 +6229,12 @@ Si vous refusez, le profil sera enregistré SANS identifiants. OpenVPN les deman
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="185"/>
         <source>Could not open %1 for reading.</source>
-        <translation>Impossible d'ouvrir %1 en lecture.</translation>
+        <translation>Impossible d&apos;ouvrir %1 en lecture.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="210"/>
         <source>Could not open %1 for writing.</source>
-        <translation>Impossible d'ouvrir %1 en écriture.</translation>
+        <translation>Impossible d&apos;ouvrir %1 en écriture.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="224"/>
@@ -6244,7 +6269,7 @@ Si vous refusez, le profil sera enregistré SANS identifiants. OpenVPN les deman
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="270"/>
         <source>Import failed</source>
-        <translation>Échec de l'import</translation>
+        <translation>Échec de l&apos;import</translation>
     </message>
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="271"/>
@@ -6254,12 +6279,12 @@ Si vous refusez, le profil sera enregistré SANS identifiants. OpenVPN les deman
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="301"/>
         <source>Save failed</source>
-        <translation>Échec de l'enregistrement</translation>
+        <translation>Échec de l&apos;enregistrement</translation>
     </message>
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="302"/>
         <source>Could not save the profile.</source>
-        <translation>Impossible d'enregistrer le profil.</translation>
+        <translation>Impossible d&apos;enregistrer le profil.</translation>
     </message>
 </context>
 <context>
@@ -6405,7 +6430,7 @@ Si vous refusez, le profil sera enregistré SANS identifiants. OpenVPN les deman
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="193"/>
         <source>&lt;a href=&quot;about:licences&quot;&gt;About licences&lt;/a&gt;</source>
-        <translation>&lt;a href="about:licences"&gt;À propos des licences&lt;/a&gt;</translation>
+        <translation>&lt;a href=&quot;about:licences&quot;&gt;À propos des licences&lt;/a&gt;</translation>
     </message>
     <message>
         <source>OpenVPN config (*.ovpn *.conf);;All files (*)</source>
@@ -6521,12 +6546,12 @@ Son fichier de configuration sous &lt;configDir&gt;/vpn/ et ses identifiants dan
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="113"/>
         <source>Native VPN integration is currently Linux-only. macOS support is in progress.</source>
-        <translation>L'intégration VPN native est pour l'instant réservée à Linux. Le support macOS est en cours.</translation>
+        <translation>L&apos;intégration VPN native est pour l&apos;instant réservée à Linux. Le support macOS est en cours.</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="164"/>
         <source>Launching VPN helper: %1 %2</source>
-        <translation>Lancement de l'assistant VPN : %1 %2</translation>
+        <translation>Lancement de l&apos;assistant VPN : %1 %2</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="167"/>
@@ -6571,17 +6596,17 @@ Son fichier de configuration sous &lt;configDir&gt;/vpn/ et ses identifiants dan
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="358"/>
         <source>sc start failed (exit %1) — make sure the WireGuard tunnel was installed via wireguard.exe /installtunnelservice and that runtime ACL grants you START.</source>
-        <translation>Échec de sc start (sortie %1) — vérifiez que le tunnel WireGuard a été installé via wireguard.exe /installtunnelservice et que les ACL d'exécution vous accordent START.</translation>
+        <translation>Échec de sc start (sortie %1) — vérifiez que le tunnel WireGuard a été installé via wireguard.exe /installtunnelservice et que les ACL d&apos;exécution vous accordent START.</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="378"/>
         <source>WireGuard tunnel did not come up within 20s</source>
-        <translation>Le tunnel WireGuard n'est pas monté en moins de 20 s</translation>
+        <translation>Le tunnel WireGuard n&apos;est pas monté en moins de 20 s</translation>
     </message>
     <message>
         <location filename="../vpn/WireGuardBackend.cpp" line="388"/>
         <source>Could not parse local IP from WireGuard config</source>
-        <translation>Impossible de lire l'IP locale dans la configuration WireGuard</translation>
+        <translation>Impossible de lire l&apos;IP locale dans la configuration WireGuard</translation>
     </message>
 </context>
 </TS>

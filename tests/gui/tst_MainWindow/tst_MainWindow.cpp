@@ -752,8 +752,23 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
 
     auto *rarMax = quickTab->findChild<QCheckBox*>(QStringLiteral("rarMaxCB"));
     auto *redundancy = quickTab->findChild<QSpinBox*>(QStringLiteral("redundancySB"));
+    auto *compress = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
+    auto *par2 = quickTab->findChild<QCheckBox*>(QStringLiteral("par2CB"));
     QVERIFY2(rarMax, "rarMaxCB not found on Quick tab");
     QVERIFY2(redundancy, "redundancySB not found on Quick tab");
+    QVERIFY(compress);
+    QVERIFY(par2);
+
+    // Each setting now follows its own switch: the volume limit means nothing
+    // without compression, and a redundancy percentage means nothing without
+    // PAR2. They are greyed until the box above them is ticked.
+    compress->setChecked(false);
+    par2->setChecked(false);
+    QVERIFY(!rarMax->isEnabled());
+    QVERIFY(!redundancy->isEnabled());
+
+    compress->setChecked(true);
+    par2->setChecked(true);
     QVERIFY(rarMax->isEnabled());
     QVERIFY(redundancy->isEnabled());
 

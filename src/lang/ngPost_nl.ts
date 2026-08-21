@@ -445,7 +445,7 @@ Bestanden worden definitief verwijderd...</translation>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="606"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
-        <translation>De postinformatie noemt '%1' twee keer. Verwijder een van de twee regels.</translation>
+        <translation>De postinformatie noemt &apos;%1&apos; twee keer. Verwijder een van de twee regels.</translation>
     </message>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="621"/>
@@ -1470,17 +1470,17 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2391"/>
         <source>&lt;span style=&apos;color:darkgreen&apos;&gt;Resumable&lt;/span&gt;</source>
-        <translation>&lt;span style='color:darkgreen'&gt;Hervatbaar&lt;/span&gt;</translation>
+        <translation>&lt;span style=&apos;color:darkgreen&apos;&gt;Hervatbaar&lt;/span&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2393"/>
         <source>&lt;span style=&apos;color:#FFA200&apos;&gt;Partially resumable&lt;/span&gt;</source>
-        <translation>&lt;span style='color:#FFA200'&gt;Gedeeltelijk hervatbaar&lt;/span&gt;</translation>
+        <translation>&lt;span style=&apos;color:#FFA200&apos;&gt;Gedeeltelijk hervatbaar&lt;/span&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2394"/>
         <source>&lt;span style=&apos;color:darkred&apos;&gt;Not resumable&lt;/span&gt;</source>
-        <translation>&lt;span style='color:darkred'&gt;Niet hervatbaar&lt;/span&gt;</translation>
+        <translation>&lt;span style=&apos;color:darkred&apos;&gt;Niet hervatbaar&lt;/span&gt;</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.cpp" line="2412"/>
@@ -2597,7 +2597,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NgPost.cpp" line="236"/>
         <source>resume one or several post ids</source>
-        <translation>een of meer post-id's hervatten</translation>
+        <translation>een of meer post-id&apos;s hervatten</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="237"/>
@@ -2622,7 +2622,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NgPost.cpp" line="241"/>
         <source>assume yes for non-interactive destructive commands</source>
-        <translation>ja aannemen bij niet-interactieve, destructieve commando's</translation>
+        <translation>ja aannemen bij niet-interactieve, destructieve commando&apos;s</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="242"/>
@@ -2637,12 +2637,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NgPost.cpp" line="257"/>
         <source>one of your fields, written in the post info file AND published in the nzb header (typically &quot;password=qwerty42&quot;)</source>
-        <translation>een van uw velden, wordt in het infobestand geschreven EN in de nzb-header gepubliceerd (meestal "password=qwerty42")</translation>
+        <translation>een van uw velden, wordt in het infobestand geschreven EN in de nzb-header gepubliceerd (meestal &quot;password=qwerty42&quot;)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="258"/>
         <source>one of your fields, written in the post info file only, never published in the nzb (ex: &quot;title=Photo backup 2026&quot;)</source>
-        <translation>een van uw velden, wordt alleen in het infobestand geschreven, nooit in de nzb gepubliceerd (bv: "title=Photo backup 2026")</translation>
+        <translation>een van uw velden, wordt alleen in het infobestand geschreven, nooit in de nzb gepubliceerd (bv: &quot;title=Photo backup 2026&quot;)</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="259"/>
@@ -2692,7 +2692,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NgPost.cpp" line="268"/>
         <source>put the archive password in the environment and json given to post commands</source>
-        <translation>het archiefwachtwoord in de omgeving en de json van de post-commando's zetten</translation>
+        <translation>het archiefwachtwoord in de omgeving en de json van de post-commando&apos;s zetten</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="269"/>
@@ -2921,12 +2921,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NgPost.cpp" line="1546"/>
         <source>Waiting for the post commands to finish before exiting...</source>
-        <translation>Er wordt gewacht tot de post-commando's klaar zijn voordat wordt afgesloten...</translation>
+        <translation>Er wordt gewacht tot de post-commando&apos;s klaar zijn voordat wordt afgesloten...</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1559"/>
         <source>Waiting for the post commands to finish...</source>
-        <translation>Er wordt gewacht tot de post-commando's klaar zijn...</translation>
+        <translation>Er wordt gewacht tot de post-commando&apos;s klaar zijn...</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1685"/>
@@ -2971,12 +2971,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NgPost.cpp" line="1795"/>
         <source>Error: metadata must be given as key=value, got &apos;%1&apos;</source>
-        <translation>Fout: metadata moeten als sleutel=waarde worden opgegeven, ontvangen: '%1'</translation>
+        <translation>Fout: metadata moeten als sleutel=waarde worden opgegeven, ontvangen: &apos;%1&apos;</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="1809"/>
         <source>Error: metadata &apos;%1&apos; is given both as public (--meta) and private (--post_meta); choose one.</source>
-        <translation>Fout: metadata '%1' wordt zowel publiek (--meta) als privé (--post_meta) opgegeven; kies er één.</translation>
+        <translation>Fout: metadata &apos;%1&apos; wordt zowel publiek (--meta) als privé (--post_meta) opgegeven; kies er één.</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2048"/>
@@ -2996,7 +2996,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NgPost.cpp" line="2475"/>
         <source>Error syntax: --vpn_profile &apos;%1&apos; does not match any profile defined in the config</source>
-        <translation>Syntaxfout: --vpn_profile '%1' komt met geen enkel in de configuratie gedefinieerd profiel overeen</translation>
+        <translation>Syntaxfout: --vpn_profile &apos;%1&apos; komt met geen enkel in de configuratie gedefinieerd profiel overeen</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="2594"/>
@@ -3037,7 +3037,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location filename="../NgPost.cpp" line="3754"/>
         <source>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</source>
-        <translation>VPN: het oude VPN_CONFIG_PATH is overgezet naar het profiel 'Default'</translation>
+        <translation>VPN: het oude VPN_CONFIG_PATH is overgezet naar het profiel &apos;Default&apos;</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="3776"/>
@@ -3193,12 +3193,12 @@ Uw actieve configuratiebestand is:
     <message>
         <location filename="../NgPost.cpp" line="3893"/>
         <source>Config migration failed: could not create backup &apos;%1&apos;.</source>
-        <translation>Migratie mislukt: de back-up '%1' kon niet worden gemaakt.</translation>
+        <translation>Migratie mislukt: de back-up &apos;%1&apos; kon niet worden gemaakt.</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="3896"/>
         <source>Config migration failed: could not copy legacy config &apos;%1&apos; to &apos;%2&apos;.</source>
-        <translation>Migratie mislukt: de oude configuratie '%1' kon niet naar '%2' worden gekopieerd.</translation>
+        <translation>Migratie mislukt: de oude configuratie &apos;%1&apos; kon niet naar &apos;%2&apos; worden gekopieerd.</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="3910"/>
@@ -3273,7 +3273,7 @@ Uw actieve configuratiebestand is:
     <message>
         <location filename="../NgPost.cpp" line="4150"/>
         <source>## ngPost waits for its post commands before quitting, so a stuck one</source>
-        <translation>## ngPost wacht op zijn post-commando's voordat het afsluit, dus een vastgelopen commando</translation>
+        <translation>## ngPost wacht op zijn post-commando&apos;s voordat het afsluit, dus een vastgelopen commando</translation>
     </message>
     <message>
         <location filename="../NgPost.cpp" line="4151"/>
@@ -3969,7 +3969,7 @@ Uw actieve configuratiebestand is:
     <message>
         <location filename="../NntpCheckCon.cpp" line="77"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
-        <translation>Server '%1' moet door het VPN maar de tunnel is niet verbonden</translation>
+        <translation>Server &apos;%1&apos; moet door het VPN maar de tunnel is niet verbonden</translation>
     </message>
     <message>
         <location filename="../NntpCheckCon.cpp" line="87"/>
@@ -4005,7 +4005,7 @@ Uw actieve configuratiebestand is:
     <message>
         <location filename="../NntpCheckCon.cpp" line="257"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
-        <translation>[Verbinding #%1] Authenticatiefout bij server %2:%3 met gebruiker '%4'</translation>
+        <translation>[Verbinding #%1] Authenticatiefout bij server %2:%3 met gebruiker &apos;%4&apos;</translation>
     </message>
     <message>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos; and pass &apos;%5&apos;</source>
@@ -4035,7 +4035,7 @@ Uw actieve configuratiebestand is:
     <message>
         <location filename="../NntpConnection.cpp" line="132"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
-        <translation>Server '%1' moet door het VPN maar de tunnel is niet verbonden</translation>
+        <translation>Server &apos;%1&apos; moet door het VPN maar de tunnel is niet verbonden</translation>
     </message>
     <message>
         <location filename="../NntpConnection.cpp" line="141"/>
@@ -4137,7 +4137,7 @@ Uw actieve configuratiebestand is:
     <message>
         <location filename="../NntpConnection.cpp" line="590"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
-        <translation>[Verbinding #%1] Authenticatiefout bij server %2:%3 met gebruiker '%4'</translation>
+        <translation>[Verbinding #%1] Authenticatiefout bij server %2:%3 met gebruiker &apos;%4&apos;</translation>
     </message>
     <message>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos; and pass &apos;%5&apos;</source>
@@ -4298,7 +4298,7 @@ Uw actieve configuratiebestand is:
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="349"/>
         <source>Cannot reach OpenVPNServiceInteractive pipe. Open Services.msc, set &quot;OpenVPN Interactive Service&quot; to Automatic, and start it. If it is not present, re-run the ngPost setup with the OpenVPN Community option.</source>
-        <translation>De pipe OpenVPNServiceInteractive is niet bereikbaar. Open Services.msc, zet "OpenVPN Interactive Service" op Automatisch en start hem. Ontbreekt hij, voer dan de ngPost-installatie opnieuw uit met de optie OpenVPN Community.</translation>
+        <translation>De pipe OpenVPNServiceInteractive is niet bereikbaar. Open Services.msc, zet &quot;OpenVPN Interactive Service&quot; op Automatisch en start hem. Ontbreekt hij, voer dan de ngPost-installatie opnieuw uit met de optie OpenVPN Community.</translation>
     </message>
     <message>
         <location filename="../vpn/OpenVpnBackend.cpp" line="373"/>
@@ -4360,7 +4360,7 @@ Uw actieve configuratiebestand is:
     <message>
         <location filename="../PostCmdRunner.cpp" line="264"/>
         <source>NZB_POST_CMD could not run &apos;%1&apos;: %2</source>
-        <translation>NZB_POST_CMD kon '%1' niet uitvoeren: %2</translation>
+        <translation>NZB_POST_CMD kon &apos;%1&apos; niet uitvoeren: %2</translation>
     </message>
     <message>
         <location filename="../PostCmdRunner.cpp" line="289"/>
@@ -5255,7 +5255,7 @@ Het model nu opslaan?</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.ui" line="59"/>
-        <location filename="../hmi/PostingWidget.ui" line="111"/>
+        <location filename="../hmi/PostingWidget.ui" line="109"/>
         <source>...</source>
         <translation>...</translation>
     </message>
@@ -5264,12 +5264,12 @@ Het model nu opslaan?</translation>
         <translation type="vanished">rar pad: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="95"/>
+        <location filename="../hmi/PostingWidget.ui" line="93"/>
         <source>full path of the rar executable</source>
         <translation>volledig pad van het rar inpakprogramma</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="108"/>
+        <location filename="../hmi/PostingWidget.ui" line="106"/>
         <source>select rar executable</source>
         <translation>selecteer uitvoerbaar rar programma</translation>
     </message>
@@ -5278,7 +5278,7 @@ Het model nu opslaan?</translation>
         <translation type="vanished">vol size:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="135"/>
+        <location filename="../hmi/PostingWidget.ui" line="416"/>
         <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
         <translation>om het rar-archief in verschillende delen te splitsen (0 om niet te splitsen)</translation>
     </message>
@@ -5296,67 +5296,64 @@ Het model nu opslaan?</translation>
         <translation>Compressie pad: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="88"/>
+        <location filename="../hmi/PostingWidget.ui" line="86"/>
         <source>RAR Path: </source>
         <translation>RAR pad: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="122"/>
         <source>Vol Size:</source>
-        <translation>Volumegrootte:</translation>
+        <translation type="vanished">Volumegrootte:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="145"/>
+        <location filename="../hmi/PostingWidget.ui" line="423"/>
         <source>Limit RAR Number</source>
         <translation>Beperk aantal RAR</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="174"/>
         <source>PAR2 Redundancy (%): </source>
-        <translation>PAR2 redundantie (%): </translation>
+        <translation type="vanished">PAR2 redundantie (%): </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="206"/>
+        <location filename="../hmi/PostingWidget.ui" line="186"/>
         <source>Select the files to post (they may be compressed if needed) you can also right click on the files area just above</source>
         <translation>Selecteer de bestanden die je wilt posten (ze kunnen indien nodig worden gecomprimeerd). U kunt ook met de rechtermuisknop klikken op het bestandsgedeelte net erboven</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="209"/>
+        <location filename="../hmi/PostingWidget.ui" line="189"/>
         <source>Select Files</source>
         <translation>Selecteer bestanden</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="220"/>
+        <location filename="../hmi/PostingWidget.ui" line="200"/>
         <source>remove all files</source>
         <translation>verwijder alle bestanden</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="223"/>
+        <location filename="../hmi/PostingWidget.ui" line="203"/>
         <source>Remove All</source>
         <translation>Verwijder alles</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="234"/>
+        <location filename="../hmi/PostingWidget.ui" line="214"/>
         <source>select a folder (only if you use compression)</source>
         <translation>selecteer een map (alleen als je compressie gebruikt)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="237"/>
+        <location filename="../hmi/PostingWidget.ui" line="217"/>
         <source>Select Folder</source>
         <translation>Selecteer map</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="270"/>
+        <location filename="../hmi/PostingWidget.ui" line="250"/>
         <source>NZB file:</source>
         <translation>NZB bestand:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="323"/>
         <source>NZB Password:</source>
-        <translation>NZB wachtwoord:</translation>
+        <translation type="vanished">NZB wachtwoord:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="390"/>
+        <location filename="../hmi/PostingWidget.ui" line="309"/>
         <source>Compress</source>
         <translation>Comprimeren</translation>
     </message>
@@ -5366,12 +5363,32 @@ Het model nu opslaan?</translation>
         <translation>Genereer PAR2</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="466"/>
+        <location filename="../hmi/PostingWidget.ui" line="292"/>
         <source>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</source>
         <translation>Als een .nfo bestand aanwezig is in de originele bestanden (voor rar/hernoemingen), kopieer het naast de gegenereerde nzb (met dezelfde basisnaam)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="469"/>
+        <location filename="../hmi/PostingWidget.ui" line="136"/>
+        <source>Random name length:</source>
+        <translation>Lengte van de willekeurige naam:</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="143"/>
+        <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
+        <translation>lengte van de archiefnaam die de dobbelsteenknop trekt (configuratie LENGTH_NAME)</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="150"/>
+        <source>Random password length:</source>
+        <translation>Lengte van het willekeurige wachtwoord:</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="157"/>
+        <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
+        <translation>lengte van het wachtwoord dat de dobbelsteenknop trekt (configuratie LENGTH_PASS)</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="295"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
         <translation>Kopieer NFO naast het nzb bestand (indien beschikbaar)</translation>
     </message>
@@ -5380,22 +5397,22 @@ Het model nu opslaan?</translation>
         <translation type="vanished">nzb bestand: </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="277"/>
+        <location filename="../hmi/PostingWidget.ui" line="257"/>
         <source>full path of the nzb file that would be created (check the nzbPath keyword in the config file to set the default directory)</source>
         <translation>volledig pad van het nzb-bestand dat zou worden gemaakt (controleer het sleutelwoord nzbPath in het configuratiebestand om de standaardmap in te stellen)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="290"/>
+        <location filename="../hmi/PostingWidget.ui" line="270"/>
         <source>select the nzb file absolute file name</source>
         <translation>selecteer de absolute bestandsnaam van het nzb-bestand</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="293"/>
+        <location filename="../hmi/PostingWidget.ui" line="273"/>
         <source> ... </source>
         <translation> ... </translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="320"/>
+        <location filename="../hmi/PostingWidget.ui" line="353"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation>Dit moet het wachtwoord zijn van het archief dat je plaatst</translation>
     </message>
@@ -5404,22 +5421,21 @@ Het model nu opslaan?</translation>
         <translation type="vanished">nzb wachtwoord:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="333"/>
+        <location filename="../hmi/PostingWidget.ui" line="366"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>wachtwoord van het archief dat ook word toegevoegd in de koptekst van het nzb-bestand</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="340"/>
         <source>length of the password</source>
-        <translation>lengte van het wachtwoord</translation>
+        <translation type="vanished">lengte van het wachtwoord</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="353"/>
+        <location filename="../hmi/PostingWidget.ui" line="379"/>
         <source>generate random password</source>
         <translation>maak willekeurig wachtwoord</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="387"/>
+        <location filename="../hmi/PostingWidget.ui" line="306"/>
         <source>compress the selected files using rar before posting</source>
         <translation>pak de geselecteerde bestanden in met rar voordat je ze plaatst</translation>
     </message>
@@ -5428,22 +5444,31 @@ Het model nu opslaan?</translation>
         <translation type="vanished">comprimeer</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="406"/>
+        <location filename="../hmi/PostingWidget.ui" line="316"/>
         <source>archive name (file name obfuscation)</source>
         <translation>archiefnaam (versleuteld)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="413"/>
         <source>length of the archive name</source>
-        <translation>lengte van de archief naam</translation>
+        <translation type="vanished">lengte van de archief naam</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="426"/>
+        <location filename="../hmi/PostingWidget.ui" line="329"/>
         <source>generate random archive name</source>
         <translation>genereer willekeurige archiefnaam</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="443"/>
+        <location filename="../hmi/PostingWidget.ui" line="356"/>
+        <source>Archive password</source>
+        <translation>Archiefwachtwoord</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="403"/>
+        <source>Vol size (MB):</source>
+        <translation>Volumegrootte (MB):</translation>
+    </message>
+    <message>
+        <location filename="../hmi/PostingWidget.ui" line="433"/>
         <source>Keep Archives</source>
         <translation>Behoud archieven</translation>
     </message>
@@ -5457,7 +5482,7 @@ Het model nu opslaan?</translation>
         <translation type="vanished">maak par2</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="440"/>
+        <location filename="../hmi/PostingWidget.ui" line="430"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation>standaard worden rar en par2-bestanden verwijderd na het posten, maar je kunt ervoor kiezen om ze te behouden</translation>
     </message>
@@ -5474,13 +5499,13 @@ Het model nu opslaan?</translation>
         <translation type="vanished">Over</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="506"/>
+        <location filename="../hmi/PostingWidget.ui" line="496"/>
         <source>Let&apos;s Post!</source>
         <translation>Nu Posten!</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.ui" line="509"/>
-        <location filename="../hmi/PostingWidget.cpp" line="802"/>
+        <location filename="../hmi/PostingWidget.ui" line="499"/>
+        <location filename="../hmi/PostingWidget.cpp" line="826"/>
         <source>Post Files</source>
         <translation>Post Bestanden</translation>
     </message>
@@ -5489,135 +5514,135 @@ Het model nu opslaan?</translation>
         <translation type="vanished">Doneer</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="150"/>
+        <location filename="../hmi/PostingWidget.cpp" line="152"/>
         <source>There are no selected files to post...</source>
         <translation>Er zijn geen geselecteerde bestanden om te posten...</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="159"/>
+        <location filename="../hmi/PostingWidget.cpp" line="161"/>
         <source>There are no existing files to post...</source>
         <translation>Er zijn geen bestanden om te posten ...</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="165"/>
+        <location filename="../hmi/PostingWidget.cpp" line="167"/>
         <source>You can&apos;t post folders without using compression...</source>
         <translation>Je kunt geen mappen plaatsen zonder compressie te gebruiken ...</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="185"/>
+        <location filename="../hmi/PostingWidget.cpp" line="187"/>
         <source>Overwrite existing nzb file?</source>
         <translation>Bestaand nzb-bestand overschrijven?</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="186"/>
+        <location filename="../hmi/PostingWidget.cpp" line="188"/>
         <source>The nzb file &apos;%1&apos; already exists.
 Would you like to overwrite it ?</source>
         <translation>Het nzb-bestand %1  bestaat al.
 Wil je het overschrijven?</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="232"/>
-        <location filename="../hmi/PostingWidget.cpp" line="809"/>
-        <location filename="../hmi/PostingWidget.cpp" line="828"/>
+        <location filename="../hmi/PostingWidget.cpp" line="234"/>
+        <location filename="../hmi/PostingWidget.cpp" line="833"/>
+        <location filename="../hmi/PostingWidget.cpp" line="852"/>
         <source>Stop Posting</source>
         <translation>Stop Posten</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="238"/>
-        <location filename="../hmi/PostingWidget.cpp" line="831"/>
+        <location filename="../hmi/PostingWidget.cpp" line="240"/>
+        <location filename="../hmi/PostingWidget.cpp" line="855"/>
         <source>Cancel Posting</source>
         <translation>Annuleer Posten</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="269"/>
+        <location filename="../hmi/PostingWidget.cpp" line="271"/>
         <source>Select one or more files to Post</source>
         <translation>Selecteer een of meer bestanden om te posten</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="281"/>
-        <location filename="../hmi/PostingWidget.cpp" line="326"/>
+        <location filename="../hmi/PostingWidget.cpp" line="283"/>
+        <location filename="../hmi/PostingWidget.cpp" line="344"/>
         <source>Select a Folder</source>
         <translation>Selecteer een map</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="338"/>
+        <location filename="../hmi/PostingWidget.cpp" line="356"/>
         <source>Create nzb file</source>
         <translation>Maak een nzb-bestand</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="351"/>
+        <location filename="../hmi/PostingWidget.cpp" line="369"/>
         <source>Select rar executable</source>
         <translation>selecteer uitvoerbaar rar programma</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="361"/>
+        <location filename="../hmi/PostingWidget.cpp" line="379"/>
         <source>the selected file is not executable...</source>
         <translation>het geselecteerde bestand is niet uitvoerbaar...</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="604"/>
+        <location filename="../hmi/PostingWidget.cpp" line="628"/>
         <source>Create a post info file</source>
         <translation>Een infobestand maken</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="605"/>
+        <location filename="../hmi/PostingWidget.cpp" line="629"/>
         <source>Write a small text file describing this post next to the nzb.
 Some Usenet indexes ask for one.</source>
         <translation>Naast de nzb een klein tekstbestand schrijven dat deze post beschrijft.
 Sommige Usenet-indexen vragen erom.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="607"/>
+        <location filename="../hmi/PostingWidget.cpp" line="631"/>
         <source>Post information…</source>
         <translation>Postinformatie…</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="608"/>
+        <location filename="../hmi/PostingWidget.cpp" line="632"/>
         <source>Choose the model and fill in your own fields, for this post.</source>
         <translation>Het model kiezen en uw eigen velden invullen, voor deze post.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="639"/>
+        <location filename="../hmi/PostingWidget.cpp" line="663"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
-        <translation>De postinformatie noemt '%1' twee keer. Verwijder een van de twee regels.</translation>
+        <translation>De postinformatie noemt &apos;%1&apos; twee keer. Verwijder een van de twee regels.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="656"/>
+        <location filename="../hmi/PostingWidget.cpp" line="680"/>
         <source>Post info model saved as the default: %1</source>
         <translation>Model opgeslagen als standaard: %1</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="722"/>
+        <location filename="../hmi/PostingWidget.cpp" line="746"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation>beperk het aantal rar bestanden tot %1 (zie configuratie RAR_MAX)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="723"/>
+        <location filename="../hmi/PostingWidget.cpp" line="747"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>PAR2_ARGS gebruiken vanuit  het configuratiebestand:%1</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="725"/>
+        <location filename="../hmi/PostingWidget.cpp" line="749"/>
         <source>You can add files or folder by:</source>
         <translation>Je kunt bestanden of mappen toevoegen door:</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="726"/>
+        <location filename="../hmi/PostingWidget.cpp" line="750"/>
         <source>Drag &amp; Drop files/folders</source>
         <translation>Bestanden en mappen slepen en neerzetten</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="727"/>
+        <location filename="../hmi/PostingWidget.cpp" line="751"/>
         <source>Right Click to add Files</source>
         <translation>Klik met de rechtermuisknop om bestanden toe te voegen</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="728"/>
+        <location filename="../hmi/PostingWidget.cpp" line="752"/>
         <source>Click on Select Files/Folder buttons</source>
         <translation>Klik op de  Selecteer Bestanden / Mappen knop</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="729"/>
+        <location filename="../hmi/PostingWidget.cpp" line="753"/>
         <source>Bare in mind you can select items in the list and press DEL to remove them</source>
         <translation>Weet dat je items in de lijst kunt selecteren en op DEL kunt drukken om ze te verwijderen</translation>
     </message>
@@ -5790,7 +5815,7 @@ Sommige Usenet-indexen vragen erom.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="327"/>
         <source>VPN: config file missing for profile &apos;%1&apos; (%2)</source>
-        <translation>VPN: configuratiebestand ontbreekt voor profiel '%1' (%2)</translation>
+        <translation>VPN: configuratiebestand ontbreekt voor profiel &apos;%1&apos; (%2)</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="348"/>
@@ -5800,12 +5825,12 @@ Sommige Usenet-indexen vragen erom.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="350"/>
         <source>VPN: no credentials in keychain for &apos;%1&apos; (relying on .ovpn inline)</source>
-        <translation>VPN: geen inloggegevens in de sleutelring voor '%1' (er wordt op de .ovpn vertrouwd)</translation>
+        <translation>VPN: geen inloggegevens in de sleutelring voor &apos;%1&apos; (er wordt op de .ovpn vertrouwd)</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="357"/>
         <source>VPN: connecting profile &apos;%1&apos; (%2)…</source>
-        <translation>VPN: profiel '%1' wordt verbonden (%2)…</translation>
+        <translation>VPN: profiel &apos;%1&apos; wordt verbonden (%2)…</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="414"/>
@@ -5890,7 +5915,7 @@ Sommige Usenet-indexen vragen erom.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="818"/>
         <source>On Windows, uninstall OpenVPN Community / WireGuard for Windows from &quot;Add or Remove Programs&quot; if you want to fully remove VPN support.</source>
-        <translation>Verwijder op Windows OpenVPN Community / WireGuard for Windows via "Apps en onderdelen" als u de VPN-ondersteuning helemaal wilt weghalen.</translation>
+        <translation>Verwijder op Windows OpenVPN Community / WireGuard for Windows via &quot;Apps en onderdelen&quot; als u de VPN-ondersteuning helemaal wilt weghalen.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="836"/>
@@ -5935,12 +5960,12 @@ Sommige Usenet-indexen vragen erom.</translation>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1002"/>
         <source>Master switch (VPN_AUTO_CONNECT) is ON but no VPN helper is installed - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</source>
-        <translation>De hoofdschakelaar (VPN_AUTO_CONNECT) staat aan maar er is geen VPN-hulpprogramma geïnstalleerd - de hoofdschakelaar wordt genegeerd. Het 'VPN gebruiken' per server geldt nog steeds.</translation>
+        <translation>De hoofdschakelaar (VPN_AUTO_CONNECT) staat aan maar er is geen VPN-hulpprogramma geïnstalleerd - de hoofdschakelaar wordt genegeerd. Het &apos;VPN gebruiken&apos; per server geldt nog steeds.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1008"/>
         <source>Master switch (VPN_AUTO_CONNECT) is ON but the VPN is not correctly configured (%1) - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</source>
-        <translation>De hoofdschakelaar (VPN_AUTO_CONNECT) staat aan maar het VPN is niet goed ingesteld (%1) - de hoofdschakelaar wordt genegeerd. Het 'VPN gebruiken' per server geldt nog steeds.</translation>
+        <translation>De hoofdschakelaar (VPN_AUTO_CONNECT) staat aan maar het VPN is niet goed ingesteld (%1) - de hoofdschakelaar wordt genegeerd. Het &apos;VPN gebruiken&apos; per server geldt nog steeds.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1046"/>
@@ -5954,11 +5979,11 @@ Sommige Usenet-indexen vragen erom.</translation>
 The VPN is not correctly configured: %2
 
 Open the VPN options with the VPN button and check the VPN configuration, or edit the server configuration and disable VPN by clearing its Use VPN checkbox.</source>
-        <translation>'VPN gebruiken' staat aan voor NNTP-server(s): %1.
+        <translation>&apos;VPN gebruiken&apos; staat aan voor NNTP-server(s): %1.
 
 Het VPN is niet goed ingesteld: %2
 
-Open de VPN-opties met de VPN-knop en controleer de instellingen, of bewerk de serverconfiguratie en zet het VPN uit door het vinkje 'VPN gebruiken' weg te halen.</translation>
+Open de VPN-opties met de VPN-knop en controleer de instellingen, of bewerk de serverconfiguratie en zet het VPN uit door het vinkje &apos;VPN gebruiken&apos; weg te halen.</translation>
     </message>
     <message>
         <location filename="../vpn/VpnManager.cpp" line="1070"/>
@@ -6158,7 +6183,7 @@ Weigert u, dan wordt het profiel ZONDER inloggegevens opgeslagen. OpenVPN vraagt
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="231"/>
         <source>Another VPN profile is already named &apos;%1&apos;.</source>
-        <translation>Een ander VPN-profiel heet al '%1'.</translation>
+        <translation>Een ander VPN-profiel heet al &apos;%1&apos;.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnProfileEditDialog.cpp" line="240"/>
@@ -6296,7 +6321,7 @@ Weigert u, dan wordt het profiel ZONDER inloggegevens opgeslagen. OpenVPN vraagt
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="122"/>
         <source>When checked: every NNTP connection from ngPost is forced through the VPN tunnel, regardless of each server&apos;s &quot;Use VPN&quot; flag. The VPN auto-starts when a job begins and disconnects 30 s after the queue is empty. Use this if you want a single global switch instead of fiddling with the per-server column.&lt;br/&gt;&lt;br/&gt;When unchecked: only the servers whose &quot;Use VPN&quot; column is ticked route through the tunnel; the others connect directly.</source>
-        <translation>Aangevinkt: elke NNTP-verbinding van ngPost wordt door de VPN-tunnel gedwongen, ongeacht het 'VPN gebruiken' van elke server. Het VPN start vanzelf wanneer een taak begint en verbreekt 30 s nadat de wachtrij leeg is. Gebruik dit als u één globale schakelaar wilt in plaats van de kolom per server bij te houden.&lt;br/&gt;&lt;br/&gt;Niet aangevinkt: alleen de servers met een vinkje in de kolom 'VPN gebruiken' gaan door de tunnel; de rest verbindt rechtstreeks.</translation>
+        <translation>Aangevinkt: elke NNTP-verbinding van ngPost wordt door de VPN-tunnel gedwongen, ongeacht het &apos;VPN gebruiken&apos; van elke server. Het VPN start vanzelf wanneer een taak begint en verbreekt 30 s nadat de wachtrij leeg is. Gebruik dit als u één globale schakelaar wilt in plaats van de kolom per server bij te houden.&lt;br/&gt;&lt;br/&gt;Niet aangevinkt: alleen de servers met een vinkje in de kolom &apos;VPN gebruiken&apos; gaan door de tunnel; de rest verbindt rechtstreeks.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="132"/>
@@ -6326,7 +6351,7 @@ Weigert u, dan wordt het profiel ZONDER inloggegevens opgeslagen. OpenVPN vraagt
     <message>
         <location filename="../hmi/VpnSettingsDialog.ui" line="193"/>
         <source>&lt;a href=&quot;about:licences&quot;&gt;About licences&lt;/a&gt;</source>
-        <translation>&lt;a href="about:licences"&gt;Over de licenties&lt;/a&gt;</translation>
+        <translation>&lt;a href=&quot;about:licences&quot;&gt;Over de licenties&lt;/a&gt;</translation>
     </message>
     <message>
         <source>OpenVPN config (*.ovpn *.conf);;All files (*)</source>
@@ -6369,7 +6394,7 @@ Weigert u, dan wordt het profiel ZONDER inloggegevens opgeslagen. OpenVPN vraagt
         <source>Delete profile &apos;%1&apos;?
 
 Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain will be removed.</source>
-        <translation>Profiel '%1' verwijderen?
+        <translation>Profiel &apos;%1&apos; verwijderen?
 
 Zijn configuratiebestand onder &lt;configDir&gt;/vpn/ en zijn inloggegevens in de sleutelring worden verwijderd.</translation>
     </message>

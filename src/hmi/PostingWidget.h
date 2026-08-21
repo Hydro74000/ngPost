@@ -128,6 +128,7 @@ private slots: // for the HMI
     void onSelectFolderClicked();
     void onClearFilesClicked();
     void onCompressCB(bool checked);
+    void onPar2CB(bool checked);
     void onGenCompressName();
     void onCompressPathClicked();
     void onNzbFileClicked();

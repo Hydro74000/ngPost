@@ -36,6 +36,7 @@
 #include <QTableWidget>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <QFrame>
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QDir>
@@ -65,6 +66,7 @@ PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber) :
     connect(_ui->postButton, &QAbstractButton::clicked, this, &PostingWidget::onPostFiles);
     connect(_ui->nzbPassCB,  &QAbstractButton::toggled, this, &PostingWidget::onNzbPassToggled);
     connect(_ui->genPass,    &QAbstractButton::clicked, this, &PostingWidget::onGenNzbPassword);
+    connect(_ui->par2CB,     &QAbstractButton::toggled, this, &PostingWidget::onPar2CB);
 
     _ui->filesList->setSignature(QString("<pre>%1</pre>").arg(_ngPost->escapeXML(_ngPost->asciiArt())));
     connect(_ui->filesList, &SignedListWidget::rightClick, this, &PostingWidget::onSelectFilesClicked);
@@ -312,6 +314,22 @@ void PostingWidget::onCompressCB(bool checked)
     _ui->nameLengthSB->setEnabled(checked);
     _ui->genCompressName->setEnabled(checked);
     _ui->keepRarCB->setEnabled(checked);
+    // The volume size only means something when ngPost is the one making the
+    // archive. It used to sit on another row, far from this box, and stayed
+    // active with nothing to act on.
+    _ui->rarSizeLbl->setEnabled(checked);
+    _ui->rarSizeEdit->setEnabled(checked);
+    _ui->rarMaxCB->setEnabled(checked);
+    // The password is deliberately NOT greyed here: posting archives you
+    // encrypted yourself, and announcing their password in the nzb, is a
+    // legitimate use that does not need ngPost to compress anything.
+}
+
+void PostingWidget::onPar2CB(bool checked)
+{
+    // Same rule: the redundancy percentage used to live on a row of its own,
+    // enabled even with PAR2 off.
+    _ui->redundancySB->setEnabled(checked);
 }
 
 void PostingWidget::onGenCompressName()
@@ -458,7 +476,10 @@ void PostingWidget::init()
 
     _ui->redundancySB->setRange(0, 100);
     _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
-    _ui->redundancySB->setEnabled(true);
+    // The suffix travels inside the spin box, so the number stops being an
+    // unlabelled one without costing a widget and its layout spacing.
+    _ui->redundancySB->setSuffix(QStringLiteral(" %"));
+    _ui->redundancySB->setEnabled(_ui->par2CB->isChecked());
 
     if (!_ngPost->_rarPassFixed.isEmpty())
     {
@@ -573,27 +594,30 @@ void PostingWidget::udatePostingParams()
 
 void PostingWidget::_buildPostInfoRow()
 {
-    QHBoxLayout *row = new QHBoxLayout();
-    row->setContentsMargins(6, 0, 6, 0);
-
     _postInfoCB = new QCheckBox(this);
     _postInfoCB->setObjectName(QStringLiteral("postInfoCB"));
     // On by default when a model is configured: the user asked for sheets once,
     // in the configuration, and should not have to ask again for every post.
     _postInfoCB->setChecked(!_ngPost->postInfoTemplatePath().isEmpty());
-    row->addWidget(_postInfoCB);
 
     _postInfoButton = new QPushButton(this);
     _postInfoButton->setObjectName(QStringLiteral("postInfoButton"));
     _postInfoButton->setEnabled(_postInfoCB->isChecked());
-    row->addWidget(_postInfoButton);
-    row->addStretch();
 
     connect(_postInfoCB, &QCheckBox::toggled, this, &PostingWidget::onPostInfoToggled);
     connect(_postInfoButton, &QAbstractButton::clicked, this, &PostingWidget::onEditPostInfo);
 
-    // just above the post button, and robust to future edits of the .ui
-    _ui->verticalLayout->insertLayout(_ui->verticalLayout->count() - 1, row);
+    // The sheet is one of the things this post produces, like the nzb and the
+    // copied nfo, so it belongs on that line rather than on a row of its own
+    // under everything else.
+    QFrame *sep = new QFrame(this);
+    sep->setFrameShape(QFrame::VLine);
+    sep->setFrameShadow(QFrame::Sunken);
+    _ui->horizontalLayout_9->addWidget(sep);
+    _ui->horizontalLayout_9->addWidget(_postInfoCB);
+    _ui->horizontalLayout_9->addWidget(_postInfoButton);
+    _ui->horizontalLayout_9->addStretch();
+
     retranslatePostInfoTexts();
 }
 
