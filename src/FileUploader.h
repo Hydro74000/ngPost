@@ -43,6 +43,12 @@ public:
 
     void startUpload(const QUrl &serverUrl);
 
+    //! Gives up any transfer in flight and closes the nzb, synchronously.
+    //! deleteLater() alone is not enough before running a post command: the
+    //! file stays open until the event loop deletes us, and on Windows a hook
+    //! that moves the nzb would fail.
+    void release();
+
 signals:
     void readyToDie();
     void error(const QString &msg);

@@ -8,6 +8,7 @@
 #ifndef NGPOST_H
 #define NGPOST_H
 #include "PostingJobOptions.h"
+#include "history/PostHistoryStore.h"
 #include "utils/CmdOrGuiApp.h"
 #include "utils/Macros.h"
 
@@ -371,6 +372,9 @@ private:
     int _nzbUploadTimeoutSec;    //!< keeps a stalled upload from blocking the exit
     PostCmdRunner *_postCmdRunner;
     bool _waitingForPostCmds;    //!< so the wait is announced only once
+    //! Exit code a fatal error asked for, < 0 when none. The post commands of
+    //! posts that already succeeded still get to finish first.
+    int _pendingExitCode;
     bool _preparePacking;
 
     GROUP_POLICY _groupPolicy;
@@ -550,6 +554,14 @@ public:
     //! the posts, the post commands and the nzb uploads.
     void maybeFinishApplication();
 
+    //! True when something will actually read the description of a post: a
+    //! post info file, a post command, or an upload. Consolidating it costs a
+    //! database read, which nobody should pay for when unused.
+    bool needsPostInfoData() const
+    {
+        return !_postInfoTemplate.isEmpty() || !_nzbPostCmd.isEmpty() || _urlNzbUpload != nullptr;
+    }
+
     //! Splits a "key=value" metadata pair on the FIRST '=' only, so a value can
     //! itself hold '=' signs (URLs usually do). Returns false when there is no
     //! separator or no name.
@@ -639,6 +651,8 @@ private:
     void _setNzbUploadUrl(const QString &url, QString &error);
     void _setPostHistoryFile(const QString &path, QString &error);
     void _ensurePostHistoryHeader();
+    static QStringList _exportProtectedPaths(const PostHistoryStore::PostInfoRecord &record,
+                                             const QString &templatePath);
 
     //! Snapshot of the current global settings, frozen into a new job so that a
     //! queued post is sent with the settings it was queued with. Callers still
@@ -646,6 +660,7 @@ private:
     PostingJobOptions _baseJobOptions() const;
 
     void _startShutdown();
+    void _requestExit(ERROR_CODE code);
 
     //! True when the command line asks for a history command rather than a
     //! post: it both dispatches and tells that no input file is needed.

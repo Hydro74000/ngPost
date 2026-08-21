@@ -142,7 +142,11 @@ public:
                       qint64 activeSeconds,
                       QString *error)
     {
-        flushArticleEventsBlocking(error);
+        // The pending article events decide the counters this very call
+        // recomputes; losing them silently would finalise a post on stale
+        // numbers.
+        if (!flushArticleEventsBlocking(error))
+            return false;
         return _store.finalizePost(postId, status, avgSpeed, activeSeconds, error);
     }
 

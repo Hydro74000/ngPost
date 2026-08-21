@@ -168,6 +168,18 @@ PostingJobOptions ResumePlanner::jobOptions(PostingJobOptions base,
     base.resumeHistoryPostId    = details.post.id;
     base.resumeFileStatesByPath = plan.statesByPath;
 
+    // The sources of this attempt, so a generated file cannot overwrite one of
+    // them: the original input paths were never recorded.
+    base.inputPaths.clear();
+    for (QFileInfo const &file : plan.files)
+        base.inputPaths << file.absoluteFilePath();
+
+    // Whatever the current run was configured with belongs to another context.
+    // The metadata of the post live in the history and are read from there when
+    // it is described; the password comes from the post itself, above.
+    base.meta.clear();
+    base.declaredPassword.clear();
+
     // facts about what the original post did, to describe it later
     base.originalDidCompress = details.doCompress;
     base.originalDidPar2     = details.doPar2;

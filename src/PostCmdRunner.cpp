@@ -15,9 +15,48 @@
 namespace
 {
 //! Head and tail of a chatty command, so a script looping on stderr cannot
-//! flood the log panel.
+//! flood the log panel, nor grow in memory without bound.
 constexpr int kMaxOutputBytes = 4096;
+constexpr int kHalfOutput     = kMaxOutputBytes / 2;
 } // namespace
+
+void PostCmdRunner::BoundedOutput::clear()
+{
+    head.clear();
+    tail.clear();
+    total = 0;
+}
+
+void PostCmdRunner::BoundedOutput::append(QByteArray const &chunk)
+{
+    total += chunk.size();
+
+    qsizetype consumed = 0;
+    if (head.size() < kHalfOutput) {
+        consumed = qMin<qsizetype>(chunk.size(), kHalfOutput - head.size());
+        head.append(chunk.left(consumed));
+    }
+    if (consumed < chunk.size()) {
+        tail.append(chunk.mid(consumed));
+        if (tail.size() > kHalfOutput)
+            tail = tail.right(kHalfOutput); // only the end of a long stream matters
+    }
+}
+
+QString PostCmdRunner::BoundedOutput::toString() const
+{
+    QString const headText = QString::fromLocal8Bit(head);
+    if (tail.isEmpty())
+        return headText.trimmed();
+
+    const qint64 omitted = total - head.size() - tail.size();
+    QString text = headText;
+    if (omitted > 0)
+        text += QCoreApplication::translate("PostCmdRunner", "\n[... %1 bytes omitted ...]\n")
+                    .arg(omitted);
+    text += QString::fromLocal8Bit(tail);
+    return text.trimmed();
+}
 
 PostCmdRunner::PostCmdRunner(QNetworkAccessManager &netMgr, QObject *parent)
     : QObject(parent), _netMgr(netMgr)
@@ -72,6 +111,7 @@ void PostCmdRunner::cancelAll()
     }
     if (_uploader) {
         _uploader->disconnect(this);
+        _uploader->release();
         _uploader->deleteLater();
         _uploader = nullptr;
     }
@@ -134,6 +174,11 @@ void PostCmdRunner::_finishUpload(QString const &errorMsg)
     _timer->stop();
     if (_uploader) {
         _uploader->disconnect(this);
+        // Closed here and not by the destructor: deleteLater() only frees it on
+        // the next event loop turn, and the next command may well be the one
+        // that moves the nzb. Deleting it outright is not an option, we may be
+        // standing in one of its own slots.
+        _uploader->release();
         _uploader->deleteLater();
         _uploader = nullptr;
     }
@@ -177,6 +222,12 @@ void PostCmdRunner::_runNextCommand()
     _process->setProcessEnvironment(env);
     _process->setProcessChannelMode(QProcess::SeparateChannels);
 
+    _stdout.clear();
+    _stderr.clear();
+    // Drained as it comes, not at the end: a hook printing in a loop would
+    // otherwise fill the pipe buffers until something gives.
+    connect(_process, &QProcess::readyReadStandardOutput, this, &PostCmdRunner::onReadyReadStdOut);
+    connect(_process, &QProcess::readyReadStandardError, this, &PostCmdRunner::onReadyReadStdErr);
     connect(_process, &QProcess::errorOccurred, this, &PostCmdRunner::onProcessError);
     connect(_process,
             QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
@@ -190,6 +241,18 @@ void PostCmdRunner::_runNextCommand()
 
     if (_settings.cmdTimeoutSec > 0)
         _timer->start(_settings.cmdTimeoutSec * 1000);
+}
+
+void PostCmdRunner::onReadyReadStdOut()
+{
+    if (_process)
+        _stdout.append(_process->readAllStandardOutput());
+}
+
+void PostCmdRunner::onReadyReadStdErr()
+{
+    if (_process)
+        _stderr.append(_process->readAllStandardError());
 }
 
 void PostCmdRunner::onProcessError()
@@ -214,8 +277,10 @@ void PostCmdRunner::onProcessFinished(int exitCode, int exitStatus)
         return;
 
     _timer->stop();
-    QString const err = _tail(_process->readAllStandardError());
-    QString const out = _tail(_process->readAllStandardOutput());
+    _stdout.append(_process->readAllStandardOutput()); // whatever is left
+    _stderr.append(_process->readAllStandardError());
+    QString const err = _stderr.toString();
+    QString const out = _stdout.toString();
     _process->disconnect(this);
     _process->deleteLater();
     _process = nullptr;
@@ -292,12 +357,3 @@ QString PostCmdRunner::_redact(QString const &text) const
     return PostInfoTemplate::redactSecrets(text, _current.data);
 }
 
-QString PostCmdRunner::_tail(QByteArray const &output) const
-{
-    if (output.size() <= kMaxOutputBytes)
-        return QString::fromLocal8Bit(output).trimmed();
-
-    QString const head = QString::fromLocal8Bit(output.left(kMaxOutputBytes / 2));
-    QString const tail = QString::fromLocal8Bit(output.right(kMaxOutputBytes / 2));
-    return head + tr("\n[... %1 bytes omitted ...]\n").arg(output.size() - kMaxOutputBytes) + tail;
-}

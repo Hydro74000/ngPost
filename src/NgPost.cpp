@@ -393,7 +393,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _postInfoOutput(NgPost::sDefaultPostInfoOutput), _postInfoOnlySuccess(true),
     _postCmdTimeoutSec(0), _postCmdFailIsError(false), _postCmdExposePassword(false),
     _nzbUploadTimeoutSec(sDefaultNzbUploadTimeoutSec), _postCmdRunner(nullptr),
-    _waitingForPostCmds(false),
+    _waitingForPostCmds(false), _pendingExitCode(-1),
     _preparePacking(false),
     _groupPolicy(GROUP_POLICY::ALL),
     _nzbCheck(nullptr), _quiet(false),
@@ -540,7 +540,7 @@ NgPost::NgPost(int &argc, char *argv[]):
                 _pendingJobs.dequeue()->deleteLater();
             _error(tr("VPN could not be established — aborting pending jobs"),
                    ERROR_CODE::ERR_WRONG_ARG);
-            QCoreApplication::exit(static_cast<int>(ERROR_CODE::ERR_WRONG_ARG));
+            _requestExit(ERROR_CODE::ERR_WRONG_ARG);
         }
     });
     // Blocked admission also needs CLI handling: the GUI shows a popup, but
@@ -551,7 +551,7 @@ NgPost::NgPost(int &argc, char *argv[]):
         if (useHMI()) return;
         _error(tr("VPN required but unavailable: %1").arg(detail),
                ERROR_CODE::ERR_WRONG_ARG);
-        QCoreApplication::exit(static_cast<int>(ERROR_CODE::ERR_WRONG_ARG));
+        _requestExit(ERROR_CODE::ERR_WRONG_ARG);
     });
 
     _loadTanslators();
@@ -1163,6 +1163,17 @@ bool NgPost::regenerateNzbGui(qint64 postId, const QString &outPath, bool includ
     return _regenerateNzbFromHistory(postId, outPath, includePassword);
 }
 
+//! What an exported record sheet must never overwrite: the model it is made
+//! from, the nzb of that post, and the source it was made of.
+QStringList NgPost::_exportProtectedPaths(const PostHistoryStore::PostInfoRecord &record,
+                                          const QString &templatePath)
+{
+    QStringList paths{ templatePath, record.nzbPath, record.info.sourcePath };
+    paths.removeAll(QString());
+    paths.removeDuplicates();
+    return paths;
+}
+
 //! Shared by the GUI and the command line. \a outPath empty means stdout, so
 //! only the record sheet goes there: everything else is a diagnostic and
 //! belongs on stderr.
@@ -1213,7 +1224,10 @@ bool NgPost::_exportPostInfo(qint64 postId,
     }
 
     const PostInfoTemplate::Result result =
-        PostInfoTemplate::renderToFile(templatePath, outPath, data, QStringList());
+        PostInfoTemplate::renderToFile(templatePath,
+                                       outPath,
+                                       data,
+                                       _exportProtectedPaths(record, templatePath));
     for (const QString &warning : result.warnings)
         _cerr << tr("Warning: %1").arg(warning) << "\n" << MB_FLUSH;
     if (!result.ok) {
@@ -1249,7 +1263,10 @@ bool NgPost::exportPostInfoGui(qint64 postId,
         *incomplete = data.partial;
 
     const PostInfoTemplate::Result result =
-        PostInfoTemplate::renderToFile(templatePath, outPath, data, QStringList());
+        PostInfoTemplate::renderToFile(templatePath,
+                                       outPath,
+                                       data,
+                                       _exportProtectedPaths(record, templatePath));
     if (!result.ok && error)
         *error = result.error;
     else if (error && !result.warnings.isEmpty())
@@ -1501,8 +1518,29 @@ void NgPost::doNzbPostCMD(PostingJob *job)
 //! The only place allowed to end the run. It waits for the posts, for the
 //! commands that follow them and for the nzb uploads, because quitting or
 //! powering off in the middle of those used to kill them silently.
+//! A fatal error asked us to stop. Only one thing may still delay it: post
+//! commands of posts that already went out. Killing those would throw away
+//! work that succeeded, just because a later job could not start.
+void NgPost::_requestExit(ERROR_CODE code)
+{
+    _pendingExitCode = static_cast<int>(code);
+    maybeFinishApplication();
+}
+
 void NgPost::maybeFinishApplication()
 {
+    if (_pendingExitCode >= 0) {
+        if (_postCmdRunner && !_postCmdRunner->isIdle()) {
+            if (!_waitingForPostCmds) {
+                _waitingForPostCmds = true;
+                _log(tr("Waiting for the post commands to finish before exiting..."));
+            }
+            return;
+        }
+        QCoreApplication::exit(_pendingExitCode);
+        return;
+    }
+
     if (_activeJob || !_pendingJobs.isEmpty())
         return;
     if (_postCmdRunner && !_postCmdRunner->isIdle()) {

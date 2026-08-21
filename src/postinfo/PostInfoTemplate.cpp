@@ -65,15 +65,38 @@ QString formatDate(QDateTime const &dt, QString const &format)
     return dt.toString(format.isEmpty() ? QString::fromLatin1(kDefaultDateFormat) : format);
 }
 
+//! Resolves symlinks when the path exists, so that protecting a source also
+//! protects the link that points at it, and vice versa.
+QString resolvedPath(QString const &path)
+{
+    QFileInfo const fi(path);
+    QString const canonical = fi.canonicalFilePath();
+    if (!canonical.isEmpty())
+        return canonical;
+    // Nothing there (yet): the destination of a file about to be written is the
+    // usual case. Resolve the parent, which normally does exist.
+    QString const parent = fi.absoluteDir().canonicalPath();
+    if (parent.isEmpty())
+        return QDir::cleanPath(fi.absoluteFilePath());
+    return QDir::cleanPath(parent + QLatin1Char('/') + fi.fileName());
+}
+
 //! True when \a path is \a other or lives below it. Used so that a source
 //! folder protects every file it contains, not just its own path.
 bool isSameOrBelow(QString const &path, QString const &other)
 {
-    QString const a = QDir::cleanPath(path);
-    QString const b = QDir::cleanPath(other);
-    if (a.compare(b, Qt::CaseSensitive) == 0)
+    // Windows and macOS do not distinguish Backup.tar from backup.TAR, and
+    // treating them as different files here would defeat the protection.
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+    const Qt::CaseSensitivity cs = Qt::CaseInsensitive;
+#else
+    const Qt::CaseSensitivity cs = Qt::CaseSensitive;
+#endif
+    QString const a = resolvedPath(path);
+    QString const b = resolvedPath(other);
+    if (a.compare(b, cs) == 0)
         return true;
-    return a.startsWith(b + QLatin1Char('/'));
+    return a.startsWith(b + QLatin1Char('/'), cs);
 }
 
 } // namespace

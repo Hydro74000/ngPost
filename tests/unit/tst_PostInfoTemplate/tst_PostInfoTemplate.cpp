@@ -67,6 +67,10 @@ private slots:
     //! and a source folder protects everything below it.
     void refuses_to_overwrite_protected_paths();
 
+    //! The protection follows symlinks, so writing "through" a link to a
+    //! source is refused as well.
+    void protection_resolves_symlinks();
+
     //! A post info file holding the archive password is owner only (Unix).
     void permissions_are_restricted_when_a_secret_is_written();
 
@@ -368,6 +372,34 @@ void TestPostInfoTemplate::refuses_to_overwrite_protected_paths()
     QVERIFY(!PostInfoTemplate::renderToFile(tmplPath, sourceDir + "/season/ep.mkv", d, guards).ok);
     // and something outside is still fine
     QVERIFY(PostInfoTemplate::renderToFile(tmplPath, dir.filePath("ok.txt"), d, guards).ok);
+}
+
+void TestPostInfoTemplate::protection_resolves_symlinks()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("symlinks need a unix filesystem here");
+#else
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    QString const tmplPath = dir.filePath("sheet.tpl");
+    QVERIFY(writeFile(tmplPath, QStringLiteral("x\n")));
+
+    // a source, and a symlink pointing at it
+    QString const source = dir.filePath("source.bin");
+    QVERIFY(writeFile(source, QStringLiteral("precious\n")));
+    QString const link = dir.filePath("link-to-source.bin");
+    QVERIFY(QFile::link(source, link));
+
+    PostInfoData d = sampleData();
+
+    // protecting the real file must also refuse writing through the link
+    QVERIFY(!PostInfoTemplate::renderToFile(tmplPath, link, d, { source }).ok);
+    // and protecting the link must refuse writing on the real file
+    QVERIFY(!PostInfoTemplate::renderToFile(tmplPath, source, d, { link }).ok);
+
+    QCOMPARE(readFile(source), QStringLiteral("precious\n"));
+#endif
 }
 
 void TestPostInfoTemplate::permissions_are_restricted_when_a_secret_is_written()

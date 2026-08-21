@@ -64,6 +64,8 @@ signals:
 
 private slots:
     void onUploadDone();
+    void onReadyReadStdOut();
+    void onReadyReadStdErr();
     void onProcessFinished(int exitCode, int exitStatus);
     void onProcessError();
     void onTimeout();
@@ -83,9 +85,22 @@ private:
     void _runNextCommand();
     void _finishTask();
     void _reportFailure(QString const &msg);
+
+    //! Head and tail of a stream, bounded whatever the command decides to
+    //! print. Reading only at the end would let a chatty hook grow the pipe
+    //! buffers until memory runs out.
+    struct BoundedOutput
+    {
+        QByteArray head;
+        QByteArray tail;
+        qint64     total = 0;
+
+        void    clear();
+        void    append(QByteArray const &chunk);
+        QString toString() const;
+    };
     QString _writeJsonFile(PostInfoData const &data) const;
     QString _redact(QString const &text) const;
-    QString _tail(QByteArray const &output) const;
 
     QNetworkAccessManager &_netMgr;
     Settings               _settings;
@@ -99,6 +114,8 @@ private:
     QProcess     *_process  = nullptr;
     QTimer       *_timer    = nullptr;
     QString       _runningCmd;
+    BoundedOutput _stdout;
+    BoundedOutput _stderr;
     bool          _canceled = false;
 };
 

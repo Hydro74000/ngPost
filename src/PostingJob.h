@@ -161,6 +161,8 @@ private:
 
     QString _nfoSrcToCopy; //!< absolute path of the .nfo to copy next to the nzb (resolved at job start, copied on success)
     QString _postInfoFilePath; //!< post info file once written, empty otherwise
+    PostInfoData _finalPostInfoData; //!< consolidated description, cached
+    bool _finalPostInfoDataReady = false;
 
     QMutex _secureDiskAccess;
 
@@ -235,8 +237,10 @@ public:
     inline const QMap<QString, MetaValue> &postMeta() const;
     inline qint64 historyPostId() const;
 
-    //! Description of this post, for a post info file or a post command. The
-    //! history refines it when available, see _writePostInfoFile().
+    //! Description of this post, for a post info file or a post command. Once
+    //! _buildFinalPostInfoData() has run, this is the consolidated view: for a
+    //! resume the live job only knows the leftovers, so both the sheet and the
+    //! hooks must read the same finalised description.
     PostInfoData postInfoData() const;
     inline const QDateTime &startedAtWall() const;
     inline const QDateTime &finishedAtWall() const;
@@ -331,9 +335,17 @@ private slots:
 private:
     void _log(const QString &aMsg, bool newline = true) const; //!< log function for QString
     void _error(const QString &error) const;
+    //! What this job alone knows, before the history consolidates it.
+    PostInfoData _livePostInfoData() const;
+    //! Merges the history into the live view and caches the result, so the
+    //! sheet and the post commands describe the same thing. Returns false when
+    //! the post cannot be described at all (a resume whose history is
+    //! unreadable).
+    bool _buildFinalPostInfoData();
     //! Writes the post info file if one was asked for. Never fails a post:
     //! every problem is reported as a warning.
     void _writePostInfoFile();
+    QStringList _protectedPaths() const;
 
     //! Visible in the log, but does NOT mark the run as failed. _error() sets
     //! COMPLETED_WITH_ERRORS, which would be wrong for something that did not
@@ -353,7 +365,10 @@ private:
 
     inline NntpFile *_getNextFile();
 
-    void _initPosting();
+    //! Builds the upload queue. Returns false when the job must not start at
+    //! all, which a resume does when one of its sources no longer matches.
+    bool _initPosting();
+    void _markResumeAbortedAsResumable();
     void _postFiles();
     void _finishPosting();
 

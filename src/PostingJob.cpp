@@ -743,7 +743,10 @@ void PostingJob::_postFiles()
         emit archiveFileNames(archiveNames);
     }
 
-    _initPosting();
+    if (!_initPosting()) {
+        emit postingFinished();
+        return;
+    }
 
     if (_nbThreads > QThread::idealThreadCount())
         _nbThreads = QThread::idealThreadCount();
@@ -1179,7 +1182,7 @@ NntpArticle *PostingJob::_readNextArticleIntoBufferPtr(const QString &threadName
                                          bufferPtr); // if we didn't have an Article, check next file
 }
 
-void PostingJob::_initPosting()
+bool PostingJob::_initPosting()
 {
     // initialize buffer and nzb file
     if (!_overwriteNzb) {
@@ -1204,19 +1207,25 @@ void PostingJob::_initPosting()
     // so the sources are checked again here, right before being read. Posting
     // the remaining parts of a file that changed meanwhile would produce an nzb
     // nobody can reassemble.
+    //
+    // One bad source aborts the WHOLE resume. Merely leaving it out would let
+    // the other files finish, and a post missing a file would then be recorded
+    // as a success. The post stays resumable: put the source back as it was and
+    // run the resume again.
     if (_resumeFromHistory) {
-        QFileInfoList stillValid;
-        stillValid.reserve(_files.size());
+        QStringList changed;
         for (QFileInfo const &file : _files) {
             const QString path = file.absoluteFilePath();
-            if (_resumeFileStatesByPath.value(path).matches(QFileInfo(path)))
-                stillValid << file;
-            else
-                _error(tr("Resume: %1 changed or disappeared since the post was interrupted, "
-                          "it is left out")
-                           .arg(path));
+            if (!_resumeFileStatesByPath.value(path).matches(QFileInfo(path)))
+                changed << path;
         }
-        _files = stillValid;
+        if (!changed.isEmpty()) {
+            _error(tr("Resume aborted: %1 changed or disappeared since the post was "
+                      "interrupted. Nothing was posted; restore the file and resume again.")
+                       .arg(changed.join(QStringLiteral(", "))));
+            _markResumeAbortedAsResumable();
+            return false;
+        }
     }
 
     _nbFiles = static_cast<uint>(_files.size());
@@ -1238,11 +1247,21 @@ void PostingJob::_initPosting()
         QString err;
         // The nzb may just have been renamed to <name>_1.nzb, after the history
         // row was created with the original path.
-        if (_nzbFilePath != _options.nzbFilePath)
-            history->updatePostNzbPath(_historyPostId, _nzbFilePath, &err);
-        // Only the first attempt knows the size of the whole post: a resume
-        // only sees the leftovers, so this write is a no-op there.
-        history->setPostSizeIfUnset(_historyPostId, static_cast<qint64>(_postSizeBytes), &err);
+        if (_nzbFilePath != _options.nzbFilePath
+            && !history->updatePostNzbPath(_historyPostId, _nzbFilePath, &err))
+            _warn(tr("History: could not update the nzb path of post %1: %2")
+                      .arg(_historyPostId)
+                      .arg(err));
+        // Only the first attempt knows the size of the whole post. A resume
+        // sees the leftovers only, and would record them as the whole size if
+        // the first attempt never got to write it.
+        if (!_resumeFromHistory
+            && !history->setPostSizeIfUnset(_historyPostId,
+                                            static_cast<qint64>(_postSizeBytes),
+                                            &err))
+            _warn(tr("History: could not record the size of post %1: %2")
+                      .arg(_historyPostId)
+                      .arg(err));
     }
 
     // initialize the NntpFiles (active objects)
@@ -1302,6 +1321,25 @@ void PostingJob::_initPosting()
         _nbArticlesTotal += nntpFile->nbArticles();
     }
     emit articlesNumber(_nbArticlesTotal);
+    return true;
+}
+
+//! A resume that we refuse to start must not stay flagged as running: put the
+//! post back where it was so the user can retry once the source is restored.
+void PostingJob::_markResumeAbortedAsResumable()
+{
+    if (!_historyPostId || !_ngPost->historyService())
+        return;
+    QString err;
+    if (!_ngPost->historyService()->updatePostStatus(_historyPostId,
+                                                     QStringLiteral("partial"),
+                                                     0, 0, 0, 0,
+                                                     QString(),
+                                                     &err)
+        && _ngPost->debugMode())
+        _error(tr("History: could not flag post %1 as resumable again: %2")
+                   .arg(_historyPostId)
+                   .arg(err));
 }
 
 void PostingJob::_finishPosting()
@@ -1362,8 +1400,17 @@ void PostingJob::_finishPosting()
         // One transaction: a crash in between must not leave a finished post
         // whose duration was never recorded.
         QString err;
-        _ngPost->historyService()->finalizePost(_historyPostId, status, avgSpeed(), activeSeconds,
-                                                &err);
+        if (!_ngPost->historyService()->finalizePost(_historyPostId,
+                                                     status,
+                                                     avgSpeed(),
+                                                     activeSeconds,
+                                                     &err)) {
+            // The post itself went out; say so rather than fail the run, but
+            // say it: the history is what resume and the record sheets read.
+            _warn(tr("History: could not record the outcome of post %1: %2")
+                      .arg(_historyPostId)
+                      .arg(err));
+        }
     }
 
     // 2.: close nzb file
@@ -1427,6 +1474,11 @@ void PostingJob::_closeNzb()
                 for (const QString &warning : warnings)
                     _error(tr("NZB history warning: %1").arg(warning));
             }
+            // Consolidated once, then used by both the post info file and the
+            // post commands: they must describe the same post, and for a
+            // resume that means the whole post, not the leftovers.
+            if (_ngPost->needsPostInfoData())
+                _buildFinalPostInfoData();
             // Written before the post commands so a script can pick it up with
             // __postInfoPath__, and only when an nzb exists: a post info file
             // without its nzb would describe nothing.
@@ -1439,6 +1491,18 @@ void PostingJob::_closeNzb()
 }
 
 PostInfoData PostingJob::postInfoData() const
+{
+    // Once consolidated, that is the truth for everyone: the sheet, the post
+    // commands and the json they receive.
+    if (_finalPostInfoDataReady) {
+        PostInfoData data = _finalPostInfoData;
+        data.postInfoPath = _postInfoFilePath; // written after the merge
+        return data;
+    }
+    return _livePostInfoData();
+}
+
+PostInfoData PostingJob::_livePostInfoData() const
 {
     PostInfoData data;
     data.originalPath = _originalDirectory;
@@ -1487,6 +1551,57 @@ PostInfoData PostingJob::postInfoData() const
     return data;
 }
 
+//! Merges what the history knows into what this job knows, once, and caches
+//! it. For a resume the live job only holds the leftovers: size, counters and
+//! dates would describe the retry rather than the post.
+bool PostingJob::_buildFinalPostInfoData()
+{
+    if (_finalPostInfoDataReady)
+        return true;
+
+    PostInfoData data = _livePostInfoData();
+
+    // The history holds the consolidated counters and, for a resume, the only
+    // view of the whole post. The live job stays authoritative for the final
+    // nzb path and for a password that HISTORY_STORE_PASSWORDS chose not to
+    // keep.
+    if (_historyPostId && _ngPost->historyService()) {
+        PostHistoryStore::PostInfoRecord record;
+        QString err;
+        if (_ngPost->historyService()->loadPostInfoRecord(_historyPostId, &record, &err)) {
+            PostInfoData fromHistory    = record.toPostInfoData();
+            fromHistory.nzbPath         = data.nzbPath;
+            fromHistory.nzbDir          = data.nzbDir;
+            fromHistory.nzbName         = data.nzbName;
+            fromHistory.nzbFileName     = data.nzbFileName;
+            fromHistory.originalPath    = data.originalPath;
+            fromHistory.legacySizeBytes = data.legacySizeBytes;
+            fromHistory.inputPaths      = data.inputPaths;
+            if (fromHistory.rarPass.isEmpty())
+                fromHistory.rarPass = data.rarPass;
+            if (fromHistory.meta.isEmpty())
+                fromHistory.meta = data.meta;
+            data = fromHistory;
+        } else if (_resumeFromHistory) {
+            // A resumed job only holds the leftovers: describing them as if
+            // they were the whole post would be a lie.
+            _warn(tr("Post info: could not read the history of post %1 (%2); a resumed post "
+                     "cannot be described without it.")
+                      .arg(_historyPostId)
+                      .arg(err));
+            return false;
+        } else {
+            _warn(tr("Post info: could not read the history (%1); falling back on what this "
+                     "post knows.")
+                      .arg(err));
+        }
+    }
+
+    _finalPostInfoData      = data;
+    _finalPostInfoDataReady = true;
+    return true;
+}
+
 void PostingJob::_writePostInfoFile()
 {
     if (_ngPost->_postInfoTemplate.isEmpty())
@@ -1499,52 +1614,17 @@ void PostingJob::_writePostInfoFile()
         return;
     }
 
-    PostInfoData data = postInfoData();
-
-    // The history holds the consolidated counters, and for a resume it is the
-    // only place that knows the whole post rather than the leftovers. The live
-    // job stays authoritative for the final nzb path and for a password that
-    // HISTORY_STORE_PASSWORDS chose not to keep.
-    if (_historyPostId && _ngPost->historyService()) {
-        PostHistoryStore::PostInfoRecord record;
-        QString err;
-        if (_ngPost->historyService()->loadPostInfoRecord(_historyPostId, &record, &err)) {
-            PostInfoData fromHistory = record.toPostInfoData();
-            fromHistory.nzbPath      = data.nzbPath;
-            fromHistory.nzbDir       = data.nzbDir;
-            fromHistory.nzbName      = data.nzbName;
-            fromHistory.nzbFileName  = data.nzbFileName;
-            fromHistory.originalPath = data.originalPath;
-            fromHistory.legacySizeBytes = data.legacySizeBytes;
-            fromHistory.inputPaths      = data.inputPaths;
-            if (fromHistory.rarPass.isEmpty())
-                fromHistory.rarPass = data.rarPass;
-            if (fromHistory.meta.isEmpty())
-                fromHistory.meta = data.meta;
-            data = fromHistory;
-        } else if (_resumeFromHistory) {
-            // A resumed job only holds the leftovers: describing them as if
-            // they were the whole post would be a lie, so write nothing.
-            _warn(tr("Post info: could not read the history of post %1 (%2); no post info file "
-                     "was written, because a resumed post cannot be described without it.")
-                      .arg(_historyPostId)
-                      .arg(err));
-            return;
-        } else {
-            _warn(tr("Post info: could not read the history (%1); falling back on what this "
-                     "post knows.")
-                      .arg(err));
-        }
+    if (!_finalPostInfoDataReady) {
+        _warn(tr("Post info: no post info file was written, the post could not be described."));
+        return;
     }
 
-    QStringList protectedPaths = _options.inputPaths;
-    protectedPaths << _nzbFilePath;
-
+    QStringList protectedPaths = _protectedPaths();
     const QString templatePath = _ngPost->postInfoTemplatePath();
     protectedPaths << templatePath;
 
     const PostInfoTemplate::Result result = PostInfoTemplate::renderToFile(
-        templatePath, _ngPost->_postInfoOutput, data, protectedPaths);
+        templatePath, _ngPost->_postInfoOutput, _finalPostInfoData, protectedPaths);
 
     for (const QString &warning : result.warnings)
         _warn(tr("Post info: %1").arg(warning));
@@ -1556,6 +1636,22 @@ void PostingJob::_writePostInfoFile()
 
     _postInfoFilePath = result.outPath;
     _log(tr("Post info file written: %1").arg(result.outPath));
+}
+
+//! Everything a generated file must never overwrite: the nzb, and every source
+//! of the post. For a resume the sources come from the resume plan, since the
+//! original input paths were not recorded.
+QStringList PostingJob::_protectedPaths() const
+{
+    QStringList paths = _options.inputPaths;
+    if (_resumeFromHistory) {
+        for (auto it = _resumeFileStatesByPath.cbegin(); it != _resumeFileStatesByPath.cend(); ++it)
+            paths << it.key();
+    }
+    paths << _nzbFilePath;
+    paths.removeAll(QString());
+    paths.removeDuplicates();
+    return paths;
 }
 
 void PostingJob::_printStats() const

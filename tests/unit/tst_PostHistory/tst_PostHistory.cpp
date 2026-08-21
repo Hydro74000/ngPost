@@ -81,6 +81,10 @@ private slots:
     //! resume plan was built: a job can wait a long time in the queue.
     void resume_file_state_detects_a_source_that_changed();
 
+    //! A resume must not carry the metadata or the password of the run that
+    //! happens to be going on: they belong to another post.
+    void resume_options_drop_the_current_metadata_and_password();
+
     void nzb_regeneration_keeps_prior_files_after_resume();
     void nzb_regeneration_repairs_missing_article_bytes();
     void nzb_regeneration_masks_password_by_default();
@@ -1204,6 +1208,39 @@ void TestPostHistory::resume_file_state_detects_a_source_that_changed()
     // and a source that vanished is not usable either
     QVERIFY(QFile::remove(path));
     QVERIFY(!state.matches(QFileInfo(path)));
+}
+
+void TestPostHistory::resume_options_drop_the_current_metadata_and_password()
+{
+    PostHistoryStore::PostDetails details;
+    details.post.id = 11;
+    details.rarPass = QStringLiteral("password-of-that-post");
+
+    // whatever the current run was configured with
+    PostingJobOptions base;
+    base.meta.insert(QStringLiteral("album"),
+                     MetaValue(QStringLiteral("another post"), MetaScope::Nzb));
+    base.declaredPassword = QStringLiteral("password-of-another-post");
+
+    ResumePlanner::JobPlan plan;
+    const QString path = QDir::tempPath() + QStringLiteral("/tst-resume-source.bin");
+    plan.files << QFileInfo(path);
+
+    const PostingJobOptions resumed =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  QStringLiteral("/tmp/out.nzb"),
+                                  QList<QString>(),
+                                  plan,
+                                  std::string("me@x.y"));
+
+    QVERIFY(resumed.meta.isEmpty());
+    QVERIFY(resumed.declaredPassword.isEmpty());
+    // the password of the post being resumed, on the other hand, is kept
+    QCOMPARE(resumed.rarPass, QStringLiteral("password-of-that-post"));
+
+    // and the sources of the attempt are known, so nothing can overwrite them
+    QCOMPARE(resumed.inputPaths, QStringList{ QFileInfo(path).absoluteFilePath() });
 }
 
 void TestPostHistory::nzb_regeneration_keeps_prior_files_after_resume()
