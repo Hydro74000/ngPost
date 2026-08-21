@@ -89,8 +89,10 @@ public:
 
     void udatePostingParams();
 
-    //! What the user typed in the metadata table, empty keys skipped.
-    QMap<QString, MetaValue> postMeta() const;
+    //! What the user typed in the metadata table, empty keys skipped. A name
+    //! used twice is reported through \a duplicate rather than silently
+    //! collapsed by the map.
+    QMap<QString, MetaValue> postMeta(QString *duplicate = nullptr) const;
 
     void retranslate();
 

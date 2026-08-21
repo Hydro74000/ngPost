@@ -260,9 +260,15 @@ void applyEnvironment(QProcessEnvironment &env, PostInfoData const &data, bool e
 {
     QMap<QString, QString> const v = values(data, true);
     for (FieldDoc const &field : fields()) {
-        if (field.isSecret && !exposeSecrets)
+        QString const name = QString::fromLatin1(field.envName);
+        if (field.isSecret && !exposeSecrets) {
+            // Removed, not skipped: the environment we start from is the one of
+            // ngPost itself, and it may already carry an NGPOST_RAR_PASS that
+            // has nothing to do with this post.
+            env.remove(name);
             continue;
-        env.insert(QString::fromLatin1(field.envName), v.value(bareName(field.placeholder)));
+        }
+        env.insert(name, v.value(bareName(field.placeholder)));
     }
     // The parameterized variables have no fixed placeholder, but a script
     // still needs the date: give it in ISO, plus the epoch for arithmetic.
@@ -331,7 +337,8 @@ QString resolveTemplatePath(QString const &path, QString const &baseDir)
 Result renderToFile(QString const      &templatePath,
                     QString const      &outputPattern,
                     PostInfoData const &data,
-                    QStringList const  &protectedPaths)
+                    QStringList const  &protectedPaths,
+                    QString const      &outputBaseDir)
 {
     Result res;
 
@@ -357,7 +364,12 @@ Result renderToFile(QString const      &templatePath,
         return res;
     }
 
-    QFileInfo const outFi(outPath);
+    // A relative destination follows the same rule as the model: it is
+    // understood from the configuration, not from wherever the process happens
+    // to have been started, which for the GUI or a service means nothing.
+    QFileInfo outFi(outPath);
+    if (outFi.isRelative() && !outputBaseDir.isEmpty())
+        outFi = QFileInfo(QDir(outputBaseDir).absoluteFilePath(outPath));
     res.outPath = QDir::cleanPath(outFi.absoluteFilePath());
 
     for (QString const &protectedPath : protectedPaths) {

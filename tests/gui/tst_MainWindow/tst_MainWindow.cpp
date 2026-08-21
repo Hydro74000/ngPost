@@ -19,6 +19,8 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QToolButton>
+
+#include "hmi/CheckBoxCenterWidget.h"
 #include <QFile>
 #include <QLabel>
 #include <QLineEdit>
@@ -337,10 +339,16 @@ void TestMainWindow::post_meta_table_folds_and_exposes_named_widgets()
                  qPrintable(QStringLiteral("widget not found: %1").arg(QString::fromLatin1(name))));
     }
 
-    // private by default: publishing in the nzb is an explicit choice
-    auto *nzbCB = quickTab->findChild<QCheckBox *>(QStringLiteral("postMetaNzbCB_0"));
-    QVERIFY(nzbCB);
-    QVERIFY(!nzbCB->isChecked());
+    // private by default: publishing in the nzb is an explicit choice. The cell
+    // is the wrapper itself, which owns the box; looking for a bare QCheckBox
+    // here found an orphan that nothing displayed.
+    auto *nzbCell = quickTab->findChild<CheckBoxCenterWidget *>(QStringLiteral("postMetaNzbCB_0"));
+    QVERIFY2(nzbCell, "the NZB cell is not a CheckBoxCenterWidget");
+    QVERIFY(!nzbCell->isChecked());
+
+    // and it is the one the user sees and clicks
+    nzbCell->setChecked(true);
+    QVERIFY(nzbCell->isChecked());
 
     toggle->setChecked(false);
     QVERIFY(content->isHidden());

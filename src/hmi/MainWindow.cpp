@@ -2080,9 +2080,12 @@ void MainWindow::_onHistoryExportInfo()
 
     QString error;
     bool incomplete = false;
+    QStringList warnings;
     if (_ngPost->exportPostInfoGui(_selectedHistoryId, templatePath, outPath, includePassword,
-                                   &error, &incomplete)) {
+                                   &error, &incomplete, &warnings)) {
         QString msg = tr("Post info file written to:\n%1").arg(outPath);
+        if (!warnings.isEmpty())
+            msg += QStringLiteral("\n\n") + warnings.join(QStringLiteral("\n"));
         if (incomplete) {
             // Being explicit beats a file that quietly pretends to be complete.
             msg += tr("\n\nThis post was made before ngPost recorded these details, so the "

@@ -1623,8 +1623,12 @@ void PostingJob::_writePostInfoFile()
     const QString templatePath = _ngPost->postInfoTemplatePath();
     protectedPaths << templatePath;
 
-    const PostInfoTemplate::Result result = PostInfoTemplate::renderToFile(
-        templatePath, _ngPost->_postInfoOutput, _finalPostInfoData, protectedPaths);
+    const PostInfoTemplate::Result result =
+        PostInfoTemplate::renderToFile(templatePath,
+                                       _ngPost->_postInfoOutput,
+                                       _finalPostInfoData,
+                                       protectedPaths,
+                                       _ngPost->postInfoOutputBaseDir());
 
     for (const QString &warning : result.warnings)
         _warn(tr("Post info: %1").arg(warning));

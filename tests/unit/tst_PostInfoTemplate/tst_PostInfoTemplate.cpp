@@ -11,6 +11,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QProcessEnvironment>
 #include <QTemporaryDir>
 
 #include "postinfo/PostInfoTemplate.h"
@@ -62,6 +63,14 @@ private slots:
     //! An unknown variable in the destination is fatal: writing to an
     //! approximate location is worse than not writing.
     void unknown_variable_in_output_path_is_fatal();
+
+    //! A relative destination follows the configuration, not the directory the
+    //! process happens to have been started from.
+    void relative_output_resolves_against_the_given_base();
+
+    //! Without the opt-in, the password is removed from the environment, not
+    //! merely left out: ngPost may have inherited one of its own.
+    void password_is_removed_from_an_inherited_environment();
 
     //! The nzb, the template itself and the source files are never overwritten,
     //! and a source folder protects everything below it.
@@ -348,6 +357,41 @@ void TestPostInfoTemplate::unknown_variable_in_output_path_is_fatal()
     QVERIFY(!res.ok);
     QVERIFY(res.error.contains(QStringLiteral("__oups__")));
     QVERIFY(!QFileInfo::exists(dir.filePath("__oups__/f.txt")));
+}
+
+void TestPostInfoTemplate::relative_output_resolves_against_the_given_base()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QVERIFY(QDir().mkpath(dir.filePath("conf")));
+
+    QString const tmplPath = dir.filePath("sheet.tpl");
+    QVERIFY(writeFile(tmplPath, QStringLiteral("x\n")));
+
+    PostInfoData const d = sampleData();
+    PostInfoTemplate::Result const res = PostInfoTemplate::renderToFile(
+        tmplPath, QStringLiteral("out/sheet.txt"), d, QStringList(), dir.filePath("conf"));
+
+    QVERIFY2(res.ok, qPrintable(res.error));
+    QCOMPARE(res.outPath, QDir::cleanPath(dir.filePath("conf/out/sheet.txt")));
+    QVERIFY(QFileInfo::exists(res.outPath));
+}
+
+void TestPostInfoTemplate::password_is_removed_from_an_inherited_environment()
+{
+    PostInfoData d = sampleData();
+    d.rarPass = QStringLiteral("s3cr3t");
+
+    QProcessEnvironment env;
+    // ngPost itself was started with one, for another post entirely
+    env.insert(QStringLiteral("NGPOST_RAR_PASS"), QStringLiteral("inherited-from-elsewhere"));
+
+    PostInfoTemplate::applyEnvironment(env, d, /*exposeSecrets*/ false);
+    QVERIFY2(!env.contains(QStringLiteral("NGPOST_RAR_PASS")),
+             qPrintable(env.value(QStringLiteral("NGPOST_RAR_PASS"))));
+
+    PostInfoTemplate::applyEnvironment(env, d, /*exposeSecrets*/ true);
+    QCOMPARE(env.value(QStringLiteral("NGPOST_RAR_PASS")), QStringLiteral("s3cr3t"));
 }
 
 void TestPostInfoTemplate::refuses_to_overwrite_protected_paths()

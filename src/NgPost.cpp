@@ -393,7 +393,8 @@ NgPost::NgPost(int &argc, char *argv[]):
     _postInfoOutput(NgPost::sDefaultPostInfoOutput), _postInfoOnlySuccess(true),
     _postCmdTimeoutSec(0), _postCmdFailIsError(false), _postCmdExposePassword(false),
     _nzbUploadTimeoutSec(sDefaultNzbUploadTimeoutSec), _postCmdRunner(nullptr),
-    _waitingForPostCmds(false), _pendingExitCode(-1),
+    _waitingForPostCmds(false), _pendingExitCode(-1), _stdoutIsData(false),
+    _stdoutRedirect(nullptr),
     _preparePacking(false),
     _groupPolicy(GROUP_POLICY::ALL),
     _nzbCheck(nullptr), _quiet(false),
@@ -1219,7 +1220,10 @@ bool NgPost::_exportPostInfo(qint64 postId,
                                                           &unknown);
         for (const QString &token : unknown)
             _cerr << tr("Warning: unknown variable %1").arg(token) << "\n" << MB_FLUSH;
-        _cout << rendered << MB_FLUSH; // stdout carries the record sheet, nothing else
+        // Named explicitly: _cout may have been pointed at stderr precisely so
+        // that this is the only thing standing on stdout.
+        QTextStream out(stdout);
+        out << rendered << MB_FLUSH;
         return true;
     }
 
@@ -1243,7 +1247,8 @@ bool NgPost::exportPostInfoGui(qint64 postId,
                                const QString &outPath,
                                bool includePassword,
                                QString *error,
-                               bool *incomplete)
+                               bool *incomplete,
+                               QStringList *warnings)
 {
     if (!_ensureHistoryStore())
         return false;
@@ -1267,10 +1272,12 @@ bool NgPost::exportPostInfoGui(qint64 postId,
                                        outPath,
                                        data,
                                        _exportProtectedPaths(record, templatePath));
+    // Warnings matter even when it worked: the permissions of a file holding
+    // the password are told this way.
+    if (warnings)
+        *warnings = result.warnings;
     if (!result.ok && error)
         *error = result.error;
-    else if (error && !result.warnings.isEmpty())
-        *error = result.warnings.join(QStringLiteral("\n"));
     return result.ok;
 }
 
@@ -2285,6 +2292,27 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
 
     if (parser.isSet(sOptionNames[Opt::QUIET]))
         _quiet = true;
+
+    // Decided before the configuration is even read, because loading it
+    // already has things to say (a migrated config, for one) and stdout is
+    // about to carry a record sheet someone will pipe.
+    _stdoutIsData = (parser.isSet(sOptionNames[Opt::EXPORT_POST_INFO])
+                     || parser.isSet(QStringLiteral("export-post-info")))
+                    && !parser.isSet(sOptionNames[Opt::OUTPUT]);
+    if (_stdoutIsData)
+    {
+        // Everything ngPost says normally goes to _cout, from 40-odd places.
+        // Rather than chase them all, the stream itself is pointed at stderr:
+        // stdout is then free for the record sheet, which names it explicitly.
+        _stdoutRedirect = new QFile();
+        if (_stdoutRedirect->open(stderr, QIODevice::WriteOnly | QIODevice::Text))
+            _cout.setDevice(_stdoutRedirect);
+        else
+        {
+            delete _stdoutRedirect;
+            _stdoutRedirect = nullptr;
+        }
+    }
 
     if (parser.isSet(sOptionNames[Opt::CONF]))
     {

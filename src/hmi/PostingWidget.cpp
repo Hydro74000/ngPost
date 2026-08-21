@@ -203,7 +203,18 @@ void PostingWidget::postFiles(bool updateMainParams)
         options.overwriteNzb      = true;
         options.delFilesAfterPost = false;
         // per post, deliberately not copied into the NgPost globals
-        options.meta = postMeta();
+        QString duplicatedKey;
+        options.meta = postMeta(&duplicatedKey);
+        if (!duplicatedKey.isEmpty())
+        {
+            // Same rule as --meta on the command line: refuse rather than keep
+            // one of the two values without saying which.
+            _hmi->logError(tr("The post information lists '%1' twice. "
+                              "Remove one of the two lines before posting.")
+                               .arg(duplicatedKey));
+            _state = STATE::IDLE;
+            return;
+        }
 
         _postingJob = new PostingJob(_ngPost, options, this);
 
@@ -281,6 +292,10 @@ void PostingWidget::onSelectFolderClicked()
 void PostingWidget::onClearFilesClicked()
 {
     _ui->filesList->clear2();
+    // The metadata describe the post that was there; leaving them would hand
+    // the title of one post to the next one queued in this tab.
+    if (_metaTable)
+        _metaTable->setRowCount(0);
     _ui->nzbFileEdit->clear();
     _ui->compressNameEdit->clear();
     if (_hmi->hasAutoCompress())
@@ -654,13 +669,14 @@ void PostingWidget::_addPostMetaRow(const QString &key, const QString &value, bo
     valueEdit->setObjectName(metaObjectName("postMetaValueEdit", row));
     _metaTable->setCellWidget(row, 1, valueEdit);
 
-    // unticked by default: an nzb circulates, so publishing is a choice
-    QCheckBox *publishCB = new QCheckBox(_metaTable);
-    publishCB->setObjectName(metaObjectName("postMetaNzbCB", row));
-    publishCB->setChecked(publish);
-    publishCB->setToolTip(tr("Publish this information in the nzb, which circulates.\n"
-                             "Leave it off to keep it in your post info file only."));
-    _metaTable->setCellWidget(row, 2, new CheckBoxCenterWidget(publishCB));
+    // Unticked by default: an nzb circulates, so publishing is a choice.
+    // CheckBoxCenterWidget takes (parent, isChecked) and owns its own box:
+    // handing it one would only make it a parent and leave that box orphaned.
+    auto *publishCell = new CheckBoxCenterWidget(_metaTable, publish);
+    publishCell->setObjectName(metaObjectName("postMetaNzbCB", row));
+    publishCell->setToolTip(tr("Publish this information in the nzb, which circulates.\n"
+                               "Leave it off to keep it in your post info file only."));
+    _metaTable->setCellWidget(row, 2, publishCell);
 
     QPushButton *delButton = new QPushButton(QStringLiteral("X"), _metaTable);
     delButton->setObjectName(metaObjectName("postMetaDelButton", row));
@@ -676,7 +692,7 @@ void PostingWidget::_addPostMetaRow(const QString &key, const QString &value, bo
     _metaTable->setCellWidget(row, 3, delButton);
 }
 
-QMap<QString, MetaValue> PostingWidget::postMeta() const
+QMap<QString, MetaValue> PostingWidget::postMeta(QString *duplicate) const
 {
     QMap<QString, MetaValue> meta;
     if (!_metaTable)
@@ -690,15 +706,17 @@ QMap<QString, MetaValue> PostingWidget::postMeta() const
         const QString key = keyEdit->text().trimmed();
         if (key.isEmpty())
             continue; // an empty line is just an unused one
+        if (duplicate && meta.contains(key)) {
+            *duplicate = key; // the caller decides, we do not silently drop one
+            return meta;
+        }
         // "password" is a secret, it goes through the password field
         if (key.compare(QStringLiteral("password"), Qt::CaseInsensitive) == 0)
             continue;
 
         bool publish = false;
-        if (QWidget *cell = _metaTable->cellWidget(row, 2)) {
-            if (QCheckBox *cb = cell->findChild<QCheckBox *>())
-                publish = cb->isChecked();
-        }
+        if (auto *cell = qobject_cast<CheckBoxCenterWidget *>(_metaTable->cellWidget(row, 2)))
+            publish = cell->isChecked();
         meta.insert(key, MetaValue(valueEdit->text(), publish ? MetaScope::Nzb : MetaScope::Local));
     }
     return meta;

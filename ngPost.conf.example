@@ -114,6 +114,7 @@ nzbPath  = /tmp
 #POST_INFO_TEMPLATE = my_record_sheet.txt
 
 ## where to write it (the variables above work here too)
+## a relative path is understood from the folder of this configuration file
 #POST_INFO_OUTPUT = __nzbDir__/__nzbName__.info.txt
 
 ## by default no post info file is written for a failed or partial post,

@@ -9,6 +9,7 @@
 #define NGPOST_H
 #include "PostingJobOptions.h"
 #include "history/PostHistoryStore.h"
+#include "utils/PathHelper.h"
 #include "utils/CmdOrGuiApp.h"
 #include "utils/Macros.h"
 
@@ -375,6 +376,10 @@ private:
     //! Exit code a fatal error asked for, < 0 when none. The post commands of
     //! posts that already succeeded still get to finish first.
     int _pendingExitCode;
+    //! True when stdout carries data a caller pipes (an exported record sheet),
+    //! so every message goes to stderr instead of corrupting it.
+    bool _stdoutIsData;
+    QFile *_stdoutRedirect; //!< keeps stderr open while _cout points at it
     bool _preparePacking;
 
     GROUP_POLICY _groupPolicy;
@@ -528,7 +533,8 @@ public:
                            const QString &outPath,
                            bool includePassword,
                            QString *error,
-                           bool *incomplete);
+                           bool *incomplete,
+                           QStringList *warnings = nullptr);
 
     bool hasMonitoringPostingJobs() const;
     void closeAllMonitoringJobs();
@@ -571,6 +577,13 @@ public:
     //! A relative path is understood from the configuration folder, or from the
     //! current directory when it was given on the command line.
     QString postInfoTemplatePath() const;
+
+    //! Folder a relative POST_INFO_OUTPUT is understood from, which is what
+    //! the configuration file says: its own folder.
+    QString postInfoOutputBaseDir() const
+    {
+        return _loadedConfigDir.isEmpty() ? PathHelper::configDir() : _loadedConfigDir;
+    }
 
     inline std::string from() const;
 

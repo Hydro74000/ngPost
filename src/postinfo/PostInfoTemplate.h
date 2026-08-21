@@ -101,11 +101,13 @@ struct Result
 //! failure is reported in the returned Result.
 //!
 //! \a protectedPaths are refused as destination; a directory in that list also
-//! protects everything below it.
+//! protects everything below it. A relative destination is resolved against
+//! \a outputBaseDir, which the configuration promises is its own folder.
 Result renderToFile(QString const      &templatePath,
                     QString const      &outputPattern,
                     PostInfoData const &data,
-                    QStringList const  &protectedPaths);
+                    QStringList const  &protectedPaths,
+                    QString const      &outputBaseDir = QString());
 
 } // namespace PostInfoTemplate
 
