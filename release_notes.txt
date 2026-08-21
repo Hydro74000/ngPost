@@ -24,9 +24,16 @@ TODO: auto RAR size and par2 parameters depending on the inputs size?
   format, so an index just ships its own model. Off until POST_INFO_TEMPLATE
   is set. New keys: POST_INFO_TEMPLATE, POST_INFO_OUTPUT and
   POST_INFO_ONLY_ON_SUCCESS (true by default).
-- Per post metadata (title, portal link, category...), typed in the posting
-  tab or given with --post_meta. They stay private by default: publishing one
-  in the nzb, which circulates, is an explicit choice (a checkbox, or -m).
+- Per post fields (title, portal link, category...), typed in the posting tab
+  or given with --post_meta. A field always goes into the post info file; the
+  "Also in NZB" box, or -m/--meta, additionally publishes it in the nzb. That
+  box is off by default, because an nzb circulates.
+- In the interface a single "Create a post info file" checkbox enables the
+  feature, and the button next to it opens an editor: pick a model, read the
+  fields it asks for, fill them in. The choice belongs to the post, not to the
+  application. Auto Post has the same pair, applying to its whole run. Models
+  opened during the session stay in the list for the next posts, and a small
+  cross drops one from it.
 - --export_post_info <id> writes the record sheet of a post already in the
   history, to a file or to stdout. Also available from the History tab.
 - Post automation is now fully reachable from the command line, so ngPost can

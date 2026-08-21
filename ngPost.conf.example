@@ -64,7 +64,7 @@ nzbPath  = /tmp
 ##   __postInfoPath__       : path of the generated post info file
 ##   __jsonPath__           : path of the temporary json file (post commands only)
 ##   __date:<format>__      : date of the post, ex: __date:dd/MM/yyyy__
-##   __meta:<name>__        : one of your own metadata (--meta / --post_meta)
+##   __meta:<name>__        : one of your own fields (--post_meta, or --meta to publish it too)
 ##
 ## the same values are also available as environment variables (NGPOST_NZB_PATH,
 ## NGPOST_POST_SIZE, ...), so a script can be called with no argument at all.

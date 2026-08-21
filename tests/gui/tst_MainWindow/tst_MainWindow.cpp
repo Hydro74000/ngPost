@@ -79,7 +79,7 @@ private slots:
 
     //! A posting tab carries one discreet checkbox; the button that opens the
     //! editor follows it.
-    void post_meta_table_folds_and_exposes_named_widgets();
+    void post_info_row_exposes_a_checkbox_and_its_button();
 
     //! Picking a model offers exactly the fields it asks for, and what is
     //! typed comes back with its scope.
@@ -88,6 +88,10 @@ private slots:
     //! The model from the configuration is the default: it is marked as such,
     //! selected, and selecting it is not an override.
     void post_info_dialog_marks_the_configured_model_as_default();
+
+    //! A model opened during the session is offered again to the next posts,
+    //! and the small cross drops it from the list.
+    void post_info_dialog_keeps_the_models_opened_this_session();
 
     //! Auto posting carries the same choice, once, for its whole run.
     void auto_post_tab_carries_one_post_info_choice();
@@ -306,7 +310,7 @@ void TestMainWindow::save_config_round_trips_post_info_keys()
     }
 }
 
-void TestMainWindow::post_meta_table_folds_and_exposes_named_widgets()
+void TestMainWindow::post_info_row_exposes_a_checkbox_and_its_button()
 {
     HomeSandbox sandbox;
     QVERIFY(QDir().mkpath(sandbox.rootPath() + QStringLiteral("/nzb")));
@@ -428,6 +432,43 @@ void TestMainWindow::post_info_dialog_marks_the_configured_model_as_default()
     QVERIFY(asDefault);
     asDefault->setChecked(true);
     QVERIFY(dlg.setAsDefault());
+}
+
+void TestMainWindow::post_info_dialog_keeps_the_models_opened_this_session()
+{
+    HomeSandbox sandbox;
+    const QString configured = sandbox.rootPath() + QStringLiteral("/default.tpl");
+    const QString other      = sandbox.rootPath() + QStringLiteral("/baselien.tpl");
+    for (const QString &path : { configured, other })
+    {
+        QFile tmpl(path);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("titre =__meta:titre__\n");
+    }
+
+    // a model opened during an earlier post is offered again, without browsing
+    PostInfoDialog dlg(configured, QString(), QMap<QString, MetaValue>(), QStringList{ other });
+    auto *list = dlg.findChild<QComboBox *>(QStringLiteral("postInfoTemplateList"));
+    QVERIFY(list);
+    QCOMPARE(list->count(), 3); // default, the session one, "Choose a file..."
+    QCOMPARE(list->itemData(1).toString(), other);
+    QCOMPARE(list->currentIndex(), 0); // the default stays selected
+
+    auto *forget = dlg.findChild<QPushButton *>(QStringLiteral("postInfoForgetButton"));
+    QVERIFY(forget);
+    QVERIFY(!forget->isEnabled()); // the configured model is not ours to drop
+
+    // selecting it enables the cross, and does not reopen anything
+    list->setCurrentIndex(1);
+    QCOMPARE(dlg.templateOverride(), other);
+    QVERIFY(forget->isEnabled());
+
+    // the cross removes it from the list and falls back on the default
+    forget->click();
+    QCOMPARE(list->count(), 2);
+    QVERIFY(dlg.sessionTemplates().isEmpty());
+    QVERIFY(dlg.templateOverride().isEmpty());
+    QVERIFY(!forget->isEnabled());
 }
 
 void TestMainWindow::auto_post_tab_carries_one_post_info_choice()

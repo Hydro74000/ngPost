@@ -203,9 +203,15 @@ void PostingWidget::postFiles(bool updateMainParams)
         options.overwriteNzb      = true;
         options.delFilesAfterPost = false;
         // per post, deliberately not copied into the NgPost globals
-        options.meta               = _postInfoMeta;
-        options.writePostInfoFile  = writesPostInfoFile();
-        options.postInfoTemplate   = _postInfoTemplate;
+        // The fields belong to the post info feature as a whole: with the box
+        // unticked there is no sheet, and nothing to publish in the nzb either.
+        // Leaving them in would publish through a box the user just turned off.
+        options.writePostInfoFile = writesPostInfoFile();
+        if (options.writePostInfoFile)
+        {
+            options.meta             = _postInfoMeta;
+            options.postInfoTemplate = _postInfoTemplate;
+        }
 
         _postingJob = new PostingJob(_ngPost, options, this);
 
@@ -609,8 +615,18 @@ void PostingWidget::onPostInfoToggled(bool checked)
 
 void PostingWidget::onEditPostInfo()
 {
-    PostInfoDialog dlg(_ngPost->postInfoTemplatePath(), _postInfoTemplate, _postInfoMeta, this);
-    if (dlg.exec() != QDialog::Accepted)
+    PostInfoDialog dlg(_ngPost->postInfoTemplatePath(),
+                       _postInfoTemplate,
+                       _postInfoMeta,
+                       _ngPost->sessionPostInfoTemplates(),
+                       this);
+    int const answer = dlg.exec();
+
+    // The list of models is kept whatever the answer: opening a file, or
+    // dropping one from the list, is housekeeping, not a change to this post.
+    _ngPost->setSessionPostInfoTemplates(dlg.sessionTemplates());
+
+    if (answer != QDialog::Accepted)
         return;
 
     QString duplicate;

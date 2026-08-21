@@ -28,11 +28,16 @@ class PostInfoDialog : public QDialog
 
 public:
     //! \a configuredTemplate is what ngPost.conf provides, used when the post
-    //! does not pick one of its own.
+    //! does not pick one of its own. \a sessionTemplates are the ones already
+    //! opened during this run, offered again here.
     PostInfoDialog(const QString &configuredTemplate,
                    const QString &templateOverride,
                    const QMap<QString, MetaValue> &meta,
+                   const QStringList &sessionTemplates = QStringList(),
                    QWidget *parent = nullptr);
+
+    //! Models the dialog ended up offering, minus the ones the user dropped.
+    QStringList sessionTemplates() const { return _sessionTemplates; }
 
     //! Empty when the post uses the model from the configuration.
     QString templateOverride() const;
@@ -44,6 +49,7 @@ public:
 
 private slots:
     void onTemplateChosen(int index);
+    void onForgetTemplate();
     void onAddField();
     //! Reads the model and offers exactly the fields it asks for.
     void onLoadFieldsFromTemplate();
@@ -56,8 +62,13 @@ private:
 
     void _fillTemplateList(const QString &override);
     void _rememberTemplate(const QString &path);
+    void _updateForgetButton();
+
+    QStringList  _sessionTemplates;
+    bool         _fillingList = false;
 
     QComboBox    *_templateList;
+    QPushButton  *_forgetButton;
     QLabel       *_templateHint;
     QCheckBox    *_setAsDefault;
     QPushButton  *_loadFieldsButton;

@@ -6,6 +6,7 @@
 #include "postinfo/PostInfoTemplate.h"
 
 #include <QCheckBox>
+#include <QSignalBlocker>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFile>
@@ -32,8 +33,10 @@ QString fieldName(char const *role, int row)
 PostInfoDialog::PostInfoDialog(const QString &configuredTemplate,
                                const QString &templateOverride,
                                const QMap<QString, MetaValue> &meta,
+                               const QStringList &sessionTemplates,
                                QWidget *parent)
-    : QDialog(parent), _configuredTemplate(configuredTemplate)
+    : QDialog(parent), _configuredTemplate(configuredTemplate),
+      _sessionTemplates(sessionTemplates)
 {
     setObjectName(QStringLiteral("postInfoDialog"));
     setWindowTitle(tr("Post information"));
@@ -53,6 +56,15 @@ PostInfoDialog::PostInfoDialog(const QString &configuredTemplate,
     _templateList = new QComboBox(this);
     _templateList->setObjectName(QStringLiteral("postInfoTemplateList"));
     tmplRow->addWidget(_templateList, 1);
+
+    // A small cross to drop a model from the list. Next to it rather than
+    // inside each row: a combo box has no per item button, and a half working
+    // one in a popup is worse than an obvious button.
+    _forgetButton = new QPushButton(QStringLiteral("\342\234\225"), this);
+    _forgetButton->setObjectName(QStringLiteral("postInfoForgetButton"));
+    _forgetButton->setMaximumWidth(30);
+    _forgetButton->setToolTip(tr("Remove this model from the list"));
+    tmplRow->addWidget(_forgetButton);
 
     _loadFieldsButton = new QPushButton(tr("Read its fields"), this);
     _loadFieldsButton->setObjectName(QStringLiteral("postInfoLoadFieldsButton"));
@@ -79,9 +91,12 @@ PostInfoDialog::PostInfoDialog(const QString &configuredTemplate,
     _fields->setColumnCount(4);
     _fields->verticalHeader()->hide();
     _fields->setHorizontalHeaderLabels(
-        QStringList{ tr("Name"), tr("Value"), tr("NZB"), QString() });
+        QStringList{ tr("Name"), tr("Value"), tr("Also in NZB"), QString() });
+    _fields->horizontalHeaderItem(2)->setToolTip(
+        tr("Off: the field is written in the post info file only.\n"
+           "On: it is written there AND published in the nzb, which circulates."));
     _fields->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    _fields->setColumnWidth(2, 60);
+    _fields->setColumnWidth(2, 90);
     _fields->setColumnWidth(3, 30);
     root->addWidget(_fields, 1);
 
@@ -89,8 +104,9 @@ PostInfoDialog::PostInfoDialog(const QString &configuredTemplate,
     _addButton->setObjectName(QStringLiteral("postInfoAddFieldButton"));
     root->addWidget(_addButton, 0, Qt::AlignLeft);
 
-    root->addWidget(new QLabel(tr("The NZB box publishes a field inside the nzb, which "
-                                  "circulates. Leave it off to keep it in your file only."),
+    root->addWidget(new QLabel(tr("Every field below is written in the post info file. Tick "
+                                  "\302\253 Also in NZB \302\273 to publish\none of them inside "
+                                  "the nzb as well \342\200\224 the nzb circulates."),
                                this));
 
     QDialogButtonBox *buttons =
@@ -100,6 +116,7 @@ PostInfoDialog::PostInfoDialog(const QString &configuredTemplate,
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(_addButton, &QAbstractButton::clicked, this, &PostInfoDialog::onAddField);
+    connect(_forgetButton, &QAbstractButton::clicked, this, &PostInfoDialog::onForgetTemplate);
     connect(_loadFieldsButton,
             &QAbstractButton::clicked,
             this,
@@ -144,10 +161,16 @@ QString PostInfoDialog::_effectiveTemplatePath() const
     return _templateList->currentData().toString();
 }
 
-//! The configured model first, marked as such, then anything else this post
-//! already pointed at, then a way out to the filesystem.
-void PostInfoDialog::_fillTemplateList(const QString &override)
+//! The configured model first, marked as such, then the ones opened earlier in
+//! this run, then a way out to the filesystem.
+void PostInfoDialog::_fillTemplateList(const QString &selected)
 {
+    // Rebuilding a combo box moves its current index around, and every move
+    // emits currentIndexChanged. Without this guard, inserting an item while
+    // "Choose a file..." was selected reopened the file dialog.
+    QSignalBlocker const blocker(_templateList);
+    _fillingList = true;
+
     _templateList->clear();
     if (!_configuredTemplate.isEmpty())
         _templateList->addItem(tr("%1  (default)").arg(QFileInfo(_configuredTemplate).fileName()),
@@ -155,30 +178,59 @@ void PostInfoDialog::_fillTemplateList(const QString &override)
     else
         _templateList->addItem(tr("(no model yet)"), QString());
 
-    if (!override.isEmpty() && override != _configuredTemplate)
-        _templateList->addItem(QFileInfo(override).fileName(), override);
+    for (QString const &path : _sessionTemplates) {
+        if (path != _configuredTemplate)
+            _templateList->addItem(QFileInfo(path).fileName(), path);
+    }
+    if (!selected.isEmpty() && selected != _configuredTemplate
+        && !_sessionTemplates.contains(selected))
+        _templateList->addItem(QFileInfo(selected).fileName(), selected);
 
     _templateList->addItem(tr("Choose a file\342\200\246"), QStringLiteral("__browse__"));
-    _templateList->setCurrentIndex(override.isEmpty() || override == _configuredTemplate ? 0 : 1);
+
+    int index = 0;
+    if (!selected.isEmpty()) {
+        int const found = _templateList->findData(selected);
+        if (found >= 0)
+            index = found;
+    }
+    _templateList->setCurrentIndex(index);
+    _fillingList = false;
+    _updateForgetButton();
 }
 
 void PostInfoDialog::_rememberTemplate(const QString &path)
 {
-    // Insert before the "Choose a file..." entry, and select it.
-    int const browseIdx = _templateList->count() - 1;
-    for (int i = 0; i < browseIdx; ++i) {
-        if (_templateList->itemData(i).toString() == path) {
-            _templateList->setCurrentIndex(i);
-            return;
-        }
-    }
-    _templateList->insertItem(browseIdx, QFileInfo(path).fileName(), path);
-    _templateList->setCurrentIndex(browseIdx);
+    if (!path.isEmpty() && path != _configuredTemplate && !_sessionTemplates.contains(path))
+        _sessionTemplates << path;
+    _fillTemplateList(path);
+}
+
+//! The configured model is not ours to drop, and neither is the way out to the
+//! filesystem.
+void PostInfoDialog::_updateForgetButton()
+{
+    QString const current = _effectiveTemplatePath();
+    _forgetButton->setEnabled(!current.isEmpty() && current != QLatin1String("__browse__")
+                              && _sessionTemplates.contains(current));
+}
+
+void PostInfoDialog::onForgetTemplate()
+{
+    QString const current = _effectiveTemplatePath();
+    if (!_sessionTemplates.removeAll(current))
+        return;
+    _fillTemplateList(QString()); // falls back on the default
+    onLoadFieldsFromTemplate();
 }
 
 void PostInfoDialog::onTemplateChosen(int index)
 {
+    if (_fillingList)
+        return;
+
     if (_templateList->itemData(index).toString() != QLatin1String("__browse__")) {
+        _updateForgetButton();
         onLoadFieldsFromTemplate();
         return;
     }
@@ -186,7 +238,7 @@ void PostInfoDialog::onTemplateChosen(int index)
     QString const path = QFileDialog::getOpenFileName(
         this, tr("Post info model"), QString(), tr("Text files (*.txt *.tpl);;All files (*)"));
     if (path.isEmpty()) {
-        _templateList->setCurrentIndex(0); // back to what it was
+        _fillTemplateList(QString()); // back to the default
         return;
     }
     _rememberTemplate(path);

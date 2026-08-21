@@ -254,11 +254,11 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
 // general options
     {{"x", sOptionNames[Opt::OBFUSCATE]},     tr("obfuscate the subjects of the articles (CAREFUL you won't find your post if you lose the nzb file)")},
     {{"g", sOptionNames[Opt::GROUPS]},        tr("newsgroups where to post the files (coma separated without space)"), sOptionNames[Opt::GROUPS]},
-    {{"m", sOptionNames[Opt::META]},          tr("extra meta data published in the nzb header (typically \"password=qwerty42\")"), sOptionNames[Opt::META]},
-    {QStringList{sOptionNames[Opt::POST_META], "post-meta"}, tr("private meta data for the post info file, never published in the nzb (ex: \"title=Photo backup 2026\")"), sOptionNames[Opt::POST_META]},
+    {{"m", sOptionNames[Opt::META]},          tr("one of your fields, written in the post info file AND published in the nzb header (typically \"password=qwerty42\")"), sOptionNames[Opt::META]},
+    {QStringList{sOptionNames[Opt::POST_META], "post-meta"}, tr("one of your fields, written in the post info file only, never published in the nzb (ex: \"title=Photo backup 2026\")"), sOptionNames[Opt::POST_META]},
     {QStringList{sOptionNames[Opt::POST_INFO_TEMPLATE], "post-info-template"}, tr("template file used to write a post info file next to the nzb"), sOptionNames[Opt::POST_INFO_TEMPLATE]},
     {QStringList{sOptionNames[Opt::POST_INFO_OUTPUT], "post-info-output"}, tr("where to write the post info file (variables allowed)"), sOptionNames[Opt::POST_INFO_OUTPUT]},
-    {QStringList{sOptionNames[Opt::NO_POST_INFO], "no-post-info"}, tr("write no post info file for this run, whatever the config says")},
+    {QStringList{sOptionNames[Opt::NO_POST_INFO], "no-post-info"}, tr("write no post info file for this run, whatever the config says (your --meta fields are still published in the nzb)")},
     {QStringList{sOptionNames[Opt::POST_INFO_ONLY_ON_SUCCESS], "post-info-only-on-success"}, tr("only write the post info file when the post fully succeeded (default)")},
     {QStringList{sOptionNames[Opt::NO_POST_INFO_ONLY_ON_SUCCESS], "no-post-info-only-on-success"}, tr("write the post info file even for a failed or partial post")},
     {QStringList{sOptionNames[Opt::NZB_POST_CMD], "nzb-post-cmd"}, tr("command to run at the end of each post, repeatable; replaces the ones from the config file"), sOptionNames[Opt::NZB_POST_CMD]},
@@ -4114,7 +4114,8 @@ void NgPost::saveConfig()
         stream << "##   " << QString(QStringLiteral("__date:<format>__")).leftJustified(22)
                << ": " << tr("date of the post, ex: __date:dd/MM/yyyy__") << "\n"
                << "##   " << QString(QStringLiteral("__meta:<name>__")).leftJustified(22)
-               << ": " << tr("one of your own metadata (--meta / --post_meta)") << "\n"
+               << ": " << tr("one of your own fields (--post_meta, or --meta to publish it too)")
+               << "\n"
                << "#\n"
                << "#NZB_POST_CMD = scp \"__nzbPath__\" myBox.com:~/nzbs/\n"
                << "#NZB_POST_CMD = zip \"__nzbPath__.zip\" \"__nzbPath__\"\n"

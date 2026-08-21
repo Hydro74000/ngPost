@@ -570,8 +570,18 @@ void AutoPostWidget::onPostInfoToggled(bool checked) { _postInfoButton->setEnabl
 
 void AutoPostWidget::onEditPostInfo()
 {
-    PostInfoDialog dlg(_ngPost->postInfoTemplatePath(), _postInfoTemplate, _postInfoMeta, this);
-    if (dlg.exec() != QDialog::Accepted)
+    PostInfoDialog dlg(_ngPost->postInfoTemplatePath(),
+                       _postInfoTemplate,
+                       _postInfoMeta,
+                       _ngPost->sessionPostInfoTemplates(),
+                       this);
+    int const answer = dlg.exec();
+
+    // The list of models is kept whatever the answer: opening a file, or
+    // dropping one from the list, is housekeeping, not a change to this post.
+    _ngPost->setSessionPostInfoTemplates(dlg.sessionTemplates());
+
+    if (answer != QDialog::Accepted)
         return;
 
     QString duplicate;

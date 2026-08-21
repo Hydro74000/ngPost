@@ -367,6 +367,7 @@ private:
     //! user means, even when the conf was given with -c.
     QString _loadedConfigDir;
     QString _postInfoOutput;
+    QStringList _sessionPostInfoTemplates;
     bool _postInfoOnlySuccess;
     //! --no_post_info: this run writes no record sheet, whatever the
     //! configuration says. The counterpart of unticking the box in the GUI.
@@ -591,6 +592,15 @@ public:
     {
         _postInfoTemplate        = path;
         _postInfoTemplateFromCli = false;
+    }
+
+    //! Models opened during this run, offered again to the next posts. Kept in
+    //! memory only: a model picked once is convenient to find again, not a
+    //! setting worth writing down.
+    const QStringList &sessionPostInfoTemplates() const { return _sessionPostInfoTemplates; }
+    void setSessionPostInfoTemplates(const QStringList &paths)
+    {
+        _sessionPostInfoTemplates = paths;
     }
 
     //! Folder a relative POST_INFO_OUTPUT is understood from, which is what
