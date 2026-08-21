@@ -21,6 +21,9 @@
 #include <QToolButton>
 
 #include "hmi/CheckBoxCenterWidget.h"
+#include "hmi/PostInfoDialog.h"
+
+#include <QComboBox>
 #include <QFile>
 #include <QLabel>
 #include <QLineEdit>
@@ -74,10 +77,20 @@ private slots:
     //! written in a conf, parsed, saved back by saveConfig, parsed again.
     void save_config_round_trips_post_info_keys();
 
-    //! The post metadata group really folds (children hidden), it does not
-    //! merely grey its children out the way a checkable QGroupBox does, and a
-    //! row exposes named widgets so a value can be typed and read back.
+    //! A posting tab carries one discreet checkbox; the button that opens the
+    //! editor follows it.
     void post_meta_table_folds_and_exposes_named_widgets();
+
+    //! Picking a model offers exactly the fields it asks for, and what is
+    //! typed comes back with its scope.
+    void post_info_dialog_offers_the_fields_of_the_model();
+
+    //! The model from the configuration is the default: it is marked as such,
+    //! selected, and selecting it is not an override.
+    void post_info_dialog_marks_the_configured_model_as_default();
+
+    //! Auto posting carries the same choice, once, for its whole run.
+    void auto_post_tab_carries_one_post_info_choice();
 
     //! Regression test for the reported bug: filling in a newly-added
     //! server row and leaving the fields (editingFinished) must persist to
@@ -296,11 +309,20 @@ void TestMainWindow::save_config_round_trips_post_info_keys()
 void TestMainWindow::post_meta_table_folds_and_exposes_named_widgets()
 {
     HomeSandbox sandbox;
+    QVERIFY(QDir().mkpath(sandbox.rootPath() + QStringLiteral("/nzb")));
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    {
+        QFile tmpl(tmplPath);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("titre =__meta:titre__\ncat =__meta:categorie__\n");
+    }
     {
         QFile conf(PathHelper::configFilePath());
         QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
         QTextStream s(&conf);
-        s << "GROUPS = alt.binaries.test\n";
+        s << "GROUPS = alt.binaries.test\n"
+          << "nzbPath = " << sandbox.rootPath() << "/nzb\n"
+          << "POST_INFO_TEMPLATE = " << tmplPath << "\n";
     }
 
     int argc = 1;
@@ -318,40 +340,134 @@ void TestMainWindow::post_meta_table_folds_and_exposes_named_widgets()
     QWidget *quickTab = tabs->widget(0);
     QVERIFY(quickTab);
 
-    auto *content = quickTab->findChild<QWidget *>(QStringLiteral("postMetaContent"));
-    QVERIFY2(content, "post metadata section not found in the posting tab");
-    auto *toggle = quickTab->findChild<QToolButton *>(QStringLiteral("postMetaToggle"));
-    QVERIFY(toggle);
+    // One discreet checkbox on the tab, everything else behind a button
+    auto *cb = quickTab->findChild<QCheckBox *>(QStringLiteral("postInfoCB"));
+    auto *btn = quickTab->findChild<QPushButton *>(QStringLiteral("postInfoButton"));
+    QVERIFY2(cb, "the post info checkbox is not on the posting tab");
+    QVERIFY(btn);
 
-    // folded by default: it must not eat vertical space of the posting tab
-    QVERIFY(content->isHidden());
+    // a model is configured, so the box starts ticked and the button is usable
+    QVERIFY(cb->isChecked());
+    QVERIFY(btn->isEnabled());
 
-    toggle->setChecked(true);
-    QVERIFY(!content->isHidden());
+    cb->setChecked(false);
+    QVERIFY2(!btn->isEnabled(), "the button must follow the checkbox");
+    cb->setChecked(true);
+    QVERIFY(btn->isEnabled());
+}
 
-    auto *table = quickTab->findChild<QTableWidget *>(QStringLiteral("postMetaTable"));
-    QVERIFY(table);
-    QCOMPARE(table->rowCount(), 1); // unfolding offers a first empty row
-
-    for (const char *name : { "postMetaKeyEdit_0", "postMetaValueEdit_0",
-                              "postMetaNzbCB_0", "postMetaDelButton_0" }) {
-        QVERIFY2(quickTab->findChild<QWidget *>(QString::fromLatin1(name)),
-                 qPrintable(QStringLiteral("widget not found: %1").arg(QString::fromLatin1(name))));
+void TestMainWindow::post_info_dialog_offers_the_fields_of_the_model()
+{
+    HomeSandbox sandbox;
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    {
+        QFile tmpl(tmplPath);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("titre =__meta:titre__\ncat =__meta:categorie__\ntaille =__postSize__\n");
     }
 
-    // private by default: publishing in the nzb is an explicit choice. The cell
-    // is the wrapper itself, which owns the box; looking for a bare QCheckBox
-    // here found an orphan that nothing displayed.
-    auto *nzbCell = quickTab->findChild<CheckBoxCenterWidget *>(QStringLiteral("postMetaNzbCB_0"));
-    QVERIFY2(nzbCell, "the NZB cell is not a CheckBoxCenterWidget");
-    QVERIFY(!nzbCell->isChecked());
+    // Opening on a model with nothing typed yet offers exactly its fields.
+    PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>());
+    auto *table = dlg.findChild<QTableWidget *>(QStringLiteral("postInfoFieldsTable"));
+    QVERIFY(table);
+    QCOMPARE(table->rowCount(), 2); // titre and categorie, not __postSize__
 
-    // and it is the one the user sees and clicks
-    nzbCell->setChecked(true);
-    QVERIFY(nzbCell->isChecked());
+    auto *firstName = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoFieldName_0"));
+    QVERIFY(firstName);
+    QCOMPARE(firstName->text(), QStringLiteral("titre"));
 
-    toggle->setChecked(false);
-    QVERIFY(content->isHidden());
+    // private by default: publishing in the nzb stays an explicit choice
+    auto *firstNzb = dlg.findChild<CheckBoxCenterWidget *>(QStringLiteral("postInfoFieldNzb_0"));
+    QVERIFY(firstNzb);
+    QVERIFY(!firstNzb->isChecked());
+
+    // and what the user types comes back out, with its scope
+    auto *firstValue = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoFieldValue_0"));
+    QVERIFY(firstValue);
+    firstValue->setText(QStringLiteral("Mercantour"));
+    firstNzb->setChecked(true);
+
+    QString duplicate;
+    const QMap<QString, MetaValue> meta = dlg.meta(&duplicate);
+    QVERIFY(duplicate.isEmpty());
+    QCOMPARE(meta.value(QStringLiteral("titre")).value, QStringLiteral("Mercantour"));
+    QCOMPARE(meta.value(QStringLiteral("titre")).scope, MetaScope::Nzb);
+    QCOMPARE(meta.value(QStringLiteral("categorie")).scope, MetaScope::Local);
+}
+
+void TestMainWindow::post_info_dialog_marks_the_configured_model_as_default()
+{
+    HomeSandbox sandbox;
+    const QString configured = sandbox.rootPath() + QStringLiteral("/default.tpl");
+    {
+        QFile tmpl(configured);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("titre =__meta:titre__\n");
+    }
+
+    PostInfoDialog dlg(configured, QString(), QMap<QString, MetaValue>());
+    auto *list = dlg.findChild<QComboBox *>(QStringLiteral("postInfoTemplateList"));
+    QVERIFY(list);
+
+    // the configured one comes first, says it is the default, and is selected
+    QCOMPARE(list->currentIndex(), 0);
+    QVERIFY2(list->itemText(0).contains(QStringLiteral("default")), qPrintable(list->itemText(0)));
+    QCOMPARE(list->itemData(0).toString(), configured);
+
+    // and keeping it is NOT an override: the post follows the configuration
+    QVERIFY(dlg.templateOverride().isEmpty());
+    QVERIFY(!dlg.setAsDefault()); // nothing asked for
+
+    // its fields were offered without having to press anything
+    auto *table = dlg.findChild<QTableWidget *>(QStringLiteral("postInfoFieldsTable"));
+    QVERIFY(table);
+    QCOMPARE(table->rowCount(), 1);
+
+    // ticking the box asks for the selection to become the configured model
+    auto *asDefault = dlg.findChild<QCheckBox *>(QStringLiteral("postInfoSetAsDefault"));
+    QVERIFY(asDefault);
+    asDefault->setChecked(true);
+    QVERIFY(dlg.setAsDefault());
+}
+
+void TestMainWindow::auto_post_tab_carries_one_post_info_choice()
+{
+    HomeSandbox sandbox;
+    QVERIFY(QDir().mkpath(sandbox.rootPath() + QStringLiteral("/nzb")));
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    {
+        QFile tmpl(tmplPath);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("titre =__meta:titre__\n");
+    }
+    {
+        QFile conf(PathHelper::configFilePath());
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "GROUPS = alt.binaries.test\n"
+          << "nzbPath = " << sandbox.rootPath() << "/nzb\n"
+          << "POST_INFO_TEMPLATE = " << tmplPath << "\n";
+    }
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QVERIFY(ngPost.parseDefaultConfig().isEmpty());
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY(window);
+    window->init(&ngPost);
+
+    // the auto posting tab has its own pair, and says the choice is global
+    auto *cb = window->findChild<QCheckBox *>(QStringLiteral("autoPostInfoCB"));
+    auto *btn = window->findChild<QPushButton *>(QStringLiteral("autoPostInfoButton"));
+    QVERIFY2(cb, "the auto post tab has no post info checkbox");
+    QVERIFY(btn);
+    QVERIFY2(cb->toolTip().contains(QStringLiteral("every post")), qPrintable(cb->toolTip()));
+
+    QVERIFY(cb->isChecked()); // a model is configured
+    cb->setChecked(false);
+    QVERIFY(!btn->isEnabled());
 }
 
 void TestMainWindow::add_two_servers_yields_unique_object_names()

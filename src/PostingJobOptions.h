@@ -88,6 +88,12 @@ struct PostingJobOptions
     //! password is never in here: it is a secret, see declaredPassword.
     QMap<QString, MetaValue> meta;
 
+    //! Whether this post writes a record sheet, and with which model. An empty
+    //! template means "the one from the configuration": the choice is per post,
+    //! the default is global.
+    bool    writePostInfoFile = true;
+    QString postInfoTemplate;
+
     //! Password announced with -m "password=...", when ngPost did not compress
     //! itself and therefore has no rarPass of its own. It is stored, purged and
     //! published exactly like an archive password, never as a metadata.

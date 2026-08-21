@@ -54,6 +54,10 @@ private slots:
     //! Secrets are replaced before anything reaches a log.
     void secrets_are_redacted();
 
+    //! The fields a model asks for can be read off it, so an editor can offer
+    //! exactly those instead of leaving the user to guess the names.
+    void meta_names_are_read_off_a_template();
+
     //! Absolute as-is, ~ expanded, relative resolved against the given base.
     void template_path_resolution();
 
@@ -302,6 +306,21 @@ void TestPostInfoTemplate::secrets_are_redacted()
         QStringLiteral("upload.sh /data/nzb/Fuze.nzb s3cr3t"), d);
     QVERIFY(!logged.contains(QStringLiteral("s3cr3t")));
     QVERIFY(logged.contains(QStringLiteral("****")));
+}
+
+void TestPostInfoTemplate::meta_names_are_read_off_a_template()
+{
+    QCOMPARE(PostInfoTemplate::metaNamesIn(QStringLiteral(
+                 "titre =__meta:titre__\n"
+                 "cat =__meta:categorie__\n"
+                 "encore =__meta:titre__\n"   // a repeat is one field, not two
+                 "taille =__postSize__\n"     // not a metadata
+                 "date =__date:dd/MM/yyyy__\n")),
+             QStringList({ QStringLiteral("titre"), QStringLiteral("categorie") }));
+
+    QVERIFY(PostInfoTemplate::metaNamesIn(QStringLiteral("nothing here")).isEmpty());
+    // an empty name is not a field
+    QVERIFY(PostInfoTemplate::metaNamesIn(QStringLiteral("x =__meta:__")).isEmpty());
 }
 
 void TestPostInfoTemplate::template_path_resolution()

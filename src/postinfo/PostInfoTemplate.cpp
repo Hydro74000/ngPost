@@ -241,6 +241,21 @@ QStringList renderArguments(QStringList const  &args,
     return rendered;
 }
 
+QStringList metaNamesIn(QString const &tmpl)
+{
+    QStringList names;
+    QRegularExpressionMatchIterator it = tokenRegExp().globalMatch(tmpl);
+    while (it.hasNext()) {
+        QRegularExpressionMatch const m = it.next();
+        if (m.captured(1) != QLatin1String("meta"))
+            continue;
+        QString const name = m.captured(2);
+        if (!name.isEmpty() && !names.contains(name))
+            names << name;
+    }
+    return names;
+}
+
 QString redactSecrets(QString const &text, PostInfoData const &data)
 {
     QMap<QString, QString> const v = values(data, false);

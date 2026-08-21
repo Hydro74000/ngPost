@@ -115,6 +115,7 @@ public:
         NO_POST_INFO_ONLY_ON_SUCCESS,
         NO_POST_CMD_FAIL_IS_ERROR,
         NO_POST_CMD_EXPOSE_PASSWORD,
+        NO_POST_INFO,
         MONITOR_FOLDERS,
         MONITOR_EXT,
         MONITOR_IGNORE_DIR,
@@ -367,6 +368,9 @@ private:
     QString _loadedConfigDir;
     QString _postInfoOutput;
     bool _postInfoOnlySuccess;
+    //! --no_post_info: this run writes no record sheet, whatever the
+    //! configuration says. The counterpart of unticking the box in the GUI.
+    bool _noPostInfo;
     int _postCmdTimeoutSec;      //!< per command, 0 = no limit
     bool _postCmdFailIsError;    //!< should a failed post command fail the run?
     bool _postCmdExposePassword; //!< password in the env and the json of a hook
@@ -563,9 +567,12 @@ public:
     //! True when something will actually read the description of a post: a
     //! post info file, a post command, or an upload. Consolidating it costs a
     //! database read, which nobody should pay for when unused.
-    bool needsPostInfoData() const
+    bool needsPostInfoData(const PostingJobOptions &options) const
     {
-        return !_postInfoTemplate.isEmpty() || !_nzbPostCmd.isEmpty() || _urlNzbUpload != nullptr;
+        const bool wantsSheet =
+            options.writePostInfoFile
+            && !(options.postInfoTemplate.isEmpty() && _postInfoTemplate.isEmpty());
+        return wantsSheet || !_nzbPostCmd.isEmpty() || _urlNzbUpload != nullptr;
     }
 
     //! Splits a "key=value" metadata pair on the FIRST '=' only, so a value can
@@ -577,6 +584,14 @@ public:
     //! A relative path is understood from the configuration folder, or from the
     //! current directory when it was given on the command line.
     QString postInfoTemplatePath() const;
+
+    //! Sets the model the configuration offers. An absolute path from the GUI
+    //! needs no resolving, so it is stored as given.
+    void setPostInfoTemplate(const QString &path)
+    {
+        _postInfoTemplate        = path;
+        _postInfoTemplateFromCli = false;
+    }
 
     //! Folder a relative POST_INFO_OUTPUT is understood from, which is what
     //! the configuration file says: its own folder.

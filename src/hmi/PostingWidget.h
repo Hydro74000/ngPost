@@ -57,14 +57,14 @@ private:
     STATE              _state;
     bool               _postingFinished;
 
-    // Per post metadata, built in code rather than in the .ui: the rows are
-    // created on the fly anyway, and a checkable QGroupBox only greys its
-    // children out, it does not fold.
-    QGroupBox    *_metaBox;
-    QToolButton  *_metaToggle;
-    QWidget      *_metaContent;
-    QTableWidget *_metaTable;
-    QPushButton  *_metaAddButton;
+    // Post info file, per post. One discreet checkbox on the tab; everything
+    // else lives in a dialog, because a posting tab is about posting.
+    QCheckBox   *_postInfoCB;
+    QPushButton *_postInfoButton;
+    //! Model this post uses, empty when it takes the one from the config.
+    QString _postInfoTemplate;
+    //! What the user typed for THIS post, never shared with the next one.
+    QMap<QString, MetaValue> _postInfoMeta;
 
 public:
     explicit PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber);
@@ -89,10 +89,14 @@ public:
 
     void udatePostingParams();
 
-    //! What the user typed in the metadata table, empty keys skipped. A name
-    //! used twice is reported through \a duplicate rather than silently
-    //! collapsed by the map.
-    QMap<QString, MetaValue> postMeta(QString *duplicate = nullptr) const;
+    //! True when this post asks for a record sheet.
+    bool writesPostInfoFile() const;
+    //! Applied by the auto-post tab to every post it launches.
+    void setPostInfo(bool enabled,
+                     const QString &templateOverride,
+                     const QMap<QString, MetaValue> &meta);
+    QString postInfoTemplateOverride() const { return _postInfoTemplate; }
+    QMap<QString, MetaValue> postInfoMeta() const { return _postInfoMeta; }
 
     void retranslate();
 
@@ -113,8 +117,8 @@ public slots: // for PostingJob
 private slots: // for the HMI
 
     void onNzbPassToggled(bool checked);
-    void onAddPostMetaRow();
-    void onTogglePostMeta(bool expanded);
+    void onPostInfoToggled(bool checked);
+    void onEditPostInfo();
     void onGenNzbPassword();
 
 
@@ -129,9 +133,8 @@ private slots: // for the HMI
 
 
 private:
-    void _buildPostMetaBox();
-    void retranslatePostMetaTexts();
-    void _addPostMetaRow(const QString &key, const QString &value, bool publish);
+    void _buildPostInfoRow();
+    void retranslatePostInfoTexts();
     void _buildFilesList(QFileInfoList &files, bool &hasFolder);
     bool _fileAlreadyInList(const QString &fileName, int currentNbFiles) const;
 

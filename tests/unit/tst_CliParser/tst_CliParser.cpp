@@ -624,14 +624,16 @@ void TestCliParser::post_automation_settings_are_reachable_from_the_cli()
                               "--nzb_post_cmd", "--post_cmd_timeout",
                               "--post_cmd_fail_is_error", "--no_post_cmd_fail_is_error",
                               "--post_cmd_expose_password", "--no_post_cmd_expose_password",
-                              "--nzb_upload_url", "--nzb_upload_timeout", "--post_history" }) {
+                              "--nzb_upload_url", "--nzb_upload_timeout", "--post_history",
+                              "--no_post_info" }) {
         QVERIFY2(out.contains(QString::fromLatin1(flag)),
                  qPrintable(QStringLiteral("help does not mention '%1'").arg(QString::fromLatin1(flag))));
     }
 
     // and they are accepted together on a real command line
     const RunResult accepted = runWithMeta(_bin,
-                                           { "--no_post_info_only_on_success",
+                                           { "--no_post_info",
+                                             "--no_post_info_only_on_success",
                                              "--post_cmd_timeout", "30",
                                              "--post_cmd_fail_is_error",
                                              "--no_post_cmd_expose_password",

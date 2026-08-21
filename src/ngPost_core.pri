@@ -162,6 +162,7 @@ DEFINES += __USE_HMI__
 SOURCES += \
     $$PWD/hmi/AutoPostWidget.cpp \
     $$PWD/hmi/CheckBoxCenterWidget.cpp \
+    $$PWD/hmi/PostInfoDialog.cpp \
     $$PWD/hmi/PostingWidget.cpp \
     $$PWD/hmi/SignedListWidget.cpp \
     $$PWD/hmi/MainWindow.cpp \
@@ -171,6 +172,7 @@ SOURCES += \
 HEADERS += \
     $$PWD/hmi/AutoPostWidget.h \
     $$PWD/hmi/CheckBoxCenterWidget.h \
+    $$PWD/hmi/PostInfoDialog.h \
     $$PWD/hmi/PostingWidget.h \
     $$PWD/hmi/SignedListWidget.h \
     $$PWD/hmi/MainWindow.h \

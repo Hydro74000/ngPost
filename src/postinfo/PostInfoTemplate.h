@@ -80,6 +80,11 @@ QStringList renderArguments(QStringList const  &args,
                             bool                nativeSeparators,
                             QStringList        *unknown = nullptr);
 
+//! Names referenced by __meta:<name>__ in a template, in the order they
+//! appear, without duplicates. Lets an editor offer exactly the fields the
+//! chosen model asks for instead of leaving the user to guess them.
+QStringList metaNamesIn(QString const &tmpl);
+
 //! Replaces the secret values by "****". Used before logging a command.
 QString redactSecrets(QString const &text, PostInfoData const &data);
 

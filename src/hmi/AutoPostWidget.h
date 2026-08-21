@@ -21,7 +21,13 @@
 #ifndef AUTOPOSTWIDGET_H
 #define AUTOPOSTWIDGET_H
 
+#include "postinfo/PostInfoData.h"
+
+#include <QMap>
 #include <QWidget>
+
+class QCheckBox;
+class QPushButton;
 class NgPost;
 class MainWindow;
 class QFileInfo;
@@ -36,6 +42,16 @@ class AutoPostWidget : public QWidget
     Q_OBJECT
 private:
     Ui::AutoPostWidget *_ui;
+
+    //! Post info file for the whole auto-post run: one choice, applied to
+    //! every post it launches.
+    QCheckBox   *_postInfoCB = nullptr;
+    QPushButton *_postInfoButton = nullptr;
+    QString _postInfoTemplate;
+    QMap<QString, MetaValue> _postInfoMeta;
+
+    void _buildPostInfoRow();
+    void retranslatePostInfoTexts();
     MainWindow         *_hmi;
     NgPost             *_ngPost;
     bool                _isMonitoring;
@@ -66,6 +82,8 @@ public slots:
     void onMonitorJobStart();
 
 private slots:
+    void onPostInfoToggled(bool checked);
+    void onEditPostInfo();
     void onSelectFilesClicked();
     void onGenQuickPosts();
     void onCompressPathClicked();

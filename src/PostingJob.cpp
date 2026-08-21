@@ -1477,7 +1477,7 @@ void PostingJob::_closeNzb()
             // Consolidated once, then used by both the post info file and the
             // post commands: they must describe the same post, and for a
             // resume that means the whole post, not the leftovers.
-            if (_ngPost->needsPostInfoData())
+            if (_ngPost->needsPostInfoData(_options))
                 _buildFinalPostInfoData();
             // Written before the post commands so a script can pick it up with
             // __postInfoPath__, and only when an nzb exists: a post info file
@@ -1604,7 +1604,14 @@ bool PostingJob::_buildFinalPostInfoData()
 
 void PostingJob::_writePostInfoFile()
 {
-    if (_ngPost->_postInfoTemplate.isEmpty())
+    if (!_options.writePostInfoFile)
+        return; // this post was told not to
+
+    // The post may bring its own model; otherwise the configured one applies.
+    const QString templatePath = _options.postInfoTemplate.isEmpty()
+                                     ? _ngPost->postInfoTemplatePath()
+                                     : _options.postInfoTemplate;
+    if (templatePath.isEmpty())
         return; // feature off: nothing written, nothing said
 
     if (_ngPost->_postInfoOnlySuccess && !hasPostFinishedSuccessfully()) {
@@ -1620,7 +1627,6 @@ void PostingJob::_writePostInfoFile()
     }
 
     QStringList protectedPaths = _protectedPaths();
-    const QString templatePath = _ngPost->postInfoTemplatePath();
     protectedPaths << templatePath;
 
     const PostInfoTemplate::Result result =
