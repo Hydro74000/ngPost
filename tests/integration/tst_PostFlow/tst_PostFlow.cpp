@@ -653,8 +653,13 @@ void TestPostFlow::post_info_file_reports_archive_and_par2_size_only()
 
     // 120000 (rar) + 30000 (par2), and NOT the 7777 bytes of the copied .nfo
     QVERIFY2(content.contains(QStringLiteral("taille post =150000")), qPrintable(content));
-    QVERIFY2(content.contains(QString::fromUtf8("titre =Mon \xC3\x89t\xC3\xA9")),
-             qPrintable(content));
+    // macOS may pass process arguments in decomposed Unicode form (NFD).
+    // The post must preserve what it received, while this assertion only
+    // cares that the two canonically equivalent spellings match.
+    const QString normalizedContent = content.normalized(QString::NormalizationForm_C);
+    const QString normalizedTitle =
+        QString::fromUtf8("titre =Mon \xC3\x89t\xC3\xA9").normalized(QString::NormalizationForm_C);
+    QVERIFY2(normalizedContent.contains(normalizedTitle), qPrintable(content));
     QVERIFY2(content.contains(QStringLiteral("prive =https://x.fr/f=326598.html")),
              qPrintable(content));
 
