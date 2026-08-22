@@ -15,149 +15,169 @@ TODO: include ParPar instead of par2cmdline?
 TODO: auto RAR size and par2 parameters depending on the inputs size?
 
 ####################################################
-###       Release: ngPost v5.4.3                 ###
+###       Pre-release: ngPost v5.5               ###
 ###       date:    2026/08/22                    ###
 ####################################################
 
-- Post info files: after each post ngPost can write a small text file
-  describing it, filled in from a model you provide. ngPost knows no index
-  format, so an index just ships its own model. Off until POST_INFO_TEMPLATE
-  is set. New keys: POST_INFO_TEMPLATE, POST_INFO_OUTPUT and
-  POST_INFO_ONLY_ON_SUCCESS (true by default).
-- Per post fields (title, portal link, category...), typed in the posting tab
-  or given with --post_meta. A field always goes into the post info file; the
-  "Also in NZB" box, or -m/--meta, additionally publishes it in the nzb. That
-  box is off by default, because an nzb circulates.
-- In the interface a single "Create a post info file" checkbox enables the
-  feature, and the button next to it opens an editor. The choice belongs to
-  the post, not to the application. Auto Post has the same pair, applying to
-  its whole run. Models opened during the session stay in the list for the
-  next posts, and a small cross drops one from it.
-- That editor holds two tables, deliberately apart: the MODEL, which is the
-  file line by line -- name, content, and a live preview of what will come out
-  -- and YOUR FIELDS, the values of this post alone, which are never written
-  into the model. Lines and fields can be added or removed, and "Save as..."
-  writes the result to a model of your own, so a model can be composed without
-  ever opening a text editor. Leaving with unsaved changes to the model asks
-  first: the post reads the file, not the table.
-- A line of a model may mix text and variables freely, for instance
-  "comment =shot by me, __originalName__, posted in __groups__".
-- A line of a model whose FIRST character is '#' is now a comment: it is not
-  written to the sheet, and a variable quoted in it asks for nothing. Indent it
-  by one space to have it written. The generic model shipped with ngPost used
-  to have its whole header copied into every sheet.
-- A "?" button lists every __variable__ ngPost knows and whether it exists
-  before or after the post. It is generated from the renderer's own table, so
-  it cannot describe something ngPost does not support.
-- The History tab loads by pages of 200 entries instead of reading the whole
-  table at once, with previous/next buttons and an "entries N-M" label. A
-  history of tens of thousands of posts no longer freezes the tab when it
-  opens. Statistics and the resume list stay unpaginated on purpose, and the
-  resume banner now refreshes with the rest of the tab instead of only once
-  when it is created.
-- The options of the posting tab are reorganised into two lines that each
-  answer one question: what this post produces (the nzb path, the copied nfo,
-  the record sheet) and how the payload is packed (compression and its name,
-  the archive password, PAR2 and its percentage). Every setting now sits next
-  to the box that switches it on and is greyed when it is off -- the volume
-  size and the RAR limit used to sit on a different row from "Compress", and
-  the redundancy percentage on a different row from "Gen PAR2", both staying
-  active with nothing to act on. The nzb path field now takes the free width
-  of its line instead of showing the tail of a long path.
-- "NZB Password" is renamed "Archive password": it is the password of the rar,
-  which the nzb merely announces -- the same value __rarPass__ names in a
-  record sheet.
-- Every interface string is translated again in all seven languages (English,
-  French, Spanish, German, Dutch, Portuguese, Chinese). 449 entries per
-  language had drifted untranslated over several releases, not only the ones
-  added here; the .ts files and the embedded .qm catalogues are back to zero
-  unfinished entries.
-- --export_post_info <id> writes the record sheet of a post already in the
-  history, to a file or to stdout. Also available from the History tab. A post
-  made before this version never recorded the rar+par2 size, the par2
-  percentage, the source name or your own fields: those lines come out EMPTY
-  rather than as a wrong zero, and ngPost says on stderr which facts are
-  missing. An index importing such a file will not read a zero byte post.
-- Post automation is now fully reachable from the command line, so ngPost can
-  be driven without any ngPost.conf: --post_info_template, --post_info_output,
-  --post_info_only_on_success / --no_..., --no_post_info (write no sheet for
-  this run whatever the config says), --nzb_post_cmd (repeatable, replaces
-  the config ones), --post_cmd_timeout, --post_cmd_fail_is_error / --no_...,
-  --post_cmd_expose_password / --no_..., --nzb_upload_url,
-  --nzb_upload_timeout and --post_history. Each boolean comes as a pair so a
-  value set in the config can be turned around for a single run.
-- Many more variables for NZB_POST_CMD and the models: __postSize__,
-  __par2Pct__, __nzbPoster__, __originalName__, __sourcePath__, __status__,
-  __avgSpeed__, __date:<format>__, __meta:<name>__ and others. All of them are
-  also passed as NGPOST_* environment variables, and the metadata in a json
-  file, so a script can be called with no argument at all.
+This pre-release contains every user-visible change made since the stable
+ngPost v5.4.2 release.
 
-- Documentation: a beginner guide "Post info files" is on the wiki in English
-  and in French, with the models copied in full, every variable, a worked
-  example and a troubleshooting section. Ready made models ship in templates/.
-  A model may live anywhere you can read it; a bare file name in ngPost.conf
-  means "next to that file", so give the full path when it lives elsewhere.
+Major new features:
 
-Changes that affect everyone, even without a post info file:
+- ngPost can now generate a post information file after each post from a
+  user-provided text model. ngPost remains independent of every third-party
+  index format: an index can distribute its own model without requiring a
+  fork or index-specific code in ngPost.
+- The feature is disabled until POST_INFO_TEMPLATE is set. POST_INFO_OUTPUT
+  selects the destination, and POST_INFO_ONLY_ON_SUCCESS defaults to true so
+  failed or partial posts are not exported accidentally.
+- Models can mix plain text and variables on the same line. A line whose first
+  character is '#' is a comment and is not written. The renderer supports 26
+  fixed variables, plus __date:<format>__, __dateStart:<format>__ and
+  __meta:<name>__. Available facts include the source name, final NZB path,
+  archive name and password, poster, groups, PAR2 percentage, payload size,
+  article counters, status, speed, duration and ngPost version.
+- __postSize__ reports the payload files plus PAR2 data before yEnc, excluding
+  an .nfo copied alongside the archive. The historical __sizeInByte__ variable
+  remains available unchanged for existing scripts.
+- Users can attach their own fields to a post, such as a title, portal link or
+  category. --post_meta keeps a field local to the generated file; -m/--meta,
+  or the GUI "Also in NZB" box, additionally publishes it in the NZB. Publishing
+  is always explicit because an NZB may circulate outside the local machine.
+- --export_post_info <id> can generate a file for a post already present in the
+  history, either to a selected path or to stdout. The same action is available
+  from the History tab.
+- Ready-made generic and Baselien models are included under templates/. A full
+  beginner guide is available on the wiki in English and French.
+- Models and output files may live anywhere accessible to the user. Relative
+  paths from ngPost.conf are resolved from that configuration file's folder.
+  Generated files are written atomically; the model, NZB and source paths are
+  protected against accidental replacement, including aliases through
+  symlinks and case-insensitive filesystems. A file containing the archive
+  password is restricted to its owner where the platform allows it.
 
-- The history database migrates from schema v1 to v2 on first launch (two new
-  tables). A database written by a NEWER ngPost is now refused instead of
-  being used blindly.
-- Post commands now run one after the other, in the order declared, and ngPost
-  WAITS for them before quitting or shutting the machine down. They used to be
-  killed halfway in command line mode.
-- A post command that fails, crashes or cannot even start is reported with its
-  exit code and its error output; it used to say nothing at all. The exit code
-  of ngPost is unchanged unless POST_CMD_FAIL_IS_ERROR = true.
-- A post command line is split into arguments BEFORE the variables are
-  replaced, so a value holding spaces or quotes stays one single argument. A
-  variable can no longer expand into several arguments.
-- The archive password is masked in the logs, and kept out of the environment
-  and the json given to post commands (POST_CMD_EXPOSE_PASSWORD to opt in).
-  __rarPass__ as an argument still works.
-- New: POST_CMD_TIMEOUT (0, no limit) and NZB_UPLOAD_TIMEOUT (300s).
+History and migration:
 
-Bug fixes:
+- The SQLite history migrates automatically and transactionally from schema
+  v1 to v2 on first launch. The migration adds post facts and scoped metadata
+  without discarding existing posts. A database created by a newer ngPost is
+  now refused instead of being opened with an unsupported schema.
+- New posts record the source name, application version, PAR2 percentage,
+  archive-plus-parity size and active transfer duration. Transfer time is
+  accumulated across resumes, and the original transfer start date is kept.
+- Posts created before v5.5 did not record every new fact. When one of them is
+  exported, unavailable values such as __postSize__, __par2Pct__,
+  __originalName__ or custom fields are left empty instead of being reported
+  as a misleading zero. ngPost also reports that the export is incomplete.
+- The History tab now loads entries in pages of 200, with previous/next
+  controls and an "entries N-M" indicator. Histories containing many thousands
+  of posts no longer need to be loaded into the interface at once. Statistics
+  and resume candidates remain complete, and the resume banner refreshes with
+  the rest of the history.
+- A resumed post now uses the original post's poster, groups, per-file group
+  choice, obfuscation settings and PAR2 description. Compression and PAR2
+  generation are not run again because the files being resumed already exist.
+- Resume sources are revalidated immediately before transfer. If one changed or
+  disappeared while the job was waiting, the whole resume is aborted before
+  anything is sent and the post remains resumable.
+- Generated files and post hooks receive the consolidated description of the
+  whole resumed post, not only the files or articles transferred by the latest
+  attempt.
 
-- A resume could be recorded as a success while one of its files was
-  missing: a source that changed since the post was interrupted was simply
-  left out. One bad source now aborts the whole resume without posting
-  anything, and the post stays resumable.
-- The post commands of a resume described the leftovers rather than the
-  whole post. They now read the same finalised description as the record
-  sheet.
-- A resume inherited the metadata and the announced password of whatever run
-  happened to be going on, and handed them to its hooks.
-- A generated record sheet could overwrite what it describes: the exports
-  protected nothing, and a resume had no source list. The comparison also
-  now resolves symlinks and ignores case where the filesystem does.
-- setPostSizeIfUnset() was called during a resume and could record the size
-  of the leftovers as the size of the whole post. The final writes to the
-  history no longer ignore their result either.
-- A chatty post command could grow in memory without bound: its output was
-  only read once it had exited.
-- A post command could find the nzb still open, because the upload was
-  released asynchronously; on Windows a hook moving the nzb would fail.
-- A VPN failure exited immediately and killed the post commands of posts
-  that had already gone out.
-- A post missing a whole unreadable file was recorded as "success". Such a
-  file never produces a failed ARTICLE, and only articles were counted. It is
-  now reported as "partial".
-- --meta was split on every '=' and the pair dropped unless there were exactly
-  two parts, so any value holding a URL was silently ignored. It is now split
-  on the first '=' only, and a malformed pair is reported.
-- Custom <meta> tags never reached the delivered nzb, because the file is
-  regenerated from the history at the end of the post and the regenerator only
-  wrote the password.
-- -m "password=..." now follows the password rules: stored under
-  HISTORY_STORE_PASSWORDS, removed by purgePassword, published only when asked.
-- started_at was stamped when a job was created rather than when its transfer
-  began, which was wrong for every queued post. A resume no longer rewrites the
-  date of the first attempt.
-- The nzb path kept in the history was stale whenever the file was renamed to
-  <name>_1.nzb.
-- Resuming a post took the obfuscation and the par2 percentage from the CURRENT
-  settings instead of those of the post being resumed.
+Automation and post hooks:
+
+- All post-information settings are now available from the command line, so a
+  scripted or containerised run does not require ngPost.conf:
+  --post_info_template, --post_info_output,
+  --post_info_only_on_success / --no_post_info_only_on_success,
+  --no_post_info, --post_meta and --export_post_info.
+- Post-command and NZB-upload settings are also available from the command
+  line: repeatable --nzb_post_cmd, --post_cmd_timeout,
+  --post_cmd_fail_is_error / --no_post_cmd_fail_is_error,
+  --post_cmd_expose_password / --no_post_cmd_expose_password,
+  --nzb_upload_url, --nzb_upload_timeout and --post_history. Command-line post
+  commands replace, rather than append to, commands from the configuration.
+- NZB_POST_CMD uses the same variable renderer as post information models.
+  Substitution is performed in one pass, so text contained in a substituted
+  value is never interpreted as another variable.
+- Command lines are split into arguments before variables are replaced. A
+  substituted path or value containing spaces, quotes or apostrophes therefore
+  remains one argument instead of changing the command structure. The legacy
+  %1 alias for the NZB path remains supported in post commands.
+- Fixed non-secret values are also provided as NGPOST_* environment variables.
+  Dates are available as NGPOST_DATE, NGPOST_DATE_START and
+  NGPOST_DATE_EPOCH. Arbitrary metadata and the complete description are stored
+  in the temporary JSON file named by NGPOST_JSON, avoiding lossy environment
+  variable name conversions.
+- Post commands now use one FIFO queue across posts and run sequentially in the
+  order configured. The NZB upload finishes and releases the file before that
+  post's commands begin, so a hook may safely move or rename it.
+- ngPost waits for NZB uploads and post commands before exiting or shutting the
+  machine down. A VPN failure also passes through this completion barrier.
+  Ctrl+C still interrupts immediately.
+- Command start failures, crashes, non-zero exit codes and bounded stdout/stderr
+  output are now reported. POST_CMD_FAIL_IS_ERROR optionally turns a hook
+  failure into a non-zero ngPost result.
+- POST_CMD_TIMEOUT controls hung commands (0 means no limit), while
+  NZB_UPLOAD_TIMEOUT defaults to 300 seconds for stalled uploads.
+- The substituted command is logged, but archive passwords are redacted.
+  Passwords are excluded from inherited environment variables and from the JSON
+  by default; POST_CMD_EXPOSE_PASSWORD explicitly enables them. Using
+  __rarPass__ as a command argument remains supported.
+
+GUI and translations:
+
+- Each posting tab now has one discreet "Create a post info file" checkbox and
+  a button opening the model editor. Auto Post offers the same controls, with
+  one choice applied to that run.
+- The editor separates the model from the values of the current post. The model
+  is displayed line by line with its name, content and live preview; custom
+  fields stay in a separate table and are never written into the model.
+- Model lines and custom fields can be added or removed, and "Save as..." can
+  create a new model without using an external text editor. Unsaved model
+  changes are confirmed before leaving because posts always read the file on
+  disk.
+- A built-in reference lists every supported variable, its meaning and whether
+  its value is known before or only after posting. Secret values are shown only
+  as present, never displayed.
+- Models opened during the session remain available to later posting tabs and
+  may be removed from the list. "Use this model for my next posts too" can make
+  the selected model the configured default.
+- Posting controls have been reorganised around two clear decisions: what the
+  post produces and how its payload is packed. Compression volume settings,
+  the RAR limit and PAR2 redundancy now follow their corresponding controls;
+  archive name and password fields have more room, and the NZB path expands to
+  use the available width.
+- "NZB Password" has been renamed "Archive password", matching what the value
+  actually represents and the __rarPass__ variable used by models and hooks.
+- All interface catalogues have been refreshed in English, French, Spanish,
+  German, Dutch, Portuguese and Chinese. The accumulated unfinished entries
+  from previous releases are translated, and the embedded .qm files have been
+  regenerated.
+
+Fixes and compatibility:
+
+- A queued posting job now keeps the settings captured when it was created
+  instead of silently adopting global settings changed while it waited.
+- A post containing a whole unreadable file is now reported as partial instead
+  of successful. Such a file creates no failed article, so checking article
+  failures alone was insufficient.
+- --meta and --post_meta split key/value pairs on the first '=' only, so URLs
+  and other values containing '=' are accepted. Empty or malformed keys and a
+  key declared with conflicting scopes are reported.
+- Metadata values are stored as entered and escaped only when the NZB is
+  written, preserving apostrophes, ampersands and Unicode in generated files.
+- Public custom metadata is preserved when the final NZB is regenerated from
+  history. Private metadata never enters the delivered NZB.
+- -m "password=..." now follows the archive password rules: it honours
+  HISTORY_STORE_PASSWORDS, is removed by password purging and is included in a
+  regenerated NZB only when password publication is requested.
+- History started_at now records the actual beginning of transfer rather than
+  job creation, and a resume no longer overwrites the first attempt's date.
+- The history now follows the final NZB path when an existing destination makes
+  ngPost rename the file to <name>_1.nzb.
+- Exports to stdout contain only the generated data; configuration messages,
+  warnings and diagnostics are sent to stderr so pipelines remain valid.
 
 ####################################################
 ###       Release: ngPost LevelUp                ###

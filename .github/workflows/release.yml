@@ -53,13 +53,14 @@ jobs:
           if [ -n "$RELEASE_INPUT" ]; then
             tag="$RELEASE_INPUT"
             package_version="$RELEASE_INPUT"
-            channel="stable"
             appimage_update_glob="ngPost-*-x86_64.AppImage.zsync"
             if [ "$PRERELEASE_INPUT" = "true" ]; then
               prerelease="true"
+              channel="prerelease"
               release_name="Pre-release $RELEASE_INPUT"
             else
               prerelease="false"
+              channel="stable"
               release_name="Release $RELEASE_INPUT"
             fi
           elif [ "${GITHUB_REF}" = "refs/heads/master" ]; then
@@ -143,6 +144,9 @@ jobs:
           mkdir -p "dist/${PKG}"
           cp src/ngPost "dist/${PKG}/"
           cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
+          cp -R templates "dist/${PKG}/"
+          test -f "dist/${PKG}/templates/post_info_default.txt"
+          test -f "dist/${PKG}/templates/post_info_baselien.txt"
           tar -C dist -czf "dist/${PKG}.tar.gz" "${PKG}"
           rm -rf "dist/${PKG}"
           ls -la dist/
@@ -380,6 +384,13 @@ jobs:
           Copy-Item ngPost.conf.example, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item THIRD_PARTY_LICENSES.md "dist/$pkg/" -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path "dist/$pkg/templates" | Out-Null
+          Copy-Item -Recurse templates/* "dist/$pkg/templates/"
+          foreach ($model in @("post_info_default.txt", "post_info_baselien.txt")) {
+            if (-not (Test-Path "dist/$pkg/templates/$model")) {
+              throw "Missing post info model in package: $model"
+            }
+          }
           # Phase 5b: bundle PowerShell helpers for Windows-only WireGuard
           # tunnel registration. They run under UAC via Start-Process RunAs.
           New-Item -ItemType Directory -Force -Path "dist/$pkg/scripts/win" | Out-Null
@@ -663,6 +674,9 @@ jobs:
           zip -qr "../dist/${PKG}.zip" ngPost.app
           cd ..
           zip -qj "dist/${PKG}.zip" THIRD_PARTY_LICENSES.md
+          zip -qr "dist/${PKG}.zip" templates
+          unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_default.txt'
+          unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_baselien.txt'
           ls -la dist/
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
@@ -796,6 +810,7 @@ jobs:
           cp src/resources/icons/ngPost.png AppDir/
           cp ngPost.desktop AppDir/
           cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md AppDir/ || true
+          cp -R templates AppDir/
       - name: Locate OpenSSL libraries
         id: openssl
         run: |
@@ -899,6 +914,8 @@ jobs:
           test -x squashfs-root/usr/bin/ngpost-vpn-install.sh   || { echo "ERROR: install script not bundled";   exit 1; }
           test -x squashfs-root/usr/bin/ngpost-vpn-uninstall.sh || { echo "ERROR: uninstall script not bundled"; exit 1; }
           test -f squashfs-root/usr/bin/49-ngpost-vpn.rules.in  || { echo "ERROR: polkit rule template not bundled"; exit 1; }
+          test -f squashfs-root/templates/post_info_default.txt  || { echo "ERROR: default post info model not bundled"; exit 1; }
+          test -f squashfs-root/templates/post_info_baselien.txt || { echo "ERROR: Baselien post info model not bundled"; exit 1; }
           # Check the update-information string is embedded in the ELF
           expected_update_info="gh-releases-zsync|Hydro74000|ngPost|latest|$APPIMAGE_UPDATE_GLOB"
           if ! strings "$APPIMAGE" | grep -Fq "$expected_update_info"; then
@@ -985,7 +1002,20 @@ jobs:
               echo "- Previous release: none found"
             fi
             echo
-            echo "## Changes since previous release"
+            echo "## Detailed release notes"
+            echo
+            awk '
+              tolower($0) ~ /^### +.*release:/ {
+                if (in_release) exit
+                in_release=1
+                next
+              }
+              in_release && /^### +date:/ { next }
+              in_release && /^#+$/ { next }
+              in_release { print }
+            ' release_notes.txt
+            echo
+            echo "## Commits since ${previous_tag:-the previous release}"
             echo
             cat commits.md
             echo
@@ -997,6 +1027,8 @@ jobs:
           name: ${{ needs.release-metadata.outputs.release_name }}
           draft: false
           prerelease: ${{ needs.release-metadata.outputs.prerelease }}
+          make_latest: ${{ needs.release-metadata.outputs.prerelease == 'true' && 'false' || 'legacy' }}
+          target_commitish: ${{ github.sha }}
           body_path: release-body.md
           files: artifacts/*
         env:

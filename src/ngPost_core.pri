@@ -31,7 +31,7 @@ LIBS    += -lqt6keychain
 # a DLL that nothing imports, which windeployqt then skips.
 linux:!android: QT += dbus
 
-VERSION = 5.4.3
+VERSION = 5.5
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 INCLUDEPATH += $$PWD
