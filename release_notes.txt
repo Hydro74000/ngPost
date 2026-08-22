@@ -16,7 +16,7 @@ TODO: auto RAR size and par2 parameters depending on the inputs size?
 
 ####################################################
 ###       Release: ngPost v5.4.3                 ###
-###       date:    2026/08/21                    ###
+###       date:    2026/08/22                    ###
 ####################################################
 
 - Post info files: after each post ngPost can write a small text file
@@ -29,10 +29,10 @@ TODO: auto RAR size and par2 parameters depending on the inputs size?
   "Also in NZB" box, or -m/--meta, additionally publishes it in the nzb. That
   box is off by default, because an nzb circulates.
 - In the interface a single "Create a post info file" checkbox enables the
-  feature, and the button next to it opens an editor. The choice belongs to the
-  post, not to the application. Auto Post has the same pair, applying to its whole run. Models
-  opened during the session stay in the list for the next posts, and a small
-  cross drops one from it.
+  feature, and the button next to it opens an editor. The choice belongs to
+  the post, not to the application. Auto Post has the same pair, applying to
+  its whole run. Models opened during the session stay in the list for the
+  next posts, and a small cross drops one from it.
 - That editor holds two tables, deliberately apart: the MODEL, which is the
   file line by line -- name, content, and a live preview of what will come out
   -- and YOUR FIELDS, the values of this post alone, which are never written
@@ -49,16 +49,39 @@ TODO: auto RAR size and par2 parameters depending on the inputs size?
 - A "?" button lists every __variable__ ngPost knows and whether it exists
   before or after the post. It is generated from the renderer's own table, so
   it cannot describe something ngPost does not support.
+- The History tab loads by pages of 200 entries instead of reading the whole
+  table at once, with previous/next buttons and an "entries N-M" label. A
+  history of tens of thousands of posts no longer freezes the tab when it
+  opens. Statistics and the resume list stay unpaginated on purpose, and the
+  resume banner now refreshes with the rest of the tab instead of only once
+  when it is created.
+- The options of the posting tab are reorganised into two lines that each
+  answer one question: what this post produces (the nzb path, the copied nfo,
+  the record sheet) and how the payload is packed (compression and its name,
+  the archive password, PAR2 and its percentage). Every setting now sits next
+  to the box that switches it on and is greyed when it is off -- the volume
+  size and the RAR limit used to sit on a different row from "Compress", and
+  the redundancy percentage on a different row from "Gen PAR2", both staying
+  active with nothing to act on. The nzb path field now takes the free width
+  of its line instead of showing the tail of a long path.
+- "NZB Password" is renamed "Archive password": it is the password of the rar,
+  which the nzb merely announces -- the same value __rarPass__ names in a
+  record sheet.
 - Every interface string is translated again in all seven languages (English,
   French, Spanish, German, Dutch, Portuguese, Chinese). 449 entries per
   language had drifted untranslated over several releases, not only the ones
   added here; the .ts files and the embedded .qm catalogues are back to zero
   unfinished entries.
 - --export_post_info <id> writes the record sheet of a post already in the
-  history, to a file or to stdout. Also available from the History tab.
+  history, to a file or to stdout. Also available from the History tab. A post
+  made before this version never recorded the rar+par2 size, the par2
+  percentage, the source name or your own fields: those lines come out EMPTY
+  rather than as a wrong zero, and ngPost says on stderr which facts are
+  missing. An index importing such a file will not read a zero byte post.
 - Post automation is now fully reachable from the command line, so ngPost can
   be driven without any ngPost.conf: --post_info_template, --post_info_output,
-  --post_info_only_on_success / --no_..., --nzb_post_cmd (repeatable, replaces
+  --post_info_only_on_success / --no_..., --no_post_info (write no sheet for
+  this run whatever the config says), --nzb_post_cmd (repeatable, replaces
   the config ones), --post_cmd_timeout, --post_cmd_fail_is_error / --no_...,
   --post_cmd_expose_password / --no_..., --nzb_upload_url,
   --nzb_upload_timeout and --post_history. Each boolean comes as a pair so a
@@ -68,6 +91,12 @@ TODO: auto RAR size and par2 parameters depending on the inputs size?
   __avgSpeed__, __date:<format>__, __meta:<name>__ and others. All of them are
   also passed as NGPOST_* environment variables, and the metadata in a json
   file, so a script can be called with no argument at all.
+
+- Documentation: a beginner guide "Post info files" is on the wiki in English
+  and in French, with the models copied in full, every variable, a worked
+  example and a troubleshooting section. Ready made models ship in templates/.
+  A model may live anywhere you can read it; a bare file name in ngPost.conf
+  means "next to that file", so give the full path when it lives elsewhere.
 
 Changes that affect everyone, even without a post info file:
 
