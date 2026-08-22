@@ -601,7 +601,11 @@ void TestCliParser::export_post_info_writes_to_file_or_stdout()
     QVERIFY2(!toStdout.timedOut, "export to stdout timed out");
     QCOMPARE(toStdout.exitCode, 0);
     // stdout carries the record sheet and nothing else: a caller pipes it
-    QCOMPARE(toStdout.stdoutText, content);
+    QString stdoutContent = toStdout.stdoutText;
+    stdoutContent.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    QString fileContent = content;
+    fileContent.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    QCOMPARE(stdoutContent, fileContent);
 
     const RunResult unknown = run(_bin,
                                   { "--export_post_info", "999999",

@@ -652,7 +652,12 @@ void TestPostInfoTemplate::baselien_template_golden()
         "categorie =Video perso\n"
         "qualite =1080p\n"
         "genre =Nature\n");
-    QCOMPARE(readFile(res.outPath), expected);
+    // Git may check the template out with CRLF on Windows. The renderer
+    // deliberately preserves the model's line endings, so compare text after
+    // canonicalising the platform representation.
+    QString actual = readFile(res.outPath);
+    actual.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    QCOMPARE(actual, expected);
 }
 
 QTEST_MAIN(TestPostInfoTemplate)
