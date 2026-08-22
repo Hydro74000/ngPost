@@ -891,6 +891,7 @@ void MainWindow::_retranslateHistoryTab()
     if (_historyDetailInfo && _historyDetailInfo->text().contains("Select a post"))
         _historyDetailInfo->setText(tr("<i>Select a post to see its details.</i>"));
     if (_histRegenNzbBtn)  _histRegenNzbBtn->setText(tr("Regenerate NZB\342\200\246"));
+    if (_histExportInfoBtn) _histExportInfoBtn->setText(tr("Export info file\342\200\246"));
     if (_histCopyPassBtn)  _histCopyPassBtn->setText(tr("Copy password"));
     if (_histPurgePassBtn) _histPurgePassBtn->setText(tr("Purge password"));
     if (_histOpenNzbBtn)   _histOpenNzbBtn->setText(tr("Open NZB location"));
@@ -1095,15 +1096,17 @@ QWidget *MainWindow::_buildHistoryTab()
 
     QHBoxLayout *detailActions = new QHBoxLayout();
     _histRegenNzbBtn  = new QPushButton(tr("Regenerate NZB\342\200\246"), detailPanel);
+    _histExportInfoBtn = new QPushButton(tr("Export info file\342\200\246"), detailPanel);
     _histCopyPassBtn  = new QPushButton(tr("Copy password"), detailPanel);
     _histPurgePassBtn = new QPushButton(tr("Purge password"), detailPanel);
     _histOpenNzbBtn   = new QPushButton(tr("Open NZB location"), detailPanel);
     _histDeleteBtn    = new QPushButton(tr("Delete entry"), detailPanel);
     _histDeleteBtn->setStyleSheet("QPushButton { color: #dd4444; }");
-    for (QPushButton *btn : {_histRegenNzbBtn, _histCopyPassBtn, _histPurgePassBtn,
-                             _histOpenNzbBtn, _histDeleteBtn})
+    for (QPushButton *btn : {_histRegenNzbBtn, _histExportInfoBtn, _histCopyPassBtn,
+                             _histPurgePassBtn, _histOpenNzbBtn, _histDeleteBtn})
         btn->setEnabled(false);
     detailActions->addWidget(_histRegenNzbBtn);
+    detailActions->addWidget(_histExportInfoBtn);
     detailActions->addWidget(_histCopyPassBtn);
     detailActions->addWidget(_histPurgePassBtn);
     detailActions->addWidget(_histOpenNzbBtn);
@@ -1275,6 +1278,7 @@ QWidget *MainWindow::_buildHistoryTab()
     connect(_historyTable,        &QTableWidget::currentCellChanged,
             this, [this](int row, int, int, int) { _onHistoryRowSelected(row); });
     connect(_histRegenNzbBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryRegenNzb);
+    connect(_histExportInfoBtn,   &QPushButton::clicked,  this, &MainWindow::_onHistoryExportInfo);
     connect(_histCopyPassBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryCopyPassword);
     connect(_histPurgePassBtn,    &QPushButton::clicked,  this, &MainWindow::_onHistoryPurgePassword);
     connect(_histDeleteBtn,       &QPushButton::clicked,  this, &MainWindow::_onHistoryDeleteEntry);
@@ -1991,6 +1995,7 @@ void MainWindow::_showHistoryDetails(const PostHistoryStore::PostDetails &detail
         _historyDetailInfo->setText(html);
 
     if (_histRegenNzbBtn)  _histRegenNzbBtn->setEnabled(true);
+    if (_histExportInfoBtn) _histExportInfoBtn->setEnabled(true);
     if (_histDeleteBtn)    _histDeleteBtn->setEnabled(true);
     if (_histCopyPassBtn)  _histCopyPassBtn->setEnabled(s.hasPassword && s.passwordStored);
     if (_histPurgePassBtn) _histPurgePassBtn->setEnabled(s.hasPassword && s.passwordStored);
@@ -2032,6 +2037,65 @@ void MainWindow::_onHistoryRegenNzb()
         QMessageBox::warning(this, tr("NZB regeneration failed"),
                              tr("Could not regenerate the NZB.\n"
                                 "Check that the post has complete article history."));
+}
+
+void MainWindow::_onHistoryExportInfo()
+{
+    if (!_selectedHistoryId || !_ngPost) return;
+
+    // The model can be the configured one, or any file the user picks: it is
+    // the index that decides the format, not ngPost.
+    QString templatePath = _ngPost->postInfoTemplatePath();
+    if (templatePath.isEmpty() || !QFileInfo::exists(templatePath)) {
+        QMessageBox::information(
+            this, tr("Pick a model"),
+            tr("A post info file is written from a model you provide: a small text file "
+               "where the values are written as __variables__.\n\n"
+               "Pick one now, or set POST_INFO_TEMPLATE in your configuration to always "
+               "use the same."));
+        templatePath = QFileDialog::getOpenFileName(this, tr("Post info model"), QString(),
+                                                    tr("Text files (*.txt *.tpl);;All files (*)"));
+        if (templatePath.isEmpty()) return;
+    }
+
+    // Only ask about the password when the model actually asks for it.
+    bool includePassword = false;
+    QFile tmpl(templatePath);
+    if (tmpl.open(QIODevice::ReadOnly)) {
+        const QString content = QString::fromUtf8(tmpl.readAll());
+        tmpl.close();
+        if (content.contains(QStringLiteral("__rarPass__"))) {
+            const int res = QMessageBox::question(
+                this, tr("Include password?"),
+                tr("This model writes the archive password into the file.\n"
+                   "Include it?"),
+                QMessageBox::Yes | QMessageBox::No);
+            includePassword = (res == QMessageBox::Yes);
+        }
+    }
+
+    const QString outPath = QFileDialog::getSaveFileName(
+        this, tr("Save post info file"), _ngPost->_nzbPath, tr("Text files (*.txt);;All files (*)"));
+    if (outPath.isEmpty()) return;
+
+    QString error;
+    bool incomplete = false;
+    QStringList warnings;
+    if (_ngPost->exportPostInfoGui(_selectedHistoryId, templatePath, outPath, includePassword,
+                                   &error, &incomplete, &warnings)) {
+        QString msg = tr("Post info file written to:\n%1").arg(outPath);
+        if (!warnings.isEmpty())
+            msg += QStringLiteral("\n\n") + warnings.join(QStringLiteral("\n"));
+        if (incomplete) {
+            // Being explicit beats a file that quietly pretends to be complete.
+            msg += tr("\n\nThis post was made before ngPost recorded these details, so the "
+                      "par2 percentage, the source name and your own information are empty.");
+        }
+        QMessageBox::information(this, tr("Post info file written"), msg);
+    } else {
+        QMessageBox::warning(this, tr("Export failed"),
+                             error.isEmpty() ? tr("Could not write the post info file.") : error);
+    }
 }
 
 void MainWindow::_onHistoryExportCsv()
@@ -2477,6 +2541,10 @@ void MainWindow::_onHistoryContextMenu(const QPoint &pos)
     if (history->checkResume(postId, &dec, &err))
         resumeAct = menu.addAction(tr("Resume"));
 
+    if (!menu.actions().isEmpty())
+        menu.addSeparator();
+    QAction *exportInfoAct = menu.addAction(tr("Export info file\342\200\246"));
+
     QAction *revealAct = nullptr;
     QAction *copyAct = nullptr;
     if (details.post.hasPassword && details.post.passwordStored) {
@@ -2494,6 +2562,8 @@ void MainWindow::_onHistoryContextMenu(const QPoint &pos)
 
     if (chosen == resumeAct) {
         _startResumePost(postId, true);
+    } else if (chosen == exportInfoAct) {
+        _onHistoryExportInfo();
     } else if (chosen == revealAct) {
         QMessageBox box(this);
         box.setWindowTitle(tr("Archive password"));

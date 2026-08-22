@@ -1,6 +1,6 @@
 <img align="left" width="80" height="80" src="https://raw.githubusercontent.com/Hydro74000/ngPost/master/src/resources/icons/ngPost.png" alt="ngPost">
 
-# ngPost v5.4.0
+# ngPost v5.4.3
 
 ngPost est un posteur pour Usenet en ligne de commande ou via une interface graphique développé en C++17/Qt6.<br/>
 Il a été conçu pour être le plus rapide possible et offrir toutes les fonctionnalités utiles pour poster facilement et en toute sécurité.<br/>
@@ -46,6 +46,14 @@ Sinon vous pouvez éditer le fichier à la main. Il vous faut remplir:
   - VPN_AUTO_CONNECT, VPN_BACKEND et VPN_CONFIG_PATH si vous utilisez le tunnel VPN intégré
   - useVpn dans chaque section Server pour indiquer si ce serveur doit passer par le VPN
   - la ou les sections Server
+
+Facultatif, si un index Usenet vous réclame une fiche pour chaque post :
+  - POST_INFO_TEMPLATE (votre modèle de fiche : ngPost ne connaît aucun format
+    d'index, vous lui donnez le modèle, il remplit les trous)
+  - POST_INFO_OUTPUT (où écrire la fiche, par défaut à côté du nzb)
+
+Des modèles prêts à copier sont dans le dossier [templates/](https://github.com/Hydro74000/ngPost/tree/master/templates),
+et le guide complet pour débuter est sur le wiki : [Fiches de post](https://github.com/Hydro74000/ngPost/wiki/Post-Info-Files-fr).
 
 
 ### En ligne de commande

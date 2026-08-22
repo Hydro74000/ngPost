@@ -87,6 +87,7 @@ private:
     QCheckBox    *_historyErrorsFilter = nullptr;
     QLabel       *_historyDetailInfo  = nullptr;
     QPushButton  *_histRegenNzbBtn    = nullptr;
+    QPushButton  *_histExportInfoBtn  = nullptr;
     QPushButton  *_histCopyPassBtn    = nullptr;
     QPushButton  *_histPurgePassBtn   = nullptr;
     QPushButton  *_histDeleteBtn      = nullptr;
@@ -241,6 +242,7 @@ private slots:
     void _onHistoryNextPage();
     void _onHistoryRowSelected(int row);
     void _onHistoryRegenNzb();
+    void _onHistoryExportInfo();
     void _onHistoryExportCsv();
     void _onHistoryCopyPassword();
     void _onHistoryPurgePassword();

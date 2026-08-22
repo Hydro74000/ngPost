@@ -20,9 +20,12 @@
 
 #ifndef POSTINGJOB_H
 #define POSTINGJOB_H
+#include "PostingJobOptions.h"
 #include "utils/Macros.h"
 
+#include <QDateTime>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QFileInfoList>
 #include <QMap>
 #include <QMutex>
@@ -60,16 +63,19 @@ class PostingJob : public QObject
     friend class NgPost;
 
 public:
-    struct ResumeFileState {
-        qint64 historyFileId = 0;
-        int ordinal = 0;
-        int totalFiles = 0;
-        QStringList groups;
-        QSet<uint> postedParts;
-    };
+    //! Kept as a nested name for the existing call sites; the definition lives
+    //! in PostingJobOptions.h so that the options can carry it.
+    using ResumeFileState = PostingJobResumeFileState;
 
 private:
     NgPost *const _ngPost; //!< handle on the application to access global configs
+
+    //! Frozen at construction: a job may wait in the queue while the global
+    //! settings change, and it must be posted with the settings it was queued
+    //! with. Also carries the facts (raw input paths, metadata, what the
+    //! original post did) that describe the job without driving it.
+    const PostingJobOptions _options;
+
     QFileInfoList _files;  //!< populated on constuction using a QStringList of paths
 
     PostingWidget *const _postWidget;
@@ -119,7 +125,16 @@ private:
     uint _part;          //!< part number (Article) on the current file
 
     QElapsedTimer _timeStart;  //!< to get some stats (upload time and avg speed)
-    quint64 _totalSize;        //!< total size (in Bytes) to be uploaded
+    quint64 _totalSize;        //!< bytes of the files that went through, legacy value
+    //! Bytes of the archive and its parity, copied .nfo excluded, before yEnc
+    //! encoding. Unlike _totalSize this is known upfront and does not shrink
+    //! when a file fails, so it describes what the post IS.
+    quint64 _postSizeBytes;
+    //! Absolute paths of the .nfo copied next to the rar volumes (KEEP_NFO_EXTENSION):
+    //! posted, but not part of the archive.
+    QSet<QString> _copiedNfoPaths;
+    QDateTime _startedAtWall;  //!< wall clock, _timeStart is monotonic only
+    QDateTime _finishedAtWall;
     QElapsedTimer _pauseTimer; //!< to record the time when ngPost is in pause
     qint64 _pauseDuration;     //!< total duration of all pauses
 
@@ -145,6 +160,9 @@ private:
     const QFileInfoList _originalFiles;
 
     QString _nfoSrcToCopy; //!< absolute path of the .nfo to copy next to the nzb (resolved at job start, copied on success)
+    QString _postInfoFilePath; //!< post info file once written, empty otherwise
+    PostInfoData _finalPostInfoData; //!< consolidated description, cached
+    bool _finalPostInfoDataReady = false;
 
     QMutex _secureDiskAccess;
 
@@ -178,29 +196,8 @@ private:
 
 public:
     PostingJob(NgPost *ngPost,
-               const QString &nzbFilePath,
-               const QFileInfoList &files,
-               PostingWidget *postWidget,
-               const QList<QString> &grpList,
-               const std::string &from,
-               bool obfuscateArticles,
-               bool obfuscateFileName,
-               const QString &tmpPath,
-               const QString &rarPath,
-               const QString &rarArgs,
-               uint rarSize,
-               bool useRarMax,
-               uint par2Pct,
-               bool doCompress,
-               bool doPar2,
-               const QString &rarName,
-               const QString &rarPass,
-               bool keepRar = false,
-               bool delFilesAfterPost = false,
-               bool overwriteNzb = true,
-               qint64 resumeHistoryPostId = 0,
-               const QMap<QString, ResumeFileState> &resumeFileStatesByPath =
-                   QMap<QString, ResumeFileState>(),
+               const PostingJobOptions &options,
+               PostingWidget *postWidget = nullptr,
                QObject *parent = nullptr);
     ~PostingJob();
 
@@ -222,12 +219,41 @@ public:
     inline const QString &rarPass() const;
     inline QString postSize() const;
 
+    //! Bytes of the archive and its parity, copied .nfo excluded, before yEnc.
+    //! Known as soon as the upload list is built, so it describes the post even
+    //! when some files end up failing.
+    inline quint64 postSizeInBytes() const;
+    inline QString postSizeHuman() const;
+    //! par2 redundancy to DESCRIBE the post: the original one for a resume,
+    //! and < 0 when there is no par2 at all.
+    inline int describedPar2Pct() const;
+    //! Poster written in the nzb. Under article obfuscation the real From: of
+    //! each article is random and differs from this one.
+    inline QString nzbPoster() const;
+    //! First path the user actually gave, before a folder was expanded.
+    inline QString sourcePath() const;
+    inline QString sourceName() const;
+    inline const QStringList &inputPaths() const;
+    inline const QMap<QString, MetaValue> &postMeta() const;
+    inline qint64 historyPostId() const;
+
+    //! Description of this post, for a post info file or a post command. Once
+    //! _buildFinalPostInfoData() has run, this is the consolidated view: for a
+    //! resume the live job only knows the leftovers, so both the sheet and the
+    //! hooks must read the same finalised description.
+    PostInfoData postInfoData() const;
+    inline const QDateTime &startedAtWall() const;
+    inline const QDateTime &finishedAtWall() const;
+
     inline bool hasCompressed() const;
     inline bool hasPacking() const;
     inline bool isPacked() const;
     inline bool hasPostStarted() const;
     inline bool hasPostFinished() const;
     inline bool hasPostFinishedSuccessfully() const;
+
+    //! The success rule itself, so it can be exercised without a live post.
+    inline static bool postSucceeded(bool postFinished, uint nbArticlesFailed, bool anyFileFailed);
 
     inline PostingWidget *widget() const;
 
@@ -309,6 +335,23 @@ private slots:
 private:
     void _log(const QString &aMsg, bool newline = true) const; //!< log function for QString
     void _error(const QString &error) const;
+    //! What this job alone knows, before the history consolidates it.
+    PostInfoData _livePostInfoData() const;
+    //! Merges the history into the live view and caches the result, so the
+    //! sheet and the post commands describe the same thing. Returns false when
+    //! the post cannot be described at all (a resume whose history is
+    //! unreadable).
+    bool _buildFinalPostInfoData();
+    //! Writes the post info file if one was asked for. Never fails a post:
+    //! every problem is reported as a warning.
+    void _writePostInfoFile();
+    QStringList _protectedPaths() const;
+
+    //! Visible in the log, but does NOT mark the run as failed. _error() sets
+    //! COMPLETED_WITH_ERRORS, which would be wrong for something that did not
+    //! harm the post itself, such as a post info file that could not be
+    //! written.
+    void _warn(const QString &warning) const;
 
     int _createNntpConnections();
     void _preparePostersArticles();
@@ -322,7 +365,10 @@ private:
 
     inline NntpFile *_getNextFile();
 
-    void _initPosting();
+    //! Builds the upload queue. Returns false when the job must not start at
+    //! all, which a resume does when one of its sources no longer matches.
+    bool _initPosting();
+    void _markResumeAbortedAsResumable();
     void _postFiles();
     void _finishPosting();
 
@@ -445,6 +491,52 @@ QString PostingJob::postSize() const
     return humanSize(static_cast<double>(_totalSize));
 }
 
+quint64 PostingJob::postSizeInBytes() const
+{
+    return _postSizeBytes;
+}
+QString PostingJob::postSizeHuman() const
+{
+    return humanSize(static_cast<double>(_postSizeBytes));
+}
+int PostingJob::describedPar2Pct() const
+{
+    return _options.describedPar2Pct();
+}
+QString PostingJob::nzbPoster() const
+{
+    return QString::fromStdString(_from);
+}
+QString PostingJob::sourcePath() const
+{
+    return _options.inputPaths.isEmpty() ? QString() : _options.inputPaths.first();
+}
+QString PostingJob::sourceName() const
+{
+    QString const path = sourcePath();
+    return path.isEmpty() ? QString() : QFileInfo(path).fileName();
+}
+const QStringList &PostingJob::inputPaths() const
+{
+    return _options.inputPaths;
+}
+const QMap<QString, MetaValue> &PostingJob::postMeta() const
+{
+    return _options.meta;
+}
+qint64 PostingJob::historyPostId() const
+{
+    return _historyPostId;
+}
+const QDateTime &PostingJob::startedAtWall() const
+{
+    return _startedAtWall;
+}
+const QDateTime &PostingJob::finishedAtWall() const
+{
+    return _finishedAtWall;
+}
+
 QString PostingJob::humanSize(double size)
 {
     QString unit = "B";
@@ -485,7 +577,15 @@ bool PostingJob::hasPostFinished() const
 }
 bool PostingJob::hasPostFinishedSuccessfully() const
 {
-    return _postFinished && !_nbArticlesFailed;
+    return postSucceeded(_postFinished, _nbArticlesFailed, !_filesFailed.isEmpty());
+}
+bool PostingJob::postSucceeded(bool postFinished, uint nbArticlesFailed, bool anyFileFailed)
+{
+    // A file that could not be read never produces a failed ARTICLE: it is put
+    // aside in _filesFailed and its articles are simply never built. Looking at
+    // nbArticlesFailed alone therefore called a post with a whole missing file
+    // a success.
+    return postFinished && !nbArticlesFailed && !anyFileFailed;
 }
 
 PostingWidget *PostingJob::widget() const

@@ -40,6 +40,51 @@ private slots:
     void list_posts_applies_filters_before_pagination();
     void service_flushes_batches_and_returns_snapshots();
     void service_snapshot_paginates_history_but_stats_are_complete();
+    //! An existing v1 database gains the new tables on open, keeps its rows,
+    //! and records the new schema version.
+    void schema_migrates_v1_database_without_losing_posts();
+
+    //! A database written by a newer ngPost is refused rather than silently
+    //! used with a schema this version does not understand.
+    void schema_refuses_a_newer_database();
+
+    //! started_at stays NULL until the transfer begins, and a resume never
+    //! rewrites the date of the first attempt.
+    void started_at_is_set_by_the_transfer_and_never_rewritten();
+
+    //! The size of the whole post is written once: a resume only sees the
+    //! leftovers and must not shrink it. The transfer time, on the contrary,
+    //! accumulates over attempts.
+    void post_size_is_written_once_and_active_seconds_accumulate();
+
+    //! Metadata round trip, scope included, and "password" refused: it is a
+    //! secret, not a metadata.
+    void post_meta_keeps_scope_and_refuses_the_password_key();
+
+    //! Only the metadata the user chose to publish reaches the delivered nzb.
+    void regenerated_nzb_publishes_only_nzb_scoped_meta();
+
+    //! A resume must not rebuild the archive: doCompress and doPar2 are orders,
+    //! and the rar/par2 volumes are already on disk. What the original post did
+    //! is carried as facts instead.
+    void resume_options_never_replay_compression_or_par2();
+
+    //! The obfuscation of the original post is replayed from the history, not
+    //! taken from the globals, which may have changed since.
+    void resume_options_take_obfuscation_from_history();
+
+    //! A resumed post still describes the par2 redundancy of the ORIGINAL
+    //! post: it is a fact about the archive, not an order to redo anything.
+    void resume_describes_the_original_par2_percentage();
+
+    //! A source is checked again right before being read, not only when the
+    //! resume plan was built: a job can wait a long time in the queue.
+    void resume_file_state_detects_a_source_that_changed();
+
+    //! A resume must not carry the metadata or the password of the run that
+    //! happens to be going on: they belong to another post.
+    void resume_options_drop_the_current_metadata_and_password();
+
     void nzb_regeneration_keeps_prior_files_after_resume();
     void nzb_regeneration_repairs_missing_article_bytes();
     void nzb_regeneration_masks_password_by_default();
@@ -71,6 +116,30 @@ QList<qint64> nzbSegmentBytes(const QString &nzb)
             bytes << reader.attributes().value(QStringLiteral("bytes")).toLongLong();
     }
     return bytes;
+}
+
+// Runs raw SQL on the database file, to assert (or forge) what the store API
+// does not expose. Returns the first column of the first row, if any.
+QVariant rawSql(const QString &dbPath, const QString &sql, const QVariantList &binds = {})
+{
+    static int sConnectionCounter = 0;
+    const QString conn = QStringLiteral("tst_raw_sql_%1").arg(++sConnectionCounter);
+    QVariant result;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conn);
+        db.setDatabaseName(dbPath);
+        if (db.open()) {
+            QSqlQuery q(db);
+            q.prepare(sql);
+            for (const QVariant &bind : binds)
+                q.addBindValue(bind);
+            if (q.exec() && q.next())
+                result = q.value(0);
+            db.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(conn);
+    return result;
 }
 
 // Counts the per-attempt audit rows of a post by reading the SQLite file
@@ -794,6 +863,384 @@ void TestPostHistory::service_snapshot_paginates_history_but_stats_are_complete(
     }
     QVERIFY(foundStatsGroup);
     QCOMPARE(stats.topPosts.size(), 20);
+}
+
+void TestPostHistory::schema_migrates_v1_database_without_losing_posts()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath("history.sqlite");
+
+    qint64 postId = 0;
+    {
+        PostHistoryStore store(dbPath, true);
+        QString error;
+        QVERIFY2(store.initialize(&error), qPrintable(error));
+        postId =
+            createStoredPost(store, QStringLiteral("old.nzb"), QStringLiteral("success"), {}, &error);
+        QVERIFY(postId > 0);
+    }
+
+    // forge a v1 database: the new tables did not exist back then
+    QVERIFY(rawSql(dbPath, QStringLiteral("DROP TABLE post_info")).isNull());
+    QVERIFY(rawSql(dbPath, QStringLiteral("DROP TABLE post_meta")).isNull());
+    QVERIFY(rawSql(dbPath,
+                   QStringLiteral("INSERT OR REPLACE INTO schema_meta(key, value) "
+                                  "VALUES('version', '1')"))
+                .isNull());
+
+    {
+        PostHistoryStore store(dbPath, true);
+        QString error;
+        QVERIFY2(store.initialize(&error), qPrintable(error));
+
+        // the tables are back, the version is recorded, and the post survived
+        QCOMPARE(rawSql(dbPath,
+                        QStringLiteral("SELECT value FROM schema_meta WHERE key='version'"))
+                     .toInt(),
+                 PostHistoryStore::kSchemaVersion);
+        QCOMPARE(rawSql(dbPath, QStringLiteral("SELECT COUNT(*) FROM posts")).toInt(), 1);
+
+        // a post from before the migration has no facts: they are missing, not invented
+        PostHistoryStore::PostInfoRecord record;
+        QVERIFY2(store.loadPostInfoRecord(postId, &record, &error), qPrintable(error));
+        QVERIFY(record.partial);
+        QCOMPARE(record.info.par2Pct, -1);
+        QCOMPARE(record.info.postSizeBytes, static_cast<qint64>(-1));
+        // stays unknown all the way to the sheet, where it renders empty
+        QCOMPARE(record.toPostInfoData().postSizeBytes, static_cast<qint64>(-1));
+    }
+}
+
+void TestPostHistory::schema_refuses_a_newer_database()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath("history.sqlite");
+
+    {
+        PostHistoryStore store(dbPath, true);
+        QString error;
+        QVERIFY2(store.initialize(&error), qPrintable(error));
+    }
+
+    rawSql(dbPath,
+           QStringLiteral("INSERT OR REPLACE INTO schema_meta(key, value) VALUES('version', ?)"),
+           { QString::number(PostHistoryStore::kSchemaVersion + 1) });
+
+    PostHistoryStore store(dbPath, true);
+    QString error;
+    QVERIFY(!store.initialize(&error));
+    QVERIFY2(error.contains(QStringLiteral("newer ngPost")), qPrintable(error));
+}
+
+void TestPostHistory::started_at_is_set_by_the_transfer_and_never_rewritten()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    PostHistoryStore store(dir.filePath("history.sqlite"), true);
+    QString error;
+    QVERIFY2(store.initialize(&error), qPrintable(error));
+
+    const qint64 postId =
+        createStoredPost(store, QStringLiteral("queued.nzb"), QStringLiteral("posting"), {}, &error);
+    QVERIFY(postId > 0);
+
+    // created, but not started: the job may sit in the queue for a long while
+    PostHistoryStore::PostInfoRecord record;
+    QVERIFY2(store.loadPostInfoRecord(postId, &record, &error), qPrintable(error));
+    QVERIFY(record.startedAt.isEmpty());
+
+    QVERIFY(store.markPostStarted(postId, &error));
+    QVERIFY2(store.loadPostInfoRecord(postId, &record, &error), qPrintable(error));
+    const QString firstStart = record.startedAt;
+    QVERIFY(!firstStart.isEmpty());
+
+    // a resume keeps the date of the first attempt
+    QVERIFY(store.markPostStarted(postId, &error));
+    QVERIFY2(store.loadPostInfoRecord(postId, &record, &error), qPrintable(error));
+    QCOMPARE(record.startedAt, firstStart);
+}
+
+void TestPostHistory::post_size_is_written_once_and_active_seconds_accumulate()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    PostHistoryStore store(dir.filePath("history.sqlite"), true);
+    QString error;
+    QVERIFY2(store.initialize(&error), qPrintable(error));
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("big.nzb");
+    post.nzbPath = dir.filePath("big.nzb");
+    PostHistoryStore::PostInfo info;
+    info.par2Pct = 8;
+    info.sourcePath = QStringLiteral("/data/backup/Photos-2026.tar");
+    info.originalName = QStringLiteral("Photos-2026.tar");
+    const qint64 postId = store.createPost(post, info, {}, &error);
+    QVERIFY2(postId > 0, qPrintable(error));
+
+    QVERIFY(store.setPostSizeIfUnset(postId, 2505484398LL, &error));
+    // a resume only sees the leftovers: it must not shrink the whole post
+    QVERIFY(store.setPostSizeIfUnset(postId, 42, &error));
+
+    QVERIFY(store.addActiveSeconds(postId, 200, &error));
+    QVERIFY(store.addActiveSeconds(postId, 50, &error));
+
+    PostHistoryStore::PostInfoRecord record;
+    QVERIFY2(store.loadPostInfoRecord(postId, &record, &error), qPrintable(error));
+    QVERIFY(!record.partial);
+    QCOMPARE(record.info.postSizeBytes, 2505484398LL);
+    QCOMPARE(record.info.activeSeconds, static_cast<qint64>(250));
+    QCOMPARE(record.info.par2Pct, 8);
+    QCOMPARE(record.info.originalName, QStringLiteral("Photos-2026.tar"));
+}
+
+void TestPostHistory::post_meta_keeps_scope_and_refuses_the_password_key()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath("history.sqlite");
+    PostHistoryStore store(dbPath, true);
+    QString error;
+    QVERIFY2(store.initialize(&error), qPrintable(error));
+
+    const qint64 postId =
+        createStoredPost(store, QStringLiteral("meta.nzb"), QStringLiteral("posting"), {}, &error);
+    QVERIFY(postId > 0);
+
+    QMap<QString, MetaValue> meta;
+    meta.insert(QStringLiteral("titre"),
+                MetaValue(QString::fromUtf8("L'\xC3\x89t\xC3\xA9 & Cie <\"x\">"), MetaScope::Nzb));
+    meta.insert(QStringLiteral("portail1"),
+                MetaValue(QStringLiteral("https://x.fr/f=326598.html"), MetaScope::Local));
+    meta.insert(QStringLiteral("password"), MetaValue(QStringLiteral("leaked"), MetaScope::Nzb));
+    QVERIFY2(store.setPostMeta(postId, meta, &error), qPrintable(error));
+
+    PostHistoryStore::PostInfoRecord record;
+    QVERIFY2(store.loadPostInfoRecord(postId, &record, &error), qPrintable(error));
+
+    QCOMPARE(record.meta.size(), 2); // the password was refused
+    QVERIFY(!record.meta.contains(QStringLiteral("password")));
+    QCOMPARE(record.meta.value(QStringLiteral("titre")).value,
+             QString::fromUtf8("L'\xC3\x89t\xC3\xA9 & Cie <\"x\">"));
+    QCOMPARE(record.meta.value(QStringLiteral("titre")).scope, MetaScope::Nzb);
+    QCOMPARE(record.meta.value(QStringLiteral("portail1")).scope, MetaScope::Local);
+    // the URL keeps its '=' sign
+    QVERIFY(record.meta.value(QStringLiteral("portail1")).value.contains(QStringLiteral("=326598")));
+
+    // deleting the post takes its metadata with it
+    QVERIFY(store.deletePost(postId, &error));
+    QCOMPARE(rawSql(dbPath, QStringLiteral("SELECT COUNT(*) FROM post_meta")).toInt(), 0);
+}
+
+void TestPostHistory::regenerated_nzb_publishes_only_nzb_scoped_meta()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    PostHistoryStore store(dir.filePath("history.sqlite"), true);
+    QString error;
+    QVERIFY2(store.initialize(&error), qPrintable(error));
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("scoped.nzb");
+    post.nzbPath = dir.filePath("scoped.nzb");
+    post.rarPass = QStringLiteral("s3cr3t");
+    post.hasPassword = true;
+    QMap<QString, MetaValue> meta;
+    meta.insert(QStringLiteral("titre"), MetaValue(QStringLiteral("Public"), MetaScope::Nzb));
+    meta.insert(QStringLiteral("portail1"), MetaValue(QStringLiteral("Private"), MetaScope::Local));
+    const qint64 postId = store.createPost(post, PostHistoryStore::PostInfo(), meta, &error);
+    QVERIFY2(postId > 0, qPrintable(error));
+
+    NzbHistoryRegenerator regenerator(&store);
+
+    QString nzb;
+    {
+        QTextStream stream(&nzb);
+        QStringList warnings;
+        QVERIFY2(regenerator.writeNzb(postId, stream, false, &warnings, &error), qPrintable(error));
+    }
+    QVERIFY(nzb.contains(QStringLiteral("<meta type=\"titre\">Public</meta>")));
+    QVERIFY(!nzb.contains(QStringLiteral("Private"))); // never leaves the machine
+    QVERIFY(!nzb.contains(QStringLiteral("s3cr3t")));  // not asked for
+
+    QString withPass;
+    {
+        QTextStream stream(&withPass);
+        QStringList warnings;
+        QVERIFY2(regenerator.writeNzb(postId, stream, true, &warnings, &error), qPrintable(error));
+    }
+    QCOMPARE(withPass.count(QStringLiteral("<meta type=\"password\">")), 1);
+    QVERIFY(withPass.contains(QStringLiteral("s3cr3t")));
+    QVERIFY(!withPass.contains(QStringLiteral("Private")));
+}
+
+void TestPostHistory::resume_options_never_replay_compression_or_par2()
+{
+    PostHistoryStore::PostDetails details;
+    details.post.id = 12;
+    details.rarName = QStringLiteral("obfuscated");
+    details.rarPass = QStringLiteral("s3cr3t");
+    details.doCompress = true; // the original post did compress...
+    details.doPar2 = true;     // ...and did generate par2
+
+    // globals currently ask for compression and par2
+    PostingJobOptions base;
+    base.doCompress = true;
+    base.doPar2 = true;
+    base.par2Pct = 15;
+    base.delFilesAfterPost = true;
+
+    ResumePlanner::JobPlan plan;
+    const PostingJobOptions resumed = ResumePlanner::jobOptions(
+        base, details, QStringLiteral("/tmp/out.nzb"), QList<QString>(), plan, std::string("me@x.y"));
+
+    // orders are off: rar and par2 must not run again on the leftovers
+    QVERIFY(!resumed.doCompress);
+    QVERIFY(!resumed.doPar2);
+    // and the sources of a resumed post are never deleted
+    QVERIFY(!resumed.delFilesAfterPost);
+
+    // but what the original post did is kept, as a fact
+    QVERIFY(resumed.originalDidCompress);
+    QVERIFY(resumed.originalDidPar2);
+    QCOMPARE(resumed.resumeHistoryPostId, static_cast<qint64>(12));
+    QCOMPARE(resumed.rarName, QStringLiteral("obfuscated"));
+}
+
+void TestPostHistory::resume_options_take_obfuscation_from_history()
+{
+    PostHistoryStore::PostDetails details;
+    details.post.id = 3;
+    details.obfuscateArticles = true;
+    details.obfuscateFileName = false;
+    details.from = QStringLiteral("original@poster.net");
+
+    PostingJobOptions base; // globals say the opposite of the original post
+    base.obfuscateArticles = false;
+    base.obfuscateFileName = true;
+
+    const PostingJobOptions resumed =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  QStringLiteral("/tmp/out.nzb"),
+                                  QList<QString>(),
+                                  ResumePlanner::JobPlan(),
+                                  std::string("fallback@x.y"));
+
+    QVERIFY(resumed.obfuscateArticles);
+    QVERIFY(!resumed.obfuscateFileName);
+    QCOMPARE(QString::fromStdString(resumed.from), QStringLiteral("original@poster.net"));
+
+    // no poster recorded: fall back on the current one rather than posting anonymously
+    details.from.clear();
+    const PostingJobOptions fallback =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  QStringLiteral("/tmp/out.nzb"),
+                                  QList<QString>(),
+                                  ResumePlanner::JobPlan(),
+                                  std::string("fallback@x.y"));
+    QCOMPARE(QString::fromStdString(fallback.from), QStringLiteral("fallback@x.y"));
+}
+
+void TestPostHistory::resume_describes_the_original_par2_percentage()
+{
+    PostHistoryStore::PostDetails details;
+    details.post.id = 7;
+    details.doPar2 = true;
+    details.par2Pct = 8; // what the original post really used
+
+    PostingJobOptions base;
+    base.doPar2 = true;
+    base.par2Pct = 15; // the globals moved on since then
+
+    const PostingJobOptions resumed =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  QStringLiteral("/tmp/out.nzb"),
+                                  QList<QString>(),
+                                  ResumePlanner::JobPlan(),
+                                  std::string("me@x.y"));
+
+    QCOMPARE(resumed.originalPar2Pct, 8);
+    QCOMPARE(resumed.describedPar2Pct(), 8);
+
+    // a post that had no par2 describes none, whatever the globals say
+    details.doPar2 = false;
+    details.par2Pct = -1;
+    const PostingJobOptions noPar2 =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  QStringLiteral("/tmp/out.nzb"),
+                                  QList<QString>(),
+                                  ResumePlanner::JobPlan(),
+                                  std::string("me@x.y"));
+    QCOMPARE(noPar2.describedPar2Pct(), -1);
+}
+
+void TestPostHistory::resume_file_state_detects_a_source_that_changed()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath("source.bin");
+    {
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(QByteArray(1000, 'a'));
+    }
+
+    QFileInfo fi(path);
+    PostingJobResumeFileState state;
+    state.sizeBytes  = fi.size();
+    state.mtimeEpoch = fi.lastModified().toSecsSinceEpoch();
+    QVERIFY(state.matches(QFileInfo(path)));
+
+    // the file grew while the job waited in the queue
+    {
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::Append));
+        f.write(QByteArray(10, 'b'));
+    }
+    QVERIFY(!state.matches(QFileInfo(path)));
+
+    // and a source that vanished is not usable either
+    QVERIFY(QFile::remove(path));
+    QVERIFY(!state.matches(QFileInfo(path)));
+}
+
+void TestPostHistory::resume_options_drop_the_current_metadata_and_password()
+{
+    PostHistoryStore::PostDetails details;
+    details.post.id = 11;
+    details.rarPass = QStringLiteral("password-of-that-post");
+
+    // whatever the current run was configured with
+    PostingJobOptions base;
+    base.meta.insert(QStringLiteral("album"),
+                     MetaValue(QStringLiteral("another post"), MetaScope::Nzb));
+    base.declaredPassword = QStringLiteral("password-of-another-post");
+
+    ResumePlanner::JobPlan plan;
+    const QString path = QDir::tempPath() + QStringLiteral("/tst-resume-source.bin");
+    plan.files << QFileInfo(path);
+
+    const PostingJobOptions resumed =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  QStringLiteral("/tmp/out.nzb"),
+                                  QList<QString>(),
+                                  plan,
+                                  std::string("me@x.y"));
+
+    QVERIFY(resumed.meta.isEmpty());
+    QVERIFY(resumed.declaredPassword.isEmpty());
+    // the password of the post being resumed, on the other hand, is kept
+    QCOMPARE(resumed.rarPass, QStringLiteral("password-of-that-post"));
+
+    // and the sources of the attempt are known, so nothing can overwrite them
+    QCOMPARE(resumed.inputPaths, QStringList{ QFileInfo(path).absoluteFilePath() });
 }
 
 void TestPostHistory::nzb_regeneration_keeps_prior_files_after_resume()

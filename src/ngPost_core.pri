@@ -31,7 +31,7 @@ LIBS    += -lqt6keychain
 # a DLL that nothing imports, which windeployqt then skips.
 linux:!android: QT += dbus
 
-VERSION = 5.4.2
+VERSION = 5.4.3
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 INCLUDEPATH += $$PWD
@@ -92,11 +92,13 @@ SOURCES += \
         $$PWD/NntpCheckCon.cpp \
         $$PWD/NntpConnection.cpp \
         $$PWD/NzbCheck.cpp \
+        $$PWD/PostCmdRunner.cpp \
         $$PWD/Poster.cpp \
         $$PWD/PostingJob.cpp \
         $$PWD/nntp/Nntp.cpp \
         $$PWD/nntp/NntpArticle.cpp \
         $$PWD/nntp/NntpFile.cpp \
+        $$PWD/postinfo/PostInfoTemplate.cpp \
         $$PWD/utils/CmdOrGuiApp.cpp \
         $$PWD/utils/PathHelper.cpp \
         $$PWD/utils/UpdateChecker.cpp \
@@ -121,12 +123,15 @@ HEADERS += \
     $$PWD/NntpCheckCon.h \
     $$PWD/NntpConnection.h \
     $$PWD/NzbCheck.h \
+    $$PWD/PostCmdRunner.h \
     $$PWD/Poster.h \
     $$PWD/PostingJob.h \
     $$PWD/nntp/Nntp.h \
     $$PWD/nntp/NntpArticle.h \
     $$PWD/nntp/NntpFile.h \
     $$PWD/nntp/NntpServerParams.h \
+    $$PWD/postinfo/PostInfoData.h \
+    $$PWD/postinfo/PostInfoTemplate.h \
     $$PWD/utils/CmdOrGuiApp.h \
     $$PWD/utils/Macros.h \
     $$PWD/utils/PathHelper.h \
@@ -157,6 +162,7 @@ DEFINES += __USE_HMI__
 SOURCES += \
     $$PWD/hmi/AutoPostWidget.cpp \
     $$PWD/hmi/CheckBoxCenterWidget.cpp \
+    $$PWD/hmi/PostInfoDialog.cpp \
     $$PWD/hmi/PostingWidget.cpp \
     $$PWD/hmi/SignedListWidget.cpp \
     $$PWD/hmi/MainWindow.cpp \
@@ -166,6 +172,7 @@ SOURCES += \
 HEADERS += \
     $$PWD/hmi/AutoPostWidget.h \
     $$PWD/hmi/CheckBoxCenterWidget.h \
+    $$PWD/hmi/PostInfoDialog.h \
     $$PWD/hmi/PostingWidget.h \
     $$PWD/hmi/SignedListWidget.h \
     $$PWD/hmi/MainWindow.h \

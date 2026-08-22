@@ -1,0 +1,13 @@
+date =__date:dd/MM/yyyy__
+nom du post =__originalName__
+taille post =__postSize__
+mot de passe =__rarPass__
+nom a rechercher =__rarName__
+posteur =__nzbPoster__
+groupe =__groups__
+pourcent =__par2Pct__
+portail1 =__meta:portail1__
+titre =__meta:titre__
+categorie =__meta:categorie__
+qualite =__meta:qualite__
+genre =__meta:genre__

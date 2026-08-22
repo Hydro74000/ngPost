@@ -135,11 +135,36 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
               "\"http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd\">\n"
            << "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n";
 
-    if (includePassword && details.post.passwordStored && !details.rarPass.isEmpty()) {
-        stream << tab << "<head>\n"
-               << tab << tab << "<meta type=\"password\">" << escapeXml(details.rarPass)
-               << "</meta>\n"
-               << tab << "</head>\n\n";
+    // Metadata the user chose to publish. This file is the one that lands on
+    // disk (the streamed nzb is rewritten from here), so anything missing in
+    // this block is missing from the delivered nzb.
+    QMap<QString, MetaValue> publishedMeta;
+    {
+        PostHistoryStore::PostInfoRecord record;
+        QString metaError;
+        if (_store->loadPostInfoRecord(postId, &record, &metaError)) {
+            for (auto it = record.meta.cbegin(); it != record.meta.cend(); ++it) {
+                if (it.value().scope == MetaScope::Nzb)
+                    publishedMeta.insert(it.key(), it.value());
+            }
+        } else if (warnings && !metaError.isEmpty()) {
+            *warnings << tr("could not read the metadata of the post: %1").arg(metaError);
+        }
+    }
+
+    const bool writePassword =
+        includePassword && details.post.passwordStored && !details.rarPass.isEmpty();
+    if (writePassword || !publishedMeta.isEmpty()) {
+        stream << tab << "<head>\n";
+        for (auto it = publishedMeta.cbegin(); it != publishedMeta.cend(); ++it) {
+            stream << tab << tab << "<meta type=\"" << escapeXml(it.key()) << "\">"
+                   << escapeXml(it.value().value) << "</meta>\n";
+        }
+        if (writePassword) {
+            stream << tab << tab << "<meta type=\"password\">" << escapeXml(details.rarPass)
+                   << "</meta>\n";
+        }
+        stream << tab << "</head>\n\n";
     }
 
     int padding = 1;

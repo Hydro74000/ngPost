@@ -23,6 +23,7 @@
 #include <QProcessEnvironment>
 
 #include "history/PostHistoryStore.h"
+#include "NgPost.h"
 #include "PostingJob.h"
 #include "TestEnv.h"
 
@@ -161,6 +162,37 @@ private slots:
     void multipar_default_args_use_only_slash_switches();
     //! GUI PAR2_PCT must override PAR2_ARGS redundancy for MultiPar (/rr) too.
     void par2_args_redundancy_override_for_multipar();
+
+    //! A file that could not be read makes the post partial, not successful:
+    //! such a file never produces a failed article, it is simply set aside.
+    void unreadable_file_makes_the_post_not_successful();
+
+    //! A metadata value very often holds a URL with its own '=' signs; the
+    //! pair must be split on the first one only.
+    void meta_value_may_contain_equal_signs();
+
+    //! Claiming the same key as public and private at once is refused instead
+    //! of silently resolved one way or the other.
+    void meta_key_cannot_be_public_and_private_at_once();
+
+    //! A pair without '=' is reported rather than silently dropped.
+    void malformed_meta_is_reported();
+
+    //! --export_post_info writes the record sheet of an old post: to a file,
+    //! or to stdout with nothing else mixed in. An unknown id fails.
+    void export_post_info_writes_to_file_or_stdout();
+
+    //! Every post automation setting is reachable from the command line, in
+    //! both directions for the booleans, so ngPost can be driven without a
+    //! configuration file at all.
+    void post_automation_settings_are_reachable_from_the_cli();
+
+    //! A timeout must be a number of seconds, and a bad one is refused rather
+    //! than silently ignored.
+    void post_cmd_timeout_rejects_a_non_numeric_value();
+
+    //! Only ftp, http and https can receive an nzb.
+    void nzb_upload_url_rejects_an_unsupported_scheme();
 };
 
 void TestCliParser::initTestCase()
@@ -455,6 +487,197 @@ void TestCliParser::par2_args_redundancy_override_for_multipar()
         QStringLiteral("/rr12"),
         QStringLiteral("/lc4"),
     }));
+}
+
+namespace
+{
+//! Runs ngPost with the given metadata options on a stub input file, without
+//! any server configured: the run fails later on, what matters here is whether
+//! the metadata itself was accepted.
+RunResult runWithMeta(const QString &bin, const QStringList &metaArgs, HomeSandbox &sandbox)
+{
+    const QString stub = sandbox.rootPath() + QStringLiteral("/in.bin");
+    QFile f(stub);
+    f.open(QIODevice::WriteOnly);
+    f.write("hello");
+    f.close();
+
+    QStringList args{ "-i", stub };
+    args += metaArgs;
+    return run(bin, args, sandbox.rootPath());
+}
+} // namespace
+
+void TestCliParser::meta_value_may_contain_equal_signs()
+{
+    QString key, value;
+
+    // the case that used to be dropped without a word: a URL of its own
+    QVERIFY(NgPost::splitMetaPair(
+        QStringLiteral("gallery=https://example.org/albums/view?id=326598&size=full"),
+        &key,
+        &value));
+    QCOMPARE(key, QStringLiteral("gallery"));
+    QCOMPARE(value, QStringLiteral("https://example.org/albums/view?id=326598&size=full"));
+
+    // an empty value is a legitimate way to blank a field of a record sheet
+    QVERIFY(NgPost::splitMetaPair(QStringLiteral("comment="), &key, &value));
+    QCOMPARE(key, QStringLiteral("comment"));
+    QVERIFY(value.isEmpty());
+
+    // spaces around the name are forgiven, the value is kept verbatim
+    QVERIFY(NgPost::splitMetaPair(QStringLiteral(" album = Mes photos "), &key, &value));
+    QCOMPARE(key, QStringLiteral("album"));
+    QCOMPARE(value, QStringLiteral(" Mes photos "));
+
+    QVERIFY(!NgPost::splitMetaPair(QStringLiteral("noEqualSignHere"), &key, &value));
+    QVERIFY(!NgPost::splitMetaPair(QStringLiteral("=orphanValue"), &key, &value));
+}
+
+void TestCliParser::meta_key_cannot_be_public_and_private_at_once()
+{
+    HomeSandbox sandbox;
+    const RunResult r =
+        runWithMeta(_bin, { "--meta", "album=Public", "--post_meta", "album=Private" }, sandbox);
+
+    QVERIFY2(!r.timedOut, "process timed out");
+    QVERIFY2(r.exitCode != 0, qPrintable(QStringLiteral("expected a failure, got %1").arg(r.exitCode)));
+    const QString out = r.stdoutText + r.stderrText;
+    QVERIFY2(out.contains(QStringLiteral("album")), qPrintable(out));
+}
+
+void TestCliParser::malformed_meta_is_reported()
+{
+    HomeSandbox sandbox;
+    const RunResult r = runWithMeta(_bin, { "--meta", "noEqualSignHere" }, sandbox);
+
+    QVERIFY2(!r.timedOut, "process timed out");
+    QVERIFY2(r.exitCode != 0, qPrintable(QStringLiteral("expected a failure, got %1").arg(r.exitCode)));
+    const QString out = r.stdoutText + r.stderrText;
+    QVERIFY2(out.contains(QStringLiteral("noEqualSignHere")), qPrintable(out));
+}
+
+void TestCliParser::export_post_info_writes_to_file_or_stdout()
+{
+    HomeSandbox sandbox;
+
+    const QString sourcePath = sandbox.rootPath() + QStringLiteral("/export.bin");
+    QFile source(sourcePath);
+    QVERIFY(source.open(QIODevice::WriteOnly));
+    source.write("export me");
+    source.close();
+
+    const QString dbPath = sandbox.rootPath() + QStringLiteral("/history.sqlite");
+    QString err;
+    const qint64 postId = createResumablePost(dbPath, sourcePath, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    QFile tmpl(tmplPath);
+    QVERIFY(tmpl.open(QIODevice::WriteOnly));
+    tmpl.write("name =__nzbName__\nid =__postId__\n");
+    tmpl.close();
+
+    const QString outPath = sandbox.rootPath() + QStringLiteral("/sheet.txt");
+    const RunResult toFile = run(_bin,
+                                 { "--export_post_info", QString::number(postId),
+                                   "--post_info_template", tmplPath, "-o", outPath,
+                                   "--post_db", dbPath },
+                                 sandbox.rootPath());
+    QVERIFY2(!toFile.timedOut, "export to file timed out");
+    QCOMPARE(toFile.exitCode, 0);
+    QVERIFY2(QFileInfo::exists(outPath),
+             qPrintable(toFile.stdoutText + toFile.stderrText));
+
+    QFile written(outPath);
+    QVERIFY(written.open(QIODevice::ReadOnly));
+    const QString content = QString::fromUtf8(written.readAll());
+    QVERIFY2(content.contains(QStringLiteral("id =%1").arg(postId)), qPrintable(content));
+
+    const RunResult toStdout = run(_bin,
+                                   { "--export-post-info", QString::number(postId),
+                                     "--post_info_template", tmplPath, "--post_db", dbPath },
+                                   sandbox.rootPath());
+    QVERIFY2(!toStdout.timedOut, "export to stdout timed out");
+    QCOMPARE(toStdout.exitCode, 0);
+    // stdout carries the record sheet and nothing else: a caller pipes it
+    QCOMPARE(toStdout.stdoutText, content);
+
+    const RunResult unknown = run(_bin,
+                                  { "--export_post_info", "999999",
+                                    "--post_info_template", tmplPath, "--post_db", dbPath },
+                                  sandbox.rootPath());
+    QVERIFY2(!unknown.timedOut, "export of an unknown id timed out");
+    QVERIFY2(unknown.exitCode != 0,
+             qPrintable(QStringLiteral("an unknown id should fail, got %1").arg(unknown.exitCode)));
+    QVERIFY(unknown.stdoutText.isEmpty());
+}
+
+void TestCliParser::post_automation_settings_are_reachable_from_the_cli()
+{
+    HomeSandbox sandbox;
+    const RunResult r = run(_bin, { "--help" }, sandbox.rootPath());
+    QVERIFY2(!r.timedOut, "ngPost --help timed out");
+
+    const QString out = r.stdoutText + r.stderrText;
+    for (const char *flag : { "--post_info_only_on_success", "--no_post_info_only_on_success",
+                              "--nzb_post_cmd", "--post_cmd_timeout",
+                              "--post_cmd_fail_is_error", "--no_post_cmd_fail_is_error",
+                              "--post_cmd_expose_password", "--no_post_cmd_expose_password",
+                              "--nzb_upload_url", "--nzb_upload_timeout", "--post_history",
+                              "--no_post_info" }) {
+        QVERIFY2(out.contains(QString::fromLatin1(flag)),
+                 qPrintable(QStringLiteral("help does not mention '%1'").arg(QString::fromLatin1(flag))));
+    }
+
+    // and they are accepted together on a real command line
+    const RunResult accepted = runWithMeta(_bin,
+                                           { "--no_post_info",
+                                             "--no_post_info_only_on_success",
+                                             "--post_cmd_timeout", "30",
+                                             "--post_cmd_fail_is_error",
+                                             "--no_post_cmd_expose_password",
+                                             "--nzb_upload_timeout", "60",
+                                             "--nzb_post_cmd", "/bin/true" },
+                                           sandbox);
+    QVERIFY2(!accepted.timedOut, "process timed out");
+    const QString acceptedOut = accepted.stdoutText + accepted.stderrText;
+    QVERIFY2(!acceptedOut.contains(QStringLiteral("Unknown option")), qPrintable(acceptedOut));
+}
+
+void TestCliParser::post_cmd_timeout_rejects_a_non_numeric_value()
+{
+    HomeSandbox sandbox;
+    const RunResult r = runWithMeta(_bin, { "--post_cmd_timeout", "soon" }, sandbox);
+
+    QVERIFY2(!r.timedOut, "process timed out");
+    QVERIFY2(r.exitCode != 0, qPrintable(QStringLiteral("expected a failure, got %1").arg(r.exitCode)));
+    const QString out = r.stdoutText + r.stderrText;
+    QVERIFY2(out.contains(QStringLiteral("post_cmd_timeout")), qPrintable(out));
+}
+
+void TestCliParser::nzb_upload_url_rejects_an_unsupported_scheme()
+{
+    HomeSandbox sandbox;
+    const RunResult r = runWithMeta(_bin, { "--nzb_upload_url", "sftp://box/nzbs" }, sandbox);
+
+    QVERIFY2(!r.timedOut, "process timed out");
+    QVERIFY2(r.exitCode != 0, qPrintable(QStringLiteral("expected a failure, got %1").arg(r.exitCode)));
+    const QString out = r.stdoutText + r.stderrText;
+    QVERIFY2(out.contains(QStringLiteral("ftp")), qPrintable(out));
+}
+
+void TestCliParser::unreadable_file_makes_the_post_not_successful()
+{
+    // every article went through and nothing was set aside
+    QVERIFY(PostingJob::postSucceeded(true, 0, false));
+
+    // a whole file could not be read: no article failed, yet the post is not complete
+    QVERIFY(!PostingJob::postSucceeded(true, 0, true));
+
+    // the usual failure modes still count
+    QVERIFY(!PostingJob::postSucceeded(true, 3, false));
+    QVERIFY(!PostingJob::postSucceeded(false, 0, false));
 }
 
 QTEST_MAIN(TestCliParser)

@@ -212,8 +212,6 @@ bool PostHistoryStore::_execSchema(QString *error)
     const QStringList statements = {
         QStringLiteral("CREATE TABLE IF NOT EXISTS schema_meta ("
                        "key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
-        QStringLiteral("INSERT OR REPLACE INTO schema_meta(key, value) "
-                       "VALUES('version', '1')"),
         QStringLiteral("CREATE TABLE IF NOT EXISTS posts ("
                        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                        "created_at TEXT NOT NULL,"
@@ -287,7 +285,30 @@ bool PostHistoryStore::_execSchema(QString *error)
         // finalization flushing into O(N^2) work and makes the inter-post stall grow
         // post after post. (file_id, part) also covers the resume-purge delete.
         QStringLiteral("CREATE INDEX IF NOT EXISTS idx_attempts_file_part "
-                       "ON post_article_attempts(file_id, part)")
+                       "ON post_article_attempts(file_id, part)"),
+        // Facts about a post that the aggregates of `posts` cannot express.
+        // post_size_bytes is NOT a duplicate of posts.size_bytes: the latter
+        // sums everything that was posted, this one is the archive and its
+        // parity only, without the .nfo copied next to the rar volumes.
+        QStringLiteral("CREATE TABLE IF NOT EXISTS post_info ("
+                       "post_id INTEGER PRIMARY KEY,"
+                       "par2_pct INTEGER,"
+                       "post_size_bytes INTEGER,"
+                       "active_seconds INTEGER,"
+                       "source_path TEXT,"
+                       "original_name TEXT,"
+                       "app_version TEXT,"
+                       "FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE)"),
+        // User metadata. The scope decides whether it may leave the machine:
+        // 'local' stays in the post info file, 'nzb' is also published in the
+        // <head> of the nzb, which circulates.
+        QStringLiteral("CREATE TABLE IF NOT EXISTS post_meta ("
+                       "post_id INTEGER NOT NULL,"
+                       "key TEXT NOT NULL,"
+                       "value TEXT,"
+                       "scope TEXT NOT NULL DEFAULT 'local' CHECK(scope IN ('local','nzb')),"
+                       "PRIMARY KEY(post_id, key),"
+                       "FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE)")
     };
 
     for (const QString &sql : statements) {
@@ -299,6 +320,11 @@ bool PostHistoryStore::_execSchema(QString *error)
         }
     }
 
+    if (!_migrateSchema(db, error)) {
+        db.rollback();
+        return false;
+    }
+
     if (!db.commit()) {
         setError(error, db);
         return false;
@@ -306,7 +332,70 @@ bool PostHistoryStore::_execSchema(QString *error)
     return true;
 }
 
+//! Reads the stored schema version, refuses a database written by a newer
+//! ngPost, applies the pending migrations, then records the new version. Runs
+//! inside the transaction opened by _execSchema().
+//!
+//! Until now the version row was rewritten to '1' on every open and never read
+//! back, which meant there was no migration story at all.
+bool PostHistoryStore::_migrateSchema(QSqlDatabase &db, QString *error)
+{
+    int storedVersion = 0;
+    {
+        QSqlQuery q(db);
+        q.prepare(QStringLiteral("SELECT value FROM schema_meta WHERE key='version'"));
+        if (!q.exec()) {
+            setError(error, q);
+            return false;
+        }
+        if (q.next())
+            storedVersion = q.value(0).toInt();
+    }
+
+    if (storedVersion == 0) {
+        // No version yet: either a brand new database, or one from before the
+        // version row was read back. Both have the v1 shape at this point,
+        // since the CREATE TABLE statements above just ran.
+        storedVersion = 1;
+    }
+
+    if (storedVersion > kSchemaVersion) {
+        if (error)
+            *error = QStringLiteral(
+                         "this history database was written by a newer ngPost "
+                         "(schema v%1, this version understands v%2); "
+                         "update ngPost rather than risking your history")
+                         .arg(storedVersion)
+                         .arg(kSchemaVersion);
+        return false;
+    }
+
+    // v1 -> v2 adds post_info and post_meta, both created above by
+    // CREATE TABLE IF NOT EXISTS, which does apply to an existing database
+    // (unlike a new column, which would need an ALTER TABLE).
+
+    if (storedVersion != kSchemaVersion) {
+        QSqlQuery q(db);
+        q.prepare(QStringLiteral("INSERT OR REPLACE INTO schema_meta(key, value) "
+                                 "VALUES('version', ?)"));
+        q.addBindValue(QString::number(kSchemaVersion));
+        if (!q.exec()) {
+            setError(error, q);
+            return false;
+        }
+    }
+    return true;
+}
+
 qint64 PostHistoryStore::createPost(const PostRecord &record, QString *error)
+{
+    return createPost(record, PostInfo(), QMap<QString, MetaValue>(), error);
+}
+
+qint64 PostHistoryStore::createPost(const PostRecord &record,
+                                    const PostInfo &info,
+                                    const QMap<QString, MetaValue> &meta,
+                                    QString *error)
 {
     if (!initialize(error))
         return 0;
@@ -318,14 +407,16 @@ qint64 PostHistoryStore::createPost(const PostRecord &record, QString *error)
     }
 
     QSqlQuery q(db);
+    // started_at is left NULL on purpose: a job can wait a long time in the
+    // queue, and it is markPostStarted() that records when the transfer really
+    // began.
     q.prepare(QStringLiteral("INSERT INTO posts("
-                             "created_at, started_at, nzb_name, nzb_path, status,"
+                             "created_at, nzb_name, nzb_path, status,"
                              "rar_name, rar_pass, has_password, password_stored,"
                              "password_origin, from_addr, do_compress, do_par2,"
                              "obfuscate_articles, obfuscate_file_name, resume_state)"
-                             "VALUES(?, ?, ?, ?, 'posting', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'resumable')"));
+                             "VALUES(?, ?, ?, 'posting', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'resumable')"));
     const bool passwordStored = _storePasswords && !record.rarPass.isEmpty();
-    q.addBindValue(nowIso());
     q.addBindValue(nowIso());
     q.addBindValue(record.nzbName);
     q.addBindValue(record.nzbPath);
@@ -358,11 +449,199 @@ qint64 PostHistoryStore::createPost(const PostRecord &record, QString *error)
         }
     }
 
+    if (!_writePostInfo(db, postId, info, error) || !_writePostMeta(db, postId, meta, error)) {
+        db.rollback();
+        return 0;
+    }
+
     if (!db.commit()) {
         setError(error, db);
         return 0;
     }
     return postId;
+}
+
+bool PostHistoryStore::_writePostInfo(QSqlDatabase &db,
+                                      qint64 postId,
+                                      const PostInfo &info,
+                                      QString *error)
+{
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("INSERT INTO post_info("
+                             "post_id, par2_pct, post_size_bytes, active_seconds,"
+                             "source_path, original_name, app_version)"
+                             "VALUES(?, ?, ?, ?, ?, ?, ?)"
+                             "ON CONFLICT(post_id) DO UPDATE SET"
+                             " par2_pct=excluded.par2_pct,"
+                             " source_path=excluded.source_path,"
+                             " original_name=excluded.original_name,"
+                             " app_version=excluded.app_version"));
+    q.addBindValue(postId);
+    q.addBindValue(info.par2Pct < 0 ? QVariant() : QVariant(info.par2Pct));
+    q.addBindValue(info.postSizeBytes < 0 ? QVariant() : QVariant(info.postSizeBytes));
+    q.addBindValue(info.activeSeconds < 0 ? QVariant() : QVariant(info.activeSeconds));
+    q.addBindValue(info.sourcePath);
+    q.addBindValue(info.originalName);
+    q.addBindValue(info.appVersion);
+    if (!q.exec()) {
+        setError(error, q);
+        return false;
+    }
+    return true;
+}
+
+bool PostHistoryStore::_writePostMeta(QSqlDatabase &db,
+                                      qint64 postId,
+                                      const QMap<QString, MetaValue> &meta,
+                                      QString *error)
+{
+    for (auto it = meta.cbegin(); it != meta.cend(); ++it) {
+        const QString key = it.key().trimmed();
+        if (key.isEmpty())
+            continue;
+        // "password" is a secret, stored and purged like the archive password;
+        // letting it in here would bypass HISTORY_STORE_PASSWORDS, survive
+        // purgePassword() and come back out despite includePassword=false.
+        if (key.compare(QStringLiteral("password"), Qt::CaseInsensitive) == 0)
+            continue;
+
+        QSqlQuery q(db);
+        q.prepare(QStringLiteral("INSERT INTO post_meta(post_id, key, value, scope)"
+                                 "VALUES(?, ?, ?, ?)"
+                                 "ON CONFLICT(post_id, key) DO UPDATE SET"
+                                 " value=excluded.value, scope=excluded.scope"));
+        q.addBindValue(postId);
+        q.addBindValue(key);
+        q.addBindValue(it.value().value);
+        q.addBindValue(it.value().scope == MetaScope::Nzb ? QStringLiteral("nzb")
+                                                          : QStringLiteral("local"));
+        if (!q.exec()) {
+            setError(error, q);
+            return false;
+        }
+    }
+    return true;
+}
+
+bool PostHistoryStore::setPostMeta(qint64 postId,
+                                   const QMap<QString, MetaValue> &meta,
+                                   QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    if (!db.transaction()) {
+        setError(error, db);
+        return false;
+    }
+    if (!_writePostMeta(db, postId, meta, error)) {
+        db.rollback();
+        return false;
+    }
+    if (!db.commit()) {
+        setError(error, db);
+        return false;
+    }
+    return true;
+}
+
+bool PostHistoryStore::markPostStarted(qint64 postId, QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    QSqlQuery q(db);
+    // "AND started_at IS NULL": a resume keeps the date of the first attempt.
+    q.prepare(QStringLiteral("UPDATE posts SET started_at=? WHERE id=? AND started_at IS NULL"));
+    q.addBindValue(nowIso());
+    q.addBindValue(postId);
+    if (!q.exec()) {
+        setError(error, q);
+        return false;
+    }
+    return true;
+}
+
+bool PostHistoryStore::updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("UPDATE posts SET nzb_path=?, nzb_name=? WHERE id=?"));
+    q.addBindValue(nzbPath);
+    q.addBindValue(QFileInfo(nzbPath).fileName());
+    q.addBindValue(postId);
+    if (!q.exec()) {
+        setError(error, q);
+        return false;
+    }
+    return true;
+}
+
+bool PostHistoryStore::setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    QSqlQuery q(db);
+    // Only the first attempt knows the size of the whole post; a resume only
+    // ever sees the leftovers.
+    q.prepare(QStringLiteral("UPDATE post_info SET post_size_bytes=? "
+                             "WHERE post_id=? AND post_size_bytes IS NULL"));
+    q.addBindValue(sizeBytes);
+    q.addBindValue(postId);
+    if (!q.exec()) {
+        setError(error, q);
+        return false;
+    }
+    return true;
+}
+
+bool PostHistoryStore::addActiveSeconds(qint64 postId, qint64 seconds, QString *error)
+{
+    if (!initialize(error))
+        return false;
+    if (seconds <= 0)
+        return true;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("UPDATE post_info SET active_seconds=COALESCE(active_seconds, 0) + ? "
+                             "WHERE post_id=?"));
+    q.addBindValue(seconds);
+    q.addBindValue(postId);
+    if (!q.exec()) {
+        setError(error, q);
+        return false;
+    }
+    return true;
+}
+
+bool PostHistoryStore::finalizePost(qint64 postId,
+                                   const QString &status,
+                                   const QString &avgSpeed,
+                                   qint64 activeSeconds,
+                                   QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    if (!db.transaction()) {
+        setError(error, db);
+        return false;
+    }
+    // updatePostStatus() recomputes its counters from post_files/post_articles,
+    // so the sizes and counts it is given are ignored on purpose.
+    if (!updatePostStatus(postId, status, 0, 0, 0, 0, avgSpeed, error)
+        || !addActiveSeconds(postId, activeSeconds, error)) {
+        db.rollback();
+        return false;
+    }
+    if (!db.commit()) {
+        setError(error, db);
+        return false;
+    }
+    return true;
 }
 
 bool PostHistoryStore::updatePostStatus(qint64 postId,
@@ -1449,6 +1728,130 @@ bool PostHistoryStore::deletePost(qint64 postId, QString *error)
     return true;
 }
 
+PostInfoData PostHistoryStore::PostInfoRecord::toPostInfoData() const
+{
+    // The database stores UTC; everything a user reads is local time.
+    auto localTime = [](const QString &iso) {
+        QDateTime dt = QDateTime::fromString(iso, Qt::ISODate);
+        return dt.isValid() ? dt.toLocalTime() : QDateTime();
+    };
+
+    PostInfoData data;
+    data.nzbPath     = nzbPath;
+    data.nzbDir      = QFileInfo(nzbPath).absolutePath();
+    data.nzbName     = QFileInfo(nzbPath).completeBaseName();
+    data.nzbFileName = QFileInfo(nzbPath).fileName();
+    if (data.nzbName.isEmpty())
+        data.nzbName = QFileInfo(post.nzbName).completeBaseName();
+
+    data.rarName   = rarName;
+    data.rarPass   = rarPass;
+    data.groups    = post.groups;
+    data.nzbPoster = from;
+    data.status    = post.status;
+    data.avgSpeed  = post.avgSpeed;
+
+    data.originalPath = info.sourcePath.isEmpty() ? QString()
+                                                  : QFileInfo(info.sourcePath).absolutePath();
+    data.sourcePath   = info.sourcePath;
+    data.originalName = info.originalName;
+    data.appVersion   = info.appVersion;
+
+    data.postSizeBytes = info.postSizeBytes; // < 0 stays "not recorded" 
+    data.legacySizeBytes = post.sizeBytes < 0 ? 0 : static_cast<quint64>(post.sizeBytes);
+    data.par2Pct         = info.par2Pct;
+    data.nbFiles          = static_cast<uint>(post.nbFiles < 0 ? 0 : post.nbFiles);
+    data.nbArticles       = static_cast<uint>(post.nbArticles < 0 ? 0 : post.nbArticles);
+    data.nbArticlesFailed = static_cast<uint>(post.nbFailedArticles < 0 ? 0 : post.nbFailedArticles);
+    data.nbArticlesPosted = data.nbArticles > data.nbArticlesFailed
+                                ? data.nbArticles - data.nbArticlesFailed
+                                : 0;
+    data.durationSec   = info.activeSeconds < 0 ? 0 : info.activeSeconds;
+    data.historyPostId = post.id;
+
+    data.startedAt  = localTime(startedAt.isEmpty() ? post.createdAt : startedAt);
+    data.finishedAt = localTime(post.finishedAt);
+
+    data.meta    = meta;
+    data.partial = partial;
+    return data;
+}
+
+bool PostHistoryStore::loadPostInfoRecord(qint64 postId, PostInfoRecord *record, QString *error)
+{
+    if (!record)
+        return false;
+    *record = PostInfoRecord();
+    if (!initialize(error))
+        return false;
+
+    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
+    QSqlQuery p(db);
+    // Deliberately no join on post_files/post_articles: describing a post does
+    // not need them, and a big post has hundreds of thousands of article rows.
+    p.prepare(QStringLiteral("SELECT p.*, COALESCE(group_concat(g.group_name, ','), '') AS groups_text,"
+                             "i.post_id AS info_id, i.par2_pct, i.post_size_bytes,"
+                             "i.active_seconds, i.source_path, i.original_name, i.app_version "
+                             "FROM posts p "
+                             "LEFT JOIN post_groups g ON g.post_id=p.id "
+                             "LEFT JOIN post_info i ON i.post_id=p.id "
+                             "WHERE p.id=? GROUP BY p.id"));
+    p.addBindValue(postId);
+    if (!p.exec() || !p.next()) {
+        setError(error, p);
+        return false;
+    }
+
+    record->post.id = postId;
+    record->post.nzbName = valueString(p, "nzb_name");
+    record->post.status = valueString(p, "status");
+    record->post.groups = valueString(p, "groups_text");
+    record->post.createdAt = valueString(p, "created_at");
+    record->post.finishedAt = valueString(p, "finished_at");
+    record->post.avgSpeed = valueString(p, "avg_speed");
+    record->post.sizeBytes = valueI64(p, "size_bytes");
+    record->post.nbFiles = valueInt(p, "nb_files");
+    record->post.nbArticles = valueInt(p, "nb_articles");
+    record->post.nbFailedArticles = valueInt(p, "nb_failed_articles");
+    record->post.hasPassword = valueBool(p, "has_password");
+    record->post.passwordStored = valueBool(p, "password_stored");
+    record->startedAt = valueString(p, "started_at");
+    record->nzbPath = valueString(p, "nzb_path");
+    record->rarName = valueString(p, "rar_name");
+    record->rarPass = valueString(p, "rar_pass");
+    record->from = valueString(p, "from_addr");
+
+    // No post_info row: the post was made before this ngPost version. Its
+    // facts cannot be reconstructed, they stay empty and the record says so.
+    record->partial = p.value(p.record().indexOf(QStringLiteral("info_id"))).isNull();
+    if (!record->partial) {
+        const QVariant par2 = p.value(p.record().indexOf(QStringLiteral("par2_pct")));
+        const QVariant size = p.value(p.record().indexOf(QStringLiteral("post_size_bytes")));
+        const QVariant active = p.value(p.record().indexOf(QStringLiteral("active_seconds")));
+        record->info.par2Pct = par2.isNull() ? -1 : par2.toInt();
+        record->info.postSizeBytes = size.isNull() ? -1 : size.toLongLong();
+        record->info.activeSeconds = active.isNull() ? -1 : active.toLongLong();
+        record->info.sourcePath = valueString(p, "source_path");
+        record->info.originalName = valueString(p, "original_name");
+        record->info.appVersion = valueString(p, "app_version");
+    }
+    p.finish();
+
+    QSqlQuery m(db);
+    m.prepare(QStringLiteral("SELECT key, value, scope FROM post_meta WHERE post_id=?"));
+    m.addBindValue(postId);
+    if (!m.exec()) {
+        setError(error, m);
+        return false;
+    }
+    while (m.next()) {
+        const MetaScope scope = m.value(2).toString() == QStringLiteral("nzb") ? MetaScope::Nzb
+                                                                              : MetaScope::Local;
+        record->meta.insert(m.value(0).toString(), MetaValue(m.value(1).toString(), scope));
+    }
+    return true;
+}
+
 bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QString *error)
 {
     if (!details)
@@ -1458,8 +1861,10 @@ bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QStr
         return false;
     QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
     QSqlQuery p(db);
-    p.prepare(QStringLiteral("SELECT p.*, COALESCE(group_concat(g.group_name, ','), '') AS groups_text "
+    p.prepare(QStringLiteral("SELECT p.*, COALESCE(group_concat(g.group_name, ','), '') AS groups_text,"
+                             "i.par2_pct AS info_par2_pct "
                              "FROM posts p LEFT JOIN post_groups g ON g.post_id=p.id "
+                             "LEFT JOIN post_info i ON i.post_id=p.id "
                              "WHERE p.id=? GROUP BY p.id"));
     p.addBindValue(postId);
     if (!p.exec() || !p.next()) {
@@ -1485,6 +1890,14 @@ bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QStr
     details->rarPass = valueString(p, "rar_pass");
     details->passwordOrigin = valueString(p, "password_origin");
     details->from = valueString(p, "from_addr");
+    details->obfuscateArticles = valueBool(p, "obfuscate_articles");
+    details->obfuscateFileName = valueBool(p, "obfuscate_file_name");
+    details->doCompress = valueBool(p, "do_compress");
+    details->doPar2 = valueBool(p, "do_par2");
+    {
+        const QVariant par2 = p.value(p.record().indexOf(QStringLiteral("info_par2_pct")));
+        details->par2Pct = par2.isNull() ? -1 : par2.toInt();
+    }
     p.finish();
 
     QSqlQuery f(db);

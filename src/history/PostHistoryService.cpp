@@ -107,6 +107,60 @@ public:
         return _store.createPost(record, error);
     }
 
+    qint64 createPost(const PostHistoryStore::PostRecord &record,
+                      const PostHistoryStore::PostInfo &info,
+                      const QMap<QString, MetaValue> &meta,
+                      QString *error)
+    {
+        flushArticleEventsBlocking(error);
+        return _store.createPost(record, info, meta, error);
+    }
+
+    bool markPostStarted(qint64 postId, QString *error)
+    {
+        return _store.markPostStarted(postId, error);
+    }
+
+    bool updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error)
+    {
+        return _store.updatePostNzbPath(postId, nzbPath, error);
+    }
+
+    bool setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error)
+    {
+        return _store.setPostSizeIfUnset(postId, sizeBytes, error);
+    }
+
+    bool addActiveSeconds(qint64 postId, qint64 seconds, QString *error)
+    {
+        return _store.addActiveSeconds(postId, seconds, error);
+    }
+
+    bool finalizePost(qint64 postId,
+                      const QString &status,
+                      const QString &avgSpeed,
+                      qint64 activeSeconds,
+                      QString *error)
+    {
+        // The pending article events decide the counters this very call
+        // recomputes; losing them silently would finalise a post on stale
+        // numbers.
+        if (!flushArticleEventsBlocking(error))
+            return false;
+        return _store.finalizePost(postId, status, avgSpeed, activeSeconds, error);
+    }
+
+    bool setPostMeta(qint64 postId, const QMap<QString, MetaValue> &meta, QString *error)
+    {
+        return _store.setPostMeta(postId, meta, error);
+    }
+
+    bool loadPostInfoRecord(qint64 postId, PostHistoryStore::PostInfoRecord *record, QString *error)
+    {
+        flushArticleEventsBlocking(error);
+        return _store.loadPostInfoRecord(postId, record, error);
+    }
+
     bool updatePostStatus(qint64 postId,
                           const QString &status,
                           int nbFiles,
@@ -564,6 +618,104 @@ bool PostHistoryService::updatePostStatus(qint64 postId,
                                       sizeBytes,
                                       avgSpeed,
                                       &err);
+    });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+qint64 PostHistoryService::createPost(const PostHistoryStore::PostRecord &record,
+                                     const PostHistoryStore::PostInfo &info,
+                                     const QMap<QString, MetaValue> &meta,
+                                     QString *error)
+{
+    QString err;
+    qint64 id = 0;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { id = worker->createPost(record, info, meta, &err); });
+    if (error)
+        *error = err;
+    return id;
+}
+
+bool PostHistoryService::markPostStarted(qint64 postId, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) { ok = worker->markPostStarted(postId, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { ok = worker->updatePostNzbPath(postId, nzbPath, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { ok = worker->setPostSizeIfUnset(postId, sizeBytes, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::addActiveSeconds(qint64 postId, qint64 seconds, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { ok = worker->addActiveSeconds(postId, seconds, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::setPostMeta(qint64 postId,
+                                     const QMap<QString, MetaValue> &meta,
+                                     QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) { ok = worker->setPostMeta(postId, meta, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::loadPostInfoRecord(qint64 postId,
+                                            PostHistoryStore::PostInfoRecord *record,
+                                            QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { ok = worker->loadPostInfoRecord(postId, record, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::finalizePost(qint64 postId,
+                                      const QString &status,
+                                      const QString &avgSpeed,
+                                      qint64 activeSeconds,
+                                      QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->finalizePost(postId, status, avgSpeed, activeSeconds, &err);
     });
     if (error)
         *error = err;

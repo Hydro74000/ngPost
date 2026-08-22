@@ -1,6 +1,6 @@
 <div align="center">
 	<img width="80" height="80" src="https://raw.githubusercontent.com/Hydro74000/ngPost/master/src/resources/icons/ngPost.png" alt="ngPost"/>
-	<h3 align="center">ngPost - 5.4.0</h3>
+	<h3 align="center">ngPost - 5.4.3</h3>
 	<img alt="Codacy grade" src="https://img.shields.io/codacy/grade/e790647f2eae44898d760b68ee6f5b78?style=for-the-badge">
 	<img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/Hydro74000/ngPost?style=for-the-badge">
 	<img alt="GitHub top language" src="https://img.shields.io/github/languages/top/Hydro74000/ngPost?style=for-the-badge">
@@ -28,6 +28,9 @@ All the features are [highlighted here](https://github.com/Hydro74000/ngPost/wik
 - Optional VPN tunnel for ngPost NNTP traffic only (OpenVPN/WireGuard, per-server opt-in — Linux & Windows).
 - Structured SQLite posting history with resume support, searchable GUI history,
   stats, legacy CSV import and NZB regeneration from history.
+- Post info files: a small text file describing each post, written from a model
+  you provide, so any Usenet index can be served without ngPost knowing its
+  format ([guide](https://github.com/Hydro74000/ngPost/wiki/Post-Info-Files)).
 - Multithreading.
 - And many more.
 

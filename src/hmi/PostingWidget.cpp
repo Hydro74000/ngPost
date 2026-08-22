@@ -20,12 +20,23 @@
 
 #include "PostingWidget.h"
 #include "ui_PostingWidget.h"
+#include "CheckBoxCenterWidget.h"
+#include "PostInfoDialog.h"
 #include "MainWindow.h"
 #include "NgPost.h"
 #include "PostingJob.h"
 #include "nntp/NntpFile.h"
 
+#include <QCheckBox>
 #include <QDebug>
+#include <QGroupBox>
+#include <QHeaderView>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QTableWidget>
+#include <QToolButton>
+#include <QVBoxLayout>
+#include <QFrame>
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QDir>
@@ -43,13 +54,19 @@ PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber) :
     _jobNumber(jobNumber),
     _postingJob(nullptr),
     _state(STATE::IDLE),
-    _postingFinished(false)
+    _postingFinished(false),
+    _postInfoCB(nullptr),
+    _postInfoButton(nullptr),
+    _postInfoTemplate(),
+    _postInfoMeta()
 {
     _ui->setupUi(this);
+    _buildPostInfoRow();
 
     connect(_ui->postButton, &QAbstractButton::clicked, this, &PostingWidget::onPostFiles);
     connect(_ui->nzbPassCB,  &QAbstractButton::toggled, this, &PostingWidget::onNzbPassToggled);
     connect(_ui->genPass,    &QAbstractButton::clicked, this, &PostingWidget::onGenNzbPassword);
+    connect(_ui->par2CB,     &QAbstractButton::toggled, this, &PostingWidget::onPar2CB);
 
     _ui->filesList->setSignature(QString("<pre>%1</pre>").arg(_ngPost->escapeXML(_ngPost->asciiArt())));
     connect(_ui->filesList, &SignedListWidget::rightClick, this, &PostingWidget::onSelectFilesClicked);
@@ -177,15 +194,28 @@ void PostingWidget::postFiles(bool updateMainParams)
 
         _postingFinished = false;
         _state = STATE::POSTING;
-        _postingJob = new PostingJob(_ngPost, nzbPath, files, this,
-                                     _ngPost->getPostingGroups(),
-                                     _ngPost->from(),
-                                     _ngPost->_obfuscateArticles, _ngPost->_obfuscateFileName,
-                                     _ngPost->_tmpPath, _ngPost->_rarPath, _ngPost->_rarArgs,
-                                     _ngPost->_rarSize, _ngPost->_useRarMax, _ngPost->_par2Pct,
-                                     _ngPost->_doCompress, _ngPost->_doPar2,
-                                     _ngPost->_rarName, _ngPost->_rarPass,
-                                     _ngPost->_keepRar);
+        PostingJobOptions options = _ngPost->_baseJobOptions();
+        options.nzbFilePath       = nzbPath;
+        options.files             = files;
+        // in the GUI the list holds exactly what the user dropped, folders included
+        options.inputPaths.reserve(files.size());
+        for (QFileInfo const &file : files)
+            options.inputPaths << file.absoluteFilePath();
+        // the GUI already asked about overwriting, and never deletes the sources
+        options.overwriteNzb      = true;
+        options.delFilesAfterPost = false;
+        // per post, deliberately not copied into the NgPost globals
+        // The fields belong to the post info feature as a whole: with the box
+        // unticked there is no sheet, and nothing to publish in the nzb either.
+        // Leaving them in would publish through a box the user just turned off.
+        options.writePostInfoFile = writesPostInfoFile();
+        if (options.writePostInfoFile)
+        {
+            options.meta             = _postInfoMeta;
+            options.postInfoTemplate = _postInfoTemplate;
+        }
+
+        _postingJob = new PostingJob(_ngPost, options, this);
 
         bool hasStarted = _ngPost->startPostingJob(_postingJob);
         if (_ngPost->lastPostingStartCanceled())
@@ -261,6 +291,10 @@ void PostingWidget::onSelectFolderClicked()
 void PostingWidget::onClearFilesClicked()
 {
     _ui->filesList->clear2();
+    // The post information describes the post that was there; leaving it would
+    // hand the title of one post to the next one queued in this tab.
+    _postInfoMeta.clear();
+    _postInfoTemplate.clear();
     _ui->nzbFileEdit->clear();
     _ui->compressNameEdit->clear();
     if (_hmi->hasAutoCompress())
@@ -280,6 +314,22 @@ void PostingWidget::onCompressCB(bool checked)
     _ui->nameLengthSB->setEnabled(checked);
     _ui->genCompressName->setEnabled(checked);
     _ui->keepRarCB->setEnabled(checked);
+    // The volume size only means something when ngPost is the one making the
+    // archive. It used to sit on another row, far from this box, and stayed
+    // active with nothing to act on.
+    _ui->rarSizeLbl->setEnabled(checked);
+    _ui->rarSizeEdit->setEnabled(checked);
+    _ui->rarMaxCB->setEnabled(checked);
+    // The password is deliberately NOT greyed here: posting archives you
+    // encrypted yourself, and announcing their password in the nzb, is a
+    // legitimate use that does not need ngPost to compress anything.
+}
+
+void PostingWidget::onPar2CB(bool checked)
+{
+    // Same rule: the redundancy percentage used to live on a row of its own,
+    // enabled even with PAR2 off.
+    _ui->redundancySB->setEnabled(checked);
 }
 
 void PostingWidget::onGenCompressName()
@@ -426,7 +476,10 @@ void PostingWidget::init()
 
     _ui->redundancySB->setRange(0, 100);
     _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
-    _ui->redundancySB->setEnabled(true);
+    // The suffix travels inside the spin box, so the number stops being an
+    // unlabelled one without costing a widget and its layout spacing.
+    _ui->redundancySB->setSuffix(QStringLiteral(" %"));
+    _ui->redundancySB->setEnabled(_ui->par2CB->isChecked());
 
     if (!_ngPost->_rarPassFixed.isEmpty())
     {
@@ -539,9 +592,161 @@ void PostingWidget::udatePostingParams()
     _ngPost->_copyNfoWithNzb = _ui->copyNfoWithNzbCB->isChecked();
 }
 
+void PostingWidget::_buildPostInfoRow()
+{
+    _postInfoCB = new QCheckBox(this);
+    _postInfoCB->setObjectName(QStringLiteral("postInfoCB"));
+    // On by default when a model is configured: the user asked for sheets once,
+    // in the configuration, and should not have to ask again for every post.
+    _postInfoCB->setChecked(!_ngPost->postInfoTemplatePath().isEmpty());
+
+    _postInfoButton = new QPushButton(this);
+    _postInfoButton->setObjectName(QStringLiteral("postInfoButton"));
+    _postInfoButton->setEnabled(_postInfoCB->isChecked());
+
+    connect(_postInfoCB, &QCheckBox::toggled, this, &PostingWidget::onPostInfoToggled);
+    connect(_postInfoButton, &QAbstractButton::clicked, this, &PostingWidget::onEditPostInfo);
+
+    // The sheet is one of the things this post produces, like the nzb and the
+    // copied nfo, so it belongs on that line rather than on a row of its own
+    // under everything else.
+    QFrame *sep = new QFrame(this);
+    sep->setFrameShape(QFrame::VLine);
+    sep->setFrameShadow(QFrame::Sunken);
+    _ui->horizontalLayout_9->addWidget(sep);
+    _ui->horizontalLayout_9->addWidget(_postInfoCB);
+    _ui->horizontalLayout_9->addWidget(_postInfoButton);
+
+    // No trailing stretch: the spare width goes to the nzb path, which is the
+    // only field on the line long enough to need it. A stretch here would eat
+    // it instead and leave the path showing "...do.nzb".
+    _ui->horizontalLayout_9->setStretchFactor(_ui->nzbFileLayout, 1);
+
+    retranslatePostInfoTexts();
+}
+
+void PostingWidget::retranslatePostInfoTexts()
+{
+    if (!_postInfoCB)
+        return;
+    _postInfoCB->setText(tr("Create a post info file"));
+    _postInfoCB->setToolTip(tr("Write a small text file describing this post next to the nzb.\n"
+                               "Some Usenet indexes ask for one."));
+    _postInfoButton->setText(tr("Post information\342\200\246"));
+    _postInfoButton->setToolTip(tr("Choose the model and fill in your own fields, for this post."));
+}
+
+void PostingWidget::onPostInfoToggled(bool checked)
+{
+    _postInfoButton->setEnabled(checked);
+}
+
+void PostingWidget::onEditPostInfo()
+{
+    PostInfoDialog dlg(_ngPost->postInfoTemplatePath(),
+                       _postInfoTemplate,
+                       _postInfoMeta,
+                       _ngPost->sessionPostInfoTemplates(),
+                       _postInfoPreview(),
+                       this);
+    int const answer = dlg.exec();
+
+    // The list of models is kept whatever the answer: opening a file, or
+    // dropping one from the list, is housekeeping, not a change to this post.
+    _ngPost->setSessionPostInfoTemplates(dlg.sessionTemplates());
+
+    if (answer != QDialog::Accepted)
+        return;
+
+    QString duplicate;
+    const QMap<QString, MetaValue> meta = dlg.meta(&duplicate);
+    if (!duplicate.isEmpty())
+    {
+        // Same rule as --meta on the command line: refuse rather than keep one
+        // of the two values without saying which.
+        _hmi->logError(tr("The post information lists '%1' twice. "
+                          "Remove one of the two lines.")
+                           .arg(duplicate));
+        return;
+    }
+
+    _postInfoTemplate = dlg.templateOverride();
+    _postInfoMeta     = meta;
+
+    if (dlg.setAsDefault())
+    {
+        // Asked to become the model offered from now on: it goes in the
+        // configuration, and stops being an override for this post.
+        _ngPost->setPostInfoTemplate(_postInfoTemplate.isEmpty() ? _ngPost->postInfoTemplatePath()
+                                                                 : _postInfoTemplate);
+        _postInfoTemplate.clear();
+        _ngPost->saveConfig();
+        _hmi->log(tr("Post info model saved as the default: %1")
+                      .arg(_ngPost->postInfoTemplatePath()));
+    }
+}
+
+//! What the sheet already knows while the post is only being prepared. Read
+//! straight from the tab rather than through udatePostingParams(), which
+//! writes into the NgPost globals: previewing a layout must change nothing.
+PostInfoData PostingWidget::_postInfoPreview() const
+{
+    PostInfoData data;
+    data.appVersion = QString(APP_VERSION);
+
+    if (!_ui->nzbFileEdit->text().isEmpty())
+    {
+        QFileInfo const nzb(_ui->nzbFileEdit->text());
+        data.nzbPath     = nzb.absoluteFilePath();
+        data.nzbDir      = nzb.absolutePath();
+        data.nzbName     = nzb.completeBaseName();
+        data.nzbFileName = nzb.fileName();
+    }
+
+    data.rarName = _ui->compressNameEdit->text();
+    if (_ui->nzbPassCB->isChecked())
+        data.rarPass = _ui->nzbPassEdit->text();
+
+    data.groups = _ngPost->groups();
+    // Left empty when ngPost draws a poster at random: showing one sample
+    // would name an address the post is not going to use.
+    if (!_ngPost->_genFrom && !_ngPost->_from.empty())
+        data.nzbPoster = QString::fromStdString(_ngPost->_from);
+
+    data.par2Pct = _ui->par2CB->isChecked() ? _ui->redundancySB->value() : -1;
+
+    QFileInfoList files;
+    bool          hasFolder = false;
+    const_cast<PostingWidget *>(this)->_buildFilesList(files, hasFolder);
+    if (!files.isEmpty())
+    {
+        data.sourcePath   = files.first().absoluteFilePath();
+        data.originalName = files.first().fileName();
+        data.originalPath = files.first().absolutePath();
+    }
+    return data;
+}
+
+void PostingWidget::setPostInfo(bool enabled,
+                                const QString &templateOverride,
+                                const QMap<QString, MetaValue> &meta)
+{
+    if (_postInfoCB)
+        _postInfoCB->setChecked(enabled);
+    _postInfoTemplate = templateOverride;
+    _postInfoMeta     = meta;
+}
+
+bool PostingWidget::writesPostInfoFile() const
+{
+    return _postInfoCB && _postInfoCB->isChecked();
+}
+
 void PostingWidget::retranslate()
 {
     _ui->retranslateUi(this);
+    // code built widgets are not touched by retranslateUi()
+    retranslatePostInfoTexts();
     _ui->rarMaxCB->setToolTip(tr("limit the number of archive volume to %1 (cf config RAR_MAX)").arg(_ngPost->_rarMax));
     _ui->redundancySB->setToolTip(tr("Using PAR2_ARGS from config file: %1").arg(_ngPost->_par2Args));
     _ui->filesList->setToolTip(QString("%1<ul><li>%2</li><li>%3</li><li>%4</li></ul>%5").arg(

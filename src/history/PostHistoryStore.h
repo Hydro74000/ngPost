@@ -8,12 +8,15 @@
 #ifndef POSTHISTORYSTORE_H
 #define POSTHISTORYSTORE_H
 
+#include "postinfo/PostInfoData.h"
+
 #include <QDateTime>
 #include <QList>
 #include <QMap>
 #include <QString>
 #include <QStringList>
 
+class QSqlDatabase;
 class QTextStream;
 
 class PostHistoryStore
@@ -120,8 +123,51 @@ public:
         QString rarPass;
         QString passwordOrigin;
         QString from;
+        //! How the original post was made. A resume must replay the obfuscation
+        //! (it changes the poster and the group policy), but must NOT replay
+        //! doCompress/doPar2: those are orders, and the archive already exists.
+        bool obfuscateArticles = false;
+        bool obfuscateFileName = false;
+        bool doCompress = false;
+        bool doPar2 = false;
+        //! par2 percentage of the original post, < 0 when it had none. Read
+        //! from post_info, so it stays -1 for a post made before that table.
+        int par2Pct = -1;
         QList<FileSummary> files;
         QMap<qint64, QList<ArticleSummary>> articlesByFile;
+    };
+
+    //! Facts about a post that the aggregates of `posts` cannot express.
+    //! Negative or empty means "not recorded", which is how posts made before
+    //! this table existed come back.
+    struct PostInfo {
+        int par2Pct = -1;          //!< < 0: no par2 at all
+        qint64 postSizeBytes = -1; //!< archive + parity, copied .nfo excluded
+        qint64 activeSeconds = -1; //!< transfer time, cumulated over resumes
+        QString sourcePath;        //!< raw input path, before folder expansion
+        QString originalName;
+        QString appVersion;
+    };
+
+    //! Everything needed to describe a post, without loading its files and
+    //! articles: a post info file needs none of those, and a large post has
+    //! hundreds of thousands of article rows.
+    struct PostInfoRecord {
+        PostSummary post;
+        PostInfo info;
+        QString nzbPath;
+        QString rarName;
+        QString rarPass;
+        QString from;
+        QString startedAt; //!< ISO 8601 UTC, empty while the transfer has not begun
+        QMap<QString, MetaValue> meta;
+        //! True when the row predates post_info: the missing facts are then
+        //! rendered empty rather than guessed.
+        bool partial = false;
+
+        //! Converts to what the template engine consumes, turning the UTC of
+        //! the database into local time.
+        PostInfoData toPostInfoData() const;
     };
 
     //! Filter struct for listPosts(). All fields are optional (empty = no filter).
@@ -164,6 +210,41 @@ public:
     bool initialize(QString *error = nullptr);
 
     qint64 createPost(const PostRecord &record, QString *error = nullptr);
+    //! Same, plus the facts and the metadata of the post, all in one
+    //! transaction so a post never exists without them.
+    qint64 createPost(const PostRecord &record,
+                      const PostInfo &info,
+                      const QMap<QString, MetaValue> &meta,
+                      QString *error = nullptr);
+
+    //! Records when the transfer really started. Does nothing if it is already
+    //! set: a resume must not rewrite the date of the original post.
+    bool markPostStarted(qint64 postId, QString *error = nullptr);
+
+    //! The nzb can be renamed to <name>_1.nzb when the first one already
+    //! exists, after the history row was created. Keeps path and name in sync.
+    bool updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error = nullptr);
+
+    //! Written once, by the first attempt. A resume only handles the leftovers,
+    //! so letting it write here would shrink the size of the whole post.
+    bool setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error = nullptr);
+
+    //! Adds to the transfer time already recorded, so resumes accumulate.
+    bool addActiveSeconds(qint64 postId, qint64 seconds, QString *error = nullptr);
+
+    //! Terminal state of one attempt: the status and the time it took, written
+    //! together so a crash in between cannot leave one without the other.
+    bool finalizePost(qint64 postId,
+                      const QString &status,
+                      const QString &avgSpeed,
+                      qint64 activeSeconds,
+                      QString *error = nullptr);
+
+    //! Upsert of the user metadata. The reserved key "password" is refused: it
+    //! is a secret, handled like the archive password, not a metadata.
+    bool setPostMeta(qint64 postId, const QMap<QString, MetaValue> &meta, QString *error = nullptr);
+
+    bool loadPostInfoRecord(qint64 postId, PostInfoRecord *record, QString *error = nullptr);
     bool updatePostStatus(qint64 postId,
                           const QString &status,
                           int nbFiles,
@@ -260,6 +341,10 @@ public:
     bool exportCsv(QTextStream &stream, bool includePasswords, QString *error = nullptr);
     bool importLegacyCsv(const QString &path, QString *error = nullptr);
 
+    //! Bump when the schema changes, and add the matching step in
+    //! _migrateSchema(). v1: initial. v2: post_info and post_meta.
+    static constexpr int kSchemaVersion = 2;
+
 private:
     QString _dbPath;
     bool _storePasswords;
@@ -267,6 +352,13 @@ private:
     QString _initializedDbPath;
 
     bool _execSchema(QString *error);
+    bool _migrateSchema(QSqlDatabase &db, QString *error);
+    //! Write helpers reused by createPost() inside its own transaction.
+    bool _writePostInfo(QSqlDatabase &db, qint64 postId, const PostInfo &info, QString *error);
+    bool _writePostMeta(QSqlDatabase &db,
+                        qint64 postId,
+                        const QMap<QString, MetaValue> &meta,
+                        QString *error);
     bool _exec(const QString &sql, QString *error);
     QString _connectionName() const;
 };

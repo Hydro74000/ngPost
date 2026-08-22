@@ -44,6 +44,18 @@ FileUploader::~FileUploader()
         delete _reply;
 }
 
+void FileUploader::release()
+{
+    if (_reply) {
+        if (_reply->isRunning())
+            _reply->abort();
+        _reply->deleteLater();
+        _reply = nullptr;
+    }
+    if (_nzbFile.isOpen())
+        _nzbFile.close();
+}
+
 void FileUploader::startUpload(const QUrl &serverUrl)
 {
     if (_nzbFile.open(QIODevice::ReadOnly)) {
