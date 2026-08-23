@@ -36,6 +36,7 @@
 #include <QTextStream>
 
 #include "hmi/MainWindow.h"
+#include "hmi/PostingWidget.h"
 #include "hmi/CheckBoxCenterWidget.h"
 #include "utils/PathHelper.h"
 #include "NgPost.h"
@@ -84,6 +85,7 @@ private slots:
 
     //! Picking a model offers exactly the fields it asks for, and what is
     //! typed comes back with its scope.
+    void post_info_stays_on_across_tabs_and_posts();
     void post_info_dialog_offers_the_fields_of_the_model();
 
     //! The model from the configuration is the default: it is marked as such,
@@ -367,6 +369,67 @@ void TestMainWindow::post_info_row_exposes_a_checkbox_and_its_button()
     QVERIFY2(!btn->isEnabled(), "the button must follow the checkbox");
     cb->setChecked(true);
     QVERIFY(btn->isEnabled());
+}
+
+void TestMainWindow::post_info_stays_on_across_tabs_and_posts()
+{
+    // The daily case: POST_INFO_TEMPLATE is set once in the configuration, and
+    // no box should ever have to be ticked again.
+    HomeSandbox sandbox;
+    QVERIFY(QDir().mkpath(sandbox.rootPath() + QStringLiteral("/nzb")));
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    {
+        QFile tmpl(tmplPath);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("titre =__meta:titre__\n");
+    }
+    {
+        QFile conf(PathHelper::configFilePath());
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "GROUPS = alt.binaries.test\n"
+          << "nzbPath = " << sandbox.rootPath() << "/nzb\n"
+          << "POST_INFO_TEMPLATE = " << tmplPath << "\n";
+    }
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QVERIFY(ngPost.parseDefaultConfig().isEmpty());
+
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY(window);
+    window->init(&ngPost);
+
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    QVERIFY(tabs);
+
+    auto boxOf = [](QWidget *tab) {
+        return tab ? tab->findChild<QCheckBox *>(QStringLiteral("postInfoCB")) : nullptr;
+    };
+
+    // the first tab
+    auto *first = boxOf(tabs->widget(0));
+    QVERIFY(first);
+    QVERIFY2(first->isChecked(), "a configured model should tick the box on its own");
+
+    // a tab opened later, as one does between two posts
+    PostingWidget *second = window->addNewQuickTab(tabs->count() - 1);
+    QVERIFY(second);
+    QVERIFY2(boxOf(second) && boxOf(second)->isChecked(),
+             "a tab opened later must start ticked too");
+
+    // Auto Post carries the same default for its whole run
+    auto *autoBox = window->findChild<QCheckBox *>(QStringLiteral("autoPostInfoCB"));
+    QVERIFY(autoBox);
+    QVERIFY(autoBox->isChecked());
+
+    // Emptying a tab to queue the next post clears what described the previous
+    // one, but must NOT turn the feature off.
+    QVERIFY(QMetaObject::invokeMethod(second, "onClearFilesClicked", Qt::DirectConnection));
+    QVERIFY2(boxOf(second)->isChecked(),
+             "clearing the files must not untick the post info box");
 }
 
 void TestMainWindow::post_info_dialog_offers_the_fields_of_the_model()
