@@ -94,6 +94,7 @@ private slots:
 
     //! Lines and fields can be added and removed to compose a model.
     void post_info_dialog_edits_and_saves_a_model();
+    void post_info_dialog_preview_follows_the_declared_format();
 
     void post_info_dialog_marks_the_configured_model_as_default();
 
@@ -503,6 +504,35 @@ void TestMainWindow::post_info_dialog_previews_every_line()
     auto *p5 = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelPreview_5"));
     QVERIFY(p5);
     QCOMPARE(p5->text(), QStringLiteral("Mercantour"));
+}
+
+void TestMainWindow::post_info_dialog_preview_follows_the_declared_format()
+{
+    HomeSandbox sandbox;
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    {
+        QFile tmpl(tmplPath);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("titre =__meta:titre__\n");
+    }
+
+    QMap<QString, MetaValue> meta;
+    meta.insert(QStringLiteral("titre"), MetaValue(QStringLiteral("un \"titre\" & co")));
+
+    PostInfoDialog dlg(tmplPath, QString(), meta);
+    auto *preview = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelPreview_0"));
+    QVERIFY(preview);
+    // plain text: nothing is escaped
+    QCOMPARE(preview->text(), QStringLiteral("un \"titre\" & co"));
+
+    // Declaring the format inside the editor must change the preview at once:
+    // the column claims to show what the file will hold.
+    auto *raw = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelRaw_1"));
+    QVERIFY2(raw, "the trailing empty line of the model should be editable");
+    raw->setText(QStringLiteral("#!xml"));
+    emit raw->textEdited(QStringLiteral("#!xml"));
+
+    QCOMPARE(preview->text(), QStringLiteral("un &quot;titre&quot; &amp; co"));
 }
 
 void TestMainWindow::post_info_dialog_edits_and_saves_a_model()

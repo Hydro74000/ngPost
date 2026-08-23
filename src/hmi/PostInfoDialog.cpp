@@ -486,6 +486,12 @@ void PostInfoDialog::_refreshPreviews()
     PostInfoData data = _preview;
     data.meta         = meta(); // what is typed right now, duplicates ignored here
 
+    // Re-read from the lines as they stand: typing "#!json" into the model, or
+    // deleting it, changes what the file will hold, and this column claims to
+    // show exactly that.
+    _escape = PostInfoTemplate::escapeModeFor(PostInfoTemplate::buildTemplate(_lines, _crlf),
+                                              _effectiveTemplatePath());
+
     // A date is knowable while the post is being prepared: previewing today
     // shows the shape of the line, which is what the format is chosen for.
     if (!data.finishedAt.isValid())

@@ -29,6 +29,7 @@ private slots:
     void escaping_follows_the_declared_format();
     void escaping_never_touches_paths_or_commands();
     void format_falls_back_on_the_model_name();
+    void a_secret_is_protected_even_once_escaped();
     void shipped_json_model_produces_valid_json();
     void template_lines_round_trip();
     void comment_lines_are_not_written();
@@ -289,6 +290,71 @@ void TestPostInfoTemplate::shipped_json_model_produces_valid_json()
     }
 }
 
+void TestPostInfoTemplate::a_secret_is_protected_even_once_escaped()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    // A password the user chose, holding a character json has to escape.
+    PostInfoData d = sampleData();
+    d.rarPass = QStringLiteral("pa\"ss\\word");
+
+    QString const tmplPath = dir.filePath(QStringLiteral("sheet.json"));
+    {
+        QFile f(tmplPath);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("{\"pass\": \"__rarPass__\"}\n");
+    }
+
+    PostInfoTemplate::Result const res = PostInfoTemplate::renderToFile(
+        tmplPath, dir.filePath(QStringLiteral("out.json")), d, QStringList());
+    QVERIFY2(res.ok, qPrintable(res.error));
+
+    // The sheet does hold the password, escaped. It must be protected all the
+    // same: matching only the raw form would leave it world readable.
+    QString const produced = readFile(res.outPath);
+    QVERIFY2(produced.contains(QStringLiteral("pa\\\"ss\\\\word")), qPrintable(produced));
+
+#ifdef Q_OS_UNIX
+    QFile::Permissions const perms = QFile::permissions(res.outPath);
+    QVERIFY2(!(perms & (QFileDevice::ReadGroup | QFileDevice::ReadOther)),
+             qPrintable(QStringLiteral("permissions 0x%1 on %2")
+                            .arg(static_cast<int>(perms), 0, 16)
+                            .arg(res.outPath)));
+#endif
+
+    // Same for xml, where the escaped characters are different ones.
+    PostInfoData x = sampleData();
+    x.rarPass = QStringLiteral("pa&ss<word");
+    QString const xmlTmpl = dir.filePath(QStringLiteral("sheet.xml"));
+    {
+        QFile f(xmlTmpl);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("<pass>__rarPass__</pass>\n");
+    }
+    PostInfoTemplate::Result const xres = PostInfoTemplate::renderToFile(
+        xmlTmpl, dir.filePath(QStringLiteral("out.xml")), x, QStringList());
+    QVERIFY2(xres.ok, qPrintable(xres.error));
+    QVERIFY(readFile(xres.outPath).contains(QStringLiteral("pa&amp;ss&lt;word")));
+#ifdef Q_OS_UNIX
+    QFile::Permissions const xperms = QFile::permissions(xres.outPath);
+    QVERIFY(!(xperms & (QFileDevice::ReadGroup | QFileDevice::ReadOther)));
+#endif
+
+    // A value with nothing to escape must come out byte for byte identical,
+    // in every mode: escaping must never be a reformatting.
+    for (auto mode : { PostInfoTemplate::Escape::None,
+                       PostInfoTemplate::Escape::Json,
+                       PostInfoTemplate::Escape::Xml }) {
+        QCOMPARE(PostInfoTemplate::escapeValue(QStringLiteral("Rando Mercantour 2026 - 1080p"),
+                                               mode),
+                 QStringLiteral("Rando Mercantour 2026 - 1080p"));
+        // accents and CJK go through as themselves, they are valid utf-8
+        QCOMPARE(PostInfoTemplate::escapeValue(QStringLiteral("Été 中文"), mode),
+                 QStringLiteral("Été 中文"));
+    }
+}
+
 void TestPostInfoTemplate::format_falls_back_on_the_model_name()
 {
     QString const plain = QStringLiteral("titre =__meta:titre__\n");
@@ -320,6 +386,15 @@ void TestPostInfoTemplate::format_falls_back_on_the_model_name()
                                              QStringLiteral("/m/sheet.json"), &unknown),
              PostInfoTemplate::Escape::None);
     QCOMPARE(unknown, QStringLiteral("yaml"));
+
+    // A word ngPost does not know, followed by one it does: the file IS
+    // escaped, so warning about the first would point at a problem that is
+    // not there.
+    unknown.clear();
+    QCOMPARE(PostInfoTemplate::escapeModeFor(QStringLiteral("#!yaml\n#!json\n") + plain,
+                                             QString(), &unknown),
+             PostInfoTemplate::Escape::Json);
+    QVERIFY2(unknown.isEmpty(), qPrintable(unknown));
 }
 
 void TestPostInfoTemplate::escaping_never_touches_paths_or_commands()

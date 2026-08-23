@@ -181,6 +181,7 @@ Escape escapeModeIn(QString const &tmpl, QString *unknownFormat)
 {
     // Only on a comment line, and only at the very start of it: the directive
     // is then dropped with the other comments and never reaches the sheet.
+    QString firstUnknown;
     for (SheetLine const &line : parseTemplate(tmpl)) {
         if (line.kind != SheetLine::Kind::Comment)
             continue;
@@ -188,13 +189,20 @@ Escape escapeModeIn(QString const &tmpl, QString *unknownFormat)
             continue;
 
         QString const format = line.raw.mid(2).trimmed().toLower();
+        // The first directive ngPost understands decides, and a word it does
+        // not understand is only worth reporting if nothing else answered:
+        // warning "unknown format yaml" about a file that WAS escaped as json
+        // would send the reader looking for a problem that is not there.
         if (format == QLatin1String("json"))
             return Escape::Json;
         if (format == QLatin1String("xml"))
             return Escape::Xml;
-        if (unknownFormat && unknownFormat->isEmpty())
-            *unknownFormat = format;
+        if (firstUnknown.isEmpty())
+            firstUnknown = format;
     }
+
+    if (unknownFormat)
+        *unknownFormat = firstUnknown;
     return Escape::None;
 }
 
@@ -640,7 +648,13 @@ Result renderToFile(QString const      &templatePath,
         if (!field.isSecret)
             continue;
         QString const secret = rawValues.value(bareName(field.placeholder));
-        if (!secret.isEmpty() && body.contains(secret)) {
+        if (secret.isEmpty())
+            continue;
+        // The body may hold the ESCAPED form: a password with a quote in it is
+        // written pa\"ss in a json sheet. Looking for the raw form only would
+        // leave that file world readable, which is the one case this whole
+        // permission contract exists for.
+        if (body.contains(secret) || body.contains(escapeValue(secret, escape))) {
             holdsSecret = true;
             break;
         }
