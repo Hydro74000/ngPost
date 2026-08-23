@@ -177,12 +177,80 @@ QMap<QString, QString> values(PostInfoData const &data, bool nativeSeparators)
     return v;
 }
 
+Escape escapeModeIn(QString const &tmpl, QString *unknownFormat)
+{
+    // Only on a comment line, and only at the very start of it: the directive
+    // is then dropped with the other comments and never reaches the sheet.
+    for (SheetLine const &line : parseTemplate(tmpl)) {
+        if (line.kind != SheetLine::Kind::Comment)
+            continue;
+        if (!line.raw.startsWith(QLatin1String("#!")))
+            continue;
+
+        QString const format = line.raw.mid(2).trimmed().toLower();
+        if (format == QLatin1String("json"))
+            return Escape::Json;
+        if (format == QLatin1String("xml"))
+            return Escape::Xml;
+        if (unknownFormat && unknownFormat->isEmpty())
+            *unknownFormat = format;
+    }
+    return Escape::None;
+}
+
+QString escapeValue(QString const &value, Escape mode)
+{
+    switch (mode) {
+    case Escape::None:
+        return value;
+
+    case Escape::Xml: {
+        QString out = value;
+        out.replace(QLatin1Char('&'), QLatin1String("&amp;"));
+        out.replace(QLatin1Char('<'), QLatin1String("&lt;"));
+        out.replace(QLatin1Char('>'), QLatin1String("&gt;"));
+        out.replace(QLatin1Char('"'), QLatin1String("&quot;"));
+        out.replace(QLatin1Char('\''), QLatin1String("&apos;"));
+        return out;
+    }
+
+    case Escape::Json: {
+        // RFC 8259: the two mandatory ones, the shorthands, and everything
+        // below 0x20 as \uXXXX. A raw newline in a title is what breaks a
+        // hand written JSON model first.
+        QString out;
+        out.reserve(value.size());
+        for (QChar const c : value) {
+            switch (c.unicode()) {
+            case '"':  out += QLatin1String("\\\""); break;
+            case '\\': out += QLatin1String("\\\\"); break;
+            case '\b': out += QLatin1String("\\b"); break;
+            case '\f': out += QLatin1String("\\f"); break;
+            case '\n': out += QLatin1String("\\n"); break;
+            case '\r': out += QLatin1String("\\r"); break;
+            case '\t': out += QLatin1String("\\t"); break;
+            default:
+                if (c.unicode() < 0x20)
+                    out += QStringLiteral("\\u%1").arg(
+                        static_cast<uint>(c.unicode()), 4, 16, QLatin1Char('0'));
+                else
+                    out += c; // UTF-8 goes through as itself, json allows it
+                break;
+            }
+        }
+        return out;
+    }
+    }
+    return value;
+}
+
 QString render(QString const      &tmpl,
                PostInfoData const &data,
                bool                nativeSeparators,
                OnUnknown           onUnknown,
                QStringList        *unknown,
-               bool                legacyPercentOne)
+               bool                legacyPercentOne,
+               Escape              escape)
 {
     QMap<QString, QString> const fixed = values(data, nativeSeparators);
 
@@ -204,15 +272,15 @@ QString render(QString const      &tmpl,
         QString const arg  = m.captured(2);
 
         if (name == QLatin1String("date")) {
-            out += formatDate(data.finishedAt, arg);
+            out += escapeValue(formatDate(data.finishedAt, arg), escape);
         } else if (name == QLatin1String("dateStart")) {
-            out += formatDate(data.startedAt, arg);
+            out += escapeValue(formatDate(data.startedAt, arg), escape);
         } else if (name == QLatin1String("meta")) {
             // an unfilled metadata is empty, never an error: templates are
             // written once and used for every post
-            out += data.meta.value(arg).value;
+            out += escapeValue(data.meta.value(arg).value, escape);
         } else if (fixed.contains(name)) {
-            out += fixed.value(name);
+            out += escapeValue(fixed.value(name), escape);
         } else {
             if (unknown && !unknown->contains(m.captured(0)))
                 *unknown << m.captured(0);
@@ -531,9 +599,19 @@ Result renderToFile(QString const      &templatePath,
         return res;
     }
 
+    // The model says what it is; the values are escaped for that format and
+    // nothing else is touched. A plain text model escapes nothing, which is
+    // what lets any separator, any wording and any prose work.
+    QString       unknownFormat;
+    Escape const  escape = escapeModeIn(tmpl, &unknownFormat);
+    if (!unknownFormat.isEmpty())
+        res.warnings << tr("unknown model format '%1', values are written as they are "
+                           "(known formats: json, xml)")
+                            .arg(unknownFormat);
+
     QStringList unknownInBody;
-    QString const body =
-        render(stripComments(tmpl), data, true, OnUnknown::KeepVerbatim, &unknownInBody);
+    QString const body = render(
+        stripComments(tmpl), data, true, OnUnknown::KeepVerbatim, &unknownInBody, false, escape);
     if (!unknownInBody.isEmpty())
         res.warnings << tr("unknown variable(s) left as-is: %1").arg(unknownInBody.join(", "));
 

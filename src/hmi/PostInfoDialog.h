@@ -100,6 +100,9 @@ private:
 
     QVector<PostInfoTemplate::SheetLine> _lines;
     bool                                 _crlf        = false;
+    //! Declared by the model itself, so the preview escapes exactly like the
+    //! file will.
+    PostInfoTemplate::Escape             _escape      = PostInfoTemplate::Escape::None;
     bool                                 _modelDirty  = false;
     bool                                 _fillingList = false;
     bool                                 _building    = false;

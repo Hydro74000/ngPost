@@ -38,6 +38,14 @@ folder you are standing in instead.
 |---|---|
 | `post_info_default.txt` | generic, one line per available variable, no password |
 | `post_info_baselien.txt` | the exact format expected by the Baselien index |
+| `post_info_json.txt` | a JSON sheet, for an index with an HTTP API |
+
+A model is free text, so it can be a JSON or an XML document too. Declare the
+format on a line of its own — `#!json` or `#!xml` — and ngPost escapes every
+value it inserts, so a title holding a quote or an ampersand can no longer
+break the file. It escapes the values only: the braces, the tags and the field
+names are yours. Without a declaration nothing is escaped, which is what lets
+a text sheet use any separator you like.
 
 ## Full documentation
 

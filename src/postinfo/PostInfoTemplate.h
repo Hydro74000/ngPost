@@ -58,6 +58,34 @@ void applyEnvironment(QProcessEnvironment &env, PostInfoData const &data, bool e
 //! Machine readable dump of the post, including metadata, for post commands.
 QByteArray toJson(PostInfoData const &data, bool includeSecrets);
 
+//! How a substituted VALUE must be escaped before it lands in the sheet.
+//!
+//! It is deliberately a property of the model, not of a variable: a model is
+//! either a text file, or a JSON document, or an XML one, and mixing the two
+//! in a single file is not a thing a sheet does. A plain text model escapes
+//! nothing at all -- that is what makes any separator, any wording and any
+//! prose work.
+enum class Escape
+{
+    None, //!< plain text: values are copied exactly as they are
+    Json, //!< quotes, backslashes and control characters
+    Xml   //!< & < > " '
+};
+
+//! Reads the format a model declares for itself. The declaration is a comment
+//! line of its own, so it never reaches the produced file:
+//!
+//!     #!json
+//!     #!xml
+//!
+//! Absent or unknown, the model is plain text and nothing is escaped.
+//! \a unknownFormat, when given, receives the word of an unrecognised
+//! directive so the caller can warn rather than escape by guesswork.
+Escape escapeModeIn(QString const &tmpl, QString *unknownFormat = nullptr);
+
+//! Escapes one value for \a mode. Escape::None returns it untouched.
+QString escapeValue(QString const &value, Escape mode);
+
 //! Substitution policy for unknown variables.
 enum class OnUnknown
 {
@@ -70,12 +98,15 @@ enum class OnUnknown
 //! \a legacyPercentOne enables the historical "%1" of NZB_POST_CMD. It is off
 //! everywhere else: in a record sheet, "50%1 off" is prose, not a request for
 //! the nzb path.
+//! \a escape applies to the VALUES only, never to the text of the model: the
+//! author writes the JSON braces or the XML tags and owns them.
 QString render(QString const &tmpl,
                PostInfoData const &data,
                bool                nativeSeparators,
                OnUnknown           onUnknown        = OnUnknown::KeepVerbatim,
                QStringList        *unknown          = nullptr,
-               bool                legacyPercentOne = false);
+               bool                legacyPercentOne = false,
+               Escape              escape           = Escape::None);
 
 //! Renders each argument of an already split command line, so that a value
 //! containing spaces or quotes stays exactly one argument.

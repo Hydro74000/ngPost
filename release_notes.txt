@@ -37,6 +37,15 @@ Major new features:
   __meta:<name>__. Available facts include the source name, final NZB path,
   archive name and password, poster, groups, PAR2 percentage, payload size,
   article counters, status, speed, duration and ngPost version.
+- A model can also be a JSON or an XML document. The format is declared on a
+  line of its own, "#!json" or "#!xml", and ngPost then escapes every value it
+  inserts for that format, so a value containing a quote or an ampersand can no
+  longer produce an invalid file. Escaping applies to inserted values only: the
+  braces, tags and field names written in the model are left untouched, and a
+  model without a declaration escapes nothing, which is what allows a text
+  model to use any separator and any wording. Output paths and post command
+  arguments are never escaped. A ready-made JSON model is provided under
+  templates/.
 - __postSize__ reports the payload files plus PAR2 data before yEnc, excluding
   an .nfo copied alongside the archive. The historical __sizeInByte__ variable
   remains available unchanged for existing scripts.
@@ -47,7 +56,7 @@ Major new features:
 - --export_post_info <id> can generate a file for a post already present in the
   history, either to a selected path or to stdout. The same action is available
   from the History tab.
-- Ready-made generic and Baselien models are included under templates/. A full
+- Ready-made generic, Baselien and JSON models are included under templates/. A full
   beginner guide is available on the wiki in English and French.
 - Models and output files may live anywhere accessible to the user. Relative
   paths from ngPost.conf are resolved from that configuration file's folder.

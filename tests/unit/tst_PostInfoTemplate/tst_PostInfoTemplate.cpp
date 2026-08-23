@@ -7,6 +7,8 @@
 //========================================================================
 
 #include <QtTest>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include <QDir>
 #include <QFile>
@@ -24,6 +26,9 @@ private slots:
     //! The variable table is the single source of truth: no duplicate name, no
     //! duplicate environment variable, never an empty description.
     void fields_table_is_consistent();
+    void escaping_follows_the_declared_format();
+    void escaping_never_touches_paths_or_commands();
+    void shipped_json_model_produces_valid_json();
     void template_lines_round_trip();
     void comment_lines_are_not_written();
     void tokens_in_lists_every_variable_of_a_model();
@@ -192,6 +197,111 @@ void TestPostInfoTemplate::fields_table_is_consistent()
         token.name = placeholder.mid(2, placeholder.size() - 4);
         QVERIFY2(!PostInfoTemplate::describe(token).isEmpty(), qPrintable(placeholder));
     }
+}
+
+void TestPostInfoTemplate::escaping_follows_the_declared_format()
+{
+    PostInfoData d = sampleData();
+    d.meta.insert(QStringLiteral("titre"),
+                  MetaValue(QStringLiteral("Mon \"super\" titre\\avec\nun saut & <balise>")));
+
+    // No declaration: nothing is escaped. That is what lets any separator,
+    // any wording and any prose work in a plain text sheet.
+    QString const plain = QStringLiteral("titre =__meta:titre__\n");
+    QCOMPARE(PostInfoTemplate::escapeModeIn(plain), PostInfoTemplate::Escape::None);
+    QVERIFY(PostInfoTemplate::render(plain, d, false).contains(QStringLiteral("\"super\"")));
+
+    // json: quotes, backslashes and the control characters
+    QString const json = QStringLiteral("#!json\n{\"titre\": \"__meta:titre__\"}\n");
+    QCOMPARE(PostInfoTemplate::escapeModeIn(json), PostInfoTemplate::Escape::Json);
+    QString const rendered = PostInfoTemplate::render(
+        PostInfoTemplate::stripComments(json), d, false,
+        PostInfoTemplate::OnUnknown::KeepVerbatim, nullptr, false,
+        PostInfoTemplate::Escape::Json);
+
+    QJsonParseError err;
+    QJsonDocument const doc = QJsonDocument::fromJson(rendered.toUtf8(), &err);
+    QVERIFY2(err.error == QJsonParseError::NoError, qPrintable(err.errorString() + " | " + rendered));
+    // and it survives the round trip unchanged, which is the whole point
+    QCOMPARE(doc.object().value(QStringLiteral("titre")).toString(),
+             d.meta.value(QStringLiteral("titre")).value);
+
+    // xml
+    QString const xml = QStringLiteral("#!xml\n<titre>__meta:titre__</titre>\n");
+    QCOMPARE(PostInfoTemplate::escapeModeIn(xml), PostInfoTemplate::Escape::Xml);
+    QString const xmlOut = PostInfoTemplate::render(
+        PostInfoTemplate::stripComments(xml), d, false,
+        PostInfoTemplate::OnUnknown::KeepVerbatim, nullptr, false,
+        PostInfoTemplate::Escape::Xml);
+    QVERIFY(xmlOut.contains(QStringLiteral("&amp; &lt;balise&gt;")));
+    QVERIFY(!xmlOut.contains(QStringLiteral("<balise>")));
+
+    // the declaration is a comment, so it never reaches the produced file
+    QVERIFY(!PostInfoTemplate::stripComments(json).contains(QStringLiteral("#!json")));
+
+    // an unknown format is reported, not guessed at
+    QString unknown;
+    QCOMPARE(PostInfoTemplate::escapeModeIn(QStringLiteral("#!yaml\na: __meta:titre__\n"), &unknown),
+             PostInfoTemplate::Escape::None);
+    QCOMPARE(unknown, QStringLiteral("yaml"));
+
+    // "#!json" only counts as a directive on a comment line of its own
+    QCOMPARE(PostInfoTemplate::escapeModeIn(QStringLiteral("titre =#!json\n")),
+             PostInfoTemplate::Escape::None);
+}
+
+void TestPostInfoTemplate::shipped_json_model_produces_valid_json()
+{
+    // The models we ship must do what they promise, including for a post that
+    // recorded nothing: an older post has no size and no par2 percentage, and
+    // that is exactly when a hand written JSON model falls apart.
+    QDir const here(QFileInfo(QStringLiteral(__FILE__)).absolutePath());
+    QString const path = QDir::cleanPath(here.absoluteFilePath(
+        QStringLiteral("../../../templates/post_info_json.txt")));
+
+    QFile file(path);
+    QVERIFY2(file.open(QIODevice::ReadOnly), qPrintable(path));
+    QString const tmpl = QString::fromUtf8(file.readAll());
+    file.close();
+
+    QCOMPARE(PostInfoTemplate::escapeModeIn(tmpl), PostInfoTemplate::Escape::Json);
+
+    for (bool complete : { true, false }) {
+        PostInfoData d;
+        if (complete) {
+            d = sampleData();
+            d.meta.insert(QStringLiteral("title"),
+                          MetaValue(QStringLiteral("A \"quoted\" title\nand a break")));
+        }
+        // else: everything empty, postSizeBytes at -1, par2Pct at -1
+
+        QString const out = PostInfoTemplate::render(
+            PostInfoTemplate::stripComments(tmpl), d, false,
+            PostInfoTemplate::OnUnknown::KeepVerbatim, nullptr, false,
+            PostInfoTemplate::Escape::Json);
+
+        QJsonParseError err;
+        QJsonDocument::fromJson(out.toUtf8(), &err);
+        QVERIFY2(err.error == QJsonParseError::NoError,
+                 qPrintable(QStringLiteral("%1 (complete=%2)\n%3")
+                                .arg(err.errorString()).arg(complete).arg(out)));
+    }
+}
+
+void TestPostInfoTemplate::escaping_never_touches_paths_or_commands()
+{
+    PostInfoData d = sampleData();
+    d.rarName = QStringLiteral("my \"archive\" & co");
+
+    // An output path is a file name, not a document: escaping it would create
+    // a file literally called my &quot;archive&quot;.
+    QCOMPARE(PostInfoTemplate::render(QStringLiteral("/tmp/__rarName__.txt"), d, false),
+             QStringLiteral("/tmp/my \"archive\" & co.txt"));
+
+    // Same for a post command argument: the shell is not xml either.
+    QStringList const args = PostInfoTemplate::renderArguments(
+        QStringList{ QStringLiteral("echo"), QStringLiteral("__rarName__") }, d, false);
+    QCOMPARE(args.at(1), d.rarName);
 }
 
 void TestPostInfoTemplate::template_lines_round_trip()

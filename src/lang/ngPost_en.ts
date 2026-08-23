@@ -3158,7 +3158,7 @@ Your active configuration file is:
     <message>
         <location filename="../NgPost.cpp" line="4134"/>
         <source>## a bare file name means &quot;next to this file&quot;; write the full path otherwise</source>
-        <translation>## a bare file name means "next to this file"; write the full path otherwise</translation>
+        <translation>## a bare file name means &quot;next to this file&quot;; write the full path otherwise</translation>
     </message>
     <message>
         <source>## a relative path is understood from the configuration folder</source>
@@ -4178,9 +4178,9 @@ Your active configuration file is:
     <name>PostInfoDialog</name>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="69"/>
-        <location filename="../hmi/PostInfoDialog.cpp" line="545"/>
-        <location filename="../hmi/PostInfoDialog.cpp" line="550"/>
-        <location filename="../hmi/PostInfoDialog.cpp" line="696"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="548"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="553"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="699"/>
         <source>Post information</source>
         <translation>Post information</translation>
     </message>
@@ -4262,7 +4262,7 @@ A line starting with # is a comment: it is never written. Changes here only reac
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="142"/>
-        <location filename="../hmi/PostInfoDialog.cpp" line="564"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="567"/>
         <source>Save as…</source>
         <translation>Save as…</translation>
     </message>
@@ -4347,99 +4347,99 @@ On: it is written there AND published in the nzb, which circulates.</translation
     </message>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="320"/>
-        <location filename="../hmi/PostInfoDialog.cpp" line="539"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="542"/>
         <source>Text files (*.txt *.tpl);;All files (*)</source>
         <translation>Text files (*.txt *.tpl);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="342"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="343"/>
         <source>No model: nothing will be written for this post.</source>
         <translation>No model: nothing will be written for this post.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="346"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="347"/>
         <source>Cannot read %1</source>
         <translation>Cannot read %1</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="352"/>
-        <location filename="../hmi/PostInfoDialog.cpp" line="558"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="354"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="561"/>
         <source>Model in use: %1</source>
         <translation>Model in use: %1</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="376"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="378"/>
         <source>name of the line</source>
         <translation>name of the line</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="387"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="389"/>
         <source>text, __variables__, or both</source>
         <translation>text, __variables__, or both</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="409"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="411"/>
         <source>comment, never written</source>
         <translation>comment, never written</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="410"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="412"/>
         <source>free text, written as it is</source>
         <translation>free text, written as it is</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="412"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="414"/>
         <source>A line starting with # is a comment. Indent it by one space to have it written.</source>
         <translation>A line starting with # is a comment. Indent it by one space to have it written.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="414"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="416"/>
         <source>Written to the sheet exactly as it reads here.</source>
         <translation>Written to the sheet exactly as it reads here.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="440"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="442"/>
         <source>Remove this line from the model</source>
         <translation>Remove this line from the model</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="502"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="504"/>
         <source>(not written)</source>
         <translation>(not written)</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="512"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="515"/>
         <source>filled in after the post</source>
         <translation>filled in after the post</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="537"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="540"/>
         <source>Save the model as</source>
         <translation>Save the model as</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="545"/>
-        <location filename="../hmi/PostInfoDialog.cpp" line="550"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="548"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="553"/>
         <source>Cannot write %1</source>
         <translation>Cannot write %1</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="564"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="567"/>
         <source>Save as… *</source>
         <translation>Save as… *</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="627"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="630"/>
         <source>album</source>
         <translation>album</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="643"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="646"/>
         <source>Remove this field. The line that uses it stays in the model.</source>
         <translation>Remove this field. The line that uses it stays in the model.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="697"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="700"/>
         <source>The model has been changed here, but not written to a file.
 
 The post uses the file, so these changes would be lost.
@@ -4450,87 +4450,87 @@ The post uses the file, so these changes would be lost.
 Save the model now?</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="719"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="722"/>
         <source>What can I put in a model</source>
         <translation>What can I put in a model</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="720"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="723"/>
         <source>A model is a plain text file. Write it as you want the sheet to read, and put a variable wherever ngPost should fill something in. Anything ngPost does not recognise is copied as it is, and a line starting with # is a comment that is never written.</source>
         <translation>A model is a plain text file. Write it as you want the sheet to read, and put a variable wherever ngPost should fill something in. Anything ngPost does not recognise is copied as it is, and a line starting with # is a comment that is never written.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="734"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="737"/>
         <source>Mixing text and variables</source>
         <translation>Mixing text and variables</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="735"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="738"/>
         <source>A line is free text: &lt;b&gt;comment =mine, __originalName__, and more&lt;/b&gt; writes the sentence with the name in the middle. You can mix as many variables and as much text as you like on one line.</source>
         <translation>A line is free text: &lt;b&gt;comment =mine, __originalName__, and more&lt;/b&gt; writes the sentence with the name in the middle. You can mix as many variables and as much text as you like on one line.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="740"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="743"/>
         <source>Your own fields</source>
         <translation>Your own fields</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="741"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="744"/>
         <source>&lt;b&gt;__meta:name__&lt;/b&gt; is a field of yours. Every name you use appears in &lt;i&gt;Your fields&lt;/i&gt; at the bottom of the window, waiting for a value. It always goes into the post info file; tick &lt;i&gt;Also in NZB&lt;/i&gt; to publish it in the nzb as well.</source>
         <translation>&lt;b&gt;__meta:name__&lt;/b&gt; is a field of yours. Every name you use appears in &lt;i&gt;Your fields&lt;/i&gt; at the bottom of the window, waiting for a value. It always goes into the post info file; tick &lt;i&gt;Also in NZB&lt;/i&gt; to publish it in the nzb as well.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="747"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="750"/>
         <source>Dates</source>
         <translation>Dates</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="748"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="751"/>
         <source>&lt;b&gt;__date__&lt;/b&gt; and &lt;b&gt;__dateStart__&lt;/b&gt; are the end and the start of the post. Give them a format after a colon, for instance &lt;b&gt;__date:dd/MM/yyyy__&lt;/b&gt; or &lt;b&gt;__date:yyyy-MM-dd HH:mm__&lt;/b&gt;. Without a format you get &lt;b&gt;yyyy-MM-dd&lt;/b&gt;. The time is yours, not UTC.</source>
         <translation>&lt;b&gt;__date__&lt;/b&gt; and &lt;b&gt;__dateStart__&lt;/b&gt; are the end and the start of the post. Give them a format after a colon, for instance &lt;b&gt;__date:dd/MM/yyyy__&lt;/b&gt; or &lt;b&gt;__date:yyyy-MM-dd HH:mm__&lt;/b&gt;. Without a format you get &lt;b&gt;yyyy-MM-dd&lt;/b&gt;. The time is yours, not UTC.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="753"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="756"/>
         <source>Filled in by ngPost</source>
         <translation>Filled in by ngPost</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="757"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="760"/>
         <source>Variable</source>
         <translation>Variable</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="757"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="760"/>
         <source>What it holds</source>
         <translation>What it holds</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="757"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="760"/>
         <source>Known</source>
         <translation>Known</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="770"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="773"/>
         <source>before the post</source>
         <translation>before the post</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="770"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="773"/>
         <source>after the post</source>
         <translation>after the post</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="775"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="778"/>
         <source>&lt;i&gt;before the post&lt;/i&gt; means the value is already known while you prepare it, so the preview column shows it. &lt;i&gt;after the post&lt;/i&gt; means it only exists once the post is over, which is why it is blank here.</source>
         <translation>&lt;i&gt;before the post&lt;/i&gt; means the value is already known while you prepare it, so the preview column shows it. &lt;i&gt;after the post&lt;/i&gt; means it only exists once the post is over, which is why it is blank here.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="781"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="784"/>
         <source>A variable marked with a warning sign holds a secret. Putting it in a model makes the produced file as sensitive as the password itself: write it in a folder only you can read.</source>
         <translation>A variable marked with a warning sign holds a secret. Putting it in a model makes the produced file as sensitive as the password itself: write it in a folder only you can read.</translation>
     </message>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="787"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="790"/>
         <source>Post info variables</source>
         <translation>Post info variables</translation>
     </message>
@@ -4538,63 +4538,68 @@ Save the model now?</translation>
 <context>
     <name>PostInfoTemplate</name>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="368"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="436"/>
         <source>your own field, you fill it in below</source>
         <translation>your own field, you fill it in below</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="372"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="440"/>
         <source>date the post finished, in the format you give</source>
         <translation>date the post finished, in the format you give</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="375"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="443"/>
         <source>date the post started, in the format you give</source>
         <translation>date the post started, in the format you give</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="489"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="557"/>
         <source>cannot read the template %1: %2</source>
         <translation>cannot read the template %1: %2</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="501"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="569"/>
         <source>unknown variable in the output path: %1</source>
         <translation>unknown variable in the output path: %1</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="505"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="573"/>
         <source>the output path is empty</source>
         <translation>the output path is empty</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="521"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="589"/>
         <source>refusing to overwrite %1</source>
         <translation>refusing to overwrite %1</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="529"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="597"/>
         <source>cannot create the folder %1</source>
         <translation>cannot create the folder %1</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="538"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="608"/>
+        <source>unknown model format &apos;%1&apos;, values are written as they are (known formats: json, xml)</source>
+        <translation>unknown model format '%1', values are written as they are (known formats: json, xml)</translation>
+    </message>
+    <message>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="616"/>
         <source>unknown variable(s) left as-is: %1</source>
         <translation>unknown variable(s) left as-is: %1</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="554"/>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="575"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="632"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="653"/>
         <source>cannot write %1: %2</source>
         <translation>cannot write %1: %2</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="563"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="641"/>
         <source>could not restrict the permissions of %1; it holds the archive password, put it in a folder only you can read</source>
         <translation>could not restrict the permissions of %1; it holds the archive password, put it in a folder only you can read</translation>
     </message>
     <message>
-        <location filename="../postinfo/PostInfoTemplate.cpp" line="568"/>
+        <location filename="../postinfo/PostInfoTemplate.cpp" line="646"/>
         <source>on Windows the post info file inherits the permissions of its folder; it holds the archive password, so keep it in a restricted folder</source>
         <translation>on Windows the post info file inherits the permissions of its folder; it holds the archive password, so keep it in a restricted folder</translation>
     </message>

@@ -336,7 +336,8 @@ void PostInfoDialog::_loadModel()
 {
     QString const path = _effectiveTemplatePath();
     _lines.clear();
-    _crlf = false;
+    _crlf   = false;
+    _escape = PostInfoTemplate::Escape::None;
 
     if (path.isEmpty()) {
         _templateHint->setText(tr("No model: nothing will be written for this post."));
@@ -347,8 +348,9 @@ void PostInfoDialog::_loadModel()
         } else {
             QString const text = QString::fromUtf8(file.readAll());
             file.close();
-            _crlf  = PostInfoTemplate::usesCrLf(text);
-            _lines = PostInfoTemplate::parseTemplate(text);
+            _crlf   = PostInfoTemplate::usesCrLf(text);
+            _lines  = PostInfoTemplate::parseTemplate(text);
+            _escape = PostInfoTemplate::escapeModeIn(text);
             _templateHint->setText(tr("Model in use: %1").arg(path));
         }
     }
@@ -505,7 +507,8 @@ void PostInfoDialog::_refreshPreviews()
 
         QString const source =
             line.kind == PostInfoTemplate::SheetLine::Kind::Field ? line.expression : line.raw;
-        QString const rendered = PostInfoTemplate::render(source, data, false);
+        QString const rendered = PostInfoTemplate::render(
+            source, data, false, PostInfoTemplate::OnUnknown::KeepVerbatim, nullptr, false, _escape);
 
         preview->setText(rendered);
         preview->setCursorPosition(0);
