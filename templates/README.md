@@ -41,9 +41,10 @@ folder you are standing in instead.
 | `post_info_json.txt` | a JSON sheet, for an index with an HTTP API |
 
 A model is free text, so it can be a JSON or an XML document too. Declare the
-format on a line of its own — `#!json` or `#!xml` — and ngPost escapes every
-value it inserts, so a title holding a quote or an ampersand can no longer
-break the file. It escapes the values only: the braces, the tags and the field
+format on a line of its own — `#!json` or `#!xml` — or simply name the model
+`something.json` or `something.xml`, which says the same thing. The declaration
+wins when both are present. ngPost then escapes every value it inserts, so a
+title holding a quote or an ampersand can no longer break the file. It escapes the values only: the braces, the tags and the field
 names are yours. Without a declaration nothing is escaped, which is what lets
 a text sheet use any separator you like.
 

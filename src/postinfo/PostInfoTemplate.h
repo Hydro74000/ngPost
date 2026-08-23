@@ -83,6 +83,17 @@ enum class Escape
 //! directive so the caller can warn rather than escape by guesswork.
 Escape escapeModeIn(QString const &tmpl, QString *unknownFormat = nullptr);
 
+//! What escapeModeIn() reads, falling back on the name of the model when it
+//! declares nothing: a model called sheet.json produces JSON.
+//!
+//! The directive always wins, including when it is unrecognised: an author who
+//! wrote "#!yaml" said something, and silently escaping their file as JSON
+//! because it happens to be named .json would contradict them. Only silence
+//! lets the extension speak.
+Escape escapeModeFor(QString const &tmpl,
+                     QString const &templatePath,
+                     QString       *unknownFormat = nullptr);
+
 //! Escapes one value for \a mode. Escape::None returns it untouched.
 QString escapeValue(QString const &value, Escape mode);
 

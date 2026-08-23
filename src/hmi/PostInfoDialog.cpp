@@ -350,7 +350,7 @@ void PostInfoDialog::_loadModel()
             file.close();
             _crlf   = PostInfoTemplate::usesCrLf(text);
             _lines  = PostInfoTemplate::parseTemplate(text);
-            _escape = PostInfoTemplate::escapeModeIn(text);
+            _escape = PostInfoTemplate::escapeModeFor(text, path);
             _templateHint->setText(tr("Model in use: %1").arg(path));
         }
     }

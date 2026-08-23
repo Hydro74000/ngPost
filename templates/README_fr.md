@@ -42,9 +42,11 @@ relatif depuis le dossier où vous vous trouvez.
 | `post_info_json.txt` | une fiche JSON, pour un index doté d'une API HTTP |
 
 Un modèle est du texte libre : il peut donc aussi être un document JSON ou XML.
-Déclarez le format sur une ligne à lui — `#!json` ou `#!xml` — et ngPost échappe
-chaque valeur qu'il insère, de sorte qu'un titre contenant un guillemet ou une
-esperluette ne casse plus le fichier. Seules les valeurs sont échappées : les
+Déclarez le format sur une ligne à lui — `#!json` ou `#!xml` — ou nommez
+simplement le modèle `quelquechose.json` ou `quelquechose.xml`, ce qui revient
+au même. La déclaration l'emporte si les deux sont présentes. ngPost échappe
+alors chaque valeur qu'il insère, de sorte qu'un titre contenant un guillemet
+ou une esperluette ne casse plus le fichier. Seules les valeurs sont échappées : les
 accolades, les balises et les noms de champs sont à vous. Sans déclaration,
 rien n'est échappé, ce qui permet à une fiche texte d'utiliser le séparateur
 que vous voulez.

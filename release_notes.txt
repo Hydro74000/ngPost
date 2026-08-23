@@ -38,8 +38,10 @@ Major new features:
   archive name and password, poster, groups, PAR2 percentage, payload size,
   article counters, status, speed, duration and ngPost version.
 - A model can also be a JSON or an XML document. The format is declared on a
-  line of its own, "#!json" or "#!xml", and ngPost then escapes every value it
-  inserts for that format, so a value containing a quote or an ampersand can no
+  line of its own, "#!json" or "#!xml", or taken from the name of the model
+  when it ends in .json or .xml; a declaration wins over a name, including an
+  unrecognised one, which is reported rather than guessed at. ngPost then
+  escapes every value it inserts for that format, so a value containing a quote or an ampersand can no
   longer produce an invalid file. Escaping applies to inserted values only: the
   braces, tags and field names written in the model are left untouched, and a
   model without a declaration escapes nothing, which is what allows a text

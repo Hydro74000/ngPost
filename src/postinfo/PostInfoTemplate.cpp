@@ -198,6 +198,25 @@ Escape escapeModeIn(QString const &tmpl, QString *unknownFormat)
     return Escape::None;
 }
 
+Escape escapeModeFor(QString const &tmpl, QString const &templatePath, QString *unknownFormat)
+{
+    QString declared;
+    Escape const fromDirective = escapeModeIn(tmpl, &declared);
+    if (unknownFormat)
+        *unknownFormat = declared;
+
+    // Something was declared, right or wrong: it decides.
+    if (fromDirective != Escape::None || !declared.isEmpty())
+        return fromDirective;
+
+    QString const suffix = QFileInfo(templatePath).suffix().toLower();
+    if (suffix == QLatin1String("json"))
+        return Escape::Json;
+    if (suffix == QLatin1String("xml"))
+        return Escape::Xml;
+    return Escape::None;
+}
+
 QString escapeValue(QString const &value, Escape mode)
 {
     switch (mode) {
@@ -602,8 +621,8 @@ Result renderToFile(QString const      &templatePath,
     // The model says what it is; the values are escaped for that format and
     // nothing else is touched. A plain text model escapes nothing, which is
     // what lets any separator, any wording and any prose work.
-    QString       unknownFormat;
-    Escape const  escape = escapeModeIn(tmpl, &unknownFormat);
+    QString      unknownFormat;
+    Escape const escape = escapeModeFor(tmpl, templatePath, &unknownFormat);
     if (!unknownFormat.isEmpty())
         res.warnings << tr("unknown model format '%1', values are written as they are "
                            "(known formats: json, xml)")

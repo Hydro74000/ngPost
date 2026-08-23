@@ -2,9 +2,11 @@
 #
 # JSON record sheet.
 #
-# The "#!json" line above declares the format of this model. Every value ngPost
-# inserts is then escaped for JSON, so a title holding a quote, a backslash or
-# a line break can no longer break the file. It escapes the VALUES only: the
+# The "#!json" line above declares the format of this model. Naming the file
+# something.json says the same thing, and is enough on its own; the declaration
+# is kept here so the model still works whatever you rename it to. Every value
+# ngPost inserts is escaped for JSON, so a title holding a quote, a backslash
+# or a line break can no longer break the file. It escapes the VALUES only: the
 # braces, the commas and the field names below are yours, and yours to keep
 # valid.
 #

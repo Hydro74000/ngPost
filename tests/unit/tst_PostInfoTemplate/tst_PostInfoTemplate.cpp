@@ -28,6 +28,7 @@ private slots:
     void fields_table_is_consistent();
     void escaping_follows_the_declared_format();
     void escaping_never_touches_paths_or_commands();
+    void format_falls_back_on_the_model_name();
     void shipped_json_model_produces_valid_json();
     void template_lines_round_trip();
     void comment_lines_are_not_written();
@@ -286,6 +287,39 @@ void TestPostInfoTemplate::shipped_json_model_produces_valid_json()
                  qPrintable(QStringLiteral("%1 (complete=%2)\n%3")
                                 .arg(err.errorString()).arg(complete).arg(out)));
     }
+}
+
+void TestPostInfoTemplate::format_falls_back_on_the_model_name()
+{
+    QString const plain = QStringLiteral("titre =__meta:titre__\n");
+
+    // Nothing declared: the name of the model decides.
+    QCOMPARE(PostInfoTemplate::escapeModeFor(plain, QStringLiteral("/m/sheet.json")),
+             PostInfoTemplate::Escape::Json);
+    QCOMPARE(PostInfoTemplate::escapeModeFor(plain, QStringLiteral("/m/sheet.XML")),
+             PostInfoTemplate::Escape::Xml);
+    QCOMPARE(PostInfoTemplate::escapeModeFor(plain, QStringLiteral("/m/sheet.txt")),
+             PostInfoTemplate::Escape::None);
+    QCOMPARE(PostInfoTemplate::escapeModeFor(plain, QString()),
+             PostInfoTemplate::Escape::None);
+
+    // yaml is not supported: quoting a yaml scalar depends on where it sits,
+    // so escaping alone would change the TYPE of a value without saying so.
+    QCOMPARE(PostInfoTemplate::escapeModeFor(plain, QStringLiteral("/m/sheet.yaml")),
+             PostInfoTemplate::Escape::None);
+
+    // A declaration always wins over the name, in both directions.
+    QCOMPARE(PostInfoTemplate::escapeModeFor(QStringLiteral("#!xml\n") + plain,
+                                             QStringLiteral("/m/sheet.json")),
+             PostInfoTemplate::Escape::Xml);
+
+    // Including when it is unrecognised: the author said something, so the
+    // extension does not get to answer in their place. It is reported instead.
+    QString unknown;
+    QCOMPARE(PostInfoTemplate::escapeModeFor(QStringLiteral("#!yaml\n") + plain,
+                                             QStringLiteral("/m/sheet.json"), &unknown),
+             PostInfoTemplate::Escape::None);
+    QCOMPARE(unknown, QStringLiteral("yaml"));
 }
 
 void TestPostInfoTemplate::escaping_never_touches_paths_or_commands()
