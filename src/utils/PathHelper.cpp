@@ -222,6 +222,8 @@ bool copyFileAtomically(const QString &from, const QString &to, QString *error)
         return false;
     }
 
+    QString temporary;
+    {
     QTemporaryFile target(stagingTemplateFor(to));
     target.setAutoRemove(false);
     if (!target.open()) {
@@ -236,30 +238,35 @@ bool copyFileAtomically(const QString &from, const QString &to, QString *error)
         if (target.write(block) != block.size()) {
             if (error)
                 *error = QStringLiteral("cannot copy it (%1)").arg(target.errorString());
-            const QString temporary = target.fileName();
+            const QString staged = target.fileName();
             target.close();
-            QFile::remove(temporary);
+            QFile::remove(staged);
             return false;
         }
     }
     if (source.error() != QFileDevice::NoError) {
         if (error)
             *error = QStringLiteral("cannot read it (%1)").arg(source.errorString());
-        const QString temporary = target.fileName();
+        const QString staged = target.fileName();
         target.close();
-        QFile::remove(temporary);
+        QFile::remove(staged);
         return false;
     }
     if (!target.flush()) {
         if (error)
             *error = QStringLiteral("cannot flush the copy (%1)").arg(target.errorString());
-        const QString temporary = target.fileName();
+        const QString staged = target.fileName();
         target.close();
-        QFile::remove(temporary);
+        QFile::remove(staged);
         return false;
     }
-    const QString temporary = target.fileName();
+    temporary = target.fileName();
     target.close();
+    }
+    // Publish only once every handle to the staged file is gone. close() is
+    // not enough on Windows: QFile::rename() falls back to copy+remove there,
+    // and the remove failed for as long as the QTemporaryFile object was still
+    // alive -- which left the whole adoption reported as Failed.
     return publishTemporaryNoClobber(temporary, to, error);
 }
 
@@ -275,6 +282,8 @@ bool writeFileAtomically(const QString &path,
         return false;
     }
 
+    QString temporary;
+    {
     QTemporaryFile file(stagingTemplateFor(path));
     file.setAutoRemove(false);
     if (!file.open()) {
@@ -286,21 +295,24 @@ bool writeFileAtomically(const QString &path,
     if (file.write(content) != content.size()) {
         if (error)
             *error = QStringLiteral("cannot write it (%1)").arg(file.errorString());
-        const QString temporary = file.fileName();
+        const QString staged = file.fileName();
         file.close();
-        QFile::remove(temporary);
+        QFile::remove(staged);
         return false;
     }
     if (!file.flush()) {
         if (error)
             *error = QStringLiteral("cannot flush the write (%1)").arg(file.errorString());
-        const QString temporary = file.fileName();
+        const QString staged = file.fileName();
         file.close();
-        QFile::remove(temporary);
+        QFile::remove(staged);
         return false;
     }
-    const QString temporary = file.fileName();
+    temporary = file.fileName();
     file.close();
+    }
+    // Same reason as copyFileAtomically: nothing may still hold the staged
+    // file when it is published.
     return publishTemporaryNoClobber(temporary, path, error);
 }
 
