@@ -525,7 +525,12 @@ void applyEnvironment(QProcessEnvironment &env, PostInfoData const &data, bool e
 QByteArray toJson(PostInfoData const &data, bool includeSecrets)
 {
     QJsonObject root;
-    QMap<QString, QString> const v = values(data, false);
+    // Native separators, like applyEnvironment() and like a command argument.
+    // A hook is handed the same path three ways; spelling it C:/a/b.json here
+    // and C:\\a\\b.json in NGPOST_JSON made the two disagree on Windows, where
+    // a script comparing them -- or building one from the other -- was wrong
+    // through no fault of its own.
+    QMap<QString, QString> const v = values(data, true);
     for (FieldDoc const &field : fields()) {
         if (field.isSecret && !includeSecrets)
             continue;

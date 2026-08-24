@@ -32,6 +32,7 @@ private slots:
     //! The variable table is the single source of truth: no duplicate name, no
     //! duplicate environment variable, never an empty description.
     void fields_table_is_consistent();
+    void a_hook_gets_one_spelling_of_every_path();
     void escaping_follows_the_declared_format();
     //! Rendering for stdout must be able to use the complete file pipeline
     //! without creating a destination file, even with hostile JSON values.
@@ -330,6 +331,39 @@ void TestPostInfoTemplate::fields_table_is_consistent()
         token.raw  = placeholder;
         token.name = placeholder.mid(2, placeholder.size() - 4);
         QVERIFY2(!PostInfoTemplate::describe(token).isEmpty(), qPrintable(placeholder));
+    }
+}
+
+void TestPostInfoTemplate::a_hook_gets_one_spelling_of_every_path()
+{
+    // A post command receives the same fact three ways: as an NGPOST_*
+    // variable, in the json file, and as a substituted argument. They must
+    // agree character for character, or a script comparing two of them is
+    // wrong on the one platform where they differ.
+    PostInfoData d = sampleData();
+    d.jsonPath     = QDir::toNativeSeparators(QStringLiteral("/tmp/ngPost_1_2.json"));
+    d.postInfoPath = QDir::toNativeSeparators(QStringLiteral("/tmp/sheet.info.txt"));
+
+    QProcessEnvironment env;
+    PostInfoTemplate::applyEnvironment(env, d, false);
+
+    QJsonParseError err;
+    const QJsonDocument doc = QJsonDocument::fromJson(PostInfoTemplate::toJson(d, false), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject json = doc.object();
+
+    for (PostInfoTemplate::FieldDoc const &field : PostInfoTemplate::fields()) {
+        if (!field.isPath || field.isSecret)
+            continue;
+        const QString bare = QString::fromLatin1(field.placeholder)
+                                 .mid(2, qstrlen(field.placeholder) - 4);
+        const QString fromEnv  = env.value(QString::fromLatin1(field.envName));
+        const QString fromJson = json.value(bare).toString();
+        QCOMPARE(fromJson, fromEnv);
+
+        const QStringList args = PostInfoTemplate::renderArguments(
+            QStringList{ QString::fromLatin1(field.placeholder) }, d, true);
+        QCOMPARE(args.value(0), fromEnv);
     }
 }
 
