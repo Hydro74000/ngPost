@@ -177,9 +177,23 @@ bool publishTemporaryNoClobber(const QString &temporary,
     QFile staged(temporary);
     if (staged.rename(target))
         return true;
-    if (error)
-        *error = QStringLiteral("cannot publish it without overwriting (%1)")
-                     .arg(staged.errorString());
+    if (error) {
+        // QFile::rename() falls back to copy+remove when the native move
+        // fails, so its message alone does not say which half went wrong.
+        // Report what is on disk afterwards: it is the difference between
+        // "nothing was published" and "published, but the staged copy stayed".
+        const QFileInfo stagedInfo(temporary);
+        const QFileInfo publishedInfo(target);
+        *error = QStringLiteral("cannot publish it without overwriting (%1"
+                                "; target now exists: %2, size %3"
+                                "; staged still exists: %4, size %5, permissions 0x%6)")
+                     .arg(staged.errorString(),
+                          publishedInfo.exists() ? QStringLiteral("yes") : QStringLiteral("no"))
+                     .arg(publishedInfo.exists() ? publishedInfo.size() : -1)
+                     .arg(stagedInfo.exists() ? QStringLiteral("yes") : QStringLiteral("no"))
+                     .arg(stagedInfo.exists() ? stagedInfo.size() : -1)
+                     .arg(static_cast<int>(QFile::permissions(temporary)), 0, 16);
+    }
     QFile::remove(temporary);
     return false;
 #endif
