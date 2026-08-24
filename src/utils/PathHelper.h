@@ -234,6 +234,21 @@ const ConfigDirMigrationResult &migrateAppNamedConfigDirIfNeeded(const QString &
 //! the code that reports it to the user once a log and a GUI exist. Status is
 //! NotNeeded when the migration never ran.
 const ConfigDirMigrationResult &configDirMigrationResult();
+
+//! The name-derived folder a previous run adopted, read back from the marker
+//! left in configDir(). Empty when no adoption ever happened here.
+//!
+//! Needed long after the adoption itself: a script still passing
+//! "-c <thatFolder>/ngPost.conf" reads a configuration that has no POST_DB, so
+//! its history goes to the CURRENT default database rather than to the one the
+//! adopted configuration points at. Recognising the folder is what lets ngPost
+//! say so instead of quietly keeping two histories.
+QString adoptedLegacyConfigDir();
+
+//! The database that adoption left in place and pointed the adopted
+//! configuration at, read back from the same marker. Empty when adoption kept
+//! no database, which is also when there is nothing to diverge from.
+QString adoptedLegacyHistoryPath();
 }
 
 #endif // PATHHELPER_H

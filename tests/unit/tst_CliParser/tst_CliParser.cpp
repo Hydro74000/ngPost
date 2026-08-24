@@ -190,6 +190,7 @@ private slots:
     //! application event loop starts. The CLI must still exit and must not
     //! leave a constructor-created phantom history row.
     void blocked_vpn_admission_exits_without_hanging_or_history_ghost();
+    void warns_when_c_points_at_the_adopted_legacy_config();
 
     //! A metadata value very often holds a URL with its own '=' signs; the
     //! pair must be split on the first one only.
@@ -1031,6 +1032,69 @@ void TestCliParser::blocked_vpn_admission_exits_without_hanging_or_history_ghost
         store.listPosts(QString(), QString(), false, &error);
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QVERIFY(posts.isEmpty());
+}
+
+void TestCliParser::warns_when_c_points_at_the_adopted_legacy_config()
+{
+    QTemporaryDir home;
+    QVERIFY(home.isValid());
+    const QString legacyDir = home.filePath(QStringLiteral(".config/ngPost-5.4.2-x86_64.AppImage"));
+    QVERIFY(QDir().mkpath(legacyDir));
+
+    // A legacy install: a configuration with no POST_DB, and its database.
+    const QString legacyConf = legacyDir + QStringLiteral("/ngPost.conf");
+    {
+        QFile f(legacyConf);
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        f.write("GROUPS = alt.binaries.test\n");
+    }
+    const QString legacyDb = legacyDir + QStringLiteral("/ngPost_history.sqlite");
+    {
+        QString err;
+        PostHistoryStore store(legacyDb, true);
+        QVERIFY2(store.initialize(&err), qPrintable(err));
+    }
+
+    // First run adopts it.
+    RunResult adopt = run(_bin, { QStringLiteral("--history") }, home.path());
+    QVERIFY(!adopt.timedOut);
+    QVERIFY2(adopt.stderrText.contains(QStringLiteral("brought over"), Qt::CaseInsensitive),
+             qPrintable(adopt.stderrText));
+
+    // A cron job still passing the old file reads settings that never had a
+    // POST_DB line, so its posts would land in the new folder's database while
+    // the adopted configuration keeps using the old one. Say so.
+    RunResult viaLegacy = run(_bin,
+                              { QStringLiteral("-c"), legacyConf, QStringLiteral("--history") },
+                              home.path());
+    QVERIFY(!viaLegacy.timedOut);
+    QVERIFY2(viaLegacy.stderrText.contains(QStringLiteral("no POST_DB line")),
+             qPrintable(viaLegacy.stderrText));
+    QVERIFY2(viaLegacy.stderrText.contains(legacyDb), qPrintable(viaLegacy.stderrText));
+
+    // The adopted configuration itself selects that database: nothing to warn.
+    const QString adopted = home.filePath(QStringLiteral(".config/ngPost/ngPost.conf"));
+    QVERIFY(QFileInfo::exists(adopted));
+    RunResult viaAdopted = run(_bin,
+                               { QStringLiteral("-c"), adopted, QStringLiteral("--history") },
+                               home.path());
+    QVERIFY(!viaAdopted.timedOut);
+    QVERIFY2(!viaAdopted.stderrText.contains(QStringLiteral("no POST_DB line")),
+             qPrintable(viaAdopted.stderrText));
+
+    // And any unrelated configuration stays silent too.
+    const QString other = home.filePath(QStringLiteral("autre.conf"));
+    {
+        QFile f(other);
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        f.write("GROUPS = x\n");
+    }
+    RunResult viaOther = run(_bin,
+                             { QStringLiteral("-c"), other, QStringLiteral("--history") },
+                             home.path());
+    QVERIFY(!viaOther.timedOut);
+    QVERIFY2(!viaOther.stderrText.contains(QStringLiteral("no POST_DB line")),
+             qPrintable(viaOther.stderrText));
 }
 
 QTEST_MAIN(TestCliParser)

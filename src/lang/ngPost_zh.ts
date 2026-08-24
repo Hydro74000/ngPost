@@ -2105,12 +2105,12 @@ This also removes all associated file and article records.</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4373"/>
+        <location line="+4416"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>使用RAR压缩文件夹时删除根（父）文件夹</translation>
     </message>
     <message>
-        <location line="-4370"/>
+        <location line="-4413"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP服务器遵循的格式 (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2224,7 +2224,7 @@ To list the available options use: %2 --help
 </translation>
     </message>
     <message>
-        <location line="+174"/>
+        <location line="+176"/>
         <source>Error syntax: you should provide at least one input file or directory using the option -i, --auto or --monitor</source>
         <translation>错误语法：您应该使用命令选项 -i, --auto 或 --monitor 提供至少一个输入文件或目录</translation>
     </message>
@@ -2274,7 +2274,7 @@ To list the available options use: %2 --help
         <translation type="vanished">欢迎使用BTC来进行捐赠, 点击此处来在GitHub中查看我的收款</translation>
     </message>
     <message>
-        <location line="-2238"/>
+        <location line="-2240"/>
         <source>Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</source>
         <translation>您可以配置PACK命令定义的子命令(COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)来打包发帖</translation>
     </message>
@@ -2308,7 +2308,7 @@ To list the available options use: %2 --help
         <translation>用户已取消发布。</translation>
     </message>
     <message>
-        <location line="+3010"/>
+        <location line="+3053"/>
         <source>VPN warning</source>
         <translation>VPN 警告</translation>
     </message>
@@ -2341,14 +2341,14 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>取消</translation>
     </message>
     <message>
-        <location line="-1692"/>
+        <location line="-1733"/>
         <source>Full debug logs are ON
 </source>
         <translation>已打开完整调试日志
 </translation>
     </message>
     <message>
-        <location line="-2313"/>
+        <location line="-2315"/>
         <source>use configuration file (default: the per-user ngPost configuration folder)</source>
         <translation>使用配置文件（默认：每位用户的 ngPost 配置文件夹）</translation>
     </message>
@@ -2751,7 +2751,7 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
     </message>
     <message>
         <location line="-770"/>
-        <location line="+1114"/>
+        <location line="+1116"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>配置文件夹迁移失败；ngPost 已在使用新文件夹前停止，以便下次安全重试。</translation>
     </message>
@@ -2897,7 +2897,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
 </translation>
     </message>
     <message>
-        <location line="+652"/>
+        <location line="+685"/>
         <source>ngPost used to keep your settings in a folder named after the program file, so renaming or updating the application (an AppImage is renamed on install and on every update) silently started ngPost with an empty configuration and an empty post history.
 
 The folder is now always called &quot;ngPost&quot;, and your settings have been brought over to it:
@@ -2914,16 +2914,15 @@ Brought over: %3</source>
 已迁移：%3</translation>
     </message>
     <message>
-        <location line="+11"/>
         <source>
 
 The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; keeps working. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
-        <translation>
+        <translation type="vanished">
 
 旧文件夹保持原样——配置文件只进行了复制而非移动，因此传入“-c %1/ngPost.conf”的脚本或 cron 任务仍可正常工作。SQLite 历史记录文件既未复制也未移动：这样操作可以立即完成，并避免改动正在使用的数据库及其 WAL 文件。</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+26"/>
         <source>
 
 Your existing post history remains available at:
@@ -3111,7 +3110,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>## 传给贴后命令；参数中的 __rarPass__ 仍然有效</translation>
     </message>
     <message>
-        <location line="-2660"/>
+        <location line="-2703"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>NZB_UPLOAD_URL (%1)使用了不支持的协议。 您只可以使用%2
@@ -3124,7 +3123,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
 </translation>
     </message>
     <message>
-        <location line="+1684"/>
+        <location line="+1686"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost 开始记录: %1</translation>
     </message>
@@ -3149,7 +3148,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>解析Proxy Socks5参数时出错. 语法应为: %1</translation>
     </message>
     <message>
-        <location line="-1786"/>
+        <location line="-1788"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>发布历史“%1”不可设置为目录...
@@ -3164,7 +3163,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
 </translation>
     </message>
     <message>
-        <location line="+1846"/>
+        <location line="+1848"/>
         <source>should be a directory!...</source>
         <translation>应该是一个目录!...</translation>
     </message>
@@ -3199,7 +3198,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>使用 PACK 命令时使用了错误的关键词: %1. 关键词请使用下面中的 (%2)</translation>
     </message>
     <message>
-        <location line="-1915"/>
+        <location line="-1917"/>
         <source>date</source>
         <translation>日期</translation>
     </message>
@@ -3254,7 +3253,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>关机进程出错：%1</translation>
     </message>
     <message>
-        <location line="+633"/>
+        <location line="+635"/>
         <location line="+678"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE 必须是正整数</translation>
@@ -3306,7 +3305,40 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>一次性 VPN 覆盖设置（不写入配置文件）</translation>
     </message>
     <message>
-        <location line="+139"/>
+        <location line="+46"/>
+        <source>Warning: this configuration file is the one ngPost adopted when it moved your settings to &quot;%1&quot;.
+It has no POST_DB line, so this run records its posts in
+    %2
+while the adopted configuration uses
+    %3
+Point this command at &quot;%1/ngPost.conf&quot;, or add &quot;POST_DB = %3&quot; to this file, to keep a single history.</source>
+        <translation>警告：此配置文件正是 ngPost 将您的设置迁移到“%1”时所采用的那一个。
+它没有 POST_DB 行，因此本次运行会把贴记录到
+    %2
+而采用的配置使用的是
+    %3
+请把此命令指向“%1/ngPost.conf”，或在此文件中加入“POST_DB = %3”，以保持单一的历史记录。</translation>
+    </message>
+    <message>
+        <location line="+37"/>
+        <source>
+
+The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
+        <translation>
+
+旧文件夹保持原样——配置文件是复制而非移动的，因此使用“-c %1/ngPost.conf”的脚本或 cron 任务读取的仍是同样的设置。SQLite 历史文件既未复制也未移动：这让操作即时完成，并且绝不触碰正在使用的数据库及其 WAL 文件。</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>
+
+One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at &quot;%1/ngPost.conf&quot; — or add &quot;POST_DB = %2&quot; to the old file — to keep a single history. ngPost says so again if it sees that file used.</source>
+        <translation>
+
+对这类脚本确实有一处变化：旧的配置文件没有 POST_DB 这一行，因此它现在会把贴记录到新文件夹的数据库中，而不是下面那个。把脚本指向“%1/ngPost.conf”，或在旧文件中加入“POST_DB = %2”，以保持单一的历史记录。若 ngPost 看到该文件被使用，会再次提示。</translation>
+    </message>
+    <message>
+        <location line="+90"/>
         <source>Config migration</source>
         <translation>配置迁移</translation>
     </message>
@@ -3513,7 +3545,7 @@ Your active configuration file is:
         <translation type="vanished">没有配置文件，您只可以使用所有参数连接到一个服务器</translation>
     </message>
     <message>
-        <location line="-656"/>
+        <location line="-697"/>
         <source>for compression and par2 support</source>
         <translation>为压缩和par2文件提供支持</translation>
     </message>
@@ -3573,7 +3605,7 @@ Your active configuration file is:
         <translation>因此，在上面的第二个示例中，nzb文件为: /tmp/file1.nzb</translation>
     </message>
     <message>
-        <location line="+404"/>
+        <location line="+445"/>
         <source># ngPost configuration file</source>
         <translation># ngPost配置文件</translation>
     </message>
@@ -4061,7 +4093,7 @@ Your active configuration file is:
         <translation type="vanished">自动压缩已启用 (--compress --gen_name --gen_pass --gen_par2)</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1085"/>
+        <location filename="../NgPost.h" line="+1090"/>
         <source>PACKing auto using: %1</source>
         <translation>打包功能自动使用: %1</translation>
     </message>

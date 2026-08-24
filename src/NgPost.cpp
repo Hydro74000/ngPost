@@ -2457,12 +2457,14 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
 
     if (parser.isSet(sOptionNames[Opt::CONF]))
     {
-        QString err = _parseConfig(parser.value(sOptionNames[Opt::CONF]));
+        const QString confPath = parser.value(sOptionNames[Opt::CONF]);
+        QString       err      = _parseConfig(confPath);
         if (!err.isEmpty())
         {
             _error(err, ERROR_CODE::ERR_CONF_FILE);
             return false;
         }
+        _warnIfConfigWasAdoptedFrom(confPath);
     }
     else
     {
@@ -3983,6 +3985,39 @@ void NgPost::_syntax(char *appName)
           << MB_FLUSH;
 }
 
+//! A script that kept pointing at the folder adoption came from reads settings
+//! that never had a POST_DB line, so its posts go to the database of the new
+//! folder while the adopted configuration still uses the old one. Nothing is
+//! lost either way, but the history quietly ends up in two files -- which is
+//! the very split the folder change exists to remove.
+void NgPost::_warnIfConfigWasAdoptedFrom(const QString &confPath)
+{
+    const QString legacyDir = PathHelper::adoptedLegacyConfigDir();
+    if (legacyDir.isEmpty())
+        return;
+
+    const QString givenDir =
+        QDir::cleanPath(QFileInfo(confPath).absoluteDir().absolutePath());
+    if (givenDir != legacyDir)
+        return;
+
+    const QString retained = PathHelper::adoptedLegacyHistoryPath();
+    // Nothing was retained, or this configuration already selects it: the two
+    // agree, so there is nothing to warn about.
+    if (retained.isEmpty() || QDir::cleanPath(_postDbFile) == retained)
+        return;
+
+    _cerr << tr("Warning: this configuration file is the one ngPost adopted when it moved "
+                "your settings to \"%1\".\n"
+                "It has no POST_DB line, so this run records its posts in\n    %2\n"
+                "while the adopted configuration uses\n    %3\n"
+                "Point this command at \"%1/ngPost.conf\", or add \"POST_DB = %3\" to "
+                "this file, to keep a single history.")
+                 .arg(PathHelper::configDirPath(), _postDbFile, retained)
+          << "\n"
+          << MB_FLUSH;
+}
+
 void NgPost::_reportConfigDirMigration()
 {
     // Reached from several entry points on purpose — the GUI, the CLI with a
@@ -4011,10 +4046,18 @@ void NgPost::_reportConfigDirMigration()
             .arg(m.legacyDir, m.targetDir, m.adopted.join(QStringLiteral(", ")));
         msg += tr("\n\nThe old folder was left as it was — configuration assets were "
                   "copied, not moved, so a script or a cron job passing "
-                  "\"-c %1/ngPost.conf\" keeps working. SQLite history files were not "
-                  "copied or moved: this makes the operation immediate and avoids "
-                  "touching a live database and its WAL files.")
+                  "\"-c %1/ngPost.conf\" still reads the same settings. SQLite history "
+                  "files were not copied or moved: this makes the operation immediate "
+                  "and avoids touching a live database and its WAL files.")
                    .arg(m.legacyDir);
+        if (!m.retainedHistoryPath.isEmpty())
+            msg += tr("\n\nOne thing does change for such a script: the old "
+                      "configuration file has no POST_DB line, so it now records its "
+                      "posts in the database of the new folder rather than in the one "
+                      "below. Point the script at \"%1/ngPost.conf\" — or add "
+                      "\"POST_DB = %2\" to the old file — to keep a single history. "
+                      "ngPost says so again if it sees that file used.")
+                       .arg(m.targetDir, m.retainedHistoryPath);
         if (!m.retainedHistoryPath.isEmpty())
             msg += tr("\n\nYour existing post history remains available at:\n    %1\n"
                       "The adopted configuration continues to use that exact database.")

@@ -554,6 +554,24 @@ bool writeMigrationStamp(const QString &dir, const char *outcome,
                                error);
 }
 
+//! Reads one "key=value" back from the marker. Deliberately tolerant: the file
+//! is informational, and a marker somebody edited must never stop ngPost.
+QString migrationStampValue(const QString &dir, const QString &key)
+{
+    QFile f(migrationStampPath(dir));
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+        return QString();
+
+    const QString prefix = key + QLatin1Char('=');
+    QTextStream  in(&f);
+    while (!in.atEnd()) {
+        const QString line = in.readLine();
+        if (line.startsWith(prefix))
+            return line.mid(prefix.size()).trimmed();
+    }
+    return QString();
+}
+
 //! An ngPost configuration folder is one that holds an ngPost.conf. Detecting
 //! by marker rather than by name is what makes an update work: the folder to
 //! adopt is named after the *previous* program file, which we cannot guess.
@@ -1035,6 +1053,21 @@ const ConfigDirMigrationResult &migrateAppNamedConfigDirIfNeeded(const QString &
 const ConfigDirMigrationResult &configDirMigrationResult()
 {
     return migrationState();
+}
+
+QString adoptedLegacyConfigDir()
+{
+    // This run may be the one that adopted it, or any later one: the marker is
+    // the only thing that still knows, so read it rather than the in-memory
+    // result, which is NotNeeded on every run but the first.
+    const QString from = migrationStampValue(configDirPath(), QStringLiteral("from"));
+    return from.isEmpty() ? QString() : QDir::cleanPath(from);
+}
+
+QString adoptedLegacyHistoryPath()
+{
+    const QString db = migrationStampValue(configDirPath(), QStringLiteral("history"));
+    return db.isEmpty() ? QString() : QDir::cleanPath(db);
 }
 
 } // namespace PathHelper

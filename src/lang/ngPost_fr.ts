@@ -2043,12 +2043,12 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4373"/>
+        <location line="+4416"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Supprimer le dossier racine (parent) lors des compressions de dossiers avec RAR</translation>
     </message>
     <message>
-        <location line="-4370"/>
+        <location line="-4413"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP serveur suivant le format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2189,7 +2189,7 @@ Pour obtenir la liste des options disponibles : %2 --help
 </translation>
     </message>
     <message>
-        <location line="+174"/>
+        <location line="+176"/>
         <source>Error syntax: you should provide at least one input file or directory using the option -i, --auto or --monitor</source>
         <translation>Erreur de syntaxe: il faut au moins un fichier ou dossier d&apos;entrée avec une des options -i, --auto ou --monitor</translation>
     </message>
@@ -2239,7 +2239,7 @@ Pour obtenir la liste des options disponibles : %2 --help
         <translation type="vanished">Vous pouvez faire une donation en BTC, cliquez ici pour avoir mon adresse via la page GitHub de ngPost</translation>
     </message>
     <message>
-        <location line="-2302"/>
+        <location line="-2304"/>
         <source>check nzb file (if articles are available on Usenet) cf https://github.com/mbruel/nzbCheck</source>
         <translation>vérification du fichier nzb (test si les articles sont présents sur Usenet) cf https://github.com/mbruel/nzbCheck</translation>
     </message>
@@ -2541,12 +2541,12 @@ Pour obtenir la liste des options disponibles : %2 --help
     </message>
     <message>
         <location line="+355"/>
-        <location line="+1114"/>
+        <location line="+1116"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>L’adoption du dossier de configuration a échoué ; ngPost s’est arrêté avant d’utiliser le nouveau dossier afin de pouvoir réessayer en toute sécurité au prochain démarrage.</translation>
     </message>
     <message>
-        <location line="-251"/>
+        <location line="-253"/>
         <source>Shutdown process failed (exit code %1).</source>
         <translation>Le processus d&apos;arrêt a échoué (code de sortie %1).</translation>
     </message>
@@ -2556,13 +2556,28 @@ Pour obtenir la liste des options disponibles : %2 --help
         <translation>Erreur du processus d&apos;arrêt : %1</translation>
     </message>
     <message>
-        <location line="+633"/>
+        <location line="+635"/>
         <location line="+678"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE doit être un entier positif</translation>
     </message>
     <message>
-        <location line="+441"/>
+        <location line="+448"/>
+        <source>Warning: this configuration file is the one ngPost adopted when it moved your settings to &quot;%1&quot;.
+It has no POST_DB line, so this run records its posts in
+    %2
+while the adopted configuration uses
+    %3
+Point this command at &quot;%1/ngPost.conf&quot;, or add &quot;POST_DB = %3&quot; to this file, to keep a single history.</source>
+        <translation>Attention : ce fichier de configuration est celui que ngPost a adopté en déplaçant vos réglages vers « %1 ».
+Il n'a pas de ligne POST_DB, donc ce lancement enregistre ses posts dans
+    %2
+alors que la configuration adoptée utilise
+    %3
+Faites pointer cette commande sur « %1/ngPost.conf », ou ajoutez « POST_DB = %3 » à ce fichier, pour n'avoir qu'un seul historique.</translation>
+    </message>
+    <message>
+        <location line="+26"/>
         <source>ngPost used to keep your settings in a folder named after the program file, so renaming or updating the application (an AppImage is renamed on install and on every update) silently started ngPost with an empty configuration and an empty post history.
 
 The folder is now always called &quot;ngPost&quot;, and your settings have been brought over to it:
@@ -2579,16 +2594,15 @@ Le dossier s’appelle désormais toujours « ngPost », et vos paramètres y on
 Éléments transférés : %3</translation>
     </message>
     <message>
-        <location line="+11"/>
         <source>
 
 The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; keeps working. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
-        <translation>
+        <translation type="vanished">
 
 L’ancien dossier a été conservé tel quel — les éléments de configuration ont été copiés, et non déplacés ; un script ou une tâche cron utilisant « -c %1/ngPost.conf » continue donc de fonctionner. Les fichiers d’historique SQLite n’ont été ni copiés ni déplacés : l’opération est ainsi immédiate et ne touche ni une base de données en cours d’utilisation ni ses fichiers WAL.</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+26"/>
         <source>
 
 Your existing post history remains available at:
@@ -2780,7 +2794,7 @@ Aucun fichier source existant n’a été modifié ou supprimé. Des fichiers s�
         <translation type="vanished">Impossible d&apos;écrire le NZB : %1</translation>
     </message>
     <message>
-        <location line="-3466"/>
+        <location line="-3509"/>
         <source>NZB written: %1</source>
         <translation>NZB écrit : %1</translation>
     </message>
@@ -2866,7 +2880,7 @@ Aucun fichier source existant n’a été modifié ou supprimé. Des fichiers s�
         <translation>Post annulé par l&apos;utilisateur.</translation>
     </message>
     <message>
-        <location line="+3010"/>
+        <location line="+3053"/>
         <source>VPN warning</source>
         <translation>Alerte VPN</translation>
     </message>
@@ -2899,14 +2913,14 @@ Réglage : Bouton &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Rout
         <translation>Annuler</translation>
     </message>
     <message>
-        <location line="-1692"/>
+        <location line="-1733"/>
         <source>Full debug logs are ON
 </source>
         <translation>Logs de Debug ON
 </translation>
     </message>
     <message>
-        <location line="-2313"/>
+        <location line="-2315"/>
         <source>use configuration file (default: the per-user ngPost configuration folder)</source>
         <translation>utiliser le fichier de configuration (par défaut : le dossier de configuration ngPost de l’utilisateur)</translation>
     </message>
@@ -2970,7 +2984,7 @@ Réglage : Bouton &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Rout
         <translation>Récupération : démarrage du prochain travail non pré-préparé</translation>
     </message>
     <message>
-        <location line="+452"/>
+        <location line="+454"/>
         <source>Error syntax: --rm_posted option is only available with --auto or --monitor</source>
         <translation>Erreur de syntaxe : l&apos;option --rm_posted n&apos;est disponible qu&apos;avec --auto ou --monitor</translation>
     </message>
@@ -3111,7 +3125,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
 </translation>
     </message>
     <message>
-        <location line="-1536"/>
+        <location line="-1538"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Protocole non supporté pour NZB_UPLOAD_URL (%1). Vous ne pouvez utiliser que: %2
@@ -3124,7 +3138,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
 </translation>
     </message>
     <message>
-        <location line="+1684"/>
+        <location line="+1686"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost commencer à logger: %1</translation>
     </message>
@@ -3149,7 +3163,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>Erreur lors de l&apos;analyse des paramètres du proxy Socks5. La syntaxe est la suivante: %1</translation>
     </message>
     <message>
-        <location line="-1786"/>
+        <location line="-1788"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>le fichier d&apos;historique des posts &apos;%1&apos; ne peut pas être un dossier...
@@ -3164,7 +3178,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
 </translation>
     </message>
     <message>
-        <location line="+1846"/>
+        <location line="+1848"/>
         <source>should be a directory!...</source>
         <translation>doit être un dossier!...</translation>
     </message>
@@ -3199,7 +3213,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>Mauvais mot clef pour PACK: %1. Ce doit être un sous ensemble de (%2)</translation>
     </message>
     <message>
-        <location line="-1915"/>
+        <location line="-1917"/>
         <source>date</source>
         <translation>date</translation>
     </message>
@@ -3244,7 +3258,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>posteur (from)</translation>
     </message>
     <message>
-        <location line="+1769"/>
+        <location line="+1771"/>
         <source>POST_INFO_OUTPUT can&apos;t be empty
 </source>
         <translation>POST_INFO_OUTPUT ne peut pas être vide
@@ -3285,7 +3299,25 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>Réglages VPN ponctuels (non enregistrés dans la configuration)</translation>
     </message>
     <message>
-        <location line="+139"/>
+        <location line="+83"/>
+        <source>
+
+The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
+        <translation>
+
+L'ancien dossier a été laissé tel quel — les éléments de configuration ont été copiés, pas déplacés, donc un script ou une tâche cron passant « -c %1/ngPost.conf » lit toujours les mêmes réglages. Les fichiers SQLite de l'historique n'ont été ni copiés ni déplacés : l'opération est ainsi immédiate et ne touche jamais à une base active ni à ses fichiers WAL.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>
+
+One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at &quot;%1/ngPost.conf&quot; — or add &quot;POST_DB = %2&quot; to the old file — to keep a single history. ngPost says so again if it sees that file used.</source>
+        <translation>
+
+Une chose change tout de même pour un tel script : l'ancien fichier de configuration n'a pas de ligne POST_DB, il enregistre donc désormais ses posts dans la base du nouveau dossier et non dans celle indiquée ci-dessous. Faites pointer le script sur « %1/ngPost.conf » — ou ajoutez « POST_DB = %2 » à l'ancien fichier — pour n'avoir qu'un seul historique. ngPost le redira s'il voit ce fichier utilisé.</translation>
+    </message>
+    <message>
+        <location line="+90"/>
         <source>Config migration</source>
         <translation>Migration de la configuration</translation>
     </message>
@@ -3472,7 +3504,7 @@ Votre fichier de configuration actif est :
         <translation type="vanished">sans fichier de configuration, vous pouvez fournir tous les paramètres pour se connecter à UN SEUL serveur</translation>
     </message>
     <message>
-        <location line="-656"/>
+        <location line="-697"/>
         <source>for compression and par2 support</source>
         <translation>pour la compression et le support des fichiers par2</translation>
     </message>
@@ -3532,7 +3564,7 @@ Votre fichier de configuration actif est :
         <translation>donc pour le second exemple ci-dessus, le nom du nzb serait: /tmp/file1.nzb</translation>
     </message>
     <message>
-        <location line="+404"/>
+        <location line="+445"/>
         <source># ngPost configuration file</source>
         <translation># fichier de configuration de ngPost</translation>
     </message>
@@ -3673,12 +3705,12 @@ Votre fichier de configuration actif est :
         <translation type="vanished">## sinon, si vous laissez commenté, un email sera généré automatiquement à chaque utilisation</translation>
     </message>
     <message>
-        <location line="-625"/>
+        <location line="-666"/>
         <source>you can provide servers in one string using -S and/or split the parameters for ONE SINGLE server (this will overwrite the configuration file)</source>
         <translation>il est possible de fournir plusieurs serveurs via l&apos;option -S et/ou un UNIQUE serveur avec les paramètres séparés (ils écraseront ceux présents dans le fichier de configuration)</translation>
     </message>
     <message>
-        <location line="+245"/>
+        <location line="+286"/>
         <source>Using default config file: %1</source>
         <translation>Utilisation de la configuration par défaut: %1</translation>
     </message>
@@ -4045,7 +4077,7 @@ Votre fichier de configuration actif est :
         <translation>Erreur: impossible d&apos;écrire le fichier de configuration par défaut: %1</translation>
     </message>
     <message>
-        <location line="-4701"/>
+        <location line="-4744"/>
         <source>Auto Posting</source>
         <translation>Post Auto</translation>
     </message>
@@ -4063,7 +4095,7 @@ Votre fichier de configuration actif est :
         <translation type="vanished">Auto compress ON (--compress --gen_name --gen_pass --gen_par2)</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1085"/>
+        <location filename="../NgPost.h" line="+1090"/>
         <source>PACKing auto using: %1</source>
         <translation>Packing auto avec: %1</translation>
     </message>

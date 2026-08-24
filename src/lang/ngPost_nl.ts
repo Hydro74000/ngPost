@@ -2094,12 +2094,12 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4373"/>
+        <location line="+4416"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Verwijder de root (bovenliggende) map bij het comprimeren van mappen met RAR</translation>
     </message>
     <message>
-        <location line="-4370"/>
+        <location line="-4413"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP-server met de indeling (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2212,7 +2212,7 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
 </translation>
     </message>
     <message>
-        <location line="+174"/>
+        <location line="+176"/>
         <source>Error syntax: you should provide at least one input file or directory using the option -i, --auto or --monitor</source>
         <translation>Syntax fout :--u moet ten minste één invoerbestand of directory opgeven met de optie -i, --auto of --monitor</translation>
     </message>
@@ -2263,7 +2263,7 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
         <translation type="vanished">Voel je vrij om te doneren in BTC, klik hier om mijn adres in de GitHub-sectie te zien</translation>
     </message>
     <message>
-        <location line="-2302"/>
+        <location line="-2304"/>
         <source>check nzb file (if articles are available on Usenet) cf https://github.com/mbruel/nzbCheck</source>
         <translation>controleer nzb-bestand (of er artikelen beschikbaar zijn op Usenet) of https://github.com/mbruel/nzbCheck</translation>
     </message>
@@ -2312,7 +2312,7 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
         <translation>Posting geannuleerd door gebruiker.</translation>
     </message>
     <message>
-        <location line="+3010"/>
+        <location line="+3053"/>
         <source>VPN warning</source>
         <translation>VPN-waarschuwing</translation>
     </message>
@@ -2345,7 +2345,7 @@ Instelling: Knop &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route
         <translation>Annuleren</translation>
     </message>
     <message>
-        <location line="-1692"/>
+        <location line="-1733"/>
         <source>Full debug logs are ON
 </source>
         <translation>Volledige foutopsporings logboeken zijn AAN
@@ -2464,7 +2464,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
 </translation>
     </message>
     <message>
-        <location line="-1536"/>
+        <location line="-1538"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Niet-ondersteund protocol voor NZB_UPLOAD_URL (%1). Je kunt alleen:%2 gebruiken
@@ -2477,7 +2477,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
 </translation>
     </message>
     <message>
-        <location line="+1684"/>
+        <location line="+1686"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost begint met loggen: %1</translation>
     </message>
@@ -2502,7 +2502,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Fout bij het parseren van Proxy Socks5-parameters. De syntaxis moet zijn:%1</translation>
     </message>
     <message>
-        <location line="-1786"/>
+        <location line="-1788"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>het historie bestand %1  mag geen directory zijn...
@@ -2517,7 +2517,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
 </translation>
     </message>
     <message>
-        <location line="+1846"/>
+        <location line="+1848"/>
         <source>should be a directory!...</source>
         <translation>moet een directory zijn! ...</translation>
     </message>
@@ -2552,7 +2552,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Verkeerde trefwoorden voor PACK: %1. Het moet een subset zijn van (%2)</translation>
     </message>
     <message>
-        <location line="-1915"/>
+        <location line="-1917"/>
         <source>date</source>
         <translation>datum</translation>
     </message>
@@ -2995,12 +2995,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     </message>
     <message>
         <location line="-770"/>
-        <location line="+1114"/>
+        <location line="+1116"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>Het overnemen van de configuratiemap is mislukt; ngPost is gestopt voordat de nieuwe map werd gebruikt, zodat het de volgende keer veilig opnieuw kan proberen.</translation>
     </message>
     <message>
-        <location line="-2218"/>
+        <location line="-2220"/>
         <source>where to write the post info file (non-secret variables allowed)</source>
         <translation>waar het postinformatiebestand moet worden opgeslagen (niet-geheime variabelen toegestaan)</translation>
     </message>
@@ -3015,7 +3015,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Fout in het afsluitproces: %1</translation>
     </message>
     <message>
-        <location line="+338"/>
+        <location line="+340"/>
         <source>Error syntax: --rm_posted option is only available with --auto or --monitor</source>
         <translation>Syntaxfout: de optie --rm_posted bestaat alleen samen met --auto of --monitor</translation>
     </message>
@@ -3157,7 +3157,22 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>dus in het tweede voorbeeld hierboven zou de nzb zijn: /tmp/file1.nzb</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+26"/>
+        <source>Warning: this configuration file is the one ngPost adopted when it moved your settings to &quot;%1&quot;.
+It has no POST_DB line, so this run records its posts in
+    %2
+while the adopted configuration uses
+    %3
+Point this command at &quot;%1/ngPost.conf&quot;, or add &quot;POST_DB = %3&quot; to this file, to keep a single history.</source>
+        <translation>Waarschuwing: dit configuratiebestand is het bestand dat ngPost overnam toen het uw instellingen naar "%1" verplaatste.
+Het heeft geen POST_DB-regel, dus deze run schrijft zijn posts in
+    %2
+terwijl de overgenomen configuratie
+    %3
+gebruikt. Laat dit commando naar "%1/ngPost.conf" wijzen, of voeg "POST_DB = %3" toe aan dit bestand, om één enkele geschiedenis te houden.</translation>
+    </message>
+    <message>
+        <location line="+26"/>
         <source>ngPost used to keep your settings in a folder named after the program file, so renaming or updating the application (an AppImage is renamed on install and on every update) silently started ngPost with an empty configuration and an empty post history.
 
 The folder is now always called &quot;ngPost&quot;, and your settings have been brought over to it:
@@ -3174,16 +3189,15 @@ De map heet voortaan altijd ‘ngPost’ en uw instellingen zijn ernaartoe overg
 Overgenomen: %3</translation>
     </message>
     <message>
-        <location line="+11"/>
         <source>
 
 The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; keeps working. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
-        <translation>
+        <translation type="vanished">
 
 De oude map is ongewijzigd gebleven — configuratiebestanden zijn gekopieerd en niet verplaatst, zodat een script of cron-taak met ‘-c %1/ngPost.conf’ blijft werken. SQLite-geschiedenisbestanden zijn niet gekopieerd of verplaatst: hierdoor is de bewerking onmiddellijk klaar en worden een actieve database en de bijbehorende WAL-bestanden niet aangeraakt.</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+26"/>
         <source>
 
 Your existing post history remains available at:
@@ -3341,7 +3355,25 @@ Uw actieve configuratiebestand is:
         <translation>WAARSCHUWING: </translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="-159"/>
+        <source>
+
+The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
+        <translation>
+
+De oude map is gebleven zoals hij was — de configuratiebestanden zijn gekopieerd, niet verplaatst, dus een script of cron-taak met "-c %1/ngPost.conf" leest nog steeds dezelfde instellingen. De SQLite-geschiedenisbestanden zijn niet gekopieerd of verplaatst: dat maakt de bewerking onmiddellijk en raakt nooit een draaiende database en haar WAL-bestanden aan.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>
+
+One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at &quot;%1/ngPost.conf&quot; — or add &quot;POST_DB = %2&quot; to the old file — to keep a single history. ngPost says so again if it sees that file used.</source>
+        <translation>
+
+Eén ding verandert wel voor zo'n script: het oude configuratiebestand heeft geen POST_DB-regel, dus het schrijft zijn posts nu in de database van de nieuwe map in plaats van in die hieronder. Laat het script naar "%1/ngPost.conf" wijzen — of voeg "POST_DB = %2" toe aan het oude bestand — om één enkele geschiedenis te houden. ngPost zegt het opnieuw als het dat bestand in gebruik ziet.</translation>
+    </message>
+    <message>
+        <location line="+158"/>
         <location line="+3"/>
         <source>Config backup created before migration: %1</source>
         <translation>Configuratieback-up gemaakt vóór de migratie: %1</translation>
@@ -4063,7 +4095,7 @@ Uw actieve configuratiebestand is:
         <translation type="vanished">utomatisch comprimeren is AAN (--compress --gen_name --gen_pass --gen_par2)</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1085"/>
+        <location filename="../NgPost.h" line="+1090"/>
         <source>PACKing auto using: %1</source>
         <translation>Automatisch inpakken met: %1</translation>
     </message>

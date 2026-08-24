@@ -1977,12 +1977,12 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4373"/>
+        <location line="+4416"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-4370"/>
+        <location line="-4413"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation></translation>
     </message>
@@ -2084,7 +2084,7 @@ To list the available options use: %2 --help
         <translation></translation>
     </message>
     <message>
-        <location line="+174"/>
+        <location line="+176"/>
         <source>Error syntax: you should provide at least one input file or directory using the option -i, --auto or --monitor</source>
         <translation></translation>
     </message>
@@ -2116,7 +2116,7 @@ To list the available options use: %2 --help
         <translation></translation>
     </message>
     <message>
-        <location line="-2302"/>
+        <location line="-2304"/>
         <source>check nzb file (if articles are available on Usenet) cf https://github.com/mbruel/nzbCheck</source>
         <translation></translation>
     </message>
@@ -2165,7 +2165,7 @@ To list the available options use: %2 --help
         <translation>Posting canceled by user.</translation>
     </message>
     <message>
-        <location line="+3010"/>
+        <location line="+3053"/>
         <source>VPN warning</source>
         <translation>VPN warning</translation>
     </message>
@@ -2198,7 +2198,7 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>Cancel</translation>
     </message>
     <message>
-        <location line="-1692"/>
+        <location line="-1733"/>
         <source>Full debug logs are ON
 </source>
         <translation></translation>
@@ -2310,7 +2310,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-1536"/>
+        <location line="-1538"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation></translation>
@@ -2322,7 +2322,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
 </translation>
     </message>
     <message>
-        <location line="+1684"/>
+        <location line="+1686"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost starts logging: %1</translation>
     </message>
@@ -2347,7 +2347,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-1786"/>
+        <location line="-1788"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation></translation>
@@ -2360,7 +2360,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+1846"/>
+        <location line="+1848"/>
         <source>should be a directory!...</source>
         <translation></translation>
     </message>
@@ -2395,7 +2395,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Wrong keywords for PACK: %1. It should be a subset of (%2)</translation>
     </message>
     <message>
-        <location line="-1915"/>
+        <location line="-1917"/>
         <source>date</source>
         <translation></translation>
     </message>
@@ -2833,7 +2833,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     </message>
     <message>
         <location line="-770"/>
-        <location line="+1114"/>
+        <location line="+1116"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</translation>
     </message>
@@ -2980,7 +2980,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+52"/>
         <source>ngPost used to keep your settings in a folder named after the program file, so renaming or updating the application (an AppImage is renamed on install and on every update) silently started ngPost with an empty configuration and an empty post history.
 
 The folder is now always called &quot;ngPost&quot;, and your settings have been brought over to it:
@@ -2997,16 +2997,15 @@ The folder is now always called &quot;ngPost&quot;, and your settings have been 
 Brought over: %3</translation>
     </message>
     <message>
-        <location line="+11"/>
         <source>
 
 The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; keeps working. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
-        <translation>
+        <translation type="vanished">
 
 The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; keeps working. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+26"/>
         <source>
 
 Your existing post history remains available at:
@@ -3164,7 +3163,40 @@ Your active configuration file is:
         <translation>WARNING: </translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="-196"/>
+        <source>Warning: this configuration file is the one ngPost adopted when it moved your settings to &quot;%1&quot;.
+It has no POST_DB line, so this run records its posts in
+    %2
+while the adopted configuration uses
+    %3
+Point this command at &quot;%1/ngPost.conf&quot;, or add &quot;POST_DB = %3&quot; to this file, to keep a single history.</source>
+        <translation>Warning: this configuration file is the one ngPost adopted when it moved your settings to "%1".
+It has no POST_DB line, so this run records its posts in
+    %2
+while the adopted configuration uses
+    %3
+Point this command at "%1/ngPost.conf", or add "POST_DB = %3" to this file, to keep a single history.</translation>
+    </message>
+    <message>
+        <location line="+37"/>
+        <source>
+
+The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
+        <translation>
+
+The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing "-c %1/ngPost.conf" still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>
+
+One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at &quot;%1/ngPost.conf&quot; — or add &quot;POST_DB = %2&quot; to the old file — to keep a single history. ngPost says so again if it sees that file used.</source>
+        <translation>
+
+One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at "%1/ngPost.conf" — or add "POST_DB = %2" to the old file — to keep a single history. ngPost says so again if it sees that file used.</translation>
+    </message>
+    <message>
+        <location line="+158"/>
         <location line="+3"/>
         <source>Config backup created before migration: %1</source>
         <translation>Config backup created before migration: %1</translation>
@@ -3833,7 +3865,7 @@ Your active configuration file is:
         <translation></translation>
     </message>
     <message>
-        <location line="-4701"/>
+        <location line="-4744"/>
         <source>Auto Posting</source>
         <translation></translation>
     </message>
@@ -3843,7 +3875,7 @@ Your active configuration file is:
         <translation></translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1085"/>
+        <location filename="../NgPost.h" line="+1090"/>
         <source>PACKing auto using: %1</source>
         <translation>PACKing auto using: %1</translation>
     </message>

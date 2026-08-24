@@ -744,6 +744,11 @@ private:
     //! before the default config is parsed. This method only reports it.
     //! Called from every entry point and self-guarded, so it speaks once.
     void _reportConfigDirMigration();
+
+    //! Says out loud that a "-c" pointing at the folder a previous run adopted
+    //! writes its history somewhere else than the adopted configuration does.
+    //! Silent for every other path, and for a config that sets POST_DB itself.
+    void _warnIfConfigWasAdoptedFrom(const QString &confPath);
     bool _configDirMigrationReported = false;
 
     static QStringList defaultPackKeywords();

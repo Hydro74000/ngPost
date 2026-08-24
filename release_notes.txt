@@ -91,7 +91,13 @@ Configuration folder:
   already contains configuration or history data, never overwrites an existing
   file, never follows symbolic links and never deletes anything. Configuration
   assets are copied atomically rather than moved, so a script or cron job using
-  `-c <old folder>/ngPost.conf` keeps working, models included. The SQLite
+  `-c <old folder>/ngPost.conf` still reads the same settings, models included.
+  One thing does change for such a script: that file has no POST_DB line, so it
+  records its posts in the database of the new folder while the adopted
+  configuration keeps using the old one -- two histories instead of one. ngPost
+  now says so, at adoption time and again on every run that passes that file,
+  and tells you the two ways out: point the script at the new configuration, or
+  add POST_DB to the old file. The SQLite
   database and its WAL files stay at their existing path and the adopted config
   continues to reference them: migration is immediate even for several GB and
   never manipulates a potentially live database. When the old folder is

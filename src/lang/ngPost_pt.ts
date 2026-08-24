@@ -2104,12 +2104,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4373"/>
+        <location line="+4416"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Remova a pasta raiz (pai) ao compactar pastas usando o RAR</translation>
     </message>
     <message>
-        <location line="-4370"/>
+        <location line="-4413"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>O servidor NNTP segue o formato (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2223,7 +2223,7 @@ Para listar as opções disponíveis use: %2 --help
 </translation>
     </message>
     <message>
-        <location line="+174"/>
+        <location line="+176"/>
         <source>Error syntax: you should provide at least one input file or directory using the option -i, --auto or --monitor</source>
         <translation>Sintaxe de erro: você deve fornecer pelo menos um arquivo ou diretório de entrada usando a opção -i, --auto ou --monitor</translation>
     </message>
@@ -2273,7 +2273,7 @@ Para listar as opções disponíveis use: %2 --help
         <translation type="vanished">Sinta-se livre para doar com BTC, clique aqui para ver meu endereço na sessão do GiTHub</translation>
     </message>
     <message>
-        <location line="-2238"/>
+        <location line="-2240"/>
         <source>Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</source>
         <translation>Compacte postagens usando a definição de configuração PACK com um subconjunto (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</translation>
     </message>
@@ -2307,7 +2307,7 @@ Para listar as opções disponíveis use: %2 --help
         <translation>Postagem cancelada pelo usuário.</translation>
     </message>
     <message>
-        <location line="+3010"/>
+        <location line="+3053"/>
         <source>VPN warning</source>
         <translation>Aviso de VPN</translation>
     </message>
@@ -2340,14 +2340,14 @@ Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos
         <translation>Cancelar</translation>
     </message>
     <message>
-        <location line="-1692"/>
+        <location line="-1733"/>
         <source>Full debug logs are ON
 </source>
         <translation>Logs de depuração completos estão LIGADOS
 </translation>
     </message>
     <message>
-        <location line="-2313"/>
+        <location line="-2315"/>
         <source>use configuration file (default: the per-user ngPost configuration folder)</source>
         <translation>usar o ficheiro de configuração (predefinição: a pasta de configuração ngPost do utilizador)</translation>
     </message>
@@ -2750,7 +2750,7 @@ Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos
     </message>
     <message>
         <location line="-770"/>
-        <location line="+1114"/>
+        <location line="+1116"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>A adoção da pasta de configuração falhou; o ngPost foi interrompido antes de utilizar a nova pasta, para poder tentar novamente em segurança da próxima vez.</translation>
     </message>
@@ -2896,7 +2896,7 @@ OU use --par2_pct ou coloque PAR2_PCT ou PAR2_ARGS na configuração de arquivo.
 </translation>
     </message>
     <message>
-        <location line="+652"/>
+        <location line="+685"/>
         <source>ngPost used to keep your settings in a folder named after the program file, so renaming or updating the application (an AppImage is renamed on install and on every update) silently started ngPost with an empty configuration and an empty post history.
 
 The folder is now always called &quot;ngPost&quot;, and your settings have been brought over to it:
@@ -2913,16 +2913,15 @@ A pasta chama-se agora sempre «ngPost» e as suas definições foram transferid
 Transferido: %3</translation>
     </message>
     <message>
-        <location line="+11"/>
         <source>
 
 The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; keeps working. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
-        <translation>
+        <translation type="vanished">
 
 A pasta antiga foi deixada como estava — os elementos de configuração foram copiados, não movidos, para que um script ou tarefa cron que passe «-c %1/ngPost.conf» continue a funcionar. Os ficheiros do histórico SQLite não foram copiados nem movidos: assim, a operação é imediata e evita alterar uma base de dados em utilização e os respetivos ficheiros WAL.</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+26"/>
         <source>
 
 Your existing post history remains available at:
@@ -3110,7 +3109,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>## dado a um comando pós-publicação; __rarPass__ nos argumentos continua a funcionar</translation>
     </message>
     <message>
-        <location line="-2660"/>
+        <location line="-2703"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Protocolo não suportado para NZB_UPLOAD_URL (%1). Você pode usar apenas: %2
@@ -3123,7 +3122,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
 </translation>
     </message>
     <message>
-        <location line="+1684"/>
+        <location line="+1686"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost inicia gravação de logs: %1</translation>
     </message>
@@ -3148,7 +3147,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>erro analizando parâmetros de Proxy Socks5. A sintaxe deveria ser: %1</translation>
     </message>
     <message>
-        <location line="-1786"/>
+        <location line="-1788"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>o histórico de postagem &apos;%1&apos; não pode ser um diretório...
@@ -3163,7 +3162,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
 </translation>
     </message>
     <message>
-        <location line="+1846"/>
+        <location line="+1848"/>
         <source>should be a directory!...</source>
         <translation>deve ser um diretório!...</translation>
     </message>
@@ -3198,7 +3197,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>Palavra-chave errada para PACK: %1. Deve ser um subconjunto de (%2)</translation>
     </message>
     <message>
-        <location line="-1915"/>
+        <location line="-1917"/>
         <source>date</source>
         <translation>data</translation>
     </message>
@@ -3253,7 +3252,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>Erro no processo de desligamento: %1</translation>
     </message>
     <message>
-        <location line="+633"/>
+        <location line="+635"/>
         <location line="+678"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE deve ser um número inteiro positivo</translation>
@@ -3305,7 +3304,40 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>Definições VPN pontuais (não guardadas na configuração)</translation>
     </message>
     <message>
-        <location line="+139"/>
+        <location line="+46"/>
+        <source>Warning: this configuration file is the one ngPost adopted when it moved your settings to &quot;%1&quot;.
+It has no POST_DB line, so this run records its posts in
+    %2
+while the adopted configuration uses
+    %3
+Point this command at &quot;%1/ngPost.conf&quot;, or add &quot;POST_DB = %3&quot; to this file, to keep a single history.</source>
+        <translation>Aviso: este ficheiro de configuração é o que o ngPost adoptou ao mudar as suas definições para «%1».
+Não tem linha POST_DB, por isso esta execução regista as suas publicações em
+    %2
+enquanto a configuração adoptada usa
+    %3
+Aponte este comando para «%1/ngPost.conf», ou acrescente «POST_DB = %3» a este ficheiro, para manter um único histórico.</translation>
+    </message>
+    <message>
+        <location line="+37"/>
+        <source>
+
+The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
+        <translation>
+
+A pasta antiga ficou como estava — os elementos de configuração foram copiados, não movidos, por isso um script ou tarefa cron que passe «-c %1/ngPost.conf» continua a ler as mesmas definições. Os ficheiros SQLite do histórico não foram copiados nem movidos: assim a operação é imediata e nunca mexe numa base de dados activa nem nos seus ficheiros WAL.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>
+
+One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at &quot;%1/ngPost.conf&quot; — or add &quot;POST_DB = %2&quot; to the old file — to keep a single history. ngPost says so again if it sees that file used.</source>
+        <translation>
+
+Uma coisa muda para um script desses: o ficheiro de configuração antigo não tem linha POST_DB, por isso passa a registar as suas publicações na base de dados da pasta nova e não na indicada abaixo. Aponte o script para «%1/ngPost.conf» — ou acrescente «POST_DB = %2» ao ficheiro antigo — para manter um único histórico. O ngPost volta a dizê-lo se vir esse ficheiro a ser usado.</translation>
+    </message>
+    <message>
+        <location line="+90"/>
         <source>Config migration</source>
         <translation>Migração da configuração</translation>
     </message>
@@ -3512,7 +3544,7 @@ O seu ficheiro de configuração activo é:
         <translation type="vanished">sem o arquivo de configuração, você não pode fornecer todos os parâmetros para conectar em UM ÚNICO servidor</translation>
     </message>
     <message>
-        <location line="-656"/>
+        <location line="-697"/>
         <source>for compression and par2 support</source>
         <translation>para compressão e suporte par2</translation>
     </message>
@@ -3572,7 +3604,7 @@ O seu ficheiro de configuração activo é:
         <translation>portanto, no segundo exemplo acima, o nzb seria: /tmp/file1.nzb</translation>
     </message>
     <message>
-        <location line="+404"/>
+        <location line="+445"/>
         <source># ngPost configuration file</source>
         <translation># arquivo de configuração ngPost</translation>
     </message>
@@ -4060,7 +4092,7 @@ O seu ficheiro de configuração activo é:
         <translation type="vanished">Auto compressão está LIGADA (--compress --gen_name --gen_pass --gen_par2)</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1085"/>
+        <location filename="../NgPost.h" line="+1090"/>
         <source>PACKing auto using: %1</source>
         <translation>Comptatação automática usando: %1</translation>
     </message>

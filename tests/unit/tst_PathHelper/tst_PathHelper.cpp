@@ -188,6 +188,7 @@ private slots:
     //! With the test harness override active the migration must not run at
     //! all — no test may touch a real ~/.config.
     void migrate_is_a_no_op_under_the_test_config_dir_override();
+    void marker_remembers_where_the_config_came_from();
 
     //! configDir() must live under the sandboxed HOME and exist after the call.
     void configDir_under_sandbox_and_created();
@@ -1045,6 +1046,48 @@ void TestPathHelper::migrate_is_a_no_op_under_the_test_config_dir_override()
 
     QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded);
     QVERIFY(r.legacyDir.isEmpty());
+}
+
+void TestPathHelper::marker_remembers_where_the_config_came_from()
+{
+    // Long after the adoption, the marker is the only thing that still knows
+    // which folder the settings came from and which database was left there.
+    // Reading it back is what lets ngPost recognise a script still pointing at
+    // the old file instead of silently keeping two histories.
+    HomeSandbox sandbox;
+    const QString cfg = PathHelper::configDirPath();
+    QVERIFY(QDir().mkpath(cfg));
+
+    QVERIFY(PathHelper::adoptedLegacyConfigDir().isEmpty());
+    QVERIFY(PathHelper::adoptedLegacyHistoryPath().isEmpty());
+
+    const QString legacy = sandbox.xdgConfigHome() + QStringLiteral("/ngPost-old.AppImage");
+    const QString db     = legacy + QStringLiteral("/ngPost_history.sqlite");
+    const QString marker = cfg + QStringLiteral("/.ngPost_config_migration");
+    {
+        QFile f(marker);
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream out(&f);
+        out << "# a comment line\n"
+            << "date=2026-08-24T10:00:00Z\n"
+            << "outcome=migrated\n"
+            << "from=" << legacy << "\n"
+            << "history=" << db << "\n"
+            << "adopted=ngPost.conf vpn\n";
+    }
+    QCOMPARE(PathHelper::adoptedLegacyConfigDir(), QDir::cleanPath(legacy));
+    QCOMPARE(PathHelper::adoptedLegacyHistoryPath(), QDir::cleanPath(db));
+
+    // A marker without a retained database: nothing to diverge from, so the
+    // caller must get an empty answer rather than a made up path.
+    {
+        QFile f(marker);
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream out(&f);
+        out << "from=" << legacy << "\n" << "history=\n";
+    }
+    QCOMPARE(PathHelper::adoptedLegacyConfigDir(), QDir::cleanPath(legacy));
+    QVERIFY(PathHelper::adoptedLegacyHistoryPath().isEmpty());
 }
 
 QTEST_APPLESS_MAIN(TestPathHelper)
