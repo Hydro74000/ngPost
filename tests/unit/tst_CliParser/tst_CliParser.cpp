@@ -274,13 +274,9 @@ void TestCliParser::help_lists_major_flags()
 void TestCliParser::inspection_and_explicit_config_do_not_adopt()
 {
     HomeSandbox sandbox;
-#if defined(Q_OS_MAC)
-    const QString configRoot = sandbox.rootPath() + QStringLiteral("/Library/Application Support");
-#elif defined(Q_OS_WIN)
-    const QString configRoot = sandbox.rootPath();
-#else
-    const QString configRoot = sandbox.xdgConfigHome();
-#endif
+    // One place decides where a spawned production binary keeps its config
+    // directory on each platform; see HomeSandbox::configRootFor.
+    const QString configRoot = sandbox.configRoot();
     const QString oldDir = configRoot + QStringLiteral("/old.AppImage");
     QVERIFY(QDir().mkpath(oldDir));
     const QString oldConf = oldDir + QStringLiteral("/ngPost.conf");
@@ -1038,7 +1034,10 @@ void TestCliParser::warns_when_c_points_at_the_adopted_legacy_config()
 {
     QTemporaryDir home;
     QVERIFY(home.isValid());
-    const QString legacyDir = home.filePath(QStringLiteral(".config/ngPost-5.4.2-x86_64.AppImage"));
+    // Where the config directory lives depends on the platform, so ask rather
+    // than assume: hardcoding ".config" adopted nothing on macOS and Windows.
+    const QString legacyDir = HomeSandbox::configRootFor(home.path())
+        + QStringLiteral("/ngPost-5.4.2-x86_64.AppImage");
     QVERIFY(QDir().mkpath(legacyDir));
 
     // A legacy install: a configuration with no POST_DB, and its database.
@@ -1073,7 +1072,8 @@ void TestCliParser::warns_when_c_points_at_the_adopted_legacy_config()
     QVERIFY2(viaLegacy.stderrText.contains(legacyDb), qPrintable(viaLegacy.stderrText));
 
     // The adopted configuration itself selects that database: nothing to warn.
-    const QString adopted = home.filePath(QStringLiteral(".config/ngPost/ngPost.conf"));
+    const QString adopted = HomeSandbox::configRootFor(home.path())
+        + QStringLiteral("/ngPost/ngPost.conf");
     QVERIFY(QFileInfo::exists(adopted));
     RunResult viaAdopted = run(_bin,
                                { QStringLiteral("-c"), adopted, QStringLiteral("--history") },

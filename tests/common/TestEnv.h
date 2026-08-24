@@ -34,6 +34,17 @@ public:
     //! Convenience: <root>/.config (Linux XDG_CONFIG_HOME).
     QString xdgConfigHome() const;
 
+    //! The folder ngPost's config directory sits IN, for a sandbox rooted at
+    //! \a home. It is not the same on every platform -- Qt reads
+    //! XDG_CONFIG_HOME on Linux, ~/Library/Application Support on macOS and
+    //! LOCALAPPDATA on Windows -- so a test placing a folder next to the
+    //! config directory must ask rather than assume. Hardcoding the Linux
+    //! layout is what made adoption tests pass here and fail on the other two.
+    static QString configRootFor(const QString &home);
+
+    //! Same, for this sandbox.
+    QString configRoot() const { return configRootFor(rootPath()); }
+
 private:
     QTemporaryDir _root;
     QString       _prevHome;

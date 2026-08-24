@@ -67,6 +67,17 @@ HomeSandbox::HomeSandbox()
     setEnv("NGPOST_TEST_CONFIG_DIR", testConfigDir.toLocal8Bit());
 }
 
+QString HomeSandbox::configRootFor(const QString &home)
+{
+#if defined(Q_OS_MAC)
+    return home + QStringLiteral("/Library/Application Support");
+#elif defined(Q_OS_WIN)
+    return home;
+#else
+    return home + QStringLiteral("/.config");
+#endif
+}
+
 HomeSandbox::~HomeSandbox()
 {
     auto restore = [](const char *key, bool had, const QString &prev) {
