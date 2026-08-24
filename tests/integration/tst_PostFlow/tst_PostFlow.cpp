@@ -544,10 +544,15 @@ void TestPostFlow::resume_history_post_preserves_original_file_ordinals()
     QFile sheet(infoOutput);
     QVERIFY2(sheet.open(QIODevice::ReadOnly), qPrintable(out));
     const QString sheetText = QString::fromUtf8(sheet.readAll());
-    QVERIFY2(sheetText.contains(QStringLiteral("original=%1")
-                                  .arg(QFileInfo(info.sourcePath).absolutePath())),
+    // A sheet writes paths with the separators of the platform, while Qt hands
+    // them back with '/' everywhere. Comparing the two raw made this pass on
+    // Linux and macOS and fail on Windows only.
+    QVERIFY2(sheetText.contains(
+                 QStringLiteral("original=%1")
+                     .arg(QDir::toNativeSeparators(QFileInfo(info.sourcePath).absolutePath()))),
              qPrintable(sheetText));
-    QVERIFY2(sheetText.contains(QStringLiteral("source=%1").arg(info.sourcePath)),
+    QVERIFY2(sheetText.contains(
+                 QStringLiteral("source=%1").arg(QDir::toNativeSeparators(info.sourcePath))),
              qPrintable(sheetText));
 
     QFile jsonFile(capturedJson);

@@ -434,9 +434,13 @@ void TestPostInfoTemplate::shipped_json_model_produces_valid_json()
     // The models we ship must do what they promise, including for a post that
     // recorded nothing: an older post has no size and no par2 percentage, and
     // that is exactly when a hand written JSON model falls apart.
-    QDir const here(QFileInfo(QStringLiteral(__FILE__)).absolutePath());
-    QString const path = QDir::cleanPath(here.absoluteFilePath(
-        QStringLiteral("../../../templates/post_info_json.txt")));
+    // NGPOST_SOURCE_ROOT comes from qmake, which knows the repository as an
+    // absolute path. __FILE__ does not: the compiler is handed a relative
+    // source path on the CI runners, so the test ended up looking for the
+    // model next to the working directory instead of in the sources.
+    QString const path = QDir::cleanPath(
+        QDir(QStringLiteral(NGPOST_SOURCE_ROOT))
+            .absoluteFilePath(QStringLiteral("templates/post_info_json.txt")));
 
     QFile file(path);
     QVERIFY2(file.open(QIODevice::ReadOnly), qPrintable(path));
