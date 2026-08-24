@@ -44,6 +44,35 @@ private:
     HomeSandbox _sandbox;
 };
 
+//! Renders a migration result for a failure message. A bare
+//! "status == Migrated returned FALSE" says nothing about WHY, which is the
+//! only thing that matters when the failure only happens on a runner you
+//! cannot attach to.
+QString describe(const PathHelper::ConfigDirMigrationResult &r)
+{
+    auto statusName = [](PathHelper::ConfigDirMigrationStatus s) -> const char * {
+        switch (s) {
+        case PathHelper::ConfigDirMigrationStatus::NotNeeded:               return "NotNeeded";
+        case PathHelper::ConfigDirMigrationStatus::SkippedTargetConfigured: return "SkippedTargetConfigured";
+        case PathHelper::ConfigDirMigrationStatus::Migrated:                return "Migrated";
+        case PathHelper::ConfigDirMigrationStatus::Failed:                  return "Failed";
+        }
+        return "?";
+    };
+    return QStringLiteral(
+               "status=%1 error='%2'\n  target=%3\n  legacy=%4\n  others=[%5]\n"
+               "  adopted=[%6] skipped=[%7]\n"
+               "  configDirPath=%8\n  genericRoot(appNamedConfigDir x)=%9\n"
+               "  NGPOST_TEST_HOME='%10' NGPOST_TEST_CONFIG_DIR='%11'")
+        .arg(QLatin1String(statusName(r.status)), r.error, r.targetDir, r.legacyDir,
+             r.otherLegacyDirs.join(QStringLiteral(", ")),
+             r.adopted.join(QStringLiteral(", ")), r.skipped.join(QStringLiteral(", ")),
+             PathHelper::configDirPath(),
+             PathHelper::appNamedConfigDir(QStringLiteral("x")),
+             QString::fromLocal8Bit(qgetenv("NGPOST_TEST_HOME")),
+             QString::fromLocal8Bit(qgetenv("NGPOST_TEST_CONFIG_DIR")));
+}
+
 //! Build a plausible ngPost config folder: a config, a history database, a
 //! post-info template and a vpn profile. Returns the folder path.
 QString makeConfigFolder(const QString &root, const QString &name,
@@ -565,7 +594,7 @@ void TestPathHelper::migrate_adopts_a_folder_whose_name_no_longer_matches()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("ngPost-5.5.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     QCOMPARE(QFileInfo(r.legacyDir).fileName(), QStringLiteral("ngPost-5.4.AppImage"));
     QVERIFY(readAll(PathHelper::configFilePath()).contains("old@example.com"));
 }
@@ -585,7 +614,7 @@ void TestPathHelper::migrate_keeps_history_and_takes_templates_and_vpn()
 
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
 
     const QString dir = PathHelper::configDir();
     QVERIFY2(QFileInfo(dir + "/ngPost.conf").isFile(), "config not adopted");
@@ -627,7 +656,7 @@ void TestPathHelper::migrate_adds_legacy_history_path_when_post_db_is_absent()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     QVERIFY(!readAll(old + "/ngPost.conf").contains("POST_DB"));
     const QByteArray adopted = readAll(PathHelper::configFilePath());
     QVERIFY(adopted.contains(QStringLiteral("POST_DB = %1").arg(oldDb).toUtf8()));
@@ -652,7 +681,7 @@ void TestPathHelper::migrate_adds_legacy_history_path_when_post_db_is_empty()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("empty-db.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     const QByteArray adopted = readAll(PathHelper::configFilePath());
     QVERIFY(adopted.contains(QStringLiteral("POST_DB = %1").arg(oldDb).toUtf8()));
     QCOMPARE(r.retainedHistoryPath, oldDb);
@@ -673,7 +702,7 @@ void TestPathHelper::migrate_preserves_a_custom_post_db()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     QCOMPARE(readAll(PathHelper::configFilePath()), sourceConfig);
     QVERIFY(r.retainedHistoryPath.isEmpty());
     QVERIFY(QFileInfo(old + "/" + PathHelper::historyDbFileName()).isFile());
@@ -688,7 +717,7 @@ void TestPathHelper::migrate_keeps_the_previous_config_as_save()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     QCOMPARE(r.savedConfigPath, old + QStringLiteral("/ngPost.conf.save"));
     QCOMPARE(readAll(r.savedConfigPath), original);
     QCOMPARE(readAll(old + "/ngPost.conf"), original);
@@ -710,7 +739,7 @@ void TestPathHelper::migrate_never_touches_an_already_configured_target()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::SkippedTargetConfigured);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::SkippedTargetConfigured, qPrintable(describe(r)));
     QCOMPARE(readAll(dir + "/ngPost.conf"), target);
     QCOMPARE(readAll(old + "/ngPost.conf"), source);
     QVERIFY2(QFileInfo(old + "/" + PathHelper::historyDbFileName()).isFile(),
@@ -726,7 +755,7 @@ void TestPathHelper::migrate_does_nothing_on_a_fresh_install()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("ngPost-5.5.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded, qPrintable(describe(r)));
     QVERIFY(r.legacyDir.isEmpty());
     // No stamp: a user who restores an old folder later must still get it.
     QVERIFY(!QFileInfo::exists(PathHelper::configDir() + "/.ngPost_config_migration"));
@@ -743,7 +772,7 @@ void TestPathHelper::migrate_does_nothing_for_a_correctly_named_install()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("ngPost"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded, qPrintable(describe(r)));
     QVERIFY(!QFileInfo::exists(PathHelper::configDir() + "/.ngPost_config_migration"));
 }
 
@@ -760,7 +789,7 @@ void TestPathHelper::migrate_is_idempotent_across_restarts()
     const PathHelper::ConfigDirMigrationResult again =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("other.AppImage"));
 
-    QVERIFY(again.status == PathHelper::ConfigDirMigrationStatus::NotNeeded);
+    QVERIFY2(again.status == PathHelper::ConfigDirMigrationStatus::NotNeeded, qPrintable(describe(again)));
     // Exactly one snapshot, not one per start.
     QCOMPARE(QDir(old).entryList({QStringLiteral("*.save")}, QDir::Files).size(), 1);
 }
@@ -799,7 +828,7 @@ void TestPathHelper::migrate_prefers_the_folder_matching_the_program_name()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("ngPost-5.5.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     QCOMPARE(QFileInfo(r.legacyDir).fileName(), QStringLiteral("ngPost-5.5.AppImage"));
     QVERIFY(readAll(PathHelper::configFilePath()).contains("named@example.com"));
 }
@@ -817,7 +846,7 @@ void TestPathHelper::migrate_prefers_the_most_recent_config_and_reports_the_othe
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("nomatch.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     QCOMPARE(QFileInfo(r.legacyDir).fileName(), QStringLiteral("recent.AppImage"));
     QCOMPARE(r.otherLegacyDirs.size(), 1);
     QVERIFY(r.otherLegacyDirs.first().endsWith(QStringLiteral("veryold.AppImage")));
@@ -840,7 +869,7 @@ void TestPathHelper::migrate_leaves_backups_in_the_old_folder()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     QVERIFY(QFileInfo(old + "/ngPost.conf.bak-20260101-120000").isFile());
     QVERIFY2(!QFileInfo::exists(PathHelper::configDir() + "/ngPost.conf.bak-20260101-120000"),
              "a backup was dragged into the new folder");
@@ -860,7 +889,7 @@ void TestPathHelper::migrate_never_overwrites_an_entry_already_in_the_target()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     QCOMPARE(readAll(dir + "/mine.txt"), QByteArray("KEEP ME\n"));
     QVERIFY(QFileInfo(old + "/mine.txt").isFile());
     QVERIFY2(r.skipped.filter(QStringLiteral("mine.txt")).size() == 1,
@@ -884,7 +913,7 @@ void TestPathHelper::migrate_never_replaces_an_existing_target_history()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::SkippedTargetConfigured);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::SkippedTargetConfigured, qPrintable(describe(r)));
     QCOMPARE(readAll(db), targetHistory);
     QCOMPARE(readAll(old + QLatin1Char('/') + PathHelper::historyDbFileName()), oldHistory);
     QVERIFY(!QFileInfo::exists(PathHelper::configFilePath()));
@@ -910,7 +939,7 @@ void TestPathHelper::migrate_leaves_symbolic_links_untouched()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     QVERIFY(!QFileInfo::exists(PathHelper::configDir() + QStringLiteral("/linked-tree")));
     QVERIFY(!r.skipped.filter(QStringLiteral("linked-tree")).isEmpty());
 #endif
@@ -935,7 +964,7 @@ void TestPathHelper::migrate_rejects_config_symlinks()
 
         const PathHelper::ConfigDirMigrationResult r =
             PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("linked.AppImage"));
-        QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded);
+        QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded, qPrintable(describe(r)));
         QVERIFY(!QFileInfo::exists(PathHelper::configFilePath()));
     }
 
@@ -949,7 +978,7 @@ void TestPathHelper::migrate_rejects_config_symlinks()
 
         const PathHelper::ConfigDirMigrationResult r =
             PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
-        QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::SkippedTargetConfigured);
+        QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::SkippedTargetConfigured, qPrintable(describe(r)));
         QVERIFY(QFileInfo(target).isSymLink());
     }
 
@@ -964,7 +993,7 @@ void TestPathHelper::migrate_rejects_config_symlinks()
 
         const PathHelper::ConfigDirMigrationResult r =
             PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("history-link.AppImage"));
-        QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::SkippedTargetConfigured);
+        QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::SkippedTargetConfigured, qPrintable(describe(r)));
         QVERIFY(QFileInfo(target).isSymLink());
     }
 #endif
@@ -982,7 +1011,7 @@ void TestPathHelper::migrate_leaves_special_files_untouched()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("fifo.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(r)));
     QVERIFY(!QFileInfo::exists(PathHelper::configDir() + QStringLiteral("/notifications.pipe")));
     QVERIFY(!r.skipped.filter(QStringLiteral("notifications.pipe")).isEmpty());
 #else
@@ -1001,7 +1030,7 @@ void TestPathHelper::migrate_retries_after_a_transient_lock_failure()
 
     const PathHelper::ConfigDirMigrationResult first =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
-    QVERIFY(first.status == PathHelper::ConfigDirMigrationStatus::Failed);
+    QVERIFY2(first.status == PathHelper::ConfigDirMigrationStatus::Failed, qPrintable(describe(first)));
     QVERIFY(!QFileInfo::exists(target + QStringLiteral("/ngPost.conf")));
     QVERIFY(!QFileInfo::exists(target + QStringLiteral("/.ngPost_config_migration")));
 
@@ -1010,7 +1039,7 @@ void TestPathHelper::migrate_retries_after_a_transient_lock_failure()
     // deliberate per-process result cache.
     const PathHelper::ConfigDirMigrationResult retry =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("retry.AppImage"));
-    QVERIFY(retry.status == PathHelper::ConfigDirMigrationStatus::Migrated);
+    QVERIFY2(retry.status == PathHelper::ConfigDirMigrationStatus::Migrated, qPrintable(describe(retry)));
     QVERIFY(QFileInfo::exists(target + QStringLiteral("/ngPost.conf")));
 }
 
@@ -1032,7 +1061,7 @@ void TestPathHelper::migrate_refuses_to_run_outside_a_test_sandbox()
     if (hadHome) qputenv("NGPOST_TEST_HOME", prevHome);
     if (hadDir)  qputenv("NGPOST_TEST_CONFIG_DIR", prevDir);
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded, qPrintable(describe(r)));
     QVERIFY(r.legacyDir.isEmpty());
 }
 
@@ -1044,7 +1073,7 @@ void TestPathHelper::migrate_is_a_no_op_under_the_test_config_dir_override()
     const PathHelper::ConfigDirMigrationResult r =
         PathHelper::migrateAppNamedConfigDirIfNeeded(QStringLiteral("old.AppImage"));
 
-    QVERIFY(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded);
+    QVERIFY2(r.status == PathHelper::ConfigDirMigrationStatus::NotNeeded, qPrintable(describe(r)));
     QVERIFY(r.legacyDir.isEmpty());
 }
 
