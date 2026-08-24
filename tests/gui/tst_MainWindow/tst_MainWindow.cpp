@@ -79,6 +79,10 @@ private slots:
     //! written in a conf, parsed, saved back by saveConfig, parsed again.
     void save_config_round_trips_post_info_keys();
 
+    //! If the atomic replacement cannot be staged, Save Config must leave the
+    //! existing file intact instead of truncating it in place.
+    void save_config_preserves_existing_file_when_atomic_open_fails();
+
     //! A posting tab carries one discreet checkbox; the button that opens the
     //! editor follows it.
     void post_info_row_exposes_a_checkbox_and_its_button();
@@ -87,6 +91,9 @@ private slots:
     //! typed comes back with its scope.
     void post_info_stays_on_across_tabs_and_posts();
     void post_info_dialog_offers_the_fields_of_the_model();
+    //! JSON/XML models use raw lines rather than `label = expression`; their
+    //! metadata fields must still be discovered from the complete model.
+    void post_info_dialog_offers_the_fields_of_a_json_model();
 
     //! The model from the configuration is the default: it is marked as such,
     //! selected, and selecting it is not an override.
@@ -321,6 +328,58 @@ void TestMainWindow::save_config_round_trips_post_info_keys()
     }
 }
 
+void TestMainWindow::save_config_preserves_existing_file_when_atomic_open_fails()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("This test relies on Unix directory write permissions");
+#else
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    const QByteArray original("GROUPS = alt.binaries.test\n# must survive a failed save\n");
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QCOMPARE(conf.write(original), qint64(original.size()));
+    }
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QVERIFY2(ngPost.parseDefaultConfig().isEmpty(), "test configuration did not parse");
+
+    const QString configDir = QFileInfo(confPath).absolutePath();
+    const QFile::Permissions originalDirPermissions = QFile::permissions(configDir);
+    const QFile::Permissions readOnlyDirPermissions =
+        QFileDevice::ReadOwner | QFileDevice::ExeOwner
+        | QFileDevice::ReadGroup | QFileDevice::ExeGroup
+        | QFileDevice::ReadOther | QFileDevice::ExeOther;
+    if (!QFile::setPermissions(configDir, readOnlyDirPermissions))
+        QSKIP("Could not make the test configuration directory read-only");
+
+    QFile permissionProbe(configDir + QStringLiteral("/write-probe"));
+    if (permissionProbe.open(QIODevice::WriteOnly)) {
+        permissionProbe.close();
+        permissionProbe.remove();
+        QFile::setPermissions(configDir, originalDirPermissions);
+        QSKIP("The test process can bypass directory permissions");
+    }
+
+    // QSaveFile must create a sibling temporary file before publishing it.
+    // QFile opened the writable target directly here and truncated it even
+    // though its parent directory was read-only.
+    ngPost.saveConfig();
+    const bool restored = QFile::setPermissions(configDir, originalDirPermissions);
+
+    QFile saved(confPath);
+    const bool opened = saved.open(QIODevice::ReadOnly);
+    const QByteArray content = opened ? saved.readAll() : QByteArray();
+    QVERIFY2(restored, "Could not restore test directory permissions");
+    QVERIFY2(opened, qPrintable(saved.errorString()));
+    QCOMPARE(content, original);
+#endif
+}
+
 void TestMainWindow::post_info_row_exposes_a_checkbox_and_its_button()
 {
     HomeSandbox sandbox;
@@ -490,6 +549,33 @@ void TestMainWindow::post_info_dialog_offers_the_fields_of_the_model()
     QCOMPARE(meta.value(QStringLiteral("titre")).value, QStringLiteral("Mercantour"));
     QCOMPARE(meta.value(QStringLiteral("titre")).scope, MetaScope::Nzb);
     QCOMPARE(meta.value(QStringLiteral("categorie")).scope, MetaScope::Local);
+}
+
+void TestMainWindow::post_info_dialog_offers_the_fields_of_a_json_model()
+{
+    HomeSandbox sandbox;
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.json");
+    {
+        QFile tmpl(tmplPath);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("#!json\n"
+                   "{\n"
+                   "  \"title\": \"__meta:title__\",\n"
+                   "  \"details\": {\"genre\": \"__meta:genre__\"}\n"
+                   "}\n");
+    }
+
+    PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>());
+    auto *fields = dlg.findChild<QTableWidget *>(QStringLiteral("postInfoFieldsTable"));
+    QVERIFY(fields);
+    QCOMPARE(fields->rowCount(), 2);
+
+    auto *title = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoFieldName_0"));
+    auto *genre = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoFieldName_1"));
+    QVERIFY(title);
+    QVERIFY(genre);
+    QCOMPARE(title->text(), QStringLiteral("title"));
+    QCOMPARE(genre->text(), QStringLiteral("genre"));
 }
 
 void TestMainWindow::post_info_dialog_previews_every_line()

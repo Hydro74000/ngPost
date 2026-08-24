@@ -29,7 +29,7 @@ ArticleBuilder::ArticleBuilder(Poster *poster, QObject *parent)
     , _ngPost(poster->_ngPost)
     , _poster(poster)
     , _job(poster->_job)
-    , _buffer(new char[static_cast<quint64>(_ngPost->articleSize()) + 1])
+    , _buffer(new char[static_cast<quint64>(_job->articleSizeBytes()) + 1])
 {
     connect(this,
             &ArticleBuilder::scheduleNextArticle,

@@ -67,6 +67,9 @@ public:
     ~PostHistoryService() override;
 
     void configure(const QString &dbPath, bool storePasswords);
+    //! Queue startup crash/resume cleanup on the history worker. Subsequent
+    //! queued snapshots run after it, without blocking the GUI thread.
+    void prepareForUse();
     bool initialize(QString *error = nullptr);
     bool markPostCrashedArticlesUnknown(QString *error = nullptr);
     bool cleanupInvalidResumePosts(QString *error = nullptr);
@@ -154,7 +157,8 @@ public:
                              const QString &outPath,
                              bool includePassword,
                              QStringList *warnings,
-                             QString *error = nullptr);
+                             QString *error = nullptr,
+                             const QString &passwordOverride = QString());
 
     void requestHistorySnapshot(const PostHistoryStore::ListFilter &filter,
                                 const QSet<qint64> &ignoredResumeIds,
@@ -169,6 +173,9 @@ public:
 
 signals:
     void error(QString msg);
+    //! Emitted after the queued startup cleanup; true means a later posting
+    //! action does not need to repeat it synchronously.
+    void prepared(bool ok);
 
 private:
     template<typename Func>

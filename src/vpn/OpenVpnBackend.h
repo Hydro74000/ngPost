@@ -30,6 +30,12 @@ public:
     void stopAndWait(int timeoutMs) override;
     bool isRunning() const override;
 
+#ifdef NGPOST_TESTING
+    static bool windowsActivityForTest(bool servicePipeConnected,
+                                       bool hasManagementSocket,
+                                       bool retryTimerActive);
+#endif
+
 private slots:
     // Linux helper-script protocol
     void onReadyReadStdout();
@@ -51,6 +57,7 @@ private:
 #ifdef Q_OS_WIN
     bool _startWindowsViaInteractiveService(QString const &configPath,
                                             QString const &authFilePath);
+    void _ensureWinManagementSocket();
     void _stopWindows();
     void _parseMgmtLine(QString const &line);
     QString _buildOpenVpnOptions(QString const &configPath,
@@ -67,6 +74,7 @@ private:
     QByteArray    _winMgmtBuffer;
     QTimer       *_winMgmtRetryTimer;
     int           _winMgmtRetryCount;
+    bool          _winStopRequested;
     QString       _winTunIface;
     QHostAddress  _winTunIp;
     QHostAddress  _winDnsIp;

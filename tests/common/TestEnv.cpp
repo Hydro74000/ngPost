@@ -37,6 +37,7 @@ HomeSandbox::HomeSandbox()
     , _hadHome(false)
     , _hadXdg(false)
     , _hadAppData(false)
+    , _hadLocalAppData(false)
     , _hadUserProfile(false)
     , _hadTestHome(false)
     , _hadTestConfigDir(false)
@@ -47,6 +48,7 @@ HomeSandbox::HomeSandbox()
     _prevHome        = getEnv("HOME", _hadHome);
     _prevXdg         = getEnv("XDG_CONFIG_HOME", _hadXdg);
     _prevAppData     = getEnv("APPDATA", _hadAppData);
+    _prevLocalAppData = getEnv("LOCALAPPDATA", _hadLocalAppData);
     _prevUserProfile = getEnv("USERPROFILE", _hadUserProfile);
     _prevTestHome      = getEnv("NGPOST_TEST_HOME", _hadTestHome);
     _prevTestConfigDir = getEnv("NGPOST_TEST_CONFIG_DIR", _hadTestConfigDir);
@@ -59,6 +61,7 @@ HomeSandbox::HomeSandbox()
     setEnv("HOME", rootPath().toLocal8Bit());
     setEnv("XDG_CONFIG_HOME", xdgConfigHome().toLocal8Bit());
     setEnv("APPDATA", rootPath().toLocal8Bit());
+    setEnv("LOCALAPPDATA", rootPath().toLocal8Bit());
     setEnv("USERPROFILE", rootPath().toLocal8Bit());
     setEnv("NGPOST_TEST_HOME", rootPath().toLocal8Bit());
     setEnv("NGPOST_TEST_CONFIG_DIR", testConfigDir.toLocal8Bit());
@@ -75,6 +78,7 @@ HomeSandbox::~HomeSandbox()
     restore("HOME", _hadHome, _prevHome);
     restore("XDG_CONFIG_HOME", _hadXdg, _prevXdg);
     restore("APPDATA", _hadAppData, _prevAppData);
+    restore("LOCALAPPDATA", _hadLocalAppData, _prevLocalAppData);
     restore("USERPROFILE", _hadUserProfile, _prevUserProfile);
     restore("NGPOST_TEST_HOME", _hadTestHome, _prevTestHome);
     restore("NGPOST_TEST_CONFIG_DIR", _hadTestConfigDir, _prevTestConfigDir);

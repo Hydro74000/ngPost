@@ -17,7 +17,7 @@ class NgPost;
 namespace ngpost::tests
 {
 
-//! RAII sandbox: redirects HOME, XDG_CONFIG_HOME, APPDATA, USERPROFILE to a
+//! RAII sandbox: redirects HOME, XDG_CONFIG_HOME, APPDATA, LOCALAPPDATA and USERPROFILE to a
 //! temporary directory and restores the previous values on destruction.
 //!
 //! Use this in every test that touches PathHelper or constructs NgPost so the
@@ -39,6 +39,7 @@ private:
     QString       _prevHome;
     QString       _prevXdg;
     QString       _prevAppData;
+    QString       _prevLocalAppData;
     QString       _prevUserProfile;
     QString       _prevTestHome;
     QString       _prevTestConfigDir;
@@ -46,6 +47,7 @@ private:
     bool          _hadHome;
     bool          _hadXdg;
     bool          _hadAppData;
+    bool          _hadLocalAppData;
     bool          _hadUserProfile;
     bool          _hadTestHome;
     bool          _hadTestConfigDir;

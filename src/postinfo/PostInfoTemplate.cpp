@@ -106,32 +106,32 @@ QVector<FieldDoc> const &fields()
     // clang-format off
     static QVector<FieldDoc> const sFields = {
         // placeholder             env name                       description                                                        path  secret  known
-        { "__originalPath__",      "NGPOST_ORIGINAL_PATH",        "folder of the posted files (legacy, unchanged)",                  true,  false, true  },
-        { "__sourcePath__",        "NGPOST_SOURCE_PATH",          "first file or folder you asked to post",                          true,  false, true  },
-        { "__originalName__",      "NGPOST_ORIGINAL_NAME",        "name of that file or folder",                                     false, false, true  },
-        { "__nzbPath__",           "NGPOST_NZB_PATH",             "full path of the nzb file",                                       true,  false, true  },
-        { "__nzbDir__",            "NGPOST_NZB_DIR",              "folder holding the nzb file",                                     true,  false, true  },
-        { "__nzbName__",           "NGPOST_NZB_NAME",             "nzb name without the .nzb extension",                             false, false, true  },
-        { "__nzbFileName__",       "NGPOST_NZB_FILE_NAME",        "nzb name with the .nzb extension",                                false, false, true  },
-        { "__rarName__",           "NGPOST_RAR_NAME",             "name of the archive, the one to search for on Usenet",            false, false, true  },
-        { "__rarPass__",           "NGPOST_RAR_PASS",             "archive password",                                                false, true, true   },
-        { "__groups__",            "NGPOST_GROUPS",               "newsgroups the post was sent to, coma separated",                 false, false, true  },
-        { "__nzbPoster__",         "NGPOST_NZB_POSTER",           "poster declared in the nzb (not the random per article From:)",   false, false, true  },
-        { "__par2Pct__",           "NGPOST_PAR2_PCT",             "par2 redundancy percentage, empty when par2 is disabled",         false, false, true  },
-        { "__postSize__",          "NGPOST_POST_SIZE",            "bytes of rar + par2 actually posted, before yEnc encoding",       false, false, false },
-        { "__postSizeHuman__",     "NGPOST_POST_SIZE_HUMAN",      "same size, human readable",                                       false, false, false },
-        { "__sizeInByte__",        "NGPOST_SIZE_IN_BYTE",         "legacy size, kept unchanged for existing scripts",                false, false, false },
-        { "__nbFiles__",           "NGPOST_NB_FILES",             "number of posted files",                                          false, false, false },
-        { "__nbArticles__",        "NGPOST_NB_ARTICLES",          "number of articles",                                              false, false, false },
-        { "__nbArticlesPosted__",  "NGPOST_NB_ARTICLES_POSTED",   "number of articles successfully posted",                          false, false, false },
-        { "__nbArticlesFailed__",  "NGPOST_NB_ARTICLES_FAILED",   "number of articles that failed",                                  false, false, false },
-        { "__avgSpeed__",          "NGPOST_AVG_SPEED",            "average upload speed",                                            false, false, false },
-        { "__durationSec__",       "NGPOST_DURATION_SEC",         "upload duration in seconds",                                      false, false, false },
-        { "__status__",            "NGPOST_STATUS",               "success, partial or failed",                                      false, false, false },
-        { "__postId__",            "NGPOST_POST_ID",              "history database id, 0 when there is no history",                 false, false, false },
-        { "__appVersion__",        "NGPOST_APP_VERSION",          "ngPost version that made the post",                               false, false, true  },
-        { "__postInfoPath__",      "NGPOST_POST_INFO_PATH",       "path of the generated post info file",                            true,  false, false },
-        { "__jsonPath__",          "NGPOST_JSON",                 "path of the temporary json file (post commands only)",            true,  false, false },
+        { "__originalPath__",      "NGPOST_ORIGINAL_PATH",        QT_TRANSLATE_NOOP("PostInfoTemplate", "folder of the posted files (legacy, unchanged)"),                  true,  false, true  },
+        { "__sourcePath__",        "NGPOST_SOURCE_PATH",          QT_TRANSLATE_NOOP("PostInfoTemplate", "first file or folder you asked to post"),                          true,  false, true  },
+        { "__originalName__",      "NGPOST_ORIGINAL_NAME",        QT_TRANSLATE_NOOP("PostInfoTemplate", "name of that file or folder"),                                     false, false, true  },
+        { "__nzbPath__",           "NGPOST_NZB_PATH",             QT_TRANSLATE_NOOP("PostInfoTemplate", "full path of the nzb file"),                                       true,  false, true  },
+        { "__nzbDir__",            "NGPOST_NZB_DIR",              QT_TRANSLATE_NOOP("PostInfoTemplate", "folder holding the nzb file"),                                     true,  false, true  },
+        { "__nzbName__",           "NGPOST_NZB_NAME",             QT_TRANSLATE_NOOP("PostInfoTemplate", "nzb name without the .nzb extension"),                             false, false, true  },
+        { "__nzbFileName__",       "NGPOST_NZB_FILE_NAME",        QT_TRANSLATE_NOOP("PostInfoTemplate", "nzb name with the .nzb extension"),                                false, false, true  },
+        { "__rarName__",           "NGPOST_RAR_NAME",             QT_TRANSLATE_NOOP("PostInfoTemplate", "name of the archive, the one to search for on Usenet"),            false, false, true  },
+        { "__rarPass__",           "NGPOST_RAR_PASS",             QT_TRANSLATE_NOOP("PostInfoTemplate", "archive password"),                                                false, true, true   },
+        { "__groups__",            "NGPOST_GROUPS",               QT_TRANSLATE_NOOP("PostInfoTemplate", "newsgroups the post was sent to, comma separated"),                false, false, true  },
+        { "__nzbPoster__",         "NGPOST_NZB_POSTER",           QT_TRANSLATE_NOOP("PostInfoTemplate", "poster declared in the nzb (not the random per article From:)"),   false, false, true  },
+        { "__par2Pct__",           "NGPOST_PAR2_PCT",             QT_TRANSLATE_NOOP("PostInfoTemplate", "par2 redundancy percentage, empty when par2 is disabled"),         false, false, true  },
+        { "__postSize__",          "NGPOST_POST_SIZE",            QT_TRANSLATE_NOOP("PostInfoTemplate", "bytes of the prepared payload and par2, before yEnc (copied nfo excluded)"), false, false, false },
+        { "__postSizeHuman__",     "NGPOST_POST_SIZE_HUMAN",      QT_TRANSLATE_NOOP("PostInfoTemplate", "same size, human readable"),                                       false, false, false },
+        { "__sizeInByte__",        "NGPOST_SIZE_IN_BYTE",         QT_TRANSLATE_NOOP("PostInfoTemplate", "legacy size, kept unchanged for existing scripts"),                false, false, false },
+        { "__nbFiles__",           "NGPOST_NB_FILES",             QT_TRANSLATE_NOOP("PostInfoTemplate", "number of payload files"),                                         false, false, false },
+        { "__nbArticles__",        "NGPOST_NB_ARTICLES",          QT_TRANSLATE_NOOP("PostInfoTemplate", "number of articles"),                                              false, false, false },
+        { "__nbArticlesPosted__",  "NGPOST_NB_ARTICLES_POSTED",   QT_TRANSLATE_NOOP("PostInfoTemplate", "number of articles successfully posted"),                          false, false, false },
+        { "__nbArticlesFailed__",  "NGPOST_NB_ARTICLES_FAILED",   QT_TRANSLATE_NOOP("PostInfoTemplate", "number of articles that failed"),                                  false, false, false },
+        { "__avgSpeed__",          "NGPOST_AVG_SPEED",            QT_TRANSLATE_NOOP("PostInfoTemplate", "average speed of the latest transfer attempt"),                    false, false, false },
+        { "__durationSec__",       "NGPOST_DURATION_SEC",         QT_TRANSLATE_NOOP("PostInfoTemplate", "active upload duration in seconds, accumulated across resumes"),   false, false, false },
+        { "__status__",            "NGPOST_STATUS",               QT_TRANSLATE_NOOP("PostInfoTemplate", "success, partial or failed"),                                      false, false, false },
+        { "__postId__",            "NGPOST_POST_ID",              QT_TRANSLATE_NOOP("PostInfoTemplate", "history database id, 0 when there is no history"),                 false, false, false },
+        { "__appVersion__",        "NGPOST_APP_VERSION",          QT_TRANSLATE_NOOP("PostInfoTemplate", "ngPost version that made the post"),                               false, false, true  },
+        { "__postInfoPath__",      "NGPOST_POST_INFO_PATH",       QT_TRANSLATE_NOOP("PostInfoTemplate", "path of the generated post info file"),                            true,  false, false },
+        { "__jsonPath__",          "NGPOST_JSON",                 QT_TRANSLATE_NOOP("PostInfoTemplate", "path of the temporary json file (post commands only)"),            true,  false, false },
     };
     // clang-format on
     return sFields;
@@ -571,13 +571,9 @@ QString resolveTemplatePath(QString const &path, QString const &baseDir)
     return QDir::cleanPath(QDir(baseDir).absoluteFilePath(expanded));
 }
 
-Result renderToFile(QString const      &templatePath,
-                    QString const      &outputPattern,
-                    PostInfoData const &data,
-                    QStringList const  &protectedPaths,
-                    QString const      &outputBaseDir)
+RenderResult renderTemplateFile(QString const &templatePath, PostInfoData const &data)
 {
-    Result res;
+    RenderResult res;
 
     QFile tmplFile(templatePath);
     if (!tmplFile.open(QIODevice::ReadOnly)) {
@@ -586,6 +582,56 @@ Result renderToFile(QString const      &templatePath,
     }
     QString const tmpl = QString::fromUtf8(tmplFile.readAll());
     tmplFile.close();
+
+    // The model says what it is; the values are escaped for that format and
+    // nothing else is touched. A plain text model escapes nothing, which is
+    // what lets any separator, any wording and any prose work.
+    QString      unknownFormat;
+    Escape const escape = escapeModeFor(tmpl, templatePath, &unknownFormat);
+    res.escape           = escape;
+    if (!unknownFormat.isEmpty())
+        res.warnings << tr("unknown model format '%1', values are written as they are "
+                           "(known formats: json, xml)")
+                            .arg(unknownFormat);
+
+    QStringList unknownInBody;
+    res.text = render(stripComments(tmpl),
+                      data,
+                      true,
+                      OnUnknown::KeepVerbatim,
+                      &unknownInBody,
+                      false,
+                      escape);
+    if (!unknownInBody.isEmpty())
+        res.warnings << tr("unknown variable(s) left as-is: %1").arg(unknownInBody.join(", "));
+
+    res.ok = true;
+    return res;
+}
+
+Result renderToFile(QString const      &templatePath,
+                    QString const      &outputPattern,
+                    PostInfoData const &data,
+                    QStringList const  &protectedPaths,
+                    QString const      &outputBaseDir)
+{
+    Result res;
+
+    RenderResult const rendered = renderTemplateFile(templatePath, data);
+    res.warnings                 = rendered.warnings;
+    if (!rendered.ok) {
+        res.error = rendered.error;
+        return res;
+    }
+
+    // Secrets in a file body can be protected with restrictive permissions;
+    // secrets in a filename are exposed by the directory listing and cannot.
+    for (FieldDoc const &field : fields()) {
+        if (field.isSecret && outputPattern.contains(field.placeholder)) {
+            res.error = tr("secret variables are not allowed in the output path");
+            return res;
+        }
+    }
 
     // The destination must be exact: writing to an approximate location is worse
     // than not writing at all, so an unknown variable there is fatal.
@@ -626,21 +672,7 @@ Result renderToFile(QString const      &templatePath,
         return res;
     }
 
-    // The model says what it is; the values are escaped for that format and
-    // nothing else is touched. A plain text model escapes nothing, which is
-    // what lets any separator, any wording and any prose work.
-    QString      unknownFormat;
-    Escape const escape = escapeModeFor(tmpl, templatePath, &unknownFormat);
-    if (!unknownFormat.isEmpty())
-        res.warnings << tr("unknown model format '%1', values are written as they are "
-                           "(known formats: json, xml)")
-                            .arg(unknownFormat);
-
-    QStringList unknownInBody;
-    QString const body = render(
-        stripComments(tmpl), data, true, OnUnknown::KeepVerbatim, &unknownInBody, false, escape);
-    if (!unknownInBody.isEmpty())
-        res.warnings << tr("unknown variable(s) left as-is: %1").arg(unknownInBody.join(", "));
+    QString const &body = rendered.text;
 
     QMap<QString, QString> const rawValues  = values(data, false);
     bool                         holdsSecret = false;
@@ -654,7 +686,7 @@ Result renderToFile(QString const      &templatePath,
         // written pa\"ss in a json sheet. Looking for the raw form only would
         // leave that file world readable, which is the one case this whole
         // permission contract exists for.
-        if (body.contains(secret) || body.contains(escapeValue(secret, escape))) {
+        if (body.contains(secret) || body.contains(escapeValue(secret, rendered.escape))) {
             holdsSecret = true;
             break;
         }
@@ -681,7 +713,13 @@ Result renderToFile(QString const      &templatePath,
 #endif
     }
 
-    file.write(body.toUtf8()); // UTF-8, no BOM
+    QByteArray const encoded = body.toUtf8(); // UTF-8, no BOM
+    if (file.write(encoded) != encoded.size()) {
+        res.error = tr("cannot write %1: %2").arg(res.outPath, file.errorString());
+        file.cancelWriting();
+        res.outPath.clear();
+        return res;
+    }
     if (!file.commit()) {
         res.error = tr("cannot write %1: %2").arg(res.outPath, file.errorString());
         res.outPath.clear();

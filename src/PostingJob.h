@@ -76,6 +76,10 @@ private:
     //! original post did) that describe the job without driving it.
     const PostingJobOptions _options;
 
+    //! Payload boundary frozen for this job. It is deliberately independent
+    //! from NgPost::articleSize(), which may change while the job is queued.
+    const qint64 _articleSizeBytes;
+
     QFileInfoList _files;  //!< populated on constuction using a QStringList of paths
 
     PostingWidget *const _postWidget;
@@ -163,6 +167,9 @@ private:
     QString _postInfoFilePath; //!< post info file once written, empty otherwise
     PostInfoData _finalPostInfoData; //!< consolidated description, cached
     bool _finalPostInfoDataReady = false;
+    //! The streamed NZB remains authoritative when the history could not be
+    //! finalized; regenerating/exporting from stale rows would corrupt facts.
+    bool _historyDataUnreliable = false;
 
     QMutex _secureDiskAccess;
 
@@ -201,6 +208,8 @@ public:
                QObject *parent = nullptr);
     ~PostingJob();
 
+    qint64 articleSizeBytes() const { return _articleSizeBytes; }
+
     void pause();
     void resume();
 
@@ -236,6 +245,7 @@ public:
     inline const QStringList &inputPaths() const;
     inline const QMap<QString, MetaValue> &postMeta() const;
     inline qint64 historyPostId() const;
+    inline bool isResumeFromHistory() const;
 
     //! Description of this post, for a post info file or a post command. Once
     //! _buildFinalPostInfoData() has run, this is the consolidated view: for a
@@ -368,7 +378,10 @@ private:
     //! Builds the upload queue. Returns false when the job must not start at
     //! all, which a resume does when one of its sources no longer matches.
     bool _initPosting();
-    void _markResumeAbortedAsResumable();
+    //! Ends a job that failed before any article could be transferred. Normal
+    //! jobs are finalized as failed in history; a refused resume keeps the
+    //! original post resumable.
+    void _abortBeforeTransfer(bool keepResumeResumable = false);
     void _postFiles();
     void _finishPosting();
 
@@ -527,6 +540,10 @@ const QMap<QString, MetaValue> &PostingJob::postMeta() const
 qint64 PostingJob::historyPostId() const
 {
     return _historyPostId;
+}
+bool PostingJob::isResumeFromHistory() const
+{
+    return _resumeFromHistory;
 }
 const QDateTime &PostingJob::startedAtWall() const
 {

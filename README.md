@@ -15,7 +15,7 @@
 This application is a high-speed command line and GUI Usenet poster for binaries, designed for secure and efficient data posting. Developed with C++17 and [Qt 6.8.2](https://www.qt.io/blog/qt-6.8.2-released), it features file compression, par2 file generation, and a posting queue for managing multiple uploads. The tool automates tasks by scanning folders and posting files, with options for executing commands post-upload and shutting down the computer upon completion.
 
 
-![ngPost_v5.4.0](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.3.0.png?raw=true)
+![ngPost_v5.3.0](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.3.0.png?raw=true)
 
 # Getting Started
 
@@ -34,7 +34,7 @@ All the features are [highlighted here](https://github.com/Hydro74000/ngPost/wik
 - Multithreading.
 - And many more.
 
-[Releases will be available](https://github.com/Hydro74000/ngPost/releases) for, Linux 64 Bit and Windows 64 Bit. Support for MacOS and Raspbian will be considered in the future.
+[Releases are available](https://github.com/Hydro74000/ngPost/releases) for Linux 64 Bit, Windows 64 Bit and macOS. Raspbian packages are not currently produced.
 
 For building the project yourself, please refer to [the wiki](https://github.com/Hydro74000/ngPost/wiki/Build)
 
@@ -66,7 +66,7 @@ useVpn = true
 LevelUp adds a SQLite history database used by both the GUI and CLI. By default
 it is stored at the application config path as `ngPost_history.sqlite`; set
 `POST_DB = /path/to/ngPost_history.sqlite` to move it. Archive passwords are
-stored in clear text for v1 so ngPost can regenerate NZB metadata; set
+stored in clear text when enabled so ngPost can regenerate NZB metadata; set
 `HISTORY_STORE_PASSWORDS = false` to disable that. Passwords are masked in GUI,
 CLI history output and CSV exports unless an explicit password action is used.
 

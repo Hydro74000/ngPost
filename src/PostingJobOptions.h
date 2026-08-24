@@ -66,6 +66,12 @@ struct PostingJobOptions
     QList<QString> grpList;
     std::string    from;
 
+    //! Payload bytes per Usenet article, frozen with the job. This must not be
+    //! read back from NgPost's mutable global settings while a queued job is
+    //! running. In particular, a resumed post must use the exact value of the
+    //! original attempt or its part boundaries no longer match the NZB.
+    qint64 articleSizeBytes = 0;
+
     bool obfuscateArticles = false;
     bool obfuscateFileName = false;
 
@@ -101,6 +107,10 @@ struct PostingJobOptions
 
     // resume
     qint64                                       resumeHistoryPostId = 0;
+    //! The original NZB advertised a password, but neither the history nor the
+    //! existing NZB could provide it. Resuming would silently drop the secret
+    //! from the consolidated NZB, so the job must fail closed.
+    bool                                         resumePasswordUnavailable = false;
     QMap<QString, PostingJobResumeFileState>      resumeFileStatesByPath;
 
     //! Facts about the ORIGINAL post, for a resume. They describe what was done

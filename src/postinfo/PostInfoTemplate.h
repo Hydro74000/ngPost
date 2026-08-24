@@ -197,6 +197,21 @@ QString redactSecrets(QString const &text, PostInfoData const &data);
 //! for a command line value). No ambiguous fallback.
 QString resolveTemplatePath(QString const &path, QString const &baseDir);
 
+//! A rendered model held in memory. This is the common pipeline used by file
+//! output and by CLI stdout: it reads the model, removes comments/directives,
+//! applies the declared (or filename-derived) escaping, and reports unknown
+//! variables without ever creating an output file.
+struct RenderResult
+{
+    bool        ok = false;
+    QString     text;
+    QString     error;
+    QStringList warnings;
+    Escape      escape = Escape::None;
+};
+
+RenderResult renderTemplateFile(QString const &templatePath, PostInfoData const &data);
+
 struct Result
 {
     bool        ok = false;

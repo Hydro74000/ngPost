@@ -29,6 +29,7 @@ FileUploader::FileUploader(QNetworkAccessManager &netMgr, const QString &nzbFile
     , _nzbFilePath(nzbFilePath)
     , _nzbFile(nzbFilePath)
     , _nzbUrl()
+    , _responseBytes(0)
 {}
 
 FileUploader::~FileUploader()
@@ -46,11 +47,16 @@ FileUploader::~FileUploader()
 
 void FileUploader::release()
 {
-    if (_reply) {
-        if (_reply->isRunning())
-            _reply->abort();
-        _reply->deleteLater();
-        _reply = nullptr;
+    // abort() is allowed to emit finished() synchronously. Detach and clear
+    // the member first so onUploadFinished()/a nested release() cannot re-enter
+    // with the same reply and leave this frame dereferencing a null pointer.
+    QNetworkReply *reply = _reply;
+    _reply = nullptr;
+    if (reply) {
+        QObject::disconnect(reply, nullptr, this, nullptr);
+        if (reply->isRunning())
+            reply->abort();
+        reply->deleteLater();
     }
     if (_nzbFile.isOpen())
         _nzbFile.close();
@@ -58,20 +64,22 @@ void FileUploader::release()
 
 void FileUploader::startUpload(const QUrl &serverUrl)
 {
+    // Keep the sanitized endpoint available for every diagnostic, including
+    // an unsupported scheme that never creates a QNetworkReply.
+    _nzbUrl = serverUrl;
+    _responseBytes = 0;
     if (_nzbFile.open(QIODevice::ReadOnly)) {
         QString protocol = serverUrl.scheme(); // always lowercase
         if (protocol == "ftp") {
             _nzbUrl = QUrl(QString("%1/%2").arg(serverUrl.url()).arg(_nzbFilePath.fileName()));
 #ifdef __DEBUG__
-            qDebug() << "FileUploader FTP url: " << _nzbUrl.url();
+            qDebug() << "FileUploader FTP url: " << url();
 #endif
 
             _reply = _netMgr.put(QNetworkRequest(_nzbUrl), &_nzbFile);
         } else if (protocol.startsWith("http")) {
-            _nzbUrl = serverUrl;
-
 #ifdef __DEBUG__
-            qDebug() << "FileUploader POST on url: " << _nzbUrl.url();
+            qDebug() << "FileUploader POST on url: " << url();
 #endif
             QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
             QString fileKey("file"), fileName = QFileInfo(_nzbFilePath).fileName();
@@ -94,20 +102,36 @@ void FileUploader::startUpload(const QUrl &serverUrl)
             emit error(tr("Error uploading nzb to %1: Protocol not supported").arg(url()));
             emit readyToDie();
         }
-        if (_reply)
+        if (_reply) {
+            QObject::connect(_reply,
+                             &QIODevice::readyRead,
+                             this,
+                             &FileUploader::onReplyReadyRead);
             QObject::connect(_reply,
                              &QNetworkReply::finished,
                              this,
                              &FileUploader::onUploadFinished);
+        }
     } else {
-        emit error(tr("Error uploading file: can't open file ").arg(_nzbFile.fileName()));
+        emit error(tr("Error uploading file: can't open file %1").arg(_nzbFile.fileName()));
         emit readyToDie();
     }
 }
 
+void FileUploader::onReplyReadyRead()
+{
+    if (_reply)
+        _responseBytes += _reply->readAll().size();
+}
+
 void FileUploader::onUploadFinished()
 {
-    qDebug() << "FileUploader reply: " << _reply->readAll();
+    // A queued finished() may already have been posted when release()
+    // disconnects a timed-out upload.
+    if (!_reply)
+        return;
+    onReplyReadyRead(); // drain bytes delivered with finished()
+    qDebug() << "FileUploader reply received (bytes): " << _responseBytes;
     if (_reply->error())
         emit error(tr("Error uploading nzb to %1: %2").arg(url()).arg(_reply->errorString()));
     else

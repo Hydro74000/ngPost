@@ -16,9 +16,12 @@
 #include <QHostAddress>
 
 #ifdef Q_OS_WIN
+#  include <QElapsedTimer>
 #  include <QLocalSocket>
+#  include <QPointer>
 #  include <QRegularExpression>
 #  include <QTcpSocket>
+#  include <QThread>
 #  include <QTimer>
 #endif
 
@@ -33,6 +36,7 @@ OpenVpnBackend::OpenVpnBackend(QObject *parent)
     , _winMgmtBuffer()
     , _winMgmtRetryTimer(nullptr)
     , _winMgmtRetryCount(0)
+    , _winStopRequested(false)
     , _winTunIface()
     , _winTunIp()
     , _winDnsIp()
@@ -50,6 +54,15 @@ QString bundledVpnBinDir()
 #endif
     return QString();
 }
+
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
+bool hasWindowsActivity(bool servicePipeConnected,
+                        bool hasManagementSocket,
+                        bool retryTimerActive)
+{
+    return servicePipeConnected || hasManagementSocket || retryTimerActive;
+}
+#endif
 }
 
 OpenVpnBackend::~OpenVpnBackend()
@@ -186,10 +199,49 @@ void OpenVpnBackend::stop()
 
 void OpenVpnBackend::stopAndWait(int timeoutMs)
 {
-    stop();
 #ifdef Q_OS_WIN
-    Q_UNUSED(timeoutMs);
+    if (!isRunning()) {
+        stop();
+        return;
+    }
+
+    QElapsedTimer deadline;
+    deadline.start();
+    auto remaining = [&]() {
+        return qMax(0, timeoutMs - static_cast<int>(deadline.elapsed()));
+    };
+
+    _winStopRequested = true;
+    if (_winServicePipe)
+        _winServicePipe->disconnectFromServer();
+
+    // The interactive-service pipe normally disappears before the management
+    // socket is created. Connect here immediately instead of relying on the
+    // retry timer/event loop, which is commonly already stopping at shutdown.
+    _ensureWinManagementSocket();
+    QPointer<QTcpSocket> management = _winMgmt;
+    while (management && management->state() != QAbstractSocket::ConnectedState
+           && remaining() > 0) {
+        management->abort();
+        management->connectToHost(QHostAddress::LocalHost, 7505);
+        if (management->waitForConnected(qMin(500, remaining())))
+            break;
+        if (remaining() > 0)
+            QThread::msleep(static_cast<unsigned long>(qMin(100, remaining())));
+    }
+
+    if (management && management->state() == QAbstractSocket::ConnectedState) {
+        management->write("signal SIGTERM\n");
+        management->flush();
+        if (management->bytesToWrite() > 0 && remaining() > 0)
+            management->waitForBytesWritten(remaining());
+        if (management && management->state() != QAbstractSocket::UnconnectedState
+            && remaining() > 0)
+            management->waitForDisconnected(remaining());
+    }
     return;
+#else
+    stop();
 #endif
     if (_proc && _proc->state() != QProcess::NotRunning) {
         // Allow the privileged helper's EXIT trap to run cleanup before we
@@ -204,10 +256,22 @@ void OpenVpnBackend::stopAndWait(int timeoutMs)
 bool OpenVpnBackend::isRunning() const
 {
 #ifdef Q_OS_WIN
-    return _winServicePipe != nullptr;
+    return hasWindowsActivity(
+        _winServicePipe && _winServicePipe->state() == QLocalSocket::ConnectedState,
+        _winMgmt != nullptr,
+        _winMgmtRetryTimer && _winMgmtRetryTimer->isActive());
 #endif
     return _proc && _proc->state() != QProcess::NotRunning;
 }
+
+#ifdef NGPOST_TESTING
+bool OpenVpnBackend::windowsActivityForTest(bool servicePipeConnected,
+                                            bool hasManagementSocket,
+                                            bool retryTimerActive)
+{
+    return hasWindowsActivity(servicePipeConnected, hasManagementSocket, retryTimerActive);
+}
+#endif
 
 void OpenVpnBackend::onReadyReadStdout()
 {
@@ -326,6 +390,7 @@ bool OpenVpnBackend::_startWindowsViaInteractiveService(QString const &configPat
     }
 
     _readySignaled = false;
+    _winStopRequested = false;
     _winMgmtBuffer.clear();
     _winMgmtRetryCount = 0;
     _winTunIface.clear();
@@ -390,15 +455,7 @@ bool OpenVpnBackend::_startWindowsViaInteractiveService(QString const &configPat
         _winMgmtRetryTimer->setSingleShot(true);
         connect(_winMgmtRetryTimer, &QTimer::timeout,
                 this, [this]() {
-            if (!_winMgmt) {
-                _winMgmt = new QTcpSocket(this);
-                connect(_winMgmt, &QTcpSocket::connected,
-                        this, &OpenVpnBackend::onWinMgmtConnected);
-                connect(_winMgmt, &QTcpSocket::readyRead,
-                        this, &OpenVpnBackend::onWinMgmtReadyRead);
-                connect(_winMgmt, &QTcpSocket::disconnected,
-                        this, &OpenVpnBackend::onWinMgmtDisconnected);
-            }
+            _ensureWinManagementSocket();
             if (_winMgmt->state() != QAbstractSocket::ConnectedState
                 && _winMgmt->state() != QAbstractSocket::ConnectingState) {
                 _winMgmt->abort();
@@ -414,6 +471,19 @@ bool OpenVpnBackend::_startWindowsViaInteractiveService(QString const &configPat
     _winMgmtRetryCount = 0;
     _winMgmtRetryTimer->start(500);
     return true;
+}
+
+void OpenVpnBackend::_ensureWinManagementSocket()
+{
+    if (_winMgmt)
+        return;
+    _winMgmt = new QTcpSocket(this);
+    connect(_winMgmt, &QTcpSocket::connected,
+            this, &OpenVpnBackend::onWinMgmtConnected);
+    connect(_winMgmt, &QTcpSocket::readyRead,
+            this, &OpenVpnBackend::onWinMgmtReadyRead);
+    connect(_winMgmt, &QTcpSocket::disconnected,
+            this, &OpenVpnBackend::onWinMgmtDisconnected);
 }
 
 void OpenVpnBackend::onWinPipeReadyRead()
@@ -464,6 +534,11 @@ void OpenVpnBackend::onWinMgmtConnected()
     if (_winMgmtRetryTimer)
         _winMgmtRetryTimer->stop();
     emit logLine(tr("Connected to openvpn management socket"));
+    if (_winStopRequested) {
+        _winMgmt->write("signal SIGTERM\n");
+        _winMgmt->flush();
+        return;
+    }
     // Subscribe to state notifications AND to log events. Without `log on all`,
     // openvpn won't push PUSH_REPLY lines to us, and we'd never see the
     // dhcp-option DNS X.X.X.X that we need for the DNS-leak fix on Windows.
@@ -552,15 +627,17 @@ void OpenVpnBackend::onWinMgmtDisconnected()
         _winServicePipe->deleteLater();
         _winServicePipe = nullptr;
     }
-    if (!_readySignaled) {
+    if (!_readySignaled && !_winStopRequested) {
         emit failed(tr("openvpn exited before the tunnel was ready"));
     }
     _readySignaled = false;
+    _winStopRequested = false;
     emit stopped();
 }
 
 void OpenVpnBackend::_stopWindows()
 {
+    _winStopRequested = true;
     if (_winMgmt && _winMgmt->state() == QAbstractSocket::ConnectedState) {
         // openvpn handles signal SIGTERM cleanly and tears down the tunnel.
         _winMgmt->write("signal SIGTERM\n");
@@ -570,7 +647,7 @@ void OpenVpnBackend::_stopWindows()
         // from here. The pipe will close when the service notices openvpn
         // died, which onWinMgmtDisconnected handles.
         _winServicePipe->disconnectFromServer();
-    } else {
+    } else if (!_winMgmtRetryTimer || !_winMgmtRetryTimer->isActive()) {
         // Nothing running.
         emit stopped();
     }

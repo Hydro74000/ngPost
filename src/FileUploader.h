@@ -36,6 +36,7 @@ private:
     QFileInfo _nzbFilePath;
     QFile _nzbFile;
     QUrl _nzbUrl;
+    qint64 _responseBytes;
 
 public:
     FileUploader(QNetworkAccessManager &netMgr, const QString &nzbFilePath);
@@ -55,6 +56,7 @@ signals:
     void log(const QString &msg, bool newline = true);
 
 private slots:
+    void onReplyReadyRead();
     void onUploadFinished();
 
 private:
@@ -66,7 +68,10 @@ QString FileUploader::url() const
     if (_nzbUrl.isEmpty())
         return QString();
     else
-        return _nzbUrl.toString(QUrl::RemovePassword | QUrl::RemovePath);
+        // Upload endpoints commonly carry credentials or tokens in user-info,
+        // the path or the query. Diagnostics only need the endpoint itself.
+        return _nzbUrl.toString(QUrl::RemoveUserInfo | QUrl::RemovePath
+                                | QUrl::RemoveQuery | QUrl::RemoveFragment);
 }
 
 #endif // FILEUPLOADER_H

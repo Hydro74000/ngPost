@@ -76,6 +76,7 @@ private:
         PostInfoData data;
         QStringList  commands;
         QUrl         uploadUrl;
+        Settings     settings; //!< immutable snapshot taken when the task is queued
         QString      jsonPath; //!< temporary, deleted when the task is over
     };
 
@@ -99,7 +100,9 @@ private:
         void    append(QByteArray const &chunk);
         QString toString() const;
     };
-    QString _writeJsonFile(PostInfoData const &data) const;
+    QString _writeJsonFile(PostInfoData const &data,
+                           Settings const     &settings,
+                           QString            *error) const;
     QString _redact(QString const &text) const;
 
     QNetworkAccessManager &_netMgr;

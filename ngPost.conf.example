@@ -46,24 +46,25 @@ nzbPath  = /tmp
 ##   __nzbFileName__        : nzb name with the .nzb extension
 ##   __rarName__            : name of the archive, the one to search for on Usenet
 ##   __rarPass__            : archive password
-##   __groups__             : newsgroups the post was sent to, coma separated
+##   __groups__             : newsgroups the post was sent to, comma separated
 ##   __nzbPoster__          : poster declared in the nzb (not the random per article From:)
 ##   __par2Pct__            : par2 redundancy percentage, empty when par2 is disabled
-##   __postSize__           : bytes of rar + par2 actually posted, before yEnc encoding
+##   __postSize__           : bytes of the prepared payload + par2, before yEnc (copied nfo excluded)
 ##   __postSizeHuman__      : same size, human readable
 ##   __sizeInByte__         : legacy size, kept unchanged for existing scripts
-##   __nbFiles__            : number of posted files
+##   __nbFiles__            : number of payload files
 ##   __nbArticles__         : number of articles
 ##   __nbArticlesPosted__   : number of articles successfully posted
 ##   __nbArticlesFailed__   : number of articles that failed
-##   __avgSpeed__           : average upload speed
-##   __durationSec__        : upload duration in seconds
+##   __avgSpeed__           : average speed of the latest transfer attempt
+##   __durationSec__        : active upload seconds, accumulated across resumes
 ##   __status__             : success, partial or failed
 ##   __postId__             : history database id, 0 when there is no history
 ##   __appVersion__         : ngPost version that made the post
 ##   __postInfoPath__       : path of the generated post info file
 ##   __jsonPath__           : path of the temporary json file (post commands only)
 ##   __date:<format>__      : date of the post, ex: __date:dd/MM/yyyy__
+##   __dateStart:<format>__ : transfer start date, ex: __dateStart:HH:mm__
 ##   __meta:<name>__        : one of your own fields (--post_meta, or --meta to publish it too)
 ##
 ## the same values are also available as environment variables (NGPOST_NZB_PATH,
@@ -114,13 +115,14 @@ nzbPath  = /tmp
 ## for instance /home/me/models/my_record_sheet.txt
 #POST_INFO_TEMPLATE = my_record_sheet.txt
 
-## where to write it (the variables above work here too)
+## where to write it (the non-secret variables above work here too;
+## secret values such as __rarPass__ are refused in a file name)
 ## a relative path is understood from the folder of this configuration file
 #POST_INFO_OUTPUT = __nzbDir__/__nzbName__.info.txt
 
 ## by default no post info file is written for a failed or partial post,
 ## which is what you want when an index imports them automatically
-#POST_INFO_ONLY_ON_SUCCESS = false
+#POST_INFO_ONLY_ON_SUCCESS = true
 
 
 ## nzb files are normally all created in nzbPath

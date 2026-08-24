@@ -8,7 +8,32 @@
 #include "history/ResumePlanner.h"
 
 #include <QDateTime>
+#include <QFile>
 #include <QFileInfo>
+#include <QXmlStreamReader>
+
+namespace
+{
+QString passwordDeclaredInNzb(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return QString();
+
+    QXmlStreamReader xml(&file);
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (!xml.isStartElement())
+            continue;
+        if (xml.name() == QLatin1String("file"))
+            break; // the head is over; do not scan a potentially huge NZB
+        if (xml.name() == QLatin1String("meta")
+            && xml.attributes().value(QLatin1String("type")) == QLatin1String("password"))
+            return xml.readElementText();
+    }
+    return QString();
+}
+}
 
 ResumePlanner::ResumePlanner(PostHistoryStore *store)
     : _store(store)
@@ -71,6 +96,10 @@ ResumePlanner::Decision ResumePlanner::check(qint64 postId, QString *error)
     } else if (missingSource) {
         decision.state = ResumeState::NotResumable;
         decision.reason = tr("source files are missing or changed");
+    } else if (details.articleSizeBytes <= 0) {
+        decision.state = ResumeState::NotResumable;
+        decision.reason = tr("the original article size is missing or inconsistent in history; "
+                             "resuming with another size would corrupt the post");
     } else if (decision.postedArticles > 0) {
         decision.state = ResumeState::PartiallyResumable;
         decision.reason = tr("some articles are already posted");
@@ -150,6 +179,11 @@ PostingJobOptions ResumePlanner::jobOptions(PostingJobOptions base,
     base.files       = plan.files;
     base.grpList     = groups;
     base.from        = details.from.isEmpty() ? fallbackFrom : details.from.toStdString();
+    // Never inherit the current global ARTICLE_SIZE. loadPostDetails() either
+    // loaded the original value or proved it from legacy article boundaries.
+    // A non-positive value stays non-positive so PostingJob also fails closed
+    // if a caller bypasses check().
+    base.articleSizeBytes = details.articleSizeBytes;
 
     // settings of the original post, not the current globals
     base.obfuscateArticles = details.obfuscateArticles;
@@ -160,6 +194,10 @@ PostingJobOptions ResumePlanner::jobOptions(PostingJobOptions base,
     base.doPar2     = false;
     base.rarName    = details.rarName;
     base.rarPass    = details.rarPass;
+    if (base.rarPass.isEmpty() && details.post.hasPassword
+        && !details.post.passwordStored)
+        base.rarPass = passwordDeclaredInNzb(nzbPath);
+    base.resumePasswordUnavailable = details.post.hasPassword && base.rarPass.isEmpty();
     base.keepRar    = false;
 
     base.delFilesAfterPost = false;

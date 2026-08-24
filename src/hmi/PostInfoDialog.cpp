@@ -581,15 +581,11 @@ void PostInfoDialog::_setModelDirty(bool dirty)
 //! a line, or in the middle of a sentence like "me __originalName__ and more".
 void PostInfoDialog::_syncFieldsFromModel()
 {
-    QStringList wanted;
-    for (PostInfoTemplate::SheetLine const &line : _lines) {
-        if (line.kind != PostInfoTemplate::SheetLine::Kind::Field)
-            continue;
-        for (PostInfoTemplate::Token const &token : PostInfoTemplate::tokensIn(line.expression)) {
-            if (token.isMeta() && !token.arg.isEmpty() && !wanted.contains(token.arg))
-                wanted << token.arg;
-        }
-    }
+    // Read the complete model, not only `label = expression` lines. JSON and
+    // XML models are naturally made of raw lines, and metaNamesIn() already
+    // applies the renderer's comment rules to all formats.
+    const QStringList wanted =
+        PostInfoTemplate::metaNamesIn(PostInfoTemplate::buildTemplate(_lines, _crlf));
 
     QStringList existing;
     for (int row = 0; row < _fields->rowCount(); ++row) {

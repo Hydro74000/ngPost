@@ -13,9 +13,15 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QPointer>
 #include <QProcessEnvironment>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 
+#include "FileUploader.h"
+#include "PostCmdRunner.h"
 #include "postinfo/PostInfoTemplate.h"
 
 class TestPostInfoTemplate : public QObject
@@ -27,6 +33,9 @@ private slots:
     //! duplicate environment variable, never an empty description.
     void fields_table_is_consistent();
     void escaping_follows_the_declared_format();
+    //! Rendering for stdout must be able to use the complete file pipeline
+    //! without creating a destination file, even with hostile JSON values.
+    void render_template_file_in_memory_uses_the_complete_pipeline();
     void escaping_never_touches_paths_or_commands();
     void format_falls_back_on_the_model_name();
     void a_secret_is_protected_even_once_escaped();
@@ -90,6 +99,10 @@ private slots:
     //! and a source folder protects everything below it.
     void refuses_to_overwrite_protected_paths();
 
+    //! A password in a filename leaks through directory listings even when
+    //! file permissions are private, so it is rejected outright.
+    void refuses_a_secret_in_the_output_path();
+
     //! The protection follows symlinks, so writing "through" a link to a
     //! source is refused as well.
     void protection_resolves_symlinks();
@@ -100,6 +113,22 @@ private slots:
     //! The shipped Baselien template renders byte for byte as expected. This
     //! pins the promise made to that index.
     void baselien_template_golden();
+
+    //! Hooks are globally FIFO, receive a self-describing JSON file, keep
+    //! secrets out by default and drain chatty output without leaking it.
+    void post_command_runner_fifo_json_secrets_and_bounded_output();
+
+    //! A timeout and a command that cannot start both release the FIFO so the
+    //! commands behind them still run.
+    void post_command_runner_timeout_and_start_failure();
+
+    //! Settings belong to the queued post: changing the runner afterwards
+    //! must not alter its timeout, secret exposure or failure policy.
+    void post_command_runner_snapshots_settings_per_task();
+
+    //! QNetworkReply::abort may synchronously emit finished(). Releasing a
+    //! timed-out upload must therefore be reentrancy-safe and close the NZB.
+    void file_uploader_release_handles_synchronous_abort();
 };
 
 namespace
@@ -167,6 +196,109 @@ QString readFile(QString const &path)
         return QString();
     return QString::fromUtf8(f.readAll());
 }
+
+QString quotedCommandArg(QString const &arg)
+{
+    // QProcess::splitCommand treats a triple quote as a literal quote. Test
+    // paths do not normally contain one, but keeping the helper exact makes
+    // the test portable to a user profile that does.
+    QString escaped = arg;
+    escaped.replace(QLatin1Char('"'), QStringLiteral("\"\"\""));
+    return QLatin1Char('"') + escaped + QLatin1Char('"');
+}
+
+QString pythonExecutable()
+{
+    QString python = QStandardPaths::findExecutable(QStringLiteral("python3"));
+    if (python.isEmpty())
+        python = QStandardPaths::findExecutable(QStringLiteral("python"));
+    return python;
+}
+
+QString writeRunnerScript(QTemporaryDir const &dir)
+{
+    const QString path = dir.filePath(QStringLiteral("runner.py"));
+    QFile script(path);
+    if (!script.open(QIODevice::WriteOnly | QIODevice::Text))
+        return QString();
+    script.write(
+        "import json, os, sys, time\n"
+        "mode, marker = sys.argv[1], sys.argv[2]\n"
+        "if mode == 'first':\n"
+        "    with open(os.environ['NGPOST_JSON'], encoding='utf-8') as f:\n"
+        "        data = json.load(f)\n"
+        "    assert data['jsonPath'] == os.environ['NGPOST_JSON']\n"
+        "    assert 'rarPass' not in data\n"
+        "    assert 'NGPOST_RAR_PASS' not in os.environ\n"
+        "    with open(marker, 'a', encoding='utf-8') as f: f.write('1')\n"
+        "    sys.stdout.write('A' * 100000)\n"
+        "    sys.stderr.write('secret=' + sys.argv[3] + '\\n' + 'B' * 100000)\n"
+        "elif mode == 'second':\n"
+        "    with open(marker, 'a', encoding='utf-8') as f: f.write('2')\n"
+        "elif mode == 'sleep':\n"
+        "    time.sleep(5)\n"
+        "elif mode == 'block':\n"
+        "    time.sleep(1)\n"
+        "    with open(marker, 'a', encoding='utf-8') as f: f.write('B')\n"
+        "elif mode == 'settings':\n"
+        "    with open(os.environ['NGPOST_JSON'], encoding='utf-8') as f:\n"
+        "        data = json.load(f)\n"
+        "    assert data['rarPass'] == sys.argv[3]\n"
+        "    assert os.environ['NGPOST_RAR_PASS'] == sys.argv[3]\n"
+        "    with open(marker, 'a', encoding='utf-8') as f: f.write('E')\n"
+        "elif mode == 'sleep_then_write':\n"
+        "    time.sleep(5)\n"
+        "    with open(marker, 'a', encoding='utf-8') as f: f.write('T')\n"
+        "elif mode == 'fail':\n"
+        "    sys.stderr.write('expected settings failure\\n')\n"
+        "    sys.exit(7)\n");
+    script.close();
+    return path;
+}
+
+class SynchronousAbortReply : public QNetworkReply
+{
+public:
+    SynchronousAbortReply(QNetworkAccessManager::Operation operation,
+                          QNetworkRequest const &request,
+                          QObject *parent)
+        : QNetworkReply(parent)
+    {
+        setOperation(operation);
+        setRequest(request);
+        setUrl(request.url());
+        open(QIODevice::ReadOnly | QIODevice::Unbuffered);
+    }
+
+    void abort() override
+    {
+        ++abortCalls;
+        setError(OperationCanceledError, QStringLiteral("fixture abort"));
+        setFinished(true);
+        emit errorOccurred(OperationCanceledError);
+        emit finished(); // deliberately direct, as permitted by QNetworkReply
+    }
+
+    int abortCalls = 0;
+
+protected:
+    qint64 readData(char *, qint64) override { return -1; }
+};
+
+class SynchronousAbortNetworkManager : public QNetworkAccessManager
+{
+public:
+    QPointer<SynchronousAbortReply> reply;
+
+protected:
+    QNetworkReply *createRequest(Operation operation,
+                                 QNetworkRequest const &request,
+                                 QIODevice *) override
+    {
+        reply = new SynchronousAbortReply(operation, request, this);
+        return reply;
+    }
+};
 
 } // namespace
 
@@ -250,6 +382,51 @@ void TestPostInfoTemplate::escaping_follows_the_declared_format()
     // "#!json" only counts as a directive on a comment line of its own
     QCOMPARE(PostInfoTemplate::escapeModeIn(QStringLiteral("titre =#!json\n")),
              PostInfoTemplate::Escape::None);
+}
+
+void TestPostInfoTemplate::render_template_file_in_memory_uses_the_complete_pipeline()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString tmplPath = dir.filePath(QStringLiteral("hostile.tpl"));
+    QVERIFY(writeFile(tmplPath,
+                      QStringLiteral("#!json\n"
+                                     "# this comment is deliberately not valid JSON\n"
+                                     "{\"title\":\"__meta:title__\","
+                                     "\"unknown\":\"__futureField__\"}\n")));
+
+    PostInfoData data = sampleData();
+    const QString hostile = QStringLiteral("quote=\" slash=\\ newline=\n tab=\t control=")
+                            + QChar(1) + QString::fromUtf8(" été 中文");
+    data.meta.insert(QStringLiteral("title"), MetaValue(hostile));
+
+    const PostInfoTemplate::RenderResult rendered =
+        PostInfoTemplate::renderTemplateFile(tmplPath, data);
+    QVERIFY2(rendered.ok, qPrintable(rendered.error));
+    QCOMPARE(rendered.escape, PostInfoTemplate::Escape::Json);
+    QVERIFY(!rendered.text.contains(QStringLiteral("#!json")));
+    QVERIFY(!rendered.text.contains(QStringLiteral("not valid JSON")));
+    QCOMPARE(rendered.warnings.size(), 1);
+    QVERIFY(rendered.warnings.first().contains(QStringLiteral("__futureField__")));
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(rendered.text.toUtf8(), &parseError);
+    QVERIFY2(parseError.error == QJsonParseError::NoError,
+             qPrintable(parseError.errorString() + QStringLiteral(" | ") + rendered.text));
+    QCOMPARE(document.object().value(QStringLiteral("title")).toString(), hostile);
+    QCOMPARE(document.object().value(QStringLiteral("unknown")).toString(),
+             QStringLiteral("__futureField__"));
+
+    // Reading/rendering in memory is side-effect free: only the supplied model
+    // exists until a caller explicitly chooses renderToFile().
+    QCOMPARE(QDir(dir.path()).entryList(QDir::Files), QStringList{ QStringLiteral("hostile.tpl") });
+
+    const QString outPath = dir.filePath(QStringLiteral("hostile.json"));
+    const PostInfoTemplate::Result written =
+        PostInfoTemplate::renderToFile(tmplPath, outPath, data, QStringList());
+    QVERIFY2(written.ok, qPrintable(written.error));
+    QCOMPARE(readFile(written.outPath), rendered.text);
 }
 
 void TestPostInfoTemplate::shipped_json_model_produces_valid_json()
@@ -778,6 +955,25 @@ void TestPostInfoTemplate::refuses_to_overwrite_protected_paths()
     QVERIFY(PostInfoTemplate::renderToFile(tmplPath, dir.filePath("ok.txt"), d, guards).ok);
 }
 
+void TestPostInfoTemplate::refuses_a_secret_in_the_output_path()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString tmplPath = dir.filePath(QStringLiteral("sheet.tpl"));
+    QVERIFY(writeFile(tmplPath, QStringLiteral("name=__nzbName__\n")));
+
+    PostInfoData data = sampleData();
+    data.rarPass = QStringLiteral("visible-secret");
+    const PostInfoTemplate::Result result = PostInfoTemplate::renderToFile(
+        tmplPath,
+        dir.filePath(QStringLiteral("__rarPass__.txt")),
+        data,
+        {});
+    QVERIFY(!result.ok);
+    QVERIFY2(result.error.contains(QStringLiteral("secret")), qPrintable(result.error));
+    QVERIFY(!QFileInfo::exists(dir.filePath(QStringLiteral("visible-secret.txt"))));
+}
+
 void TestPostInfoTemplate::protection_resolves_symlinks()
 {
 #ifndef Q_OS_UNIX
@@ -877,6 +1073,209 @@ void TestPostInfoTemplate::baselien_template_golden()
     QString actual = readFile(res.outPath);
     actual.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
     QCOMPARE(actual, expected);
+}
+
+void TestPostInfoTemplate::post_command_runner_fifo_json_secrets_and_bounded_output()
+{
+    const QString python = pythonExecutable();
+    if (python.isEmpty())
+        QSKIP("Python is required for the cross-platform hook fixture");
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString script = writeRunnerScript(dir);
+    QVERIFY(!script.isEmpty());
+    const QString marker = dir.filePath(QStringLiteral("order.txt"));
+
+    PostInfoData data = sampleData();
+    data.historyPostId = 4711;
+    data.rarPass = QStringLiteral("runner-secret-4711");
+
+    const QString first = QStringLiteral("%1 %2 first %3 %4")
+                              .arg(quotedCommandArg(python),
+                                   quotedCommandArg(script),
+                                   quotedCommandArg(marker),
+                                   quotedCommandArg(data.rarPass));
+    const QString second = QStringLiteral("%1 %2 second %3")
+                               .arg(quotedCommandArg(python),
+                                    quotedCommandArg(script),
+                                    quotedCommandArg(marker));
+
+    QNetworkAccessManager network;
+    PostCmdRunner runner(network);
+    PostCmdRunner::Settings settings;
+    settings.cmdTimeoutSec = 10;
+    settings.exposeSecrets = false;
+    runner.setSettings(settings);
+
+    QSignalSpy idleSpy(&runner, &PostCmdRunner::idle);
+    QSignalSpy logSpy(&runner, &PostCmdRunner::log);
+    QSignalSpy errorSpy(&runner, &PostCmdRunner::error);
+
+    runner.enqueue(data, { first }, QUrl());
+    runner.enqueue(data, { second }, QUrl());
+    QTRY_VERIFY_WITH_TIMEOUT(runner.isIdle(), 15000);
+    QVERIFY(idleSpy.count() >= 1);
+    QCOMPARE(readFile(marker), QStringLiteral("12"));
+    QCOMPARE(errorSpy.count(), 0);
+
+    QString logs;
+    for (const QList<QVariant> &row : logSpy)
+        logs += row.at(0).toString() + QLatin1Char('\n');
+    QVERIFY2(!logs.contains(data.rarPass), qPrintable(logs));
+    QVERIFY2(logs.contains(QStringLiteral("****")), qPrintable(logs));
+    QVERIFY2(logs.contains(QStringLiteral("bytes omitted")), qPrintable(logs));
+}
+
+void TestPostInfoTemplate::post_command_runner_timeout_and_start_failure()
+{
+    const QString python = pythonExecutable();
+    if (python.isEmpty())
+        QSKIP("Python is required for the cross-platform hook fixture");
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString script = writeRunnerScript(dir);
+    QVERIFY(!script.isEmpty());
+    const QString marker = dir.filePath(QStringLiteral("after-errors.txt"));
+
+    const QString sleeper = QStringLiteral("%1 %2 sleep %3")
+                                .arg(quotedCommandArg(python),
+                                     quotedCommandArg(script),
+                                     quotedCommandArg(marker));
+    const QString after = QStringLiteral("%1 %2 second %3")
+                              .arg(quotedCommandArg(python),
+                                   quotedCommandArg(script),
+                                   quotedCommandArg(marker));
+
+    PostInfoData data = sampleData();
+    data.historyPostId = 4712;
+
+    QNetworkAccessManager network;
+    PostCmdRunner runner(network);
+    PostCmdRunner::Settings settings;
+    settings.cmdTimeoutSec = 1;
+    settings.failIsError = false;
+    runner.setSettings(settings);
+
+    QSignalSpy logSpy(&runner, &PostCmdRunner::log);
+    runner.enqueue(data,
+                   { sleeper,
+                     QStringLiteral("ngpost-command-that-does-not-exist-4712"),
+                     after },
+                   QUrl());
+    QTRY_VERIFY_WITH_TIMEOUT(runner.isIdle(), 10000);
+    QCOMPARE(readFile(marker), QStringLiteral("2"));
+
+    QString logs;
+    for (const QList<QVariant> &row : logSpy)
+        logs += row.at(0).toString() + QLatin1Char('\n');
+    QVERIFY2(logs.contains(QStringLiteral("timed out"), Qt::CaseInsensitive), qPrintable(logs));
+    QVERIFY2(logs.contains(QStringLiteral("could not run"), Qt::CaseInsensitive), qPrintable(logs));
+}
+
+void TestPostInfoTemplate::post_command_runner_snapshots_settings_per_task()
+{
+    const QString python = pythonExecutable();
+    if (python.isEmpty())
+        QSKIP("Python is required for the cross-platform hook fixture");
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString script = writeRunnerScript(dir);
+    QVERIFY(!script.isEmpty());
+    const QString marker = dir.filePath(QStringLiteral("settings-order.txt"));
+
+    auto command = [&](QString const &mode, QString const &extra = QString()) {
+        QString cmd = QStringLiteral("%1 %2 %3 %4")
+                          .arg(quotedCommandArg(python),
+                               quotedCommandArg(script),
+                               mode,
+                               quotedCommandArg(marker));
+        if (!extra.isEmpty())
+            cmd += QLatin1Char(' ') + quotedCommandArg(extra);
+        return cmd;
+    };
+
+    QNetworkAccessManager network;
+    PostCmdRunner runner(network);
+    QSignalSpy logSpy(&runner, &PostCmdRunner::log);
+    QSignalSpy errorSpy(&runner, &PostCmdRunner::error);
+
+    PostInfoData data = sampleData();
+    data.rarPass = QStringLiteral("snapshot-secret-4810");
+
+    // Keep the first task alive while all the following tasks and their
+    // distinct settings are queued.
+    PostCmdRunner::Settings settings;
+    settings.cmdTimeoutSec = 10;
+    runner.setSettings(settings);
+    data.historyPostId = 4809;
+    runner.enqueue(data, { command(QStringLiteral("block")) }, QUrl());
+
+    settings.exposeSecrets = true;
+    settings.failIsError = true;
+    runner.setSettings(settings);
+    data.historyPostId = 4810;
+    runner.enqueue(data,
+                   { command(QStringLiteral("settings"), data.rarPass) },
+                   QUrl());
+
+    settings.cmdTimeoutSec = 1;
+    settings.exposeSecrets = false;
+    settings.failIsError = false;
+    runner.setSettings(settings);
+    data.historyPostId = 4811;
+    runner.enqueue(data, { command(QStringLiteral("sleep_then_write")) }, QUrl());
+
+    settings.cmdTimeoutSec = 10;
+    settings.failIsError = true;
+    runner.setSettings(settings);
+    data.historyPostId = 4812;
+    runner.enqueue(data, { command(QStringLiteral("fail")) }, QUrl());
+
+    // This configuration must affect only tasks queued from now on.
+    settings.cmdTimeoutSec = 0;
+    settings.exposeSecrets = false;
+    settings.failIsError = false;
+    runner.setSettings(settings);
+
+    QTRY_VERIFY_WITH_TIMEOUT(runner.isIdle(), 10000);
+    QCOMPARE(readFile(marker), QStringLiteral("BE"));
+    QCOMPARE(errorSpy.count(), 1);
+    QVERIFY2(errorSpy.at(0).at(0).toString().contains(QStringLiteral("exit code 7")),
+             qPrintable(errorSpy.at(0).at(0).toString()));
+
+    QString logs;
+    for (const QList<QVariant> &row : logSpy)
+        logs += row.at(0).toString() + QLatin1Char('\n');
+    QVERIFY2(logs.contains(QStringLiteral("timed out after 1s"), Qt::CaseInsensitive),
+             qPrintable(logs));
+}
+
+void TestPostInfoTemplate::file_uploader_release_handles_synchronous_abort()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString nzbPath = dir.filePath(QStringLiteral("post.nzb"));
+    QVERIFY(writeFile(nzbPath, QStringLiteral("fixture")));
+
+    SynchronousAbortNetworkManager network;
+    FileUploader uploader(network, nzbPath);
+    // This is the same direct re-entry shape as PostCmdRunner::onUploadDone():
+    // finished -> readyToDie -> release while the original release is in abort.
+    connect(&uploader, &FileUploader::readyToDie,
+            &uploader, &FileUploader::release, Qt::DirectConnection);
+    QSignalSpy readySpy(&uploader, &FileUploader::readyToDie);
+
+    uploader.startUpload(QUrl(QStringLiteral("https://example.invalid/upload")));
+    QVERIFY(network.reply);
+    SynchronousAbortReply *reply = network.reply;
+    uploader.release();
+
+    QCOMPARE(reply->abortCalls, 1);
+    QCOMPARE(readySpy.count(), 0); // release detached finished before aborting
+    QVERIFY(QFile::rename(nzbPath, dir.filePath(QStringLiteral("moved.nzb"))));
 }
 
 QTEST_MAIN(TestPostInfoTemplate)

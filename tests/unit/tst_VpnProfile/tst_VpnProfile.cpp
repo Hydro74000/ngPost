@@ -10,10 +10,13 @@
 #include <QFile>
 #include <QFileDevice>
 #include <QFileInfo>
+#include <QPointer>
 
 #include "nntp/NntpServerParams.h"
 #include "TestEnv.h"
 #include "utils/PathHelper.h"
+#include "vpn/OpenVpnBackend.h"
+#include "vpn/VpnBackend.h"
 #include "vpn/VpnManager.h"
 #include "vpn/VpnProfile.h"
 
@@ -52,6 +55,37 @@ struct TestVpnHelperFile
             QFile::remove(path);
     }
 };
+
+class FakeVpnBackend : public VpnBackend
+{
+public:
+    explicit FakeVpnBackend(QObject *parent = nullptr)
+        : VpnBackend(parent)
+    {}
+
+    bool start(QString const &) override { return true; }
+    void stop() override
+    {
+        ++stopCalls;
+        running = false;
+        emit stopped();
+    }
+    void stopAndWait(int) override
+    {
+        ++stopAndWaitCalls;
+        running = false;
+        // Deliberately synchronous: VpnManager must have disconnected this
+        // signal before calling us or onBackendStopped() will re-enter cleanup.
+        emit stopped();
+    }
+    bool isRunning() const override { return running; }
+
+    void fail(QString const &reason) { emit failed(reason); }
+
+    bool running = true;
+    int stopCalls = 0;
+    int stopAndWaitCalls = 0;
+};
 }
 
 class TestVpnProfile : public QObject
@@ -68,6 +102,8 @@ private slots:
     //! absoluteConfigPath() is "<vpnDir>/<configFileName>". Empty configFile →
     //! empty result (guarded path).
     void absoluteConfigPath_under_vpnDir();
+    //! A profile loaded through -c remains relative to that config folder.
+    void absoluteConfigPath_uses_declaring_config_folder();
     void absoluteConfigPath_empty_when_configFile_empty();
 
     //! backendToString() ↔ backendFromString() round-trip for both backends.
@@ -89,6 +125,19 @@ private slots:
     //! Per-server Use VPN remains fail-closed and logs clear guidance when VPN
     //! setup is incomplete.
     void per_server_useVpn_blocks_and_logs_guidance_when_vpn_incomplete();
+
+    //! Once the service pipe has gone away, the management socket/retry loop
+    //! still means OpenVPN is alive and must be stopped during teardown.
+    void openvpn_windows_activity_includes_management_phase();
+
+    //! A terminal failure detaches the backend before stopping it, and an
+    //! auto-started Wait job is notified even though retainForJob() has not run.
+    void backend_failure_stops_once_and_notifies_waiting_job();
+
+    //! Windows WireGuard profile edits preserve the old service until the new
+    //! one is ready and undo partial transitions on failure. Hooks make the
+    //! service transaction portable and guarantee no UAC in tests.
+    void wireguard_update_service_transaction_rolls_back();
 };
 
 void TestVpnProfile::default_profile_is_invalid()
@@ -126,6 +175,19 @@ void TestVpnProfile::absoluteConfigPath_under_vpnDir()
     const QString abs = p.absoluteConfigPath();
     QCOMPARE(abs, PathHelper::vpnDir() + QStringLiteral("/myprof.ovpn"));
     QVERIFY(abs.startsWith(sandbox.rootPath()));
+}
+
+void TestVpnProfile::absoluteConfigPath_uses_declaring_config_folder()
+{
+    HomeSandbox sandbox;
+    VpnProfile p;
+    p.name = QStringLiteral("Explicit");
+    p.configFileName = QStringLiteral("explicit.ovpn");
+    p.configBaseDir = sandbox.rootPath() + QStringLiteral("/old-config");
+
+    QCOMPARE(p.absoluteConfigPath(),
+             QDir(p.configBaseDir).filePath(QStringLiteral("vpn/explicit.ovpn")));
+    QVERIFY(!p.absoluteConfigPath().startsWith(PathHelper::vpnDir()));
 }
 
 void TestVpnProfile::absoluteConfigPath_empty_when_configFile_empty()
@@ -261,5 +323,132 @@ void TestVpnProfile::per_server_useVpn_blocks_and_logs_guidance_when_vpn_incompl
     QCOMPARE(statusLine, unavailableDetail);
 }
 
-QTEST_APPLESS_MAIN(TestVpnProfile)
+void TestVpnProfile::openvpn_windows_activity_includes_management_phase()
+{
+    QVERIFY(!OpenVpnBackend::windowsActivityForTest(false, false, false));
+    QVERIFY(OpenVpnBackend::windowsActivityForTest(true, false, false));
+    QVERIFY(OpenVpnBackend::windowsActivityForTest(false, true, false));
+    QVERIFY(OpenVpnBackend::windowsActivityForTest(false, false, true));
+}
+
+void TestVpnProfile::backend_failure_stops_once_and_notifies_waiting_job()
+{
+    HomeSandbox sandbox;
+    VpnManager manager;
+    auto *backend = new FakeVpnBackend;
+    QPointer<FakeVpnBackend> guard(backend);
+    manager.setBackendForTest(backend, VpnManager::State::Starting);
+    manager.setAutoStartedByJobForTest(true);
+
+    QSignalSpy unavailableSpy(&manager, &VpnManager::vpnRequiredButUnavailable);
+    backend->fail(QStringLiteral("fixture failure"));
+
+    QCOMPARE(manager.state(), VpnManager::State::Failed);
+    QVERIFY(!manager.hasBackendForTest());
+    QCOMPARE(backend->stopCalls, 0);
+    QCOMPARE(backend->stopAndWaitCalls, 1);
+    QCOMPARE(unavailableSpy.size(), 1);
+    QCOMPARE(unavailableSpy.first().at(0).value<VpnManager::JobBlockReason>(),
+             VpnManager::JobBlockReason::VpnFailed);
+    QCOMPARE(unavailableSpy.first().at(1).toString(), QStringLiteral("fixture failure"));
+    QVERIFY(!manager.isAutoStarted());
+
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QVERIFY(guard.isNull());
+}
+
+void TestVpnProfile::wireguard_update_service_transaction_rolls_back()
+{
+    HomeSandbox sandbox;
+    VpnManager manager;
+
+    VpnProfile oldProfile;
+    oldProfile.name = QStringLiteral("old");
+    oldProfile.backend = VpnManager::Backend::WireGuard;
+    oldProfile.configFileName = QStringLiteral("old.conf");
+    oldProfile.configBaseDir = sandbox.rootPath();
+    manager.setProfilesFromConfig({ oldProfile }, oldProfile.name);
+
+    QStringList actions;
+    manager.setWireGuardServiceHooksForTest(
+        [&](QString const &path) {
+            actions << QStringLiteral("register:") + path;
+            return true;
+        },
+        [&](QString const &service) {
+            actions << QStringLiteral("unregister:") + service;
+            return true;
+        });
+
+    // A display-name-only edit leaves the unchanged WG service alone.
+    VpnProfile renamed = oldProfile;
+    renamed.name = QStringLiteral("renamed");
+    QVERIFY(manager.updateProfile(oldProfile.name, renamed, false));
+    QVERIFY(actions.isEmpty());
+
+    // Replacing the contents behind the same basename requires U -> R.
+    QVERIFY(manager.updateProfile(renamed.name, renamed, true));
+    QCOMPARE(actions,
+             QStringList({ QStringLiteral("unregister:WireGuardTunnel$old"),
+                           QStringLiteral("register:") + renamed.absoluteConfigPath() }));
+
+    // If installing that replacement fails, the old file is restored before
+    // the old service is registered again, and the profile remains untouched.
+    actions.clear();
+    int registerCalls = 0;
+    bool oldContentsRestored = false;
+    bool rollbackRegisterSawOldContents = false;
+    manager.setWireGuardServiceHooksForTest(
+        [&](QString const &path) {
+            actions << QStringLiteral("register:") + path;
+            ++registerCalls;
+            if (registerCalls == 1)
+                return false; // replacement fails
+            rollbackRegisterSawOldContents = oldContentsRestored;
+            return oldContentsRestored;
+        },
+        [&](QString const &service) {
+            actions << QStringLiteral("unregister:") + service;
+            return true;
+        });
+    VpnProfile failedReplacement = renamed;
+    failedReplacement.name = QStringLiteral("must-not-commit");
+    QVERIFY(!manager.updateProfile(
+        renamed.name, failedReplacement, true,
+        [&]() {
+            actions << QStringLiteral("restore-config");
+            oldContentsRestored = true;
+            return true;
+        }));
+    QCOMPARE(manager.profiles().first().name, renamed.name);
+    QVERIFY(rollbackRegisterSawOldContents);
+    QCOMPARE(actions,
+             QStringList({ QStringLiteral("unregister:WireGuardTunnel$old"),
+                           QStringLiteral("register:") + renamed.absoluteConfigPath(),
+                           QStringLiteral("restore-config"),
+                           QStringLiteral("register:") + renamed.absoluteConfigPath() }));
+
+    // With a different basename the safe order is R(new), U(old). If U(old)
+    // fails, U(new) rolls the newly-created service back.
+    actions.clear();
+    VpnProfile moved = renamed;
+    moved.configFileName = QStringLiteral("new.conf");
+    manager.setWireGuardServiceHooksForTest(
+        [&](QString const &path) {
+            actions << QStringLiteral("register:") + path;
+            return true;
+        },
+        [&](QString const &service) {
+            actions << QStringLiteral("unregister:") + service;
+            return service != QStringLiteral("WireGuardTunnel$old");
+        });
+    QVERIFY(!manager.updateProfile(renamed.name, moved, true));
+    QCOMPARE(manager.profiles().first().configFileName, renamed.configFileName);
+    QCOMPARE(actions,
+             QStringList({ QStringLiteral("register:") + moved.absoluteConfigPath(),
+                           QStringLiteral("unregister:WireGuardTunnel$old"),
+                           QStringLiteral("unregister:WireGuardTunnel$new") }));
+}
+
+QTEST_GUILESS_MAIN(TestVpnProfile)
 #include "tst_VpnProfile.moc"

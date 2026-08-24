@@ -15,6 +15,8 @@
 #include <QObject>
 #include <QString>
 
+#include <functional>
+
 class QTimer;
 class VpnBackend;
 struct NntpServerParams;
@@ -91,7 +93,10 @@ public:
     bool addProfile(VpnProfile const &p);
     //! Update an existing profile by name. The profile's `name` may change;
     //! `oldName` identifies the entry to replace.
-    bool updateProfile(QString const &oldName, VpnProfile const &p);
+    using ConfigRollback = std::function<bool()>;
+    bool updateProfile(QString const &oldName, VpnProfile const &p,
+                       bool configFileChanged = true,
+                       ConfigRollback restorePreviousConfig = {});
     //! Remove a profile by name. Also deletes its config file from
     //! <configDir>/vpn/ and removes credentials from the keychain.
     bool removeProfile(QString const &name);
@@ -154,7 +159,7 @@ public:
     //! prompt) if the helper isn't installed.
     void runStartupCleanup();
 
-#ifdef Q_OS_WIN
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
     //! Windows-only: register a WireGuard tunnel as a service via the
     //! bundled install-wg-tunnel.ps1 (UAC prompted, runs once at profile
     //! creation). Returns true on success.
@@ -162,6 +167,19 @@ public:
 
     //! Symmetric uninstall.
     bool unregisterWindowsWireGuardTunnel(QString const &serviceName);
+#endif
+
+#ifdef NGPOST_TESTING
+    //! Narrow dependency injection used by the portable profile-transaction
+    //! tests. On Windows it also guarantees that tests never trigger UAC.
+    using WireGuardServiceHook = std::function<bool(QString const &)>;
+    void setWireGuardServiceHooksForTest(WireGuardServiceHook registerHook,
+                                         WireGuardServiceHook unregisterHook);
+    //! Install a fake backend and the state needed to exercise terminal-signal
+    //! cleanup without launching a helper or a Windows service.
+    void setBackendForTest(VpnBackend *backend, State state = State::Starting);
+    bool hasBackendForTest() const { return _currentBackend != nullptr; }
+    void setAutoStartedByJobForTest(bool value) { _autoStartedByJob = value; }
 #endif
 
     //! VPN orchestration.
@@ -236,6 +254,9 @@ private:
     void _setState(State s);
     void _instantiateBackend();
     void _destroyBackend();
+    //! Detach all terminal signals before stopping so a synchronous `stopped`
+    //! cannot re-enter VpnManager and destroy the same backend twice.
+    void _stopAndDestroyBackend();
     //! Zero out + delete the short-lived auth-user-pass file we wrote for
     //! the current openvpn invocation, if any.
     void _shredRuntimeAuthFile();
@@ -251,6 +272,8 @@ private:
     QString      _tunIface;
     QHostAddress _dnsServer;
     VpnBackend  *_currentBackend;
+    bool         _backendStartInProgress;
+    bool         _backendFailedDuringStart;
 
     // Pending-ready bookkeeping while the reported tunnel IP becomes usable.
     QTimer      *_tunPollTimer;
@@ -270,6 +293,11 @@ private:
     bool    _autoStartedByJob;
     int     _activeJobsNeedingVpn; //!< how many jobs hold the tunnel open
     QTimer *_autoDisconnectTimer;
+
+#ifdef NGPOST_TESTING
+    WireGuardServiceHook _testRegisterWireGuardService;
+    WireGuardServiceHook _testUnregisterWireGuardService;
+#endif
 
     static VpnManager *sInstance;
 };

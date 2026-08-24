@@ -38,6 +38,7 @@
 #include <QMutex>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QTemporaryFile>
 #include <QThread>
 #include <algorithm>
 #include <cmath>
@@ -190,6 +191,9 @@ PostingJob::PostingJob(NgPost *ngPost,
     : QObject(parent)
     , _ngPost(ngPost)
     , _options(options)
+    , _articleSizeBytes(options.articleSizeBytes > 0
+                            ? options.articleSizeBytes
+                            : (options.resumeHistoryPostId == 0 ? ngPost->articleSize() : 0))
     , _files(options.files)
     , _postWidget(postWidget)
     ,
@@ -348,13 +352,8 @@ PostingJob::PostingJob(NgPost *ngPost,
 
     if (_ngPost->_ensureHistoryStore()) {
         PostHistoryService *history = _ngPost->historyService();
-        if (_resumeFromHistory) {
-            QString err;
-            if ((!history || !history->markPostResuming(_historyPostId, &err))
-                && _ngPost->debugMode())
-                _error(tr("History: could not mark post as resuming: %1").arg(err));
+        if (_resumeFromHistory)
             return;
-        }
 
         PostHistoryStore::PostRecord rec;
         rec.nzbName = _nzbName;
@@ -386,6 +385,7 @@ PostingJob::PostingJob(NgPost *ngPost,
         // them: the archive does not exist yet, and nothing has been sent.
         PostHistoryStore::PostInfo info;
         info.par2Pct      = _options.describedPar2Pct();
+        info.articleSizeBytes = _articleSizeBytes;
         info.sourcePath   = _options.inputPaths.isEmpty() ? QString() : _options.inputPaths.first();
         info.originalName = info.sourcePath.isEmpty() ? QString()
                                                       : QFileInfo(info.sourcePath).fileName();
@@ -483,8 +483,8 @@ qint64 PostingJob::registerHistoryFile(int ordinal, const QFileInfo &file, NntpF
             _resumeFileStatesByPath.value(file.absoluteFilePath());
         if (state.historyFileId)
             return state.historyFileId;
-        if (_ngPost->debugMode())
-            _error(tr("History: missing resume state for file %1").arg(file.absoluteFilePath()));
+        _historyDataUnreliable = true;
+        _warn(tr("History: missing resume state for file %1").arg(file.absoluteFilePath()));
         return 0;
     }
 
@@ -500,8 +500,10 @@ qint64 PostingJob::registerHistoryFile(int ordinal, const QFileInfo &file, NntpF
     rec.status = QStringLiteral("pending");
     QString err;
     const qint64 id = history->upsertFile(rec, &err);
-    if (!id && _ngPost->debugMode())
-        _error(tr("History: could not create file record: %1").arg(err));
+    if (!id) {
+        _historyDataUnreliable = true;
+        _warn(tr("History: could not create file record: %1").arg(err));
+    }
     return id;
 }
 
@@ -631,7 +633,7 @@ void PostingJob::onStartPosting(bool isActiveJob)
         _log("[PostingJob::onStartPosting] Starting compression...");
 #endif
         if (!startCompressFiles(_rarPath, _tmpPath, _rarName, _rarPass, _rarSize))
-            emit postingFinished();
+            _abortBeforeTransfer();
     } else if (_doPar2) {
 #ifdef __USE_TMP_RAM__
         if (_ngPost->useTmpRam()) {
@@ -654,7 +656,7 @@ void PostingJob::onStartPosting(bool isActiveJob)
         }
 #endif
         if (!startGenPar2(_tmpPath, _rarName, _par2Pct))
-            emit postingFinished();
+            _abortBeforeTransfer();
     } else {
         _packed = true;
         _postFiles();
@@ -744,7 +746,7 @@ void PostingJob::_postFiles()
     }
 
     if (!_initPosting()) {
-        emit postingFinished();
+        _abortBeforeTransfer(_resumeFromHistory);
         return;
     }
 
@@ -756,13 +758,13 @@ void PostingJob::_postFiles()
         nbPosters = 1;
     if (!nbCon) {
         _error(tr("Error: there are no NntpConnection..."));
-        emit postingFinished();
+        _abortBeforeTransfer(_resumeFromHistory);
         return;
     }
 
     if (!_nzb->open(QIODevice::WriteOnly)) {
         _error(tr("Error: Can't create nzb output file: %1").arg(_nzbFilePath));
-        emit postingFinished();
+        _abortBeforeTransfer(_resumeFromHistory);
         return;
     } else {
         QString tab = _ngPost->space();
@@ -800,7 +802,22 @@ void PostingJob::_postFiles()
     _startedAtWall = QDateTime::currentDateTime();
     if (_historyPostId && _ngPost->historyService()) {
         QString err;
-        _ngPost->historyService()->markPostStarted(_historyPostId, &err);
+        // Only now is the retry genuinely running: source validation,
+        // connections and NZB creation all succeeded. Until this point a
+        // refused resume leaves the previous terminal row exactly as it was.
+        if (_resumeFromHistory
+            && !_ngPost->historyService()->markPostResuming(_historyPostId, &err)) {
+            _historyDataUnreliable = true;
+            _warn(tr("History: could not mark post %1 as resuming: %2")
+                      .arg(_historyPostId)
+                      .arg(err));
+        }
+        if (!_ngPost->historyService()->markPostStarted(_historyPostId, &err)) {
+            _historyDataUnreliable = true;
+            _warn(tr("History: could not record the start of post %1: %2")
+                      .arg(_historyPostId)
+                      .arg(err));
+        }
     }
 
     //    QMutexLocker lock(&_secureArticles); // start the connections but they must wait _prepareArticles
@@ -1108,41 +1125,43 @@ void PostingJob::_delOriginalFiles()
 NntpArticle *PostingJob::_readNextArticleIntoBufferPtr(const QString &threadName, char **bufferPtr)
 {
     //qDebug() << "[PostingJob::readNextArticleIntoBufferPtr] " << threadName;
-    if (!_nntpFile) {
-        _nntpFile = _getNextFile();
+    for (;;) {
         if (!_nntpFile) {
-            _noMoreFiles = 0x1;
+            _nntpFile = _getNextFile();
+            if (!_nntpFile) {
+                _noMoreFiles = 0x1;
 #ifdef __DEBUG__
-            _log(tr("[%1] No more file to post...").arg(threadName));
+                _log(tr("[%1] No more file to post...").arg(threadName));
 #endif
-            return nullptr;
+                return nullptr;
+            }
         }
-    }
 
-    if (!_file) {
-        _file = new QFile(_nntpFile->path());
-        if (_file->open(QIODevice::ReadOnly)) {
-            if (_ngPost->debugFull())
-                _log(tr("[%1] starting processing file %2").arg(threadName).arg(_nntpFile->path()));
-            _part = 0;
-        } else {
-            if (_ngPost->debugMode())
-                _error(
-                    tr("[%1] Error: couldn't open file %2").arg(threadName).arg(_nntpFile->path()));
-            else
-                _error(tr("Error: couldn't open file %1").arg(_nntpFile->path()));
-            emit _nntpFile->errorReadingFile();
-            delete _file;
-            _file = nullptr;
-            _nntpFile = nullptr;
-            return _readNextArticleIntoBufferPtr(threadName,
-                                                 bufferPtr); // Check if we have more files
+        if (!_file) {
+            _file = new QFile(_nntpFile->path());
+            if (_file->open(QIODevice::ReadOnly)) {
+                if (_ngPost->debugFull())
+                    _log(tr("[%1] starting processing file %2")
+                             .arg(threadName)
+                             .arg(_nntpFile->path()));
+                _part = 0;
+            } else {
+                if (_ngPost->debugMode())
+                    _error(tr("[%1] Error: couldn't open file %2")
+                               .arg(threadName)
+                               .arg(_nntpFile->path()));
+                else
+                    _error(tr("Error: couldn't open file %1").arg(_nntpFile->path()));
+                emit _nntpFile->errorReadingFile();
+                delete _file;
+                _file = nullptr;
+                _nntpFile = nullptr;
+                continue; // Check whether another file is available.
+            }
         }
-    }
 
-    if (_file) {
         qint64 pos = _file->pos();
-        qint64 bytesRead = _file->read(*bufferPtr, _ngPost->articleSize());
+        qint64 bytesRead = _file->read(*bufferPtr, _articleSizeBytes);
         if (bytesRead > 0) {
             (*bufferPtr)[bytesRead] = '\0';
             if (_ngPost->debugFull())
@@ -1158,7 +1177,10 @@ NntpArticle *PostingJob::_readNextArticleIntoBufferPtr(const QString &threadName
                              .arg(threadName)
                              .arg(_part)
                              .arg(_nntpFile->path()));
-                return _readNextArticleIntoBufferPtr(threadName, bufferPtr);
+                // A large interrupted post can contain hundreds of thousands
+                // of consecutive completed parts. Iteration keeps that normal
+                // resume path at constant stack depth.
+                continue;
             }
             NntpArticle *article = new NntpArticle(_nntpFile,
                                                    _part,
@@ -1177,13 +1199,31 @@ NntpArticle *PostingJob::_readNextArticleIntoBufferPtr(const QString &threadName
             _nntpFile = nullptr;
         }
     }
-
-    return _readNextArticleIntoBufferPtr(threadName,
-                                         bufferPtr); // if we didn't have an Article, check next file
 }
 
 bool PostingJob::_initPosting()
 {
+    // A resume without a proven original boundary must never silently fall
+    // back to the current global ARTICLE_SIZE: that would re-number parts and
+    // combine already-posted and new segments into a corrupt NZB.
+    if (_articleSizeBytes <= 0) {
+        if (_resumeFromHistory) {
+            _error(tr("Resume aborted: the original article size is missing or inconsistent in "
+                      "history. Nothing was posted because resuming with another size would "
+                      "corrupt the post."));
+        } else {
+            _error(tr("Posting aborted: ARTICLE_SIZE must be a positive integer."));
+        }
+        return false;
+    }
+
+    if (_resumeFromHistory && _options.resumePasswordUnavailable) {
+        _error(tr("Resume aborted: this post advertised an archive password, but it was not "
+                  "stored and could not be recovered from the existing NZB. Nothing was posted "
+                  "because the consolidated NZB would lose the password."));
+        return false;
+    }
+
     // initialize buffer and nzb file
     if (!_overwriteNzb) {
         QFileInfo fi(_nzbFilePath);
@@ -1201,7 +1241,17 @@ bool PostingJob::_initPosting()
             _nzbFilePath = fi.absoluteFilePath();
         }
     }
-    _nzb = new QFile(_nzbFilePath);
+    if (_resumeFromHistory) {
+        // Never truncate the last usable NZB before the consolidated history
+        // rewrite has succeeded. The streamed retry contains only the missing
+        // files, so it is diagnostic scratch data, not a deliverable NZB.
+        auto *scratch = new QTemporaryFile(
+            QFileInfo(_nzbFilePath).absoluteDir().filePath(QStringLiteral(".ngpost-resume-XXXXXX.nzb")));
+        scratch->setAutoRemove(true);
+        _nzb = scratch;
+    } else {
+        _nzb = new QFile(_nzbFilePath);
+    }
 
     // A resumed job can wait a long time in the queue after its plan was built,
     // so the sources are checked again here, right before being read. Posting
@@ -1223,7 +1273,6 @@ bool PostingJob::_initPosting()
             _error(tr("Resume aborted: %1 changed or disappeared since the post was "
                       "interrupted. Nothing was posted; restore the file and resume again.")
                        .arg(changed.join(QStringLiteral(", "))));
-            _markResumeAbortedAsResumable();
             return false;
         }
     }
@@ -1248,20 +1297,24 @@ bool PostingJob::_initPosting()
         // The nzb may just have been renamed to <name>_1.nzb, after the history
         // row was created with the original path.
         if (_nzbFilePath != _options.nzbFilePath
-            && !history->updatePostNzbPath(_historyPostId, _nzbFilePath, &err))
+            && !history->updatePostNzbPath(_historyPostId, _nzbFilePath, &err)) {
+            _historyDataUnreliable = true;
             _warn(tr("History: could not update the nzb path of post %1: %2")
                       .arg(_historyPostId)
                       .arg(err));
+        }
         // Only the first attempt knows the size of the whole post. A resume
         // sees the leftovers only, and would record them as the whole size if
         // the first attempt never got to write it.
         if (!_resumeFromHistory
             && !history->setPostSizeIfUnset(_historyPostId,
                                             static_cast<qint64>(_postSizeBytes),
-                                            &err))
+                                            &err)) {
+            _historyDataUnreliable = true;
             _warn(tr("History: could not record the size of post %1: %2")
                       .arg(_historyPostId)
                       .arg(err));
+        }
     }
 
     // initialize the NntpFiles (active objects)
@@ -1324,22 +1377,16 @@ bool PostingJob::_initPosting()
     return true;
 }
 
-//! A resume that we refuse to start must not stay flagged as running: put the
-//! post back where it was so the user can retry once the source is restored.
-void PostingJob::_markResumeAbortedAsResumable()
+void PostingJob::_abortBeforeTransfer(bool keepResumeResumable)
 {
-    if (!_historyPostId || !_ngPost->historyService())
-        return;
-    QString err;
-    if (!_ngPost->historyService()->updatePostStatus(_historyPostId,
-                                                     QStringLiteral("partial"),
-                                                     0, 0, 0, 0,
-                                                     QString(),
-                                                     &err)
-        && _ngPost->debugMode())
-        _error(tr("History: could not flag post %1 as resumable again: %2")
-                   .arg(_historyPostId)
-                   .arg(err));
+    // Constructor-time history rows used to remain in status='posting' when
+    // compression, PAR2, connection creation or NZB opening failed. Finalize
+    // those jobs just like a transfer failure. A resume is the exception: its
+    // original terminal row has not yet been marked as running and must not be
+    // overwritten as a brand-new failure.
+    if (!keepResumeResumable)
+        _finishPosting();
+    emit postingFinished();
 }
 
 void PostingJob::_finishPosting()
@@ -1354,9 +1401,19 @@ void PostingJob::_finishPosting()
         return;
     _finishedAtWall = QDateTime::currentDateTime();
 
+    // A job may be stopped while still paused. resume() normally accounts for
+    // the pause, but in that terminal path it is never called again; without
+    // this, the exported active duration and average speed include the whole
+    // final pause.
+    if (_isPaused && _pauseTimer.isValid()) {
+        _pauseDuration += _pauseTimer.elapsed();
+        _pauseTimer.invalidate();
+        _isPaused = false;
+    }
+
     _stopPosting = 0x1;
 
-    if (_timeStart.isValid() && _postFinished) {
+    if (_timeStart.isValid() && _postFinished && _filesFailed.isEmpty()) {
         _nbArticlesUploaded = _nbArticlesTotal; // we might not have processed the last onArticlePosted
         _uploadedSize = _totalSize;
     }
@@ -1405,6 +1462,7 @@ void PostingJob::_finishPosting()
                                                      avgSpeed(),
                                                      activeSeconds,
                                                      &err)) {
+            _historyDataUnreliable = true;
             // The post itself went out; say so rather than fail the run, but
             // say it: the history is what resume and the record sheets read.
             _warn(tr("History: could not record the outcome of post %1: %2")
@@ -1465,25 +1523,47 @@ void PostingJob::_closeNzb()
         if (_nzb->isOpen()) {
             _nzbStream << "</nzb>\n";
             _nzb->close();
-            if (_historyPostId && _ngPost->historyService()) {
+            bool nzbReady = !(_resumeFromHistory && _historyDataUnreliable);
+            if (!nzbReady)
+                _error(tr("Could not consolidate the resumed NZB because its history is incomplete; "
+                          "the previous NZB was left untouched."));
+            if (_historyPostId && _ngPost->historyService()
+                && !_historyDataUnreliable) {
                 QStringList warnings;
                 QString err;
+                const QString livePassword =
+                    _rarPass.isEmpty() ? _options.declaredPassword : _rarPass;
                 if (!_ngPost->historyService()->regenerateNzbToFile(
-                        _historyPostId, _nzbFilePath, true, &warnings, &err))
+                        _historyPostId,
+                        _nzbFilePath,
+                        true,
+                        &warnings,
+                        &err,
+                        livePassword)) {
                     _error(tr("Could not regenerate final NZB from history: %1").arg(err));
+                    // A fresh post still has its complete streamed NZB. A
+                    // resume deliberately streamed only to a scratch file and
+                    // therefore has no new deliverable until consolidation
+                    // succeeds.
+                    if (_resumeFromHistory)
+                        nzbReady = false;
+                }
                 for (const QString &warning : warnings)
                     _error(tr("NZB history warning: %1").arg(warning));
             }
             // Consolidated once, then used by both the post info file and the
             // post commands: they must describe the same post, and for a
             // resume that means the whole post, not the leftovers.
+            bool postInfoReady = nzbReady;
             if (_ngPost->needsPostInfoData(_options))
-                _buildFinalPostInfoData();
+                postInfoReady = postInfoReady && _buildFinalPostInfoData();
             // Written before the post commands so a script can pick it up with
             // __postInfoPath__, and only when an nzb exists: a post info file
             // without its nzb would describe nothing.
-            _writePostInfoFile();
-            _ngPost->doNzbPostCMD(this);
+            if (postInfoReady) {
+                _writePostInfoFile();
+                _ngPost->doNzbPostCMD(this);
+            }
         }
         delete _nzb;
         _nzb = nullptr;
@@ -1565,7 +1645,7 @@ bool PostingJob::_buildFinalPostInfoData()
     // view of the whole post. The live job stays authoritative for the final
     // nzb path and for a password that HISTORY_STORE_PASSWORDS chose not to
     // keep.
-    if (_historyPostId && _ngPost->historyService()) {
+    if (_historyPostId && _ngPost->historyService() && !_historyDataUnreliable) {
         PostHistoryStore::PostInfoRecord record;
         QString err;
         if (_ngPost->historyService()->loadPostInfoRecord(_historyPostId, &record, &err)) {
@@ -1574,9 +1654,18 @@ bool PostingJob::_buildFinalPostInfoData()
             fromHistory.nzbDir          = data.nzbDir;
             fromHistory.nzbName         = data.nzbName;
             fromHistory.nzbFileName     = data.nzbFileName;
-            fromHistory.originalPath    = data.originalPath;
-            fromHistory.legacySizeBytes = data.legacySizeBytes;
-            fromHistory.inputPaths      = data.inputPaths;
+            // A resumed job only sees the remaining upload files; its live
+            // originalDirectory therefore describes the retry, not the post.
+            // Keep the original path reconstructed from the post_info row.
+            if (!_resumeFromHistory) {
+                fromHistory.originalPath = data.originalPath;
+                // A fresh job still owns the raw inputs and the historical
+                // meaning of __sizeInByte__. A resumed job only owns the
+                // remaining files, so replacing either value there would turn
+                // the consolidated description back into a retry-only view.
+                fromHistory.legacySizeBytes = data.legacySizeBytes;
+                fromHistory.inputPaths      = data.inputPaths;
+            }
             if (fromHistory.rarPass.isEmpty())
                 fromHistory.rarPass = data.rarPass;
             if (fromHistory.meta.isEmpty())
@@ -1595,6 +1684,13 @@ bool PostingJob::_buildFinalPostInfoData()
                      "post knows.")
                       .arg(err));
         }
+    } else if (_historyDataUnreliable && _resumeFromHistory) {
+        // The live resume contains only the remaining files. If persistence of
+        // its final counters failed, neither that view nor the pre-resume
+        // snapshot can honestly describe the completed whole post.
+        _warn(tr("Post info: the resumed post could not be finalized in history; no automatic "
+                 "post info file or post-command data will be produced."));
+        return false;
     }
 
     _finalPostInfoData      = data;
@@ -1654,11 +1750,18 @@ void PostingJob::_writePostInfoFile()
 QStringList PostingJob::_protectedPaths() const
 {
     QStringList paths = _options.inputPaths;
+    for (const QFileInfo &file : _files)
+        paths << file.absoluteFilePath();
     if (_resumeFromHistory) {
         for (auto it = _resumeFileStatesByPath.cbegin(); it != _resumeFileStatesByPath.cend(); ++it)
             paths << it.key();
     }
     paths << _nzbFilePath;
+    if (!_ngPost->_postDbFile.isEmpty())
+        paths << _ngPost->_postDbFile << (_ngPost->_postDbFile + QStringLiteral("-wal"))
+              << (_ngPost->_postDbFile + QStringLiteral("-shm"));
+    if (!_ngPost->_postHistoryFile.isEmpty())
+        paths << _ngPost->_postHistoryFile;
     paths.removeAll(QString());
     paths.removeDuplicates();
     return paths;
@@ -1698,7 +1801,7 @@ void PostingJob::_printStats() const
                 msgEnd += ts;
             msgEnd += tr("file: %1, rar name: %2").arg(_nzbName).arg(_rarName);
             if (!_rarPass.isEmpty())
-                msgEnd += tr(", rar pass: %1").arg(_rarPass);
+                msgEnd += tr(", archive password: ***");
         }
         if (!_ngPost->_urlNzbUpload)
             msgEnd += "\n";
@@ -1889,7 +1992,7 @@ void PostingJob::onCompressionFinished(int exitCode)
     if (exitCode != 0) {
         _error(tr("Error during compression: %1").arg(exitCode));
         _cleanCompressDir();
-        emit postingFinished();
+        _abortBeforeTransfer();
     } else {
         if (_doPar2) {
             disconnect(_extProc,
@@ -1899,7 +2002,7 @@ void PostingJob::onCompressionFinished(int exitCode)
                        &PostingJob::onCompressionFinished);
             if (!startGenPar2(_tmpPath, _rarName, _par2Pct)) {
                 _cleanCompressDir();
-                emit postingFinished();
+                _abortBeforeTransfer();
             }
         } else {
             _packed = true;
@@ -2039,7 +2142,7 @@ void PostingJob::onGenPar2Finished(int exitCode)
     if (exitCode != 0) {
         _error(tr("Error during par2 generation: %1").arg(exitCode));
         _cleanCompressDir();
-        emit postingFinished();
+        _abortBeforeTransfer();
     } else {
         _packed = true;
         if (this == _ngPost->_activeJob)

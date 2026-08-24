@@ -36,6 +36,11 @@
 #include <QTimer>
 
 #include <qt6keychain/keychain.h>
+
+#ifdef NGPOST_TESTING
+#include <utility>
+#endif
+
 using QKeychain::ReadPasswordJob;
 using QKeychain::WritePasswordJob;
 using QKeychain::DeletePasswordJob;
@@ -55,6 +60,8 @@ VpnManager::VpnManager(QObject *parent)
     , _tunIface()
     , _dnsServer()
     , _currentBackend(nullptr)
+    , _backendStartInProgress(false)
+    , _backendFailedDuringStart(false)
     , _tunPollTimer(new QTimer(this))
     , _tunPollAttempts(0)
     , _profiles()
@@ -182,12 +189,86 @@ bool VpnManager::addProfile(VpnProfile const &p)
     return true;
 }
 
-bool VpnManager::updateProfile(QString const &oldName, VpnProfile const &p)
+bool VpnManager::updateProfile(QString const &oldName, VpnProfile const &p,
+                               bool configFileChanged,
+                               ConfigRollback restorePreviousConfig)
 {
     int idx = findProfileIndex(oldName);
     if (idx < 0 || !p.isValid()) return false;
     // If renaming, ensure the new name doesn't collide with another profile.
     if (p.name != oldName && findProfileIndex(p.name) >= 0) return false;
+
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
+    VpnProfile const oldProfile = _profiles.at(idx);
+    bool const oldWireGuard = oldProfile.backend == Backend::WireGuard;
+    bool const newWireGuard = p.backend == Backend::WireGuard;
+    QString const oldConfig = oldProfile.absoluteConfigPath();
+    QString const newConfig = p.absoluteConfigPath();
+    QString const oldService = WireGuardBackend::serviceNameFromConfig(oldConfig);
+    QString const newService = WireGuardBackend::serviceNameFromConfig(newConfig);
+    bool const sameService = oldService.compare(newService, Qt::CaseInsensitive) == 0;
+    bool const sameConfig = oldConfig.compare(newConfig, Qt::CaseInsensitive) == 0;
+    bool const refreshWireGuard = oldWireGuard != newWireGuard
+        || (oldWireGuard && newWireGuard
+            && (configFileChanged || !sameService || !sameConfig));
+
+    // Re-registering a running service would stop the tunnel behind the
+    // manager's back while it still reports Connected. Make the user stop it
+    // explicitly; the profile file transaction in the dialog will roll back.
+    if (refreshWireGuard && _activeProfileName == oldName
+        && (_state == State::Starting || _state == State::Connected
+            || _state == State::Stopping)) {
+        emit logLine(tr("Disconnect the active VPN before changing its WireGuard configuration."));
+        return false;
+    }
+
+    if (oldWireGuard && newWireGuard && refreshWireGuard) {
+        if (sameService) {
+            // SCM cannot hold two services with the same name. Remove the old
+            // registration first. If installing its replacement fails and both
+            // registrations refer to the same overwritten file, restore that
+            // file *before* asking WireGuard to recreate the old service.
+            if (!unregisterWindowsWireGuardTunnel(oldService))
+                return false;
+            if (!registerWindowsWireGuardTunnel(newConfig)) {
+                bool oldConfigAvailable = true;
+                if (configFileChanged && sameConfig) {
+                    oldConfigAvailable = restorePreviousConfig
+                        && restorePreviousConfig();
+                    if (!oldConfigAvailable)
+                        emit logLine(tr("Could not restore the previous WireGuard "
+                                        "configuration before recreating %1.")
+                                         .arg(oldService));
+                }
+                if (oldConfigAvailable
+                    && !registerWindowsWireGuardTunnel(oldConfig))
+                    emit logLine(tr("WireGuard service rollback failed for %1.").arg(oldService));
+                return false;
+            }
+        } else {
+            // Preserve the old working service until its replacement exists.
+            if (!registerWindowsWireGuardTunnel(newConfig))
+                return false;
+            if (!unregisterWindowsWireGuardTunnel(oldService)) {
+                if (!unregisterWindowsWireGuardTunnel(newService))
+                    emit logLine(tr("Could not remove the replacement WireGuard service %1 "
+                                    "after the old service failed to uninstall.")
+                                     .arg(newService));
+                return false;
+            }
+        }
+    } else if (!oldWireGuard && newWireGuard) {
+        if (!registerWindowsWireGuardTunnel(newConfig))
+            return false;
+    } else if (oldWireGuard && !newWireGuard) {
+        if (!unregisterWindowsWireGuardTunnel(oldService))
+            return false;
+    }
+#else
+    Q_UNUSED(configFileChanged);
+    Q_UNUSED(restorePreviousConfig);
+#endif
+
     _profiles[idx] = p;
     if (_activeProfileName == oldName)
         _activeProfileName = p.name;
@@ -257,6 +338,7 @@ VpnManager::~VpnManager()
         delete _currentBackend;
         _currentBackend = nullptr;
     }
+    _shredRuntimeAuthFile();
     if (sInstance == this)
         sInstance = nullptr;
 }
@@ -312,6 +394,7 @@ QString writeAuthFile(QString const &user, QString const &pass)
 
 bool VpnManager::start()
 {
+    _backendFailedDuringStart = false;
     if (_state == State::Starting || _state == State::Connected)
         return true;
 
@@ -367,9 +450,12 @@ bool VpnManager::start()
     if (!authFilePath.isEmpty())
         packed += QChar(QChar::Null) + authFilePath;
 
-    if (!_currentBackend->start(packed)) {
+    _backendStartInProgress = true;
+    bool const started = _currentBackend->start(packed);
+    _backendStartInProgress = false;
+    if (!started || _backendFailedDuringStart) {
         _setState(State::Failed);
-        _destroyBackend();
+        _stopAndDestroyBackend();
         _shredRuntimeAuthFile();
         return false;
     }
@@ -504,15 +590,25 @@ void VpnManager::onBackendFailed(QString const &reason)
     _tunIface.clear();
     _dnsServer = QHostAddress();
     _setState(State::Failed);
-    _destroyBackend();
+
+    // A backend is allowed to reject start() synchronously. Stopping it from
+    // inside its own start() stack can invalidate members that start() still
+    // has to clean up. Remember the failure and let start() perform the common
+    // cleanup immediately after the backend call returns.
+    if (_backendStartInProgress)
+        _backendFailedDuringStart = true;
+    else
+        _stopAndDestroyBackend();
     _shredRuntimeAuthFile();
 
-    // If a job was waiting on us, surface the failure so the GUI can popup.
-    if (_activeJobsNeedingVpn > 0) {
+    // A job waiting for an auto-started tunnel has not reached retainForJob()
+    // yet. _autoStartedByJob is therefore as important as the active count.
+    bool const waitingJob = _autoStartedByJob || _activeJobsNeedingVpn > 0;
+    if (waitingJob)
         emit vpnRequiredButUnavailable(JobBlockReason::VpnFailed, reason);
-        _activeJobsNeedingVpn = 0;
-        _autoStartedByJob = false;
-    }
+    _activeJobsNeedingVpn = 0;
+    _autoStartedByJob = false;
+    _cancelAutoDisconnect();
 }
 
 void VpnManager::onBackendStopped()
@@ -581,6 +677,23 @@ void VpnManager::_destroyBackend()
         _currentBackend->deleteLater();
         _currentBackend = nullptr;
     }
+}
+
+void VpnManager::_stopAndDestroyBackend()
+{
+    VpnBackend *backend = _currentBackend;
+    if (!backend)
+        return;
+
+    // Clear the manager pointer first and detach every backend -> manager
+    // connection before stopAndWait(). Windows WireGuard emits stopped()
+    // synchronously, and OpenVPN may do so while waitForDisconnected() runs.
+    // Neither is then able to re-enter onBackendStopped() and destroy twice.
+    _currentBackend = nullptr;
+    QObject::disconnect(backend, nullptr, this, nullptr);
+    if (backend->isRunning())
+        backend->stopAndWait(5000);
+    backend->deleteLater();
 }
 
 QString VpnManager::backendToString(Backend b)
@@ -908,6 +1021,10 @@ int runElevatedPowerShell(QString const &script, QStringList const &args)
 
 bool VpnManager::registerWindowsWireGuardTunnel(QString const &confAbsPath)
 {
+#ifdef NGPOST_TESTING
+    if (_testRegisterWireGuardService)
+        return _testRegisterWireGuardService(confAbsPath);
+#endif
     QString script = findWinScript(QStringLiteral("install-wg-tunnel.ps1"));
     if (script.isEmpty()) {
         emit logLine(tr("install-wg-tunnel.ps1 not found in app bundle"));
@@ -927,6 +1044,10 @@ bool VpnManager::registerWindowsWireGuardTunnel(QString const &confAbsPath)
 
 bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
 {
+#ifdef NGPOST_TESTING
+    if (_testUnregisterWireGuardService)
+        return _testUnregisterWireGuardService(serviceName);
+#endif
     QString script = findWinScript(QStringLiteral("uninstall-wg-tunnel.ps1"));
     if (script.isEmpty()) {
         emit logLine(tr("uninstall-wg-tunnel.ps1 not found in app bundle"));
@@ -943,8 +1064,50 @@ bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
 }
 #endif // Q_OS_WIN
 
+#if defined(NGPOST_TESTING) && !defined(Q_OS_WIN)
+bool VpnManager::registerWindowsWireGuardTunnel(QString const &confAbsPath)
+{
+    return !_testRegisterWireGuardService || _testRegisterWireGuardService(confAbsPath);
+}
+
+bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
+{
+    return !_testUnregisterWireGuardService || _testUnregisterWireGuardService(serviceName);
+}
+#endif
+
+#ifdef NGPOST_TESTING
+void VpnManager::setWireGuardServiceHooksForTest(WireGuardServiceHook registerHook,
+                                                 WireGuardServiceHook unregisterHook)
+{
+    _testRegisterWireGuardService = std::move(registerHook);
+    _testUnregisterWireGuardService = std::move(unregisterHook);
+}
+
+void VpnManager::setBackendForTest(VpnBackend *backend, State state)
+{
+    _stopAndDestroyBackend();
+    _currentBackend = backend;
+    if (_currentBackend) {
+        _currentBackend->setParent(this);
+        connect(_currentBackend, &VpnBackend::ready, this, &VpnManager::onBackendReady);
+        connect(_currentBackend, &VpnBackend::failed, this, &VpnManager::onBackendFailed);
+        connect(_currentBackend, &VpnBackend::stopped, this, &VpnManager::onBackendStopped);
+        connect(_currentBackend, &VpnBackend::logLine, this, &VpnManager::logLine);
+        connect(_currentBackend, &VpnBackend::statusLine, this, &VpnManager::statusLine);
+    }
+    _setState(state);
+}
+#endif
+
 void VpnManager::runStartupCleanup()
 {
+#ifdef Q_OS_WIN
+    // Windows tunnels are owned by their vendor services. The POSIX helper and
+    // its `cleanup` verb do not exist here; in particular, never try to launch
+    // the default `pkexec` command merely because WireGuard/OpenVPN is installed.
+    return;
+#else
     if (!isHelperInstalled())
         return;
 
@@ -965,6 +1128,7 @@ void VpnManager::runStartupCleanup()
         args << QString::fromLatin1(kInstalledHelperPath) << QStringLiteral("cleanup");
         p->start(helperLauncherProgram(), args);
     });
+#endif
 }
 
 bool VpnManager::jobNeedsVpn(QList<NntpServerParams *> const &activeServers) const
@@ -1069,8 +1233,12 @@ VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
         _autoStartedByJob = true;
         emit logLine(tr("Auto-starting VPN for incoming job..."));
         if (!start()) {
-            emit vpnRequiredButUnavailable(JobBlockReason::VpnFailed,
-                                           tr("Could not start the VPN."));
+            // A backend that emitted failed() during start() already supplied
+            // its precise reason through onBackendFailed(). Do not produce a
+            // second popup with a generic message.
+            if (!_backendFailedDuringStart)
+                emit vpnRequiredButUnavailable(JobBlockReason::VpnFailed,
+                                               tr("Could not start the VPN."));
             _autoStartedByJob = false;
             return Admission::Blocked;
         }

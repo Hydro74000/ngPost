@@ -14,6 +14,7 @@
 #include "utils/Macros.h"
 
 #include <QCommandLineOption>
+#include <QDir>
 #include <QFileInfo>
 #include <QMutex>
 #include <QNetworkAccessManager>
@@ -367,6 +368,10 @@ private:
     //! user means, even when the conf was given with -c.
     QString _loadedConfigDir;
     QString _postInfoOutput;
+    //! Like the model, a relative output given explicitly on the command line
+    //! belongs to the caller's current directory. A value read from ngPost.conf
+    //! belongs next to that configuration file.
+    bool _postInfoOutputFromCli;
     QStringList _sessionPostInfoTemplates;
     bool _postInfoOnlySuccess;
     //! --no_post_info: this run writes no record sheet, whatever the
@@ -607,6 +612,8 @@ public:
     //! the configuration file says: its own folder.
     QString postInfoOutputBaseDir() const
     {
+        if (_postInfoOutputFromCli)
+            return QDir::currentPath();
         return _loadedConfigDir.isEmpty() ? PathHelper::configDir() : _loadedConfigDir;
     }
 
@@ -655,7 +662,7 @@ public slots:
 
     void onShutdownProcReadyReadStandardOutput();
     void onShutdownProcReadyReadStandardError();
-    void onShutdownProcFinished(int exitCode);
+    void onShutdownProcFinished(int exitCode, QProcess::ExitStatus exitStatus);
     //    void onShutdownProcStarted();
     //    void onShutdownProcStateChanged(QProcess::ProcessState newState);
     void onShutdownProcError(QProcess::ProcessError error);
@@ -677,6 +684,7 @@ private:
 
     void _post(const QFileInfo &fileInfo, const QString &monitorFolder = "");
     void _finishPosting();
+    void _discardUnstartedJob(PostingJob *job);
 
     //! Parses one key=value metadata. Returns false (and reports) on a malformed
     //! pair or on a key claimed by both --meta and --post_meta.
@@ -689,8 +697,8 @@ private:
     void _setNzbUploadUrl(const QString &url, QString &error);
     void _setPostHistoryFile(const QString &path, QString &error);
     void _ensurePostHistoryHeader();
-    static QStringList _exportProtectedPaths(const PostHistoryStore::PostInfoRecord &record,
-                                             const QString &templatePath);
+    QStringList _exportProtectedPaths(const PostHistoryStore::PostInfoRecord &record,
+                                      const QString &templatePath) const;
 
     //! Snapshot of the current global settings, frozen into a new job so that a
     //! queued post is sent with the settings it was queued with. Callers still
@@ -729,6 +737,15 @@ private:
 
     void _syntax(char *appName);
     QString _parseConfig(const QString &configPath);
+
+    //! Tell the user about the config directory adopted at startup by
+    //! PathHelper::migrateAppNamedConfigDirIfNeeded(). The GUI adoption happens
+    //! before MainWindow; CLI adoption happens after argument validation and
+    //! before the default config is parsed. This method only reports it.
+    //! Called from every entry point and self-guarded, so it speaks once.
+    void _reportConfigDirMigration();
+    bool _configDirMigrationReported = false;
+
     static QStringList defaultPackKeywords();
 
 #ifdef __DEBUG__

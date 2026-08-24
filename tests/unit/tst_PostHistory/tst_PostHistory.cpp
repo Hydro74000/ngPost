@@ -30,8 +30,28 @@ class TestPostHistory : public QObject
     Q_OBJECT
 
 private slots:
+    //! Building the service must not create a database. It is constructed
+    //! before the config is read, so the path it holds is still the default
+    //! one; touching it there dropped an empty history in every folder ngPost
+    //! ever resolved, even when POST_DB pointed elsewhere.
+    void service_construction_creates_no_database();
+
+    //! And when the path is reconfigured, only the configured database is
+    //! ever created — never the one the service was built with.
+    void reconfigured_service_only_creates_the_configured_database();
+
+    //! GUI startup queues cleanup before its first snapshot. Both operations
+    //! must use POST_DB, in FIFO order, without touching the constructor's
+    //! provisional default path.
+    void prepared_service_uses_configured_database_before_snapshot();
+
+    //! The one that matters: a database that already holds posts must come
+    //! back with every row intact, whatever the service does at startup.
+    void existing_database_with_entries_is_never_reset();
+
     void sqlite_lifecycle_and_resume_states();
     void empty_resume_post_is_cancelled_by_cleanup();
+    void terminal_failure_without_files_stays_failed_and_not_resumable();
     void missing_source_is_not_resumable();
     void mark_article_status_keeps_payload_when_row_is_missing();
     void apply_article_events_batches_ordered_status_changes();
@@ -39,23 +59,42 @@ private slots:
     void list_posts_paginates_with_stable_order();
     void list_posts_applies_filters_before_pagination();
     void service_flushes_batches_and_returns_snapshots();
+    //! A resume decision must never be made from the database when a queued
+    //! article event could not be persisted first.
+    void service_resume_queries_fail_closed_when_flush_fails();
     void service_snapshot_paginates_history_but_stats_are_complete();
     //! An existing v1 database gains the new tables on open, keeps its rows,
     //! and records the new schema version.
     void schema_migrates_v1_database_without_losing_posts();
 
+    //! v2 had post_info but not the frozen article boundary. Opening it adds
+    //! the column and old posts are resumed only when their persisted segments
+    //! prove one exact value.
+    void schema_migrates_v2_and_derives_article_size_safely();
+
     //! A database written by a newer ngPost is refused rather than silently
     //! used with a schema this version does not understand.
     void schema_refuses_a_newer_database();
+
+    //! Corrupt/non-numeric versions are not silently interpreted as v1.
+    void schema_refuses_an_invalid_version();
 
     //! started_at stays NULL until the transfer begins, and a resume never
     //! rewrites the date of the first attempt.
     void started_at_is_set_by_the_transfer_and_never_rewritten();
 
+    //! Merely beginning a resume must not discard the outcome of the previous
+    //! attempt; a source check can still refuse the retry before any transfer.
+    void resume_marker_preserves_previous_terminal_facts();
+
     //! The size of the whole post is written once: a resume only sees the
     //! leftovers and must not shrink it. The transfer time, on the contrary,
     //! accumulates over attempts.
     void post_size_is_written_once_and_active_seconds_accumulate();
+
+    //! Posted means the persisted article status is exactly `posted`; pending
+    //! rows must not be inferred as successes by subtracting only failures.
+    void post_info_counts_only_explicitly_posted_articles();
 
     //! Metadata round trip, scope included, and "password" refused: it is a
     //! secret, not a metadata.
@@ -85,9 +124,22 @@ private slots:
     //! happens to be going on: they belong to another post.
     void resume_options_drop_the_current_metadata_and_password();
 
+    //! When password storage is disabled, the delivered NZB is the only
+    //! durable place from which a resume may recover the archive password.
+    void resume_recovers_unstored_password_from_existing_nzb();
+
+    //! A protected post must not resume with an unrelated current password or
+    //! silently publish a consolidated NZB without its original password.
+    void resume_fails_closed_when_unstored_password_is_absent_from_nzb();
+
     void nzb_regeneration_keeps_prior_files_after_resume();
     void nzb_regeneration_repairs_missing_article_bytes();
     void nzb_regeneration_masks_password_by_default();
+    void nzb_regeneration_uses_live_password_without_storing_it();
+    void nzb_regeneration_refuses_incomplete_success_and_empty_history();
+    void nzb_regeneration_refuses_a_corrupt_stored_article_size();
+    //! A failed regeneration must leave an existing NZB byte-for-byte intact.
+    void nzb_regeneration_to_file_is_atomic_on_failure();
     void import_legacy_csv_is_explicit_history_only();
 };
 
@@ -140,6 +192,34 @@ QVariant rawSql(const QString &dbPath, const QString &sql, const QVariantList &b
     }
     QSqlDatabase::removeDatabase(conn);
     return result;
+}
+
+bool execRawSql(const QString &dbPath,
+                const QString &sql,
+                const QVariantList &binds = {},
+                QString *error = nullptr)
+{
+    static int sConnectionCounter = 0;
+    const QString conn = QStringLiteral("tst_raw_exec_%1").arg(++sConnectionCounter);
+    bool ok = false;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conn);
+        db.setDatabaseName(dbPath);
+        if (db.open()) {
+            QSqlQuery q(db);
+            q.prepare(sql);
+            for (const QVariant &bind : binds)
+                q.addBindValue(bind);
+            ok = q.exec();
+            if (!ok && error)
+                *error = q.lastError().text();
+            db.close();
+        } else if (error) {
+            *error = db.lastError().text();
+        }
+    }
+    QSqlDatabase::removeDatabase(conn);
+    return ok;
 }
 
 // Counts the per-attempt audit rows of a post by reading the SQLite file
@@ -350,6 +430,36 @@ void TestPostHistory::empty_resume_post_is_cancelled_by_cleanup()
     QCOMPARE(d.state, ResumePlanner::ResumeState::NotResumable);
     QCOMPARE(d.reason, QStringLiteral("posting never started; nothing to resume"));
     QCOMPARE(store.resumeCandidates(&err).size(), 0);
+}
+
+void TestPostHistory::terminal_failure_without_files_stays_failed_and_not_resumable()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString error;
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("failed-before-transfer.nzb");
+    const qint64 postId = store.createPost(post, &error);
+    QVERIFY2(postId > 0, qPrintable(error));
+    QVERIFY2(store.updatePostStatus(postId,
+                                    QStringLiteral("failed"),
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    QString(),
+                                    &error),
+             qPrintable(error));
+
+    QVERIFY2(store.cleanupInvalidResumePosts(&error), qPrintable(error));
+    PostHistoryStore::PostDetails details;
+    QVERIFY2(store.loadPostDetails(postId, &details, &error), qPrintable(error));
+    QCOMPARE(details.post.status, QStringLiteral("failed"));
+    QVERIFY(!details.post.resumable);
+    QCOMPARE(details.post.resumeReason,
+             QStringLiteral("posting never started; nothing to resume"));
 }
 
 void TestPostHistory::missing_source_is_not_resumable()
@@ -767,6 +877,107 @@ void TestPostHistory::service_flushes_batches_and_returns_snapshots()
     QCOMPARE(snapshot.resumeRows.first().failedArticles, 1);
 }
 
+void TestPostHistory::service_resume_queries_fail_closed_when_flush_fails()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString dbPath = dir.filePath(QStringLiteral("history.sqlite"));
+    PostHistoryService service(dbPath, true);
+    QString err;
+    QVERIFY2(service.initialize(&err), qPrintable(err));
+
+    const QString sourcePath = dir.filePath(QStringLiteral("payload.bin"));
+    QFile source(sourcePath);
+    QVERIFY(source.open(QIODevice::WriteOnly));
+    QCOMPARE(source.write(QByteArray(4, 'x')), qint64(4));
+    source.close();
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("flush-failure.nzb");
+    post.nzbPath = dir.filePath(post.nzbName);
+    post.from = QStringLiteral("poster@example.invalid");
+    post.groups = { QStringLiteral("alt.binaries.test") };
+    PostHistoryStore::PostInfo info;
+    info.articleSizeBytes = 4;
+    const qint64 postId = service.createPost(post, info, {}, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    const QFileInfo sourceInfo(sourcePath);
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.originalPath = sourceInfo.absoluteFilePath();
+    file.postedName = sourceInfo.fileName();
+    file.sizeBytes = sourceInfo.size();
+    file.mtimeEpoch = sourceInfo.lastModified().toSecsSinceEpoch();
+    file.totalArticles = 1;
+    file.groups = post.groups;
+    const qint64 fileId = service.upsertFile(file, &err);
+    QVERIFY2(fileId > 0, qPrintable(err));
+
+    PostHistoryService::ResumeRow baseline;
+    QVERIFY2(service.checkResume(postId, &baseline, &err), qPrintable(err));
+    QCOMPARE(baseline.state, QStringLiteral("resumable"));
+
+    // Break a table used by the batched writer, then queue a valid event. The
+    // service keeps that event pending after the failed transaction, which
+    // makes every resume-facing read prove that it propagates the flush
+    // failure rather than consulting the older, superficially resumable
+    // database state.
+    QString schemaErr;
+    QVERIFY2(execRawSql(dbPath,
+                        QStringLiteral("DROP TABLE post_article_attempts"),
+                        {},
+                        &schemaErr),
+             qPrintable(schemaErr));
+    service.enqueueArticlePosting(fileId,
+                                  1,
+                                  QStringLiteral("pending@ngpost"),
+                                  1,
+                                  0,
+                                  4);
+
+    PostHistoryService::ResumeRow decision;
+    decision.state = QStringLiteral("stale-sentinel");
+    err.clear();
+    QVERIFY(!service.checkResume(postId, &decision, &err));
+    QVERIFY2(!err.isEmpty(), "the flush failure was not propagated");
+    QCOMPARE(decision.state, QStringLiteral("not_resumable"));
+    QCOMPARE(decision.reason, err);
+    QCOMPARE(decision.postedArticles, 0);
+    QCOMPARE(decision.pendingArticles, 0);
+
+    PostHistoryStore::PostDetails details;
+    err.clear();
+    QVERIFY(!service.loadPostDetails(postId, &details, &err));
+    QVERIFY2(!err.isEmpty(), "loadPostDetails hid the flush failure");
+
+    err.clear();
+    const QList<PostHistoryStore::PostSummary> candidates = service.resumeCandidates(&err);
+    QVERIFY(candidates.isEmpty());
+    QVERIFY2(!err.isEmpty(), "resumeCandidates hid the flush failure");
+
+    QEventLoop loop;
+    bool called = false;
+    PostHistoryService::HistorySnapshot snapshot;
+    service.requestHistorySnapshot(PostHistoryStore::ListFilter(),
+                                   QSet<qint64>(),
+                                   &loop,
+                                   [&](const PostHistoryService::HistorySnapshot &result) {
+        snapshot = result;
+        called = true;
+        loop.quit();
+    });
+    QTimer::singleShot(3000, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    QVERIFY(called);
+    QVERIFY2(!snapshot.error.isEmpty(), "the history snapshot hid the flush failure");
+    QVERIFY(snapshot.posts.isEmpty());
+    QVERIFY(snapshot.resumeRows.isEmpty());
+}
+
 void TestPostHistory::service_snapshot_paginates_history_but_stats_are_complete()
 {
     QTemporaryDir dir;
@@ -912,6 +1123,107 @@ void TestPostHistory::schema_migrates_v1_database_without_losing_posts()
     }
 }
 
+void TestPostHistory::schema_migrates_v2_and_derives_article_size_safely()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath(QStringLiteral("history.sqlite"));
+
+    qint64 provenPostId = 0;
+    qint64 ambiguousPostId = 0;
+    {
+        PostHistoryStore store(dbPath, true);
+        QString error;
+        QVERIFY2(store.initialize(&error), qPrintable(error));
+
+        auto addPost = [&](const QString &name, bool withPayloadEvidence) {
+            PostHistoryStore::PostRecord post;
+            post.nzbName = name;
+            post.nzbPath = dir.filePath(name);
+            post.from = QStringLiteral("poster@example.invalid");
+            post.groups = { QStringLiteral("alt.binaries.test") };
+
+            PostHistoryStore::PostInfo info;
+            info.articleSizeBytes = 4;
+            const qint64 postId = store.createPost(post, info, {}, &error);
+            if (!postId)
+                return static_cast<qint64>(0);
+
+            PostHistoryStore::FileRecord file;
+            file.postId = postId;
+            file.ordinal = 1;
+            file.originalPath = dir.filePath(name + QStringLiteral(".bin"));
+            file.postedName = name + QStringLiteral(".bin");
+            file.sizeBytes = 10;
+            file.totalArticles = 3;
+            const qint64 fileId = store.upsertFile(file, &error);
+            if (!fileId)
+                return static_cast<qint64>(0);
+
+            if (withPayloadEvidence) {
+                for (int part = 1; part <= 3; ++part) {
+                    PostHistoryStore::ArticleRecord article;
+                    article.fileId = fileId;
+                    article.part = part;
+                    article.pos = (part - 1) * 4;
+                    article.bytes = part < 3 ? 4 : 2;
+                    if (!store.upsertArticle(article, &error))
+                        return static_cast<qint64>(0);
+                }
+            }
+            return postId;
+        };
+
+        provenPostId = addPost(QStringLiteral("proven.nzb"), true);
+        QVERIFY2(provenPostId > 0, qPrintable(error));
+        ambiguousPostId = addPost(QStringLiteral("ambiguous.nzb"), false);
+        QVERIFY2(ambiguousPostId > 0, qPrintable(error));
+    }
+
+    // Rebuild only post_info with its exact v2 shape, then advertise v2.
+    // This does not depend on SQLite's newer DROP COLUMN support.
+    QString sqlError;
+    QVERIFY2(execRawSql(dbPath,
+                        QStringLiteral("CREATE TABLE post_info_v2 ("
+                                       "post_id INTEGER PRIMARY KEY, par2_pct INTEGER, "
+                                       "post_size_bytes INTEGER, active_seconds INTEGER, "
+                                       "source_path TEXT, original_name TEXT, app_version TEXT, "
+                                       "FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE)"),
+                        {}, &sqlError), qPrintable(sqlError));
+    QVERIFY2(execRawSql(dbPath,
+                        QStringLiteral("INSERT INTO post_info_v2 "
+                                       "SELECT post_id, par2_pct, post_size_bytes, active_seconds, "
+                                       "source_path, original_name, app_version FROM post_info"),
+                        {}, &sqlError), qPrintable(sqlError));
+    QVERIFY2(execRawSql(dbPath, QStringLiteral("DROP TABLE post_info"), {}, &sqlError),
+             qPrintable(sqlError));
+    QVERIFY2(execRawSql(dbPath,
+                        QStringLiteral("ALTER TABLE post_info_v2 RENAME TO post_info"),
+                        {}, &sqlError), qPrintable(sqlError));
+    QVERIFY2(execRawSql(dbPath,
+                        QStringLiteral("INSERT OR REPLACE INTO schema_meta(key, value) "
+                                       "VALUES('version', '2')"),
+                        {}, &sqlError), qPrintable(sqlError));
+
+    PostHistoryStore store(dbPath, true);
+    QString error;
+    QVERIFY2(store.initialize(&error), qPrintable(error));
+    QCOMPARE(rawSql(dbPath, QStringLiteral("SELECT value FROM schema_meta WHERE key='version'"))
+                 .toInt(),
+             PostHistoryStore::kSchemaVersion);
+    QCOMPARE(rawSql(dbPath,
+                    QStringLiteral("SELECT COUNT(*) FROM pragma_table_info('post_info') "
+                                   "WHERE name='article_size_bytes'"))
+                 .toInt(),
+             1);
+
+    PostHistoryStore::PostDetails details;
+    QVERIFY2(store.loadPostDetails(provenPostId, &details, &error), qPrintable(error));
+    QCOMPARE(details.articleSizeBytes, static_cast<qint64>(4));
+    QVERIFY2(store.loadPostDetails(ambiguousPostId, &details, &error), qPrintable(error));
+    QCOMPARE(details.articleSizeBytes, static_cast<qint64>(-1));
+}
+
 void TestPostHistory::schema_refuses_a_newer_database()
 {
     QTemporaryDir dir;
@@ -934,6 +1246,30 @@ void TestPostHistory::schema_refuses_a_newer_database()
     QVERIFY2(error.contains(QStringLiteral("newer ngPost")), qPrintable(error));
 }
 
+void TestPostHistory::schema_refuses_an_invalid_version()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath(QStringLiteral("history.sqlite"));
+
+    {
+        PostHistoryStore store(dbPath, true);
+        QString error;
+        QVERIFY2(store.initialize(&error), qPrintable(error));
+    }
+
+    QString sqlError;
+    QVERIFY2(execRawSql(dbPath,
+                        QStringLiteral("INSERT OR REPLACE INTO schema_meta(key, value) "
+                                       "VALUES('version', 'not-a-version')"),
+                        {}, &sqlError), qPrintable(sqlError));
+
+    PostHistoryStore store(dbPath, true);
+    QString error;
+    QVERIFY(!store.initialize(&error));
+    QVERIFY2(error.contains(QStringLiteral("invalid history schema version")), qPrintable(error));
+}
+
 void TestPostHistory::started_at_is_set_by_the_transfer_and_never_rewritten()
 {
     QTemporaryDir dir;
@@ -942,14 +1278,18 @@ void TestPostHistory::started_at_is_set_by_the_transfer_and_never_rewritten()
     QString error;
     QVERIFY2(store.initialize(&error), qPrintable(error));
 
-    const qint64 postId =
-        createStoredPost(store, QStringLiteral("queued.nzb"), QStringLiteral("posting"), {}, &error);
-    QVERIFY(postId > 0);
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("queued.nzb");
+    PostHistoryStore::PostInfo info;
+    info.sourcePath = dir.filePath(QStringLiteral("queued.bin"));
+    const qint64 postId = store.createPost(post, info, {}, &error);
+    QVERIFY2(postId > 0, qPrintable(error));
 
     // created, but not started: the job may sit in the queue for a long while
     PostHistoryStore::PostInfoRecord record;
     QVERIFY2(store.loadPostInfoRecord(postId, &record, &error), qPrintable(error));
     QVERIFY(record.startedAt.isEmpty());
+    QVERIFY(!record.toPostInfoData().startedAt.isValid());
 
     QVERIFY(store.markPostStarted(postId, &error));
     QVERIFY2(store.loadPostInfoRecord(postId, &record, &error), qPrintable(error));
@@ -960,6 +1300,42 @@ void TestPostHistory::started_at_is_set_by_the_transfer_and_never_rewritten()
     QVERIFY(store.markPostStarted(postId, &error));
     QVERIFY2(store.loadPostInfoRecord(postId, &record, &error), qPrintable(error));
     QCOMPARE(record.startedAt, firstStart);
+}
+
+void TestPostHistory::resume_marker_preserves_previous_terminal_facts()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString error;
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("resume.nzb");
+    post.nzbPath = dir.filePath(post.nzbName);
+    PostHistoryStore::PostInfo info;
+    info.sourcePath = dir.filePath(QStringLiteral("payload.bin"));
+    const qint64 postId = store.createPost(post, info, {}, &error);
+    QVERIFY2(postId > 0, qPrintable(error));
+
+    QVERIFY2(store.updatePostStatus(postId,
+                                    QStringLiteral("partial"),
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    QStringLiteral("12.3 MB/s"),
+                                    &error),
+             qPrintable(error));
+    PostHistoryStore::PostInfoRecord before;
+    QVERIFY2(store.loadPostInfoRecord(postId, &before, &error), qPrintable(error));
+    QVERIFY(!before.post.finishedAt.isEmpty());
+
+    QVERIFY2(store.markPostResuming(postId, &error), qPrintable(error));
+    PostHistoryStore::PostInfoRecord during;
+    QVERIFY2(store.loadPostInfoRecord(postId, &during, &error), qPrintable(error));
+    QCOMPARE(during.post.status, QStringLiteral("posting"));
+    QCOMPARE(during.post.finishedAt, before.post.finishedAt);
+    QCOMPARE(during.post.avgSpeed, before.post.avgSpeed);
 }
 
 void TestPostHistory::post_size_is_written_once_and_active_seconds_accumulate()
@@ -994,6 +1370,62 @@ void TestPostHistory::post_size_is_written_once_and_active_seconds_accumulate()
     QCOMPARE(record.info.activeSeconds, static_cast<qint64>(250));
     QCOMPARE(record.info.par2Pct, 8);
     QCOMPARE(record.info.originalName, QStringLiteral("Photos-2026.tar"));
+}
+
+void TestPostHistory::post_info_counts_only_explicitly_posted_articles()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString error;
+    QVERIFY2(store.initialize(&error), qPrintable(error));
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("counters.nzb");
+    PostHistoryStore::PostInfo info;
+    info.sourcePath = dir.filePath(QStringLiteral("source.bin"));
+    const qint64 postId = store.createPost(post, info, {}, &error);
+    QVERIFY2(postId > 0, qPrintable(error));
+
+    PostHistoryStore::FileRecord file;
+    file.postId       = postId;
+    file.ordinal      = 1;
+    file.originalPath = info.sourcePath;
+    file.postedName   = QStringLiteral("source.bin");
+    file.totalArticles = 5; // the fifth article has no row yet: pending
+    const qint64 fileId = store.upsertFile(file, &error);
+    QVERIFY2(fileId > 0, qPrintable(error));
+
+    auto addArticle = [&](int part, const QString &status) {
+        PostHistoryStore::ArticleRecord article;
+        article.fileId = fileId;
+        article.part   = part;
+        article.status = status;
+        QVERIFY2(store.upsertArticle(article, &error), qPrintable(error));
+    };
+    addArticle(1, QStringLiteral("posted"));
+    addArticle(2, QStringLiteral("posted"));
+    addArticle(3, QStringLiteral("failed"));
+    addArticle(4, QStringLiteral("unknown"));
+
+    QVERIFY2(store.updatePostStatus(postId,
+                                    QStringLiteral("partial"),
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    QString(),
+                                    &error),
+             qPrintable(error));
+
+    PostHistoryStore::PostInfoRecord record;
+    QVERIFY2(store.loadPostInfoRecord(postId, &record, &error), qPrintable(error));
+    QCOMPARE(record.post.nbArticles, 5);
+    QCOMPARE(record.post.nbFailedArticles, 2);
+    // total - failed would incorrectly report 3 by counting the absent/pending
+    // fifth article. Only the two explicit posted rows are successes.
+    QCOMPARE(record.nbArticlesPosted, 2);
+    QCOMPARE(record.toPostInfoData().nbArticlesPosted, static_cast<uint>(2));
 }
 
 void TestPostHistory::post_meta_keeps_scope_and_refuses_the_password_key()
@@ -1052,6 +1484,23 @@ void TestPostHistory::regenerated_nzb_publishes_only_nzb_scoped_meta()
     meta.insert(QStringLiteral("portail1"), MetaValue(QStringLiteral("Private"), MetaScope::Local));
     const qint64 postId = store.createPost(post, PostHistoryStore::PostInfo(), meta, &error);
     QVERIFY2(postId > 0, qPrintable(error));
+
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.postedName = QStringLiteral("payload.bin");
+    file.sizeBytes = 4;
+    file.totalArticles = 1;
+    const qint64 fileId = store.upsertFile(file, &error);
+    QVERIFY2(fileId > 0, qPrintable(error));
+    QVERIFY2(store.markArticlePosted(fileId, 1, QStringLiteral("meta@ngpost"), &error),
+             qPrintable(error));
+    QVERIFY2(store.updatePostStatus(postId,
+                                    QStringLiteral("success"),
+                                    1, 1, 0, 4,
+                                    QStringLiteral("1 KB/s"),
+                                    &error),
+             qPrintable(error));
 
     NzbHistoryRegenerator regenerator(&store);
 
@@ -1243,6 +1692,94 @@ void TestPostHistory::resume_options_drop_the_current_metadata_and_password()
     QCOMPARE(resumed.inputPaths, QStringList{ QFileInfo(path).absoluteFilePath() });
 }
 
+void TestPostHistory::resume_recovers_unstored_password_from_existing_nzb()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString nzbPath = dir.filePath(QStringLiteral("protected.nzb"));
+
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    const QByteArray contents =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<nzb><head>"
+        "<meta type=\"title\">Protected post</meta>"
+        "<meta type=\"password\">sword&amp;fish</meta>"
+        "</head><file><groups/><segments/></file></nzb>\n";
+    QCOMPARE(nzb.write(contents), static_cast<qint64>(contents.size()));
+    nzb.close();
+
+    PostHistoryStore::PostDetails details;
+    details.post.id = 21;
+    details.post.hasPassword = true;
+    details.post.passwordStored = false;
+    QVERIFY(details.rarPass.isEmpty());
+
+    PostingJobOptions base;
+    base.rarPass = QStringLiteral("password-of-another-post");
+    base.declaredPassword = QStringLiteral("declared-by-the-current-run");
+
+    const PostingJobOptions resumed =
+        ResumePlanner::jobOptions(base,
+                                  details,
+                                  nzbPath,
+                                  QList<QString>(),
+                                  ResumePlanner::JobPlan(),
+                                  std::string("me@x.y"));
+
+    // QXmlStreamReader decodes entities: the recovered value is the exact
+    // password that the original NZB advertised, not its XML representation.
+    QCOMPARE(resumed.rarPass, QStringLiteral("sword&fish"));
+    QVERIFY(!resumed.resumePasswordUnavailable);
+    QVERIFY(resumed.declaredPassword.isEmpty());
+}
+
+void TestPostHistory::resume_fails_closed_when_unstored_password_is_absent_from_nzb()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString nzbPath = dir.filePath(QStringLiteral("no-password.nzb"));
+
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    const QByteArray contents =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<nzb><head><meta type=\"title\">No password here</meta></head>"
+        "<file><groups/><segments/></file></nzb>\n";
+    QCOMPARE(nzb.write(contents), static_cast<qint64>(contents.size()));
+    nzb.close();
+
+    PostHistoryStore::PostDetails details;
+    details.post.id = 22;
+    details.post.hasPassword = true;
+    details.post.passwordStored = false;
+
+    PostingJobOptions base;
+    base.rarPass = QStringLiteral("password-of-another-post");
+    base.declaredPassword = QStringLiteral("declared-by-the-current-run");
+
+    const auto optionsFor = [&](const QString &path) {
+        return ResumePlanner::jobOptions(base,
+                                         details,
+                                         path,
+                                         QList<QString>(),
+                                         ResumePlanner::JobPlan(),
+                                         std::string("me@x.y"));
+    };
+
+    const PostingJobOptions withoutMeta = optionsFor(nzbPath);
+    QVERIFY(withoutMeta.rarPass.isEmpty());
+    QVERIFY(withoutMeta.declaredPassword.isEmpty());
+    QVERIFY(withoutMeta.resumePasswordUnavailable);
+
+    // A missing NZB has the same fail-closed outcome. In neither case may the
+    // current run's unrelated password leak into the resumed post.
+    QVERIFY(QFile::remove(nzbPath));
+    const PostingJobOptions withoutFile = optionsFor(nzbPath);
+    QVERIFY(withoutFile.rarPass.isEmpty());
+    QVERIFY(withoutFile.resumePasswordUnavailable);
+}
+
 void TestPostHistory::nzb_regeneration_keeps_prior_files_after_resume()
 {
     QTemporaryDir dir;
@@ -1366,10 +1903,15 @@ void TestPostHistory::nzb_regeneration_repairs_missing_article_bytes()
     post.nzbPath = dir.filePath(QStringLiteral("zero-bytes.nzb"));
     post.from = QStringLiteral("poster@example.invalid");
     post.groups = { QStringLiteral("alt.binaries.test") };
-    const qint64 postId = store.createPost(post, &err);
+    // Make the original boundary differ from the current setting while both
+    // remain plausible for three parts. The regenerator must use the frozen
+    // fact, not whichever ARTICLE_SIZE happens to be configured today.
+    const qint64 articleBytes = NgPost::articleSize() - 1;
+    PostHistoryStore::PostInfo info;
+    info.articleSizeBytes = articleBytes;
+    const qint64 postId = store.createPost(post, info, {}, &err);
     QVERIFY2(postId > 0, qPrintable(err));
 
-    const qint64 articleBytes = NgPost::articleSize();
     const qint64 tailBytes = 123;
     PostHistoryStore::FileRecord file;
     file.postId = postId;
@@ -1456,6 +1998,204 @@ void TestPostHistory::nzb_regeneration_masks_password_by_default()
     QVERIFY(withPassword.contains(QStringLiteral("swordfish")));
 }
 
+void TestPostHistory::nzb_regeneration_uses_live_password_without_storing_it()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), false);
+    QString err;
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("private.nzb");
+    post.nzbPath = dir.filePath(QStringLiteral("private.nzb"));
+    post.rarPass = QStringLiteral("not-in-sqlite");
+    post.hasPassword = true;
+    post.passwordOrigin = QStringLiteral("generated");
+    post.from = QStringLiteral("poster@example.invalid");
+    const qint64 postId = store.createPost(post, &err);
+    QVERIFY2(postId > 0, qPrintable(err));
+
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.postedName = QStringLiteral("payload.bin");
+    file.sizeBytes = 4;
+    file.totalArticles = 1;
+    const qint64 fileId = store.upsertFile(file, &err);
+    QVERIFY2(fileId > 0, qPrintable(err));
+    QVERIFY2(store.markArticlePosted(fileId, 1, QStringLiteral("private@ngpost"), &err),
+             qPrintable(err));
+    QVERIFY2(store.updatePostStatus(postId,
+                                    QStringLiteral("success"),
+                                    1,
+                                    1,
+                                    0,
+                                    4,
+                                    QStringLiteral("1 KB/s"),
+                                    &err),
+             qPrintable(err));
+
+    // The storage policy is still honoured.
+    PostHistoryStore::PostDetails details;
+    QVERIFY2(store.loadPostDetails(postId, &details, &err), qPrintable(err));
+    QVERIFY(!details.post.passwordStored);
+    QVERIFY(details.rarPass.isEmpty());
+
+    NzbHistoryRegenerator regenerator(&store);
+    QString historical;
+    QTextStream historicalStream(&historical);
+    QVERIFY2(regenerator.writeNzb(postId, historicalStream, true, nullptr, &err), qPrintable(err));
+    QVERIFY(!historical.contains(QStringLiteral("not-in-sqlite")));
+
+    // Automatic finalisation can overlay the password still owned by the live
+    // job, without persisting it. This prevents the history rewrite from
+    // stripping a password already present in the streamed NZB.
+    QString automatic;
+    QTextStream automaticStream(&automatic);
+    QVERIFY2(regenerator.writeNzb(postId,
+                                  automaticStream,
+                                  true,
+                                  nullptr,
+                                  &err,
+                                  QStringLiteral("not-in-sqlite")),
+             qPrintable(err));
+    QVERIFY(automatic.contains(
+        QStringLiteral("<meta type=\"password\">not-in-sqlite</meta>")));
+
+    QString explicitlyMasked;
+    QTextStream maskedStream(&explicitlyMasked);
+    QVERIFY2(regenerator.writeNzb(postId,
+                                  maskedStream,
+                                  false,
+                                  nullptr,
+                                  &err,
+                                  QStringLiteral("not-in-sqlite")),
+             qPrintable(err));
+    QVERIFY(!explicitlyMasked.contains(QStringLiteral("not-in-sqlite")));
+}
+
+void TestPostHistory::nzb_regeneration_refuses_incomplete_success_and_empty_history()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString error;
+
+    PostHistoryStore::PostRecord empty;
+    empty.nzbName = QStringLiteral("legacy.nzb");
+    const qint64 emptyId = store.createPost(empty, &error);
+    QVERIFY2(emptyId > 0, qPrintable(error));
+    QVERIFY2(store.updatePostStatus(emptyId,
+                                    QStringLiteral("success"),
+                                    0, 0, 0, 0,
+                                    QString(),
+                                    &error),
+             qPrintable(error));
+
+    NzbHistoryRegenerator regenerator(&store);
+    QString output;
+    QTextStream outputStream(&output);
+    QVERIFY(!regenerator.writeNzb(emptyId, outputStream, false, nullptr, &error));
+    QVERIFY2(error.contains(QStringLiteral("no structured")), qPrintable(error));
+
+    PostHistoryStore::PostRecord incomplete;
+    incomplete.nzbName = QStringLiteral("incomplete.nzb");
+    PostHistoryStore::PostInfo info;
+    info.articleSizeBytes = 4;
+    const qint64 postId = store.createPost(incomplete, info, {}, &error);
+    QVERIFY2(postId > 0, qPrintable(error));
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.postedName = QStringLiteral("two-parts.bin");
+    file.sizeBytes = 8;
+    file.totalArticles = 2;
+    const qint64 fileId = store.upsertFile(file, &error);
+    QVERIFY2(fileId > 0, qPrintable(error));
+    QVERIFY2(store.markArticlePosted(fileId, 1, QStringLiteral("only-one@ngpost"), &error),
+             qPrintable(error));
+    QVERIFY2(store.updatePostStatus(postId,
+                                    QStringLiteral("success"),
+                                    1, 2, 0, 8,
+                                    QStringLiteral("1 KB/s"),
+                                    &error),
+             qPrintable(error));
+
+    output.clear();
+    error.clear();
+    QVERIFY(!regenerator.writeNzb(postId, outputStream, false, nullptr, &error));
+    QVERIFY2(error.contains(QStringLiteral("incomplete")), qPrintable(error));
+}
+
+void TestPostHistory::nzb_regeneration_refuses_a_corrupt_stored_article_size()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    PostHistoryStore store(dir.filePath(QStringLiteral("history.sqlite")), true);
+    QString error;
+
+    PostHistoryStore::PostRecord post;
+    post.nzbName = QStringLiteral("bad-boundary.nzb");
+    PostHistoryStore::PostInfo info;
+    info.articleSizeBytes = 4;
+    const qint64 postId = store.createPost(post, info, {}, &error);
+    QVERIFY2(postId > 0, qPrintable(error));
+    PostHistoryStore::FileRecord file;
+    file.postId = postId;
+    file.ordinal = 1;
+    file.postedName = QStringLiteral("payload.bin");
+    file.sizeBytes = 10; // 4-byte parts require 3 articles, not the stored 2
+    file.totalArticles = 2;
+    const qint64 fileId = store.upsertFile(file, &error);
+    QVERIFY2(fileId > 0, qPrintable(error));
+    QVERIFY2(store.markArticlePosted(fileId, 1, QStringLiteral("one@ngpost"), &error),
+             qPrintable(error));
+    QVERIFY2(store.markArticlePosted(fileId, 2, QStringLiteral("two@ngpost"), &error),
+             qPrintable(error));
+    QVERIFY2(store.updatePostStatus(postId,
+                                    QStringLiteral("success"),
+                                    1, 2, 0, 10,
+                                    QStringLiteral("1 KB/s"),
+                                    &error),
+             qPrintable(error));
+
+    NzbHistoryRegenerator regenerator(&store);
+    QString output;
+    QTextStream stream(&output);
+    QVERIFY(!regenerator.writeNzb(postId, stream, false, nullptr, &error));
+    QVERIFY2(error.contains(QStringLiteral("article size")), qPrintable(error));
+}
+
+void TestPostHistory::nzb_regeneration_to_file_is_atomic_on_failure()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString dbPath  = dir.filePath(QStringLiteral("history.sqlite"));
+    const QString nzbPath = dir.filePath(QStringLiteral("keep-me.nzb"));
+    const QByteArray original("an existing streamed nzb\n");
+    {
+        QFile nzb(nzbPath);
+        QVERIFY(nzb.open(QIODevice::WriteOnly));
+        QCOMPARE(nzb.write(original), original.size());
+    }
+
+    PostHistoryService service(dbPath, true);
+    QStringList warnings;
+    QString error;
+    QVERIFY(!service.regenerateNzbToFile(999999,
+                                         nzbPath,
+                                         true,
+                                         &warnings,
+                                         &error));
+    QVERIFY(!error.isEmpty());
+
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::ReadOnly));
+    QCOMPARE(nzb.readAll(), original);
+}
+
 void TestPostHistory::import_legacy_csv_is_explicit_history_only()
 {
     QTemporaryDir dir;
@@ -1477,6 +2217,135 @@ void TestPostHistory::import_legacy_csv_is_explicit_history_only()
     QCOMPARE(posts.size(), 1);
     QCOMPARE(posts.first().nzbName, QStringLiteral("legacy.nzb"));
     QCOMPARE(posts.first().nbArticles, 0);
+
+    PostHistoryStore::PostInfoRecord record;
+    QVERIFY2(store.loadPostInfoRecord(posts.first().id, &record, &err), qPrintable(err));
+    QVERIFY(record.partial);
+    QCOMPARE(rawSql(store.dbPath(), QStringLiteral("SELECT COUNT(*) FROM post_info")).toInt(), 0);
+}
+
+
+void TestPostHistory::service_construction_creates_no_database()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath(QStringLiteral("never_touched.sqlite"));
+
+    {
+        PostHistoryService service(dbPath, true);
+        // Let the worker thread run its start() the way it does in production.
+        QTest::qWait(50);
+        QVERIFY2(!QFileInfo::exists(dbPath),
+                 "the service created a database it was never asked to use");
+    }
+    QVERIFY2(!QFileInfo::exists(dbPath), "a database appeared while tearing down");
+}
+
+void TestPostHistory::reconfigured_service_only_creates_the_configured_database()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    // What NgPost does: build with the default path, then apply POST_DB.
+    const QString defaultDb   = dir.filePath(QStringLiteral("default.sqlite"));
+    const QString configuredDb = dir.filePath(QStringLiteral("configured.sqlite"));
+
+    PostHistoryService service(defaultDb, true);
+    service.configure(configuredDb, true);
+
+    QString err;
+    QVERIFY2(service.initialize(&err), qPrintable(err));
+
+    PostHistoryStore::PostRecord rec;
+    rec.nzbName = QStringLiteral("real.nzb");
+    QVERIFY(service.createPost(rec, &err) > 0);
+
+    QVERIFY2(QFileInfo::exists(configuredDb), "the configured database was not created");
+    QVERIFY2(!QFileInfo::exists(defaultDb),
+             "a stray database was left at the path POST_DB replaced");
+}
+
+void TestPostHistory::prepared_service_uses_configured_database_before_snapshot()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString defaultDb = dir.filePath(QStringLiteral("default.sqlite"));
+    const QString configuredDb = dir.filePath(QStringLiteral("configured.sqlite"));
+
+    qint64 postId = 0;
+    {
+        PostHistoryStore store(configuredDb, true);
+        QString err;
+        QVERIFY2(store.initialize(&err), qPrintable(err));
+        PostHistoryStore::PostRecord rec;
+        rec.nzbName = QStringLiteral("interrupted-before-start.nzb");
+        postId = store.createPost(rec, &err);
+        QVERIFY2(postId > 0, qPrintable(err));
+    }
+
+    PostHistoryService service(defaultDb, true);
+    service.configure(configuredDb, true);
+    QSignalSpy preparedSpy(&service, &PostHistoryService::prepared);
+    service.prepareForUse();
+
+    QEventLoop loop;
+    bool called = false;
+    PostHistoryService::HistorySnapshot result;
+    service.requestHistorySnapshot(PostHistoryStore::ListFilter(), {}, &loop,
+                                   [&](const PostHistoryService::HistorySnapshot &snapshot) {
+        result = snapshot;
+        called = true;
+        loop.quit();
+    });
+    QTimer::singleShot(3000, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    QVERIFY(called);
+    QCOMPARE(preparedSpy.size(), 1);
+    QVERIFY(preparedSpy.first().first().toBool());
+    QVERIFY2(result.error.isEmpty(), qPrintable(result.error));
+    QCOMPARE(result.posts.size(), 1);
+    QCOMPARE(result.posts.first().id, postId);
+    QCOMPARE(result.posts.first().status, QStringLiteral("cancelled"));
+    QVERIFY2(!QFileInfo::exists(defaultDb),
+             "GUI preparation created the stale constructor database");
+}
+
+void TestPostHistory::existing_database_with_entries_is_never_reset()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath(QStringLiteral("history.sqlite"));
+
+    qint64 postId = 0;
+    {   // an install with real history in it
+        PostHistoryStore store(dbPath, true);
+        QString err;
+        QVERIFY2(store.initialize(&err), qPrintable(err));
+        PostHistoryStore::PostRecord rec;
+        rec.nzbName = QStringLiteral("precious.nzb");
+        rec.rarName = QStringLiteral("precious");
+        postId = store.createPost(rec, &err);
+        QVERIFY2(postId > 0, qPrintable(err));
+    }
+    const qint64 sizeBefore = QFileInfo(dbPath).size();
+
+    {   // a later start, exactly as NgPost does it
+        PostHistoryService service(dbPath, true);
+        QTest::qWait(50);
+        QString err;
+        QVERIFY2(service.initialize(&err), qPrintable(err));
+        QVERIFY2(service.markPostCrashedArticlesUnknown(&err), qPrintable(err));
+        QVERIFY2(service.cleanupInvalidResumePosts(&err), qPrintable(err));
+    }
+
+    PostHistoryStore store(dbPath, true);
+    QString err;
+    const QList<PostHistoryStore::PostSummary> posts =
+        store.listPosts(PostHistoryStore::ListFilter(), &err);
+    QCOMPARE(posts.size(), 1);
+    QCOMPARE(posts.first().id, postId);
+    QCOMPARE(posts.first().nzbName, QStringLiteral("precious.nzb"));
+    QVERIFY2(QFileInfo(dbPath).size() >= sizeBefore, "the database shrank");
 }
 
 QTEST_MAIN(TestPostHistory)

@@ -21,6 +21,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QStandardPaths>
@@ -41,6 +44,21 @@ bool hasPython3()
 {
     return !QStandardPaths::findExecutable("python3").isEmpty()
            || !QStandardPaths::findExecutable("python").isEmpty();
+}
+
+QString pythonExecutable()
+{
+    QString python = QStandardPaths::findExecutable(QStringLiteral("python3"));
+    if (python.isEmpty())
+        python = QStandardPaths::findExecutable(QStringLiteral("python"));
+    return python;
+}
+
+QString quotedCommandArg(QString arg)
+{
+    // QProcess::splitCommand uses three quotes for one literal quote.
+    arg.replace(QLatin1Char('"'), QStringLiteral("\"\"\""));
+    return QLatin1Char('"') + arg + QLatin1Char('"');
 }
 
 //! Run ngPost as a subprocess inside the given sandboxed HOME and return its
@@ -407,7 +425,14 @@ void TestPostFlow::resume_history_post_preserves_original_file_ordinals()
     post.nzbPath = nzbPath;
     post.from = QStringLiteral("poster@example.invalid");
     post.groups = { QStringLiteral("alt.binaries.test") };
-    const qint64 postId = store.createPost(post, &err);
+    PostHistoryStore::PostInfo info;
+    // Deliberately different from the upload-volume directory: a resumed job
+    // only sees first.bin/second.bin below, but the sheet must keep this
+    // original source location from history.
+    info.sourcePath = sandbox.rootPath()
+                      + QStringLiteral("/historic-source/original-collection.bin");
+    info.originalName = QStringLiteral("original-collection.bin");
+    const qint64 postId = store.createPost(post, info, {}, &err);
     QVERIFY2(postId > 0, qPrintable(err));
 
     auto addFile = [&](int ordinal, const QString &path) {
@@ -454,6 +479,33 @@ void TestPostFlow::resume_history_post_preserves_original_file_ordinals()
                                     QStringLiteral("1 KB/s"), &err),
              qPrintable(err));
 
+    const QString infoTemplate = sandbox.rootPath() + QStringLiteral("/resume-info.tpl");
+    const QString infoOutput   = sandbox.rootPath() + QStringLiteral("/resume-info.txt");
+    {
+        QFile tmpl(infoTemplate);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("original=__originalPath__\nsource=__sourcePath__\n");
+    }
+
+    // Capture the exact JSON handed to post-actions. Before this regression
+    // fix, the final merge replaced the complete historical size and file list
+    // with second.bin alone, because it was the only source left to retry.
+    const QString capturedJson = sandbox.rootPath() + QStringLiteral("/resume-post.json");
+    const QString captureScript = sandbox.rootPath() + QStringLiteral("/capture-post-json.py");
+    {
+        QFile script(captureScript);
+        QVERIFY(script.open(QIODevice::WriteOnly | QIODevice::Text));
+        script.write("import json, os, sys\n"
+                     "with open(os.environ['NGPOST_JSON'], encoding='utf-8') as src:\n"
+                     "    data = json.load(src)\n"
+                     "with open(sys.argv[1], 'w', encoding='utf-8') as dst:\n"
+                     "    json.dump(data, dst)\n");
+    }
+    const QString captureCommand = QStringLiteral("%1 %2 %3")
+                                       .arg(quotedCommandArg(pythonExecutable()),
+                                            quotedCommandArg(captureScript),
+                                            quotedCommandArg(capturedJson));
+
     const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
     QString out;
     const int code = runNgPost(_bin, {
@@ -461,6 +513,9 @@ void TestPostFlow::resume_history_post_preserves_original_file_ordinals()
         "--resume-post", QString::number(postId),
         "--yes",
         "--post_db", dbPath,
+        "--post_info_template", infoTemplate,
+        "--post_info_output", infoOutput,
+        "--nzb-post-cmd", captureCommand,
         "-a", "4",
         "--quiet",
         "--disp_progress", "none",
@@ -485,6 +540,28 @@ void TestPostFlow::resume_history_post_preserves_original_file_ordinals()
     QVERIFY(files.at(0).segments.contains(QStringLiteral("first-2@ngpost")));
     QVERIFY(files.at(1).segments.contains(QStringLiteral("second-1@ngpost")));
     QVERIFY(!files.at(1).segments.contains(QStringLiteral("second-old@ngpost")));
+
+    QFile sheet(infoOutput);
+    QVERIFY2(sheet.open(QIODevice::ReadOnly), qPrintable(out));
+    const QString sheetText = QString::fromUtf8(sheet.readAll());
+    QVERIFY2(sheetText.contains(QStringLiteral("original=%1")
+                                  .arg(QFileInfo(info.sourcePath).absolutePath())),
+             qPrintable(sheetText));
+    QVERIFY2(sheetText.contains(QStringLiteral("source=%1").arg(info.sourcePath)),
+             qPrintable(sheetText));
+
+    QFile jsonFile(capturedJson);
+    QVERIFY2(jsonFile.open(QIODevice::ReadOnly), qPrintable(out));
+    QJsonParseError parseError;
+    const QJsonDocument json = QJsonDocument::fromJson(jsonFile.readAll(), &parseError);
+    QCOMPARE(parseError.error, QJsonParseError::NoError);
+    QVERIFY(json.isObject());
+    const QJsonObject postData = json.object();
+    QCOMPARE(postData.value(QStringLiteral("sizeInByte")).toString(), QStringLiteral("16"));
+    const QJsonArray inputPaths = postData.value(QStringLiteral("inputPaths")).toArray();
+    QCOMPARE(inputPaths.size(), 2);
+    QCOMPARE(inputPaths.at(0).toString(), QFileInfo(firstPath).absoluteFilePath());
+    QCOMPARE(inputPaths.at(1).toString(), QFileInfo(secondPath).absoluteFilePath());
 }
 
 void TestPostFlow::config_values_keep_equals()

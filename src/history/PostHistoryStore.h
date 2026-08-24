@@ -111,6 +111,7 @@ public:
     struct ArticleSummary {
         qint64 fileId = 0;
         int part = 0;
+        qint64 pos = 0;
         qint64 bytes = 0;
         QString msgId;
         QString status;
@@ -133,6 +134,13 @@ public:
         //! par2 percentage of the original post, < 0 when it had none. Read
         //! from post_info, so it stays -1 for a post made before that table.
         int par2Pct = -1;
+        //! Effective payload bytes per article of the original attempt. When
+        //! an older row has no stored value, loadPostDetails() derives it only
+        //! if the recorded part boundaries prove one unambiguous value.
+        qint64 articleSizeBytes = -1;
+        //! Distinguishes a legacy row with no value from a current row whose
+        //! stored boundary exists but contradicts its file/article records.
+        bool articleSizeWasStored = false;
         QList<FileSummary> files;
         QMap<qint64, QList<ArticleSummary>> articlesByFile;
     };
@@ -144,6 +152,7 @@ public:
         int par2Pct = -1;          //!< < 0: no par2 at all
         qint64 postSizeBytes = -1; //!< archive + parity, copied .nfo excluded
         qint64 activeSeconds = -1; //!< transfer time, cumulated over resumes
+        qint64 articleSizeBytes = -1; //!< payload bytes per Usenet article
         QString sourcePath;        //!< raw input path, before folder expansion
         QString originalName;
         QString appVersion;
@@ -160,7 +169,11 @@ public:
         QString rarPass;
         QString from;
         QString startedAt; //!< ISO 8601 UTC, empty while the transfer has not begun
+        int nbArticlesPosted = 0; //!< rows whose persisted status is exactly "posted"
         QMap<QString, MetaValue> meta;
+        //! Posted artifacts, loaded without their article rows. They are used
+        //! as overwrite guards by historical exports.
+        QStringList filePaths;
         //! True when the row predates post_info: the missing facts are then
         //! rendered empty rather than guessed.
         bool partial = false;
@@ -209,6 +222,8 @@ public:
 
     bool initialize(QString *error = nullptr);
 
+    //! Compatibility/legacy insertion. No post_info row is invented: callers
+    //! that cannot provide the newer facts get a deliberately partial record.
     qint64 createPost(const PostRecord &record, QString *error = nullptr);
     //! Same, plus the facts and the metadata of the post, all in one
     //! transaction so a post never exists without them.
@@ -342,8 +357,9 @@ public:
     bool importLegacyCsv(const QString &path, QString *error = nullptr);
 
     //! Bump when the schema changes, and add the matching step in
-    //! _migrateSchema(). v1: initial. v2: post_info and post_meta.
-    static constexpr int kSchemaVersion = 2;
+    //! _migrateSchema(). v1: initial. v2: post_info/post_meta. v3: the frozen
+    //! article-size boundary required for a byte-identical resume.
+    static constexpr int kSchemaVersion = 3;
 
 private:
     QString _dbPath;
@@ -353,6 +369,10 @@ private:
 
     bool _execSchema(QString *error);
     bool _migrateSchema(QSqlDatabase &db, QString *error);
+    qint64 _createPost(const PostRecord &record,
+                       const PostInfo *info,
+                       const QMap<QString, MetaValue> &meta,
+                       QString *error);
     //! Write helpers reused by createPost() inside its own transaction.
     bool _writePostInfo(QSqlDatabase &db, qint64 postId, const PostInfo &info, QString *error);
     bool _writePostMeta(QSqlDatabase &db,
