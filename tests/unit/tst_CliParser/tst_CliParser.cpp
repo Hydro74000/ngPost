@@ -273,6 +273,22 @@ void TestCliParser::help_lists_major_flags()
 
 void TestCliParser::inspection_and_explicit_config_do_not_adopt()
 {
+#if !defined(Q_OS_LINUX)
+    // The sandbox cannot reach the binary this test spawns. genericConfigRoot()
+    // honours NGPOST_TEST_HOME only under NGPOST_TESTING, which the production
+    // binary is not built with, so it resolves its config directory through
+    // QStandardPaths -- and that reads the real user profile on macOS and
+    // Windows rather than HOME or LOCALAPPDATA. Measured on the runners: the
+    // test planted its legacy folder in the sandbox while the binary used
+    // /Users/runner/Library/Application Support/ngPost. Asserting here would
+    // test the runner's own configuration, and would write into it.
+    //
+    // The adoption itself is covered in-process by tst_PathHelper, which runs
+    // on all three platforms and is properly sandboxed -- it is what caught the
+    // Windows publish bug fixed in 05cf6a4.
+    QSKIP("config-folder adoption through a spawned binary can only be sandboxed on Linux");
+#endif
+
     HomeSandbox sandbox;
     // One place decides where a spawned production binary keeps its config
     // directory on each platform; see HomeSandbox::configRootFor.
@@ -1032,6 +1048,22 @@ void TestCliParser::blocked_vpn_admission_exits_without_hanging_or_history_ghost
 
 void TestCliParser::warns_when_c_points_at_the_adopted_legacy_config()
 {
+#if !defined(Q_OS_LINUX)
+    // The sandbox cannot reach the binary this test spawns. genericConfigRoot()
+    // honours NGPOST_TEST_HOME only under NGPOST_TESTING, which the production
+    // binary is not built with, so it resolves its config directory through
+    // QStandardPaths -- and that reads the real user profile on macOS and
+    // Windows rather than HOME or LOCALAPPDATA. Measured on the runners: the
+    // test planted its legacy folder in the sandbox while the binary used
+    // /Users/runner/Library/Application Support/ngPost. Asserting here would
+    // test the runner's own configuration, and would write into it.
+    //
+    // The adoption itself is covered in-process by tst_PathHelper, which runs
+    // on all three platforms and is properly sandboxed -- it is what caught the
+    // Windows publish bug fixed in 05cf6a4.
+    QSKIP("config-folder adoption through a spawned binary can only be sandboxed on Linux");
+#endif
+
     QTemporaryDir home;
     QVERIFY(home.isValid());
     // Where the config directory lives depends on the platform, so ask rather
