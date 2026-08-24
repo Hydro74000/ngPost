@@ -1057,8 +1057,14 @@ void TestCliParser::warns_when_c_points_at_the_adopted_legacy_config()
     // First run adopts it.
     RunResult adopt = run(_bin, { QStringLiteral("--history") }, home.path());
     QVERIFY(!adopt.timedOut);
+    // "Using default config file: ..." on stdout names the folder the spawned
+    // binary actually resolved. Without it, a failure here cannot distinguish
+    // "adoption is broken" from "the sandbox does not reach that binary".
+    const QString where = QStringLiteral(
+        "expected legacy dir: %1\nstdout:\n%2\nstderr:\n%3")
+        .arg(legacyDir, adopt.stdoutText, adopt.stderrText);
     QVERIFY2(adopt.stderrText.contains(QStringLiteral("brought over"), Qt::CaseInsensitive),
-             qPrintable(adopt.stderrText));
+             qPrintable(where));
 
     // A cron job still passing the old file reads settings that never had a
     // POST_DB line, so its posts would land in the new folder's database while
