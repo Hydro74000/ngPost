@@ -24,7 +24,22 @@ public:
     void checkLatestRelease();
 
     static bool    isAppImage();
-    static bool    isVersionNewer(const QString &latestTag, const QString &currentVersion);
+
+    //! True when \a candidate supersedes \a current, both given as release
+    //! tags. Numbers first; on a tie a stable release beats a pre-release of
+    //! the same number ("v5.5" over "v5.5-unstable.20260824.107.abc"), and two
+    //! pre-releases of one number are ordered by their build ordinal. Without
+    //! that last part a build could never be offered the stable it leads to,
+    //! since both read 5.5.
+    static bool isVersionNewer(const QString &candidate, const QString &current);
+
+    //! A tag carrying a pre-release suffix, i.e. anything after the numbers.
+    static bool isPreRelease(const QString &tag);
+
+    //! The release this binary was built as. The full tag when the release
+    //! workflow provided one, the plain version otherwise (a local build).
+    static QString buildTag();
+
     static QString stripVersionPrefix(const QString &tag);
 
     QString latestTag()      const { return _latestTag; }
@@ -51,6 +66,7 @@ private:
     bool    runInstallerLinux(const QString &archivePath);
 
     static const QString sReleaseApiUrl;
+    static const QString sReleaseListApiUrl;
     static const QString sRepoOwner;
     static const QString sRepoName;
     static const qint64  sCheckIntervalSeconds = 86400; // once per day

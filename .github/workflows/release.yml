@@ -142,6 +142,12 @@ jobs:
           done
           ls -la resources/lang/
       - name: Build Project
+        env:
+          # The release this binary IS. Read by ngPost_core.pri at qmake time --
+          # quoting a -D through bash, pwsh and nmake is three different
+          # problems -- and used by the update check to tell a pre-release
+          # build apart from the stable of the same number.
+          NGPOST_BUILD_TAG: ${{ needs.release-metadata.outputs.release_tag }}
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
@@ -203,6 +209,12 @@ jobs:
           }
           Get-ChildItem resources/lang/
       - name: Build Project on Windows with MSVC
+        env:
+          # The release this binary IS. Read by ngPost_core.pri at qmake time --
+          # quoting a -D through bash, pwsh and nmake is three different
+          # problems -- and used by the update check to tell a pre-release
+          # build apart from the stable of the same number.
+          NGPOST_BUILD_TAG: ${{ needs.release-metadata.outputs.release_tag }}
         shell: pwsh
         run: |
           cd src
@@ -669,6 +681,12 @@ jobs:
           done
           ls -la resources/lang/
       - name: Build Project on macOS
+        env:
+          # The release this binary IS. Read by ngPost_core.pri at qmake time --
+          # quoting a -D through bash, pwsh and nmake is three different
+          # problems -- and used by the update check to tell a pre-release
+          # build apart from the stable of the same number.
+          NGPOST_BUILD_TAG: ${{ needs.release-metadata.outputs.release_tag }}
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
@@ -752,6 +770,12 @@ jobs:
           done
           ls -la resources/lang/
       - name: Build Project
+        env:
+          # The release this binary IS. Read by ngPost_core.pri at qmake time --
+          # quoting a -D through bash, pwsh and nmake is three different
+          # problems -- and used by the update check to tell a pre-release
+          # build apart from the stable of the same number.
+          NGPOST_BUILD_TAG: ${{ needs.release-metadata.outputs.release_tag }}
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
@@ -853,6 +877,11 @@ jobs:
           chmod +x linuxdeploy linuxdeploy-plugin-qt
       - name: Build AppImage
         env:
+          # The release this binary IS. Read by ngPost_core.pri at qmake time --
+          # quoting a -D through bash, pwsh and nmake is three different
+          # problems -- and used by the update check to tell a pre-release
+          # build apart from the stable of the same number.
+          NGPOST_BUILD_TAG: ${{ needs.release-metadata.outputs.release_tag }}
           # Qt 6 dlopen plugins that linuxdeploy-plugin-qt won't pick up automatically
           EXTRA_QT_PLUGINS: "tls;networkinformation"
           LDAI_OUTPUT: ngPost-${{ needs.release-metadata.outputs.package_version }}-x86_64.AppImage

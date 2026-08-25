@@ -244,6 +244,18 @@ GUI and translations:
 
 Fixes and compatibility:
 
+- The update check now follows the channel of the build it runs in. A stable
+  install asks GitHub for its latest stable release, as before. A pre-release
+  build asks for the list instead, because what supersedes it may be a newer
+  unstable build or the stable it leads to -- neither of which the "latest"
+  endpoint ever returns. Release ordering understands a pre-release suffix:
+  v5.5 supersedes v5.5-unstable.20260824.107.abc, never the other way round,
+  and two unstable builds of one version are ordered by the date and run
+  number in their tag. Without this, anyone running an unstable build would
+  have been told they were up to date forever, including once the stable of
+  the same number was published. AppImages are unaffected: they update through
+  zsync, which was already channel-aware.
+
 - A queued posting job now keeps the settings captured when it was created
   instead of silently adopting global settings changed while it waited.
 - A post containing a whole unreadable file is now reported as partial instead

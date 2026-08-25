@@ -9,5 +9,6 @@ SUBDIRS = \
     tst_PostInfoTemplate \
     tst_VpnProfile \
     tst_CliParser \
+    tst_UpdateChecker \
     tst_WireGuardBackend \
     tst_WindowsBindHelper

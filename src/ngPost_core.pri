@@ -34,6 +34,16 @@ linux:!android: QT += dbus
 VERSION = 5.5
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
+# The exact release this binary was built as, e.g. "v5.5" or
+# "v5.5-unstable.20260824.107.ac4bf63". APP_VERSION alone cannot tell the two
+# apart -- both read 5.5 -- so an unstable build could never be offered the
+# stable of the same number. Read from the environment at qmake time rather
+# than passed on the command line: the quoting of a -D through bash, pwsh and
+# nmake is three different problems. Empty for a local build, and the update
+# check then behaves exactly as it did before.
+NGPOST_BUILD_TAG = $$(NGPOST_BUILD_TAG)
+!isEmpty(NGPOST_BUILD_TAG): DEFINES += NGPOST_BUILD_TAG=\\\"$$NGPOST_BUILD_TAG\\\"
+
 INCLUDEPATH += $$PWD
 CONFIG += c++17
 

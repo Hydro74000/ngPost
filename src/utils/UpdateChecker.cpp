@@ -29,6 +29,9 @@ const QString UpdateChecker::sRepoName      = "ngPost";
 const QString UpdateChecker::sReleaseApiUrl =
         QStringLiteral("https://api.github.com/repos/%1/%2/releases/latest")
         .arg(UpdateChecker::sRepoOwner, UpdateChecker::sRepoName);
+const QString UpdateChecker::sReleaseListApiUrl =
+        QStringLiteral("https://api.github.com/repos/%1/%2/releases?per_page=20")
+        .arg(UpdateChecker::sRepoOwner, UpdateChecker::sRepoName);
 
 UpdateChecker::UpdateChecker(NgPost *ngPost, QNetworkAccessManager *netMgr, QObject *parent)
     : QObject(parent),
@@ -51,19 +54,88 @@ QString UpdateChecker::stripVersionPrefix(const QString &tag)
     return s;
 }
 
-bool UpdateChecker::isVersionNewer(const QString &latestTag, const QString &currentVersion)
+namespace
 {
-    const QStringList latest  = stripVersionPrefix(latestTag).split('.');
-    const QStringList current = stripVersionPrefix(currentVersion).split('.');
-    const int n = qMax(latest.size(), current.size());
+//! Splits "5.5-unstable.20260824.107.abc" into "5.5" and
+//! "unstable.20260824.107.abc". A tag without a '-' has no suffix.
+void splitTag(const QString &tag, QString *numbers, QString *suffix)
+{
+    const int dash = tag.indexOf(QLatin1Char('-'));
+    if (dash < 0)
+    {
+        *numbers = tag;
+        suffix->clear();
+        return;
+    }
+    *numbers = tag.left(dash);
+    *suffix  = tag.mid(dash + 1);
+}
+
+//! Element-wise comparison of two dotted lists. Numeric elements compare as
+//! numbers so 107 sorts after 99; anything else compares as text. Returns
+//! -1, 0 or 1.
+int compareDotted(const QString &a, const QString &b, bool numericOnly)
+{
+    const QStringList left  = a.split(QLatin1Char('.'), Qt::SkipEmptyParts);
+    const QStringList right = b.split(QLatin1Char('.'), Qt::SkipEmptyParts);
+    const int n = qMax(left.size(), right.size());
     for (int i = 0; i < n; ++i)
     {
-        int l = (i < latest.size())  ? latest.at(i).toInt()  : 0;
-        int c = (i < current.size()) ? current.at(i).toInt() : 0;
-        if (l > c) return true;
-        if (l < c) return false;
+        const QString l = i < left.size() ? left.at(i) : QString();
+        const QString r = i < right.size() ? right.at(i) : QString();
+
+        bool lok = false, rok = false;
+        const int li = l.toInt(&lok);
+        const int ri = r.toInt(&rok);
+        if (numericOnly || (lok && rok))
+        {
+            // A missing element counts as 0, which is what makes 5.5 and
+            // 5.5.0 the same release.
+            const int lv = lok ? li : 0;
+            const int rv = rok ? ri : 0;
+            if (lv != rv)
+                return lv < rv ? -1 : 1;
+            continue;
+        }
+        if (l != r)
+            return l < r ? -1 : 1;
     }
-    return false; // equal
+    return 0;
+}
+} // namespace
+
+bool UpdateChecker::isPreRelease(const QString &tag)
+{
+    return stripVersionPrefix(tag).contains(QLatin1Char('-'));
+}
+
+QString UpdateChecker::buildTag()
+{
+#ifdef NGPOST_BUILD_TAG
+    return QStringLiteral(NGPOST_BUILD_TAG);
+#else
+    return NgPost::sVersion;
+#endif
+}
+
+bool UpdateChecker::isVersionNewer(const QString &candidate, const QString &current)
+{
+    QString candidateNumbers, candidateSuffix, currentNumbers, currentSuffix;
+    splitTag(stripVersionPrefix(candidate), &candidateNumbers, &candidateSuffix);
+    splitTag(stripVersionPrefix(current), &currentNumbers, &currentSuffix);
+
+    const int byNumber = compareDotted(candidateNumbers, currentNumbers, true);
+    if (byNumber != 0)
+        return byNumber > 0;
+
+    // Same numbers. Semver's rule: the stable release supersedes any
+    // pre-release that led to it, and never the other way round.
+    if (candidateSuffix.isEmpty() != currentSuffix.isEmpty())
+        return currentSuffix.isEmpty() ? false : true;
+
+    // Two pre-releases of the same number, or two identical stables. The
+    // ordinal the release workflow builds -- date, run number -- orders them.
+    return compareDotted(candidateSuffix, currentSuffix, false) > 0;
 }
 
 void UpdateChecker::checkLatestRelease()
@@ -74,7 +146,10 @@ void UpdateChecker::checkLatestRelease()
         return;
     }
 
-    const QUrl url(sReleaseApiUrl);
+    // A stable build asks GitHub for "the latest release", which by definition
+    // ignores pre-releases. A pre-release build has to look at the list: what
+    // supersedes it may be a newer unstable build, or the stable it leads to.
+    const QUrl url(isPreRelease(buildTag()) ? QUrl(sReleaseListApiUrl) : QUrl(sReleaseApiUrl));
     QNetworkRequest req(url);
     req.setRawHeader("User-Agent", "ngPost C++ app");
     req.setRawHeader("Accept",     "application/vnd.github+json");
@@ -99,13 +174,45 @@ void UpdateChecker::onReleaseInfoReceived()
     const QByteArray body = reply->readAll();
     QJsonParseError err;
     const QJsonDocument doc = QJsonDocument::fromJson(body, &err);
-    if (err.error != QJsonParseError::NoError || !doc.isObject())
+    if (err.error != QJsonParseError::NoError || (!doc.isObject() && !doc.isArray()))
     {
         qDebug() << "[UpdateChecker] invalid JSON from GitHub:" << err.errorString();
         return;
     }
 
-    const QJsonObject root = doc.object();
+    // "/releases/latest" answers with one release, "/releases" with a list.
+    // Pick the entry that supersedes this build by the most: the list is
+    // ordered by creation date, but a stable published before a later unstable
+    // is still the one to offer.
+    QJsonObject root;
+    if (doc.isObject())
+        root = doc.object();
+    else
+    {
+        const QString mine = buildTag();
+        QString best;
+        for (const QJsonValue &v : doc.array())
+        {
+            const QJsonObject candidate = v.toObject();
+            if (candidate.value("draft").toBool())
+                continue;
+            const QString tag = candidate.value("tag_name").toString();
+            if (tag.isEmpty() || !isVersionNewer(tag, mine))
+                continue;
+            if (best.isEmpty() || isVersionNewer(tag, best))
+            {
+                best = tag;
+                root = candidate;
+            }
+        }
+        if (best.isEmpty())
+        {
+            _ngPost->_lastUpdateCheckEpoch = QDateTime::currentSecsSinceEpoch();
+            _ngPost->saveConfig();
+            qDebug() << "[UpdateChecker] up to date (current" << mine << ")";
+            return;
+        }
+    }
     _latestTag        = root.value("tag_name").toString();
     _releaseNotes     = root.value("body").toString();
     _releasePageUrl   = QUrl(root.value("html_url").toString());
@@ -121,9 +228,9 @@ void UpdateChecker::onReleaseInfoReceived()
     _ngPost->_lastUpdateCheckEpoch = QDateTime::currentSecsSinceEpoch();
     _ngPost->saveConfig();
 
-    if (!isVersionNewer(_latestTag, NgPost::sVersion))
+    if (!isVersionNewer(_latestTag, buildTag()))
     {
-        qDebug() << "[UpdateChecker] up to date (current" << NgPost::sVersion
+        qDebug() << "[UpdateChecker] up to date (current" << buildTag()
                  << "latest" << _latestTag << ")";
         return;
     }
