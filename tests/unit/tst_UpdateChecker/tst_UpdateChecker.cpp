@@ -31,6 +31,10 @@ private slots:
     //! A pre-release of a higher number still wins over a lower stable, and a
     //! lower pre-release never displaces a higher stable.
     void numbers_decide_before_the_suffix();
+
+    //! A stable install gets exactly the verdict the previous implementation
+    //! gave, over every plausible pair of released versions.
+    void a_stable_install_keeps_the_answers_it_had();
 };
 
 void TestUpdateChecker::stable_releases_order_by_number()
@@ -86,6 +90,47 @@ void TestUpdateChecker::numbers_decide_before_the_suffix()
         QStringLiteral("v5.6-unstable.20260901.1.abc"), QStringLiteral("v5.5")));
     QVERIFY(!UpdateChecker::isVersionNewer(
         QStringLiteral("v5.4-unstable.20260901.1.abc"), QStringLiteral("v5.5")));
+}
+
+void TestUpdateChecker::a_stable_install_keeps_the_answers_it_had()
+{
+    // Regression guard for the users who matter most: someone on a released
+    // stable must get exactly the verdict the previous implementation gave.
+    // Every pair below was checked against it.
+    const QStringList stables{ QStringLiteral("4.16"),  QStringLiteral("5.0"),
+                               QStringLiteral("5.0.1"), QStringLiteral("5.4"),
+                               QStringLiteral("5.4.2"), QStringLiteral("5.4.3"),
+                               QStringLiteral("5.5"),   QStringLiteral("5.5.0"),
+                               QStringLiteral("5.6"),   QStringLiteral("5.9"),
+                               QStringLiteral("5.10"),  QStringLiteral("6.0") };
+
+    auto numeric = [](const QString &t) {
+        QList<int> parts;
+        for (const QString &p : t.split(QLatin1Char('.')))
+            parts << p.toInt();
+        return parts;
+    };
+    auto expected = [&](const QString &a, const QString &b) {
+        const QList<int> l = numeric(a), c = numeric(b);
+        for (int i = 0; i < qMax(l.size(), c.size()); ++i) {
+            const int lv = i < l.size() ? l.at(i) : 0;
+            const int cv = i < c.size() ? c.at(i) : 0;
+            if (lv != cv)
+                return lv > cv;
+        }
+        return false;
+    };
+
+    for (const QString &a : stables) {
+        for (const QString &b : stables) {
+            for (const QString &pa : { QString(), QStringLiteral("v") }) {
+                for (const QString &pb : { QString(), QStringLiteral("v") }) {
+                    QVERIFY2(UpdateChecker::isVersionNewer(pa + a, pb + b) == expected(a, b),
+                             qPrintable(pa + a + " vs " + pb + b));
+                }
+            }
+        }
+    }
 }
 
 QTEST_APPLESS_MAIN(TestUpdateChecker)

@@ -228,6 +228,17 @@ void UpdateChecker::onReleaseInfoReceived()
     _ngPost->_lastUpdateCheckEpoch = QDateTime::currentSecsSinceEpoch();
     _ngPost->saveConfig();
 
+    // A stable install is never offered a pre-release, whatever came back.
+    // The endpoint already excludes them, so this only closes the door on a
+    // future caller: isVersionNewer() alone would say yes to a HIGHER numbered
+    // pre-release, which is right for an unstable build and wrong here.
+    if (isPreRelease(_latestTag) && !isPreRelease(buildTag()))
+    {
+        qDebug() << "[UpdateChecker] ignoring pre-release" << _latestTag
+                 << "for stable build" << buildTag();
+        return;
+    }
+
     if (!isVersionNewer(_latestTag, buildTag()))
     {
         qDebug() << "[UpdateChecker] up to date (current" << buildTag()
