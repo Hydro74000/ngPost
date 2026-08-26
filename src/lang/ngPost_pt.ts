@@ -234,7 +234,7 @@
     </message>
     <message>
         <location line="+24"/>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+243"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+244"/>
         <source>Monitor Folder</source>
         <translation>Pasta de Monitoramento</translation>
     </message>
@@ -293,7 +293,7 @@
         <translation>Lembre-se de que você pode selecionar itens na lista e pressionar DEL para removê-los</translation>
     </message>
     <message>
-        <location line="-347"/>
+        <location line="-348"/>
         <source>Nothing to post...</source>
         <translation>Nada para postar...</translation>
     </message>
@@ -312,7 +312,7 @@ Aperte o botão de Escanear e remota o que não deseja postar ;)
 (para remover arquivos, selecione na lista e pressione DEL ou BackSpace)</translation>
     </message>
     <message>
-        <location line="+43"/>
+        <location line="+44"/>
         <location line="+30"/>
         <source>Select a Folder</source>
         <translation>Selecione uma Pasta</translation>
@@ -440,14 +440,18 @@ Isso Será irreversível...</translation>
         <translation>Modelo e campos usados por todas as publicações desta execução.</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+42"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>As informações da publicação mencionam «%1» duas vezes. Remova uma das duas linhas.</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>Predefinições guardadas: modelo %1, escrita em %2</translation>
+    </message>
+    <message>
         <source>Post info model saved as the default: %1</source>
-        <translation>Modelo de ficha guardado como predefinido: %1</translation>
+        <translation type="vanished">Modelo de ficha guardado como predefinido: %1</translation>
     </message>
 </context>
 <context>
@@ -4092,7 +4096,7 @@ O seu ficheiro de configuração activo é:
         <translation type="vanished">Auto compressão está LIGADA (--compress --gen_name --gen_pass --gen_par2)</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1090"/>
+        <location filename="../NgPost.h" line="+1100"/>
         <source>PACKing auto using: %1</source>
         <translation>Comptatação automática usando: %1</translation>
     </message>
@@ -4628,15 +4632,15 @@ O seu ficheiro de configuração activo é:
 <context>
     <name>PostInfoDialog</name>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="+69"/>
-        <location line="+485"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
+        <location line="+573"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>Informações da publicação</translation>
     </message>
     <message>
-        <location line="-627"/>
+        <location line="-715"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>Uma ficha descreve esta publicação num ficheiro de texto escrito ao lado do nzb.
@@ -4675,7 +4679,24 @@ the model offered by default. This post uses it either way.</source>
 o modelo proposto por omissão. Esta publicação usa-o de qualquer forma.</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+6"/>
+        <source>Write it to:</source>
+        <translation>Escrevê-la em:</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Leave empty to follow your configuration. Variables work here:
+__nzbDir__/__nzbName__.info.txt writes it next to the nzb.</source>
+        <translation>Deixe vazio para seguir a sua configuração. As variáveis funcionam aqui:
+__nzbDir__/__nzbName__.info.txt escreve-a ao lado do nzb.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Choose a folder for this post&apos;s sheet</source>
+        <translation>Escolher uma pasta para a ficha desta publicação</translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>The model — the file, line by line</source>
         <translation>O modelo — o ficheiro, linha a linha</translation>
     </message>
@@ -4713,12 +4734,12 @@ Uma linha que comece por # é um comentário: nunca é escrita. As alterações 
     </message>
     <message>
         <location line="+3"/>
-        <location line="+431"/>
+        <location line="+492"/>
         <source>Save as…</source>
         <translation>Guardar como…</translation>
     </message>
     <message>
-        <location line="-429"/>
+        <location line="-490"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>Escreve estas linhas num ficheiro de modelo seu.</translation>
     </message>
@@ -4777,7 +4798,32 @@ Marcado: é escrito aí E publicado no nzb, que circula.</translation>
         <translation>Todas as __variáveis__ que o ngPost conhece, e o que contêm.</translation>
     </message>
     <message>
-        <location line="+69"/>
+        <location line="+68"/>
+        <source>No destination set: no sheet will be written.</source>
+        <translation>Sem destino: não será escrita nenhuma ficha.</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Unknown variable in the destination: %1</source>
+        <translation>Variável desconhecida no destino: %1</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The destination is still empty for this post.</source>
+        <translation>O destino continua vazio para esta publicação.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Goes to: %1</source>
+        <translation>Vai para: %1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Folder for this post&apos;s sheet</source>
+        <translation>Pasta para a ficha desta publicação</translation>
+    </message>
+    <message>
+        <location line="+31"/>
         <source>%1  (default)</source>
         <translation>%1  (predefinido)</translation>
     </message>
@@ -4798,12 +4844,12 @@ Marcado: é escrito aí E publicado no nzb, que circula.</translation>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+228"/>
+        <location line="+229"/>
         <source>Text files (*.txt *.tpl);;All files (*)</source>
         <translation>Ficheiros de texto (*.txt *.tpl);;Todos os ficheiros (*)</translation>
     </message>
     <message>
-        <location line="-205"/>
+        <location line="-206"/>
         <source>No model: nothing will be written for this post.</source>
         <translation>Sem modelo: não será escrito nada para esta publicação.</translation>
     </message>
@@ -4814,12 +4860,12 @@ Marcado: é escrito aí E publicado no nzb, que circula.</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+213"/>
+        <location line="+214"/>
         <source>Model in use: %1</source>
         <translation>Modelo em uso: %1</translation>
     </message>
     <message>
-        <location line="-189"/>
+        <location line="-190"/>
         <source>name of the line</source>
         <translation>nome da linha</translation>
     </message>
@@ -4854,7 +4900,7 @@ Marcado: é escrito aí E publicado no nzb, que circula.</translation>
         <translation>Remover esta linha do modelo</translation>
     </message>
     <message>
-        <location line="+68"/>
+        <location line="+69"/>
         <source>(not written)</source>
         <translation>(não escrito)</translation>
     </message>
@@ -5004,7 +5050,7 @@ Guardar o modelo agora?</translation>
         <translation>data em que a publicação começou, no formato que indicar</translation>
     </message>
     <message>
-        <location line="+110"/>
+        <location line="+115"/>
         <source>cannot read the template %1: %2</source>
         <translation>não é possível ler o modelo %1: %2</translation>
     </message>
@@ -5034,7 +5080,7 @@ Guardar o modelo agora?</translation>
         <translation>formato de modelo desconhecido «%1», os valores sao escritos tal e qual (formatos conhecidos: json, xml)</translation>
     </message>
     <message>
-        <location line="-484"/>
+        <location line="-489"/>
         <source>folder of the posted files (legacy, unchanged)</source>
         <translation>pasta dos arquivos postados (legado, inalterado)</translation>
     </message>
@@ -5164,7 +5210,7 @@ Guardar o modelo agora?</translation>
         <translation>caminho do arquivo json temporário (somente comandos pós-postagem)</translation>
     </message>
     <message>
-        <location line="+472"/>
+        <location line="+477"/>
         <source>unknown variable(s) left as-is: %1</source>
         <translation>variável(eis) desconhecida(s) deixada(s) tal e qual: %1</translation>
     </message>
@@ -5389,7 +5435,7 @@ Guardar o modelo agora?</translation>
         <translation>Histórico: não foi possível registar o tamanho da publicação %1: %2</translation>
     </message>
     <message>
-        <location line="+490"/>
+        <location line="+496"/>
         <source>, archive password: ***</source>
         <translation>, senha do arquivo: ***</translation>
     </message>
@@ -5398,7 +5444,7 @@ Guardar o modelo agora?</translation>
         <translation type="vanished">Histórico: não foi possível voltar a marcar a publicação %1 como retomável: %2</translation>
     </message>
     <message>
-        <location line="-336"/>
+        <location line="-342"/>
         <source>History: could not record the outcome of post %1: %2</source>
         <translation>Histórico: não foi possível registar o resultado da publicação %1: %2</translation>
     </message>
@@ -5443,7 +5489,7 @@ Guardar o modelo agora?</translation>
         <translation>Ficha: não foi escrita nenhuma ficha, não foi possível descrever a publicação.</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
         <location line="+3"/>
         <source>Post info: %1</source>
         <translation>Ficha: %1</translation>
@@ -5585,7 +5631,7 @@ Guardar o modelo agora?</translation>
         <translation type="vanished">Histórico: não foi possível marcar o post como a retomar: %1</translation>
     </message>
     <message>
-        <location line="-1879"/>
+        <location line="-1885"/>
         <source>History: could not create post record: %1</source>
         <translation>Histórico: não foi possível criar o registo do post: %1</translation>
     </message>
@@ -5919,7 +5965,7 @@ Guardar o modelo agora?</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+830"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+842"/>
         <source>Post Files</source>
         <translation>Postar Arquivos</translation>
     </message>
@@ -5953,7 +5999,7 @@ Guardar o modelo agora?</translation>
         <translation>Lembre-se de que você pode selecionar itens na lista e pressionar DEL para removê-los</translation>
     </message>
     <message>
-        <location line="-605"/>
+        <location line="-617"/>
         <source>There are no selected files to post...</source>
         <translation>Não existem arquivos selecionados para postar...</translation>
     </message>
@@ -5980,26 +6026,26 @@ Would you like to overwrite it ?</source>
 Deseja substituí-lo?</translation>
     </message>
     <message>
-        <location line="+46"/>
-        <location line="+603"/>
+        <location line="+47"/>
+        <location line="+614"/>
         <location line="+19"/>
         <source>Stop Posting</source>
         <translation>Para a Postagem</translation>
     </message>
     <message>
-        <location line="-616"/>
-        <location line="+619"/>
+        <location line="-627"/>
+        <location line="+630"/>
         <source>Cancel Posting</source>
         <translation>Cancele a Postagem</translation>
     </message>
     <message>
-        <location line="-588"/>
+        <location line="-599"/>
         <source>Select one or more files to Post</source>
         <translation>Selecione um ou mais arquivo para Postar</translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+61"/>
+        <location line="+62"/>
         <source>Select a Folder</source>
         <translation>Selecione uma Pasta</translation>
     </message>
@@ -6041,17 +6087,21 @@ Alguns índices Usenet pedem um.</translation>
         <translation>Escolher o modelo e preencher os seus próprios campos, para esta publicação.</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+33"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>As informações da publicação mencionam «%1» duas vezes. Remova uma das duas linhas.</translation>
     </message>
     <message>
-        <location line="+17"/>
-        <source>Post info model saved as the default: %1</source>
-        <translation>Modelo de ficha guardado como predefinido: %1</translation>
+        <location line="+23"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>Predefinições guardadas: modelo %1, escrita em %2</translation>
     </message>
     <message>
-        <location line="+66"/>
+        <source>Post info model saved as the default: %1</source>
+        <translation type="vanished">Modelo de ficha guardado como predefinido: %1</translation>
+    </message>
+    <message>
+        <location line="+68"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation>limite o número de volumes do arquivo para %1 (cf config RAR_MAX)</translation>
     </message>
@@ -6148,7 +6198,7 @@ Alguns índices Usenet pedem um.</translation>
 <context>
     <name>UpdateChecker</name>
     <message>
-        <location filename="../utils/UpdateChecker.cpp" line="+177"/>
+        <location filename="../utils/UpdateChecker.cpp" line="+295"/>
         <source>Unable to write to install directory %1. Opening release page instead.</source>
         <translation>Não foi possível escrever no diretório de instalação %1. A abrir a página de versão em alternativa.</translation>
     </message>

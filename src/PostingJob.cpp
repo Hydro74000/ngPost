@@ -1725,9 +1725,15 @@ void PostingJob::_writePostInfoFile()
     QStringList protectedPaths = _protectedPaths();
     protectedPaths << templatePath;
 
+    // A destination chosen for this post wins over the configured one. A
+    // relative path is understood the same way either came: from the folder
+    // of the configuration file, never from wherever the process was started.
+    const QString outputPattern =
+        _options.postInfoOutput.isEmpty() ? _ngPost->_postInfoOutput : _options.postInfoOutput;
+
     const PostInfoTemplate::Result result =
         PostInfoTemplate::renderToFile(templatePath,
-                                       _ngPost->_postInfoOutput,
+                                       outputPattern,
                                        _finalPostInfoData,
                                        protectedPaths,
                                        _ngPost->postInfoOutputBaseDir());

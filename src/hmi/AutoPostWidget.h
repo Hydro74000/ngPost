@@ -48,6 +48,7 @@ private:
     QCheckBox   *_postInfoCB = nullptr;
     QPushButton *_postInfoButton = nullptr;
     QString _postInfoTemplate;
+    QString _postInfoOutput;
     QMap<QString, MetaValue> _postInfoMeta;
 
     void _buildPostInfoRow();

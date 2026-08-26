@@ -59,11 +59,14 @@ PostInfoDialog::PostInfoDialog(const QString                  &configuredTemplat
                                const QMap<QString, MetaValue> &meta,
                                const QStringList              &sessionTemplates,
                                const PostInfoData             &preview,
+                               const QString                  &configuredOutput,
+                               const QString                  &outputOverride,
                                QWidget                        *parent)
     : QDialog(parent)
     , _configuredTemplate(configuredTemplate)
     , _preview(preview)
     , _sessionTemplates(sessionTemplates)
+    , _configuredOutput(configuredOutput)
 {
     setObjectName(QStringLiteral("postInfoDialog"));
     setWindowTitle(tr("Post information"));
@@ -106,6 +109,35 @@ PostInfoDialog::PostInfoDialog(const QString                  &configuredTemplat
         tr("Writes it in your configuration as POST_INFO_TEMPLATE, so it becomes\n"
            "the model offered by default. This post uses it either way."));
     root->addWidget(_setAsDefault);
+
+    // ---- where it goes ---------------------------------------------------
+    QHBoxLayout *outRow = new QHBoxLayout();
+    outRow->addWidget(new QLabel(tr("Write it to:"), this));
+
+    _output = new QLineEdit(this);
+    _output->setObjectName(QStringLiteral("postInfoOutput"));
+    // Empty means "whatever the configuration says", so show that as the
+    // placeholder rather than pre-filling it: a filled field would look like a
+    // choice this post made, and would stop following a later config change.
+    _output->setPlaceholderText(_configuredOutput);
+    _output->setToolTip(tr("Leave empty to follow your configuration. Variables work here:\n"
+                           "__nzbDir__/__nzbName__.info.txt writes it next to the nzb."));
+    outRow->addWidget(_output, 1);
+
+    // QChar rather than an octal escape: QStringLiteral takes those bytes as
+    // Latin-1, which put "\u00e2\u0080\u00a6" on the button instead of an ellipsis.
+    _outputButton = new QPushButton(QString(QChar(0x2026)), this);
+    _outputButton->setObjectName(QStringLiteral("postInfoOutputButton"));
+    _outputButton->setFixedWidth(34);
+    _outputButton->setToolTip(tr("Choose a folder for this post's sheet"));
+    outRow->addWidget(_outputButton);
+
+    root->addLayout(outRow);
+
+    _outputHint = new QLabel(this);
+    _outputHint->setObjectName(QStringLiteral("postInfoOutputHint"));
+    _outputHint->setWordWrap(true);
+    root->addWidget(_outputHint);
 
     _templateHint = new QLabel(this);
     _templateHint->setObjectName(QStringLiteral("postInfoTemplateHint"));
@@ -199,6 +231,8 @@ PostInfoDialog::PostInfoDialog(const QString                  &configuredTemplat
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(_forgetButton, &QAbstractButton::clicked, this, &PostInfoDialog::onForgetTemplate);
     connect(_helpButton, &QAbstractButton::clicked, this, &PostInfoDialog::onShowHelp);
+    connect(_outputButton, &QAbstractButton::clicked, this, &PostInfoDialog::onBrowseOutput);
+    connect(_output, &QLineEdit::textEdited, this, &PostInfoDialog::onOutputEdited);
     connect(_reloadButton, &QAbstractButton::clicked, this, &PostInfoDialog::onReloadModel);
     connect(_addLineButton, &QAbstractButton::clicked, this, &PostInfoDialog::onAddModelLine);
     connect(_saveAsButton, &QAbstractButton::clicked, this, &PostInfoDialog::onSaveModelAs);
@@ -215,9 +249,12 @@ PostInfoDialog::PostInfoDialog(const QString                  &configuredTemplat
     for (auto it = meta.cbegin(); it != meta.cend(); ++it)
         _addField(it.key(), it.value().value, it.value().scope == MetaScope::Nzb);
 
+    _output->setText(outputOverride);
+    onOutputEdited();
+
     _loadModel();
 
-    resize(900, 760);
+    resize(900, 800);
 }
 
 // ======================================================================
@@ -230,6 +267,61 @@ QString PostInfoDialog::templateOverride() const
     // configuration says", so a later change there follows this post too.
     QString const chosen = _effectiveTemplatePath();
     return chosen == _configuredTemplate ? QString() : chosen;
+}
+
+QString PostInfoDialog::outputOverride() const
+{
+    const QString typed = _output->text().trimmed();
+    // Typing back exactly what the configuration says is not an override: the
+    // post keeps following it, so a later change to the configuration follows
+    // this post too.
+    return typed == _configuredOutput ? QString() : typed;
+}
+
+//! Shows where the sheet actually lands, resolved with this post's values.
+//! "__nzbDir__/__nzbName__.info.txt" says little; the path it produces says
+//! everything.
+void PostInfoDialog::onOutputEdited()
+{
+    const QString pattern = _output->text().trimmed().isEmpty() ? _configuredOutput
+                                                                : _output->text().trimmed();
+    if (pattern.isEmpty()) {
+        _outputHint->setText(tr("No destination set: no sheet will be written."));
+        return;
+    }
+
+    PostInfoData data = _preview;
+    data.meta         = meta();
+    if (!data.finishedAt.isValid())
+        data.finishedAt = QDateTime::currentDateTime();
+    if (!data.startedAt.isValid())
+        data.startedAt = data.finishedAt;
+
+    QStringList unknown;
+    const QString resolved = PostInfoTemplate::render(
+        pattern, data, true, PostInfoTemplate::OnUnknown::Fail, &unknown);
+
+    if (!unknown.isEmpty())
+        _outputHint->setText(tr("Unknown variable in the destination: %1")
+                                 .arg(unknown.join(QStringLiteral(", "))));
+    else if (resolved.trimmed().isEmpty())
+        _outputHint->setText(tr("The destination is still empty for this post."));
+    else
+        _outputHint->setText(tr("Goes to: %1").arg(QDir::toNativeSeparators(resolved)));
+}
+
+void PostInfoDialog::onBrowseOutput()
+{
+    // A folder, not a file: the name is the model's business, through
+    // __nzbName__. Picking a file name here would freeze every sheet of every
+    // post onto one path, overwriting the previous one each time.
+    const QString dir = QFileDialog::getExistingDirectory(
+        this, tr("Folder for this post's sheet"), QString());
+    if (dir.isEmpty())
+        return;
+    _output->setText(QDir::toNativeSeparators(
+        QDir(dir).filePath(QStringLiteral("__nzbName__.info.txt"))));
+    onOutputEdited();
 }
 
 bool PostInfoDialog::setAsDefault() const
@@ -491,6 +583,7 @@ void PostInfoDialog::_refreshPreviews()
     // show exactly that.
     _escape = PostInfoTemplate::escapeModeFor(PostInfoTemplate::buildTemplate(_lines, _crlf),
                                               _effectiveTemplatePath());
+    onOutputEdited(); // the destination may use __meta:...__ too
 
     // A date is knowable while the post is being prepared: previewing today
     // shows the shape of the line, which is what the format is chosen for.
@@ -765,7 +858,7 @@ void PostInfoDialog::onShowHelp()
     for (PostInfoTemplate::FieldDoc const &field : PostInfoTemplate::fields()) {
         QString name = QString::fromLatin1(field.placeholder).toHtmlEscaped();
         if (field.isSecret) {
-            name += QStringLiteral(" \342\232\240");
+            name += QStringLiteral(" ") + QChar(0x26A0);
             anySecret = true;
         }
         html += QStringLiteral("<tr><td><b>%1</b></td><td>%2</td><td>%3</td></tr>")
@@ -782,7 +875,7 @@ void PostInfoDialog::onShowHelp()
                         "it only exists once the post is over, which is why it is blank here."));
 
     if (anySecret)
-        html += QStringLiteral("<p>\342\232\240 %1</p>")
+        html += QStringLiteral("<p>") + QChar(0x26A0) + QStringLiteral(" %1</p>")
                     .arg(tr("A variable marked with a warning sign holds a secret. Putting it in "
                             "a model makes the produced file as sensitive as the password itself: "
                             "write it in a folder only you can read."));

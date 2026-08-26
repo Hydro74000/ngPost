@@ -63,6 +63,7 @@ private:
     QPushButton *_postInfoButton;
     //! Model this post uses, empty when it takes the one from the config.
     QString _postInfoTemplate;
+    QString _postInfoOutput;
     //! What the user typed for THIS post, never shared with the next one.
     QMap<QString, MetaValue> _postInfoMeta;
 
@@ -96,6 +97,7 @@ public:
     //! Applied by the auto-post tab to every post it launches.
     void setPostInfo(bool enabled,
                      const QString &templateOverride,
+                     const QString &outputOverride,
                      const QMap<QString, MetaValue> &meta);
     QString postInfoTemplateOverride() const { return _postInfoTemplate; }
     QMap<QString, MetaValue> postInfoMeta() const { return _postInfoMeta; }

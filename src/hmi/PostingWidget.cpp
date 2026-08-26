@@ -213,6 +213,7 @@ void PostingWidget::postFiles(bool updateMainParams)
         {
             options.meta             = _postInfoMeta;
             options.postInfoTemplate = _postInfoTemplate;
+            options.postInfoOutput   = _postInfoOutput;
         }
 
         _postingJob = new PostingJob(_ngPost, options, this);
@@ -295,6 +296,7 @@ void PostingWidget::onClearFilesClicked()
     // hand the title of one post to the next one queued in this tab.
     _postInfoMeta.clear();
     _postInfoTemplate.clear();
+    _postInfoOutput.clear();
     _ui->nzbFileEdit->clear();
     _ui->compressNameEdit->clear();
     if (_hmi->hasAutoCompress())
@@ -648,6 +650,8 @@ void PostingWidget::onEditPostInfo()
                        _postInfoMeta,
                        _ngPost->sessionPostInfoTemplates(),
                        _postInfoPreview(),
+                       _ngPost->postInfoOutputPattern(),
+                       _postInfoOutput,
                        this);
     int const answer = dlg.exec();
 
@@ -671,18 +675,24 @@ void PostingWidget::onEditPostInfo()
     }
 
     _postInfoTemplate = dlg.templateOverride();
+    _postInfoOutput   = dlg.outputOverride();
     _postInfoMeta     = meta;
 
     if (dlg.setAsDefault())
     {
-        // Asked to become the model offered from now on: it goes in the
-        // configuration, and stops being an override for this post.
+        // Asked to become what is offered from now on: model and destination
+        // go in the configuration and stop being overrides for this post.
         _ngPost->setPostInfoTemplate(_postInfoTemplate.isEmpty() ? _ngPost->postInfoTemplatePath()
                                                                  : _postInfoTemplate);
         _postInfoTemplate.clear();
+        if (!_postInfoOutput.isEmpty())
+        {
+            _ngPost->setPostInfoOutput(_postInfoOutput);
+            _postInfoOutput.clear();
+        }
         _ngPost->saveConfig();
-        _hmi->log(tr("Post info model saved as the default: %1")
-                      .arg(_ngPost->postInfoTemplatePath()));
+        _hmi->log(tr("Post info defaults saved: model %1, written to %2")
+                      .arg(_ngPost->postInfoTemplatePath(), _ngPost->postInfoOutputPattern()));
     }
 }
 
@@ -729,11 +739,13 @@ PostInfoData PostingWidget::_postInfoPreview() const
 
 void PostingWidget::setPostInfo(bool enabled,
                                 const QString &templateOverride,
+                                const QString &outputOverride,
                                 const QMap<QString, MetaValue> &meta)
 {
     if (_postInfoCB)
         _postInfoCB->setChecked(enabled);
     _postInfoTemplate = templateOverride;
+    _postInfoOutput   = outputOverride;
     _postInfoMeta     = meta;
 }
 

@@ -2393,7 +2393,7 @@ void MainWindow::_onResumeSelectionChanged()
                 ? tr("<span style='color:#FFA200'>Partially resumable</span>")
                 : tr("<span style='color:darkred'>Not resumable</span>");
     _resumeDetailInfo->setText(
-        QStringLiteral("<b>%1</b> \342\200\224 %2 | "
+        QStringLiteral("<b>%1</b> ") + QChar(0x2014) + QStringLiteral(" %2 | "
                        "Posted: %3 | Pending: %4 | Failed: %5 | Unknown: %6%7")
             .arg(item->text(), stateStr)
             .arg(dec.postedArticles).arg(dec.pendingArticles)

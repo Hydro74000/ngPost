@@ -100,6 +100,11 @@ struct PostingJobOptions
     bool    writePostInfoFile = true;
     QString postInfoTemplate;
 
+    //! Where this post writes its sheet, overriding POST_INFO_OUTPUT for this
+    //! post only. Empty means "wherever the configuration says", which is the
+    //! nzb folder unless that was changed.
+    QString postInfoOutput;
+
     //! Password announced with -m "password=...", when ngPost did not compress
     //! itself and therefore has no rarPass of its own. It is stored, purged and
     //! published exactly like an archive password, never as a metadata.

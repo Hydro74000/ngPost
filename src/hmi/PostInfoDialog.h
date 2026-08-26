@@ -42,6 +42,8 @@ public:
                    const QMap<QString, MetaValue> &meta,
                    const QStringList              &sessionTemplates = QStringList(),
                    const PostInfoData             &preview          = PostInfoData(),
+                   const QString                  &configuredOutput = QString(),
+                   const QString                  &outputOverride   = QString(),
                    QWidget                        *parent           = nullptr);
 
     //! Models the dialog ended up offering, minus the ones the user dropped,
@@ -50,6 +52,10 @@ public:
 
     //! Empty when the post uses the model from the configuration.
     QString templateOverride() const;
+
+    //! Where this post writes its sheet. Empty when it follows the
+    //! configuration, which is what most posts do.
+    QString outputOverride() const;
     //! True when the user asked for the selected model to become the one the
     //! configuration provides from now on.
     bool setAsDefault() const;
@@ -63,6 +69,8 @@ private slots:
     void onReloadModel();
     //! Opens the reference of every __variable__, built from the engine table.
     void onShowHelp();
+    void onBrowseOutput();
+    void onOutputEdited();
 
     void onAddModelLine();
     void onAddField();
@@ -112,6 +120,11 @@ private:
     QPushButton  *_reloadButton;
     QCheckBox    *_setAsDefault;
     QLabel       *_templateHint;
+
+    QString       _configuredOutput;
+    QLineEdit    *_output;
+    QPushButton  *_outputButton;
+    QLabel       *_outputHint;
 
     QTableWidget *_model;
     QPushButton  *_addLineButton;

@@ -242,7 +242,7 @@
     </message>
     <message>
         <location line="+24"/>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+243"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+244"/>
         <source>Monitor Folder</source>
         <translation>Carpeta de Monitorización</translation>
     </message>
@@ -281,12 +281,12 @@
         <translation>Usando PAR2_ARGS del fichero de configuración: %1</translation>
     </message>
     <message>
-        <location line="-340"/>
+        <location line="-341"/>
         <source>Nothing to post...</source>
         <translation>Nada que publicar...</translation>
     </message>
     <message>
-        <location line="+342"/>
+        <location line="+343"/>
         <source>You can use the &lt;b&gt;Monitor Mode&lt;/b&gt;</source>
         <translation>Tú puedes usar el &lt;b&gt;Modo Monitor&lt;/b&gt;</translation>
     </message>
@@ -316,7 +316,7 @@
         <translation>Ten en cuenta que puedes seleccionar elementos de la lista y pulsar DEL para eliminarlos</translation>
     </message>
     <message>
-        <location line="-346"/>
+        <location line="-347"/>
         <source>There is nothing to post!
 Press the Scan button and remove what you don&apos;t want to post ;)
 (To remove files, select in the list and press DEL or BackSpace)</source>
@@ -330,7 +330,7 @@ Presiona el botón de escanear y elimina lo que no quieras publicar ;)
         <translation>No se puede utilizar la publicación automática sin compresión de las carpetas... (%1)</translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+52"/>
         <location line="+30"/>
         <source>Select a Folder</source>
         <translation>Seleccione una carpeta</translation>
@@ -448,14 +448,18 @@ Será irreversible...</translation>
         <translation>Modelo y campos usados por todas las publicaciones de esta ejecución.</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+42"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>La información de la publicación menciona «%1» dos veces. Quite una de las dos líneas.</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>Valores por omisión guardados: modelo %1, escrita en %2</translation>
+    </message>
+    <message>
         <source>Post info model saved as the default: %1</source>
-        <translation>Modelo de ficha guardado como el predeterminado: %1</translation>
+        <translation type="vanished">Modelo de ficha guardado como el predeterminado: %1</translation>
     </message>
 </context>
 <context>
@@ -4133,7 +4137,7 @@ Su archivo de configuración activo es:
         <translation type="vanished">Auto compresión ON (--compress --gen_name --gen_pass --gen_par2)</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1090"/>
+        <location filename="../NgPost.h" line="+1100"/>
         <source>PACKing auto using: %1</source>
         <translation>Empaquetado automático usando: %1</translation>
     </message>
@@ -4677,15 +4681,15 @@ Su archivo de configuración activo es:
 <context>
     <name>PostInfoDialog</name>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="+69"/>
-        <location line="+485"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
+        <location line="+573"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>Información de la publicación</translation>
     </message>
     <message>
-        <location line="-627"/>
+        <location line="-715"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>Una ficha describe esta publicación en un archivo de texto escrito junto al nzb.
@@ -4724,7 +4728,24 @@ the model offered by default. This post uses it either way.</source>
 el modelo ofrecido por omisión. Esta publicación lo usa de todas formas.</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+6"/>
+        <source>Write it to:</source>
+        <translation>Escribirla en:</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Leave empty to follow your configuration. Variables work here:
+__nzbDir__/__nzbName__.info.txt writes it next to the nzb.</source>
+        <translation>Déjelo vacío para seguir su configuración. Aquí funcionan las variables:
+__nzbDir__/__nzbName__.info.txt la escribe junto al nzb.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Choose a folder for this post&apos;s sheet</source>
+        <translation>Elegir una carpeta para la ficha de esta publicación</translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>The model — the file, line by line</source>
         <translation>El modelo — el archivo, línea por línea</translation>
     </message>
@@ -4762,12 +4783,12 @@ Una línea que empieza por # es un comentario: nunca se escribe. Los cambios hec
     </message>
     <message>
         <location line="+3"/>
-        <location line="+431"/>
+        <location line="+492"/>
         <source>Save as…</source>
         <translation>Guardar como…</translation>
     </message>
     <message>
-        <location line="-429"/>
+        <location line="-490"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>Escribe estas líneas en un archivo de modelo suyo.</translation>
     </message>
@@ -4826,7 +4847,32 @@ Marcado: se escribe ahí Y se publica en el nzb, que circula.</translation>
         <translation>Todas las __variables__ que ngPost conoce, y lo que contienen.</translation>
     </message>
     <message>
-        <location line="+69"/>
+        <location line="+68"/>
+        <source>No destination set: no sheet will be written.</source>
+        <translation>Sin destino: no se escribirá ninguna ficha.</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Unknown variable in the destination: %1</source>
+        <translation>Variable desconocida en el destino: %1</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The destination is still empty for this post.</source>
+        <translation>El destino sigue vacío para esta publicación.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Goes to: %1</source>
+        <translation>Irá a: %1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Folder for this post&apos;s sheet</source>
+        <translation>Carpeta para la ficha de esta publicación</translation>
+    </message>
+    <message>
+        <location line="+31"/>
         <source>%1  (default)</source>
         <translation>%1  (por omisión)</translation>
     </message>
@@ -4847,12 +4893,12 @@ Marcado: se escribe ahí Y se publica en el nzb, que circula.</translation>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+228"/>
+        <location line="+229"/>
         <source>Text files (*.txt *.tpl);;All files (*)</source>
         <translation>Archivos de texto (*.txt *.tpl);;Todos los archivos (*)</translation>
     </message>
     <message>
-        <location line="-205"/>
+        <location line="-206"/>
         <source>No model: nothing will be written for this post.</source>
         <translation>Sin modelo: no se escribirá nada para esta publicación.</translation>
     </message>
@@ -4863,12 +4909,12 @@ Marcado: se escribe ahí Y se publica en el nzb, que circula.</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+213"/>
+        <location line="+214"/>
         <source>Model in use: %1</source>
         <translation>Modelo en uso: %1</translation>
     </message>
     <message>
-        <location line="-189"/>
+        <location line="-190"/>
         <source>name of the line</source>
         <translation>nombre de la línea</translation>
     </message>
@@ -4903,7 +4949,7 @@ Marcado: se escribe ahí Y se publica en el nzb, que circula.</translation>
         <translation>Quitar esta línea del modelo</translation>
     </message>
     <message>
-        <location line="+68"/>
+        <location line="+69"/>
         <source>(not written)</source>
         <translation>(no escrito)</translation>
     </message>
@@ -5053,7 +5099,7 @@ La publicación usa el archivo, así que estos cambios se perderían.
         <translation>fecha de inicio de la publicación, en el formato que dé</translation>
     </message>
     <message>
-        <location line="+110"/>
+        <location line="+115"/>
         <source>cannot read the template %1: %2</source>
         <translation>no se puede leer el modelo %1: %2</translation>
     </message>
@@ -5083,7 +5129,7 @@ La publicación usa el archivo, así que estos cambios se perderían.
         <translation>formato de modelo desconocido «%1», los valores se escriben tal cual (formatos conocidos: json, xml)</translation>
     </message>
     <message>
-        <location line="-484"/>
+        <location line="-489"/>
         <source>folder of the posted files (legacy, unchanged)</source>
         <translation>carpeta de los archivos publicados (heredado, sin cambios)</translation>
     </message>
@@ -5213,7 +5259,7 @@ La publicación usa el archivo, así que estos cambios se perderían.
         <translation>ruta del archivo json temporal (solo comandos posteriores a la publicación)</translation>
     </message>
     <message>
-        <location line="+472"/>
+        <location line="+477"/>
         <source>unknown variable(s) left as-is: %1</source>
         <translation>variable(s) desconocida(s) dejada(s) tal cual: %1</translation>
     </message>
@@ -5499,7 +5545,7 @@ Comienza a publicar:%1</translation>
         <translation>Ficha: no se escribió ninguna ficha, no se pudo describir la publicación.</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
         <location line="+3"/>
         <source>Post info: %1</source>
         <translation>Ficha: %1</translation>
@@ -5673,7 +5719,7 @@ Tamaño de la subida: %1 en %2 (%3 seg.) =&gt; velocidad media: %4 (%5 conexione
         <translation type="vanished">Historial: no se pudo marcar el post como reanudando: %1</translation>
     </message>
     <message>
-        <location line="-1879"/>
+        <location line="-1885"/>
         <source>History: could not create post record: %1</source>
         <translation>Historial: no se pudo crear el registro del post: %1</translation>
     </message>
@@ -6007,7 +6053,7 @@ Tamaño de la subida: %1 en %2 (%3 seg.) =&gt; velocidad media: %4 (%5 conexione
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+830"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+842"/>
         <source>Post Files</source>
         <translation>Publicar Ficheros</translation>
     </message>
@@ -6041,7 +6087,7 @@ Tamaño de la subida: %1 en %2 (%3 seg.) =&gt; velocidad media: %4 (%5 conexione
         <translation>Ten en cuenta que puedes seleccionar elementos de la lista y pulsar DEL para eliminarlos</translation>
     </message>
     <message>
-        <location line="-605"/>
+        <location line="-617"/>
         <source>There are no selected files to post...</source>
         <translation>No hay selecionados ficheros para publicar...</translation>
     </message>
@@ -6068,26 +6114,26 @@ Would you like to overwrite it ?</source>
 ¿Le gustaría sobrescribirlo?</translation>
     </message>
     <message>
-        <location line="+46"/>
-        <location line="+603"/>
+        <location line="+47"/>
+        <location line="+614"/>
         <location line="+19"/>
         <source>Stop Posting</source>
         <translation>Parar de publicar</translation>
     </message>
     <message>
-        <location line="-616"/>
-        <location line="+619"/>
+        <location line="-627"/>
+        <location line="+630"/>
         <source>Cancel Posting</source>
         <translation>Cancelar la publicación</translation>
     </message>
     <message>
-        <location line="-588"/>
+        <location line="-599"/>
         <source>Select one or more files to Post</source>
         <translation>Seleccione uno o más ficheros para Publicar</translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+61"/>
+        <location line="+62"/>
         <source>Select a Folder</source>
         <translation>Seleccione una Carpeta</translation>
     </message>
@@ -6129,17 +6175,21 @@ Algunos índices de Usenet lo piden.</translation>
         <translation>Elegir el modelo y rellenar sus propios campos, para esta publicación.</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+33"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>La información de la publicación menciona «%1» dos veces. Quite una de las dos líneas.</translation>
     </message>
     <message>
-        <location line="+17"/>
-        <source>Post info model saved as the default: %1</source>
-        <translation>Modelo de ficha guardado como el predeterminado: %1</translation>
+        <location line="+23"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>Valores por omisión guardados: modelo %1, escrita en %2</translation>
     </message>
     <message>
-        <location line="+66"/>
+        <source>Post info model saved as the default: %1</source>
+        <translation type="vanished">Modelo de ficha guardado como el predeterminado: %1</translation>
+    </message>
+    <message>
+        <location line="+68"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation>limitar el número de volumen de archivo a %1 (cf config RAR_MAX)</translation>
     </message>
@@ -6236,7 +6286,7 @@ Algunos índices de Usenet lo piden.</translation>
 <context>
     <name>UpdateChecker</name>
     <message>
-        <location filename="../utils/UpdateChecker.cpp" line="+177"/>
+        <location filename="../utils/UpdateChecker.cpp" line="+295"/>
         <source>Unable to write to install directory %1. Opening release page instead.</source>
         <translation>No se puede escribir en el directorio de instalación %1. Abriendo la página de versión en su lugar.</translation>
     </message>

@@ -226,7 +226,7 @@
     </message>
     <message>
         <location line="+24"/>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+243"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+244"/>
         <source>Monitor Folder</source>
         <translation>Surveiller Dossier</translation>
     </message>
@@ -265,12 +265,12 @@
         <translation>utilisation de fichier de configuration pour PAR2_ARGS: %1</translation>
     </message>
     <message>
-        <location line="-340"/>
+        <location line="-341"/>
         <source>Nothing to post...</source>
         <translation>Rien à poster...</translation>
     </message>
     <message>
-        <location line="+342"/>
+        <location line="+343"/>
         <source>You can use the &lt;b&gt;Monitor Mode&lt;/b&gt;</source>
         <translation>Vous pouvez &lt;b&gt;Surveiller un dossier&lt;/b&gt;</translation>
     </message>
@@ -300,7 +300,7 @@
         <translation>Vous pouvez sélectionner dans la liste et appuyer sur SUPPR pour enlever fichiers/dossiers</translation>
     </message>
     <message>
-        <location line="-346"/>
+        <location line="-347"/>
         <source>There is nothing to post!
 Press the Scan button and remove what you don&apos;t want to post ;)
 (To remove files, select in the list and press DEL or BackSpace)</source>
@@ -312,7 +312,7 @@ Press the Scan button and remove what you don&apos;t want to post ;)
         <translation>Il n&apos;est pas possible d&apos;utiliser le mode AUTO sans compression sur un dossier... (%1)</translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+52"/>
         <location line="+30"/>
         <source>Select a Folder</source>
         <translation>Sélectionner un dossier</translation>
@@ -425,14 +425,18 @@ It will be irreversible...</source>
         <translation>Modèle et champs utilisés par tous les posts de ce lancement.</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+42"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>Les informations du post citent « %1 » deux fois. Supprimez l&apos;une des deux lignes.</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>Réglages de fiche enregistrés par défaut : modèle %1, écrite dans %2</translation>
+    </message>
+    <message>
         <source>Post info model saved as the default: %1</source>
-        <translation>Modèle de fiche enregistré comme modèle par défaut : %1</translation>
+        <translation type="vanished">Modèle de fiche enregistré comme modèle par défaut : %1</translation>
     </message>
 </context>
 <context>
@@ -2570,11 +2574,11 @@ while the adopted configuration uses
     %3
 Point this command at &quot;%1/ngPost.conf&quot;, or add &quot;POST_DB = %3&quot; to this file, to keep a single history.</source>
         <translation>Attention : ce fichier de configuration est celui que ngPost a adopté en déplaçant vos réglages vers « %1 ».
-Il n'a pas de ligne POST_DB, donc ce lancement enregistre ses posts dans
+Il n&apos;a pas de ligne POST_DB, donc ce lancement enregistre ses posts dans
     %2
 alors que la configuration adoptée utilise
     %3
-Faites pointer cette commande sur « %1/ngPost.conf », ou ajoutez « POST_DB = %3 » à ce fichier, pour n'avoir qu'un seul historique.</translation>
+Faites pointer cette commande sur « %1/ngPost.conf », ou ajoutez « POST_DB = %3 » à ce fichier, pour n&apos;avoir qu&apos;un seul historique.</translation>
     </message>
     <message>
         <location line="+26"/>
@@ -3305,7 +3309,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
 The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
         <translation>
 
-L'ancien dossier a été laissé tel quel — les éléments de configuration ont été copiés, pas déplacés, donc un script ou une tâche cron passant « -c %1/ngPost.conf » lit toujours les mêmes réglages. Les fichiers SQLite de l'historique n'ont été ni copiés ni déplacés : l'opération est ainsi immédiate et ne touche jamais à une base active ni à ses fichiers WAL.</translation>
+L&apos;ancien dossier a été laissé tel quel — les éléments de configuration ont été copiés, pas déplacés, donc un script ou une tâche cron passant « -c %1/ngPost.conf » lit toujours les mêmes réglages. Les fichiers SQLite de l&apos;historique n&apos;ont été ni copiés ni déplacés : l&apos;opération est ainsi immédiate et ne touche jamais à une base active ni à ses fichiers WAL.</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -3314,7 +3318,7 @@ L'ancien dossier a été laissé tel quel — les éléments de configuration on
 One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at &quot;%1/ngPost.conf&quot; — or add &quot;POST_DB = %2&quot; to the old file — to keep a single history. ngPost says so again if it sees that file used.</source>
         <translation>
 
-Une chose change tout de même pour un tel script : l'ancien fichier de configuration n'a pas de ligne POST_DB, il enregistre donc désormais ses posts dans la base du nouveau dossier et non dans celle indiquée ci-dessous. Faites pointer le script sur « %1/ngPost.conf » — ou ajoutez « POST_DB = %2 » à l'ancien fichier — pour n'avoir qu'un seul historique. ngPost le redira s'il voit ce fichier utilisé.</translation>
+Une chose change tout de même pour un tel script : l&apos;ancien fichier de configuration n&apos;a pas de ligne POST_DB, il enregistre donc désormais ses posts dans la base du nouveau dossier et non dans celle indiquée ci-dessous. Faites pointer le script sur « %1/ngPost.conf » — ou ajoutez « POST_DB = %2 » à l&apos;ancien fichier — pour n&apos;avoir qu&apos;un seul historique. ngPost le redira s&apos;il voit ce fichier utilisé.</translation>
     </message>
     <message>
         <location line="+90"/>
@@ -4095,7 +4099,7 @@ Votre fichier de configuration actif est :
         <translation type="vanished">Auto compress ON (--compress --gen_name --gen_pass --gen_par2)</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1090"/>
+        <location filename="../NgPost.h" line="+1100"/>
         <source>PACKing auto using: %1</source>
         <translation>Packing auto avec: %1</translation>
     </message>
@@ -4647,15 +4651,15 @@ Votre fichier de configuration actif est :
 <context>
     <name>PostInfoDialog</name>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="+69"/>
-        <location line="+485"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
+        <location line="+573"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>Informations du post</translation>
     </message>
     <message>
-        <location line="-627"/>
+        <location line="-715"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>Une fiche de post décrit ce post dans un fichier texte écrit à côté du nzb.
@@ -4694,7 +4698,24 @@ the model offered by default. This post uses it either way.</source>
 le modèle proposé par défaut. Ce post l&apos;utilise de toute façon.</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+6"/>
+        <source>Write it to:</source>
+        <translation>L'écrire dans :</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Leave empty to follow your configuration. Variables work here:
+__nzbDir__/__nzbName__.info.txt writes it next to the nzb.</source>
+        <translation>Laissez vide pour suivre votre configuration. Les variables fonctionnent ici :
+__nzbDir__/__nzbName__.info.txt l'écrit à côté du nzb.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Choose a folder for this post&apos;s sheet</source>
+        <translation>Choisir un dossier pour la fiche de ce post</translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>The model — the file, line by line</source>
         <translation>Le modèle — le fichier, ligne par ligne</translation>
     </message>
@@ -4732,12 +4753,12 @@ Une ligne commençant par # est un commentaire : elle n&apos;est jamais écrite.
     </message>
     <message>
         <location line="+3"/>
-        <location line="+431"/>
+        <location line="+492"/>
         <source>Save as…</source>
         <translation>Enregistrer sous…</translation>
     </message>
     <message>
-        <location line="-429"/>
+        <location line="-490"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>Écrit ces lignes dans un fichier modèle à vous.</translation>
     </message>
@@ -4796,7 +4817,32 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
         <translation>Toutes les __variables__ que ngPost connaît, et ce qu&apos;elles contiennent.</translation>
     </message>
     <message>
-        <location line="+69"/>
+        <location line="+68"/>
+        <source>No destination set: no sheet will be written.</source>
+        <translation>Aucune destination : aucune fiche ne sera écrite.</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Unknown variable in the destination: %1</source>
+        <translation>Variable inconnue dans la destination : %1</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The destination is still empty for this post.</source>
+        <translation>La destination est encore vide pour ce post.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Goes to: %1</source>
+        <translation>Ira dans : %1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Folder for this post&apos;s sheet</source>
+        <translation>Dossier pour la fiche de ce post</translation>
+    </message>
+    <message>
+        <location line="+31"/>
         <source>%1  (default)</source>
         <translation>%1  (défaut)</translation>
     </message>
@@ -4817,12 +4863,12 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+228"/>
+        <location line="+229"/>
         <source>Text files (*.txt *.tpl);;All files (*)</source>
         <translation>Fichiers texte (*.txt *.tpl);;Tous les fichiers (*)</translation>
     </message>
     <message>
-        <location line="-205"/>
+        <location line="-206"/>
         <source>No model: nothing will be written for this post.</source>
         <translation>Aucun modèle : rien ne sera écrit pour ce post.</translation>
     </message>
@@ -4833,12 +4879,12 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+213"/>
+        <location line="+214"/>
         <source>Model in use: %1</source>
         <translation>Modèle utilisé : %1</translation>
     </message>
     <message>
-        <location line="-189"/>
+        <location line="-190"/>
         <source>name of the line</source>
         <translation>nom de la ligne</translation>
     </message>
@@ -4873,7 +4919,7 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
         <translation>Retirer cette ligne du modèle</translation>
     </message>
     <message>
-        <location line="+68"/>
+        <location line="+69"/>
         <source>(not written)</source>
         <translation>(non écrit)</translation>
     </message>
@@ -5023,7 +5069,7 @@ Enregistrer le modèle maintenant ?</translation>
         <translation>date de début du post, dans le format que vous donnez</translation>
     </message>
     <message>
-        <location line="+110"/>
+        <location line="+115"/>
         <source>cannot read the template %1: %2</source>
         <translation>impossible de lire le modèle %1 : %2</translation>
     </message>
@@ -5053,7 +5099,7 @@ Enregistrer le modèle maintenant ?</translation>
         <translation>format de modèle inconnu « %1 », les valeurs sont écrites telles quelles (formats connus : json, xml)</translation>
     </message>
     <message>
-        <location line="-484"/>
+        <location line="-489"/>
         <source>folder of the posted files (legacy, unchanged)</source>
         <translation>dossier des fichiers postés (historique, inchangé)</translation>
     </message>
@@ -5183,7 +5229,7 @@ Enregistrer le modèle maintenant ?</translation>
         <translation>chemin du fichier json temporaire (post-commandes seulement)</translation>
     </message>
     <message>
-        <location line="+472"/>
+        <location line="+477"/>
         <source>unknown variable(s) left as-is: %1</source>
         <translation>variable(s) inconnue(s) laissée(s) telles quelles : %1</translation>
     </message>
@@ -5518,7 +5564,7 @@ Start posting: %1</translation>
         <translation>Fiche de post : aucune fiche n&apos;a été écrite, le post n&apos;a pas pu être décrit.</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
         <location line="+3"/>
         <source>Post info: %1</source>
         <translation>Fiche de post : %1</translation>
@@ -5578,7 +5624,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
 </translation>
     </message>
     <message>
-        <location line="-247"/>
+        <location line="-253"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>Impossible de régénérer le NZB final depuis l&apos;historique : %1</translation>
     </message>
@@ -5592,7 +5638,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation type="vanished">Impossible de rouvrir le NZB pour la régénération depuis l&apos;historique : %1</translation>
     </message>
     <message>
-        <location line="+246"/>
+        <location line="+252"/>
         <source>nzb file: %1
 </source>
         <translation>fichier nzb: %1
@@ -5982,7 +6028,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+830"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+842"/>
         <source>Post Files</source>
         <translation>Poster Fichiers</translation>
     </message>
@@ -6016,7 +6062,7 @@ Taille du Post: %1 en %2 (%3 sec) =&gt; débit moyen: %4 (%5 connexions sur %6 t
         <translation>Vous pouvez sélectionner dans la liste et appuyer sur SUPPR pour enlever fichiers/dossiers</translation>
     </message>
     <message>
-        <location line="-605"/>
+        <location line="-617"/>
         <source>There are no selected files to post...</source>
         <translation>Il n&apos;y a aucun fichier séléctionné à poster...</translation>
     </message>
@@ -6042,26 +6088,26 @@ Would you like to overwrite it ?</source>
         <translation>Le fichier nzb &apos;%1&apos; existe déjà. Voulez vous l&apos;écraser?</translation>
     </message>
     <message>
-        <location line="+46"/>
-        <location line="+603"/>
+        <location line="+47"/>
+        <location line="+614"/>
         <location line="+19"/>
         <source>Stop Posting</source>
         <translation>Stop Post</translation>
     </message>
     <message>
-        <location line="-616"/>
-        <location line="+619"/>
+        <location line="-627"/>
+        <location line="+630"/>
         <source>Cancel Posting</source>
         <translation>Annuler Post</translation>
     </message>
     <message>
-        <location line="-588"/>
+        <location line="-599"/>
         <source>Select one or more files to Post</source>
         <translation>Sélectionner un ou plusieurs fichiers à poster</translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+61"/>
+        <location line="+62"/>
         <source>Select a Folder</source>
         <translation>Sélectionner un dossier</translation>
     </message>
@@ -6103,17 +6149,21 @@ Certains index Usenet en demandent un.</translation>
         <translation>Choisir le modèle et remplir vos propres champs, pour ce post.</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+33"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>Les informations du post citent « %1 » deux fois. Supprimez l&apos;une des deux lignes.</translation>
     </message>
     <message>
-        <location line="+17"/>
-        <source>Post info model saved as the default: %1</source>
-        <translation>Modèle de fiche enregistré comme modèle par défaut : %1</translation>
+        <location line="+23"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>Réglages de fiche enregistrés par défaut : modèle %1, écrite dans %2</translation>
     </message>
     <message>
-        <location line="+66"/>
+        <source>Post info model saved as the default: %1</source>
+        <translation type="vanished">Modèle de fiche enregistré comme modèle par défaut : %1</translation>
+    </message>
+    <message>
+        <location line="+68"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation>limite le nombre maximum de volumes à %1 (cf RAR_MAX conf)</translation>
     </message>
@@ -6210,7 +6260,7 @@ Certains index Usenet en demandent un.</translation>
 <context>
     <name>UpdateChecker</name>
     <message>
-        <location filename="../utils/UpdateChecker.cpp" line="+177"/>
+        <location filename="../utils/UpdateChecker.cpp" line="+295"/>
         <source>Unable to write to install directory %1. Opening release page instead.</source>
         <translation>Impossible d&apos;écrire dans le dossier d&apos;installation %1. Ouverture de la page release à la place.</translation>
     </message>

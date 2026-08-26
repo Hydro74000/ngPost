@@ -236,7 +236,7 @@
     </message>
     <message>
         <location line="+24"/>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+243"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+244"/>
         <source>Monitor Folder</source>
         <translation>Monitor Map</translation>
     </message>
@@ -265,7 +265,7 @@
         <translation type="vanished">Doneer</translation>
     </message>
     <message>
-        <location filename="../hmi/AutoPostWidget.cpp" line="-122"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="-123"/>
         <source>You can&apos;t use auto posting without compression on folders... (%1)</source>
         <translation>U kunt automatisch posten niet gebruiken zonder compressie op mappen... (%1)</translation>
     </message>
@@ -284,7 +284,7 @@ Druk op de Scan-knop en verwijder wat je niet wilt posten;)
 (Om bestanden te verwijderen, selecteer in de lijst en druk op DEL of BackSpace)</translation>
     </message>
     <message>
-        <location line="+43"/>
+        <location line="+44"/>
         <location line="+30"/>
         <source>Select a Folder</source>
         <translation>Selecteer een Map</translation>
@@ -443,14 +443,18 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>Model en velden voor alle posts van deze run.</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+42"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>De postinformatie noemt &apos;%1&apos; twee keer. Verwijder een van de twee regels.</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>Standaardwaarden opgeslagen: model %1, geschreven naar %2</translation>
+    </message>
+    <message>
         <source>Post info model saved as the default: %1</source>
-        <translation>Model opgeslagen als standaard: %1</translation>
+        <translation type="vanished">Model opgeslagen als standaard: %1</translation>
     </message>
 </context>
 <context>
@@ -3164,12 +3168,12 @@ It has no POST_DB line, so this run records its posts in
 while the adopted configuration uses
     %3
 Point this command at &quot;%1/ngPost.conf&quot;, or add &quot;POST_DB = %3&quot; to this file, to keep a single history.</source>
-        <translation>Waarschuwing: dit configuratiebestand is het bestand dat ngPost overnam toen het uw instellingen naar "%1" verplaatste.
+        <translation>Waarschuwing: dit configuratiebestand is het bestand dat ngPost overnam toen het uw instellingen naar &quot;%1&quot; verplaatste.
 Het heeft geen POST_DB-regel, dus deze run schrijft zijn posts in
     %2
 terwijl de overgenomen configuratie
     %3
-gebruikt. Laat dit commando naar "%1/ngPost.conf" wijzen, of voeg "POST_DB = %3" toe aan dit bestand, om één enkele geschiedenis te houden.</translation>
+gebruikt. Laat dit commando naar &quot;%1/ngPost.conf&quot; wijzen, of voeg &quot;POST_DB = %3&quot; toe aan dit bestand, om één enkele geschiedenis te houden.</translation>
     </message>
     <message>
         <location line="+26"/>
@@ -3361,7 +3365,7 @@ Uw actieve configuratiebestand is:
 The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
         <translation>
 
-De oude map is gebleven zoals hij was — de configuratiebestanden zijn gekopieerd, niet verplaatst, dus een script of cron-taak met "-c %1/ngPost.conf" leest nog steeds dezelfde instellingen. De SQLite-geschiedenisbestanden zijn niet gekopieerd of verplaatst: dat maakt de bewerking onmiddellijk en raakt nooit een draaiende database en haar WAL-bestanden aan.</translation>
+De oude map is gebleven zoals hij was — de configuratiebestanden zijn gekopieerd, niet verplaatst, dus een script of cron-taak met &quot;-c %1/ngPost.conf&quot; leest nog steeds dezelfde instellingen. De SQLite-geschiedenisbestanden zijn niet gekopieerd of verplaatst: dat maakt de bewerking onmiddellijk en raakt nooit een draaiende database en haar WAL-bestanden aan.</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -3370,7 +3374,7 @@ De oude map is gebleven zoals hij was — de configuratiebestanden zijn gekopiee
 One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at &quot;%1/ngPost.conf&quot; — or add &quot;POST_DB = %2&quot; to the old file — to keep a single history. ngPost says so again if it sees that file used.</source>
         <translation>
 
-Eén ding verandert wel voor zo'n script: het oude configuratiebestand heeft geen POST_DB-regel, dus het schrijft zijn posts nu in de database van de nieuwe map in plaats van in die hieronder. Laat het script naar "%1/ngPost.conf" wijzen — of voeg "POST_DB = %2" toe aan het oude bestand — om één enkele geschiedenis te houden. ngPost zegt het opnieuw als het dat bestand in gebruik ziet.</translation>
+Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heeft geen POST_DB-regel, dus het schrijft zijn posts nu in de database van de nieuwe map in plaats van in die hieronder. Laat het script naar &quot;%1/ngPost.conf&quot; wijzen — of voeg &quot;POST_DB = %2&quot; toe aan het oude bestand — om één enkele geschiedenis te houden. ngPost zegt het opnieuw als het dat bestand in gebruik ziet.</translation>
     </message>
     <message>
         <location line="+158"/>
@@ -4095,7 +4099,7 @@ Eén ding verandert wel voor zo'n script: het oude configuratiebestand heeft gee
         <translation type="vanished">utomatisch comprimeren is AAN (--compress --gen_name --gen_pass --gen_par2)</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1090"/>
+        <location filename="../NgPost.h" line="+1100"/>
         <source>PACKing auto using: %1</source>
         <translation>Automatisch inpakken met: %1</translation>
     </message>
@@ -4619,15 +4623,15 @@ Eén ding verandert wel voor zo'n script: het oude configuratiebestand heeft gee
 <context>
     <name>PostInfoDialog</name>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="+69"/>
-        <location line="+485"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
+        <location line="+573"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>Postinformatie</translation>
     </message>
     <message>
-        <location line="-627"/>
+        <location line="-715"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>Een infobestand beschrijft deze post in een tekstbestand naast de nzb.
@@ -4666,7 +4670,24 @@ the model offered by default. This post uses it either way.</source>
 het standaard aangeboden model wordt. Deze post gebruikt het hoe dan ook.</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+6"/>
+        <source>Write it to:</source>
+        <translation>Schrijven naar:</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Leave empty to follow your configuration. Variables work here:
+__nzbDir__/__nzbName__.info.txt writes it next to the nzb.</source>
+        <translation>Laat leeg om uw configuratie te volgen. Variabelen werken hier:
+__nzbDir__/__nzbName__.info.txt schrijft het naast de nzb.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Choose a folder for this post&apos;s sheet</source>
+        <translation>Een map kiezen voor het infobestand van deze post</translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>The model — the file, line by line</source>
         <translation>Het model — het bestand, regel voor regel</translation>
     </message>
@@ -4704,12 +4725,12 @@ Een regel die met # begint is een opmerking: die wordt nooit geschreven. Wijzigi
     </message>
     <message>
         <location line="+3"/>
-        <location line="+431"/>
+        <location line="+492"/>
         <source>Save as…</source>
         <translation>Opslaan als…</translation>
     </message>
     <message>
-        <location line="-429"/>
+        <location line="-490"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>Schrijft deze regels naar een eigen modelbestand.</translation>
     </message>
@@ -4768,7 +4789,32 @@ Aan: het staat daar EN wordt gepubliceerd in de nzb, die rondgaat.</translation>
         <translation>Elke __variabele__ die ngPost kent, en wat ze bevat.</translation>
     </message>
     <message>
-        <location line="+69"/>
+        <location line="+68"/>
+        <source>No destination set: no sheet will be written.</source>
+        <translation>Geen bestemming: er wordt geen infobestand geschreven.</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Unknown variable in the destination: %1</source>
+        <translation>Onbekende variabele in de bestemming: %1</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The destination is still empty for this post.</source>
+        <translation>De bestemming is nog leeg voor deze post.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Goes to: %1</source>
+        <translation>Gaat naar: %1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Folder for this post&apos;s sheet</source>
+        <translation>Map voor het infobestand van deze post</translation>
+    </message>
+    <message>
+        <location line="+31"/>
         <source>%1  (default)</source>
         <translation>%1  (standaard)</translation>
     </message>
@@ -4789,12 +4835,12 @@ Aan: het staat daar EN wordt gepubliceerd in de nzb, die rondgaat.</translation>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+228"/>
+        <location line="+229"/>
         <source>Text files (*.txt *.tpl);;All files (*)</source>
         <translation>Tekstbestanden (*.txt *.tpl);;Alle bestanden (*)</translation>
     </message>
     <message>
-        <location line="-205"/>
+        <location line="-206"/>
         <source>No model: nothing will be written for this post.</source>
         <translation>Geen model: er wordt niets geschreven voor deze post.</translation>
     </message>
@@ -4805,12 +4851,12 @@ Aan: het staat daar EN wordt gepubliceerd in de nzb, die rondgaat.</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+213"/>
+        <location line="+214"/>
         <source>Model in use: %1</source>
         <translation>Gebruikt model: %1</translation>
     </message>
     <message>
-        <location line="-189"/>
+        <location line="-190"/>
         <source>name of the line</source>
         <translation>naam van de regel</translation>
     </message>
@@ -4845,7 +4891,7 @@ Aan: het staat daar EN wordt gepubliceerd in de nzb, die rondgaat.</translation>
         <translation>Deze regel uit het model verwijderen</translation>
     </message>
     <message>
-        <location line="+68"/>
+        <location line="+69"/>
         <source>(not written)</source>
         <translation>(niet geschreven)</translation>
     </message>
@@ -4995,7 +5041,7 @@ Het model nu opslaan?</translation>
         <translation>datum waarop de post begon, in het formaat dat u opgeeft</translation>
     </message>
     <message>
-        <location line="+110"/>
+        <location line="+115"/>
         <source>cannot read the template %1: %2</source>
         <translation>kan het model %1 niet lezen: %2</translation>
     </message>
@@ -5025,7 +5071,7 @@ Het model nu opslaan?</translation>
         <translation>onbekend modelformaat &apos;%1&apos;, de waarden worden onveranderd geschreven (bekende formaten: json, xml)</translation>
     </message>
     <message>
-        <location line="-484"/>
+        <location line="-489"/>
         <source>folder of the posted files (legacy, unchanged)</source>
         <translation>map van de geposte bestanden (verouderd, ongewijzigd)</translation>
     </message>
@@ -5155,7 +5201,7 @@ Het model nu opslaan?</translation>
         <translation>pad van het tijdelijke json-bestand (alleen postcommando&apos;s)</translation>
     </message>
     <message>
-        <location line="+472"/>
+        <location line="+477"/>
         <source>unknown variable(s) left as-is: %1</source>
         <translation>onbekende variabele(n) onveranderd gelaten: %1</translation>
     </message>
@@ -5380,7 +5426,7 @@ Het model nu opslaan?</translation>
         <translation>Geschiedenis: kon de grootte van post %1 niet vastleggen: %2</translation>
     </message>
     <message>
-        <location line="+490"/>
+        <location line="+496"/>
         <source>, archive password: ***</source>
         <translation>, archiefwachtwoord: ***</translation>
     </message>
@@ -5389,7 +5435,7 @@ Het model nu opslaan?</translation>
         <translation type="vanished">Geschiedenis: kon post %1 niet opnieuw als hervatbaar markeren: %2</translation>
     </message>
     <message>
-        <location line="-336"/>
+        <location line="-342"/>
         <source>History: could not record the outcome of post %1: %2</source>
         <translation>Geschiedenis: kon de uitkomst van post %1 niet vastleggen: %2</translation>
     </message>
@@ -5434,7 +5480,7 @@ Het model nu opslaan?</translation>
         <translation>Infobestand: er is geen infobestand geschreven, de post kon niet worden beschreven.</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
         <location line="+3"/>
         <source>Post info: %1</source>
         <translation>Infobestand: %1</translation>
@@ -5576,7 +5622,7 @@ Het model nu opslaan?</translation>
         <translation type="vanished">Geschiedenis: kon post niet markeren als hervattend: %1</translation>
     </message>
     <message>
-        <location line="-1879"/>
+        <location line="-1885"/>
         <source>History: could not create post record: %1</source>
         <translation>Geschiedenis: kon geen postrecord aanmaken: %1</translation>
     </message>
@@ -5910,7 +5956,7 @@ Het model nu opslaan?</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+830"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+842"/>
         <source>Post Files</source>
         <translation>Post Bestanden</translation>
     </message>
@@ -5919,7 +5965,7 @@ Het model nu opslaan?</translation>
         <translation type="vanished">Doneer</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="-678"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-690"/>
         <source>There are no selected files to post...</source>
         <translation>Er zijn geen geselecteerde bestanden om te posten...</translation>
     </message>
@@ -5946,26 +5992,26 @@ Would you like to overwrite it ?</source>
 Wil je het overschrijven?</translation>
     </message>
     <message>
-        <location line="+46"/>
-        <location line="+603"/>
+        <location line="+47"/>
+        <location line="+614"/>
         <location line="+19"/>
         <source>Stop Posting</source>
         <translation>Stop Posten</translation>
     </message>
     <message>
-        <location line="-616"/>
-        <location line="+619"/>
+        <location line="-627"/>
+        <location line="+630"/>
         <source>Cancel Posting</source>
         <translation>Annuleer Posten</translation>
     </message>
     <message>
-        <location line="-588"/>
+        <location line="-599"/>
         <source>Select one or more files to Post</source>
         <translation>Selecteer een of meer bestanden om te posten</translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+61"/>
+        <location line="+62"/>
         <source>Select a Folder</source>
         <translation>Selecteer een map</translation>
     </message>
@@ -6007,17 +6053,21 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>Het model kiezen en uw eigen velden invullen, voor deze post.</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+33"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>De postinformatie noemt &apos;%1&apos; twee keer. Verwijder een van de twee regels.</translation>
     </message>
     <message>
-        <location line="+17"/>
-        <source>Post info model saved as the default: %1</source>
-        <translation>Model opgeslagen als standaard: %1</translation>
+        <location line="+23"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>Standaardwaarden opgeslagen: model %1, geschreven naar %2</translation>
     </message>
     <message>
-        <location line="+66"/>
+        <source>Post info model saved as the default: %1</source>
+        <translation type="vanished">Model opgeslagen als standaard: %1</translation>
+    </message>
+    <message>
+        <location line="+68"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation>beperk het aantal rar bestanden tot %1 (zie configuratie RAR_MAX)</translation>
     </message>
@@ -6139,7 +6189,7 @@ Sommige Usenet-indexen vragen erom.</translation>
 <context>
     <name>UpdateChecker</name>
     <message>
-        <location filename="../utils/UpdateChecker.cpp" line="+177"/>
+        <location filename="../utils/UpdateChecker.cpp" line="+295"/>
         <source>Unable to write to install directory %1. Opening release page instead.</source>
         <translation>Kan niet schrijven naar installatiemap %1. De release-pagina wordt in plaats daarvan geopend.</translation>
     </message>

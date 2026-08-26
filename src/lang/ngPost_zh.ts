@@ -234,7 +234,7 @@
     </message>
     <message>
         <location line="+24"/>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+243"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+244"/>
         <source>Monitor Folder</source>
         <translation>监视文件夹</translation>
     </message>
@@ -263,7 +263,7 @@
         <translation type="vanished">捐赠</translation>
     </message>
     <message>
-        <location filename="../hmi/AutoPostWidget.cpp" line="-122"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="-123"/>
         <source>You can&apos;t use auto posting without compression on folders... (%1)</source>
         <translation>您将无法使用自动发布如果没有开启文件夹压缩... (%1)</translation>
     </message>
@@ -282,7 +282,7 @@ Press the Scan button and remove what you don&apos;t want to post ;)
 （请在列表中选中想要删除的文件，然后使用DEL键或者退格键删除）</translation>
     </message>
     <message>
-        <location line="+43"/>
+        <location line="+44"/>
         <location line="+30"/>
         <source>Select a Folder</source>
         <translation>选择一个文件夹</translation>
@@ -440,14 +440,18 @@ It will be irreversible...</source>
         <translation>本次运行所有贴使用的模板和字段。</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+42"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>发贴信息中“%1”出现了两次。请删除其中一行。</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>已保存默认设置：模板 %1，写入 %2</translation>
+    </message>
+    <message>
         <source>Post info model saved as the default: %1</source>
-        <translation>信息文件模板已保存为默认：%1</translation>
+        <translation type="vanished">信息文件模板已保存为默认：%1</translation>
     </message>
 </context>
 <context>
@@ -4093,7 +4097,7 @@ Your active configuration file is:
         <translation type="vanished">自动压缩已启用 (--compress --gen_name --gen_pass --gen_par2)</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1090"/>
+        <location filename="../NgPost.h" line="+1100"/>
         <source>PACKing auto using: %1</source>
         <translation>打包功能自动使用: %1</translation>
     </message>
@@ -4617,15 +4621,15 @@ Your active configuration file is:
 <context>
     <name>PostInfoDialog</name>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="+69"/>
-        <location line="+485"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
+        <location line="+573"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>发贴信息</translation>
     </message>
     <message>
-        <location line="-627"/>
+        <location line="-715"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>信息文件在 nzb 旁边用一个文本文件描述此贴。
@@ -4664,7 +4668,24 @@ the model offered by default. This post uses it either way.</source>
 默认提供的模板。无论如何此贴都会使用它。</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+6"/>
+        <source>Write it to:</source>
+        <translation>写入到：</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Leave empty to follow your configuration. Variables work here:
+__nzbDir__/__nzbName__.info.txt writes it next to the nzb.</source>
+        <translation>留空则沿用您的配置。此处可使用变量：
+__nzbDir__/__nzbName__.info.txt 会把它写在 nzb 旁边。</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Choose a folder for this post&apos;s sheet</source>
+        <translation>为此贴的信息文件选择一个文件夹</translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>The model — the file, line by line</source>
         <translation>模板 —— 文件，逐行呈现</translation>
     </message>
@@ -4702,12 +4723,12 @@ A line starting with # is a comment: it is never written. Changes here only reac
     </message>
     <message>
         <location line="+3"/>
-        <location line="+431"/>
+        <location line="+492"/>
         <source>Save as…</source>
         <translation>另存为…</translation>
     </message>
     <message>
-        <location line="-429"/>
+        <location line="-490"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>把这些行写入一个属于您自己的模板文件。</translation>
     </message>
@@ -4766,7 +4787,32 @@ On: it is written there AND published in the nzb, which circulates.</source>
         <translation>ngPost 认识的每一个 __变量__ 及其含义。</translation>
     </message>
     <message>
-        <location line="+69"/>
+        <location line="+68"/>
+        <source>No destination set: no sheet will be written.</source>
+        <translation>未设置目标：不会写出任何信息文件。</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Unknown variable in the destination: %1</source>
+        <translation>目标中含有未知变量：%1</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The destination is still empty for this post.</source>
+        <translation>此贴的目标仍为空。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Goes to: %1</source>
+        <translation>将写入：%1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Folder for this post&apos;s sheet</source>
+        <translation>此贴信息文件所在的文件夹</translation>
+    </message>
+    <message>
+        <location line="+31"/>
         <source>%1  (default)</source>
         <translation>%1  （默认）</translation>
     </message>
@@ -4787,12 +4833,12 @@ On: it is written there AND published in the nzb, which circulates.</source>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+228"/>
+        <location line="+229"/>
         <source>Text files (*.txt *.tpl);;All files (*)</source>
         <translation>文本文件 (*.txt *.tpl);;所有文件 (*)</translation>
     </message>
     <message>
-        <location line="-205"/>
+        <location line="-206"/>
         <source>No model: nothing will be written for this post.</source>
         <translation>没有模板：此贴不会写出任何内容。</translation>
     </message>
@@ -4803,12 +4849,12 @@ On: it is written there AND published in the nzb, which circulates.</source>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+213"/>
+        <location line="+214"/>
         <source>Model in use: %1</source>
         <translation>当前模板：%1</translation>
     </message>
     <message>
-        <location line="-189"/>
+        <location line="-190"/>
         <source>name of the line</source>
         <translation>该行的名称</translation>
     </message>
@@ -4843,7 +4889,7 @@ On: it is written there AND published in the nzb, which circulates.</source>
         <translation>从模板中移除此行</translation>
     </message>
     <message>
-        <location line="+68"/>
+        <location line="+69"/>
         <source>(not written)</source>
         <translation>（不写出）</translation>
     </message>
@@ -4993,7 +5039,7 @@ Save the model now?</source>
         <translation>发贴开始的日期，按您给出的格式</translation>
     </message>
     <message>
-        <location line="+110"/>
+        <location line="+115"/>
         <source>cannot read the template %1: %2</source>
         <translation>无法读取模板 %1：%2</translation>
     </message>
@@ -5023,7 +5069,7 @@ Save the model now?</source>
         <translation>未知的模板格式“%1”，取值将原样写出（已知格式：json、xml）</translation>
     </message>
     <message>
-        <location line="-484"/>
+        <location line="-489"/>
         <source>folder of the posted files (legacy, unchanged)</source>
         <translation>已发布文件所在的文件夹（旧版字段，保持不变）</translation>
     </message>
@@ -5153,7 +5199,7 @@ Save the model now?</source>
         <translation>临时 json 文件路径（仅用于发贴后命令）</translation>
     </message>
     <message>
-        <location line="+472"/>
+        <location line="+477"/>
         <source>unknown variable(s) left as-is: %1</source>
         <translation>未知变量已原样保留：%1</translation>
     </message>
@@ -5378,7 +5424,7 @@ Save the model now?</source>
         <translation>历史：无法记录贴 %1 的大小：%2</translation>
     </message>
     <message>
-        <location line="+490"/>
+        <location line="+496"/>
         <source>, archive password: ***</source>
         <translation>，压缩文件密码：***</translation>
     </message>
@@ -5387,7 +5433,7 @@ Save the model now?</source>
         <translation type="vanished">历史：无法把贴 %1 重新标记为可续传：%2</translation>
     </message>
     <message>
-        <location line="-336"/>
+        <location line="-342"/>
         <source>History: could not record the outcome of post %1: %2</source>
         <translation>历史：无法记录贴 %1 的结果：%2</translation>
     </message>
@@ -5432,7 +5478,7 @@ Save the model now?</source>
         <translation>信息文件：未写出任何信息文件，无法描述该贴。</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
         <location line="+3"/>
         <source>Post info: %1</source>
         <translation>信息文件：%1</translation>
@@ -5574,7 +5620,7 @@ Save the model now?</source>
         <translation type="vanished">历史记录：无法将帖子标记为恢复中：%1</translation>
     </message>
     <message>
-        <location line="-1879"/>
+        <location line="-1885"/>
         <source>History: could not create post record: %1</source>
         <translation>历史记录：无法创建帖子记录：%1</translation>
     </message>
@@ -5908,7 +5954,7 @@ Save the model now?</source>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+830"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+842"/>
         <source>Post Files</source>
         <translation>发布文件</translation>
     </message>
@@ -5917,7 +5963,7 @@ Save the model now?</source>
         <translation type="vanished">捐赠</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="-678"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-690"/>
         <source>There are no selected files to post...</source>
         <translation>没有选中的文件用于发布...</translation>
     </message>
@@ -5944,26 +5990,26 @@ Would you like to overwrite it ?</source>
 您想要覆盖它么?</translation>
     </message>
     <message>
-        <location line="+46"/>
-        <location line="+603"/>
+        <location line="+47"/>
+        <location line="+614"/>
         <location line="+19"/>
         <source>Stop Posting</source>
         <translation>停止发布</translation>
     </message>
     <message>
-        <location line="-616"/>
-        <location line="+619"/>
+        <location line="-627"/>
+        <location line="+630"/>
         <source>Cancel Posting</source>
         <translation>取消发布</translation>
     </message>
     <message>
-        <location line="-588"/>
+        <location line="-599"/>
         <source>Select one or more files to Post</source>
         <translation>选择一个或多个文件发布</translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+61"/>
+        <location line="+62"/>
         <source>Select a Folder</source>
         <translation>选择一个文件夹</translation>
     </message>
@@ -6005,17 +6051,21 @@ Some Usenet indexes ask for one.</source>
         <translation>为此贴选择模板并填写您自己的字段。</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+33"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>发贴信息中“%1”出现了两次。请删除其中一行。</translation>
     </message>
     <message>
-        <location line="+17"/>
-        <source>Post info model saved as the default: %1</source>
-        <translation>信息文件模板已保存为默认：%1</translation>
+        <location line="+23"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>已保存默认设置：模板 %1，写入 %2</translation>
     </message>
     <message>
-        <location line="+66"/>
+        <source>Post info model saved as the default: %1</source>
+        <translation type="vanished">信息文件模板已保存为默认：%1</translation>
+    </message>
+    <message>
+        <location line="+68"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation>限制压缩卷数目为%1（配置文件中参数RAR_MAX）</translation>
     </message>
@@ -6137,7 +6187,7 @@ Some Usenet indexes ask for one.</source>
 <context>
     <name>UpdateChecker</name>
     <message>
-        <location filename="../utils/UpdateChecker.cpp" line="+177"/>
+        <location filename="../utils/UpdateChecker.cpp" line="+295"/>
         <source>Unable to write to install directory %1. Opening release page instead.</source>
         <translation>无法写入安装目录 %1。改为打开版本页面。</translation>
     </message>

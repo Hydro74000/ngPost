@@ -506,6 +506,7 @@ public:
     //! Read back what the configuration parsing produced, so a test can check
     //! that saveConfig() writes something that parses back to the same thing.
     QString postInfoOutputForTest() const { return _postInfoOutput; }
+
     bool postInfoOnlyOnSuccessForTest() const { return _postInfoOnlySuccess; }
     int postCmdTimeoutSecForTest() const { return _postCmdTimeoutSec; }
     bool postCmdFailIsErrorForTest() const { return _postCmdFailIsError; }
@@ -597,6 +598,15 @@ public:
     {
         _postInfoTemplate        = path;
         _postInfoTemplateFromCli = false;
+    }
+
+    //! Where the configuration says a sheet goes. Shown in the GUI as the
+    //! default a post follows unless it picks its own.
+    QString postInfoOutputPattern() const { return _postInfoOutput; }
+    void    setPostInfoOutput(const QString &pattern)
+    {
+        _postInfoOutput        = pattern;
+        _postInfoOutputFromCli = false;
     }
 
     //! Models opened during this run, offered again to the next posts. Kept in

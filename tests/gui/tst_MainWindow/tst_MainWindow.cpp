@@ -99,6 +99,9 @@ private slots:
     //! selected, and selecting it is not an override.
     //! The preview column is the sheet: known values, blanks for what only
     //! exists after the post, and free text mixed with variables.
+    //! The sheet can go somewhere else than the configuration says, per post.
+    void post_info_dialog_offers_a_destination();
+
     void post_info_dialog_previews_every_line();
 
     //! Lines and fields can be added and removed to compose a model.
@@ -576,6 +579,59 @@ void TestMainWindow::post_info_dialog_offers_the_fields_of_a_json_model()
     QVERIFY(genre);
     QCOMPARE(title->text(), QStringLiteral("title"));
     QCOMPARE(genre->text(), QStringLiteral("genre"));
+}
+
+void TestMainWindow::post_info_dialog_offers_a_destination()
+{
+    HomeSandbox sandbox;
+    const QString tmplPath = sandbox.rootPath() + QStringLiteral("/sheet.tpl");
+    {
+        QFile tmpl(tmplPath);
+        QVERIFY(tmpl.open(QIODevice::WriteOnly));
+        tmpl.write("titre =__meta:titre__\n");
+    }
+
+    PostInfoData preview;
+    preview.nzbDir  = sandbox.rootPath() + QStringLiteral("/nzb");
+    preview.nzbName = QStringLiteral("mon-post");
+
+    const QString configured = QStringLiteral("__nzbDir__/__nzbName__.info.txt");
+    PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>(), QStringList(),
+                       preview, configured);
+
+    auto *out = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoOutput"));
+    auto *hint = dlg.findChild<QLabel *>(QStringLiteral("postInfoOutputHint"));
+    QVERIFY(out);
+    QVERIFY(hint);
+
+    // Empty by default: the post follows the configuration, and the field
+    // shows that rather than pretending the post chose it.
+    QVERIFY(out->text().isEmpty());
+    QCOMPARE(out->placeholderText(), configured);
+    QVERIFY(dlg.outputOverride().isEmpty());
+
+    // ...and the hint resolves the configured pattern, so the user sees the
+    // actual path instead of the variables.
+    QVERIFY2(hint->text().contains(QStringLiteral("mon-post.info.txt")), qPrintable(hint->text()));
+
+    // Typing a destination makes it this post's own.
+    const QString mine = sandbox.rootPath() + QStringLiteral("/ailleurs/__nzbName__.json");
+    out->setText(mine);
+    emit out->textEdited(mine);
+    QCOMPARE(dlg.outputOverride(), mine);
+    QVERIFY2(hint->text().contains(QStringLiteral("ailleurs")), qPrintable(hint->text()));
+    QVERIFY2(hint->text().contains(QStringLiteral("mon-post.json")), qPrintable(hint->text()));
+
+    // Typing back exactly what the configuration says is not an override: the
+    // post keeps following it.
+    out->setText(configured);
+    emit out->textEdited(configured);
+    QVERIFY(dlg.outputOverride().isEmpty());
+
+    // A variable ngPost does not know is reported rather than written to.
+    out->setText(QStringLiteral("/tmp/__nawak__.txt"));
+    emit out->textEdited(QStringLiteral("/tmp/__nawak__.txt"));
+    QVERIFY2(hint->text().contains(QStringLiteral("__nawak__")), qPrintable(hint->text()));
 }
 
 void TestMainWindow::post_info_dialog_previews_every_line()

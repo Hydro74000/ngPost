@@ -203,7 +203,7 @@
     </message>
     <message>
         <location line="+24"/>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+243"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+244"/>
         <source>Monitor Folder</source>
         <translation></translation>
     </message>
@@ -238,12 +238,12 @@
         <translation></translation>
     </message>
     <message>
-        <location line="-340"/>
+        <location line="-341"/>
         <source>Nothing to post...</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+342"/>
+        <location line="+343"/>
         <source>You can use the &lt;b&gt;Monitor Mode&lt;/b&gt;</source>
         <translation></translation>
     </message>
@@ -273,7 +273,7 @@
         <translation></translation>
     </message>
     <message>
-        <location line="-346"/>
+        <location line="-347"/>
         <source>There is nothing to post!
 Press the Scan button and remove what you don&apos;t want to post ;)
 (To remove files, select in the list and press DEL or BackSpace)</source>
@@ -285,7 +285,7 @@ Press the Scan button and remove what you don&apos;t want to post ;)
         <translation>You can&apos;t use auto posting without compression on folders... (%1)</translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+52"/>
         <location line="+30"/>
         <source>Select a Folder</source>
         <translation></translation>
@@ -399,14 +399,18 @@ It will be irreversible...</source>
         <translation>Model and fields used by all the posts of this run.</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+42"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>Post info defaults saved: model %1, written to %2</translation>
+    </message>
+    <message>
         <source>Post info model saved as the default: %1</source>
-        <translation>Post info model saved as the default: %1</translation>
+        <translation type="vanished">Post info model saved as the default: %1</translation>
     </message>
 </context>
 <context>
@@ -3170,12 +3174,12 @@ It has no POST_DB line, so this run records its posts in
 while the adopted configuration uses
     %3
 Point this command at &quot;%1/ngPost.conf&quot;, or add &quot;POST_DB = %3&quot; to this file, to keep a single history.</source>
-        <translation>Warning: this configuration file is the one ngPost adopted when it moved your settings to "%1".
+        <translation>Warning: this configuration file is the one ngPost adopted when it moved your settings to &quot;%1&quot;.
 It has no POST_DB line, so this run records its posts in
     %2
 while the adopted configuration uses
     %3
-Point this command at "%1/ngPost.conf", or add "POST_DB = %3" to this file, to keep a single history.</translation>
+Point this command at &quot;%1/ngPost.conf&quot;, or add &quot;POST_DB = %3&quot; to this file, to keep a single history.</translation>
     </message>
     <message>
         <location line="+37"/>
@@ -3184,7 +3188,7 @@ Point this command at "%1/ngPost.conf", or add "POST_DB = %3" to this file, to k
 The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
         <translation>
 
-The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing "-c %1/ngPost.conf" still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</translation>
+The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; still reads the same settings. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -3193,7 +3197,7 @@ The old folder was left as it was — configuration assets were copied, not move
 One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at &quot;%1/ngPost.conf&quot; — or add &quot;POST_DB = %2&quot; to the old file — to keep a single history. ngPost says so again if it sees that file used.</source>
         <translation>
 
-One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at "%1/ngPost.conf" — or add "POST_DB = %2" to the old file — to keep a single history. ngPost says so again if it sees that file used.</translation>
+One thing does change for such a script: the old configuration file has no POST_DB line, so it now records its posts in the database of the new folder rather than in the one below. Point the script at &quot;%1/ngPost.conf&quot; — or add &quot;POST_DB = %2&quot; to the old file — to keep a single history. ngPost says so again if it sees that file used.</translation>
     </message>
     <message>
         <location line="+158"/>
@@ -3875,7 +3879,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1090"/>
+        <location filename="../NgPost.h" line="+1100"/>
         <source>PACKing auto using: %1</source>
         <translation>PACKing auto using: %1</translation>
     </message>
@@ -4390,15 +4394,15 @@ One thing does change for such a script: the old configuration file has no POST_
 <context>
     <name>PostInfoDialog</name>
     <message>
-        <location filename="../hmi/PostInfoDialog.cpp" line="+69"/>
-        <location line="+485"/>
+        <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
+        <location line="+573"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>Post information</translation>
     </message>
     <message>
-        <location line="-627"/>
+        <location line="-715"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>A post info file describes this post in a text file written next to the nzb.
@@ -4437,7 +4441,24 @@ the model offered by default. This post uses it either way.</source>
 the model offered by default. This post uses it either way.</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+6"/>
+        <source>Write it to:</source>
+        <translation>Write it to:</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Leave empty to follow your configuration. Variables work here:
+__nzbDir__/__nzbName__.info.txt writes it next to the nzb.</source>
+        <translation>Leave empty to follow your configuration. Variables work here:
+__nzbDir__/__nzbName__.info.txt writes it next to the nzb.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Choose a folder for this post&apos;s sheet</source>
+        <translation>Choose a folder for this post's sheet</translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>The model — the file, line by line</source>
         <translation>The model — the file, line by line</translation>
     </message>
@@ -4475,12 +4496,12 @@ A line starting with # is a comment: it is never written. Changes here only reac
     </message>
     <message>
         <location line="+3"/>
-        <location line="+431"/>
+        <location line="+492"/>
         <source>Save as…</source>
         <translation>Save as…</translation>
     </message>
     <message>
-        <location line="-429"/>
+        <location line="-490"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>Writes these lines to a model file of your own.</translation>
     </message>
@@ -4539,7 +4560,32 @@ On: it is written there AND published in the nzb, which circulates.</translation
         <translation>Every __variable__ ngPost knows, and what it holds.</translation>
     </message>
     <message>
-        <location line="+69"/>
+        <location line="+68"/>
+        <source>No destination set: no sheet will be written.</source>
+        <translation>No destination set: no sheet will be written.</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Unknown variable in the destination: %1</source>
+        <translation>Unknown variable in the destination: %1</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The destination is still empty for this post.</source>
+        <translation>The destination is still empty for this post.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Goes to: %1</source>
+        <translation>Goes to: %1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Folder for this post&apos;s sheet</source>
+        <translation>Folder for this post's sheet</translation>
+    </message>
+    <message>
+        <location line="+31"/>
         <source>%1  (default)</source>
         <translation>%1  (default)</translation>
     </message>
@@ -4560,12 +4606,12 @@ On: it is written there AND published in the nzb, which circulates.</translation
     </message>
     <message>
         <location line="+0"/>
-        <location line="+228"/>
+        <location line="+229"/>
         <source>Text files (*.txt *.tpl);;All files (*)</source>
         <translation>Text files (*.txt *.tpl);;All files (*)</translation>
     </message>
     <message>
-        <location line="-205"/>
+        <location line="-206"/>
         <source>No model: nothing will be written for this post.</source>
         <translation>No model: nothing will be written for this post.</translation>
     </message>
@@ -4576,12 +4622,12 @@ On: it is written there AND published in the nzb, which circulates.</translation
     </message>
     <message>
         <location line="+7"/>
-        <location line="+213"/>
+        <location line="+214"/>
         <source>Model in use: %1</source>
         <translation>Model in use: %1</translation>
     </message>
     <message>
-        <location line="-189"/>
+        <location line="-190"/>
         <source>name of the line</source>
         <translation>name of the line</translation>
     </message>
@@ -4616,7 +4662,7 @@ On: it is written there AND published in the nzb, which circulates.</translation
         <translation>Remove this line from the model</translation>
     </message>
     <message>
-        <location line="+68"/>
+        <location line="+69"/>
         <source>(not written)</source>
         <translation>(not written)</translation>
     </message>
@@ -4766,7 +4812,7 @@ Save the model now?</translation>
         <translation>date the post started, in the format you give</translation>
     </message>
     <message>
-        <location line="+110"/>
+        <location line="+115"/>
         <source>cannot read the template %1: %2</source>
         <translation>cannot read the template %1: %2</translation>
     </message>
@@ -4796,7 +4842,7 @@ Save the model now?</translation>
         <translation>unknown model format &apos;%1&apos;, values are written as they are (known formats: json, xml)</translation>
     </message>
     <message>
-        <location line="-484"/>
+        <location line="-489"/>
         <source>folder of the posted files (legacy, unchanged)</source>
         <translation>folder of the posted files (legacy, unchanged)</translation>
     </message>
@@ -4926,7 +4972,7 @@ Save the model now?</translation>
         <translation>path of the temporary json file (post commands only)</translation>
     </message>
     <message>
-        <location line="+472"/>
+        <location line="+477"/>
         <source>unknown variable(s) left as-is: %1</source>
         <translation>unknown variable(s) left as-is: %1</translation>
     </message>
@@ -5204,7 +5250,7 @@ Save the model now?</translation>
         <translation>Post info: no post info file was written, the post could not be described.</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
         <location line="+3"/>
         <source>Post info: %1</source>
         <translation>Post info: %1</translation>
@@ -5342,7 +5388,7 @@ Save the model now?</translation>
         <translation type="vanished">History: could not mark post as resuming: %1</translation>
     </message>
     <message>
-        <location line="-1879"/>
+        <location line="-1885"/>
         <source>History: could not create post record: %1</source>
         <translation>History: could not create post record: %1</translation>
     </message>
@@ -5615,7 +5661,7 @@ Save the model now?</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+830"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+842"/>
         <source>Post Files</source>
         <translation></translation>
     </message>
@@ -5645,7 +5691,7 @@ Save the model now?</translation>
         <translation></translation>
     </message>
     <message>
-        <location line="-605"/>
+        <location line="-617"/>
         <source>There are no selected files to post...</source>
         <translation></translation>
     </message>
@@ -5671,26 +5717,26 @@ Would you like to overwrite it ?</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+46"/>
-        <location line="+603"/>
+        <location line="+47"/>
+        <location line="+614"/>
         <location line="+19"/>
         <source>Stop Posting</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-616"/>
-        <location line="+619"/>
+        <location line="-627"/>
+        <location line="+630"/>
         <source>Cancel Posting</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-588"/>
+        <location line="-599"/>
         <source>Select one or more files to Post</source>
         <translation></translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+61"/>
+        <location line="+62"/>
         <source>Select a Folder</source>
         <translation></translation>
     </message>
@@ -5732,17 +5778,21 @@ Some Usenet indexes ask for one.</translation>
         <translation>Choose the model and fill in your own fields, for this post.</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+33"/>
         <source>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</source>
         <translation>The post information lists &apos;%1&apos; twice. Remove one of the two lines.</translation>
     </message>
     <message>
-        <location line="+17"/>
-        <source>Post info model saved as the default: %1</source>
-        <translation>Post info model saved as the default: %1</translation>
+        <location line="+23"/>
+        <source>Post info defaults saved: model %1, written to %2</source>
+        <translation>Post info defaults saved: model %1, written to %2</translation>
     </message>
     <message>
-        <location line="+66"/>
+        <source>Post info model saved as the default: %1</source>
+        <translation type="vanished">Post info model saved as the default: %1</translation>
+    </message>
+    <message>
+        <location line="+68"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation></translation>
     </message>
@@ -5839,7 +5889,7 @@ Some Usenet indexes ask for one.</translation>
 <context>
     <name>UpdateChecker</name>
     <message>
-        <location filename="../utils/UpdateChecker.cpp" line="+177"/>
+        <location filename="../utils/UpdateChecker.cpp" line="+295"/>
         <source>Unable to write to install directory %1. Opening release page instead.</source>
         <translation>Unable to write to install directory %1. Opening release page instead.</translation>
     </message>

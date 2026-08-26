@@ -156,6 +156,7 @@ Press the Scan button and remove what you don't want to post ;)\n\
         // One choice for the whole run: every post it launches gets it.
         quickPostWidget->setPostInfo(_postInfoCB && _postInfoCB->isChecked(),
                                      _postInfoTemplate,
+                                     _postInfoOutput,
                                      _postInfoMeta);
         quickPostWidget->genNameAndPassword(_ngPost->_genName, _ngPost->_genPass, _ngPost->_doPar2, useRarMax);
 
@@ -589,6 +590,8 @@ void AutoPostWidget::onEditPostInfo()
                        _postInfoMeta,
                        _ngPost->sessionPostInfoTemplates(),
                        _postInfoPreview(),
+                       _ngPost->postInfoOutputPattern(),
+                       _postInfoOutput,
                        this);
     int const answer = dlg.exec();
 
@@ -610,6 +613,7 @@ void AutoPostWidget::onEditPostInfo()
     }
 
     _postInfoTemplate = dlg.templateOverride();
+    _postInfoOutput   = dlg.outputOverride();
     _postInfoMeta     = meta;
 
     if (dlg.setAsDefault())
@@ -617,8 +621,13 @@ void AutoPostWidget::onEditPostInfo()
         _ngPost->setPostInfoTemplate(_postInfoTemplate.isEmpty() ? _ngPost->postInfoTemplatePath()
                                                                  : _postInfoTemplate);
         _postInfoTemplate.clear();
+        if (!_postInfoOutput.isEmpty())
+        {
+            _ngPost->setPostInfoOutput(_postInfoOutput);
+            _postInfoOutput.clear();
+        }
         _ngPost->saveConfig();
-        _hmi->log(tr("Post info model saved as the default: %1")
-                      .arg(_ngPost->postInfoTemplatePath()));
+        _hmi->log(tr("Post info defaults saved: model %1, written to %2")
+                      .arg(_ngPost->postInfoTemplatePath(), _ngPost->postInfoOutputPattern()));
     }
 }
