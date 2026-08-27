@@ -15,11 +15,11 @@ TODO: include ParPar instead of par2cmdline?
 TODO: auto RAR size and par2 parameters depending on the inputs size?
 
 ####################################################
-###       Pre-release: ngPost v5.5               ###
-###       date:    2026/08/24                    ###
+###       Release: ngPost v5.5                   ###
+###       date:    2026/08/27                    ###
 ####################################################
 
-This pre-release contains every user-visible change made since the stable
+This release contains every user-visible change made since the stable
 ngPost v5.4.2 release.
 
 Major new features:
@@ -230,6 +230,13 @@ GUI and translations:
 - Models opened during the session remain available to later posting tabs and
   may be removed from the list. "Use this model for my next posts too" can make
   the selected model the configured default.
+- A post can also be written somewhere other than what POST_INFO_OUTPUT says.
+  The "Write it to:" field is empty by default and shows the configured
+  destination in grey, meaning the post follows it, including any later change
+  to the configuration. Typing a path, or picking a folder, applies to that
+  post only, and the line underneath resolves the variables so the real path
+  is visible before posting. "Use this model for my next posts too" saves the
+  destination together with the model.
 - Posting controls have been reorganised around two clear decisions: what the
   post produces and how its payload is packed. Compression volume settings,
   the RAR limit and PAR2 redundancy now follow their corresponding controls;
