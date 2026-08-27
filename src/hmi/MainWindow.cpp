@@ -876,6 +876,8 @@ void MainWindow::_retranslateHistoryTab()
         _histClearBtn->setText(tr("Clear"));
         _histClearBtn->setToolTip(tr("Clear all filters"));
     }
+    if (_histPrevPageBtn) _histPrevPageBtn->setText(tr("Previous"));
+    if (_histNextPageBtn) _histNextPageBtn->setText(tr("Next"));
     if (_historyDateFrom) _historyDateFrom->setSpecialValueText(tr("Any date"));
     if (_historyDateTo)   _historyDateTo->setSpecialValueText(tr("Any date"));
 
@@ -889,6 +891,7 @@ void MainWindow::_retranslateHistoryTab()
     if (_historyDetailInfo && _historyDetailInfo->text().contains("Select a post"))
         _historyDetailInfo->setText(tr("<i>Select a post to see its details.</i>"));
     if (_histRegenNzbBtn)  _histRegenNzbBtn->setText(tr("Regenerate NZB\342\200\246"));
+    if (_histExportInfoBtn) _histExportInfoBtn->setText(tr("Export info file\342\200\246"));
     if (_histCopyPassBtn)  _histCopyPassBtn->setText(tr("Copy password"));
     if (_histPurgePassBtn) _histPurgePassBtn->setText(tr("Purge password"));
     if (_histOpenNzbBtn)   _histOpenNzbBtn->setText(tr("Open NZB location"));
@@ -1093,15 +1096,17 @@ QWidget *MainWindow::_buildHistoryTab()
 
     QHBoxLayout *detailActions = new QHBoxLayout();
     _histRegenNzbBtn  = new QPushButton(tr("Regenerate NZB\342\200\246"), detailPanel);
+    _histExportInfoBtn = new QPushButton(tr("Export info file\342\200\246"), detailPanel);
     _histCopyPassBtn  = new QPushButton(tr("Copy password"), detailPanel);
     _histPurgePassBtn = new QPushButton(tr("Purge password"), detailPanel);
     _histOpenNzbBtn   = new QPushButton(tr("Open NZB location"), detailPanel);
     _histDeleteBtn    = new QPushButton(tr("Delete entry"), detailPanel);
     _histDeleteBtn->setStyleSheet("QPushButton { color: #dd4444; }");
-    for (QPushButton *btn : {_histRegenNzbBtn, _histCopyPassBtn, _histPurgePassBtn,
-                             _histOpenNzbBtn, _histDeleteBtn})
+    for (QPushButton *btn : {_histRegenNzbBtn, _histExportInfoBtn, _histCopyPassBtn,
+                             _histPurgePassBtn, _histOpenNzbBtn, _histDeleteBtn})
         btn->setEnabled(false);
     detailActions->addWidget(_histRegenNzbBtn);
+    detailActions->addWidget(_histExportInfoBtn);
     detailActions->addWidget(_histCopyPassBtn);
     detailActions->addWidget(_histPurgePassBtn);
     detailActions->addWidget(_histOpenNzbBtn);
@@ -1111,6 +1116,20 @@ QWidget *MainWindow::_buildHistoryTab()
     histSplitter->addWidget(detailPanel);
     histSplitter->setStretchFactor(0, 3);
     histSplitter->setStretchFactor(1, 1);
+
+    QHBoxLayout *historyPageRow = new QHBoxLayout();
+    _histPrevPageBtn = new QPushButton(tr("Previous"), histTab);
+    _histNextPageBtn = new QPushButton(tr("Next"), histTab);
+    _histPageLabel = new QLabel(histTab);
+    _histPrevPageBtn->setEnabled(false);
+    _histNextPageBtn->setEnabled(false);
+    _histPageLabel->setAlignment(Qt::AlignCenter);
+    historyPageRow->addStretch();
+    historyPageRow->addWidget(_histPrevPageBtn);
+    historyPageRow->addWidget(_histPageLabel);
+    historyPageRow->addWidget(_histNextPageBtn);
+    historyPageRow->addStretch();
+    histLayout->addLayout(historyPageRow);
 
     _innerHistoryTabs->addTab(histTab, tr("History"));
 
@@ -1224,17 +1243,27 @@ QWidget *MainWindow::_buildHistoryTab()
     _innerHistoryTabs->addTab(resumeTab, tr("Resume"));
 
     // ===== Connect signals =====
+    auto refreshFirstHistoryPage = [this]() {
+        _historyPageOffset = 0;
+        _refreshHistoryViews();
+    };
     connect(_histRefreshBtn,      &QPushButton::clicked,  this, &MainWindow::_onHistoryRefresh);
     connect(_resumeRefreshBtn,    &QPushButton::clicked,  this, &MainWindow::_onHistoryRefresh);
     connect(_histExportCsvBtn,    &QPushButton::clicked,  this, &MainWindow::_onHistoryExportCsv);
-    connect(_historySearchEdit,   &QLineEdit::returnPressed, this, &MainWindow::_onHistoryRefresh);
+    connect(_historySearchEdit,   &QLineEdit::returnPressed, this, refreshFirstHistoryPage);
     connect(_historyStatusFilter, qOverload<int>(&QComboBox::currentIndexChanged),
-            this, &MainWindow::_onHistoryRefresh);
-    connect(_historyPassFilter,   &QCheckBox::toggled,    this, &MainWindow::_onHistoryRefresh);
-    connect(_historyErrorsFilter, &QCheckBox::toggled,    this, &MainWindow::_onHistoryRefresh);
-    connect(_historyDateFrom,     &QDateEdit::dateChanged, this, &MainWindow::_onHistoryRefresh);
-    connect(_historyDateTo,       &QDateEdit::dateChanged, this, &MainWindow::_onHistoryRefresh);
-    connect(_historyGroupEdit,    &QLineEdit::returnPressed, this, &MainWindow::_onHistoryRefresh);
+            this, [refreshFirstHistoryPage](int) { refreshFirstHistoryPage(); });
+    connect(_historyPassFilter,   &QCheckBox::toggled,
+            this, [refreshFirstHistoryPage](bool) { refreshFirstHistoryPage(); });
+    connect(_historyErrorsFilter, &QCheckBox::toggled,
+            this, [refreshFirstHistoryPage](bool) { refreshFirstHistoryPage(); });
+    connect(_historyDateFrom,     &QDateEdit::dateChanged,
+            this, [refreshFirstHistoryPage](const QDate &) { refreshFirstHistoryPage(); });
+    connect(_historyDateTo,       &QDateEdit::dateChanged,
+            this, [refreshFirstHistoryPage](const QDate &) { refreshFirstHistoryPage(); });
+    connect(_historyGroupEdit,    &QLineEdit::returnPressed, this, refreshFirstHistoryPage);
+    connect(_histPrevPageBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryPreviousPage);
+    connect(_histNextPageBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryNextPage);
     connect(_histClearBtn,        &QPushButton::clicked,  this, [this]() {
         _historySearchEdit->clear();
         _historyStatusFilter->setCurrentIndex(0);
@@ -1243,11 +1272,13 @@ QWidget *MainWindow::_buildHistoryTab()
         _historyDateFrom->setDate(_historyDateFrom->minimumDate());
         _historyDateTo->setDate(_historyDateTo->minimumDate());
         _historyGroupEdit->clear();
+        _historyPageOffset = 0;
         _onHistoryRefresh();
     });
     connect(_historyTable,        &QTableWidget::currentCellChanged,
             this, [this](int row, int, int, int) { _onHistoryRowSelected(row); });
     connect(_histRegenNzbBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryRegenNzb);
+    connect(_histExportInfoBtn,   &QPushButton::clicked,  this, &MainWindow::_onHistoryExportInfo);
     connect(_histCopyPassBtn,     &QPushButton::clicked,  this, &MainWindow::_onHistoryCopyPassword);
     connect(_histPurgePassBtn,    &QPushButton::clicked,  this, &MainWindow::_onHistoryPurgePassword);
     connect(_histDeleteBtn,       &QPushButton::clicked,  this, &MainWindow::_onHistoryDeleteEntry);
@@ -1278,27 +1309,10 @@ QWidget *MainWindow::_buildHistoryTab()
     // ===== Initial data load =====
     _refreshHistoryViews();
 
-    // Banner: show if resumable posts exist.
-    if (_ngPost && _ngPost->historyService()) {
-        _ngPost->historyService()->requestHistorySnapshot(PostHistoryStore::ListFilter(),
-                                                          _ignoredResumeIds,
-                                                          this,
-                                                          [this](const PostHistoryService::HistorySnapshot &snapshot) {
-            if (!snapshot.error.isEmpty() || snapshot.resumeRows.isEmpty())
-                return;
-            _bannerLabel->setText(tr("%1 post(s) can be resumed.").arg(snapshot.resumeRows.size()));
-            _bannerLabel->setVisible(true);
-            _bannerResumeBtn->setVisible(true);
-            statusBar()->showMessage(
-                tr("%1 post(s) can be resumed. Open the Resume tab to review them.")
-                    .arg(snapshot.resumeRows.size()), 10000);
-        });
-    }
-
     return root;
 }
 
-void MainWindow::_refreshHistoryViews()
+void MainWindow::_refreshHistoryViews(bool rewindEmptyPage)
 {
     PostHistoryService *history = _ngPost ? _ngPost->historyService() : nullptr;
     if (!history)
@@ -1317,9 +1331,15 @@ void MainWindow::_refreshHistoryViews()
         filter.dateFrom = _historyDateFrom->date().toString(Qt::ISODate);
     if (_historyDateTo && _historyDateTo->date() > _historyDateTo->minimumDate())
         filter.dateTo = _historyDateTo->date().toString(Qt::ISODate);
+    filter.limit = sHistoryPageSize;
+    filter.offset = _historyPageOffset > 0 ? _historyPageOffset : 0;
+    _historyPageOffset = filter.offset;
 
     const QSet<qint64> ignoredResumeIds = _ignoredResumeIds;
-    history->requestHistorySnapshot(filter, ignoredResumeIds, this, [this](const PostHistoryService::HistorySnapshot &snapshot) {
+    const int generation = ++_historyRefreshGeneration;
+    history->requestHistorySnapshot(filter, ignoredResumeIds, this, [this, generation, rewindEmptyPage](const PostHistoryService::HistorySnapshot &snapshot) {
+        if (generation != _historyRefreshGeneration)
+            return;
         if (!snapshot.error.isEmpty()) {
             statusBar()->showMessage(tr("History refresh failed: %1").arg(snapshot.error), 6000);
             return;
@@ -1327,6 +1347,12 @@ void MainWindow::_refreshHistoryViews()
 
         if (!_historyTable || !_resumeTable)
             return;
+
+        if (rewindEmptyPage && snapshot.posts.isEmpty() && snapshot.hasPreviousPage) {
+            _historyPageOffset = qMax(0, _historyPageOffset - sHistoryPageSize);
+            _refreshHistoryViews();
+            return;
+        }
 
         _historyTable->setSortingEnabled(false);
         const QList<PostHistoryStore::PostSummary> posts = snapshot.posts;
@@ -1357,6 +1383,27 @@ void MainWindow::_refreshHistoryViews()
         _historyTable->resizeColumnsToContents();
         _historyTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
         _historyTable->setSortingEnabled(true);
+
+        if (_histPrevPageBtn)
+            _histPrevPageBtn->setEnabled(snapshot.hasPreviousPage);
+        if (_histNextPageBtn)
+            _histNextPageBtn->setEnabled(snapshot.hasNextPage);
+        if (_histPageLabel) {
+            if (posts.isEmpty())
+                _histPageLabel->setText(tr("No entries"));
+            else
+                _histPageLabel->setText(tr("Entries %1-%2")
+                                            .arg(snapshot.pageOffset + 1)
+                                            .arg(snapshot.pageOffset + posts.size()));
+        }
+
+        const int resumableCount = snapshot.resumeRows.size();
+        if (_bannerLabel) {
+            _bannerLabel->setText(tr("%1 post(s) can be resumed.").arg(resumableCount));
+            _bannerLabel->setVisible(resumableCount > 0);
+        }
+        if (_bannerResumeBtn)
+            _bannerResumeBtn->setVisible(resumableCount > 0);
 
         _resumeTable->setRowCount(0);
         for (const PostHistoryService::ResumeRow &resume : snapshot.resumeRows) {
@@ -1842,6 +1889,18 @@ void MainWindow::_onHistoryRefresh()
     _refreshHistoryViews();
 }
 
+void MainWindow::_onHistoryPreviousPage()
+{
+    _historyPageOffset = qMax(0, _historyPageOffset - sHistoryPageSize);
+    _refreshHistoryViews();
+}
+
+void MainWindow::_onHistoryNextPage()
+{
+    _historyPageOffset += sHistoryPageSize;
+    _refreshHistoryViews();
+}
+
 void MainWindow::_onHistoryRowSelected(int row)
 {
     if (!_historyTable || row < 0) {
@@ -1936,6 +1995,7 @@ void MainWindow::_showHistoryDetails(const PostHistoryStore::PostDetails &detail
         _historyDetailInfo->setText(html);
 
     if (_histRegenNzbBtn)  _histRegenNzbBtn->setEnabled(true);
+    if (_histExportInfoBtn) _histExportInfoBtn->setEnabled(true);
     if (_histDeleteBtn)    _histDeleteBtn->setEnabled(true);
     if (_histCopyPassBtn)  _histCopyPassBtn->setEnabled(s.hasPassword && s.passwordStored);
     if (_histPurgePassBtn) _histPurgePassBtn->setEnabled(s.hasPassword && s.passwordStored);
@@ -1977,6 +2037,65 @@ void MainWindow::_onHistoryRegenNzb()
         QMessageBox::warning(this, tr("NZB regeneration failed"),
                              tr("Could not regenerate the NZB.\n"
                                 "Check that the post has complete article history."));
+}
+
+void MainWindow::_onHistoryExportInfo()
+{
+    if (!_selectedHistoryId || !_ngPost) return;
+
+    // The model can be the configured one, or any file the user picks: it is
+    // the index that decides the format, not ngPost.
+    QString templatePath = _ngPost->postInfoTemplatePath();
+    if (templatePath.isEmpty() || !QFileInfo::exists(templatePath)) {
+        QMessageBox::information(
+            this, tr("Pick a model"),
+            tr("A post info file is written from a model you provide: a small text file "
+               "where the values are written as __variables__.\n\n"
+               "Pick one now, or set POST_INFO_TEMPLATE in your configuration to always "
+               "use the same."));
+        templatePath = QFileDialog::getOpenFileName(this, tr("Post info model"), QString(),
+                                                    tr("Text files (*.txt *.tpl);;All files (*)"));
+        if (templatePath.isEmpty()) return;
+    }
+
+    // Only ask about the password when the model actually asks for it.
+    bool includePassword = false;
+    QFile tmpl(templatePath);
+    if (tmpl.open(QIODevice::ReadOnly)) {
+        const QString content = QString::fromUtf8(tmpl.readAll());
+        tmpl.close();
+        if (content.contains(QStringLiteral("__rarPass__"))) {
+            const int res = QMessageBox::question(
+                this, tr("Include password?"),
+                tr("This model writes the archive password into the file.\n"
+                   "Include it?"),
+                QMessageBox::Yes | QMessageBox::No);
+            includePassword = (res == QMessageBox::Yes);
+        }
+    }
+
+    const QString outPath = QFileDialog::getSaveFileName(
+        this, tr("Save post info file"), _ngPost->_nzbPath, tr("Text files (*.txt);;All files (*)"));
+    if (outPath.isEmpty()) return;
+
+    QString error;
+    bool incomplete = false;
+    QStringList warnings;
+    if (_ngPost->exportPostInfoGui(_selectedHistoryId, templatePath, outPath, includePassword,
+                                   &error, &incomplete, &warnings)) {
+        QString msg = tr("Post info file written to:\n%1").arg(outPath);
+        if (!warnings.isEmpty())
+            msg += QStringLiteral("\n\n") + warnings.join(QStringLiteral("\n"));
+        if (incomplete) {
+            // Being explicit beats a file that quietly pretends to be complete.
+            msg += tr("\n\nThis post was made before ngPost recorded these details, so the "
+                      "par2 percentage, the source name and your own information are empty.");
+        }
+        QMessageBox::information(this, tr("Post info file written"), msg);
+    } else {
+        QMessageBox::warning(this, tr("Export failed"),
+                             error.isEmpty() ? tr("Could not write the post info file.") : error);
+    }
 }
 
 void MainWindow::_onHistoryExportCsv()
@@ -2274,7 +2393,7 @@ void MainWindow::_onResumeSelectionChanged()
                 ? tr("<span style='color:#FFA200'>Partially resumable</span>")
                 : tr("<span style='color:darkred'>Not resumable</span>");
     _resumeDetailInfo->setText(
-        QStringLiteral("<b>%1</b> \342\200\224 %2 | "
+        QStringLiteral("<b>%1</b> ") + QChar(0x2014) + QStringLiteral(" %2 | "
                        "Posted: %3 | Pending: %4 | Failed: %5 | Unknown: %6%7")
             .arg(item->text(), stateStr)
             .arg(dec.postedArticles).arg(dec.pendingArticles)
@@ -2422,6 +2541,10 @@ void MainWindow::_onHistoryContextMenu(const QPoint &pos)
     if (history->checkResume(postId, &dec, &err))
         resumeAct = menu.addAction(tr("Resume"));
 
+    if (!menu.actions().isEmpty())
+        menu.addSeparator();
+    QAction *exportInfoAct = menu.addAction(tr("Export info file\342\200\246"));
+
     QAction *revealAct = nullptr;
     QAction *copyAct = nullptr;
     if (details.post.hasPassword && details.post.passwordStored) {
@@ -2439,6 +2562,8 @@ void MainWindow::_onHistoryContextMenu(const QPoint &pos)
 
     if (chosen == resumeAct) {
         _startResumePost(postId, true);
+    } else if (chosen == exportInfoAct) {
+        _onHistoryExportInfo();
     } else if (chosen == revealAct) {
         QMessageBox box(this);
         box.setWindowTitle(tr("Archive password"));

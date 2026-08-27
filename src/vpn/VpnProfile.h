@@ -29,10 +29,12 @@ struct VpnProfile
     QString             name;            //!< unique, also used as keychain key
     VpnManager::Backend backend;
     QString             configFileName;  //!< basename, lives in <configDir>/vpn/
+    QString             configBaseDir;   //!< non-persisted folder of the config that declared it
     bool                hasAuth;         //!< OpenVPN: user/pass required at connect
 
     VpnProfile()
-        : name(), backend(VpnManager::Backend::OpenVPN), configFileName(), hasAuth(false)
+        : name(), backend(VpnManager::Backend::OpenVPN), configFileName(),
+          configBaseDir(), hasAuth(false)
     {}
 
     //! Resolve the absolute path of the .ovpn/.conf file under configDir/vpn/.

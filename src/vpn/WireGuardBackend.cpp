@@ -12,6 +12,7 @@
 #include "VpnManager.h"
 
 #include <QCoreApplication>
+#include <QFile>
 #include <QFileInfo>
 #include <QHostAddress>
 #include <QRegularExpression>
@@ -24,6 +25,7 @@ WireGuardBackend::WireGuardBackend(QObject *parent)
     , _readySignaled(false)
 #ifdef Q_OS_WIN
     , _winServiceName()
+    , _winConfigPath()
     , _winIface()
     , _winPollAttempts(0)
     , _winPollTimer(nullptr)
@@ -317,9 +319,7 @@ bool WireGuardBackend::_queryTunnelInfo(QString *iface, QString *ip, QString *dn
     // wg show doesn't surface the local IP nor DNS directly — those live in
     // the [Interface] section of the .conf. Parse the .conf for them
     // instead; the service must have applied them as-is.
-    QString cfgPath = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
-                      + "/vpn/" + tunnelName + ".conf";
-    QFile cfg(cfgPath);
+    QFile cfg(_winConfigPath);
     if (!cfg.open(QIODevice::ReadOnly | QIODevice::Text))
         return false;
     QString content = QString::fromUtf8(cfg.readAll());
@@ -340,6 +340,7 @@ bool WireGuardBackend::_startWindows(QString const &configPath)
         return false;
     }
     _winServiceName = serviceNameFromConfig(configPath);
+    _winConfigPath = fi.absoluteFilePath();
     _winPollAttempts = 0;
 
     emit logLine(tr("Starting WireGuard service: %1").arg(_winServiceName));
@@ -407,6 +408,7 @@ void WireGuardBackend::_stopWindows()
     // We don't strictly need to verify exit code: a failed stop just
     // leaves the tunnel up; the next session will detect.
     _winServiceName.clear();
+    _winConfigPath.clear();
     emit stopped();
 }
 #endif // Q_OS_WIN

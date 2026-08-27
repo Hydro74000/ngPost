@@ -31,8 +31,18 @@ LIBS    += -lqt6keychain
 # a DLL that nothing imports, which windeployqt then skips.
 linux:!android: QT += dbus
 
-VERSION = 5.4.2
+VERSION = 5.5
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
+
+# The exact release this binary was built as, e.g. "v5.5" or
+# "v5.5-unstable.20260824.107.ac4bf63". APP_VERSION alone cannot tell the two
+# apart -- both read 5.5 -- so an unstable build could never be offered the
+# stable of the same number. Read from the environment at qmake time rather
+# than passed on the command line: the quoting of a -D through bash, pwsh and
+# nmake is three different problems. Empty for a local build, and the update
+# check then behaves exactly as it did before.
+NGPOST_BUILD_TAG = $$(NGPOST_BUILD_TAG)
+!isEmpty(NGPOST_BUILD_TAG): DEFINES += NGPOST_BUILD_TAG=\\\"$$NGPOST_BUILD_TAG\\\"
 
 INCLUDEPATH += $$PWD
 CONFIG += c++17
@@ -92,11 +102,13 @@ SOURCES += \
         $$PWD/NntpCheckCon.cpp \
         $$PWD/NntpConnection.cpp \
         $$PWD/NzbCheck.cpp \
+        $$PWD/PostCmdRunner.cpp \
         $$PWD/Poster.cpp \
         $$PWD/PostingJob.cpp \
         $$PWD/nntp/Nntp.cpp \
         $$PWD/nntp/NntpArticle.cpp \
         $$PWD/nntp/NntpFile.cpp \
+        $$PWD/postinfo/PostInfoTemplate.cpp \
         $$PWD/utils/CmdOrGuiApp.cpp \
         $$PWD/utils/PathHelper.cpp \
         $$PWD/utils/UpdateChecker.cpp \
@@ -121,12 +133,15 @@ HEADERS += \
     $$PWD/NntpCheckCon.h \
     $$PWD/NntpConnection.h \
     $$PWD/NzbCheck.h \
+    $$PWD/PostCmdRunner.h \
     $$PWD/Poster.h \
     $$PWD/PostingJob.h \
     $$PWD/nntp/Nntp.h \
     $$PWD/nntp/NntpArticle.h \
     $$PWD/nntp/NntpFile.h \
     $$PWD/nntp/NntpServerParams.h \
+    $$PWD/postinfo/PostInfoData.h \
+    $$PWD/postinfo/PostInfoTemplate.h \
     $$PWD/utils/CmdOrGuiApp.h \
     $$PWD/utils/Macros.h \
     $$PWD/utils/PathHelper.h \
@@ -157,6 +172,7 @@ DEFINES += __USE_HMI__
 SOURCES += \
     $$PWD/hmi/AutoPostWidget.cpp \
     $$PWD/hmi/CheckBoxCenterWidget.cpp \
+    $$PWD/hmi/PostInfoDialog.cpp \
     $$PWD/hmi/PostingWidget.cpp \
     $$PWD/hmi/SignedListWidget.cpp \
     $$PWD/hmi/MainWindow.cpp \
@@ -166,6 +182,7 @@ SOURCES += \
 HEADERS += \
     $$PWD/hmi/AutoPostWidget.h \
     $$PWD/hmi/CheckBoxCenterWidget.h \
+    $$PWD/hmi/PostInfoDialog.h \
     $$PWD/hmi/PostingWidget.h \
     $$PWD/hmi/SignedListWidget.h \
     $$PWD/hmi/MainWindow.h \

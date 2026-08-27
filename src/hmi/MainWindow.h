@@ -69,6 +69,7 @@ private:
     static const int  sDefaultConnections = 5;
     static const int  sDefaultServerPort  = 563;
     static const int  sDeleteColumnWidth  = 30;
+    static const int  sHistoryPageSize    = 200;
 
     static const QList<const char *> sServerListHeaders;
     static const QVector<int> sServerListSizes;
@@ -86,6 +87,7 @@ private:
     QCheckBox    *_historyErrorsFilter = nullptr;
     QLabel       *_historyDetailInfo  = nullptr;
     QPushButton  *_histRegenNzbBtn    = nullptr;
+    QPushButton  *_histExportInfoBtn  = nullptr;
     QPushButton  *_histCopyPassBtn    = nullptr;
     QPushButton  *_histPurgePassBtn   = nullptr;
     QPushButton  *_histDeleteBtn      = nullptr;
@@ -104,6 +106,8 @@ private:
     QTableWidget *_statsTopTable      = nullptr;
     qint64        _selectedHistoryId  = 0;
     QSet<qint64>  _ignoredResumeIds;
+    int           _historyPageOffset  = 0;
+    int           _historyRefreshGeneration = 0;
 
     // Additional history tab widgets needed for retranslation
     QLabel       *_bannerLabel        = nullptr;
@@ -116,6 +120,9 @@ private:
     QLabel       *_histToLabel        = nullptr;
     QLabel       *_histGroupLabel     = nullptr;
     QPushButton  *_histClearBtn       = nullptr;
+    QPushButton  *_histPrevPageBtn    = nullptr;
+    QPushButton  *_histNextPageBtn    = nullptr;
+    QLabel       *_histPageLabel      = nullptr;
     QLabel       *_statsPeriodLabel   = nullptr;
     QLabel       *_statsGroupLabel    = nullptr;
     QPushButton  *_statsRefreshBtn    = nullptr;
@@ -231,8 +238,11 @@ private slots:
     void onVpnStateChanged(VpnManager::State newState);
 
     void _onHistoryRefresh();
+    void _onHistoryPreviousPage();
+    void _onHistoryNextPage();
     void _onHistoryRowSelected(int row);
     void _onHistoryRegenNzb();
+    void _onHistoryExportInfo();
     void _onHistoryExportCsv();
     void _onHistoryCopyPassword();
     void _onHistoryPurgePassword();
@@ -259,7 +269,7 @@ private:
     void _initPostingBox();
     QWidget *_buildHistoryTab();
     void     _retranslateHistoryTab();
-    void _refreshHistoryViews();
+    void _refreshHistoryViews(bool rewindEmptyPage = true);
     void _showHistoryDetails(const PostHistoryStore::PostDetails &details);
     bool _startResumePost(qint64 postId, bool askConfirmation = true);
 

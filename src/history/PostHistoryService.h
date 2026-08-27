@@ -42,6 +42,10 @@ public:
         QList<PostHistoryStore::PostSummary> posts;
         QList<ResumeRow> resumeRows;
         QString error;
+        int pageOffset = 0;
+        int pageLimit = 0;
+        bool hasPreviousPage = false;
+        bool hasNextPage = false;
     };
 
     struct StatsSnapshot {
@@ -63,11 +67,33 @@ public:
     ~PostHistoryService() override;
 
     void configure(const QString &dbPath, bool storePasswords);
+    //! Queue startup crash/resume cleanup on the history worker. Subsequent
+    //! queued snapshots run after it, without blocking the GUI thread.
+    void prepareForUse();
     bool initialize(QString *error = nullptr);
     bool markPostCrashedArticlesUnknown(QString *error = nullptr);
     bool cleanupInvalidResumePosts(QString *error = nullptr);
 
     qint64 createPost(const PostHistoryStore::PostRecord &record, QString *error = nullptr);
+    qint64 createPost(const PostHistoryStore::PostRecord &record,
+                      const PostHistoryStore::PostInfo &info,
+                      const QMap<QString, MetaValue> &meta,
+                      QString *error = nullptr);
+    bool markPostStarted(qint64 postId, QString *error = nullptr);
+    bool updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error = nullptr);
+    bool setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error = nullptr);
+    bool addActiveSeconds(qint64 postId, qint64 seconds, QString *error = nullptr);
+    bool finalizePost(qint64 postId,
+                      const QString &status,
+                      const QString &avgSpeed,
+                      qint64 activeSeconds,
+                      QString *error = nullptr);
+    bool setPostMeta(qint64 postId,
+                     const QMap<QString, MetaValue> &meta,
+                     QString *error = nullptr);
+    bool loadPostInfoRecord(qint64 postId,
+                            PostHistoryStore::PostInfoRecord *record,
+                            QString *error = nullptr);
     bool updatePostStatus(qint64 postId,
                           const QString &status,
                           int nbFiles,
@@ -131,7 +157,8 @@ public:
                              const QString &outPath,
                              bool includePassword,
                              QStringList *warnings,
-                             QString *error = nullptr);
+                             QString *error = nullptr,
+                             const QString &passwordOverride = QString());
 
     void requestHistorySnapshot(const PostHistoryStore::ListFilter &filter,
                                 const QSet<qint64> &ignoredResumeIds,
@@ -146,6 +173,9 @@ public:
 
 signals:
     void error(QString msg);
+    //! Emitted after the queued startup cleanup; true means a later posting
+    //! action does not need to repeat it synchronously.
+    void prepared(bool ok);
 
 private:
     template<typename Func>

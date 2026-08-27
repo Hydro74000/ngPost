@@ -25,7 +25,8 @@ public:
                   QTextStream &stream,
                   bool includePassword,
                   QStringList *warnings,
-                  QString *error);
+                  QString *error,
+                  const QString &passwordOverride = QString());
 
 private:
     PostHistoryStore *_store;

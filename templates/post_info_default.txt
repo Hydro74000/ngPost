@@ -1,0 +1,37 @@
+# Generic post info file.
+#
+# A line starting with '#' is a comment: it is NOT written to the produced
+# sheet. Indent it by one space if you really want it written.
+#
+# Every name wrapped in two underscores is replaced by its value. Delete the
+# lines you do not need, add your own, mix text and variables freely: the
+# format is yours.
+#
+# This file may live anywhere you can read it. POST_INFO_TEMPLATE understands a
+# bare file name as "next to ngPost.conf", so write the full path if you keep
+# it somewhere else.
+#
+# The archive password is deliberately not written by this model: the file
+# would then have to be protected like a password file. If you really want it,
+# add a line with rarPass wrapped in two underscores.
+
+date        =__date__
+name        =__originalName__
+nzb         =__nzbFileName__
+size        =__postSize__
+size human  =__postSizeHuman__
+archive     =__rarName__
+par2        =__par2Pct__
+groups      =__groups__
+poster      =__nzbPoster__
+status      =__status__
+files       =__nbFiles__
+articles    =__nbArticles__
+failed      =__nbArticlesFailed__
+speed       =__avgSpeed__
+ngPost      =__appVersion__
+
+# Your own information, typed in the posting tab or given with
+# --post_meta "title=..." on the command line. An empty one stays empty.
+title       =__meta:title__
+category    =__meta:category__

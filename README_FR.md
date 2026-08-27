@@ -1,6 +1,6 @@
 <img align="left" width="80" height="80" src="https://raw.githubusercontent.com/Hydro74000/ngPost/master/src/resources/icons/ngPost.png" alt="ngPost">
 
-# ngPost v5.4.0
+# ngPost v5.5
 
 ngPost est un posteur pour Usenet en ligne de commande ou via une interface graphique développé en C++17/Qt6.<br/>
 Il a été conçu pour être le plus rapide possible et offrir toutes les fonctionnalités utiles pour poster facilement et en toute sécurité.<br/>
@@ -16,21 +16,22 @@ Voici la liste des principales fonctionnalités et atouts de ngPost:
   - **mode invisible**: obfuscation complète des Articles : impossible de (re)trouver un post sans avoir le fichier nzb
   - **exécution d'une commande ou un script une fois les nzb générés**
   - possibilité **d'éteindre l'ordinateur** lorsque tous les posts sont finis
-  - tunnel **VPN Linux intégré** pour les connexions NNTP de ngPost uniquement, avec OpenVPN ou WireGuard et activation par serveur
+  - tunnel **VPN Linux et Windows intégré** pour les connexions NNTP de ngPost uniquement, avec OpenVPN ou WireGuard et activation par serveur
   - multi-langues (Français, Allemand, Anglais, Chinois, Espagnol, Néerlandais, Portugais)
   - ...
 
 ![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3.png)
 
 
-[Les versions pour chacun des OS sont disponibles ici](https://github.com/Hydro74000/ngPost/releases), pour: Linux 64bit et Windows 64bit. Le support MacOS et Raspbian pourra être réévalué dans le futur.
+[Les versions pour chacun des OS sont disponibles ici](https://github.com/Hydro74000/ngPost/releases), pour Linux 64 bits, Windows 64 bits et macOS. Aucun paquet Raspbian récent n'est actuellement produit.
 
 
 ### Fichier de configuration
 
-Tout d'abord il vous faut éditer le fichier de configuration, basez vous [sur cette version FR](https://github.com/Hydro74000/ngPost/blob/master/ngPost_fr.conf).
-  - sous Windows: il est dans le dossier d'installation de ngPost: ngPost.conf (remplacez la version anglaise par la française ci-dessus)
-  - sous Linux et MacOS: $HOME/.ngPost (sans extension)
+Tout d'abord il vous faut éditer le fichier de configuration, basez vous [sur cette version FR](ngPost_fr.conf).
+  - sous Windows : `%LOCALAPPDATA%\ngPost\ngPost.conf`
+  - sous Linux : `$XDG_CONFIG_HOME/ngPost/ngPost.conf` (ou `~/.config/ngPost/ngPost.conf`)
+  - sous macOS : `~/Library/Application Support/ngPost/ngPost.conf`
 
 Si vous utilisez l'interface graphique, lancez l'application, changez la langue, ajoutez vos serveurs, indiquez tous les champs puis cliquer sur "sauver"
 
@@ -47,17 +48,25 @@ Sinon vous pouvez éditer le fichier à la main. Il vous faut remplir:
   - useVpn dans chaque section Server pour indiquer si ce serveur doit passer par le VPN
   - la ou les sections Server
 
+Facultatif, si un index Usenet vous réclame une fiche pour chaque post :
+  - POST_INFO_TEMPLATE (votre modèle de fiche : ngPost ne connaît aucun format
+    d'index, vous lui donnez le modèle, il remplit les trous)
+  - POST_INFO_OUTPUT (où écrire la fiche, par défaut à côté du nzb)
+
+Des modèles prêts à copier sont dans le dossier [templates/](templates/),
+et le guide complet pour débuter est sur le wiki : [Fiches de post](https://github.com/Hydro74000/ngPost/wiki/Post-Info-Files-fr).
+
 
 ### En ligne de commande
 <pre>
 Syntaxe: ngPost (options)* (-i <file or folder> | --auto <folder> | --monitor <folder>)+
 	--help             : Aide: afficher la syntaxe
 	-v or --version    : version de l'application
-	-c or --conf       : utilisation d'un fichier de configuration autre que celui par défaut ($HOME/.ngPost ou ngPost.conf sous Windows)
+	-c or --conf       : utilisation d'un fichier de configuration autre que celui du dossier ngPost propre à l'utilisateur
 	--disp_progress    : affichage de la progression en ligne de commande: NONE (défaut), BAR (barre de progression) ou FILES (log à chaque upload de fichier)
 	-d or --debug      : display extra information
 	--fulldebug        : display full debug information
-	-l or --lang       : langue de l'application (EN, FR, ES ou DE)
+	-l or --lang       : langue de l'application (EN, FR, ES, DE, NL, PT ou ZH)
 	--check            : check nzb file (if articles are available on Usenet) cf https://github.com/mbruel/nzbCheck
 	-q or --quiet      : quiet mode (no output on stdout)
 
@@ -66,7 +75,7 @@ Syntaxe: ngPost (options)* (-i <file or folder> | --auto <folder> | --monitor <f
 	--history-show     : détail d'un post historisé (alias --history_show)
 	--history-import-csv: import explicite d'un ancien POST_HISTORY csv (alias --history_import_csv)
 	--regenerate-nzb   : régénère un NZB depuis l'historique vers stdout ou -o fichier (alias --regenerate_nzb)
-	--include-password : inclut le mot de passe d'archive stocké dans le NZB régénéré
+	--include-password : inclut le mot de passe d'archive stocké dans un NZB régénéré ou une fiche exportée
 	--resume-list      : liste les posts reprenables, option --json disponible (alias --resume_list)
 	--resume-check     : diagnostique un post reprenable (alias --resume_check)
 	--resume-post      : reprend un ou plusieurs ids séparés par virgule, avec --dry-run ou --yes (alias --resume_post)
@@ -124,7 +133,7 @@ Exemples:
   - surveillance d'un dossier: ngPost --monitor /Downloads/testNgPost --rm_posted --compress --gen_par2 --gen_name --gen_pass --rar_size 42 --disp_progress files
   - post automatique: ngPost --auto /Downloads/testNgPost --compress --gen_par2 --gen_name --gen_pass --rar_size 42 --disp_progress files
   - avec compression, obfuscation, password et par2: ngPost -i /tmp/file1 -i /tmp/folder1 -o /nzb/myPost.nzb --compress --gen_name --gen_pass --gen_par2
-  - avec fichier de configuration: ngPost -c ~/.ngPost -m "password=qwerty42" -f ngPost@nowhere.com -i /tmp/file1 -i /tmp/file2 -i /tmp/folderToPost1 -i /tmp/folderToPost2
+  - avec fichier de configuration: ngPost -c ~/.config/ngPost/ngPost.conf -m "password=qwerty42" -f ngPost@nowhere.com -i /tmp/file1 -i /tmp/file2 -i /tmp/folderToPost1 -i /tmp/folderToPost2
   - avec les paramètres d'UN serveur:  ngPost -t 1 -m "password=qwerty42" -m "metaKey=someValue" -h news.newshosting.com -P 443 -s -u user -p pass -n 30 -f ngPost@nowhere.com  -g "alt.binaries.test,alt.binaries.test2" -a 64000 -i /tmp/folderToPost -o /tmp/folderToPost.nzb
 
 Si vous ne fournissez pas le fichier de sortie (nzb file avec l'option -o), il sera créé dans le dossier par défaut nzbPath avec le nom du premier fichier ou dossier donné dans la ligne de commande.
@@ -172,9 +181,9 @@ L'onglet **Historique** regroupe trois sous-onglets :
 
 La reprise repose sur la base SQLite : les articles confirmés par le serveur sont conservés, les articles `failed`, `pending` ou `unknown` sont repostés avec de nouveaux Message-ID. Les articles `unknown` correspondent aux cas où la connexion a été coupée avant confirmation serveur ; l'ancien Message-ID reste dans l'historique technique et n'est pas utilisé dans le NZB final. Pour les posts compressés, les archives/par2 temporaires doivent encore exister ; pour les fichiers non compressés, chemin, taille et date de modification doivent correspondre.
 
-#### le tunnel VPN intégré (Linux):
+#### le tunnel VPN intégré (Linux et Windows):
 
-Le bouton **VPN...** ouvre les paramètres du tunnel VPN. Cette fonctionnalité est prévue pour Linux et permet de faire passer seulement les connexions NNTP de ngPost par un tunnel OpenVPN ou WireGuard, sans modifier la route par défaut du système et sans impacter les autres applications.<br/>
+Le bouton **VPN...** ouvre les paramètres du tunnel VPN. Cette fonctionnalité est disponible sous Linux et Windows et permet de faire passer seulement les connexions NNTP de ngPost par un tunnel OpenVPN ou WireGuard, sans modifier la route par défaut du système et sans impacter les autres applications.<br/>
 
 La première utilisation nécessite l'installation du helper privilégié via **Install**. L'installation passe par `pkexec`/Polkit, installe les scripts dans `/var/lib/ngpost` et crée une règle Polkit limitée à l'utilisateur courant et au helper VPN de ngPost. Une fois installé, les boutons **Connect** et **Disconnect** ne redemandent plus le mot de passe.<br/>
 
@@ -259,7 +268,13 @@ Les dernieres versions packagées sont disponibles ici<br/>
 Une alternative pour compiler est [d'installer QT](https://www.qt.io/download) et de charger le fichier ngPost.pro dans QtCreator<br/>
 
 
-### version Linux portable: AppImage compilée avec Qt v5.12.6, GLIBC 2.24
+### Anciennes archives v4.16
+
+Les sections ci-dessous sont conservées pour les utilisateurs de la version
+4.16. Leurs liens, dépendances et ancien chemin `~/.ngPost` ne concernent pas
+ngPost 5.5 ; utilisez les paquets et les chemins indiqués au début de ce fichier.
+
+#### version Linux portable: AppImage compilée avec Qt v5.12.6, GLIBC 2.24
 - téléchargez [ngPost_v4.16-x86_64.AppImage](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16-x86_64.AppImage)
 - chmod 755 ngPost_v4.16-x86_64.AppImage
 - si vous le lancez sans paramètres, l'interface graphique s'ouvrira, sinon c'est en mode ligne de commande. (cf ngPost --help -l fr)
@@ -268,7 +283,7 @@ Une alternative pour compiler est [d'installer QT](https://www.qt.io/download) e
 PS: pour des systèmes plus vieux GLIBC < 2.24, voici une version compilée sous Debian8 avec GLIBC 2.19 et Qt v5.8.0: [ngPost_v4.16-x86_64_debian8.AppImage](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16-x86_64_debian8.AppImage)
 
 
-### version Raspbian portable (armhf pour Raspberry PI)
+#### version Raspbian portable (armhf pour Raspberry PI)
 - téléchargez [ngPost_v4.16-armhf.AppImage](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16-armhf.AppImage)
 - chmod 755 ngPost_v4.16-armhf.AppImage
 - si vous le lancez sans paramètres, l'interface graphique s'ouvrira, sinon c'est en mode ligne de commande. (cf ngPost --help -l fr)
@@ -290,7 +305,7 @@ RAR_PATH = /usr/bin/7z
 RAR_EXTRA = -mx0 -mhe=on
 </pre>
 
-### Windows installer
+#### Windows installer
 - Utilisez l'installeur [ngPost_v4.16_x64_setup.exe](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16_x64_setup.exe) ou [ngPost_v4.16_x86_setup.exe](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16_x86_setup.exe) pour la version 32bit
 - lancez l'application **ngPost.exe**, l'interface graphique s'ouvrira. Changez tous vos paramètres dont la langue puis cliquez sur **sauver**
 - vous pouvez bien sûr ensuite l'utiliser en ligne de commande. cf ngPost --help
@@ -298,7 +313,7 @@ RAR_EXTRA = -mx0 -mhe=on
 **Know Issue with non SSL support:** you may need to install [msvc2015 redistribuables](https://www.microsoft.com/en-us/download/details.aspx?id=48145) as libssl depends on its APIs<br/>
 
 
-### MacOS release built on High Sierra (v10.13)
+#### MacOS release built on High Sierra (v10.13)
 - téléchargez [ngPost_v4.16.dmg](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16.dmg)
 - si vous le lancez sans paramètres, l'interface graphique s'ouvrira, sinon c'est en mode ligne de commande. (cf ngPost --help -l fr)
 - pour le fichier de configuration, éditez le fichier **~/.ngPost** et copiez [ce modèle](https://raw.githubusercontent.com/Hydro74000/ngPost/master/ngPost_fr.conf) (ne pas mettre l'extension .conf!)

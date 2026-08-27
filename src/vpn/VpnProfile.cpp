@@ -11,9 +11,13 @@
 
 #include "utils/PathHelper.h"
 
+#include <QDir>
+
 QString VpnProfile::absoluteConfigPath() const
 {
     if (configFileName.isEmpty())
         return QString();
-    return PathHelper::vpnDir() + "/" + configFileName;
+    if (configBaseDir.isEmpty())
+        return PathHelper::vpnDir() + "/" + configFileName;
+    return QDir(configBaseDir).filePath(QStringLiteral("vpn/") + configFileName);
 }

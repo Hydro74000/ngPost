@@ -7,10 +7,14 @@
 
 #ifndef NGPOST_H
 #define NGPOST_H
+#include "PostingJobOptions.h"
+#include "history/PostHistoryStore.h"
+#include "utils/PathHelper.h"
 #include "utils/CmdOrGuiApp.h"
 #include "utils/Macros.h"
 
 #include <QCommandLineOption>
+#include <QDir>
 #include <QFileInfo>
 #include <QMutex>
 #include <QNetworkAccessManager>
@@ -40,6 +44,7 @@ class NzbCheck;
 class UpdateChecker;
 class VpnManager;
 class PostHistoryService;
+class PostCmdRunner;
 
 #define NB_ARTICLES_TO_PREPARE_PER_CONNECTION 3
 
@@ -99,12 +104,26 @@ public:
         THREAD,
         NZB_UPLOAD_URL,
         NZB_POST_CMD,
+        POST_INFO_TEMPLATE,
+        POST_INFO_OUTPUT,
+        POST_INFO_ONLY_ON_SUCCESS,
+        POST_CMD_TIMEOUT,
+        POST_CMD_FAIL_IS_ERROR,
+        POST_CMD_EXPOSE_PASSWORD,
+        NZB_UPLOAD_TIMEOUT,
+        //! CLI-only negatives, so a boolean set in the configuration file can
+        //! be turned off for a single run (same idea as --vpn / --no_vpn).
+        NO_POST_INFO_ONLY_ON_SUCCESS,
+        NO_POST_CMD_FAIL_IS_ERROR,
+        NO_POST_CMD_EXPOSE_PASSWORD,
+        NO_POST_INFO,
         MONITOR_FOLDERS,
         MONITOR_EXT,
         MONITOR_IGNORE_DIR,
         MONITOR_SEC_DELAY_SCAN,
         MSG_ID,
         META,
+        POST_META,
         ARTICLE_SIZE,
         FROM,
         GROUPS,
@@ -172,6 +191,7 @@ public:
         HISTORY_SHOW,
         HISTORY_IMPORT_CSV,
         REGENERATE_NZB,
+        EXPORT_POST_INFO,
         INCLUDE_PASSWORD,
         RESUME_LIST,
         RESUME_CHECK,
@@ -189,21 +209,6 @@ private:
     static const QMap<GROUP_POLICY, QString> sGroupPolicies;
 
     static const QMap<Opt, QString> sOptionNames;
-
-    enum class PostCmdPlaceHolders {
-        originalPath,
-        nzbPath,
-        nzbName,
-        rarName,
-        rarPass,
-        groups,
-        nbArticles,
-        nbArticlesFailed,
-        sizeInByte,
-        nbFiles
-    };
-
-    static const QMap<PostCmdPlaceHolders, QString> sPostCmdPlaceHolders;
 
     enum class AppMode { CMD = 0, HMI = 1 }; //!< supposed to be CMD but a simple HMI has been added
 
@@ -250,7 +255,13 @@ private:
     bool _saveFrom;
     std::string _from; //!< email of poster (if empty, random one will be used for each file)
 
-    QMap<QString, QString> _meta; //!< list of meta to add in the nzb header (typically a password)
+    //! User metadata, with the scope deciding whether it may be published in
+    //! the nzb header. Stored raw: the XML escaping happens where the nzb is
+    //! written, not here, so a template gets the value the user typed.
+    QMap<QString, MetaValue> _meta;
+    //! Password announced with -m "password=...", kept apart from _meta because
+    //! it is a secret and follows the archive password rules.
+    QString _declaredPassword;
     QList<QString>
         _grpList; //!< Newsgroup where we're posting in a list format to write in the nzb file
     int _nbGroups;
@@ -345,6 +356,40 @@ private:
     ushort _waitDurationBeforeAutoResume;
 
     QStringList _nzbPostCmd;
+    //! Path of the post info template. Empty means the feature is off: no
+    //! file, no message, nothing changes for whoever does not want it.
+    QString _postInfoTemplate;
+    //! True when _postInfoTemplate came from the command line, since a relative
+    //! path is then resolved against the current directory instead of the
+    //! folder of the configuration file.
+    bool _postInfoTemplateFromCli;
+    //! Folder of the configuration file actually loaded, which is where a
+    //! relative POST_INFO_TEMPLATE is looked up: "next to my conf" is what a
+    //! user means, even when the conf was given with -c.
+    QString _loadedConfigDir;
+    QString _postInfoOutput;
+    //! Like the model, a relative output given explicitly on the command line
+    //! belongs to the caller's current directory. A value read from ngPost.conf
+    //! belongs next to that configuration file.
+    bool _postInfoOutputFromCli;
+    QStringList _sessionPostInfoTemplates;
+    bool _postInfoOnlySuccess;
+    //! --no_post_info: this run writes no record sheet, whatever the
+    //! configuration says. The counterpart of unticking the box in the GUI.
+    bool _noPostInfo;
+    int _postCmdTimeoutSec;      //!< per command, 0 = no limit
+    bool _postCmdFailIsError;    //!< should a failed post command fail the run?
+    bool _postCmdExposePassword; //!< password in the env and the json of a hook
+    int _nzbUploadTimeoutSec;    //!< keeps a stalled upload from blocking the exit
+    PostCmdRunner *_postCmdRunner;
+    bool _waitingForPostCmds;    //!< so the wait is announced only once
+    //! Exit code a fatal error asked for, < 0 when none. The post commands of
+    //! posts that already succeeded still get to finish first.
+    int _pendingExitCode;
+    //! True when stdout carries data a caller pipes (an exported record sheet),
+    //! so every message goes to stderr instead of corrupting it.
+    bool _stdoutIsData;
+    QFile *_stdoutRedirect; //!< keeps stderr open while _cout points at it
     bool _preparePacking;
 
     GROUP_POLICY _groupPolicy;
@@ -381,6 +426,12 @@ private:
     static const int sDefaultArticleSize = 716800;
     static constexpr const char *sDefaultSpace = "  ";
     static constexpr const char *sDefaultMsgIdSignature = "ngPost";
+    //! ".info.txt" and not ".txt": with nzbPath pointing at the source folder,
+    //! __nzbName__.txt could silently overwrite a source file.
+    static constexpr const char *sDefaultPostInfoOutput = "__nzbDir__/__nzbName__.info.txt";
+    //! An upload has no reason to take longer, and it is the only thing that
+    //! keeps ngPost from quitting or powering off.
+    static const int sDefaultNzbUploadTimeoutSec = 300;
 #if defined(WIN32) || defined(__MINGW64__)
     static constexpr const char *sDefaultNzbPath = ""; //!< local folder
     static constexpr const char *sDefaultConfig = "ngPost.conf";
@@ -451,6 +502,17 @@ public:
 #if defined(NGPOST_TESTING) && defined(__USE_HMI__)
     inline MainWindow *mainWindowForTest() const;
 #endif
+#ifdef NGPOST_TESTING
+    //! Read back what the configuration parsing produced, so a test can check
+    //! that saveConfig() writes something that parses back to the same thing.
+    QString postInfoOutputForTest() const { return _postInfoOutput; }
+
+    bool postInfoOnlyOnSuccessForTest() const { return _postInfoOnlySuccess; }
+    int postCmdTimeoutSecForTest() const { return _postCmdTimeoutSec; }
+    bool postCmdFailIsErrorForTest() const { return _postCmdFailIsError; }
+    bool postCmdExposePasswordForTest() const { return _postCmdExposePassword; }
+    int nzbUploadTimeoutSecForTest() const { return _nzbUploadTimeoutSec; }
+#endif
 
     bool startPostingJob(PostingJob *job);
 
@@ -475,6 +537,15 @@ public:
 
     bool resumePostGui(qint64 postId, PostingWidget *widget = nullptr, QString *error = nullptr);
     bool regenerateNzbGui(qint64 postId, const QString &outPath, bool includePassword = false);
+    //! Renders the post info file of an existing post from the GUI. Sets
+    //! \a incomplete when the post predates the facts a record sheet needs.
+    bool exportPostInfoGui(qint64 postId,
+                           const QString &templatePath,
+                           const QString &outPath,
+                           bool includePassword,
+                           QString *error,
+                           bool *incomplete,
+                           QStringList *warnings = nullptr);
 
     bool hasMonitoringPostingJobs() const;
     void closeAllMonitoringJobs();
@@ -495,6 +566,66 @@ public:
     void changeLanguage(const QString &lang);
 
     void doNzbPostCMD(PostingJob *job);
+
+    //! The only place allowed to quit or to power the machine off. Waits for
+    //! the posts, the post commands and the nzb uploads.
+    void maybeFinishApplication();
+
+    //! True when something will actually read the description of a post: a
+    //! post info file, a post command, or an upload. Consolidating it costs a
+    //! database read, which nobody should pay for when unused.
+    bool needsPostInfoData(const PostingJobOptions &options) const
+    {
+        const bool wantsSheet =
+            options.writePostInfoFile
+            && !(options.postInfoTemplate.isEmpty() && _postInfoTemplate.isEmpty());
+        return wantsSheet || !_nzbPostCmd.isEmpty() || _urlNzbUpload != nullptr;
+    }
+
+    //! Splits a "key=value" metadata pair on the FIRST '=' only, so a value can
+    //! itself hold '=' signs (URLs usually do). Returns false when there is no
+    //! separator or no name.
+    static bool splitMetaPair(const QString &keyValue, QString *key, QString *value);
+
+    //! Absolute path of the post info template, empty when the feature is off.
+    //! A relative path is understood from the configuration folder, or from the
+    //! current directory when it was given on the command line.
+    QString postInfoTemplatePath() const;
+
+    //! Sets the model the configuration offers. An absolute path from the GUI
+    //! needs no resolving, so it is stored as given.
+    void setPostInfoTemplate(const QString &path)
+    {
+        _postInfoTemplate        = path;
+        _postInfoTemplateFromCli = false;
+    }
+
+    //! Where the configuration says a sheet goes. Shown in the GUI as the
+    //! default a post follows unless it picks its own.
+    QString postInfoOutputPattern() const { return _postInfoOutput; }
+    void    setPostInfoOutput(const QString &pattern)
+    {
+        _postInfoOutput        = pattern;
+        _postInfoOutputFromCli = false;
+    }
+
+    //! Models opened during this run, offered again to the next posts. Kept in
+    //! memory only: a model picked once is convenient to find again, not a
+    //! setting worth writing down.
+    const QStringList &sessionPostInfoTemplates() const { return _sessionPostInfoTemplates; }
+    void setSessionPostInfoTemplates(const QStringList &paths)
+    {
+        _sessionPostInfoTemplates = paths;
+    }
+
+    //! Folder a relative POST_INFO_OUTPUT is understood from, which is what
+    //! the configuration file says: its own folder.
+    QString postInfoOutputBaseDir() const
+    {
+        if (_postInfoOutputFromCli)
+            return QDir::currentPath();
+        return _loadedConfigDir.isEmpty() ? PathHelper::configDir() : _loadedConfigDir;
+    }
 
     inline std::string from() const;
 
@@ -541,7 +672,7 @@ public slots:
 
     void onShutdownProcReadyReadStandardOutput();
     void onShutdownProcReadyReadStandardError();
-    void onShutdownProcFinished(int exitCode);
+    void onShutdownProcFinished(int exitCode, QProcess::ExitStatus exitStatus);
     //    void onShutdownProcStarted();
     //    void onShutdownProcStateChanged(QProcess::ProcessState newState);
     void onShutdownProcError(QProcess::ProcessError error);
@@ -563,6 +694,39 @@ private:
 
     void _post(const QFileInfo &fileInfo, const QString &monitorFolder = "");
     void _finishPosting();
+    void _discardUnstartedJob(PostingJob *job);
+
+    //! Parses one key=value metadata. Returns false (and reports) on a malformed
+    //! pair or on a key claimed by both --meta and --post_meta.
+    bool _addMeta(const QString &keyValue, MetaScope scope);
+
+    //! Validate and apply the two settings that need checking, shared by the
+    //! configuration file and the command line so the rules cannot diverge.
+    //! They append to \a error rather than reporting, since the config parser
+    //! accumulates its errors.
+    void _setNzbUploadUrl(const QString &url, QString &error);
+    void _setPostHistoryFile(const QString &path, QString &error);
+    void _ensurePostHistoryHeader();
+    QStringList _exportProtectedPaths(const PostHistoryStore::PostInfoRecord &record,
+                                      const QString &templatePath) const;
+
+    //! Snapshot of the current global settings, frozen into a new job so that a
+    //! queued post is sent with the settings it was queued with. Callers still
+    //! have to fill nzbFilePath, files and inputPaths.
+    PostingJobOptions _baseJobOptions() const;
+
+    void _startShutdown();
+    void _requestExit(ERROR_CODE code);
+
+    //! True when the command line asks for a history command rather than a
+    //! post: it both dispatches and tells that no input file is needed.
+    bool _isHistoryCommand(QCommandLineParser &parser) const;
+    //! Renders the post info file of an existing post. Writes to outPath, or
+    //! to stdout when it is empty.
+    bool _exportPostInfo(qint64 postId,
+                         const QString &templatePath,
+                         const QString &outPath,
+                         bool includePassword);
 
     //!< auto-post nfo bundling (cf AUTO_INCLUDE_NFO):
     //!< return the sibling <completeBaseName>.nfo of a non-nfo file, or an invalid QFileInfo
@@ -583,6 +747,20 @@ private:
 
     void _syntax(char *appName);
     QString _parseConfig(const QString &configPath);
+
+    //! Tell the user about the config directory adopted at startup by
+    //! PathHelper::migrateAppNamedConfigDirIfNeeded(). The GUI adoption happens
+    //! before MainWindow; CLI adoption happens after argument validation and
+    //! before the default config is parsed. This method only reports it.
+    //! Called from every entry point and self-guarded, so it speaks once.
+    void _reportConfigDirMigration();
+
+    //! Says out loud that a "-c" pointing at the folder a previous run adopted
+    //! writes its history somewhere else than the adopted configuration does.
+    //! Silent for every other path, and for a config that sets POST_DB itself.
+    void _warnIfConfigWasAdoptedFrom(const QString &confPath);
+    bool _configDirMigrationReported = false;
+
     static QStringList defaultPackKeywords();
 
 #ifdef __DEBUG__

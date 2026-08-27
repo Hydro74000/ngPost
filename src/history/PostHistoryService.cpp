@@ -12,10 +12,10 @@
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
-#include <QFile>
 #include <QIODevice>
 #include <QMetaObject>
 #include <QPointer>
+#include <QSaveFile>
 #include <QTextStream>
 #include <QTimer>
 #include <QtGlobal>
@@ -59,11 +59,27 @@ public:
         connect(&_retryTimer, &QTimer::timeout, this, [this]() { flushArticleEventsOnce(); });
     }
 
+    //! Starts the flush machinery only — deliberately without opening or
+    //! creating the database.
+    //!
+    //! The service is built from NgPost's constructor, before the config file
+    //! is read, so at this point the path is still the default one. Creating
+    //! the database here meant every single run — `--help` and `--version`
+    //! included — dropped a fully schema'd, permanently empty SQLite file at
+    //! that default path, even when POST_DB pointed somewhere else entirely.
+    //! Harmless data-wise, but it is what left stray ngPost_history.sqlite
+    //! files in every config folder ngPost ever resolved, and a plausible
+    //! looking empty history is a first-class red herring when someone is
+    //! trying to work out where their posts went.
+    //!
+    //! Nothing needs it: every PostHistoryStore entry point opens with
+    //! `if (!initialize(error))`, and NgPost calls _ensureHistoryStore()
+    //! before any post and any history command. The database is therefore
+    //! created on first real use, against the configured path, and a path
+    //! that cannot be opened is now reported against the path that is
+    //! actually in use rather than against a default nobody asked for.
     void start()
     {
-        QString err;
-        if (!_store.initialize(&err))
-            reportError(QObject::tr("History service initialization failed: %1").arg(err));
         _lastFlushTimer.start();
         _lastErrorTimer.invalidate();
         _flushTimer.start();
@@ -74,14 +90,29 @@ public:
         _flushTimer.stop();
         _retryTimer.stop();
         QString err;
-        flushArticleEventsBlocking(&err);
+        if (!flushArticleEventsBlocking(&err))
+            reportError(QObject::tr("History service flush failed: %1").arg(err));
         _store.closeConnection();
     }
 
     void configure(const QString &dbPath, bool storePasswords)
     {
-        flushArticleEventsBlocking(nullptr);
+        QString err;
+        if (!flushArticleEventsBlocking(&err)) {
+            reportError(QObject::tr("History service flush failed: %1").arg(err));
+            return;
+        }
         _store.configure(dbPath, storePasswords);
+    }
+
+    void prepareForUse()
+    {
+        QString err;
+        const bool ok = _store.markPostCrashedArticlesUnknown(&err)
+            && _store.cleanupInvalidResumePosts(&err);
+        if (!ok)
+            reportError(err);
+        emit _service->prepared(ok);
     }
 
     bool initialize(QString *error)
@@ -91,20 +122,79 @@ public:
 
     bool markPostCrashedArticlesUnknown(QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return false;
         return _store.markPostCrashedArticlesUnknown(error);
     }
 
     bool cleanupInvalidResumePosts(QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return false;
         return _store.cleanupInvalidResumePosts(error);
     }
 
     qint64 createPost(const PostHistoryStore::PostRecord &record, QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return 0;
         return _store.createPost(record, error);
+    }
+
+    qint64 createPost(const PostHistoryStore::PostRecord &record,
+                      const PostHistoryStore::PostInfo &info,
+                      const QMap<QString, MetaValue> &meta,
+                      QString *error)
+    {
+        if (!flushArticleEventsBlocking(error))
+            return 0;
+        return _store.createPost(record, info, meta, error);
+    }
+
+    bool markPostStarted(qint64 postId, QString *error)
+    {
+        return _store.markPostStarted(postId, error);
+    }
+
+    bool updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error)
+    {
+        return _store.updatePostNzbPath(postId, nzbPath, error);
+    }
+
+    bool setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error)
+    {
+        return _store.setPostSizeIfUnset(postId, sizeBytes, error);
+    }
+
+    bool addActiveSeconds(qint64 postId, qint64 seconds, QString *error)
+    {
+        return _store.addActiveSeconds(postId, seconds, error);
+    }
+
+    bool finalizePost(qint64 postId,
+                      const QString &status,
+                      const QString &avgSpeed,
+                      qint64 activeSeconds,
+                      QString *error)
+    {
+        // The pending article events decide the counters this very call
+        // recomputes; losing them silently would finalise a post on stale
+        // numbers.
+        if (!flushArticleEventsBlocking(error))
+            return false;
+        return _store.finalizePost(postId, status, avgSpeed, activeSeconds, error);
+    }
+
+    bool setPostMeta(qint64 postId, const QMap<QString, MetaValue> &meta, QString *error)
+    {
+        return _store.setPostMeta(postId, meta, error);
+    }
+
+    bool loadPostInfoRecord(qint64 postId, PostHistoryStore::PostInfoRecord *record, QString *error)
+    {
+        if (!flushArticleEventsBlocking(error))
+            return false;
+        return _store.loadPostInfoRecord(postId, record, error);
     }
 
     bool updatePostStatus(qint64 postId,
@@ -130,44 +220,53 @@ public:
 
     bool markPostResuming(qint64 postId, QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return false;
         return _store.markPostResuming(postId, error);
     }
 
     bool setPostAbandoned(qint64 postId, QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return false;
         return _store.setPostAbandoned(postId, error);
     }
 
     bool purgeResumeData(qint64 postId, QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return false;
         return _store.purgeResumeData(postId, error);
     }
 
     bool purgePassword(qint64 postId, QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return false;
         return _store.purgePassword(postId, error);
     }
 
     bool deletePost(qint64 postId, QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return false;
         return _store.deletePost(postId, error);
     }
 
     qint64 upsertFile(const PostHistoryStore::FileRecord &record, QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return 0;
         return _store.upsertFile(record, error);
     }
 
     void enqueueUpdateFileStatus(qint64 fileId, const QString &status)
     {
         QString err;
-        flushArticleEventsBlocking(&err);
+        if (!flushArticleEventsBlocking(&err)) {
+            reportError(QObject::tr("History service flush failed: %1").arg(err));
+            return;
+        }
         if (!_store.updateFileStatus(fileId, status, &err))
             reportError(QObject::tr("History file status update failed: %1").arg(err));
     }
@@ -202,14 +301,16 @@ public:
 
     bool loadPostDetails(qint64 postId, PostHistoryStore::PostDetails *details, QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return false;
         return _store.loadPostDetails(postId, details, error);
     }
 
     QList<PostHistoryStore::PostSummary> listPosts(const PostHistoryStore::ListFilter &filter,
                                                    QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return {};
         if (error)
             error->clear();
         return _store.listPosts(filter, error);
@@ -217,7 +318,8 @@ public:
 
     QList<PostHistoryStore::PostSummary> resumeCandidates(QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return {};
         if (error)
             error->clear();
         return _store.resumeCandidates(error);
@@ -225,7 +327,8 @@ public:
 
     bool exportCsv(QTextStream &stream, bool includePasswords, QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return false;
         if (error)
             error->clear();
         return _store.exportCsv(stream, includePasswords, error);
@@ -233,7 +336,8 @@ public:
 
     bool importLegacyCsv(const QString &path, QString *error)
     {
-        flushArticleEventsBlocking(error);
+        if (!flushArticleEventsBlocking(error))
+            return false;
         if (error)
             error->clear();
         return _store.importLegacyCsv(path, error);
@@ -255,29 +359,53 @@ public:
                              const QString &outPath,
                              bool includePassword,
                              QStringList *warnings,
-                             QString *error)
+                             QString *error,
+                             const QString &passwordOverride)
     {
         if (!flushArticleEventsBlocking(error))
             return false;
-        QFile file(outPath);
+        QSaveFile file(outPath);
         if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
             if (error)
-                *error = QObject::tr("Could not open file for writing: %1").arg(outPath);
+                *error = QObject::tr("Could not open file for writing: %1 (%2)")
+                             .arg(outPath, file.errorString());
             return false;
         }
         QTextStream stream(&file);
         NzbHistoryRegenerator regenerator(&_store);
-        return regenerator.writeNzb(postId, stream, includePassword, warnings, error);
+        if (!regenerator.writeNzb(postId,
+                                  stream,
+                                  includePassword,
+                                  warnings,
+                                  error,
+                                  passwordOverride)) {
+            file.cancelWriting();
+            return false;
+        }
+        stream.flush();
+        if (stream.status() != QTextStream::Ok || !file.commit()) {
+            if (error)
+                *error = QObject::tr("Could not finish writing %1: %2")
+                             .arg(outPath, file.errorString());
+            return false;
+        }
+        return true;
     }
 
     bool checkResume(qint64 postId, PostHistoryService::ResumeRow *row, QString *error)
     {
         if (!row)
             return false;
-        flushArticleEventsBlocking(error);
+        *row = PostHistoryService::ResumeRow();
+        row->postId = postId;
+        if (!flushArticleEventsBlocking(error)) {
+            row->state = QStringLiteral("not_resumable");
+            if (error)
+                row->reason = *error;
+            return false;
+        }
         ResumePlanner planner(&_store);
         const ResumePlanner::Decision dec = planner.check(postId, error);
-        row->postId = postId;
         row->state = dec.state == ResumePlanner::ResumeState::Resumable
             ? QStringLiteral("resumable")
             : dec.state == ResumePlanner::ResumeState::PartiallyResumable
@@ -295,12 +423,26 @@ public:
                                                         const QSet<qint64> &ignoredResumeIds)
     {
         PostHistoryService::HistorySnapshot snapshot;
+        snapshot.pageOffset = filter.offset > 0 ? filter.offset : 0;
+        snapshot.pageLimit = filter.limit > 0 ? filter.limit : 0;
+        snapshot.hasPreviousPage = snapshot.pageLimit > 0 && snapshot.pageOffset > 0;
+
         QString err;
-        flushArticleEventsBlocking(&err);
+        if (!flushArticleEventsBlocking(&err)) {
+            snapshot.error = err;
+            return snapshot;
+        }
         err.clear();
         snapshot.posts = _store.listPosts(filter, &err);
         if (!err.isEmpty())
             snapshot.error = err;
+
+        if (snapshot.error.isEmpty() && snapshot.pageLimit > 0) {
+            err.clear();
+            snapshot.hasNextPage = _store.hasPostsAfter(filter, &err);
+            if (!err.isEmpty())
+                snapshot.error = err;
+        }
 
         err.clear();
         const QList<PostHistoryStore::PostSummary> candidates = _store.resumeCandidates(&err);
@@ -313,6 +455,11 @@ public:
                 continue;
             QString checkErr;
             const ResumePlanner::Decision dec = planner.check(post.id, &checkErr);
+            if (!checkErr.isEmpty()) {
+                snapshot.error = checkErr;
+                snapshot.resumeRows.clear();
+                return snapshot;
+            }
             if (dec.state == ResumePlanner::ResumeState::NotResumable)
                 continue;
             PostHistoryService::ResumeRow row;
@@ -338,7 +485,10 @@ public:
     {
         PostHistoryService::StatsSnapshot snapshot;
         QString err;
-        flushArticleEventsBlocking(&err);
+        if (!flushArticleEventsBlocking(&err)) {
+            snapshot.error = err;
+            return snapshot;
+        }
 
         err.clear();
         snapshot.groups = _store.allGroups(&err);
@@ -489,6 +639,11 @@ void PostHistoryService::configure(const QString &dbPath, bool storePasswords)
     _invokeBlocking([&](PostHistoryWorker *worker) { worker->configure(dbPath, storePasswords); });
 }
 
+void PostHistoryService::prepareForUse()
+{
+    _invokeQueued([](PostHistoryWorker *worker) { worker->prepareForUse(); });
+}
+
 bool PostHistoryService::initialize(QString *error)
 {
     QString err;
@@ -553,6 +708,104 @@ bool PostHistoryService::updatePostStatus(qint64 postId,
                                       sizeBytes,
                                       avgSpeed,
                                       &err);
+    });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+qint64 PostHistoryService::createPost(const PostHistoryStore::PostRecord &record,
+                                     const PostHistoryStore::PostInfo &info,
+                                     const QMap<QString, MetaValue> &meta,
+                                     QString *error)
+{
+    QString err;
+    qint64 id = 0;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { id = worker->createPost(record, info, meta, &err); });
+    if (error)
+        *error = err;
+    return id;
+}
+
+bool PostHistoryService::markPostStarted(qint64 postId, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) { ok = worker->markPostStarted(postId, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { ok = worker->updatePostNzbPath(postId, nzbPath, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { ok = worker->setPostSizeIfUnset(postId, sizeBytes, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::addActiveSeconds(qint64 postId, qint64 seconds, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { ok = worker->addActiveSeconds(postId, seconds, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::setPostMeta(qint64 postId,
+                                     const QMap<QString, MetaValue> &meta,
+                                     QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) { ok = worker->setPostMeta(postId, meta, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::loadPostInfoRecord(qint64 postId,
+                                            PostHistoryStore::PostInfoRecord *record,
+                                            QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { ok = worker->loadPostInfoRecord(postId, record, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::finalizePost(qint64 postId,
+                                      const QString &status,
+                                      const QString &avgSpeed,
+                                      qint64 activeSeconds,
+                                      QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->finalizePost(postId, status, avgSpeed, activeSeconds, &err);
     });
     if (error)
         *error = err;
@@ -783,12 +1036,18 @@ bool PostHistoryService::regenerateNzbToFile(qint64 postId,
                                              const QString &outPath,
                                              bool includePassword,
                                              QStringList *warnings,
-                                             QString *error)
+                                             QString *error,
+                                             const QString &passwordOverride)
 {
     QString err;
     bool ok = false;
     _invokeBlocking([&](PostHistoryWorker *worker) {
-        ok = worker->regenerateNzbToFile(postId, outPath, includePassword, warnings, &err);
+        ok = worker->regenerateNzbToFile(postId,
+                                         outPath,
+                                         includePassword,
+                                         warnings,
+                                         &err,
+                                         passwordOverride);
     });
     if (error)
         *error = err;

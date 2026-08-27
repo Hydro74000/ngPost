@@ -67,6 +67,7 @@ private:
 
 #ifdef Q_OS_WIN
     QString  _winServiceName;   //!< "WireGuardTunnel$<profileBase>"
+    QString  _winConfigPath;    //!< exact config used to start this tunnel
     QString  _winIface;
     int      _winPollAttempts;
     class QTimer *_winPollTimer;

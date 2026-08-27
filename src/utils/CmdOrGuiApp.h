@@ -32,6 +32,10 @@ protected:
 
     QCoreApplication  *_app;  //!< Application instance (either a QCoreApplication or a QApplication in HMI mode)
     bool               _ownsApp;
+    //! Name Qt derived from the executable before ngPost pinned its stable
+    //! application identity. The GUI adopts the matching old configuration
+    //! immediately; CLI mode waits until its arguments have been validated.
+    QString            _derivedApplicationName;
 #ifdef __USE_HMI__
     const AppMode      _mode; //!< CMD or HMI (for Windowser...)
     MainWindow        *_hmi;  //!< potential HMI

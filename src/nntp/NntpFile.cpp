@@ -22,9 +22,18 @@
 #include "PostingJob.h"
 #include "NgPost.h"
 #include "NntpArticle.h"
-#include <cmath>
 #include <QTextStream>
 #include <QDebug>
+
+namespace
+{
+uint articleCount(qint64 fileSize, qint64 articleSize)
+{
+    if (fileSize <= 0 || articleSize <= 0)
+        return 0;
+    return static_cast<uint>(fileSize / articleSize + (fileSize % articleSize ? 1 : 0));
+}
+} // namespace
 
 NntpFile::NntpFile(PostingJob *postingJob, const QFileInfo &file,
                    uint num, uint nbFiles, int padding,
@@ -33,7 +42,7 @@ NntpFile::NntpFile(PostingJob *postingJob, const QFileInfo &file,
     _postingJob(postingJob),
     _file(file), _num(num), _nbFiles(nbFiles), _padding(padding),
     _grpList(grpList), _groups(grpList.join(",").toStdString()),
-    _nbAticles(static_cast<uint>(std::ceil(static_cast<float>(file.size())/NgPost::articleSize()))),
+    _nbAticles(articleCount(file.size(), postingJob->articleSizeBytes())),
     _articles(),
     _historyFileId(0),
     _posted(), _failed()
@@ -41,7 +50,7 @@ NntpFile::NntpFile(PostingJob *postingJob, const QFileInfo &file,
 #if defined(__DEBUG__) && defined(LOG_CONSTRUCTORS)
     qDebug() << "Creation NntpFile: " << file.absoluteFilePath()
              << " size: " << file.size()
-             << " article size: " << NgPost::articleSize()
+             << " article size: " << postingJob->articleSizeBytes()
              << " => nbArticles: " << _nbAticles;
 #endif
     _articles.reserve(static_cast<int>(_nbAticles));

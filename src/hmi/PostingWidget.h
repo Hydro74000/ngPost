@@ -26,7 +26,17 @@ class NgPost;
 class NntpFile;
 class MainWindow;
 class PostingJob;
+#include "postinfo/PostInfoData.h"
+
 #include <QFileInfoList>
+#include <QMap>
+
+class QCheckBox;
+class QGroupBox;
+class QPushButton;
+class QTableWidget;
+class QToolButton;
+class QWidget;
 
 namespace Ui {
 class PostingWidget;
@@ -46,6 +56,16 @@ private:
     PostingJob        *_postingJob;
     STATE              _state;
     bool               _postingFinished;
+
+    // Post info file, per post. One discreet checkbox on the tab; everything
+    // else lives in a dialog, because a posting tab is about posting.
+    QCheckBox   *_postInfoCB;
+    QPushButton *_postInfoButton;
+    //! Model this post uses, empty when it takes the one from the config.
+    QString _postInfoTemplate;
+    QString _postInfoOutput;
+    //! What the user typed for THIS post, never shared with the next one.
+    QMap<QString, MetaValue> _postInfoMeta;
 
 public:
     explicit PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber);
@@ -70,6 +90,18 @@ public:
 
     void udatePostingParams();
 
+    //! True when this post asks for a record sheet.
+    bool writesPostInfoFile() const;
+    //! Values the record sheet can already show while the post is prepared.
+    PostInfoData _postInfoPreview() const;
+    //! Applied by the auto-post tab to every post it launches.
+    void setPostInfo(bool enabled,
+                     const QString &templateOverride,
+                     const QString &outputOverride,
+                     const QMap<QString, MetaValue> &meta);
+    QString postInfoTemplateOverride() const { return _postInfoTemplate; }
+    QMap<QString, MetaValue> postInfoMeta() const { return _postInfoMeta; }
+
     void retranslate();
 
     void setNzbPassword(const QString &pass);
@@ -89,6 +121,8 @@ public slots: // for PostingJob
 private slots: // for the HMI
 
     void onNzbPassToggled(bool checked);
+    void onPostInfoToggled(bool checked);
+    void onEditPostInfo();
     void onGenNzbPassword();
 
 
@@ -96,6 +130,7 @@ private slots: // for the HMI
     void onSelectFolderClicked();
     void onClearFilesClicked();
     void onCompressCB(bool checked);
+    void onPar2CB(bool checked);
     void onGenCompressName();
     void onCompressPathClicked();
     void onNzbFileClicked();
@@ -103,6 +138,8 @@ private slots: // for the HMI
 
 
 private:
+    void _buildPostInfoRow();
+    void retranslatePostInfoTexts();
     void _buildFilesList(QFileInfoList &files, bool &hasFolder);
     bool _fileAlreadyInList(const QString &fileName, int currentNbFiles) const;
 

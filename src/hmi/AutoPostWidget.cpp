@@ -20,6 +20,7 @@
 
 #include "AutoPostWidget.h"
 #include "ui_AutoPostWidget.h"
+#include "PostInfoDialog.h"
 #include "PostingWidget.h"
 #include "MainWindow.h"
 #include "NgPost.h"
@@ -39,6 +40,7 @@ AutoPostWidget::AutoPostWidget(NgPost *ngPost, MainWindow *hmi) :
     _currentPostIdx(1)
 {
     _ui->setupUi(this);
+    _buildPostInfoRow();
     _ui->filesList->setSignature(QString("<pre>%1</pre>").arg(_ngPost->escapeXML(_ngPost->asciiArt())));
     connect(_ui->filesList, &SignedListWidget::rightClick, this, &AutoPostWidget::onSelectFilesClicked);
 }
@@ -151,6 +153,11 @@ Press the Scan button and remove what you don't want to post ;)\n\
 
         PostingWidget *quickPostWidget = _hmi->addNewQuickTab(0, postFiles);
         quickPostWidget->init();
+        // One choice for the whole run: every post it launches gets it.
+        quickPostWidget->setPostInfo(_postInfoCB && _postInfoCB->isChecked(),
+                                     _postInfoTemplate,
+                                     _postInfoOutput,
+                                     _postInfoMeta);
         quickPostWidget->genNameAndPassword(_ngPost->_genName, _ngPost->_genPass, _ngPost->_doPar2, useRarMax);
 
         if (startPost)
@@ -523,5 +530,104 @@ void AutoPostWidget::handleDropEvent(QDropEvent *e)
             QString fileName = url.toLocalFile();
             _ui->filesList->addPathIfNotInList(fileName, currentNbFiles, QFileInfo(fileName).isDir());
         }
+    }
+}
+
+void AutoPostWidget::_buildPostInfoRow()
+{
+    QHBoxLayout *row = new QHBoxLayout();
+    row->setContentsMargins(6, 0, 6, 0);
+
+    _postInfoCB = new QCheckBox(this);
+    _postInfoCB->setObjectName(QStringLiteral("autoPostInfoCB"));
+    _postInfoCB->setChecked(!_ngPost->postInfoTemplatePath().isEmpty());
+    row->addWidget(_postInfoCB);
+
+    _postInfoButton = new QPushButton(this);
+    _postInfoButton->setObjectName(QStringLiteral("autoPostInfoButton"));
+    _postInfoButton->setEnabled(_postInfoCB->isChecked());
+    row->addWidget(_postInfoButton);
+    row->addStretch();
+
+    connect(_postInfoCB, &QCheckBox::toggled, this, &AutoPostWidget::onPostInfoToggled);
+    connect(_postInfoButton, &QAbstractButton::clicked, this, &AutoPostWidget::onEditPostInfo);
+
+    _ui->verticalLayout->insertLayout(_ui->verticalLayout->count() - 1, row);
+    retranslatePostInfoTexts();
+}
+
+void AutoPostWidget::retranslatePostInfoTexts()
+{
+    if (!_postInfoCB)
+        return;
+    _postInfoCB->setText(tr("Create a post info file"));
+    // Said plainly: this is not a per post choice here.
+    _postInfoCB->setToolTip(tr("Applies to every post this auto posting launches."));
+    _postInfoButton->setText(tr("Post information\342\200\246"));
+    _postInfoButton->setToolTip(tr("Model and fields used by all the posts of this run."));
+}
+
+//! An auto posting run knows none of the per post names yet: every post it
+//! creates gets its own nzb and archive. Only the settings shared by the whole
+//! run can be shown.
+PostInfoData AutoPostWidget::_postInfoPreview() const
+{
+    PostInfoData data;
+    data.appVersion = QString(APP_VERSION);
+    data.groups     = _ngPost->groups();
+    if (!_ngPost->_genFrom && !_ngPost->_from.empty())
+        data.nzbPoster = QString::fromStdString(_ngPost->_from);
+    data.par2Pct = _ngPost->_doPar2 ? static_cast<int>(_ngPost->_par2Pct) : -1;
+    return data;
+}
+
+void AutoPostWidget::onPostInfoToggled(bool checked) { _postInfoButton->setEnabled(checked); }
+
+void AutoPostWidget::onEditPostInfo()
+{
+    PostInfoDialog dlg(_ngPost->postInfoTemplatePath(),
+                       _postInfoTemplate,
+                       _postInfoMeta,
+                       _ngPost->sessionPostInfoTemplates(),
+                       _postInfoPreview(),
+                       _ngPost->postInfoOutputPattern(),
+                       _postInfoOutput,
+                       this);
+    int const answer = dlg.exec();
+
+    // The list of models is kept whatever the answer: opening a file, or
+    // dropping one from the list, is housekeeping, not a change to this post.
+    _ngPost->setSessionPostInfoTemplates(dlg.sessionTemplates());
+
+    if (answer != QDialog::Accepted)
+        return;
+
+    QString duplicate;
+    const QMap<QString, MetaValue> meta = dlg.meta(&duplicate);
+    if (!duplicate.isEmpty())
+    {
+        _hmi->logError(tr("The post information lists '%1' twice. "
+                          "Remove one of the two lines.")
+                           .arg(duplicate));
+        return;
+    }
+
+    _postInfoTemplate = dlg.templateOverride();
+    _postInfoOutput   = dlg.outputOverride();
+    _postInfoMeta     = meta;
+
+    if (dlg.setAsDefault())
+    {
+        _ngPost->setPostInfoTemplate(_postInfoTemplate.isEmpty() ? _ngPost->postInfoTemplatePath()
+                                                                 : _postInfoTemplate);
+        _postInfoTemplate.clear();
+        if (!_postInfoOutput.isEmpty())
+        {
+            _ngPost->setPostInfoOutput(_postInfoOutput);
+            _postInfoOutput.clear();
+        }
+        _ngPost->saveConfig();
+        _hmi->log(tr("Post info defaults saved: model %1, written to %2")
+                      .arg(_ngPost->postInfoTemplatePath(), _ngPost->postInfoOutputPattern()));
     }
 }

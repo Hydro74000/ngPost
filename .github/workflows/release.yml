@@ -39,6 +39,7 @@ jobs:
       release_name: ${{ steps.metadata.outputs.release_name }}
       prerelease: ${{ steps.metadata.outputs.prerelease }}
       channel: ${{ steps.metadata.outputs.channel }}
+      appimage_update_tag: ${{ steps.metadata.outputs.appimage_update_tag }}
       appimage_update_glob: ${{ steps.metadata.outputs.appimage_update_glob }}
     steps:
       - uses: actions/checkout@v4
@@ -53,14 +54,32 @@ jobs:
           if [ -n "$RELEASE_INPUT" ]; then
             tag="$RELEASE_INPUT"
             package_version="$RELEASE_INPUT"
-            channel="stable"
             appimage_update_glob="ngPost-*-x86_64.AppImage.zsync"
             if [ "$PRERELEASE_INPUT" = "true" ]; then
+              # A pre-release must say so in its tag. A bare "v5.5" has no
+              # suffix, so the in-app update check reads it as the stable 5.5
+              # and offers it to everyone -- and it also burns the tag the real
+              # stable release needs. Refuse rather than publish that.
+              case "${RELEASE_INPUT#v}" in
+                *-*) ;;
+                *)
+                  echo "A pre-release tag must carry a suffix, e.g. ${RELEASE_INPUT}-unstable.1" >&2
+                  echo "Got \"$RELEASE_INPUT\", which reads as a stable release." >&2
+                  exit 1
+                  ;;
+              esac
               prerelease="true"
+              channel="prerelease"
               release_name="Pre-release $RELEASE_INPUT"
+              # A named prerelease is not returned by GitHub's "latest"
+              # endpoint. Pin updates to its explicit tag so amendments of
+              # that prerelease remain discoverable.
+              appimage_update_tag="$tag"
             else
               prerelease="false"
+              channel="stable"
               release_name="Release $RELEASE_INPUT"
+              appimage_update_tag="latest"
             fi
           elif [ "${GITHUB_REF}" = "refs/heads/master" ]; then
             base_version="$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*([0-9]+([.][0-9]+){1,2}).*/\1/p' src/ngPost_core.pri | head -1)"
@@ -73,6 +92,7 @@ jobs:
             release_name="Release v${base_version}"
             prerelease="false"
             channel="stable"
+            appimage_update_tag="latest"
             appimage_update_glob="ngPost-*-x86_64.AppImage.zsync"
           else
             base_version="$(sed -nE 's/^[[:space:]]*VERSION[[:space:]]*=[[:space:]]*([0-9]+(\.[0-9]+){1,2}).*/\1/p' src/ngPost_core.pri | head -1)"
@@ -88,6 +108,7 @@ jobs:
             release_name="Unstable $tag"
             prerelease="true"
             channel="unstable"
+            appimage_update_tag="latest-pre"
             appimage_update_glob="ngPost-v*-unstable.*-x86_64.AppImage.zsync"
           fi
 
@@ -97,6 +118,7 @@ jobs:
             echo "release_name=$release_name"
             echo "prerelease=$prerelease"
             echo "channel=$channel"
+            echo "appimage_update_tag=$appimage_update_tag"
             echo "appimage_update_glob=$appimage_update_glob"
           } >> "$GITHUB_OUTPUT"
 
@@ -132,6 +154,12 @@ jobs:
           done
           ls -la resources/lang/
       - name: Build Project
+        env:
+          # The release this binary IS. Read by ngPost_core.pri at qmake time --
+          # quoting a -D through bash, pwsh and nmake is three different
+          # problems -- and used by the update check to tell a pre-release
+          # build apart from the stable of the same number.
+          NGPOST_BUILD_TAG: ${{ needs.release-metadata.outputs.release_tag }}
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
@@ -143,6 +171,10 @@ jobs:
           mkdir -p "dist/${PKG}"
           cp src/ngPost "dist/${PKG}/"
           cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
+          cp -R templates "dist/${PKG}/"
+          test -f "dist/${PKG}/templates/post_info_default.txt"
+          test -f "dist/${PKG}/templates/post_info_baselien.txt"
+          test -f "dist/${PKG}/templates/post_info_json.txt"
           tar -C dist -czf "dist/${PKG}.tar.gz" "${PKG}"
           rm -rf "dist/${PKG}"
           ls -la dist/
@@ -189,6 +221,12 @@ jobs:
           }
           Get-ChildItem resources/lang/
       - name: Build Project on Windows with MSVC
+        env:
+          # The release this binary IS. Read by ngPost_core.pri at qmake time --
+          # quoting a -D through bash, pwsh and nmake is three different
+          # problems -- and used by the update check to tell a pre-release
+          # build apart from the stable of the same number.
+          NGPOST_BUILD_TAG: ${{ needs.release-metadata.outputs.release_tag }}
         shell: pwsh
         run: |
           cd src
@@ -380,6 +418,13 @@ jobs:
           Copy-Item ngPost.conf.example, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item THIRD_PARTY_LICENSES.md "dist/$pkg/" -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path "dist/$pkg/templates" | Out-Null
+          Copy-Item -Recurse templates/* "dist/$pkg/templates/"
+          foreach ($model in @("post_info_default.txt", "post_info_baselien.txt", "post_info_json.txt")) {
+            if (-not (Test-Path "dist/$pkg/templates/$model")) {
+              throw "Missing post info model in package: $model"
+            }
+          }
           # Phase 5b: bundle PowerShell helpers for Windows-only WireGuard
           # tunnel registration. They run under UAC via Start-Process RunAs.
           New-Item -ItemType Directory -Force -Path "dist/$pkg/scripts/win" | Out-Null
@@ -648,6 +693,12 @@ jobs:
           done
           ls -la resources/lang/
       - name: Build Project on macOS
+        env:
+          # The release this binary IS. Read by ngPost_core.pri at qmake time --
+          # quoting a -D through bash, pwsh and nmake is three different
+          # problems -- and used by the update check to tell a pre-release
+          # build apart from the stable of the same number.
+          NGPOST_BUILD_TAG: ${{ needs.release-metadata.outputs.release_tag }}
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
@@ -663,6 +714,10 @@ jobs:
           zip -qr "../dist/${PKG}.zip" ngPost.app
           cd ..
           zip -qj "dist/${PKG}.zip" THIRD_PARTY_LICENSES.md
+          zip -qr "dist/${PKG}.zip" templates
+          unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_default.txt'
+          unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_baselien.txt'
+          unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_json.txt'
           ls -la dist/
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
@@ -727,6 +782,12 @@ jobs:
           done
           ls -la resources/lang/
       - name: Build Project
+        env:
+          # The release this binary IS. Read by ngPost_core.pri at qmake time --
+          # quoting a -D through bash, pwsh and nmake is three different
+          # problems -- and used by the update check to tell a pre-release
+          # build apart from the stable of the same number.
+          NGPOST_BUILD_TAG: ${{ needs.release-metadata.outputs.release_tag }}
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
@@ -796,6 +857,7 @@ jobs:
           cp src/resources/icons/ngPost.png AppDir/
           cp ngPost.desktop AppDir/
           cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md AppDir/ || true
+          cp -R templates AppDir/
       - name: Locate OpenSSL libraries
         id: openssl
         run: |
@@ -827,15 +889,20 @@ jobs:
           chmod +x linuxdeploy linuxdeploy-plugin-qt
       - name: Build AppImage
         env:
+          # The release this binary IS. Read by ngPost_core.pri at qmake time --
+          # quoting a -D through bash, pwsh and nmake is three different
+          # problems -- and used by the update check to tell a pre-release
+          # build apart from the stable of the same number.
+          NGPOST_BUILD_TAG: ${{ needs.release-metadata.outputs.release_tag }}
           # Qt 6 dlopen plugins that linuxdeploy-plugin-qt won't pick up automatically
           EXTRA_QT_PLUGINS: "tls;networkinformation"
           LDAI_OUTPUT: ngPost-${{ needs.release-metadata.outputs.package_version }}-x86_64.AppImage
           # Embed update info into the ELF + emit a .zsync file alongside the AppImage.
           # Format: gh-releases-zsync|<user>|<repo>|<tag>|<glob>
-          # Using "latest" => AppImageUpdate fetches the latest GitHub release each check.
-          # The filename glob is channel-aware so unstable builds only follow unstable assets.
-          UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|${{ needs.release-metadata.outputs.appimage_update_glob }}"
-          LDAI_UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|latest|${{ needs.release-metadata.outputs.appimage_update_glob }}"
+          # Stable uses GitHub's latest stable release; a named prerelease uses
+          # its explicit tag because "latest" deliberately ignores prereleases.
+          UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|${{ needs.release-metadata.outputs.appimage_update_tag }}|${{ needs.release-metadata.outputs.appimage_update_glob }}"
+          LDAI_UPDATE_INFORMATION: "gh-releases-zsync|Hydro74000|ngPost|${{ needs.release-metadata.outputs.appimage_update_tag }}|${{ needs.release-metadata.outputs.appimage_update_glob }}"
         run: |
           # QT_ROOT_DIR is exported by jurplel/install-qt-action — resolve in shell, not in env:
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
@@ -864,6 +931,7 @@ jobs:
           test -f dist/*.AppImage.zsync || { echo "ERROR: .zsync file not generated"; exit 1; }
       - name: Verify AppImage is self-contained & update-info embedded
         env:
+          APPIMAGE_UPDATE_TAG: ${{ needs.release-metadata.outputs.appimage_update_tag }}
           APPIMAGE_UPDATE_GLOB: ${{ needs.release-metadata.outputs.appimage_update_glob }}
         run: |
           cd dist
@@ -899,8 +967,11 @@ jobs:
           test -x squashfs-root/usr/bin/ngpost-vpn-install.sh   || { echo "ERROR: install script not bundled";   exit 1; }
           test -x squashfs-root/usr/bin/ngpost-vpn-uninstall.sh || { echo "ERROR: uninstall script not bundled"; exit 1; }
           test -f squashfs-root/usr/bin/49-ngpost-vpn.rules.in  || { echo "ERROR: polkit rule template not bundled"; exit 1; }
+          test -f squashfs-root/templates/post_info_default.txt  || { echo "ERROR: default post info model not bundled"; exit 1; }
+          test -f squashfs-root/templates/post_info_baselien.txt || { echo "ERROR: Baselien post info model not bundled"; exit 1; }
+          test -f squashfs-root/templates/post_info_json.txt     || { echo "ERROR: JSON post info model not bundled"; exit 1; }
           # Check the update-information string is embedded in the ELF
-          expected_update_info="gh-releases-zsync|Hydro74000|ngPost|latest|$APPIMAGE_UPDATE_GLOB"
+          expected_update_info="gh-releases-zsync|Hydro74000|ngPost|$APPIMAGE_UPDATE_TAG|$APPIMAGE_UPDATE_GLOB"
           if ! strings "$APPIMAGE" | grep -Fq "$expected_update_info"; then
             echo "ERROR: UPDATE_INFORMATION not embedded in AppImage ELF"; exit 1
           fi
@@ -936,6 +1007,32 @@ jobs:
           merge-multiple: true
       - name: List artifacts
         run: ls -la artifacts/
+      - name: Verify release asset set
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.package_version }}
+        run: |
+          set -euo pipefail
+          expected=(
+            "ngPost-${VERSION}-linux-x86_64.tar.gz"
+            "ngPost-${VERSION}-windows-x86_64.zip"
+            "ngPost-${VERSION}-windows-x86_64-setup.exe"
+            "ngPost-${VERSION}-macos.zip"
+            "ngPost-${VERSION}-x86_64.AppImage"
+            "ngPost-${VERSION}-x86_64.AppImage.zsync"
+          )
+          mapfile -t actual < <(find artifacts -maxdepth 1 -type f -printf '%f\n' | sort)
+          if [ "${#actual[@]}" -ne "${#expected[@]}" ]; then
+            printf 'Expected %d release assets, found %d:\n' \
+              "${#expected[@]}" "${#actual[@]}" >&2
+            printf '  %s\n' "${actual[@]}" >&2
+            exit 1
+          fi
+          for asset in "${expected[@]}"; do
+            test -f "artifacts/${asset}" || {
+              echo "Missing release asset: ${asset}" >&2
+              exit 1
+            }
+          done
       - name: Generate release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -952,11 +1049,12 @@ jobs:
           if [ "$CHANNEL" = "unstable" ]; then
             previous_tag="$(gh release list --limit 100 --json tagName,isPrerelease \
               --jq '[.[] | select(.isPrerelease and (.tagName | test("-unstable\\.")))][0].tagName // ""')"
-          fi
-
-          if [ -z "$previous_tag" ]; then
-            previous_tag="$(gh release list --limit 100 --json tagName \
-              --jq '.[0].tagName // ""')"
+          else
+            # Stable and named pre-releases compare against the latest
+            # published stable release, never against a newer unstable build.
+            previous_tag="$(gh release list --limit 100 \
+              --json tagName,isDraft,isPrerelease \
+              --jq '[.[] | select((.isDraft | not) and (.isPrerelease | not))][0].tagName // ""')"
           fi
 
           range=""
@@ -985,7 +1083,20 @@ jobs:
               echo "- Previous release: none found"
             fi
             echo
-            echo "## Changes since previous release"
+            echo "## Detailed release notes"
+            echo
+            awk '
+              tolower($0) ~ /^### +.*release:/ {
+                if (in_release) exit
+                in_release=1
+                next
+              }
+              in_release && /^### +date:/ { next }
+              in_release && /^#+$/ { next }
+              in_release { print }
+            ' release_notes.txt
+            echo
+            echo "## Commits since ${previous_tag:-the previous release}"
             echo
             cat commits.md
             echo
@@ -997,7 +1108,11 @@ jobs:
           name: ${{ needs.release-metadata.outputs.release_name }}
           draft: false
           prerelease: ${{ needs.release-metadata.outputs.prerelease }}
+          make_latest: ${{ needs.release-metadata.outputs.prerelease == 'true' && 'false' || 'legacy' }}
+          target_commitish: ${{ github.sha }}
           body_path: release-body.md
           files: artifacts/*
+          append_body: false
+          overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

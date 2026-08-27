@@ -22,6 +22,7 @@
 #include <QJsonObject>
 #include <QMessageBox>
 #include <QRegularExpression>
+#include <QSaveFile>
 
 #include <qt6keychain/keychain.h>
 using QKeychain::ReadPasswordJob;
@@ -40,6 +41,93 @@ QString sanitizeForFilename(QString const &s)
     out.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9._-]+")), "_");
     if (out.isEmpty()) out = QStringLiteral("profile");
     return out;
+}
+
+bool sameFile(QString const &left, QString const &right)
+{
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+    constexpr Qt::CaseSensitivity pathCase = Qt::CaseInsensitive;
+#else
+    constexpr Qt::CaseSensitivity pathCase = Qt::CaseSensitive;
+#endif
+    QFileInfo const leftInfo(left);
+    QFileInfo const rightInfo(right);
+    QString const leftCanonical  = leftInfo.canonicalFilePath();
+    QString const rightCanonical = rightInfo.canonicalFilePath();
+    if (!leftCanonical.isEmpty() && !rightCanonical.isEmpty())
+        return leftCanonical.compare(rightCanonical, pathCase) == 0;
+    return leftInfo.absoluteFilePath().compare(rightInfo.absoluteFilePath(), pathCase) == 0;
+}
+
+bool writeProfileAtomically(QString const &destinationPath,
+                            QByteArray const &contents,
+                            QString *error)
+{
+    constexpr QFileDevice::Permissions ownerOnly =
+        QFileDevice::ReadOwner | QFileDevice::WriteOwner;
+    QSaveFile destination(destinationPath);
+    if (!destination.open(QIODevice::WriteOnly)) {
+        if (error)
+            *error = destination.errorString();
+        return false;
+    }
+    // VPN profiles may contain inline passwords or WireGuard private keys.
+    // Apply owner-only permissions to the temporary inode before it can be
+    // atomically published, and treat failure as a failed save.
+    if (!destination.setPermissions(ownerOnly)) {
+        if (error)
+            *error = QStringLiteral("Could not restrict the file to owner read/write: %1")
+                         .arg(destination.errorString());
+        destination.cancelWriting();
+        return false;
+    }
+    if (destination.write(contents) != contents.size()) {
+        if (error)
+            *error = destination.errorString();
+        destination.cancelWriting();
+        return false;
+    }
+    if (!destination.commit()) {
+        if (error)
+            *error = destination.errorString();
+        return false;
+    }
+    return true;
+}
+
+// Publish a replacement only after the complete source has been read and
+// written. The previous imported profile therefore survives a read, write or
+// disk-full failure, and selecting that same profile file again is a no-op.
+bool copyProfileAtomically(QString const &sourcePath,
+                           QString const &destinationPath,
+                           QString       *error)
+{
+    if (sameFile(sourcePath, destinationPath)) {
+        QFile destination(destinationPath);
+        if (!destination.setPermissions(QFileDevice::ReadOwner
+                                        | QFileDevice::WriteOwner)) {
+            if (error)
+                *error = QStringLiteral("Could not restrict the file to owner read/write: %1")
+                             .arg(destination.errorString());
+            return false;
+        }
+        return true;
+    }
+
+    QFile source(sourcePath);
+    if (!source.open(QIODevice::ReadOnly)) {
+        if (error)
+            *error = source.errorString();
+        return false;
+    }
+
+    const QByteArray contents = source.readAll();
+    if (source.error() != QFileDevice::NoError) {
+        if (error)
+            *error = source.errorString();
+        return false;
+    }
+    return writeProfileAtomically(destinationPath, contents, error);
 }
 }
 
@@ -205,14 +293,13 @@ bool VpnProfileEditDialog::_persistCredentials(QString const &profileName,
                               .arg(user, pass);
     result = (text + inlineBlock).toUtf8();
 
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        QMessageBox::warning(this, tr("Inline fallback failed"),
-                             tr("Could not open %1 for writing.").arg(configFileAbsPath));
+    QString writeError;
+    if (!writeProfileAtomically(configFileAbsPath, result, &writeError)) {
+        QMessageBox::warning(this,
+                             tr("Inline fallback failed"),
+                             tr("Could not write %1: %2").arg(configFileAbsPath, writeError));
         return false;
     }
-    f.write(result);
-    f.close();
-    f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     *wroteInlineFallback = true;
     return true;
 }
@@ -247,6 +334,9 @@ void VpnProfileEditDialog::onAccept()
     p.backend        = (_ui->backendCB->currentIndex() == 0)
                            ? VpnManager::Backend::OpenVPN
                            : VpnManager::Backend::WireGuard;
+    const int existingIndex = _manager->findProfileIndex(_oldName);
+    if (existingIndex >= 0)
+        p.configBaseDir = _manager->profiles().at(existingIndex).configBaseDir;
 
     // Determine the destination filename inside <configDir>/vpn/.
     if (!sourceFile.isEmpty()) {
@@ -256,22 +346,77 @@ void VpnProfileEditDialog::onAccept()
         p.configFileName = sanitizeForFilename(name) + ext;
     } else {
         // No new file: keep the existing one's basename.
-        int idx = _manager->findProfileIndex(_oldName);
-        if (idx >= 0)
-            p.configFileName = _manager->profiles().at(idx).configFileName;
+        if (existingIndex >= 0)
+            p.configFileName = _manager->profiles().at(existingIndex).configFileName;
     }
 
     QString destAbs = p.absoluteConfigPath();
-    if (!sourceFile.isEmpty()) {
-        // Copy into <configDir>/vpn/, overwriting if needed.
-        if (QFile::exists(destAbs))
-            QFile::remove(destAbs);
-        if (!QFile::copy(sourceFile, destAbs)) {
-            QMessageBox::warning(this, tr("Import failed"),
-                                 tr("Could not copy %1 to %2.").arg(sourceFile, destAbs));
+
+    // Different display names may collapse to the same sanitized filename.
+    // Never let one profile silently replace another one's active config.
+    for (int i = 0; i < _manager->profiles().size(); ++i) {
+        if (i == existingIndex)
+            continue;
+        const VpnProfile &other = _manager->profiles().at(i);
+        if (sameFile(destAbs, other.absoluteConfigPath())) {
+            QMessageBox::warning(this,
+                                 tr("Configuration file already used"),
+                                 tr("This profile name would use the same configuration file as "
+                                    "'%1'. Please choose another name.")
+                                     .arg(other.name));
             return;
         }
-        QFile::setPermissions(destAbs, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    }
+
+    // Saving is a transaction from the user's perspective. Keep the previous
+    // file so a declined credential fallback or a manager/service failure can
+    // roll the import back completely.
+    const bool destinationExisted = QFileInfo::exists(destAbs);
+    QByteArray previousContents;
+    if (destinationExisted) {
+        QFile previous(destAbs);
+        if (!previous.open(QIODevice::ReadOnly)) {
+            QMessageBox::warning(this,
+                                 tr("Save failed"),
+                                 tr("Could not preserve the existing VPN configuration %1: %2")
+                                     .arg(destAbs, previous.errorString()));
+            return;
+        }
+        previousContents = previous.readAll();
+        if (previous.error() != QFileDevice::NoError) {
+            QMessageBox::warning(this,
+                                 tr("Save failed"),
+                                 tr("Could not preserve the existing VPN configuration %1: %2")
+                                     .arg(destAbs, previous.errorString()));
+            return;
+        }
+    }
+    bool rollbackAttempted = false;
+    bool rollbackSucceeded = false;
+    auto rollbackFile = [&]() -> bool {
+        if (rollbackAttempted)
+            return rollbackSucceeded;
+        rollbackAttempted = true;
+        QString rollbackError;
+        rollbackSucceeded = destinationExisted
+            ? writeProfileAtomically(destAbs, previousContents, &rollbackError)
+            : (!QFileInfo::exists(destAbs) || QFile::remove(destAbs));
+        if (!rollbackSucceeded)
+            QMessageBox::warning(this,
+                                 tr("Rollback failed"),
+                                 tr("Could not restore the previous VPN configuration %1: %2")
+                                     .arg(destAbs, rollbackError));
+        return rollbackSucceeded;
+    };
+
+    if (!sourceFile.isEmpty()) {
+        QString copyError;
+        if (!copyProfileAtomically(sourceFile, destAbs, &copyError)) {
+            QMessageBox::warning(this, tr("Import failed"),
+                                 tr("Could not copy %1 to %2: %3")
+                                     .arg(sourceFile, destAbs, copyError));
+            return;
+        }
     }
 
     // Credentials (OpenVPN only). If user typed user+pass, persist them.
@@ -282,6 +427,7 @@ void VpnProfileEditDialog::onAccept()
         if (!user.isEmpty() || !pass.isEmpty()) {
             if (!_persistCredentials(name, user, pass, destAbs, &wroteInline)) {
                 // user chose to abort the save when keychain unavailable
+                rollbackFile();
                 return;
             }
             p.hasAuth = true;
@@ -295,9 +441,11 @@ void VpnProfileEditDialog::onAccept()
     if (_oldName.isEmpty())
         ok = _manager->addProfile(p);
     else
-        ok = _manager->updateProfile(_oldName, p);
+        ok = _manager->updateProfile(_oldName, p, _stagingFileChanged,
+                                     rollbackFile);
 
     if (!ok) {
+        rollbackFile();
         QMessageBox::warning(this, tr("Save failed"),
                              tr("Could not save the profile."));
         return;

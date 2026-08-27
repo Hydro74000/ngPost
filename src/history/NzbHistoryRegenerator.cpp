@@ -48,8 +48,15 @@ bool isPlausibleFullArticleSize(const PostHistoryStore::FileSummary &file,
 
 qint64 inferFullArticleBytes(const PostHistoryStore::FileSummary &file,
                              const QList<PostHistoryStore::ArticleSummary> &articles,
-                             qint64 postFullArticleBytesHint)
+                             qint64 postFullArticleBytesHint,
+                             bool postHintIsExact)
 {
+    // Since schema v3 this is the boundary the original PostingJob actually
+    // used. It must win over today's global ARTICLE_SIZE, even when both sizes
+    // happen to be mathematically plausible for the same article count.
+    if (postHintIsExact)
+        return postFullArticleBytesHint;
+
     qint64 historyMaxBytes = 0;
     for (const PostHistoryStore::ArticleSummary &article : articles) {
         if (article.bytes > historyMaxBytes)
@@ -112,7 +119,8 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
                                      QTextStream &stream,
                                      bool includePassword,
                                      QStringList *warnings,
-                                     QString *error)
+                                     QString *error,
+                                     const QString &passwordOverride)
 {
     if (!_store) {
         if (error)
@@ -126,7 +134,14 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
 
     if (details.post.status == QStringLiteral("partial") && warnings)
         *warnings << tr("post is partial; regenerated NZB may be incomplete");
-    if (details.post.hasPassword && !details.post.passwordStored && warnings)
+    if (details.files.isEmpty()) {
+        if (error)
+            *error = tr("the post has no structured file/article history; refusing to create an "
+                        "empty NZB");
+        return false;
+    }
+    if (details.post.hasPassword && !details.post.passwordStored
+        && passwordOverride.isEmpty() && warnings)
         *warnings << tr("post had an archive password, but it is not stored");
 
     const QString tab = NgPost::space();
@@ -135,11 +150,47 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
               "\"http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd\">\n"
            << "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n";
 
-    if (includePassword && details.post.passwordStored && !details.rarPass.isEmpty()) {
-        stream << tab << "<head>\n"
-               << tab << tab << "<meta type=\"password\">" << escapeXml(details.rarPass)
-               << "</meta>\n"
-               << tab << "</head>\n\n";
+    // Metadata the user chose to publish. This file is the one that lands on
+    // disk (the streamed nzb is rewritten from here), so anything missing in
+    // this block is missing from the delivered nzb.
+    QMap<QString, MetaValue> publishedMeta;
+    {
+        PostHistoryStore::PostInfoRecord record;
+        QString metaError;
+        if (_store->loadPostInfoRecord(postId, &record, &metaError)) {
+            for (auto it = record.meta.cbegin(); it != record.meta.cend(); ++it) {
+                if (it.value().scope == MetaScope::Nzb)
+                    publishedMeta.insert(it.key(), it.value());
+            }
+        } else {
+            if (error)
+                *error = tr("could not read the metadata of the post: %1").arg(metaError);
+            return false;
+        }
+    }
+
+    // Automatic finalisation still owns the live password even when the user
+    // chose HISTORY_STORE_PASSWORDS=false. Use that one-time overlay so
+    // rewriting the streamed NZB from history does not silently strip its
+    // <meta type="password">. Historical exports deliberately pass no
+    // override and therefore remain empty unless storage was enabled.
+    const QString effectivePassword = passwordOverride.isEmpty()
+        ? details.rarPass
+        : passwordOverride;
+    const bool passwordAvailable = !passwordOverride.isEmpty()
+        || (details.post.passwordStored && !details.rarPass.isEmpty());
+    const bool writePassword = includePassword && passwordAvailable;
+    if (writePassword || !publishedMeta.isEmpty()) {
+        stream << tab << "<head>\n";
+        for (auto it = publishedMeta.cbegin(); it != publishedMeta.cend(); ++it) {
+            stream << tab << tab << "<meta type=\"" << escapeXml(it.key()) << "\">"
+                   << escapeXml(it.value().value) << "</meta>\n";
+        }
+        if (writePassword) {
+            stream << tab << tab << "<meta type=\"password\">" << escapeXml(effectivePassword)
+                   << "</meta>\n";
+        }
+        stream << tab << "</head>\n\n";
     }
 
     int padding = 1;
@@ -149,24 +200,46 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
         n /= 10;
     }
 
-    const qint64 postFullArticleBytesHint = inferPostFullArticleBytesHint(details);
+    if (details.articleSizeWasStored && details.articleSizeBytes <= 0) {
+        if (error)
+            *error = tr("the stored article size is inconsistent with the post history; refusing "
+                        "to rebuild the NZB");
+        return false;
+    }
+    const bool hasExactArticleSize = details.articleSizeBytes > 0;
+    const qint64 postFullArticleBytesHint = hasExactArticleSize
+        ? details.articleSizeBytes
+        : inferPostFullArticleBytesHint(details);
     int repairedArticleBytes = 0;
     for (const PostHistoryStore::FileSummary &file : details.files) {
         const QList<PostHistoryStore::ArticleSummary> articles = details.articlesByFile.value(file.id);
         const qint64 fullArticleBytes =
-            inferFullArticleBytes(file, articles, postFullArticleBytesHint);
+            inferFullArticleBytes(file, articles, postFullArticleBytesHint, hasExactArticleSize);
         bool hasUnknown = false;
         bool hasNonPosted = false;
+        bool hasMissing = articles.size() < file.totalArticles;
         for (const PostHistoryStore::ArticleSummary &article : articles) {
             if (article.status == QStringLiteral("unknown"))
                 hasUnknown = true;
             if (article.status != QStringLiteral("posted"))
                 hasNonPosted = true;
+            if (article.status == QStringLiteral("posted") && article.msgId.isEmpty())
+                hasMissing = true;
         }
         if (hasUnknown && warnings)
             *warnings << tr("file %1 contains unknown articles").arg(file.postedName);
         if (hasNonPosted && warnings)
             *warnings << tr("file %1 contains non-posted articles").arg(file.postedName);
+        if (hasMissing && warnings)
+            *warnings << tr("file %1 has missing article records").arg(file.postedName);
+        if (details.post.status == QStringLiteral("success")
+            && (hasNonPosted || hasMissing)) {
+            if (error)
+                *error = tr("history for successful file %1 is incomplete; refusing to replace "
+                            "the NZB")
+                             .arg(file.postedName);
+            return false;
+        }
 
         stream << tab << "<file poster=\"" << escapeXml(details.from) << "\""
                << " date=\"" << QDateTime::currentSecsSinceEpoch() << "\""

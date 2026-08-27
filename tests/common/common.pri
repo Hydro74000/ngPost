@@ -32,6 +32,12 @@ include($$PWD/../../src/ngPost_core.pri)
 # members to NgPostTestAccess (see TestEnv.h).
 DEFINES += NGPOST_TESTING
 
+# Absolute path of the repository, resolved by qmake rather than by __FILE__:
+# a compiler may well be handed a relative source path, and the test binary is
+# then left resolving it against its own working directory. Tests that read a
+# file shipped with the sources (templates/, fixtures) use this.
+DEFINES += NGPOST_SOURCE_ROOT=\\\"$$absolute_path($$PWD/../..)\\\"
+
 # Shared test helpers
 SOURCES += $$PWD/TestEnv.cpp \
            $$PWD/MockNntpServer.cpp \

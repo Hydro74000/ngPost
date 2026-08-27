@@ -5,6 +5,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A newer push supersedes this run: finishing it only delays the result that
+# matters and holds a runner. Release publishing keeps its own group and is
+# deliberately never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux:
     name: Linux app
@@ -21,6 +28,7 @@ jobs:
           version: '6.8.2'
           arch: 'linux_gcc_64'
           modules: 'qtcharts'
+          cache: true
 
       - name: Build QtKeychain
         run: |
@@ -71,6 +79,7 @@ jobs:
           target: 'desktop'
           arch: 'win64_msvc2022_64'
           modules: 'qtcharts'
+          cache: true
 
       - name: Build QtKeychain
         shell: pwsh
@@ -117,6 +126,7 @@ jobs:
           version: '6.8.2'
           arch: 'clang_64'
           modules: 'qtcharts'
+          cache: true
 
       - name: Build QtKeychain
         run: |

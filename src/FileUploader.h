@@ -36,6 +36,7 @@ private:
     QFileInfo _nzbFilePath;
     QFile _nzbFile;
     QUrl _nzbUrl;
+    qint64 _responseBytes;
 
 public:
     FileUploader(QNetworkAccessManager &netMgr, const QString &nzbFilePath);
@@ -43,12 +44,19 @@ public:
 
     void startUpload(const QUrl &serverUrl);
 
+    //! Gives up any transfer in flight and closes the nzb, synchronously.
+    //! deleteLater() alone is not enough before running a post command: the
+    //! file stays open until the event loop deletes us, and on Windows a hook
+    //! that moves the nzb would fail.
+    void release();
+
 signals:
     void readyToDie();
     void error(const QString &msg);
     void log(const QString &msg, bool newline = true);
 
 private slots:
+    void onReplyReadyRead();
     void onUploadFinished();
 
 private:
@@ -60,7 +68,10 @@ QString FileUploader::url() const
     if (_nzbUrl.isEmpty())
         return QString();
     else
-        return _nzbUrl.toString(QUrl::RemovePassword | QUrl::RemovePath);
+        // Upload endpoints commonly carry credentials or tokens in user-info,
+        // the path or the query. Diagnostics only need the endpoint itself.
+        return _nzbUrl.toString(QUrl::RemoveUserInfo | QUrl::RemovePath
+                                | QUrl::RemoveQuery | QUrl::RemoveFragment);
 }
 
 #endif // FILEUPLOADER_H

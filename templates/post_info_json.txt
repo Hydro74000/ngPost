@@ -1,0 +1,36 @@
+#!json
+#
+# JSON record sheet.
+#
+# The "#!json" line above declares the format of this model. Naming the file
+# something.json says the same thing, and is enough on its own; the declaration
+# is kept here so the model still works whatever you rename it to. Every value
+# ngPost inserts is escaped for JSON, so a title holding a quote, a backslash
+# or a line break can no longer break the file. It escapes the VALUES only: the
+# braces, the commas and the field names below are yours, and yours to keep
+# valid.
+#
+# Mind the quotes around the numbers. A fact ngPost never recorded comes out
+# EMPTY (an older post has no size, and there is no par2 percentage when par2
+# is off), and "size": , is not valid JSON while "size": "" is.
+#
+# Name the produced file accordingly:
+#   POST_INFO_OUTPUT = __nzbDir__/__nzbName__.json
+#
+# Lines starting with # are comments and are never written to the sheet, this
+# whole header included.
+
+{
+  "name":     "__originalName__",
+  "nzb":      "__nzbFileName__",
+  "archive":  "__rarName__",
+  "size":     "__postSize__",
+  "par2":     "__par2Pct__",
+  "groups":   "__groups__",
+  "poster":   "__nzbPoster__",
+  "status":   "__status__",
+  "date":     "__date:yyyy-MM-dd HH:mm__",
+  "ngPost":   "__appVersion__",
+  "title":    "__meta:title__",
+  "category": "__meta:category__"
+}
