@@ -408,10 +408,6 @@ It will be irreversible...</source>
         <source>Post info defaults saved: model %1, written to %2</source>
         <translation>Post info defaults saved: model %1, written to %2</translation>
     </message>
-    <message>
-        <source>Post info model saved as the default: %1</source>
-        <translation type="vanished">Post info model saved as the default: %1</translation>
-    </message>
 </context>
 <context>
     <name>FileUploader</name>
@@ -609,10 +605,6 @@ It will be irreversible...</source>
         <location line="+27"/>
         <source>CAREFUL: you won&apos;t be able to find your post without the NZB file</source>
         <translation></translation>
-    </message>
-    <message>
-        <source>Article&apos;s obfuscation: Subject changed to be a UUID + random From</source>
-        <translation type="vanished">Article&apos;s obfuscation: Subject changed to UUID + random From</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -1476,10 +1468,6 @@ Are you sure you want to quit?</source>
         <translation></translation>
     </message>
     <message>
-        <source>Open Resume â</source>
-        <translation type="vanished">Open Resume →</translation>
-    </message>
-    <message>
         <location line="-967"/>
         <location line="+128"/>
         <source>All statuses</source>
@@ -1502,14 +1490,6 @@ Are you sure you want to quit?</source>
         <translation>Refresh</translation>
     </message>
     <message>
-        <source>Export CSVâ¦</source>
-        <translation type="vanished">Export CSV…</translation>
-    </message>
-    <message>
-        <source>Search name, NZB, archiveâ¦</source>
-        <translation type="vanished">Search name, NZB, archive…</translation>
-    </message>
-    <message>
         <location line="-369"/>
         <location line="+147"/>
         <source>Search:</source>
@@ -1529,10 +1509,6 @@ Are you sure you want to quit?</source>
         <location line="+7"/>
         <source>Any date</source>
         <translation>Any date</translation>
-    </message>
-    <message>
-        <source>Group filterâ¦</source>
-        <translation type="vanished">Group filter…</translation>
     </message>
     <message>
         <location line="-151"/>
@@ -1593,10 +1569,6 @@ Are you sure you want to quit?</source>
         <location line="+471"/>
         <source>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</source>
         <translation>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</translation>
-    </message>
-    <message>
-        <source>Regenerate NZBâ¦</source>
-        <translation type="vanished">Regenerate NZB…</translation>
     </message>
     <message>
         <location line="-1014"/>
@@ -1802,10 +1774,6 @@ Are you sure you want to quit?</source>
         <source>%1 post(s) can be resumed.</source>
         <translation>%1 post(s) can be resumed.</translation>
     </message>
-    <message>
-        <source>%1 post(s) can be resumed. Open the Resume tab to review them.</source>
-        <translation type="vanished">%1 post(s) can be resumed. Open the Resume tab to review them.</translation>
-    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -1981,12 +1949,12 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4416"/>
+        <location line="+4435"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-4413"/>
+        <location line="-4432"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation></translation>
     </message>
@@ -2140,10 +2108,6 @@ To list the available options use: %2 --help
         <translation>SSL issue on your system...</translation>
     </message>
     <message>
-        <source>NZB Post cmd: %1</source>
-        <translation type="vanished">NZB Post cmd: %1</translation>
-    </message>
-    <message>
         <location line="+446"/>
         <source>no packing needed for next pending job %1</source>
         <translation>no packing needed for next pending job %1</translation>
@@ -2169,7 +2133,7 @@ To list the available options use: %2 --help
         <translation>Posting canceled by user.</translation>
     </message>
     <message>
-        <location line="+3053"/>
+        <location line="+3072"/>
         <source>VPN warning</source>
         <translation>VPN warning</translation>
     </message>
@@ -2202,7 +2166,7 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>Cancel</translation>
     </message>
     <message>
-        <location line="-1733"/>
+        <location line="-1752"/>
         <source>Full debug logs are ON
 </source>
         <translation></translation>
@@ -2231,12 +2195,12 @@ That&apos;s not the case for &apos;%1&apos; which contains folders: %2</translat
     </message>
     <message>
         <location line="+139"/>
-        <location line="+719"/>
+        <location line="+738"/>
         <source>Generate new random poster for each post</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-688"/>
+        <location line="-707"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation></translation>
     </message>
@@ -2308,25 +2272,19 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+93"/>
+        <location line="+112"/>
         <source>the nzbPath &apos;%1&apos; is not writable...
 </source>
         <translation></translation>
     </message>
     <message>
-        <location line="-1538"/>
+        <location line="-1557"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation></translation>
     </message>
     <message>
-        <source>Invalid VPN_BACKEND value: %1 (expected &apos;openvpn&apos; or &apos;wireguard&apos;)
-</source>
-        <translation type="vanished">Invalid VPN_BACKEND value: %1 (expected &apos;openvpn&apos; or &apos;wireguard&apos;)
-</translation>
-    </message>
-    <message>
-        <location line="+1686"/>
+        <location line="+1705"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost starts logging: %1</translation>
     </message>
@@ -2351,7 +2309,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-1788"/>
+        <location line="-1807"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation></translation>
@@ -2364,7 +2322,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+1848"/>
+        <location line="+1867"/>
         <source>should be a directory!...</source>
         <translation></translation>
     </message>
@@ -2399,7 +2357,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Wrong keywords for PACK: %1. It should be a subset of (%2)</translation>
     </message>
     <message>
-        <location line="-1917"/>
+        <location line="-1936"/>
         <source>date</source>
         <translation></translation>
     </message>
@@ -2502,10 +2460,6 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <location line="+1"/>
         <source>template file used to write a post info file next to the nzb</source>
         <translation>template file used to write a post info file next to the nzb</translation>
-    </message>
-    <message>
-        <source>where to write the post info file (variables allowed)</source>
-        <translation type="vanished">where to write the post info file (variables allowed)</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -2752,14 +2706,6 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Warning: post %1 was made before ngPost recorded these facts; the par2 percentage, the source name and the metadata are empty.</translation>
     </message>
     <message>
-        <source>Cannot read the template %1: %2</source>
-        <translation type="vanished">Cannot read the template %1: %2</translation>
-    </message>
-    <message>
-        <source>Warning: unknown variable %1</source>
-        <translation type="vanished">Warning: unknown variable %1</translation>
-    </message>
-    <message>
         <location line="+37"/>
         <source>Post info file written: %1</source>
         <translation>Post info file written: %1</translation>
@@ -2873,7 +2819,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     </message>
     <message>
         <location line="+86"/>
-        <location line="+678"/>
+        <location line="+697"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE must be a positive integer</translation>
     </message>
@@ -2999,14 +2945,6 @@ The folder is now always called &quot;ngPost&quot;, and your settings have been 
     to:   %2
 
 Brought over: %3</translation>
-    </message>
-    <message>
-        <source>
-
-The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; keeps working. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
-        <translation type="vanished">
-
-The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; keeps working. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</translation>
     </message>
     <message>
         <location line="+26"/>
@@ -3346,10 +3284,6 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>## a bare file name means &quot;next to this file&quot;; write the full path otherwise</translation>
     </message>
     <message>
-        <source>## a relative path is understood from the configuration folder</source>
-        <translation type="vanished">## a relative path is understood from the configuration folder</translation>
-    </message>
-    <message>
         <location line="+6"/>
         <source>## where to write it (the variables above work here too)</source>
         <translation>## where to write it (the variables above work here too)</translation>
@@ -3405,14 +3339,6 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>## given to a post command; __rarPass__ in the arguments still works</translation>
     </message>
     <message>
-        <source>## here is the list of the available placeholders</source>
-        <translation type="vanished">## here is the list of the available placeholders</translation>
-    </message>
-    <message>
-        <source>full path of the source file</source>
-        <translation type="vanished">full path of the source file</translation>
-    </message>
-    <message>
         <location line="+81"/>
         <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
         <translation>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</translation>
@@ -3456,14 +3382,6 @@ One thing does change for such a script: the old configuration file has no POST_
         <location line="+1"/>
         <source>#PACK = GEN_PAR2</source>
         <translation></translation>
-    </message>
-    <message>
-        <source>## launch a command or script at the end of each Post (cf examples)</source>
-        <translation type="vanished">## execute a command or script at the end of each post (see examples)</translation>
-    </message>
-    <message>
-        <source>## the full path of the nzb file is provided in the %1 placeholder (Qt style)</source>
-        <translation type="vanished">## the complete path of the nzb file is provided by the placeholder %1 (Qt style)</translation>
     </message>
     <message>
         <location line="-132"/>
@@ -3869,7 +3787,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="-4744"/>
+        <location line="-4763"/>
         <source>Auto Posting</source>
         <translation></translation>
     </message>
@@ -3942,14 +3860,6 @@ One thing does change for such a script: the old configuration file has no POST_
 <context>
     <name>NntpCheckCon</name>
     <message>
-        <source>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</source>
-        <translation type="vanished">Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</translation>
-    </message>
-    <message>
-        <source>VPN bind failed on %1: %2</source>
-        <translation type="vanished">VPN bind failed on %1: %2</translation>
-    </message>
-    <message>
         <location filename="../NntpCheckCon.cpp" line="+77"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</translation>
@@ -4003,14 +3913,6 @@ One thing does change for such a script: the old configuration file has no POST_
 </context>
 <context>
     <name>NntpConnection</name>
-    <message>
-        <source>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</source>
-        <translation type="vanished">Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</translation>
-    </message>
-    <message>
-        <source>VPN bind failed on %1: %2</source>
-        <translation type="vanished">VPN bind failed on %1: %2</translation>
-    </message>
     <message>
         <location filename="../NntpConnection.cpp" line="+132"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
@@ -4233,18 +4135,6 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>Config file not found or unreadable: %1</translation>
     </message>
     <message>
-        <source>Privileged helper script ngpost-vpn-helper.sh not found. Install it under /usr/lib/ngpost/ or run from the AppImage.</source>
-        <translation type="vanished">Privileged helper script ngpost-vpn-helper.sh not found. Install it under /usr/lib/ngpost/ or run from the AppImage.</translation>
-    </message>
-    <message>
-        <source>Launching VPN helper: pkexec %1</source>
-        <translation type="vanished">Launching VPN helper: pkexec %1</translation>
-    </message>
-    <message>
-        <source>Failed to start pkexec/helper</source>
-        <translation type="vanished">Failed to start pkexec/helper</translation>
-    </message>
-    <message>
         <location line="-22"/>
         <source>Native VPN integration is currently Linux/Windows-only. macOS support is in progress.</source>
         <translation>Native VPN integration is currently Linux/Windows-only. macOS support is in progress.</translation>
@@ -4395,14 +4285,14 @@ One thing does change for such a script: the old configuration file has no POST_
     <name>PostInfoDialog</name>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
-        <location line="+573"/>
+        <location line="+591"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>Post information</translation>
     </message>
     <message>
-        <location line="-715"/>
+        <location line="-733"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>A post info file describes this post in a text file written next to the nzb.
@@ -4453,9 +4343,9 @@ __nzbDir__/__nzbName__.info.txt writes it next to the nzb.</source>
 __nzbDir__/__nzbName__.info.txt writes it next to the nzb.</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+9"/>
         <source>Choose a folder for this post&apos;s sheet</source>
-        <translation>Choose a folder for this post's sheet</translation>
+        <translation>Choose a folder for this post&apos;s sheet</translation>
     </message>
     <message>
         <location line="+16"/>
@@ -4496,12 +4386,12 @@ A line starting with # is a comment: it is never written. Changes here only reac
     </message>
     <message>
         <location line="+3"/>
-        <location line="+492"/>
+        <location line="+508"/>
         <source>Save as…</source>
         <translation>Save as…</translation>
     </message>
     <message>
-        <location line="-490"/>
+        <location line="-506"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>Writes these lines to a model file of your own.</translation>
     </message>
@@ -4565,12 +4455,17 @@ On: it is written there AND published in the nzb, which circulates.</translation
         <translation>No destination set: no sheet will be written.</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+28"/>
         <source>Unknown variable in the destination: %1</source>
         <translation>Unknown variable in the destination: %1</translation>
     </message>
     <message>
         <location line="+3"/>
+        <source>The path needs %1, which this post does not have yet. It is resolved when the sheet is written.</source>
+        <translation>The path needs %1, which this post does not have yet. It is resolved when the sheet is written.</translation>
+    </message>
+    <message>
+        <location line="+4"/>
         <source>The destination is still empty for this post.</source>
         <translation>The destination is still empty for this post.</translation>
     </message>
@@ -4582,7 +4477,7 @@ On: it is written there AND published in the nzb, which circulates.</translation
     <message>
         <location line="+9"/>
         <source>Folder for this post&apos;s sheet</source>
-        <translation>Folder for this post's sheet</translation>
+        <translation>Folder for this post&apos;s sheet</translation>
     </message>
     <message>
         <location line="+31"/>
@@ -5201,10 +5096,6 @@ Save the model now?</translation>
         <translation>History: could not record the size of post %1: %2</translation>
     </message>
     <message>
-        <source>History: could not flag post %1 as resumable again: %2</source>
-        <translation type="vanished">History: could not flag post %1 as resumable again: %2</translation>
-    </message>
-    <message>
         <location line="+154"/>
         <source>History: could not record the outcome of post %1: %2</source>
         <translation>History: could not record the outcome of post %1: %2</translation>
@@ -5384,10 +5275,6 @@ Save the model now?</translation>
         <translation></translation>
     </message>
     <message>
-        <source>History: could not mark post as resuming: %1</source>
-        <translation type="vanished">History: could not mark post as resuming: %1</translation>
-    </message>
-    <message>
         <location line="-1885"/>
         <source>History: could not create post record: %1</source>
         <translation>History: could not create post record: %1</translation>
@@ -5403,26 +5290,6 @@ Save the model now?</translation>
         <translation>History: could not create file record: %1</translation>
     </message>
     <message>
-        <source>History: could not update article payload: %1</source>
-        <translation type="vanished">History: could not update article payload: %1</translation>
-    </message>
-    <message>
-        <source>History: could not mark article posting: %1</source>
-        <translation type="vanished">History: could not mark article posting: %1</translation>
-    </message>
-    <message>
-        <source>History: could not mark article posted: %1</source>
-        <translation type="vanished">History: could not mark article posted: %1</translation>
-    </message>
-    <message>
-        <source>History: could not mark article failed: %1</source>
-        <translation type="vanished">History: could not mark article failed: %1</translation>
-    </message>
-    <message>
-        <source>History: could not mark article unknown: %1</source>
-        <translation type="vanished">History: could not mark article unknown: %1</translation>
-    </message>
-    <message>
         <location line="+1038"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>Could not regenerate final NZB from history: %1</translation>
@@ -5431,10 +5298,6 @@ Save the model now?</translation>
         <location line="+9"/>
         <source>NZB history warning: %1</source>
         <translation>NZB history warning: %1</translation>
-    </message>
-    <message>
-        <source>Could not reopen NZB for history regeneration: %1</source>
-        <translation type="vanished">Could not reopen NZB for history regeneration: %1</translation>
     </message>
     <message>
         <location line="-376"/>
@@ -5448,10 +5311,6 @@ Save the model now?</translation>
         <location filename="../hmi/PostingWidget.ui" line="+14"/>
         <source>Form</source>
         <translation></translation>
-    </message>
-    <message>
-        <source>Check the configuration file and define or comment RAR_MAX to activate/deactivate this feature</source>
-        <translation type="vanished">To enable/disable this function, add the parameter RAR_MAX to the configuration file or comment it out/delete it</translation>
     </message>
     <message>
         <location line="+29"/>
@@ -5480,17 +5339,9 @@ Save the model now?</translation>
         <translation></translation>
     </message>
     <message>
-        <source>Random name length:</source>
-        <translation type="vanished">Random name length:</translation>
-    </message>
-    <message>
         <location line="+244"/>
         <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
         <translation>length of the archive name drawn by the dice button (config LENGTH_NAME)</translation>
-    </message>
-    <message>
-        <source>Random password length:</source>
-        <translation type="vanished">Random password length:</translation>
     </message>
     <message>
         <location line="+63"/>
@@ -5523,17 +5374,9 @@ Save the model now?</translation>
         <translation>RAR Path: </translation>
     </message>
     <message>
-        <source>Vol Size:</source>
-        <translation type="vanished">Vol Size:</translation>
-    </message>
-    <message>
         <location line="+70"/>
         <source>Limit RAR Number</source>
         <translation>Limit RAR Number</translation>
-    </message>
-    <message>
-        <source>PAR2 Redundancy (%): </source>
-        <translation type="vanished">PAR2 Redundancy (%): </translation>
     </message>
     <message>
         <location line="+39"/>
@@ -5569,10 +5412,6 @@ Save the model now?</translation>
         <location line="+33"/>
         <source>NZB file:</source>
         <translation>NZB file:</translation>
-    </message>
-    <message>
-        <source>NZB Password:</source>
-        <translation type="vanished">NZB Password:</translation>
     </message>
     <message>
         <location line="+71"/>
@@ -5788,10 +5627,6 @@ Some Usenet indexes ask for one.</translation>
         <translation>Post info defaults saved: model %1, written to %2</translation>
     </message>
     <message>
-        <source>Post info model saved as the default: %1</source>
-        <translation type="vanished">Post info model saved as the default: %1</translation>
-    </message>
-    <message>
         <location line="+68"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation></translation>
@@ -5823,10 +5658,6 @@ Some Usenet indexes ask for one.</translation>
         <location line="-255"/>
         <source>History file status update failed: %1</source>
         <translation>History file status update failed: %1</translation>
-    </message>
-    <message>
-        <source>Could not open file for writing: %1</source>
-        <translation type="vanished">Could not open file for writing: %1</translation>
     </message>
     <message>
         <location line="+273"/>
@@ -5902,14 +5733,6 @@ Some Usenet indexes ask for one.</translation>
 <context>
     <name>VpnManager</name>
     <message>
-        <source>VPN: no config file selected</source>
-        <translation type="vanished">VPN: no config file selected</translation>
-    </message>
-    <message>
-        <source>VPN: tunnel up on %1 (%2)</source>
-        <translation type="vanished">VPN: tunnel up on %1 (%2)</translation>
-    </message>
-    <message>
         <location filename="../vpn/VpnManager.cpp" line="+585"/>
         <source>VPN: failed — %1</source>
         <translation>VPN: failed — %1</translation>
@@ -5925,14 +5748,6 @@ Some Usenet indexes ask for one.</translation>
         <translation>VPN: backend not supported on this platform yet</translation>
     </message>
     <message>
-        <source>VPN: install script not found at %1</source>
-        <translation type="vanished">VPN: install script not found at %1</translation>
-    </message>
-    <message>
-        <source>Running VPN install: pkexec %1 %2</source>
-        <translation type="vanished">Running VPN install: pkexec %1 %2</translation>
-    </message>
-    <message>
         <location line="+250"/>
         <source>VPN install: timed out</source>
         <translation>VPN install: timed out</translation>
@@ -5941,10 +5756,6 @@ Some Usenet indexes ask for one.</translation>
         <location line="+28"/>
         <source>VPN: uninstall script not found at %1</source>
         <translation>VPN: uninstall script not found at %1</translation>
-    </message>
-    <message>
-        <source>Running VPN uninstall: pkexec %1</source>
-        <translation type="vanished">Running VPN uninstall: pkexec %1</translation>
     </message>
     <message>
         <location line="+17"/>
@@ -5960,10 +5771,6 @@ Some Usenet indexes ask for one.</translation>
         <location line="+75"/>
         <source>The VPN helper is not installed. Open the VPN dialog and click Install.</source>
         <translation>The VPN helper is not installed. Open the VPN dialog and click Install.</translation>
-    </message>
-    <message>
-        <source>No VPN configuration file is selected.</source>
-        <translation type="vanished">No VPN configuration file is selected.</translation>
     </message>
     <message>
         <location line="-1077"/>
@@ -6192,14 +5999,6 @@ Open the VPN options with the VPN button and check the VPN configuration, or edi
         <translation>Queue empty for %1 s — disconnecting VPN</translation>
     </message>
     <message>
-        <source>No more jobs need the VPN; scheduling auto-disconnect in %1 s</source>
-        <translation type="vanished">No more jobs need the VPN; scheduling auto-disconnect in %1 s</translation>
-    </message>
-    <message>
-        <source>Auto-disconnect grace expired — stopping VPN</source>
-        <translation type="vanished">Auto-disconnect grace expired — stopping VPN</translation>
-    </message>
-    <message>
         <location line="+15"/>
         <source>disabled</source>
         <translation>disabled</translation>
@@ -6357,10 +6156,6 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
         <translation>Could not write %1: %2</translation>
     </message>
     <message>
-        <source>Could not open %1 for writing.</source>
-        <translation type="vanished">Could not open %1 for writing.</translation>
-    </message>
-    <message>
         <location line="+11"/>
         <source>Missing name</source>
         <translation>Missing name</translation>
@@ -6422,10 +6217,6 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
         <translation>Import failed</translation>
     </message>
     <message>
-        <source>Could not copy %1 to %2.</source>
-        <translation type="vanished">Could not copy %1 to %2.</translation>
-    </message>
-    <message>
         <location line="-35"/>
         <location line="+8"/>
         <location line="+61"/>
@@ -6466,49 +6257,9 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
         <translation>Install...</translation>
     </message>
     <message>
-        <source>Install the privileged VPN helper. After this you won&apos;t be prompted for a password on Connect / Disconnect.</source>
-        <translation type="vanished">Install the privileged VPN helper. After this you won&apos;t be prompted for a password on Connect / Disconnect.</translation>
-    </message>
-    <message>
         <location line="+7"/>
         <source>Uninstall...</source>
         <translation>Uninstall...</translation>
-    </message>
-    <message>
-        <source>Remove the privileged VPN helper from the system.</source>
-        <translation type="vanished">Remove the privileged VPN helper from the system.</translation>
-    </message>
-    <message>
-        <source>Configuration</source>
-        <translation type="vanished">Configuration</translation>
-    </message>
-    <message>
-        <source>Backend:</source>
-        <translation type="vanished">Backend:</translation>
-    </message>
-    <message>
-        <source>OpenVPN</source>
-        <translation type="vanished">OpenVPN</translation>
-    </message>
-    <message>
-        <source>WireGuard</source>
-        <translation type="vanished">WireGuard</translation>
-    </message>
-    <message>
-        <source>Config file:</source>
-        <translation type="vanished">Config file:</translation>
-    </message>
-    <message>
-        <source>Browse...</source>
-        <translation type="vanished">Browse...</translation>
-    </message>
-    <message>
-        <source>Auto-connect VPN when a job starts</source>
-        <translation type="vanished">Auto-connect VPN when a job starts</translation>
-    </message>
-    <message>
-        <source>When checked, ngPost will bring up the VPN tunnel automatically when any job starts, and disconnect 30 seconds after the queue is empty. Per-server &quot;Use VPN&quot; still controls which connections route through the tunnel.</source>
-        <translation type="vanished">When checked, ngPost will bring up the VPN tunnel automatically when any job starts, and disconnect 30 seconds after the queue is empty. Per-server &quot;Use VPN&quot; still controls which connections route through the tunnel.</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -6579,22 +6330,6 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
         <location line="+18"/>
         <source>&lt;a href=&quot;about:licences&quot;&gt;About licences&lt;/a&gt;</source>
         <translation>&lt;a href=&quot;about:licences&quot;&gt;About licences&lt;/a&gt;</translation>
-    </message>
-    <message>
-        <source>OpenVPN config (*.ovpn *.conf);;All files (*)</source>
-        <translation type="vanished">OpenVPN config (*.ovpn *.conf);;All files (*)</translation>
-    </message>
-    <message>
-        <source>WireGuard config (*.conf);;All files (*)</source>
-        <translation type="vanished">WireGuard config (*.conf);;All files (*)</translation>
-    </message>
-    <message>
-        <source>Select VPN config</source>
-        <translation type="vanished">Select VPN config</translation>
-    </message>
-    <message>
-        <source>No config file selected.</source>
-        <translation type="vanished">No config file selected.</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="+79"/>
@@ -6682,14 +6417,6 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
         <location line="+6"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found</source>
         <translation>Privileged helper script ngpost-vpn-helper.sh not found</translation>
-    </message>
-    <message>
-        <source>Launching VPN helper: pkexec %1</source>
-        <translation type="vanished">Launching VPN helper: pkexec %1</translation>
-    </message>
-    <message>
-        <source>Failed to start pkexec/helper</source>
-        <translation type="vanished">Failed to start pkexec/helper</translation>
     </message>
     <message>
         <location line="-24"/>

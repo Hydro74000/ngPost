@@ -56,6 +56,18 @@ jobs:
             package_version="$RELEASE_INPUT"
             appimage_update_glob="ngPost-*-x86_64.AppImage.zsync"
             if [ "$PRERELEASE_INPUT" = "true" ]; then
+              # A pre-release must say so in its tag. A bare "v5.5" has no
+              # suffix, so the in-app update check reads it as the stable 5.5
+              # and offers it to everyone -- and it also burns the tag the real
+              # stable release needs. Refuse rather than publish that.
+              case "${RELEASE_INPUT#v}" in
+                *-*) ;;
+                *)
+                  echo "A pre-release tag must carry a suffix, e.g. ${RELEASE_INPUT}-unstable.1" >&2
+                  echo "Got \"$RELEASE_INPUT\", which reads as a stable release." >&2
+                  exit 1
+                  ;;
+              esac
               prerelease="true"
               channel="prerelease"
               release_name="Pre-release $RELEASE_INPUT"
