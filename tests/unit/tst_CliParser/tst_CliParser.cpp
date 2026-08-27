@@ -133,6 +133,11 @@ private slots:
     //! executable-named configuration folder as a side effect.
     void inspection_and_explicit_config_do_not_adopt();
 
+    //! A configuration written before "[server]" blocks existed puts HOST,
+    //! USER and PASS at the top level. Those keys used to be written into a
+    //! server object no block had created, which crashed the process.
+    void server_keys_without_a_block_are_not_a_crash();
+
     //! An unknown flag fails with a non-zero exit code. Currently
     //! ERR_WRONG_ARG = 3 but tests assert "non-zero" for resilience to enum
     //! reordering.
@@ -374,6 +379,33 @@ void TestCliParser::inspection_and_explicit_config_do_not_adopt()
     QVERIFY2(!QFileInfo::exists(canonicalDir + QStringLiteral("/ngPost_history.sqlite")),
              "a shadow history database was created in the canonical folder");
     QVERIFY2(!migrated.stderrText.isEmpty(), "migration was not reported on stderr");
+}
+
+void TestCliParser::server_keys_without_a_block_are_not_a_crash()
+{
+    HomeSandbox sandbox;
+
+    // Exactly what a very old ngPost.conf looks like: one server, spelled out
+    // at the top level, with no "[server]" line anywhere.
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/legacy.conf");
+    QFile         conf(confPath);
+    QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+    conf.write("HOST = news.example.invalid\n"
+               "PORT = 119\n"
+               "USER = someone\n"
+               "PASS = secret\n"
+               "CONNECTION = 3\n");
+    conf.close();
+
+    const RunResult r = run(_bin, { "-c", confPath, "--history" }, sandbox.rootPath());
+
+    QVERIFY2(!r.timedOut, "process timed out");
+    // A crash is a signal, not an exit code: on Unix QProcess reports it as a
+    // crash exit status, so assert the clean value rather than "not 139".
+    QVERIFY2(r.exitCode == 0,
+             qPrintable(QStringLiteral("a pre-[server] configuration must be read, not crash on; exit=%1 out=%2")
+                            .arg(r.exitCode)
+                            .arg(r.stdoutText + r.stderrText)));
 }
 
 void TestCliParser::unknown_flag_rejected()

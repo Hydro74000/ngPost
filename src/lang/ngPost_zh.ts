@@ -2,29 +2,6 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="zh_CN">
 <context>
-    <name>AboutNgPost</name>
-    <message>
-        <source>Dialog</source>
-        <translation type="vanished">对话</translation>
-    </message>
-    <message>
-        <source>asciiArt</source>
-        <translation type="vanished">ascii图像</translation>
-    </message>
-    <message>
-        <source>Description</source>
-        <translation type="vanished">描述</translation>
-    </message>
-    <message>
-        <source>Donate</source>
-        <translation type="vanished">捐赠</translation>
-    </message>
-    <message>
-        <source>copyright</source>
-        <translation type="vanished">版权所有</translation>
-    </message>
-</context>
-<context>
     <name>AutoPostWidget</name>
     <message>
         <location filename="../hmi/AutoPostWidget.ui" line="+294"/>
@@ -225,14 +202,6 @@
         <translation>发布成功时删除文件（仅适用监视功能）</translation>
     </message>
     <message>
-        <source>About ngPost</source>
-        <translation type="vanished">关于ngPost</translation>
-    </message>
-    <message>
-        <source>About</source>
-        <translation type="vanished">关于</translation>
-    </message>
-    <message>
         <location line="+24"/>
         <location filename="../hmi/AutoPostWidget.cpp" line="+244"/>
         <source>Monitor Folder</source>
@@ -257,10 +226,6 @@
         <location line="+6"/>
         <source>Generate Posts</source>
         <translation>生成发布文件</translation>
-    </message>
-    <message>
-        <source>Donate</source>
-        <translation type="vanished">捐赠</translation>
     </message>
     <message>
         <location filename="../hmi/AutoPostWidget.cpp" line="-123"/>
@@ -449,10 +414,6 @@ It will be irreversible...</source>
         <source>Post info defaults saved: model %1, written to %2</source>
         <translation>已保存默认设置：模板 %1，写入 %2</translation>
     </message>
-    <message>
-        <source>Post info model saved as the default: %1</source>
-        <translation type="vanished">信息文件模板已保存为默认：%1</translation>
-    </message>
 </context>
 <context>
     <name>FileUploader</name>
@@ -460,10 +421,6 @@ It will be irreversible...</source>
         <location filename="../FileUploader.cpp" line="+102"/>
         <source>Error uploading nzb to %1: Protocol not supported</source>
         <translation>上传nzb到%1时发生错误: 协议不支持</translation>
-    </message>
-    <message>
-        <source>Error uploading file: can&apos;t open file </source>
-        <translation type="vanished">上传文件错误: 无法打开文件 </translation>
     </message>
     <message>
         <location line="+14"/>
@@ -617,26 +574,14 @@ It will be irreversible...</source>
         <translation>显示调试信息</translation>
     </message>
     <message>
-        <source>save email</source>
-        <translation type="vanished">保存邮件地址</translation>
-    </message>
-    <message>
         <location line="-497"/>
         <source>generate a new random email for each Post</source>
         <translation>每次发布都使用新的随机邮件地址</translation>
     </message>
     <message>
-        <source>new random email for each Post</source>
-        <translation type="vanished">每次发布使用新的随机邮件地址</translation>
-    </message>
-    <message>
         <location line="+25"/>
         <source>Use a Fixed password for all the Posts</source>
         <translation>所有的发布使用固定的密码</translation>
-    </message>
-    <message>
-        <source>archive password:</source>
-        <translation type="vanished">压缩文件密码:</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -657,10 +602,6 @@ It will be irreversible...</source>
         <location line="+26"/>
         <source>add the list of groups separated with a coma (no space)</source>
         <translation>使用逗号来添加新闻组列表（请不要使用空格）</translation>
-    </message>
-    <message>
-        <source>NewsGroups:</source>
-        <translation type="vanished">新闻组:</translation>
     </message>
     <message>
         <location line="+16"/>
@@ -684,17 +625,9 @@ It will be irreversible...</source>
         <translation>发布失败时重试次数（很可能msg-id已经被占用了）</translation>
     </message>
     <message>
-        <source>nb Retry:</source>
-        <translation type="vanished">nb重试:</translation>
-    </message>
-    <message>
         <location line="+26"/>
         <source>Number of Threads on which all the Connections will be spreads</source>
         <translation>所有连接将使用的线程数</translation>
-    </message>
-    <message>
-        <source>Nb Threads:</source>
-        <translation type="vanished">Nb 线程数:</translation>
     </message>
     <message>
         <location line="+27"/>
@@ -702,17 +635,9 @@ It will be irreversible...</source>
         <translation>注意: 没有NZB文件您将无法找到您的发布的贴子</translation>
     </message>
     <message>
-        <source>Article&apos;s obfuscation: Subject changed to be a UUID + random From</source>
-        <translation type="vanished">文章混淆: 文章主题将会被改成UUID+随机字符串形式</translation>
-    </message>
-    <message>
         <location line="+13"/>
         <source>when using compression with random name, rename also the file inside the archive</source>
         <translation>当压缩文件使用随机文件名时，压缩包内的文件名也会被重命名</translation>
-    </message>
-    <message>
-        <source>file name obfuscation</source>
-        <translation type="vanished">文件名混淆</translation>
     </message>
     <message>
         <location line="+23"/>
@@ -735,10 +660,6 @@ It will be irreversible...</source>
         <translation>自动关闭标签页</translation>
     </message>
     <message>
-        <source>nzb destination Path: </source>
-        <translation type="vanished">nzb目标文件夹: </translation>
-    </message>
-    <message>
         <location line="+93"/>
         <location line="+13"/>
         <source>set the destination path of all the nzb file</source>
@@ -748,10 +669,6 @@ It will be irreversible...</source>
         <location line="+3"/>
         <source> ... </source>
         <translation> ... </translation>
-    </message>
-    <message>
-        <source>shutdown computer</source>
-        <translation type="vanished">关闭计算机</translation>
     </message>
     <message>
         <location line="+50"/>
@@ -769,10 +686,6 @@ It will be irreversible...</source>
         <translation>将所有参数以及服务器信息保存到配置文件中</translation>
     </message>
     <message>
-        <source>save</source>
-        <translation type="vanished">保存</translation>
-    </message>
-    <message>
         <location line="+45"/>
         <source>Job 1</source>
         <translation>任务1</translation>
@@ -786,10 +699,6 @@ It will be irreversible...</source>
         <location line="+20"/>
         <source>show some debug information</source>
         <translation>显示简要调试信息</translation>
-    </message>
-    <message>
-        <source>show debug info</source>
-        <translation type="vanished">显示调试信息</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -812,10 +721,6 @@ It will be irreversible...</source>
         <location line="+48"/>
         <source>TextLabel</source>
         <translation>文字标签</translation>
-    </message>
-    <message>
-        <source>(0 / 0) avg speed: 0 MB/s</source>
-        <translation type="vanished">(0 / 0)平均速度: 0 MB/s</translation>
     </message>
     <message>
         <location line="+40"/>
@@ -1573,10 +1478,6 @@ This also removes all associated file and article records.</source>
         <translation>VPN：失败</translation>
     </message>
     <message>
-        <source>Open Resume â</source>
-        <translation type="vanished">打开续传 →</translation>
-    </message>
-    <message>
         <location line="-1736"/>
         <location line="+128"/>
         <source>All statuses</source>
@@ -1599,14 +1500,6 @@ This also removes all associated file and article records.</source>
         <translation>刷新</translation>
     </message>
     <message>
-        <source>Export CSVâ¦</source>
-        <translation type="vanished">导出 CSV…</translation>
-    </message>
-    <message>
-        <source>Search name, NZB, archiveâ¦</source>
-        <translation type="vanished">搜索名称、NZB、归档…</translation>
-    </message>
-    <message>
         <location line="-369"/>
         <location line="+147"/>
         <source>Search:</source>
@@ -1626,10 +1519,6 @@ This also removes all associated file and article records.</source>
         <location line="+7"/>
         <source>Any date</source>
         <translation>任意日期</translation>
-    </message>
-    <message>
-        <source>Group filterâ¦</source>
-        <translation type="vanished">组过滤…</translation>
     </message>
     <message>
         <location line="-151"/>
@@ -1690,10 +1579,6 @@ This also removes all associated file and article records.</source>
         <location line="+471"/>
         <source>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</source>
         <translation>&lt;i&gt;选择一个帖子以查看详情。&lt;/i&gt;</translation>
-    </message>
-    <message>
-        <source>Regenerate NZBâ¦</source>
-        <translation type="vanished">重新生成 NZB…</translation>
     </message>
     <message>
         <location line="-1014"/>
@@ -1899,10 +1784,6 @@ This also removes all associated file and article records.</source>
         <source>%1 post(s) can be resumed.</source>
         <translation>%1 个帖子可以续传。</translation>
     </message>
-    <message>
-        <source>%1 post(s) can be resumed. Open the Resume tab to review them.</source>
-        <translation type="vanished">%1 个帖子可以续传。请打开“续传”标签页查看。</translation>
-    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -1917,10 +1798,6 @@ This also removes all associated file and article records.</source>
         <translation>快速发布</translation>
     </message>
     <message>
-        <source>Donations are welcome, I spent quite some time to develop this app and make a sexy GUI although I&apos;m not using it ;)</source>
-        <translation type="vanished">欢迎捐款，我花了很多时间来开发此应用程序并制作了一个漂亮的图形界面，尽管我没有使用它;)</translation>
-    </message>
-    <message>
         <location line="+150"/>
         <source>Help: display syntax</source>
         <translation>帮助：显示语法</translation>
@@ -1929,10 +1806,6 @@ This also removes all associated file and article records.</source>
         <location line="+1"/>
         <source>app version</source>
         <translation>程序版本</translation>
-    </message>
-    <message>
-        <source>use configuration file (if not provided, we try to load $HOME/.ngPost)</source>
-        <translation type="vanished">使用配置文件（如果没有提供，请尝试载入$HOME/.ngPost）</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -2000,10 +1873,6 @@ This also removes all associated file and article records.</source>
         <translation>将文件发布到哪些新闻组（使用逗号分隔，请不要使用空格）</translation>
     </message>
     <message>
-        <source>extra meta data in header (typically &quot;password=qwerty42&quot;)</source>
-        <translation type="vanished">标头中的额外元数据（例如&quot;password=qwerty42&quot;）</translation>
-    </message>
-    <message>
         <location line="+17"/>
         <source>poster email (random one if not provided)</source>
         <translation>发布者邮件地址（如果没有提供特定的邮件地址程序将生成一个随机的邮件地址）</translation>
@@ -2064,10 +1933,6 @@ This also removes all associated file and article records.</source>
         <translation>par2绝对文件路径（ngPost自我定义的路径）</translation>
     </message>
     <message>
-        <source>compress inputs with random name and password and generate par2 (equivalent of --compress --gen_name --gen_pass --gen_par2)</source>
-        <translation type="vanished">使用随机文件名，添加密码以及生成par2文件的形式压缩导入的文件/文件夹（在命令行中等同于--compress --gen_name --gen_pass --gen_par2）</translation>
-    </message>
-    <message>
         <location line="+4"/>
         <source>compress inputs using RAR or 7z</source>
         <translation>使用RAR或者7z压缩导入的文件/文件夹</translation>
@@ -2109,12 +1974,12 @@ This also removes all associated file and article records.</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4416"/>
+        <location line="+4435"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>使用RAR压缩文件夹时删除根（父）文件夹</translation>
     </message>
     <message>
-        <location line="-4413"/>
+        <location line="-4432"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP服务器遵循的格式 (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2174,26 +2039,6 @@ This also removes all associated file and article records.</source>
         <translation>错误: 无法找到语言文件%1</translation>
     </message>
     <message>
-        <source>&lt;center&gt;&lt;h3&gt;New version available on GitHUB&lt;/h3&gt;&lt;/center&gt;</source>
-        <translation type="vanished">&lt;center&gt;&lt;h3&gt;在GitHUB上找到新版本&lt;/h3&gt;&lt;/center&gt;</translation>
-    </message>
-    <message>
-        <source>&lt;br/&gt;The last release is now &lt;b&gt;v%1&lt;/b&gt;</source>
-        <translation type="vanished">&lt;br/&gt;最新版本为&lt;b&gt;v%1&lt;/b&gt;</translation>
-    </message>
-    <message>
-        <source>&lt;br/&gt;&lt;br/&gt;You can download it from the &lt;a href=&apos;https://github.com/Hydro74000/ngPost/releases/tag/v%1&apos;&gt;release directory&lt;/a&gt;</source>
-        <translation type="vanished">&lt;br/&gt;&lt;br/&gt;您可以从&lt;a href=&apos;https://github.com/Hydro74000/ngPost/releases/tag/v%1&apos;&gt;发行目录&lt;/a&gt;下载</translation>
-    </message>
-    <message>
-        <source>&lt;br/&gt;&lt;br/&gt;Here are the full &lt;a href=&apos;https://github.com/Hydro74000/ngPost/blob/master/release_notes.txt&apos;&gt;release_notes&lt;/a&gt;</source>
-        <translation type="vanished">&lt;br/&gt;&lt;br/&gt;在此您可以找到完整的 &lt;a href=&apos;https://github.com/Hydro74000/ngPost/blob/master/release_notes.txt&apos;&gt;发行说明&lt;/a&gt;</translation>
-    </message>
-    <message>
-        <source>New version available</source>
-        <translation type="vanished">找到新版本</translation>
-    </message>
-    <message>
         <location line="+108"/>
         <source> =&gt; closing application</source>
         <translation> =&gt;关闭程序</translation>
@@ -2233,21 +2078,9 @@ To list the available options use: %2 --help
         <translation>错误语法：您应该使用命令选项 -i, --auto 或 --monitor 提供至少一个输入文件或目录</translation>
     </message>
     <message>
-        <source>Error syntax: --del option is only available with --auto or --monitor</source>
-        <translation type="vanished">错误语法：--del 选项只能配合 --auto 或者 --monitor 来使用</translation>
-    </message>
-    <message>
-        <source>Error syntax: --auto only works with --compress or AUTO_COMPRESS in config</source>
-        <translation type="vanished">错误语法： --auto 只能在配置文件中配合 --compress 或 AUTO_COMPRESS 来使用</translation>
-    </message>
-    <message>
         <location line="+83"/>
         <source>Error syntax: --auto only uses folders as argument...</source>
         <translation>错误语法：--auto 只能用作文件夹参数...</translation>
-    </message>
-    <message>
-        <source>Error syntax: --monitor only works with --compress</source>
-        <translation type="vanished">错误语法：--monitor 只能与 --compress 配合使用</translation>
     </message>
     <message>
         <location line="+32"/>
@@ -2274,10 +2107,6 @@ To list the available options use: %2 --help
 </translation>
     </message>
     <message>
-        <source>Feel free to donate in BTC, click here to see my address on the GitHub section</source>
-        <translation type="vanished">欢迎使用BTC来进行捐赠, 点击此处来在GitHub中查看我的收款</translation>
-    </message>
-    <message>
         <location line="-2240"/>
         <source>Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</source>
         <translation>您可以配置PACK命令定义的子命令(COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)来打包发帖</translation>
@@ -2286,10 +2115,6 @@ To list the available options use: %2 --help
         <location line="+1295"/>
         <source>SSL issue on your system...</source>
         <translation>您的系统出现SSL问题...</translation>
-    </message>
-    <message>
-        <source>NZB Post cmd: %1</source>
-        <translation type="vanished">NZB发布命令：%1</translation>
     </message>
     <message>
         <location line="+446"/>
@@ -2312,7 +2137,7 @@ To list the available options use: %2 --help
         <translation>用户已取消发布。</translation>
     </message>
     <message>
-        <location line="+3053"/>
+        <location line="+3072"/>
         <source>VPN warning</source>
         <translation>VPN 警告</translation>
     </message>
@@ -2345,7 +2170,7 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>取消</translation>
     </message>
     <message>
-        <location line="-1733"/>
+        <location line="-1752"/>
         <source>Full debug logs are ON
 </source>
         <translation>已打开完整调试日志
@@ -2450,10 +2275,6 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <location line="+1"/>
         <source>template file used to write a post info file next to the nzb</source>
         <translation>用于在 nzb 旁边写信息文件的模板文件</translation>
-    </message>
-    <message>
-        <source>where to write the post info file (variables allowed)</source>
-        <translation type="vanished">信息文件写到哪里（可使用变量）</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -2705,14 +2526,6 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>警告：贴 %1 发布于 ngPost 记录这些内容之前；par2 百分比、来源名称和元数据均为空。</translation>
     </message>
     <message>
-        <source>Cannot read the template %1: %2</source>
-        <translation type="vanished">无法读取模板 %1：%2</translation>
-    </message>
-    <message>
-        <source>Warning: unknown variable %1</source>
-        <translation type="vanished">警告：未知变量 %1</translation>
-    </message>
-    <message>
         <location line="+37"/>
         <source>Post info file written: %1</source>
         <translation>信息文件已写入：%1</translation>
@@ -2812,16 +2625,12 @@ That&apos;s not the case for &apos;%1&apos; which contains folders: %2</source>
     </message>
     <message>
         <location line="+69"/>
-        <location line="+719"/>
+        <location line="+738"/>
         <source>Generate new random poster for each post</source>
         <translation>为每个帖子生成新的随机发布者</translation>
     </message>
     <message>
-        <source>You should give an integer for the article size (option -a)</source>
-        <translation type="vanished">您应该为文章大小指定一个整数（参数-a）</translation>
-    </message>
-    <message>
-        <location line="-688"/>
+        <location line="-707"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>您应为发布文章的重试次数提供一个无符号整数（参数-r）</translation>
     </message>
@@ -2894,7 +2703,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>无法读取配置文件“%1”...</translation>
     </message>
     <message>
-        <location line="+93"/>
+        <location line="+112"/>
         <source>the nzbPath &apos;%1&apos; is not writable...
 </source>
         <translation>无法写入nzb保存路径“%1”...
@@ -2916,14 +2725,6 @@ Brought over: %3</source>
     目标：%2
 
 已迁移：%3</translation>
-    </message>
-    <message>
-        <source>
-
-The old folder was left as it was — configuration assets were copied, not moved, so a script or a cron job passing &quot;-c %1/ngPost.conf&quot; keeps working. SQLite history files were not copied or moved: this makes the operation immediate and avoids touching a live database and its WAL files.</source>
-        <translation type="vanished">
-
-旧文件夹保持原样——配置文件只进行了复制而非移动，因此传入“-c %1/ngPost.conf”的脚本或 cron 任务仍可正常工作。SQLite 历史记录文件既未复制也未移动：这样操作可以立即完成，并避免改动正在使用的数据库及其 WAL 文件。</translation>
     </message>
     <message>
         <location line="+26"/>
@@ -3055,10 +2856,6 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>## 只写文件名表示“与本文件同目录”；否则请写完整路径</translation>
     </message>
     <message>
-        <source>## a relative path is understood from the configuration folder</source>
-        <translation type="vanished">## 相对路径以配置文件夹为基准</translation>
-    </message>
-    <message>
         <location line="+6"/>
         <source>## where to write it (the variables above work here too)</source>
         <translation>## 写到哪里（上面的变量在这里同样可用）</translation>
@@ -3114,20 +2911,14 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>## 传给贴后命令；参数中的 __rarPass__ 仍然有效</translation>
     </message>
     <message>
-        <location line="-2703"/>
+        <location line="-2722"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>NZB_UPLOAD_URL (%1)使用了不支持的协议。 您只可以使用%2
 </translation>
     </message>
     <message>
-        <source>Invalid VPN_BACKEND value: %1 (expected &apos;openvpn&apos; or &apos;wireguard&apos;)
-</source>
-        <translation type="vanished">VPN_BACKEND 值无效：%1（应为 &apos;openvpn&apos; 或 &apos;wireguard&apos;）
-</translation>
-    </message>
-    <message>
-        <location line="+1686"/>
+        <location line="+1705"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost 开始记录: %1</translation>
     </message>
@@ -3152,7 +2943,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>解析Proxy Socks5参数时出错. 语法应为: %1</translation>
     </message>
     <message>
-        <location line="-1788"/>
+        <location line="-1807"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>发布历史“%1”不可设置为目录...
@@ -3167,7 +2958,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
 </translation>
     </message>
     <message>
-        <location line="+1848"/>
+        <location line="+1867"/>
         <source>should be a directory!...</source>
         <translation>应该是一个目录!...</translation>
     </message>
@@ -3202,7 +2993,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>使用 PACK 命令时使用了错误的关键词: %1. 关键词请使用下面中的 (%2)</translation>
     </message>
     <message>
-        <location line="-1917"/>
+        <location line="-1936"/>
         <source>date</source>
         <translation>日期</translation>
     </message>
@@ -3258,7 +3049,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
     </message>
     <message>
         <location line="+635"/>
-        <location line="+678"/>
+        <location line="+697"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE 必须是正整数</translation>
     </message>
@@ -3452,54 +3243,6 @@ Your active configuration file is:
         <translation>## 您可以通过定义多个NZB_POST_CMD来使用多个发布命令</translation>
     </message>
     <message>
-        <source>## here is the list of the available placeholders</source>
-        <translation type="vanished">## 以下是可用占位符列表</translation>
-    </message>
-    <message>
-        <source>full path of the source file</source>
-        <translation type="vanished">源文件的完整路径</translation>
-    </message>
-    <message>
-        <source>## here is the list of the available placehoders</source>
-        <translation type="vanished">## 这是可用的占位符列表</translation>
-    </message>
-    <message>
-        <source>full path of the written nzb file</source>
-        <translation type="vanished">被写入的nzb文件的完整路径</translation>
-    </message>
-    <message>
-        <source>name of the nzb without the extension (original source name)</source>
-        <translation type="vanished">不包含扩展名的nzb文件名（源文件名)</translation>
-    </message>
-    <message>
-        <source>name of the archive files (in case of obfuscation)</source>
-        <translation type="vanished">压缩文件名（如果使用了混淆)</translation>
-    </message>
-    <message>
-        <source>archive password</source>
-        <translation type="vanished">压缩文件密码</translation>
-    </message>
-    <message>
-        <source>size of the post (before yEnc encoding)</source>
-        <translation type="vanished">帖子大小 (yEnc 编码前)</translation>
-    </message>
-    <message>
-        <source>list of groups (comma separated)</source>
-        <translation type="vanished">新闻组列表 (以逗号分隔)</translation>
-    </message>
-    <message>
-        <source>number of files in the post</source>
-        <translation type="vanished">帖子中的文件数</translation>
-    </message>
-    <message>
-        <source>number of Articles</source>
-        <translation type="vanished">文章数</translation>
-    </message>
-    <message>
-        <source>number of Articles that failed to be posted</source>
-        <translation type="vanished">发布失败的文章数</translation>
-    </message>
-    <message>
         <location line="+176"/>
         <source>## For GUI ONLY, save the logs in a file (to debug potential crashes)</source>
         <translation>## 仅限图形界面, 保存记录为文件 (为了调试潜在的程序崩溃)</translation>
@@ -3543,10 +3286,6 @@ Your active configuration file is:
         <location line="+1"/>
         <source>#PACK = GEN_PAR2</source>
         <translation></translation>
-    </message>
-    <message>
-        <source>without config file, you can provide all the parameters to connect to ONE SINGLE server</source>
-        <translation type="vanished">没有配置文件，您只可以使用所有参数连接到一个服务器</translation>
     </message>
     <message>
         <location line="-697"/>
@@ -3614,10 +3353,6 @@ Your active configuration file is:
         <translation># ngPost配置文件</translation>
     </message>
     <message>
-        <source>## Lang for the app. Currently supported: EN, FR, ES, DE</source>
-        <translation type="vanished">##界面语言. 当前可以显示：英语，法语，西班牙语，德语</translation>
-    </message>
-    <message>
         <location line="+10"/>
         <source>## destination folder for all your nzb</source>
         <translation>##您所有nzb文件的目标文件夹</translation>
@@ -3676,14 +3411,6 @@ Your active configuration file is:
         <location line="+1"/>
         <source>#NZB_UPLOAD_URL = ftp://user:pass@url_or_ip:21</source>
         <translation>#NZB_UPLOAD_URL = ftp://user:pass@url_or_ip:21</translation>
-    </message>
-    <message>
-        <source>## launch a command or script at the end of each Post (cf examples)</source>
-        <translation type="vanished">##在每次发布最后启动命令行或脚本（参见示例）</translation>
-    </message>
-    <message>
-        <source>## the full path of the nzb file is provided in the %1 placeholder (Qt style)</source>
-        <translation type="vanished">##nzb文件的完整路径在%1占位符中提供（Qt样式）</translation>
     </message>
     <message>
         <location line="+65"/>
@@ -3911,10 +3638,6 @@ Your active configuration file is:
         <translation>##当有发布任务在等候时，在上传当前发布任务的同时准备下一个发布的文件</translation>
     </message>
     <message>
-        <source>## Auto compression for all posts with random archive name, password and par2 generation</source>
-        <translation type="vanished">##自动压缩功能为所有帖子生成随机压缩包文件名，随机密码以及par2文件</translation>
-    </message>
-    <message>
         <location line="+34"/>
         <source>## use the same Password for all your Posts using compression</source>
         <translation>##为您所有使用了压缩的帖子使用同样的密码</translation>
@@ -4093,10 +3816,6 @@ Your active configuration file is:
         <translation>错误: 无法写入默认配置文件: %1</translation>
     </message>
     <message>
-        <source>Auto compress is ON (--compress --gen_name --gen_pass --gen_par2)</source>
-        <translation type="vanished">自动压缩已启用 (--compress --gen_name --gen_pass --gen_par2)</translation>
-    </message>
-    <message>
         <location filename="../NgPost.h" line="+1100"/>
         <source>PACKing auto using: %1</source>
         <translation>打包功能自动使用: %1</translation>
@@ -4160,14 +3879,6 @@ Your active configuration file is:
 <context>
     <name>NntpCheckCon</name>
     <message>
-        <source>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</source>
-        <translation type="vanished">服务器 &apos;%1&apos; 被标记为使用 VPN，但 VPN 隧道未连接</translation>
-    </message>
-    <message>
-        <source>VPN bind failed on %1: %2</source>
-        <translation type="vanished">%1 上的 VPN 绑定失败：%2</translation>
-    </message>
-    <message>
         <location filename="../NntpCheckCon.cpp" line="+77"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>服务器“%1”必须走 VPN，但隧道尚未连接</translation>
@@ -4209,10 +3920,6 @@ Your active configuration file is:
         <translation>[连接 #%1] 以用户“%4”认证服务器 %2:%3 时出错</translation>
     </message>
     <message>
-        <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos; and pass &apos;%5&apos;</source>
-        <translation type="vanished">【连接#%1】使用用户名’%4‘以及密码’%5‘登录’到服务器%2：%3时发生错误</translation>
-    </message>
-    <message>
         <location line="+50"/>
         <source>[Con #%1] Checking article %2</source>
         <translation>[连接 #%1] 正在检查文章 %2</translation>
@@ -4225,14 +3932,6 @@ Your active configuration file is:
 </context>
 <context>
     <name>NntpConnection</name>
-    <message>
-        <source>Server &apos;%1&apos; is marked Use VPN but the VPN tunnel is not connected</source>
-        <translation type="vanished">服务器 &apos;%1&apos; 被标记为使用 VPN，但 VPN 隧道未连接</translation>
-    </message>
-    <message>
-        <source>VPN bind failed on %1: %2</source>
-        <translation type="vanished">%1 上的 VPN 绑定失败：%2</translation>
-    </message>
     <message>
         <location filename="../NntpConnection.cpp" line="+132"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
@@ -4339,10 +4038,6 @@ Your active configuration file is:
         <location line="+30"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
         <translation>[连接 #%1] 以用户“%4”认证服务器 %2:%3 时出错</translation>
-    </message>
-    <message>
-        <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos; and pass &apos;%5&apos;</source>
-        <translation type="vanished">【连接#%1】使用用户名’%4‘以及密码’%5‘登录’到服务器%2：%3时发生错误</translation>
     </message>
     <message>
         <location line="+26"/>
@@ -4458,18 +4153,6 @@ Your active configuration file is:
         <location line="+29"/>
         <source>Config file not found or unreadable: %1</source>
         <translation>找不到配置文件或无法读取：%1</translation>
-    </message>
-    <message>
-        <source>Privileged helper script ngpost-vpn-helper.sh not found. Install it under /usr/lib/ngpost/ or run from the AppImage.</source>
-        <translation type="vanished">找不到特权辅助脚本 ngpost-vpn-helper.sh。请安装到 /usr/lib/ngpost/ 或从 AppImage 运行。</translation>
-    </message>
-    <message>
-        <source>Launching VPN helper: pkexec %1</source>
-        <translation type="vanished">正在启动 VPN 辅助程序：pkexec %1</translation>
-    </message>
-    <message>
-        <source>Failed to start pkexec/helper</source>
-        <translation type="vanished">pkexec/辅助程序启动失败</translation>
     </message>
     <message>
         <location line="-22"/>
@@ -4622,14 +4305,14 @@ Your active configuration file is:
     <name>PostInfoDialog</name>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
-        <location line="+573"/>
+        <location line="+591"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>发贴信息</translation>
     </message>
     <message>
-        <location line="-715"/>
+        <location line="-733"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>信息文件在 nzb 旁边用一个文本文件描述此贴。
@@ -4680,7 +4363,7 @@ __nzbDir__/__nzbName__.info.txt writes it next to the nzb.</source>
 __nzbDir__/__nzbName__.info.txt 会把它写在 nzb 旁边。</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+9"/>
         <source>Choose a folder for this post&apos;s sheet</source>
         <translation>为此贴的信息文件选择一个文件夹</translation>
     </message>
@@ -4723,12 +4406,12 @@ A line starting with # is a comment: it is never written. Changes here only reac
     </message>
     <message>
         <location line="+3"/>
-        <location line="+492"/>
+        <location line="+508"/>
         <source>Save as…</source>
         <translation>另存为…</translation>
     </message>
     <message>
-        <location line="-490"/>
+        <location line="-506"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>把这些行写入一个属于您自己的模板文件。</translation>
     </message>
@@ -4792,12 +4475,17 @@ On: it is written there AND published in the nzb, which circulates.</source>
         <translation>未设置目标：不会写出任何信息文件。</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+28"/>
         <source>Unknown variable in the destination: %1</source>
         <translation>目标中含有未知变量：%1</translation>
     </message>
     <message>
         <location line="+3"/>
+        <source>The path needs %1, which this post does not have yet. It is resolved when the sheet is written.</source>
+        <translation>路径需要 %1，本次发布尚未拥有该值。写入信息文件时会解析该路径。</translation>
+    </message>
+    <message>
+        <location line="+4"/>
         <source>The destination is still empty for this post.</source>
         <translation>此贴的目标仍为空。</translation>
     </message>
@@ -5429,10 +5117,6 @@ Save the model now?</source>
         <translation>，压缩文件密码：***</translation>
     </message>
     <message>
-        <source>History: could not flag post %1 as resumable again: %2</source>
-        <translation type="vanished">历史：无法把贴 %1 重新标记为可续传：%2</translation>
-    </message>
-    <message>
         <location line="-342"/>
         <source>History: could not record the outcome of post %1: %2</source>
         <translation>历史：无法记录贴 %1 的结果：%2</translation>
@@ -5513,10 +5197,6 @@ Save the model now?</source>
         <location line="+4"/>
         <source>file: %1, rar name: %2</source>
         <translation>文件: %1, rar文件名: %2</translation>
-    </message>
-    <message>
-        <source>, rar pass: %1</source>
-        <translation type="vanished">, rar密码: %1</translation>
     </message>
     <message>
         <location line="+86"/>
@@ -5616,10 +5296,6 @@ Save the model now?</source>
         <translation>错误: par2不可用...</translation>
     </message>
     <message>
-        <source>History: could not mark post as resuming: %1</source>
-        <translation type="vanished">历史记录：无法将帖子标记为恢复中：%1</translation>
-    </message>
-    <message>
         <location line="-1885"/>
         <source>History: could not create post record: %1</source>
         <translation>历史记录：无法创建帖子记录：%1</translation>
@@ -5640,26 +5316,6 @@ Save the model now?</source>
         <translation>历史记录：无法创建文件记录：%1</translation>
     </message>
     <message>
-        <source>History: could not update article payload: %1</source>
-        <translation type="vanished">历史记录：无法更新文章有效载荷：%1</translation>
-    </message>
-    <message>
-        <source>History: could not mark article posting: %1</source>
-        <translation type="vanished">历史记录：无法将文章标记为发布中：%1</translation>
-    </message>
-    <message>
-        <source>History: could not mark article posted: %1</source>
-        <translation type="vanished">历史记录：无法将文章标记为已发布：%1</translation>
-    </message>
-    <message>
-        <source>History: could not mark article failed: %1</source>
-        <translation type="vanished">历史记录：无法将文章标记为失败：%1</translation>
-    </message>
-    <message>
-        <source>History: could not mark article unknown: %1</source>
-        <translation type="vanished">历史记录：无法将文章标记为未知：%1</translation>
-    </message>
-    <message>
         <location line="+1038"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>无法从历史记录重新生成最终 NZB：%1</translation>
@@ -5668,10 +5324,6 @@ Save the model now?</source>
         <location line="+9"/>
         <source>NZB history warning: %1</source>
         <translation>NZB 历史记录警告：%1</translation>
-    </message>
-    <message>
-        <source>Could not reopen NZB for history regeneration: %1</source>
-        <translation type="vanished">无法重新打开 NZB 进行历史记录重建：%1</translation>
     </message>
     <message>
         <location line="-376"/>
@@ -5685,14 +5337,6 @@ Save the model now?</source>
         <location filename="../hmi/PostingWidget.ui" line="+14"/>
         <source>Form</source>
         <translation>表单</translation>
-    </message>
-    <message>
-        <source>Check the configuration file and define or comment RAR_MAX to activate/deactivate this feature</source>
-        <translation type="vanished">检查配置文件并定义或注释参数RAR_MAX以激活/停用此功能</translation>
-    </message>
-    <message>
-        <source>compress path: </source>
-        <translation type="vanished">压缩路径: </translation>
     </message>
     <message>
         <location line="+29"/>
@@ -5711,10 +5355,6 @@ Save the model now?</source>
         <translation>...</translation>
     </message>
     <message>
-        <source>rar path: </source>
-        <translation type="vanished">rar路径: </translation>
-    </message>
-    <message>
         <location line="-16"/>
         <source>full path of the rar executable</source>
         <translation>rar可执行文件的完整路径</translation>
@@ -5725,21 +5365,9 @@ Save the model now?</source>
         <translation>选择rar可执行文件</translation>
     </message>
     <message>
-        <source>vol size:</source>
-        <translation type="vanished">分卷大小:</translation>
-    </message>
-    <message>
         <location line="+43"/>
         <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
         <translation>将rar压缩文件拆分为多个卷（0为不拆分）</translation>
-    </message>
-    <message>
-        <source>limit rar number</source>
-        <translation type="vanished">限制rar文件数</translation>
-    </message>
-    <message>
-        <source>par2 redundancy (%): </source>
-        <translation type="vanished">par2恢复记录（%）: </translation>
     </message>
     <message>
         <location line="-125"/>
@@ -5752,17 +5380,9 @@ Save the model now?</source>
         <translation>RAR路径：</translation>
     </message>
     <message>
-        <source>Vol Size:</source>
-        <translation type="vanished">卷大小：</translation>
-    </message>
-    <message>
         <location line="+70"/>
         <source>Limit RAR Number</source>
         <translation>限制RAR数量</translation>
-    </message>
-    <message>
-        <source>PAR2 Redundancy (%): </source>
-        <translation type="vanished">PAR2冗余度(%)：</translation>
     </message>
     <message>
         <location line="+39"/>
@@ -5800,10 +5420,6 @@ Save the model now?</source>
         <translation>NZB文件：</translation>
     </message>
     <message>
-        <source>NZB Password:</source>
-        <translation type="vanished">NZB密码：</translation>
-    </message>
-    <message>
         <location line="+71"/>
         <source>Compress</source>
         <translation>压缩</translation>
@@ -5819,17 +5435,9 @@ Save the model now?</source>
         <translation>如果原始文件中存在.nfo文件（在rar/重命名之前），则将其复制到生成的nzb旁边（使用相同的基名）</translation>
     </message>
     <message>
-        <source>Random name length:</source>
-        <translation type="vanished">随机名称长度：</translation>
-    </message>
-    <message>
         <location line="+37"/>
         <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
         <translation>骰子按钮抽取的压缩包名称长度（配置项 LENGTH_NAME）</translation>
-    </message>
-    <message>
-        <source>Random password length:</source>
-        <translation type="vanished">随机密码长度：</translation>
     </message>
     <message>
         <location line="+63"/>
@@ -5840,10 +5448,6 @@ Save the model now?</source>
         <location line="-97"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
         <translation>将NFO复制到nzb文件旁边（如果可用）</translation>
-    </message>
-    <message>
-        <source>nzb file: </source>
-        <translation type="vanished">nzb文件: </translation>
     </message>
     <message>
         <location line="-38"/>
@@ -5866,17 +5470,9 @@ Save the model now?</source>
         <translation>这应该是您要发布的压缩文件的密码</translation>
     </message>
     <message>
-        <source>nzb password:</source>
-        <translation type="vanished">nzb密码:</translation>
-    </message>
-    <message>
         <location line="+13"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>压缩文件中使用的密码，该密码也将添加到nzb文件的标头中</translation>
-    </message>
-    <message>
-        <source>length of the password</source>
-        <translation type="vanished">密码长度</translation>
     </message>
     <message>
         <location line="+26"/>
@@ -5889,17 +5485,9 @@ Save the model now?</source>
         <translation>在发布前使用rar压缩选中的文件</translation>
     </message>
     <message>
-        <source>compress</source>
-        <translation type="vanished">压缩</translation>
-    </message>
-    <message>
         <location line="+10"/>
         <source>archive name (file name obfuscation)</source>
         <translation>压缩包文件名（文件名混淆）</translation>
-    </message>
-    <message>
-        <source>length of the archive name</source>
-        <translation type="vanished">压缩包文件名长度</translation>
     </message>
     <message>
         <location line="+26"/>
@@ -5927,25 +5515,9 @@ Save the model now?</source>
         <translation>生成par2文件（必须使用压缩选项）</translation>
     </message>
     <message>
-        <source>gen par2</source>
-        <translation type="vanished">生成par2</translation>
-    </message>
-    <message>
         <location line="-287"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation>默认情况下，压缩文件和par2文件会在发布成功后删除，但您可以选择保留它们</translation>
-    </message>
-    <message>
-        <source>keep archives</source>
-        <translation type="vanished">保留压缩文件</translation>
-    </message>
-    <message>
-        <source>About ngPost</source>
-        <translation type="vanished">关于ngPost</translation>
-    </message>
-    <message>
-        <source>About</source>
-        <translation type="vanished">关于</translation>
     </message>
     <message>
         <location line="+324"/>
@@ -5957,10 +5529,6 @@ Save the model now?</source>
         <location filename="../hmi/PostingWidget.cpp" line="+842"/>
         <source>Post Files</source>
         <translation>发布文件</translation>
-    </message>
-    <message>
-        <source>Donate</source>
-        <translation type="vanished">捐赠</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="-690"/>
@@ -6061,10 +5629,6 @@ Some Usenet indexes ask for one.</source>
         <translation>已保存默认设置：模板 %1，写入 %2</translation>
     </message>
     <message>
-        <source>Post info model saved as the default: %1</source>
-        <translation type="vanished">信息文件模板已保存为默认：%1</translation>
-    </message>
-    <message>
         <location line="+68"/>
         <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
         <translation>限制压缩卷数目为%1（配置文件中参数RAR_MAX）</translation>
@@ -6121,10 +5685,6 @@ Some Usenet indexes ask for one.</source>
         <location line="-255"/>
         <source>History file status update failed: %1</source>
         <translation>更新历史中的文件状态失败：%1</translation>
-    </message>
-    <message>
-        <source>Could not open file for writing: %1</source>
-        <translation type="vanished">无法以写入方式打开文件：%1</translation>
     </message>
     <message>
         <location line="+273"/>
@@ -6200,14 +5760,6 @@ Some Usenet indexes ask for one.</source>
 <context>
     <name>VpnManager</name>
     <message>
-        <source>VPN: no config file selected</source>
-        <translation type="vanished">VPN：未选择配置文件</translation>
-    </message>
-    <message>
-        <source>VPN: tunnel up on %1 (%2)</source>
-        <translation type="vanished">VPN：隧道已在 %1 (%2) 上建立</translation>
-    </message>
-    <message>
         <location filename="../vpn/VpnManager.cpp" line="+585"/>
         <source>VPN: failed — %1</source>
         <translation>VPN：失败 — %1</translation>
@@ -6223,14 +5775,6 @@ Some Usenet indexes ask for one.</source>
         <translation>VPN：此平台尚不支持该后端</translation>
     </message>
     <message>
-        <source>VPN: install script not found at %1</source>
-        <translation type="vanished">VPN：未找到安装脚本：%1</translation>
-    </message>
-    <message>
-        <source>Running VPN install: pkexec %1 %2</source>
-        <translation type="vanished">正在执行 VPN 安装：pkexec %1 %2</translation>
-    </message>
-    <message>
         <location line="+250"/>
         <source>VPN install: timed out</source>
         <translation>VPN 安装：超时</translation>
@@ -6239,10 +5783,6 @@ Some Usenet indexes ask for one.</source>
         <location line="+28"/>
         <source>VPN: uninstall script not found at %1</source>
         <translation>VPN：未找到卸载脚本：%1</translation>
-    </message>
-    <message>
-        <source>Running VPN uninstall: pkexec %1</source>
-        <translation type="vanished">正在执行 VPN 卸载：pkexec %1</translation>
     </message>
     <message>
         <location line="+17"/>
@@ -6258,10 +5798,6 @@ Some Usenet indexes ask for one.</source>
         <location line="+75"/>
         <source>The VPN helper is not installed. Open the VPN dialog and click Install.</source>
         <translation>VPN 辅助程序未安装。请打开 VPN 对话框并点击安装。</translation>
-    </message>
-    <message>
-        <source>No VPN configuration file is selected.</source>
-        <translation type="vanished">未选择 VPN 配置文件。</translation>
     </message>
     <message>
         <location line="-1077"/>
@@ -6490,14 +6026,6 @@ VPN 未正确配置：%2
         <translation>队列已空闲 %1 秒——正在断开 VPN</translation>
     </message>
     <message>
-        <source>No more jobs need the VPN; scheduling auto-disconnect in %1 s</source>
-        <translation type="vanished">没有更多任务需要 VPN；将在 %1 秒后自动断开</translation>
-    </message>
-    <message>
-        <source>Auto-disconnect grace expired — stopping VPN</source>
-        <translation type="vanished">自动断开宽限期已过 — 正在停止 VPN</translation>
-    </message>
-    <message>
         <location line="+15"/>
         <source>disabled</source>
         <translation>已禁用</translation>
@@ -6655,10 +6183,6 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
         <translation>无法写入 %1：%2</translation>
     </message>
     <message>
-        <source>Could not open %1 for writing.</source>
-        <translation type="vanished">无法以写入方式打开 %1。</translation>
-    </message>
-    <message>
         <location line="+11"/>
         <source>Missing name</source>
         <translation>名称缺失</translation>
@@ -6720,10 +6244,6 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
         <translation>导入失败</translation>
     </message>
     <message>
-        <source>Could not copy %1 to %2.</source>
-        <translation type="vanished">无法把 %1 复制到 %2。</translation>
-    </message>
-    <message>
         <location line="-35"/>
         <location line="+8"/>
         <location line="+61"/>
@@ -6764,49 +6284,9 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
         <translation>安装...</translation>
     </message>
     <message>
-        <source>Install the privileged VPN helper. After this you won&apos;t be prompted for a password on Connect / Disconnect.</source>
-        <translation type="vanished">安装特权 VPN 辅助程序。此后连接/断开时将不再提示密码。</translation>
-    </message>
-    <message>
         <location line="+7"/>
         <source>Uninstall...</source>
         <translation>卸载...</translation>
-    </message>
-    <message>
-        <source>Remove the privileged VPN helper from the system.</source>
-        <translation type="vanished">从系统中删除特权 VPN 辅助程序。</translation>
-    </message>
-    <message>
-        <source>Configuration</source>
-        <translation type="vanished">配置</translation>
-    </message>
-    <message>
-        <source>Backend:</source>
-        <translation type="vanished">后端：</translation>
-    </message>
-    <message>
-        <source>OpenVPN</source>
-        <translation type="vanished">OpenVPN</translation>
-    </message>
-    <message>
-        <source>WireGuard</source>
-        <translation type="vanished">WireGuard</translation>
-    </message>
-    <message>
-        <source>Config file:</source>
-        <translation type="vanished">配置文件：</translation>
-    </message>
-    <message>
-        <source>Browse...</source>
-        <translation type="vanished">浏览...</translation>
-    </message>
-    <message>
-        <source>Auto-connect VPN when a job starts</source>
-        <translation type="vanished">任务开始时自动连接 VPN</translation>
-    </message>
-    <message>
-        <source>When checked, ngPost will bring up the VPN tunnel automatically when any job starts, and disconnect 30 seconds after the queue is empty. Per-server &quot;Use VPN&quot; still controls which connections route through the tunnel.</source>
-        <translation type="vanished">启用时，ngPost 将在任意任务开始时自动建立 VPN 隧道，并在队列清空 30 秒后断开。每个服务器的&quot;使用 VPN&quot;选项仍控制哪些连接经由隧道路由。</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -6877,22 +6357,6 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
         <location line="+18"/>
         <source>&lt;a href=&quot;about:licences&quot;&gt;About licences&lt;/a&gt;</source>
         <translation>&lt;a href=&quot;about:licences&quot;&gt;关于许可证&lt;/a&gt;</translation>
-    </message>
-    <message>
-        <source>OpenVPN config (*.ovpn *.conf);;All files (*)</source>
-        <translation type="vanished">OpenVPN 配置 (*.ovpn *.conf);;所有文件 (*)</translation>
-    </message>
-    <message>
-        <source>WireGuard config (*.conf);;All files (*)</source>
-        <translation type="vanished">WireGuard 配置 (*.conf);;所有文件 (*)</translation>
-    </message>
-    <message>
-        <source>Select VPN config</source>
-        <translation type="vanished">选择 VPN 配置</translation>
-    </message>
-    <message>
-        <source>No config file selected.</source>
-        <translation type="vanished">未选择配置文件。</translation>
     </message>
     <message>
         <location filename="../hmi/VpnSettingsDialog.cpp" line="+79"/>
@@ -6980,14 +6444,6 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
         <location line="+6"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found</source>
         <translation>找不到特权辅助脚本 ngpost-vpn-helper.sh</translation>
-    </message>
-    <message>
-        <source>Launching VPN helper: pkexec %1</source>
-        <translation type="vanished">正在启动 VPN 辅助程序：pkexec %1</translation>
-    </message>
-    <message>
-        <source>Failed to start pkexec/helper</source>
-        <translation type="vanished">pkexec/辅助程序启动失败</translation>
     </message>
     <message>
         <location line="-24"/>

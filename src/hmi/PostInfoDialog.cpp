@@ -301,9 +301,25 @@ void PostInfoDialog::onOutputEdited()
     const QString resolved = PostInfoTemplate::render(
         pattern, data, true, PostInfoTemplate::OnUnknown::Fail, &unknown);
 
+    // On a tab that has not named its nzb yet, __nzbName__ and __nzbDir__ are
+    // still empty, so the default pattern resolves to something like
+    // "\\.info.txt". That is not where the sheet goes, it is a path we cannot
+    // know yet -- say so, the way the model table says "filled in after the
+    // post" for the values it does not have either.
+    const QMap<QString, QString> known = PostInfoTemplate::values(data, true);
+    QStringList                  pending;
+    for (PostInfoTemplate::Token const &token : PostInfoTemplate::tokensIn(pattern)) {
+        if (!token.isMeta() && known.value(token.name).isEmpty())
+            pending << token.raw;
+    }
+
     if (!unknown.isEmpty())
         _outputHint->setText(tr("Unknown variable in the destination: %1")
                                  .arg(unknown.join(QStringLiteral(", "))));
+    else if (!pending.isEmpty())
+        _outputHint->setText(tr("The path needs %1, which this post does not "
+                                "have yet. It is resolved when the sheet is written.")
+                                 .arg(pending.join(QStringLiteral(", "))));
     else if (resolved.trimmed().isEmpty())
         _outputHint->setText(tr("The destination is still empty for this post."));
     else

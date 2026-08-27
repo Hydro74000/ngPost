@@ -3320,6 +3320,25 @@ QString NgPost::_parseConfig(const QString &configPath)
                     QString opt = line.left(equalIdx).trimmed().toLower(),
                             val = line.mid(equalIdx + 1).trimmed();
                     bool ok = false;
+
+                    // Before "[server]" blocks existed, a configuration put its
+                    // single server's keys at the top level. Those keys still
+                    // parse, but no block ever created the object they write
+                    // into -- so a file written that way used to crash here on
+                    // a null pointer. Give them the server they imply.
+                    static const QStringList sTopLevelServerKeys = {
+                        sOptionNames[Opt::HOST],     sOptionNames[Opt::PORT],
+                        sOptionNames[Opt::SSL],      sOptionNames[Opt::ENABLED],
+                        sOptionNames[Opt::NZBCHECK], sOptionNames[Opt::SERVER_USE_VPN].toLower(),
+                        sOptionNames[Opt::USER],     sOptionNames[Opt::PASS],
+                        sOptionNames[Opt::CONNECTION]
+                    };
+                    if (!serverParams && sTopLevelServerKeys.contains(opt))
+                    {
+                        serverParams = new NntpServerParams();
+                        _nntpServers << serverParams;
+                    }
+
                     if (opt == sOptionNames[Opt::THREAD])
                     {
                         int nb = val.toInt(&ok);
