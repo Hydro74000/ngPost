@@ -15,37 +15,37 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_6">
+    <layout class="QHBoxLayout" name="horizontalLayout_9">
      <item>
-      <layout class="QHBoxLayout" name="compressPathLayout_2">
+      <layout class="QHBoxLayout" name="nzbFileLayout">
        <item>
-        <widget class="QLabel" name="compressPathLbl">
+        <widget class="QLabel" name="nzbFileLbl">
          <property name="text">
-          <string>Compress Path: </string>
+          <string>NZB file:</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="compressPathEdit">
+        <widget class="QLineEdit" name="nzbFileEdit">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-           <horstretch>0</horstretch>
+           <horstretch>1</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
          <property name="minimumSize">
           <size>
-           <width>200</width>
+           <width>120</width>
            <height>0</height>
           </size>
          </property>
          <property name="toolTip">
-          <string>temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</string>
+          <string>full path of the nzb file that would be created (check the nzbPath keyword in the config file to set the default directory)</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="compressPathButton">
+        <widget class="QPushButton" name="nzbFileButton">
          <property name="maximumSize">
           <size>
            <width>30</width>
@@ -53,121 +53,34 @@
           </size>
          </property>
          <property name="toolTip">
-          <string>select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</string>
+          <string>select the nzb file absolute file name</string>
          </property>
          <property name="text">
-          <string>...</string>
+          <string> ... </string>
          </property>
         </widget>
        </item>
       </layout>
      </item>
      <item>
-      <spacer name="horizontalSpacer_8">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
+      <widget class="QFrame" name="sepNzbNfo">
+       <property name="frameShape">
+        <enum>QFrame::Shape::VLine</enum>
        </property>
-       <property name="sizeType">
-        <enum>QSizePolicy::Policy::Expanding</enum>
+       <property name="frameShadow">
+        <enum>QFrame::Shadow::Sunken</enum>
        </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
+      </widget>
      </item>
      <item>
-      <layout class="QHBoxLayout" name="rarPathLayout">
-       <item>
-        <widget class="QLabel" name="rarLbl">
-         <property name="text">
-          <string>RAR Path: </string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="rarEdit">
-         <property name="toolTip">
-          <string>full path of the rar executable</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="rarPathButton">
-         <property name="maximumSize">
-          <size>
-           <width>30</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>select rar executable</string>
-         </property>
-         <property name="text">
-          <string>...</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer_11">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
+      <widget class="QCheckBox" name="copyNfoWithNzbCB">
+       <property name="toolTip">
+        <string>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</string>
        </property>
-       <property name="sizeType">
-        <enum>QSizePolicy::Policy::Expanding</enum>
+       <property name="text">
+        <string>Copy NFO alongside the nzb file (if available)</string>
        </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <layout class="QHBoxLayout" name="rarSizeLayout">
-       <item>
-        <widget class="QLabel" name="rarSizeLbl">
-         <property name="text">
-          <string>Vol size (MB):</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="rarSizeEdit">
-         <property name="maximumSize">
-          <size>
-           <width>50</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>to split the rar archive in several volumes (0 to don't split)</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="rarMaxCB">
-         <property name="text">
-          <string>Limit RAR Number</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="keepRarCB">
-         <property name="toolTip">
-          <string>by default archives and par2 files are deleted uppon post success but you can choose to keep them</string>
-         </property>
-         <property name="text">
-          <string>Keep Archives</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
+      </widget>
      </item>
     </layout>
    </item>
@@ -250,76 +163,6 @@
     </layout>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_9">
-     <item>
-      <layout class="QHBoxLayout" name="nzbFileLayout">
-       <item>
-        <widget class="QLabel" name="nzbFileLbl">
-         <property name="text">
-          <string>NZB file:</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="nzbFileEdit">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-           <horstretch>1</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>120</width>
-           <height>0</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>full path of the nzb file that would be created (check the nzbPath keyword in the config file to set the default directory)</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="nzbFileButton">
-         <property name="maximumSize">
-          <size>
-           <width>30</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>select the nzb file absolute file name</string>
-         </property>
-         <property name="text">
-          <string> ... </string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <widget class="QFrame" name="sepNzbNfo">
-       <property name="frameShape">
-        <enum>QFrame::Shape::VLine</enum>
-       </property>
-       <property name="frameShadow">
-        <enum>QFrame::Shadow::Sunken</enum>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="copyNfoWithNzbCB">
-       <property name="toolTip">
-        <string>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</string>
-       </property>
-       <property name="text">
-        <string>Copy NFO alongside the nzb file (if available)</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
     <layout class="QHBoxLayout" name="packingLayout">
      <item>
       <widget class="QCheckBox" name="compressCB">
@@ -327,7 +170,7 @@
         <string>compress the selected files using rar before posting</string>
        </property>
        <property name="text">
-        <string>Compress</string>
+        <string>Compress this post:</string>
        </property>
       </widget>
      </item>
@@ -461,6 +304,26 @@
          <width>70</width>
          <height>16777215</height>
         </size>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="sepKeepRar">
+       <property name="frameShape">
+        <enum>QFrame::Shape::VLine</enum>
+       </property>
+       <property name="frameShadow">
+        <enum>QFrame::Shadow::Sunken</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="keepRarCB">
+       <property name="toolTip">
+        <string>by default archives and par2 files are deleted uppon post success but you can choose to keep them</string>
+       </property>
+       <property name="text">
+        <string>Keep Archives</string>
        </property>
       </widget>
      </item>

@@ -29,108 +29,6 @@ class Ui_AutoPostWidget(object):
         AutoPostWidget.resize(1409, 507)
         self.verticalLayout = QVBoxLayout(AutoPostWidget)
         self.verticalLayout.setObjectName(u"verticalLayout")
-        self.postingParamsLayout = QHBoxLayout()
-        self.postingParamsLayout.setObjectName(u"postingParamsLayout")
-        self.compressPathLayout_2 = QHBoxLayout()
-        self.compressPathLayout_2.setObjectName(u"compressPathLayout_2")
-        self.compressPathLbl = QLabel(AutoPostWidget)
-        self.compressPathLbl.setObjectName(u"compressPathLbl")
-
-        self.compressPathLayout_2.addWidget(self.compressPathLbl)
-
-        self.compressPathEdit = QLineEdit(AutoPostWidget)
-        self.compressPathEdit.setObjectName(u"compressPathEdit")
-        sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.compressPathEdit.sizePolicy().hasHeightForWidth())
-        self.compressPathEdit.setSizePolicy(sizePolicy)
-        self.compressPathEdit.setMinimumSize(QSize(200, 0))
-
-        self.compressPathLayout_2.addWidget(self.compressPathEdit)
-
-        self.compressPathButton = QPushButton(AutoPostWidget)
-        self.compressPathButton.setObjectName(u"compressPathButton")
-        self.compressPathButton.setMaximumSize(QSize(30, 16777215))
-
-        self.compressPathLayout_2.addWidget(self.compressPathButton)
-
-
-        self.postingParamsLayout.addLayout(self.compressPathLayout_2)
-
-        self.horizontalSpacer_8 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-
-        self.postingParamsLayout.addItem(self.horizontalSpacer_8)
-
-        self.rarLayout = QHBoxLayout()
-        self.rarLayout.setObjectName(u"rarLayout")
-        self.rarPathLayout = QHBoxLayout()
-        self.rarPathLayout.setObjectName(u"rarPathLayout")
-        self.rarLbl = QLabel(AutoPostWidget)
-        self.rarLbl.setObjectName(u"rarLbl")
-
-        self.rarPathLayout.addWidget(self.rarLbl)
-
-        self.rarEdit = QLineEdit(AutoPostWidget)
-        self.rarEdit.setObjectName(u"rarEdit")
-
-        self.rarPathLayout.addWidget(self.rarEdit)
-
-        self.rarPathButton = QPushButton(AutoPostWidget)
-        self.rarPathButton.setObjectName(u"rarPathButton")
-        self.rarPathButton.setMaximumSize(QSize(30, 16777215))
-
-        self.rarPathLayout.addWidget(self.rarPathButton)
-
-
-        self.rarLayout.addLayout(self.rarPathLayout)
-
-        self.rarSizeLayout = QHBoxLayout()
-        self.rarSizeLayout.setObjectName(u"rarSizeLayout")
-        self.rarSizeLbl = QLabel(AutoPostWidget)
-        self.rarSizeLbl.setObjectName(u"rarSizeLbl")
-
-        self.rarSizeLayout.addWidget(self.rarSizeLbl)
-
-        self.rarSizeEdit = QLineEdit(AutoPostWidget)
-        self.rarSizeEdit.setObjectName(u"rarSizeEdit")
-        self.rarSizeEdit.setMaximumSize(QSize(50, 16777215))
-
-        self.rarSizeLayout.addWidget(self.rarSizeEdit)
-
-        self.rarMaxCB = QCheckBox(AutoPostWidget)
-        self.rarMaxCB.setObjectName(u"rarMaxCB")
-
-        self.rarSizeLayout.addWidget(self.rarMaxCB)
-
-
-        self.rarLayout.addLayout(self.rarSizeLayout)
-
-
-        self.postingParamsLayout.addLayout(self.rarLayout)
-
-        self.horizontalSpacer_11 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-
-        self.postingParamsLayout.addItem(self.horizontalSpacer_11)
-
-        self.redundancyLayout = QHBoxLayout()
-        self.redundancyLayout.setObjectName(u"redundancyLayout")
-        self.redundancyLbl = QLabel(AutoPostWidget)
-        self.redundancyLbl.setObjectName(u"redundancyLbl")
-
-        self.redundancyLayout.addWidget(self.redundancyLbl)
-
-        self.redundancySB = QSpinBox(AutoPostWidget)
-        self.redundancySB.setObjectName(u"redundancySB")
-
-        self.redundancyLayout.addWidget(self.redundancySB)
-
-
-        self.postingParamsLayout.addLayout(self.redundancyLayout)
-
-
-        self.verticalLayout.addLayout(self.postingParamsLayout)
-
         self.filesList = SignedListWidget(AutoPostWidget)
         self.filesList.setObjectName(u"filesList")
 
@@ -145,6 +43,9 @@ class Ui_AutoPostWidget(object):
 
         self.autoDirEdit = QLineEdit(AutoPostWidget)
         self.autoDirEdit.setObjectName(u"autoDirEdit")
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.autoDirEdit.sizePolicy().hasHeightForWidth())
         self.autoDirEdit.setSizePolicy(sizePolicy)
         self.autoDirEdit.setMinimumSize(QSize(200, 0))
@@ -268,6 +169,12 @@ class Ui_AutoPostWidget(object):
 
         self.optionsLayout.addWidget(self.par2CB)
 
+        self.redundancySB = QSpinBox(AutoPostWidget)
+        self.redundancySB.setObjectName(u"redundancySB")
+        self.redundancySB.setMaximumSize(QSize(70, 16777215))
+
+        self.optionsLayout.addWidget(self.redundancySB)
+
         self.horizontalSpacer_4 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.optionsLayout.addItem(self.horizontalSpacer_4)
@@ -323,31 +230,6 @@ class Ui_AutoPostWidget(object):
 
     def retranslateUi(self, AutoPostWidget):
         AutoPostWidget.setWindowTitle(QCoreApplication.translate("AutoPostWidget", u"Form", None))
-        self.compressPathLbl.setText(QCoreApplication.translate("AutoPostWidget", u"compress path: ", None))
-#if QT_CONFIG(tooltip)
-        self.compressPathEdit.setToolTip(QCoreApplication.translate("AutoPostWidget", u"temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)", None))
-#endif // QT_CONFIG(tooltip)
-#if QT_CONFIG(tooltip)
-        self.compressPathButton.setToolTip(QCoreApplication.translate("AutoPostWidget", u"select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)", None))
-#endif // QT_CONFIG(tooltip)
-        self.compressPathButton.setText(QCoreApplication.translate("AutoPostWidget", u"...", None))
-        self.rarLbl.setText(QCoreApplication.translate("AutoPostWidget", u"rar path: ", None))
-#if QT_CONFIG(tooltip)
-        self.rarEdit.setToolTip(QCoreApplication.translate("AutoPostWidget", u"full path of the rar executable", None))
-#endif // QT_CONFIG(tooltip)
-#if QT_CONFIG(tooltip)
-        self.rarPathButton.setToolTip(QCoreApplication.translate("AutoPostWidget", u"select rar executable", None))
-#endif // QT_CONFIG(tooltip)
-        self.rarPathButton.setText(QCoreApplication.translate("AutoPostWidget", u"...", None))
-        self.rarSizeLbl.setText(QCoreApplication.translate("AutoPostWidget", u"vol size:", None))
-#if QT_CONFIG(tooltip)
-        self.rarSizeEdit.setToolTip(QCoreApplication.translate("AutoPostWidget", u"to split the rar archive in several volumes (0 to don't split)", None))
-#endif // QT_CONFIG(tooltip)
-#if QT_CONFIG(tooltip)
-        self.rarMaxCB.setToolTip(QCoreApplication.translate("AutoPostWidget", u"Check the configuration file and define or comment RAR_MAX to activate/deactivate this feature", None))
-#endif // QT_CONFIG(tooltip)
-        self.rarMaxCB.setText(QCoreApplication.translate("AutoPostWidget", u"limit rar number", None))
-        self.redundancyLbl.setText(QCoreApplication.translate("AutoPostWidget", u"par2 redundancy (%): ", None))
         self.autoDirLbl.setText(QCoreApplication.translate("AutoPostWidget", u"<b>Auto Dir</b> path: ", None))
 #if QT_CONFIG(tooltip)
         self.autoDirEdit.setToolTip(QCoreApplication.translate("AutoPostWidget", u"Auto Dir path", None))

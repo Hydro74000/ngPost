@@ -159,57 +159,6 @@
              </property>
             </spacer>
            </item>
-           <item>
-            <layout class="QHBoxLayout" name="rarPassLayout">
-             <item>
-              <widget class="QCheckBox" name="rarPassCB">
-               <property name="toolTip">
-                <string>Use a Fixed password for all the Posts</string>
-               </property>
-               <property name="text">
-                <string>Archive Password:</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLineEdit" name="rarPassEdit">
-               <property name="enabled">
-                <bool>false</bool>
-               </property>
-               <property name="toolTip">
-                <string>archive password</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QSpinBox" name="rarLengthSB">
-               <property name="toolTip">
-                <string>length of the password</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="genPass">
-               <property name="maximumSize">
-                <size>
-                 <width>24</width>
-                 <height>24</height>
-                </size>
-               </property>
-               <property name="toolTip">
-                <string>generate random password</string>
-               </property>
-               <property name="text">
-                <string/>
-               </property>
-               <property name="icon">
-                <iconset resource="../resources/resources.qrc">
-                 <normaloff>:/icons/genKey.png</normaloff>:/icons/genKey.png</iconset>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
           </layout>
          </item>
          <item>
@@ -370,12 +319,12 @@
             </spacer>
            </item>
            <item>
-            <widget class="QCheckBox" name="autoCompressCB">
+            <widget class="QCheckBox" name="keepNfoExtensionCB">
              <property name="toolTip">
-              <string>compress QuickPosts with a random archive name and password and generate the par2</string>
+              <string>Keep .nfo file(s) visible on the post: the nfo stays inside the rar AND is posted alongside (named like the archive)</string>
              </property>
              <property name="text">
-              <string>Auto Compress</string>
+              <string>keep nfo visible</string>
              </property>
             </widget>
            </item>
@@ -394,12 +343,23 @@
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_keepNfo">
            <item>
-            <widget class="QCheckBox" name="keepNfoExtensionCB">
+            <widget class="QCheckBox" name="autoCompressCB">
              <property name="toolTip">
-              <string>Keep .nfo file(s) visible on the post: the nfo stays inside the rar AND is posted alongside (named like the archive)</string>
+              <string>Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.
+Unlike the per post box, this choice is saved.</string>
              </property>
              <property name="text">
-              <string>keep nfo visible</string>
+              <string>Enable compression by default on posts</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="compressionSettingsBtn">
+             <property name="toolTip">
+              <string>Where the archives are built, with which rar, in which volume size, and under which default password</string>
+             </property>
+             <property name="text">
+              <string>Compression Settings</string>
              </property>
             </widget>
            </item>

@@ -372,7 +372,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _folderMonitor(nullptr), _monitorThread(nullptr),
     _delAuto(false),
     _monitor_nzb_folders(false), _monitorExtensions(), _monitorIgnoreDir(false), _monitorSecDelayScan(1),
-    _keepRar(false), _packAuto(false), _packAutoKeywords(),
+    _keepRar(false), _keepRarDefault(false), _packAuto(false), _packAutoKeywords(),
     _lang("en"), _translators(),
     _netMgr(), _updateChecker(nullptr), _urlNzbUpload(nullptr), _urlNzbUploadStr(),
     _doShutdownWhenDone(false), _shutdownProc(nullptr),
@@ -3754,7 +3754,10 @@ QString NgPost::_parseConfig(const QString &configPath)
                     {
                         val = val.toLower();
                         if (val == "true" || val == "on" || val == "1")
-                            _keepRar = true;
+                        {
+                            _keepRar        = true;
+                            _keepRarDefault = true;
+                        }
                     }
                     else if (opt == sOptionNames[Opt::AUTO_COMPRESS])
                     {
@@ -4730,7 +4733,7 @@ void NgPost::saveConfig()
                << (_useRarMax ? "" : "#") << "RAR_MAX = " << _rarMax << "\n"
                << "\n"
                << tr("##  keep rar folder after posting (otherwise it is automatically deleted uppon successful post)") << "\n"
-               << (_keepRar  ? "" : "#") << "KEEP_RAR = true\n"
+               << (_keepRarDefault ? "" : "#") << "KEEP_RAR = true\n"
                << "\n"
                << "## " << tr("Remove root (parent) folder when compressing Folders using RAR") << "\n"
                << (_rarNoRootFolder  ? "" : "#") << "RAR_NO_ROOT_FOLDER = true\n"
