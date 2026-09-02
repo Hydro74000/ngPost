@@ -1,6 +1,6 @@
 <img align="left" width="80" height="80" src="https://raw.githubusercontent.com/Hydro74000/ngPost/master/src/resources/icons/ngPost.png" alt="ngPost">
 
-# ngPost v5.5
+# ngPost v5.5.1
 
 ngPost est un posteur pour Usenet en ligne de commande ou via une interface graphique développé en C++17/Qt6.<br/>
 Il a été conçu pour être le plus rapide possible et offrir toutes les fonctionnalités utiles pour poster facilement et en toute sécurité.<br/>
@@ -272,7 +272,7 @@ Une alternative pour compiler est [d'installer QT](https://www.qt.io/download) e
 
 Les sections ci-dessous sont conservées pour les utilisateurs de la version
 4.16. Leurs liens, dépendances et ancien chemin `~/.ngPost` ne concernent pas
-ngPost 5.5 ; utilisez les paquets et les chemins indiqués au début de ce fichier.
+ngPost 5.5.1 ; utilisez les paquets et les chemins indiqués au début de ce fichier.
 
 #### version Linux portable: AppImage compilée avec Qt v5.12.6, GLIBC 2.24
 - téléchargez [ngPost_v4.16-x86_64.AppImage](https://github.com/Hydro74000/ngPost/releases/download/v4.16/ngPost_v4.16-x86_64.AppImage)

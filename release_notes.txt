@@ -15,6 +15,95 @@ TODO: include ParPar instead of par2cmdline?
 TODO: auto RAR size and par2 parameters depending on the inputs size?
 
 ####################################################
+###       Release: ngPost v5.5.1                 ###
+###       date:    2026/09/02                    ###
+####################################################
+
+ngPost v5.5.1 is a maintenance and usability release focused on streamlining the
+posting interface, centralising archive compression settings, providing contextual
+guidance for dependencies, and updating translations across all supported languages.
+
+Major improvements and fixes:
+
+- Dedicated Compression Settings Dialog:
+  * Archive compression options (RAR vs 7-Zip selection, binary executable paths,
+    volume split size / RAR max limit, default archive retention policy, fixed
+    archive password) are now centralized in a dedicated modal dialog accessible
+    via the Options menu or directly from posting tabs.
+  * Cleans up both Quick Post and Auto Post tabs by removing cluttered inline
+    technical configuration fields.
+  * Disentangles the configured global default for preserving archives (KEEP_RAR)
+    from per-post tab overrides, preventing a one-off post setting from silently
+    overwriting the permanent configuration on disk.
+
+- Refactored Posting Tab Layout:
+  * Streamlined posting tab controls into a clean, intuitive two-row layout.
+  * Unified packaging and compression options with immediate access to the
+    Compression Settings dialog.
+
+- Contextual Dependency Tooltips:
+  * Greyed-out (disabled) checkboxes and fields now display explicit contextual
+    tooltips explaining why they are disabled and which prerequisite option must
+    be enabled first (e.g. explaining that compression must be active to keep
+    archive files).
+  * Prerequisite tooltips are dynamically updated and properly preserved across
+    on-the-fly language changes.
+
+- Translations:
+  * Full translation updates and refreshed binary catalogs (.qm) across all
+    seven supported languages: German (de), English (en), Spanish (es),
+    French (fr), Dutch (nl), Portuguese (pt), and Chinese (zh).
+
+- Quality Assurance:
+  * Added extensive GUI test coverage in tst_MainWindow (+464 lines) testing the
+    dialog lifecycle, control dependency synchronization, configuration
+    persistence, and translation resilience.
+
+====================================================
+Notes de version (Français) :
+
+ngPost v5.5.1 est une version de maintenance et d'ergonomie qui simplifie
+l'interface de post, centralise les réglages de compression d'archives,
+ajoute des infobulles contextuelles pour les options dépendantes et met à
+jour l'ensemble des traductions.
+
+Principaux changements et améliorations :
+
+- Boîte de dialogue dédiée aux réglages de compression :
+  * Les options de compression d'archives (choix entre RAR et 7-Zip, chemins des
+    exécutables, taille des volumes / limite RAR max, conservation des archives,
+    mot de passe fixe) sont désormais regroupées dans une boîte de dialogue
+    dédiée « Paramètres de compression » (accessible via le menu Options ou
+    depuis les onglets de post).
+  * Allège considérablement les onglets de post (« Post rapide » et « Auto-post »)
+    en éliminant les champs de configuration encombrants.
+  * Sépare proprement la valeur par défaut configurée (KEEP_RAR) du choix
+    spécifique fait sur un post donné, évitant qu'un réglage ponctuel n'écrase la
+    configuration globale.
+
+- Réorganisation de la disposition des onglets de post :
+  * Nouvelle disposition claire et aérée sur deux lignes logiques.
+  * Simplification visuelle des options d'empaquetage et de compression.
+
+- Infobulles d'aide sur les contrôles dépendants :
+  * Les cases à cocher et champs grisés (désactivés) affichent désormais une
+    infobulle explicative indiquant clairement quelle option parente doit être
+    activée au préalable (par exemple, pourquoi la conservation des archives
+    nécessite d'activer la compression).
+  * Les infobulles d'explication sont mises à jour dynamiquement lors des
+    changements de langue en cours d'utilisation.
+
+- Traductions complètes :
+  * Mises à jour complètes des catalogues de traduction dans les 7 langues
+    supportées : Allemand (de), Anglais (en), Espagnol (es), Français (fr),
+    Néerlandais (nl), Portugais (pt) et Chinois (zh).
+
+- Tests et assurance qualité :
+  * Ajout d'une suite complète de tests d'interface dans tst_MainWindow
+    validant le cycle de vie du dialogue de compression, la persistance des
+    réglages et la cohérence des infobulles contextuelles.
+
+####################################################
 ###       Release: ngPost v5.5                   ###
 ###       date:    2026/08/27                    ###
 ####################################################
