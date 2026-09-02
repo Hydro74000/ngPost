@@ -73,6 +73,7 @@ class NgPost : public QObject, public CmdOrGuiApp
     friend class MainWindow; //!< so it can access all parameters
     friend class PostingWidget;
     friend class AutoPostWidget;
+    friend class CompressionSettingsDialog;
     friend class PostingJob;
     friend class UpdateChecker;
 
@@ -327,7 +328,10 @@ private:
     bool _monitorIgnoreDir;
     ushort _monitorSecDelayScan;
 
-    bool _keepRar;
+    bool _keepRar;        //!< what THIS post does, refreshed from its tab before each job
+    //! What a new tab starts with, and what KEEP_RAR holds on disk. Kept apart
+    //! from _keepRar so that a per post choice never rewrites the default.
+    bool _keepRarDefault;
     bool _packAuto;
     QStringList _packAutoKeywords;
 

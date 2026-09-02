@@ -21,6 +21,7 @@
 #include "PostingWidget.h"
 #include "ui_PostingWidget.h"
 #include "CheckBoxCenterWidget.h"
+#include "DependentControl.h"
 #include "PostInfoDialog.h"
 #include "MainWindow.h"
 #include "NgPost.h"
@@ -255,9 +256,19 @@ void PostingWidget::postFiles(bool updateMainParams)
 
 void PostingWidget::onNzbPassToggled(bool checked)
 {
-    _ui->nzbPassEdit->setEnabled(checked);
-    _ui->passLengthSB->setEnabled(checked);
-    _ui->genPass->setEnabled(checked);
+    // Two switches command these: the password box itself, and the compression
+    // of this post above it. The greyed tooltip names whichever is missing.
+    bool const compress = _ui->compressCB->isChecked();
+    bool const on       = checked && compress;
+    QString const needs = compress ? tr("requires: %1").arg(_ui->nzbPassCB->text())
+                                   : tr("requires: %1").arg(_ui->compressCB->text());
+
+    setDependentEnabled(_ui->nzbPassEdit, on,
+                        tr("password used in your archive that would also be added in the header of the nzb file"),
+                        needs);
+    setDependentEnabled(_ui->passLengthSB, on,
+                        tr("length of the password drawn by the dice button (config LENGTH_PASS)"), needs);
+    setDependentEnabled(_ui->genPass, on, tr("generate random password"), needs);
 }
 
 void PostingWidget::onGenNzbPassword()
@@ -312,43 +323,48 @@ void PostingWidget::onClearFilesClicked()
 
 void PostingWidget::onCompressCB(bool checked)
 {
-    _ui->compressNameEdit->setEnabled(checked);
-    _ui->nameLengthSB->setEnabled(checked);
-    _ui->genCompressName->setEnabled(checked);
-    _ui->keepRarCB->setEnabled(checked);
-    // The volume size only means something when ngPost is the one making the
-    // archive. It used to sit on another row, far from this box, and stayed
-    // active with nothing to act on.
-    _ui->rarSizeLbl->setEnabled(checked);
-    _ui->rarSizeEdit->setEnabled(checked);
-    _ui->rarMaxCB->setEnabled(checked);
-    // The password is deliberately NOT greyed here: posting archives you
-    // encrypted yourself, and announcing their password in the nzb, is a
-    // legitimate use that does not need ngPost to compress anything.
+    // Everything here only means something while ngPost is the one building the
+    // archive, so it follows the box. Each greyed control now says what it is
+    // waiting for: a greyed box with no explanation was reported as a broken one.
+    QString const needsCompress = tr("requires: %1").arg(_ui->compressCB->text());
+
+    setDependentEnabled(_ui->compressNameEdit, checked,
+                        tr("archive name (file name obfuscation)"), needsCompress);
+    setDependentEnabled(_ui->nameLengthSB, checked,
+                        tr("length of the archive name drawn by the dice button (config LENGTH_NAME)"),
+                        needsCompress);
+    setDependentEnabled(_ui->genCompressName, checked,
+                        tr("generate random archive name"), needsCompress);
+    setDependentEnabled(_ui->keepRarCB, checked,
+                        tr("by default archives and par2 files are deleted uppon post success but you can choose to keep them"),
+                        needsCompress);
+    setDependentEnabled(_ui->nzbPassCB, checked,
+                        tr("This should be the password of the archive you're posting"), needsCompress);
+    setDependentEnabled(_ui->par2CB, checked,
+                        tr("generate the par2 (the compress option must be selected)"), needsCompress);
+
+    // The password field and the redundancy have a switch of their own on top
+    // of this one, so they answer to both.
+    onNzbPassToggled(_ui->nzbPassCB->isChecked());
+    onPar2CB(_ui->par2CB->isChecked());
 }
 
 void PostingWidget::onPar2CB(bool checked)
 {
-    // Same rule: the redundancy percentage used to live on a row of its own,
-    // enabled even with PAR2 off.
-    _ui->redundancySB->setEnabled(checked);
+    // Same rule: the redundancy percentage answers to PAR2, which itself
+    // answers to the compression of this post.
+    bool const compress = _ui->compressCB->isChecked();
+    QString const needs = compress ? tr("requires: %1").arg(_ui->par2CB->text())
+                                   : tr("requires: %1").arg(_ui->compressCB->text());
+
+    setDependentEnabled(_ui->redundancySB, checked && compress,
+                        tr("Using PAR2_ARGS from config file: %1").arg(_ngPost->_par2Args),
+                        needs);
 }
 
 void PostingWidget::onGenCompressName()
 {
     _ui->compressNameEdit->setText(_ngPost->randomPass(static_cast<uint>(_ui->nameLengthSB->value())));
-}
-
-void PostingWidget::onCompressPathClicked()
-{
-    QString path = QFileDialog::getExistingDirectory(
-                this,
-                tr("Select a Folder"),
-                _ui->compressPathEdit->text(),
-                QFileDialog::ShowDirsOnly);
-
-    if (!path.isEmpty())
-        _ui->compressPathEdit->setText(path);
 }
 
 void PostingWidget::onNzbFileClicked()
@@ -362,24 +378,6 @@ void PostingWidget::onNzbFileClicked()
 
     if (!path.isEmpty())
         _ui->nzbFileEdit->setText(path);
-}
-
-void PostingWidget::onRarPathClicked()
-{
-    QString path = QFileDialog::getOpenFileName(
-                this,
-                tr("Select rar executable"),
-                QFileInfo(_ngPost->_rarPath).absolutePath()
-                );
-
-    if (!path.isEmpty())
-    {
-        QFileInfo fi(path);
-        if (fi.isFile() && fi.isExecutable())
-            _ui->rarEdit->setText(path);
-        else
-            _ngPost->error(tr("the selected file is not executable..."));
-    }
 }
 
 void PostingWidget::handleKeyEvent(QKeyEvent *keyEvent)
@@ -462,26 +460,16 @@ void PostingWidget::_buildFilesList(QFileInfoList &files, bool &hasFolder)
 
 void PostingWidget::init()
 {
-    _ui->rarMaxCB->setChecked(_ngPost->_useRarMax);
-    _ui->rarMaxCB->setEnabled(true);
-
     _ui->nzbPassCB->setChecked(false);
     onNzbPassToggled(false);
 
-    _ui->compressPathEdit->setText(_ngPost->_tmpPath);
-    _ui->rarEdit->setText(_ngPost->_rarPath);
-
-    _ui->rarSizeEdit->setText(QString::number(_ngPost->_rarSize));
-    _ui->rarSizeEdit->setValidator(new QIntValidator(1, 1000000, _ui->rarSizeEdit));
-
-    _ui->keepRarCB->setChecked(_ngPost->_keepRar);
+    _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
 
     _ui->redundancySB->setRange(0, 100);
     _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
     // The suffix travels inside the spin box, so the number stops being an
     // unlabelled one without costing a widget and its layout spacing.
     _ui->redundancySB->setSuffix(QStringLiteral(" %"));
-    _ui->redundancySB->setEnabled(_ui->par2CB->isChecked());
 
     if (!_ngPost->_rarPassFixed.isEmpty())
     {
@@ -506,14 +494,11 @@ void PostingWidget::init()
     connect(_ui->compressCB,        &QAbstractButton::toggled, this, &PostingWidget::onCompressCB);
     connect(_ui->genCompressName,   &QAbstractButton::clicked, this, &PostingWidget::onGenCompressName);
 
-
-    connect(_ui->compressPathButton,&QAbstractButton::clicked, this, &PostingWidget::onCompressPathClicked);
-    connect(_ui->rarPathButton,     &QAbstractButton::clicked, this, &PostingWidget::onRarPathClicked);
-
     connect(_ui->nzbFileButton,     &QAbstractButton::clicked, this, &PostingWidget::onNzbFileClicked);
 
 
     onCompressCB(_ngPost->_doCompress);
+    onPar2CB(_ui->par2CB->isChecked());
     if (_ngPost->_doCompress)
         _ui->compressCB->setChecked(true);
     if (_ngPost->_genName)
@@ -525,15 +510,13 @@ void PostingWidget::init()
     }
     if (_ngPost->_doPar2)
         _ui->par2CB->setChecked(true);
-    if (_ngPost->_keepRar)
-        _ui->keepRarCB->setChecked(true);
 
     QString fixedPass = _hmi->fixedArchivePassword();
     if (!fixedPass.isEmpty())
         _ui->nzbPassEdit->setText(fixedPass);
 }
 
-void PostingWidget::genNameAndPassword(bool genName, bool genPass, bool doPar2, bool useRarMax)
+void PostingWidget::genNameAndPassword(bool genName, bool genPass, bool doPar2)
 {
     _ui->compressCB->setChecked(_ngPost->_doCompress);
     if (genName)
@@ -543,12 +526,10 @@ void PostingWidget::genNameAndPassword(bool genName, bool genPass, bool doPar2, 
         _ui->nzbPassCB->setChecked(true);        
         onGenNzbPassword();
     }
-    _ui->rarMaxCB->setChecked(useRarMax);
-
     if (doPar2)
         _ui->par2CB->setChecked(true);
 
-    _ui->keepRarCB->setChecked(_ngPost->_keepRar);
+    _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
 }
 
 
@@ -563,10 +544,11 @@ void PostingWidget::udatePostingParams()
         _ngPost->setNzbName(nzb);
     }
 
-    // fetch compression settings
-    _ngPost->_tmpPath    = _ui->compressPathEdit->text();
+    // fetch compression settings. The compression paths and the volume size are
+    // NOT read here any more: they are configuration, they live in the
+    // Compression settings dialog, and every tab used to overwrite the same
+    // NgPost members with its own copy so the last active tab silently won.
     _ngPost->_doCompress = _ui->compressCB->isChecked();
-    _ngPost->_rarPath    = _ui->rarEdit->text();
     _ngPost->_rarName    = _ui->compressNameEdit->text();
     if (_ui->nzbPassCB->isChecked())
         _ngPost->_rarPass = _ui->nzbPassEdit->text().toLocal8Bit();
@@ -574,17 +556,6 @@ void PostingWidget::udatePostingParams()
         _ngPost->_rarPass = QString();
     _ngPost->_lengthName = static_cast<uint>(_ui->nameLengthSB->value());
     _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
-    uint val = 0;
-    bool ok  = true;
-    _ngPost->_rarSize = 0;
-    if (!_ui->rarSizeEdit->text().isEmpty())
-    {
-        val = _ui->rarSizeEdit->text().toUInt(&ok);
-        if (ok)
-            _ngPost->_rarSize = val;
-    }
-    _ngPost->_useRarMax = _ui->rarMaxCB->isChecked();
-
     // fetch par2 settings
     _ngPost->_doPar2  = _ui->par2CB->isChecked();
     _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
@@ -759,8 +730,12 @@ void PostingWidget::retranslate()
     _ui->retranslateUi(this);
     // code built widgets are not touched by retranslateUi()
     retranslatePostInfoTexts();
-    _ui->rarMaxCB->setToolTip(tr("limit the number of archive volume to %1 (cf config RAR_MAX)").arg(_ngPost->_rarMax));
-    _ui->redundancySB->setToolTip(tr("Using PAR2_ARGS from config file: %1").arg(_ngPost->_par2Args));
+    // The tooltips of the dependent controls carry both their help text and,
+    // while they are greyed, what they are waiting for. retranslateUi() has just
+    // reset them to the plain .ui text, so let the handlers rebuild both halves
+    // in the new language instead of setting them here and losing the state.
+    onCompressCB(_ui->compressCB->isChecked());
+    onPar2CB(_ui->par2CB->isChecked());
     _ui->filesList->setToolTip(QString("%1<ul><li>%2</li><li>%3</li><li>%4</li></ul>%5").arg(
                                    tr("You can add files or folder by:")).arg(
                                    tr("Drag & Drop files/folders")).arg(

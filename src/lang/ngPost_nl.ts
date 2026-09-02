@@ -4,7 +4,7 @@
 <context>
     <name>AutoPostWidget</name>
     <message>
-        <location filename="../hmi/AutoPostWidget.ui" line="+294"/>
+        <location filename="../hmi/AutoPostWidget.ui" line="+126"/>
         <source>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</source>
         <translation>Wanneer een geplaatst bestand een naastgelegen .nfo-bestand heeft (zelfde naam, andere extensie), dat .nfo in dezelfde post opnemen (de losse .nfo wordt niet apart geplaatst)</translation>
     </message>
@@ -14,76 +14,18 @@
         <translation>nfo samen met andere bestanden plaatsen</translation>
     </message>
     <message>
-        <location line="-283"/>
+        <location line="-115"/>
         <source>Form</source>
         <translatorcomment>Controleren</translatorcomment>
         <translation>Form</translation>
     </message>
     <message>
-        <location line="+10"/>
-        <source>compress path: </source>
-        <translation>comprimeer pad: </translation>
-    </message>
-    <message>
-        <location line="+19"/>
-        <source>temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>tijdelijke map waarin de archieven en par2 worden gemaakt (deze wordt opgeschoond zodra de post is voltooid)</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>selecteer de tijdelijke map waar de rar en par2 worden gemaakt (deze wordt opgeschoond zodra de post is voltooid)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <location line="+52"/>
-        <location line="+117"/>
+        <location line="+46"/>
         <source>...</source>
         <translation>...</translation>
     </message>
     <message>
-        <location line="-140"/>
-        <source>rar path: </source>
-        <translation>rar pad: </translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>full path of the rar executable</source>
-        <translation>volledig pad van het rar programma (exe)</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select rar executable</source>
-        <translation>selecteer rar programma</translation>
-    </message>
-    <message>
-        <location line="+14"/>
-        <source>vol size:</source>
-        <translatorcomment>Check</translatorcomment>
-        <translation>vol size:</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
-        <translation>om het rar-archief in verschillende delen te splitsen (0 om niet te splitsen)</translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>Check the configuration file and define or comment RAR_MAX to activate/deactivate this feature</source>
-        <translation>Controleer het configuratie bestand en definieer of becommentarieer RAR_MAX om deze functie te activeren / deactiveren</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>limit rar number</source>
-        <translation>limiet aantal rar bestanden</translation>
-    </message>
-    <message>
-        <location line="+29"/>
-        <source>par2 redundancy (%): </source>
-        <translation>par2 redundantie (%): </translation>
-    </message>
-    <message>
-        <location line="+19"/>
+        <location line="-35"/>
         <source>&lt;b&gt;Auto Dir&lt;/b&gt; path: </source>
         <translation>&lt;b&gt;Auto Dir&lt;/b&gt; pad: </translation>
     </message>
@@ -149,6 +91,7 @@
     </message>
     <message>
         <location line="+12"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+311"/>
         <source>generate a random name for the archive</source>
         <translation>genereer een willekeurige naam voor het archief</translation>
     </message>
@@ -159,11 +102,13 @@
     </message>
     <message>
         <location line="+7"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>length of the random archive name</source>
         <translation>lengte van de willekeurige archiefnaam</translation>
     </message>
     <message>
         <location line="+14"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>generate a random password for the archive or use the fixed one</source>
         <translation>genereer een willekeurig wachtwoord voor het archief of gebruik een vast wachtwoord</translation>
     </message>
@@ -174,6 +119,7 @@
     </message>
     <message>
         <location line="+7"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>length of the random archive password</source>
         <translation>lengte van het willekeurige wachtwoord</translation>
     </message>
@@ -185,6 +131,7 @@
     </message>
     <message>
         <location line="-29"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation>standaard worden archieven en par2-bestanden verwijderd na het posten, maar je kunt ervoor kiezen om ze te behouden</translation>
     </message>
@@ -194,7 +141,7 @@
         <translation>Bewaar archieven</translation>
     </message>
     <message>
-        <location line="+46"/>
+        <location line="+56"/>
         <source>delete files/folders once they have been successfully posted (careful with that it&apos;s irreversible!!!)</source>
         <translation>verwijder bestanden / mappen zodra ze met succes zijn gepost (let op, dit is onomkeerbaar !!!)</translation>
     </message>
@@ -205,7 +152,7 @@
     </message>
     <message>
         <location line="+24"/>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+244"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="-111"/>
         <source>Monitor Folder</source>
         <translation>Monitor Map</translation>
     </message>
@@ -230,7 +177,7 @@
         <translation>Genereer Posts</translation>
     </message>
     <message>
-        <location filename="../hmi/AutoPostWidget.cpp" line="-123"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="-92"/>
         <source>You can&apos;t use auto posting without compression on folders... (%1)</source>
         <translation>U kunt automatisch posten niet gebruiken zonder compressie op mappen... (%1)</translation>
     </message>
@@ -249,23 +196,12 @@ Druk op de Scan-knop en verwijder wat je niet wilt posten;)
 (Om bestanden te verwijderen, selecteer in de lijst en druk op DEL of BackSpace)</translation>
     </message>
     <message>
-        <location line="+44"/>
-        <location line="+30"/>
+        <location line="+43"/>
         <source>Select a Folder</source>
         <translation>Selecteer een Map</translation>
     </message>
     <message>
-        <location line="-18"/>
-        <source>Select rar executable</source>
-        <translation>Selecteer rar programma</translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>the selected file is not executable...</source>
-        <translation>het geselecteerde bestand is niet uitvoerbaar ...</translation>
-    </message>
-    <message>
-        <location line="+28"/>
+        <location line="+20"/>
         <source>No auto directory selected...</source>
         <translation>Geen automatische directory geselecteerd ...</translation>
     </message>
@@ -314,17 +250,17 @@ Het is mogelijk in de opdrachtregel als MONITOR_IGNORE_DIR is ingeschakeld in uw
     </message>
     <message>
         <location line="+3"/>
-        <location line="+69"/>
+        <location line="+72"/>
         <source>Monitoring %1</source>
         <translation>Monitoring %1</translation>
     </message>
     <message>
-        <location line="-67"/>
+        <location line="-70"/>
         <source>Stop Monitoring</source>
         <translation>Stop Monitoring</translation>
     </message>
     <message>
-        <location line="+49"/>
+        <location line="+52"/>
         <source>Deleting files/folders once posted</source>
         <translation>Bestanden / mappen verwijderen zodra ze zijn gepost</translation>
     </message>
@@ -343,22 +279,23 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>Selecteer een te monitorern map om toe te voegen</translation>
     </message>
     <message>
-        <location line="+57"/>
+        <location line="+18"/>
+        <location line="+16"/>
+        <source>requires: %1</source>
+        <translation>vereist: %1</translation>
+    </message>
+    <message>
+        <location line="+42"/>
         <source>Select one or more files</source>
         <translation>Selecteer 1 of meer bestanden</translation>
     </message>
     <message>
-        <location line="+88"/>
-        <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
-        <translation>beperk het aantal archiefvolumes tot%1 (zie configuratie RAR_MAX)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="-43"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>PAR2_ARGS gebruiken vanuit configuratiebestand:%1</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+126"/>
         <source>You can use the &lt;b&gt;Monitor Mode&lt;/b&gt;</source>
         <translation>Je kunt de &lt;b&gt; Monitor modus &lt;/b&gt; gebruiken</translation>
     </message>
@@ -416,6 +353,134 @@ Bestanden worden definitief verwijderd...</translation>
         <location line="+21"/>
         <source>Post info defaults saved: model %1, written to %2</source>
         <translation>Standaardwaarden opgeslagen: model %1, geschreven naar %2</translation>
+    </message>
+</context>
+<context>
+    <name>CompressionSettingsDialog</name>
+    <message>
+        <location filename="../hmi/CompressionSettingsDialog.ui" line="+14"/>
+        <source>Compression settings</source>
+        <translation>Compressie-instellingen</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Archives</source>
+        <translation>Archieven</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Compress Path: </source>
+        <translation>Compressie pad: </translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
+        <translation>tijdelijke map waarin de archieven en par2 worden gemaakt (deze wordt opgeschoond zodra de post is voltooid)</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
+        <translation>selecteer de tijdelijke map waar de rar en par2 worden gemaakt (deze wordt opgeschoond zodra de post is voltooid)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+34"/>
+        <source>...</source>
+        <translation>...</translation>
+    </message>
+    <message>
+        <location line="-25"/>
+        <source>RAR Path: </source>
+        <translation>RAR pad: </translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>full path of the rar executable</source>
+        <translation>volledig pad van het rar programma (exe)</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>select rar executable</source>
+        <translation>selecteer rar programma</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Vol size (MB):</source>
+        <translation>Volumegrootte (MB):</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
+        <translation>om het rar-archief in verschillende delen te splitsen (0 om niet te splitsen)</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>cap the number of volumes: ngPost raises the volume size rather than making more of them (config RAR_MAX)</source>
+        <translation>het aantal delen begrenzen: ngPost verhoogt de volumegrootte in plaats van meer delen te maken (config RAR_MAX)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Limit RAR Number</source>
+        <translation>Beperk aantal RAR</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>Archives and par2 are deleted once the post succeeds.
+Ticked, they are left in the compression path folder instead.
+This is the default every new post starts with; each post can still decide otherwise (config KEEP_RAR).</source>
+        <translation>Archieven en par2 worden verwijderd zodra de post is geslaagd.
+Aangevinkt blijven ze in de map van het compressiepad staan.
+Dit is de standaard waarmee elke nieuwe post begint; elke post kan alsnog anders kiezen (config KEEP_RAR).</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Keep the archives on disk</source>
+        <translation>De archieven op schijf bewaren</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Archive password</source>
+        <translation>Archiefwachtwoord</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>use the same password for every post (config RAR_PASS)</source>
+        <translation>gebruik hetzelfde wachtwoord voor elke post (config RAR_PASS)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Enable the default archive password</source>
+        <translation>Standaard archiefwachtwoord inschakelen</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>password used for all the archives (it is also written in the header of the nzb file)</source>
+        <translation>wachtwoord voor alle archieven (het wordt ook in de header van het nzb-bestand geschreven)</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
+        <translation>lengte van het wachtwoord dat de dobbelsteenknop trekt (configuratie LENGTH_PASS)</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>generate random password</source>
+        <translation>genereer willekeurige wachtwoord</translation>
+    </message>
+    <message>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+95"/>
+        <source>Select a Folder</source>
+        <translation>Selecteer een Map</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Select rar executable</source>
+        <translation>Selecteer rar programma</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>the selected file is not executable...</source>
+        <translation>het geselecteerde bestand is niet uitvoerbaar ...</translation>
     </message>
 </context>
 <context>
@@ -486,12 +551,7 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>Nieuwe willekeurige e-mail voor elke post</translation>
     </message>
     <message>
-        <location line="+25"/>
-        <source>Archive Password:</source>
-        <translation>Archief wachtwoord:</translation>
-    </message>
-    <message>
-        <location line="+59"/>
+        <location line="+33"/>
         <source>News Groups:</source>
         <translation>Nieuwsgroepen:</translation>
     </message>
@@ -516,7 +576,19 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>Bestandsnaam verduistering</translation>
     </message>
     <message>
-        <location line="+67"/>
+        <location line="+44"/>
+        <source>Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.
+Unlike the per post box, this choice is saved.</source>
+        <translation>Bereidt elke post voor met de inpakopties van de PACK-configuratieregel: compressie, een willekeurige archiefnaam, een willekeurig wachtwoord en de par2.
+Anders dan het vakje per post wordt deze keuze bewaard.</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Compression Settings</source>
+        <translation>Compressie-instellingen</translation>
+    </message>
+    <message>
+        <location line="+20"/>
         <source>Check once a day for a new ngPost release on GitHub</source>
         <translation>Eenmaal per dag controleren op een nieuwe ngPost-versie op GitHub</translation>
     </message>
@@ -526,7 +598,7 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>Controleren op updates</translation>
     </message>
     <message>
-        <location line="-26"/>
+        <location line="-61"/>
         <source>Keep .nfo file(s) visible on the post: the nfo stays inside the rar AND is posted alongside (named like the archive)</source>
         <translation>Houd .nfo bestand(en) zichtbaar in de post: het nfo blijft in het rar EN wordt ernaast gepost (genoemd als het archief)</translation>
     </message>
@@ -536,7 +608,7 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>houd nfo zichtbaar</translation>
     </message>
     <message>
-        <location line="+30"/>
+        <location line="+65"/>
         <source>Tunnel ngPost connections through OpenVPN or WireGuard (the rest of the system is unaffected)</source>
         <translation>ngPost-verbindingen tunnelen via OpenVPN of WireGuard (de rest van het systeem wordt niet beïnvloed)</translation>
     </message>
@@ -552,7 +624,7 @@ Bestanden worden definitief verwijderd...</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+2593"/>
+        <location filename="../hmi/MainWindow.cpp" line="+2575"/>
         <source>VPN: disabled</source>
         <translation>VPN: uitgeschakeld</translation>
     </message>
@@ -577,32 +649,12 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>Toon debug informatie</translation>
     </message>
     <message>
-        <location line="-497"/>
+        <location line="-457"/>
         <source>generate a new random email for each Post</source>
         <translation>genereer een nieuwe willekeurige e-mail adres voor elk bericht</translation>
     </message>
     <message>
-        <location line="+25"/>
-        <source>Use a Fixed password for all the Posts</source>
-        <translation>Gebruik een vast wachtwoord voor alle berichten</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>archive password</source>
-        <translation>rar wachtwoord</translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>length of the password</source>
-        <translation>Lengte van het wachtwoord</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>generate random password</source>
-        <translation>maak willekeurig wachtwoord</translation>
-    </message>
-    <message>
-        <location line="+26"/>
+        <location line="+33"/>
         <source>add the list of groups separated with a coma (no space)</source>
         <translation>voeg de lijst toe van groepen gescheiden door een coma (geen spatie)</translation>
     </message>
@@ -643,17 +695,7 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>wanneer je willekeurige namen gebruikt, hernoem dan ook het bestand in het archief</translation>
     </message>
     <message>
-        <location line="+23"/>
-        <source>compress QuickPosts with a random archive name and password and generate the par2</source>
-        <translation>comprimeer Snelle Posts met een willekeurige archiefnaam en wachtwoord en genereer de par2</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Auto Compress</source>
-        <translation>Automatisch comprimeren</translation>
-    </message>
-    <message>
-        <location line="+7"/>
+        <location line="+33"/>
         <source>Auto close Tabs when posted successfully</source>
         <translation>Tabbladen automatisch sluiten wanneer ze met succes zijn gepost</translation>
     </message>
@@ -663,7 +705,17 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>Tabbladen automatisch sluiten</translation>
     </message>
     <message>
-        <location line="+93"/>
+        <location line="+15"/>
+        <source>Enable compression by default on posts</source>
+        <translation>Compressie standaard inschakelen voor posts</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Where the archives are built, with which rar, in which volume size, and under which default password</source>
+        <translation>Waar de archieven worden gemaakt, met welke rar, in welke volumegrootte en met welk standaardwachtwoord</translation>
+    </message>
+    <message>
+        <location line="+82"/>
         <location line="+13"/>
         <source>set the destination path of all the nzb file</source>
         <translation>de map waar alle nzb bestanden worden opgeslagen</translation>
@@ -731,7 +783,7 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>go command line (close the GUI and continue in the shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-928"/>
+        <location filename="../hmi/MainWindow.cpp" line="-909"/>
         <source>on</source>
         <translation>aan</translation>
     </message>
@@ -767,37 +819,37 @@ Bestanden worden definitief verwijderd...</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+774"/>
+        <location line="+755"/>
         <location line="+173"/>
         <source>Password</source>
         <translation>Wachtwoord</translation>
     </message>
     <message>
-        <location line="-863"/>
-        <location line="+206"/>
+        <location line="-844"/>
+        <location line="+210"/>
         <source>Default %1</source>
         <translation>Standaard %1</translation>
     </message>
     <message>
-        <location line="-202"/>
-        <location line="+206"/>
+        <location line="-206"/>
+        <location line="+210"/>
         <source>Post history, statistics and resume center</source>
         <translation>Postgeschiedenis, statistieken en hervattingscentrum</translation>
     </message>
     <message>
-        <location line="-205"/>
-        <location line="+209"/>
+        <location line="-209"/>
+        <location line="+213"/>
         <source>New</source>
         <translation>Nieuw</translation>
     </message>
     <message>
-        <location line="-158"/>
+        <location line="-162"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>gemiddelde snelheid</translation>
     </message>
     <message>
-        <location line="+75"/>
+        <location line="+79"/>
         <source>close while still posting?</source>
         <translation>sluiten terwijl je nog post?</translation>
     </message>
@@ -825,13 +877,13 @@ Weet je zeker dat je wilt stoppen?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+489"/>
+        <location line="+466"/>
         <location line="+173"/>
         <source>Files</source>
         <translation>Bestanden</translation>
     </message>
     <message>
-        <location line="-661"/>
+        <location line="-638"/>
         <source>Parameters</source>
         <translation>Parameters</translation>
     </message>
@@ -887,7 +939,7 @@ Weet je zeker dat je wilt stoppen?</translation>
         <translation>Update mislukt</translation>
     </message>
     <message>
-        <location line="+73"/>
+        <location line="+59"/>
         <source>VPN required</source>
         <translation>VPN vereist</translation>
     </message>
@@ -905,7 +957,7 @@ The job stays in the queue.</source>
 De taak blijft in de wachtrij.</translation>
     </message>
     <message>
-        <location line="+210"/>
+        <location line="+201"/>
         <location line="+117"/>
         <source>Open Resume →</source>
         <translation>Hervatting openen →</translation>
@@ -1611,9 +1663,9 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Item verwijderen</translation>
     </message>
     <message>
-        <location line="-1022"/>
-        <location line="+206"/>
-        <location line="+435"/>
+        <location line="-1003"/>
+        <location line="+210"/>
+        <location line="+412"/>
         <location line="+292"/>
         <source>History</source>
         <translation>Geschiedenis</translation>
@@ -1967,12 +2019,12 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4435"/>
+        <location line="+4438"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Verwijder de root (bovenliggende) map bij het comprimeren van mappen met RAR</translation>
     </message>
     <message>
-        <location line="-4432"/>
+        <location line="-4435"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP-server met de indeling (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2141,7 +2193,7 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
         <translation>Posting geannuleerd door gebruiker.</translation>
     </message>
     <message>
-        <location line="+3072"/>
+        <location line="+3075"/>
         <source>VPN warning</source>
         <translation>VPN-waarschuwing</translation>
     </message>
@@ -2174,7 +2226,7 @@ Instelling: Knop &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route
         <translation>Annuleren</translation>
     </message>
     <message>
-        <location line="-1752"/>
+        <location line="-1755"/>
         <source>Full debug logs are ON
 </source>
         <translation>Volledige foutopsporings logboeken zijn AAN
@@ -2356,7 +2408,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>moet een verhouding zijn tussen%1 en%2</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+44"/>
         <source>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it.</source>
         <translation>verouderd sleutelwoord AUTO_COMPRESS, je moet in plaats daarvan PACK gebruiken, klik op OPSLAAN om je configuratie bij te werken en ga het controleren.</translation>
     </message>
@@ -2371,7 +2423,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Verkeerde trefwoorden voor PACK: %1. Het moet een subset zijn van (%2)</translation>
     </message>
     <message>
-        <location line="-1936"/>
+        <location line="-1939"/>
         <source>date</source>
         <translation>datum</translation>
     </message>
@@ -2879,7 +2931,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
 </translation>
     </message>
     <message>
-        <location line="+266"/>
+        <location line="+269"/>
         <source>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</source>
         <translation>VPN: het oude VPN_CONFIG_PATH is overgezet naar het profiel &apos;Default&apos;</translation>
     </message>
@@ -3821,7 +3873,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>Fout: kan standaard configuratie bestand niet schrijven: %1</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1100"/>
+        <location filename="../NgPost.h" line="+1104"/>
         <source>PACKing auto using: %1</source>
         <translation>Automatisch inpakken met: %1</translation>
     </message>
@@ -5344,53 +5396,7 @@ Het model nu opslaan?</translation>
         <translation>Form</translation>
     </message>
     <message>
-        <location line="+29"/>
-        <source>temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>tijdelijke map waarin de rar en par2 worden gemaakt (deze wordt opgeschoond zodra de post is voltooid)</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>selecteer de tijdelijke map waar de rar en par2 worden gemaakt (deze wordt opgeschoond zodra de post is voltooid)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <location line="+50"/>
-        <source>...</source>
-        <translation>...</translation>
-    </message>
-    <message>
-        <location line="-16"/>
-        <source>full path of the rar executable</source>
-        <translation>volledig pad van het rar inpakprogramma</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select rar executable</source>
-        <translation>selecteer uitvoerbaar rar programma</translation>
-    </message>
-    <message>
-        <location line="+43"/>
-        <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
-        <translation>om het rar-archief in verschillende delen te splitsen (0 om niet te splitsen)</translation>
-    </message>
-    <message>
-        <location line="-125"/>
-        <source>Compress Path: </source>
-        <translation>Compressie pad: </translation>
-    </message>
-    <message>
-        <location line="+62"/>
-        <source>RAR Path: </source>
-        <translation>RAR pad: </translation>
-    </message>
-    <message>
-        <location line="+70"/>
-        <source>Limit RAR Number</source>
-        <translation>Beperk aantal RAR</translation>
-    </message>
-    <message>
-        <location line="+39"/>
+        <location line="+94"/>
         <source>Select the files to post (they may be compressed if needed) you can also right click on the files area just above</source>
         <translation>Selecteer de bestanden die je wilt posten (ze kunnen indien nodig worden gecomprimeerd). U kunt ook met de rechtermuisknop klikken op het bestandsgedeelte net erboven</translation>
     </message>
@@ -5420,37 +5426,34 @@ Het model nu opslaan?</translation>
         <translation>Selecteer map</translation>
     </message>
     <message>
-        <location line="+33"/>
+        <location line="-115"/>
         <source>NZB file:</source>
         <translation>NZB bestand:</translation>
     </message>
     <message>
-        <location line="+71"/>
-        <source>Compress</source>
-        <translation>Comprimeren</translation>
-    </message>
-    <message>
-        <location line="+123"/>
+        <location line="+272"/>
         <source>Gen PAR2</source>
         <translation>Genereer PAR2</translation>
     </message>
     <message>
-        <location line="-140"/>
+        <location line="-218"/>
         <source>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</source>
         <translation>Als een .nfo bestand aanwezig is in de originele bestanden (voor rar/hernoemingen), kopieer het naast de gegenereerde nzb (met dezelfde basisnaam)</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+115"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+334"/>
         <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
         <translation>lengte van de archiefnaam die de dobbelsteenknop trekt (configuratie LENGTH_NAME)</translation>
     </message>
     <message>
         <location line="+63"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-64"/>
         <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
         <translation>lengte van het wachtwoord dat de dobbelsteenknop trekt (configuratie LENGTH_PASS)</translation>
     </message>
     <message>
-        <location line="-97"/>
+        <location line="-175"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
         <translation>Kopieer NFO naast het nzb bestand (indien beschikbaar)</translation>
     </message>
@@ -5470,17 +5473,25 @@ Het model nu opslaan?</translation>
         <translation> ... </translation>
     </message>
     <message>
-        <location line="+93"/>
+        <location line="+114"/>
+        <source>Compress this post:</source>
+        <translation>Deze post comprimeren:</translation>
+    </message>
+    <message>
+        <location line="+57"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+72"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation>Dit moet het wachtwoord zijn van het archief dat je plaatst</translation>
     </message>
     <message>
         <location line="+13"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-75"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>wachtwoord van het archief dat ook word toegevoegd in de koptekst van het nzb-bestand</translation>
     </message>
     <message>
         <location line="+26"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+4"/>
         <source>generate random password</source>
         <translation>maak willekeurig wachtwoord</translation>
     </message>
@@ -5491,11 +5502,13 @@ Het model nu opslaan?</translation>
     </message>
     <message>
         <location line="+10"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+61"/>
         <source>archive name (file name obfuscation)</source>
         <translation>archiefnaam (versleuteld)</translation>
     </message>
     <message>
         <location line="+26"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+5"/>
         <source>generate random archive name</source>
         <translation>genereer willekeurige archiefnaam</translation>
     </message>
@@ -5505,38 +5518,35 @@ Het model nu opslaan?</translation>
         <translation>Archiefwachtwoord</translation>
     </message>
     <message>
-        <location line="-254"/>
-        <source>Vol size (MB):</source>
-        <translation>Volumegrootte (MB):</translation>
-    </message>
-    <message>
-        <location line="+30"/>
+        <location line="+93"/>
         <source>Keep Archives</source>
         <translation>Behoud archieven</translation>
     </message>
     <message>
-        <location line="+284"/>
+        <location line="-33"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+7"/>
         <source>generate the par2 (the compress option must be selected)</source>
         <translation>genereer par2 (de compressie-optie moet geselecteerd zijn)</translation>
     </message>
     <message>
-        <location line="-287"/>
+        <location line="+30"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-5"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation>standaard worden rar en par2-bestanden verwijderd na het posten, maar je kunt ervoor kiezen om ze te behouden</translation>
     </message>
     <message>
-        <location line="+324"/>
+        <location line="+27"/>
         <source>Let&apos;s Post!</source>
         <translation>Nu Posten!</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+842"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+478"/>
         <source>Post Files</source>
         <translation>Post Bestanden</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="-690"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-664"/>
         <source>There are no selected files to post...</source>
         <translation>Er zijn geen geselecteerde bestanden om te posten...</translation>
     </message>
@@ -5564,45 +5574,43 @@ Wil je het overschrijven?</translation>
     </message>
     <message>
         <location line="+47"/>
-        <location line="+614"/>
+        <location line="+588"/>
         <location line="+19"/>
         <source>Stop Posting</source>
         <translation>Stop Posten</translation>
     </message>
     <message>
-        <location line="-627"/>
-        <location line="+630"/>
+        <location line="-601"/>
+        <location line="+604"/>
         <source>Cancel Posting</source>
         <translation>Annuleer Posten</translation>
     </message>
     <message>
-        <location line="-599"/>
+        <location line="-563"/>
         <source>Select one or more files to Post</source>
         <translation>Selecteer een of meer bestanden om te posten</translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+62"/>
         <source>Select a Folder</source>
         <translation>Selecteer een map</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="-32"/>
+        <location line="+1"/>
+        <location line="+65"/>
+        <location line="+28"/>
+        <location line="+1"/>
+        <source>requires: %1</source>
+        <translation>vereist: %1</translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>Create nzb file</source>
         <translation>Maak een nzb-bestand</translation>
     </message>
     <message>
-        <location line="+13"/>
-        <source>Select rar executable</source>
-        <translation>selecteer uitvoerbaar rar programma</translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>the selected file is not executable...</source>
-        <translation>het geselecteerde bestand is niet uitvoerbaar...</translation>
-    </message>
-    <message>
-        <location line="+253"/>
+        <location line="+231"/>
         <source>Create a post info file</source>
         <translation>Een infobestand maken</translation>
     </message>
@@ -5634,17 +5642,12 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>Standaardwaarden opgeslagen: model %1, geschreven naar %2</translation>
     </message>
     <message>
-        <location line="+68"/>
-        <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
-        <translation>beperk het aantal rar bestanden tot %1 (zie configuratie RAR_MAX)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="-304"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>PAR2_ARGS gebruiken vanuit  het configuratiebestand:%1</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+379"/>
         <source>You can add files or folder by:</source>
         <translation>Je kunt bestanden of mappen toevoegen door:</translation>
     </message>

@@ -4,7 +4,7 @@
 <context>
     <name>AutoPostWidget</name>
     <message>
-        <location filename="../hmi/AutoPostWidget.ui" line="+294"/>
+        <location filename="../hmi/AutoPostWidget.ui" line="+126"/>
         <source>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</source>
         <translation>Quando um arquivo publicado tem um .nfo ao lado (mesmo nome, extensão diferente), incluir esse .nfo na mesma publicação (o .nfo sozinho não é publicado separadamente)</translation>
     </message>
@@ -14,74 +14,17 @@
         <translation>copiar o nfo junto com os outros arquivos</translation>
     </message>
     <message>
-        <location line="-283"/>
+        <location line="-115"/>
         <source>Form</source>
         <translation>Modelo</translation>
     </message>
     <message>
-        <location line="+10"/>
-        <source>compress path: </source>
-        <translation>caminho p/ compressão: </translation>
-    </message>
-    <message>
-        <location line="+19"/>
-        <source>temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>pasta temporária onde os arquivos e par2 serão criados(será limpo assim que a postagem for concluída)</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>escolha a pasta temporária onde os arquivos e par2 serão criados (será limpo assim que a postagem for concluída)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <location line="+52"/>
-        <location line="+117"/>
+        <location line="+46"/>
         <source>...</source>
         <translation>...</translation>
     </message>
     <message>
-        <location line="-140"/>
-        <source>rar path: </source>
-        <translation>caminho rar: </translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>full path of the rar executable</source>
-        <translation>caminho completo para o arquivo rar executável</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select rar executable</source>
-        <translation>escolha o executável rar</translation>
-    </message>
-    <message>
-        <location line="+14"/>
-        <source>vol size:</source>
-        <translation>tamanho do vol:</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
-        <translation>para dividir os arquivos rar em vários volumes(0 para não dividir)</translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>Check the configuration file and define or comment RAR_MAX to activate/deactivate this feature</source>
-        <translation>Verifique o arquivo de configuração e defina ou comente RAR_MAX para ativar/desativar essa função</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>limit rar number</source>
-        <translation>limite número rar</translation>
-    </message>
-    <message>
-        <location line="+29"/>
-        <source>par2 redundancy (%): </source>
-        <translation>par2 redundância (%): </translation>
-    </message>
-    <message>
-        <location line="+19"/>
+        <location line="-35"/>
         <source>&lt;b&gt;Auto Dir&lt;/b&gt; path: </source>
         <translation>&lt;b&gt;Diretório Automático&lt;/b&gt; caminho: </translation>
     </message>
@@ -147,6 +90,7 @@
     </message>
     <message>
         <location line="+12"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+311"/>
         <source>generate a random name for the archive</source>
         <translation>gere um nome aleatório para o arquivo</translation>
     </message>
@@ -157,11 +101,13 @@
     </message>
     <message>
         <location line="+7"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>length of the random archive name</source>
         <translation>tamanho do nome aleatório do arquivo</translation>
     </message>
     <message>
         <location line="+14"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>generate a random password for the archive or use the fixed one</source>
         <translation>gere uma senha senha aleatória para o arquivo ou use uma fixa</translation>
     </message>
@@ -172,6 +118,7 @@
     </message>
     <message>
         <location line="+7"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>length of the random archive password</source>
         <translation>tamanho da senha aleatória do arquivo</translation>
     </message>
@@ -183,6 +130,7 @@
     </message>
     <message>
         <location line="-29"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation>por padrão, os arquivos e os arquivos par2 são excluídos após o sucesso da postagem, mas você pode optar por mantê-los</translation>
     </message>
@@ -192,7 +140,7 @@
         <translation>manter arquivos</translation>
     </message>
     <message>
-        <location line="+46"/>
+        <location line="+56"/>
         <source>delete files/folders once they have been successfully posted (careful with that it&apos;s irreversible!!!)</source>
         <translation>delete arquivos/pastas uma vez que sejam postados com sucesso (cuidado com isso é irreversível!!!)</translation>
     </message>
@@ -203,7 +151,7 @@
     </message>
     <message>
         <location line="+24"/>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+244"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="-111"/>
         <source>Monitor Folder</source>
         <translation>Pasta de Monitoramento</translation>
     </message>
@@ -228,7 +176,7 @@
         <translation>Gerar Postagens</translation>
     </message>
     <message>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+227"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+241"/>
         <source>You can use the &lt;b&gt;Monitor Mode&lt;/b&gt;</source>
         <translation>Você pode usar o&lt;b&gt;Modo de Monitoramento&lt;/b&gt;</translation>
     </message>
@@ -258,7 +206,7 @@
         <translation>Lembre-se de que você pode selecionar itens na lista e pressionar DEL para removê-los</translation>
     </message>
     <message>
-        <location line="-348"/>
+        <location line="-331"/>
         <source>Nothing to post...</source>
         <translation>Nada para postar...</translation>
     </message>
@@ -277,23 +225,12 @@ Aperte o botão de Escanear e remota o que não deseja postar ;)
 (para remover arquivos, selecione na lista e pressione DEL ou BackSpace)</translation>
     </message>
     <message>
-        <location line="+44"/>
-        <location line="+30"/>
+        <location line="+43"/>
         <source>Select a Folder</source>
         <translation>Selecione uma Pasta</translation>
     </message>
     <message>
-        <location line="-18"/>
-        <source>Select rar executable</source>
-        <translation>Selecione o executável rar</translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>the selected file is not executable...</source>
-        <translation>o arquivo selecionado não pode ser executável...</translation>
-    </message>
-    <message>
-        <location line="+28"/>
+        <location line="+20"/>
         <source>No auto directory selected...</source>
         <translation>Diretório automático não selecionado...</translation>
     </message>
@@ -341,17 +278,17 @@ It&apos;s possible in command line if MONITOR_IGNORE_DIR is enabled in your conf
     </message>
     <message>
         <location line="+3"/>
-        <location line="+69"/>
+        <location line="+72"/>
         <source>Monitoring %1</source>
         <translation>Monitoramento %1</translation>
     </message>
     <message>
-        <location line="-67"/>
+        <location line="-70"/>
         <source>Stop Monitoring</source>
         <translation>Parar Monitoramento</translation>
     </message>
     <message>
-        <location line="+49"/>
+        <location line="+52"/>
         <source>Deleting files/folders once posted</source>
         <translation>Excluindo arquivos/pastas depois de postados</translation>
     </message>
@@ -370,22 +307,23 @@ Isso Será irreversível...</translation>
         <translation>Selecione a Pasta de Monitoramento para adicionar</translation>
     </message>
     <message>
-        <location line="+57"/>
+        <location line="+18"/>
+        <location line="+16"/>
+        <source>requires: %1</source>
+        <translation>requer: %1</translation>
+    </message>
+    <message>
+        <location line="+42"/>
         <source>Select one or more files</source>
         <translation>Selecione um ou mais arquivos</translation>
     </message>
     <message>
-        <location line="+88"/>
-        <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
-        <translation>limite o numero de volumes do arquivo para %1 (cf config RAR_MAX)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="-43"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>Usando ARGS_PAR2 do arquivo de configuração: %1</translation>
     </message>
     <message>
-        <location line="+94"/>
+        <location line="+218"/>
         <source>Create a post info file</source>
         <translation>Criar uma ficha de publicação</translation>
     </message>
@@ -413,6 +351,134 @@ Isso Será irreversível...</translation>
         <location line="+21"/>
         <source>Post info defaults saved: model %1, written to %2</source>
         <translation>Predefinições guardadas: modelo %1, escrita em %2</translation>
+    </message>
+</context>
+<context>
+    <name>CompressionSettingsDialog</name>
+    <message>
+        <location filename="../hmi/CompressionSettingsDialog.ui" line="+14"/>
+        <source>Compression settings</source>
+        <translation>Definições de compressão</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Archives</source>
+        <translation>Arquivos</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Compress Path: </source>
+        <translation>Caminho de compressão: </translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
+        <translation>pasta temporária onde os arquivos e par2 serão criados(será limpo assim que a postagem for concluída)</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
+        <translation>escolha a pasta temporária onde os arquivos e par2 serão criados (será limpo assim que a postagem for concluída)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+34"/>
+        <source>...</source>
+        <translation>...</translation>
+    </message>
+    <message>
+        <location line="-25"/>
+        <source>RAR Path: </source>
+        <translation>Caminho RAR: </translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>full path of the rar executable</source>
+        <translation>caminho completo para o arquivo rar executável</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>select rar executable</source>
+        <translation>escolha o executável rar</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Vol size (MB):</source>
+        <translation>Tamanho do volume (MB):</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
+        <translation>para dividir os arquivos rar em vários volumes(0 para não dividir)</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>cap the number of volumes: ngPost raises the volume size rather than making more of them (config RAR_MAX)</source>
+        <translation>limitar o número de volumes: o ngPost aumenta o tamanho do volume em vez de criar mais (config RAR_MAX)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Limit RAR Number</source>
+        <translation>Limitar número de RAR</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>Archives and par2 are deleted once the post succeeds.
+Ticked, they are left in the compression path folder instead.
+This is the default every new post starts with; each post can still decide otherwise (config KEEP_RAR).</source>
+        <translation>Os arquivos e os par2 são apagados quando o post é bem-sucedido.
+Marcada, ficam na pasta do caminho de compressão.
+É a predefinição com que cada novo post começa; cada post pode decidir de outra forma (config KEEP_RAR).</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Keep the archives on disk</source>
+        <translation>Manter os arquivos no disco</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Archive password</source>
+        <translation>Palavra-passe do arquivo</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>use the same password for every post (config RAR_PASS)</source>
+        <translation>usar a mesma palavra-passe para todos os posts (config RAR_PASS)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Enable the default archive password</source>
+        <translation>Ativar a palavra-passe de arquivo predefinida</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>password used for all the archives (it is also written in the header of the nzb file)</source>
+        <translation>palavra-passe usada para todos os arquivos (também é escrita no cabeçalho do ficheiro nzb)</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
+        <translation>comprimento da palavra-passe que o botão do dado gera (config LENGTH_PASS)</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>generate random password</source>
+        <translation>gere uma senha aleatória</translation>
+    </message>
+    <message>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+95"/>
+        <source>Select a Folder</source>
+        <translation>Selecione uma Pasta</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Select rar executable</source>
+        <translation>Selecione o executável rar</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>the selected file is not executable...</source>
+        <translation>o arquivo selecionado não pode ser executável...</translation>
     </message>
 </context>
 <context>
@@ -483,12 +549,7 @@ Isso Será irreversível...</translation>
         <translation>Novo E-mail aleatório para cada postagem</translation>
     </message>
     <message>
-        <location line="+25"/>
-        <source>Archive Password:</source>
-        <translation>Senha do arquivo:</translation>
-    </message>
-    <message>
-        <location line="+59"/>
+        <location line="+33"/>
         <source>News Groups:</source>
         <translation>Grupos de notícias:</translation>
     </message>
@@ -513,7 +574,19 @@ Isso Será irreversível...</translation>
         <translation>Ofuscação de nomes de arquivo</translation>
     </message>
     <message>
-        <location line="+67"/>
+        <location line="+44"/>
+        <source>Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.
+Unlike the per post box, this choice is saved.</source>
+        <translation>Prepara cada post com as opções de empacotamento da linha PACK: compressão, nome de arquivo aleatório, palavra-passe aleatória e par2.
+Ao contrário da caixa por post, esta escolha é guardada.</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Compression Settings</source>
+        <translation>Definições de compressão</translation>
+    </message>
+    <message>
+        <location line="+20"/>
         <source>Check once a day for a new ngPost release on GitHub</source>
         <translation>Verificar uma vez por dia se há uma nova versão do ngPost no GitHub</translation>
     </message>
@@ -523,7 +596,7 @@ Isso Será irreversível...</translation>
         <translation>Verificar atualizações</translation>
     </message>
     <message>
-        <location line="-26"/>
+        <location line="-61"/>
         <source>Keep .nfo file(s) visible on the post: the nfo stays inside the rar AND is posted alongside (named like the archive)</source>
         <translation>Manter arquivo(s) .nfo visível(is) na postagem: o nfo permanece dentro do rar E é postado ao lado (nomeado como o arquivo)</translation>
     </message>
@@ -533,7 +606,7 @@ Isso Será irreversível...</translation>
         <translation>manter nfo visível</translation>
     </message>
     <message>
-        <location line="+30"/>
+        <location line="+65"/>
         <source>Tunnel ngPost connections through OpenVPN or WireGuard (the rest of the system is unaffected)</source>
         <translation>Fazer túnel das ligações ngPost através de OpenVPN ou WireGuard (o resto do sistema não é afetado)</translation>
     </message>
@@ -549,7 +622,7 @@ Isso Será irreversível...</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+2593"/>
+        <location filename="../hmi/MainWindow.cpp" line="+2575"/>
         <source>VPN: disabled</source>
         <translation>VPN: desativado</translation>
     </message>
@@ -574,32 +647,12 @@ Isso Será irreversível...</translation>
         <translation>Mostrar informações de depuração</translation>
     </message>
     <message>
-        <location line="-497"/>
+        <location line="-457"/>
         <source>generate a new random email for each Post</source>
         <translation>gerar um novo email aleatório para cada Postagem</translation>
     </message>
     <message>
-        <location line="+25"/>
-        <source>Use a Fixed password for all the Posts</source>
-        <translation>Usar uma senha Fixa para todas as Postagens</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>archive password</source>
-        <translation>senha para arquivamento</translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>length of the password</source>
-        <translation>tamanho da senha</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>generate random password</source>
-        <translation>gerar senha aleatória</translation>
-    </message>
-    <message>
-        <location line="+26"/>
+        <location line="+33"/>
         <source>add the list of groups separated with a coma (no space)</source>
         <translation>adicionar a lista de grupos separadamente com uma vírgula (não usar espaço)</translation>
     </message>
@@ -640,17 +693,7 @@ Isso Será irreversível...</translation>
         <translation>quando usar compressão com nome aleatório, renomeie também o nome do arquivo dentro da compressão</translation>
     </message>
     <message>
-        <location line="+23"/>
-        <source>compress QuickPosts with a random archive name and password and generate the par2</source>
-        <translation>comprimir PostagensRápidas com um nome e senha aleatórias e gerar o par2</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Auto Compress</source>
-        <translation>Comprimir Auto</translation>
-    </message>
-    <message>
-        <location line="+7"/>
+        <location line="+33"/>
         <source>Auto close Tabs when posted successfully</source>
         <translation>Fechar Automaticamente Abas quando postadas com sucesso</translation>
     </message>
@@ -660,7 +703,17 @@ Isso Será irreversível...</translation>
         <translation>Fechas Abas Auto</translation>
     </message>
     <message>
-        <location line="+93"/>
+        <location line="+15"/>
+        <source>Enable compression by default on posts</source>
+        <translation>Ativar a compressão por predefinição nos posts</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Where the archives are built, with which rar, in which volume size, and under which default password</source>
+        <translation>Onde os arquivos são criados, com que rar, com que tamanho de volume e com que palavra-passe predefinida</translation>
+    </message>
+    <message>
+        <location line="+82"/>
         <location line="+13"/>
         <source>set the destination path of all the nzb file</source>
         <translation>selecione o caminho de destino de todos os arquivos nzb</translation>
@@ -728,7 +781,7 @@ Isso Será irreversível...</translation>
         <translation>vá por linha de comando (feche o GUI e continue no shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-928"/>
+        <location filename="../hmi/MainWindow.cpp" line="-909"/>
         <source>on</source>
         <translation>on</translation>
     </message>
@@ -764,37 +817,37 @@ Isso Será irreversível...</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+774"/>
+        <location line="+755"/>
         <location line="+173"/>
         <source>Password</source>
         <translation>Senha</translation>
     </message>
     <message>
-        <location line="-863"/>
-        <location line="+206"/>
+        <location line="-844"/>
+        <location line="+210"/>
         <source>Default %1</source>
         <translation>Padrão %1</translation>
     </message>
     <message>
-        <location line="-202"/>
-        <location line="+206"/>
+        <location line="-206"/>
+        <location line="+210"/>
         <source>Post history, statistics and resume center</source>
         <translation>Histórico de publicações, estatísticas e centro de retoma</translation>
     </message>
     <message>
-        <location line="-205"/>
-        <location line="+209"/>
+        <location line="-209"/>
+        <location line="+213"/>
         <source>New</source>
         <translation>Novo</translation>
     </message>
     <message>
-        <location line="-158"/>
+        <location line="-162"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>velocidade média</translation>
     </message>
     <message>
-        <location line="+75"/>
+        <location line="+79"/>
         <source>close while still posting?</source>
         <translation>fechar enquanto ainda está postando?</translation>
     </message>
@@ -822,13 +875,13 @@ Tem certeza que deseja sair?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+489"/>
+        <location line="+466"/>
         <location line="+173"/>
         <source>Files</source>
         <translation>Arquivos</translation>
     </message>
     <message>
-        <location line="-661"/>
+        <location line="-638"/>
         <source>Parameters</source>
         <translation>Parâmetros</translation>
     </message>
@@ -884,7 +937,7 @@ Tem certeza que deseja sair?</translation>
         <translation>Atualização falhou</translation>
     </message>
     <message>
-        <location line="+73"/>
+        <location line="+59"/>
         <source>VPN required</source>
         <translation>VPN necessário</translation>
     </message>
@@ -902,7 +955,7 @@ The job stays in the queue.</source>
 O trabalho fica na fila.</translation>
     </message>
     <message>
-        <location line="+210"/>
+        <location line="+201"/>
         <location line="+117"/>
         <source>Open Resume →</source>
         <translation>Abrir a retoma →</translation>
@@ -1608,9 +1661,9 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>Excluir entrada</translation>
     </message>
     <message>
-        <location line="-1022"/>
-        <location line="+206"/>
-        <location line="+435"/>
+        <location line="-1003"/>
+        <location line="+210"/>
+        <location line="+412"/>
         <location line="+292"/>
         <source>History</source>
         <translation>Histórico</translation>
@@ -1973,12 +2026,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4435"/>
+        <location line="+4438"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Remova a pasta raiz (pai) ao compactar pastas usando o RAR</translation>
     </message>
     <message>
-        <location line="-4432"/>
+        <location line="-4435"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>O servidor NNTP segue o formato (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2136,7 +2189,7 @@ Para listar as opções disponíveis use: %2 --help
         <translation>Postagem cancelada pelo usuário.</translation>
     </message>
     <message>
-        <location line="+3072"/>
+        <location line="+3075"/>
         <source>VPN warning</source>
         <translation>Aviso de VPN</translation>
     </message>
@@ -2169,7 +2222,7 @@ Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos
         <translation>Cancelar</translation>
     </message>
     <message>
-        <location line="-1752"/>
+        <location line="-1755"/>
         <source>Full debug logs are ON
 </source>
         <translation>Logs de depuração completos estão LIGADOS
@@ -2709,7 +2762,7 @@ OU use --par2_pct ou coloque PAR2_PCT ou PAR2_ARGS na configuração de arquivo.
 </translation>
     </message>
     <message>
-        <location line="+685"/>
+        <location line="+688"/>
         <source>ngPost used to keep your settings in a folder named after the program file, so renaming or updating the application (an AppImage is renamed on install and on every update) silently started ngPost with an empty configuration and an empty post history.
 
 The folder is now always called &quot;ngPost&quot;, and your settings have been brought over to it:
@@ -2910,7 +2963,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>## dado a um comando pós-publicação; __rarPass__ nos argumentos continua a funcionar</translation>
     </message>
     <message>
-        <location line="-2722"/>
+        <location line="-2725"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Protocolo não suportado para NZB_UPLOAD_URL (%1). Você pode usar apenas: %2
@@ -2977,7 +3030,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>deve ser um rácio entre %1 e %2</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+44"/>
         <source>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it.</source>
         <translation>Palavra-chave obsoleta AUTO_COMPRESS, você deve usar PACK, por favor clique SAVE para atualizar sua configuração e então pode verificar.</translation>
     </message>
@@ -2992,7 +3045,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>Palavra-chave errada para PACK: %1. Deve ser um subconjunto de (%2)</translation>
     </message>
     <message>
-        <location line="-1936"/>
+        <location line="-1939"/>
         <source>date</source>
         <translation>data</translation>
     </message>
@@ -3074,7 +3127,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
 </translation>
     </message>
     <message>
-        <location line="+266"/>
+        <location line="+269"/>
         <source>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</source>
         <translation>VPN: o antigo VPN_CONFIG_PATH foi migrado para o perfil «Default»</translation>
     </message>
@@ -3815,7 +3868,7 @@ O seu ficheiro de configuração activo é:
         <translation>Erro: não foi possível gravar o arquivo de configuração padrão: %1</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1100"/>
+        <location filename="../NgPost.h" line="+1104"/>
         <source>PACKing auto using: %1</source>
         <translation>Comptatação automática usando: %1</translation>
     </message>
@@ -5338,53 +5391,7 @@ Guardar o modelo agora?</translation>
         <translation>Modelo</translation>
     </message>
     <message>
-        <location line="+29"/>
-        <source>temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>pasta temporária onde os arquivos e par2 serão criados(será deletado uma vez que a postagem seja concluída)</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>selecione a pasta temporária onde os arquivos e o par2 serão criados (eles serão limpos assim que a postagem for concluída)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <location line="+50"/>
-        <source>...</source>
-        <translation>...</translation>
-    </message>
-    <message>
-        <location line="-16"/>
-        <source>full path of the rar executable</source>
-        <translation>caminho completo do executável rar</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select rar executable</source>
-        <translation>selecione o executável rar</translation>
-    </message>
-    <message>
-        <location line="+43"/>
-        <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
-        <translation>dividir o arquivo rar em vários volumes (0 para não dividir)</translation>
-    </message>
-    <message>
-        <location line="-125"/>
-        <source>Compress Path: </source>
-        <translation>Caminho de compressão: </translation>
-    </message>
-    <message>
-        <location line="+62"/>
-        <source>RAR Path: </source>
-        <translation>Caminho RAR: </translation>
-    </message>
-    <message>
-        <location line="+70"/>
-        <source>Limit RAR Number</source>
-        <translation>Limitar número de RAR</translation>
-    </message>
-    <message>
-        <location line="+39"/>
+        <location line="+94"/>
         <source>Select the files to post (they may be compressed if needed) you can also right click on the files area just above</source>
         <translation>Selecione os arquivos a serem postados (eles podem ser compactados, se necessário). Você também pode clicar com o botão direito do mouse na área de arquivos logo acima</translation>
     </message>
@@ -5414,37 +5421,34 @@ Guardar o modelo agora?</translation>
         <translation>Selecione uma pasta</translation>
     </message>
     <message>
-        <location line="+33"/>
+        <location line="-115"/>
         <source>NZB file:</source>
         <translation>Arquivo NZB:</translation>
     </message>
     <message>
-        <location line="+71"/>
-        <source>Compress</source>
-        <translation>Comprimir</translation>
-    </message>
-    <message>
-        <location line="+123"/>
+        <location line="+272"/>
         <source>Gen PAR2</source>
         <translation>Gerar PAR2</translation>
     </message>
     <message>
-        <location line="-140"/>
+        <location line="-218"/>
         <source>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</source>
         <translation>Se um arquivo .nfo estiver presente nos arquivos originais (antes de rar/renomeações), copiá-lo ao lado do nzb gerado (com o mesmo nome base)</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+115"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+334"/>
         <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
         <translation>comprimento do nome de arquivo que o botão do dado gera (config LENGTH_NAME)</translation>
     </message>
     <message>
         <location line="+63"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-64"/>
         <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
         <translation>comprimento da palavra-passe que o botão do dado gera (config LENGTH_PASS)</translation>
     </message>
     <message>
-        <location line="-97"/>
+        <location line="-175"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
         <translation>Copiar NFO ao lado do arquivo nzb (se disponível)</translation>
     </message>
@@ -5464,17 +5468,25 @@ Guardar o modelo agora?</translation>
         <translation> ... </translation>
     </message>
     <message>
-        <location line="+93"/>
+        <location line="+114"/>
+        <source>Compress this post:</source>
+        <translation>Comprimir este post:</translation>
+    </message>
+    <message>
+        <location line="+57"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+72"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation>Essa deve ser a senha do arquivo que você está postando</translation>
     </message>
     <message>
         <location line="+13"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-75"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>senha usada no seu arquivo que também seria adicionada no cabeçalho do arquivo nzb</translation>
     </message>
     <message>
         <location line="+26"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+4"/>
         <source>generate random password</source>
         <translation>gerar senha aleatória</translation>
     </message>
@@ -5485,11 +5497,13 @@ Guardar o modelo agora?</translation>
     </message>
     <message>
         <location line="+10"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+61"/>
         <source>archive name (file name obfuscation)</source>
         <translation>nome do arquivo (nome do arquivo ofuscado)</translation>
     </message>
     <message>
         <location line="+26"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+5"/>
         <source>generate random archive name</source>
         <translation>gerar nome de arquivo aleatório</translation>
     </message>
@@ -5499,33 +5513,30 @@ Guardar o modelo agora?</translation>
         <translation>Palavra-passe do arquivo</translation>
     </message>
     <message>
-        <location line="-254"/>
-        <source>Vol size (MB):</source>
-        <translation>Tamanho do volume (MB):</translation>
-    </message>
-    <message>
-        <location line="+30"/>
+        <location line="+93"/>
         <source>Keep Archives</source>
         <translation>Manter arquivos</translation>
     </message>
     <message>
-        <location line="+284"/>
+        <location line="-33"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+7"/>
         <source>generate the par2 (the compress option must be selected)</source>
         <translation>gerar o par2 (a opção compactar deve ser selecionada)</translation>
     </message>
     <message>
-        <location line="-287"/>
+        <location line="+30"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-5"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation>por padrão os arquivos e par2 são deletados após postagem bem-sucedida mas você pode optar por mantê-los</translation>
     </message>
     <message>
-        <location line="+324"/>
+        <location line="+27"/>
         <source>Let&apos;s Post!</source>
         <translation>Vamos Postar!</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+842"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+478"/>
         <source>Post Files</source>
         <translation>Postar Arquivos</translation>
     </message>
@@ -5555,7 +5566,7 @@ Guardar o modelo agora?</translation>
         <translation>Lembre-se de que você pode selecionar itens na lista e pressionar DEL para removê-los</translation>
     </message>
     <message>
-        <location line="-617"/>
+        <location line="-591"/>
         <source>There are no selected files to post...</source>
         <translation>Não existem arquivos selecionados para postar...</translation>
     </message>
@@ -5583,45 +5594,43 @@ Deseja substituí-lo?</translation>
     </message>
     <message>
         <location line="+47"/>
-        <location line="+614"/>
+        <location line="+588"/>
         <location line="+19"/>
         <source>Stop Posting</source>
         <translation>Para a Postagem</translation>
     </message>
     <message>
-        <location line="-627"/>
-        <location line="+630"/>
+        <location line="-601"/>
+        <location line="+604"/>
         <source>Cancel Posting</source>
         <translation>Cancele a Postagem</translation>
     </message>
     <message>
-        <location line="-599"/>
+        <location line="-563"/>
         <source>Select one or more files to Post</source>
         <translation>Selecione um ou mais arquivo para Postar</translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+62"/>
         <source>Select a Folder</source>
         <translation>Selecione uma Pasta</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="-32"/>
+        <location line="+1"/>
+        <location line="+65"/>
+        <location line="+28"/>
+        <location line="+1"/>
+        <source>requires: %1</source>
+        <translation>requer: %1</translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>Create nzb file</source>
         <translation>Crie o arquivo nzb</translation>
     </message>
     <message>
-        <location line="+13"/>
-        <source>Select rar executable</source>
-        <translation>Selecione o executável rar</translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>the selected file is not executable...</source>
-        <translation>o arquivo selecionado não é executável...</translation>
-    </message>
-    <message>
-        <location line="+253"/>
+        <location line="+231"/>
         <source>Create a post info file</source>
         <translation>Criar uma ficha de publicação</translation>
     </message>
@@ -5653,12 +5662,7 @@ Alguns índices Usenet pedem um.</translation>
         <translation>Predefinições guardadas: modelo %1, escrita em %2</translation>
     </message>
     <message>
-        <location line="+68"/>
-        <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
-        <translation>limite o número de volumes do arquivo para %1 (cf config RAR_MAX)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="-304"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>Usando PAR2_ARGS do arquivo de configuração: %1</translation>
     </message>

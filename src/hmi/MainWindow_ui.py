@@ -116,34 +116,6 @@ class Ui_MainWindow(object):
 
         self.posterLayout.addItem(self.horizontalSpacer_6)
 
-        self.rarPassLayout = QHBoxLayout()
-        self.rarPassLayout.setObjectName(u"rarPassLayout")
-        self.rarPassCB = QCheckBox(self.postingBox)
-        self.rarPassCB.setObjectName(u"rarPassCB")
-
-        self.rarPassLayout.addWidget(self.rarPassCB)
-
-        self.rarPassEdit = QLineEdit(self.postingBox)
-        self.rarPassEdit.setObjectName(u"rarPassEdit")
-        self.rarPassEdit.setEnabled(False)
-
-        self.rarPassLayout.addWidget(self.rarPassEdit)
-
-        self.rarLengthSB = QSpinBox(self.postingBox)
-        self.rarLengthSB.setObjectName(u"rarLengthSB")
-
-        self.rarPassLayout.addWidget(self.rarLengthSB)
-
-        self.genPass = QPushButton(self.postingBox)
-        self.genPass.setObjectName(u"genPass")
-        self.genPass.setMaximumSize(QSize(24, 24))
-        self.genPass.setIcon(icon1)
-
-        self.rarPassLayout.addWidget(self.genPass)
-
-
-        self.posterLayout.addLayout(self.rarPassLayout)
-
 
         self.verticalLayout_4.addLayout(self.posterLayout)
 
@@ -235,10 +207,10 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_6.addItem(self.horizontalSpacer)
 
-        self.autoCompressCB = QCheckBox(self.postingBox)
-        self.autoCompressCB.setObjectName(u"autoCompressCB")
+        self.keepNfoExtensionCB = QCheckBox(self.postingBox)
+        self.keepNfoExtensionCB.setObjectName(u"keepNfoExtensionCB")
 
-        self.horizontalLayout_6.addWidget(self.autoCompressCB)
+        self.horizontalLayout_6.addWidget(self.keepNfoExtensionCB)
 
         self.autoCloseCB = QCheckBox(self.postingBox)
         self.autoCloseCB.setObjectName(u"autoCloseCB")
@@ -250,10 +222,15 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_keepNfo = QHBoxLayout()
         self.horizontalLayout_keepNfo.setObjectName(u"horizontalLayout_keepNfo")
-        self.keepNfoExtensionCB = QCheckBox(self.postingBox)
-        self.keepNfoExtensionCB.setObjectName(u"keepNfoExtensionCB")
+        self.autoCompressCB = QCheckBox(self.postingBox)
+        self.autoCompressCB.setObjectName(u"autoCompressCB")
 
-        self.horizontalLayout_keepNfo.addWidget(self.keepNfoExtensionCB)
+        self.horizontalLayout_keepNfo.addWidget(self.autoCompressCB)
+
+        self.compressionSettingsBtn = QPushButton(self.postingBox)
+        self.compressionSettingsBtn.setObjectName(u"compressionSettingsBtn")
+
+        self.horizontalLayout_keepNfo.addWidget(self.compressionSettingsBtn)
 
         self.horizontalSpacer_keepNfo = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
@@ -500,20 +477,6 @@ class Ui_MainWindow(object):
 #endif // QT_CONFIG(tooltip)
         self.uniqueFromCB.setText(QCoreApplication.translate("MainWindow", u"New Random Email For Each Post", None))
 #if QT_CONFIG(tooltip)
-        self.rarPassCB.setToolTip(QCoreApplication.translate("MainWindow", u"Use a Fixed password for all the Posts", None))
-#endif // QT_CONFIG(tooltip)
-        self.rarPassCB.setText(QCoreApplication.translate("MainWindow", u"Archive Password:", None))
-#if QT_CONFIG(tooltip)
-        self.rarPassEdit.setToolTip(QCoreApplication.translate("MainWindow", u"archive password", None))
-#endif // QT_CONFIG(tooltip)
-#if QT_CONFIG(tooltip)
-        self.rarLengthSB.setToolTip(QCoreApplication.translate("MainWindow", u"length of the password", None))
-#endif // QT_CONFIG(tooltip)
-#if QT_CONFIG(tooltip)
-        self.genPass.setToolTip(QCoreApplication.translate("MainWindow", u"generate random password", None))
-#endif // QT_CONFIG(tooltip)
-        self.genPass.setText("")
-#if QT_CONFIG(tooltip)
         self.groupsLbl.setToolTip(QCoreApplication.translate("MainWindow", u"add the list of groups separated with a coma (no space)", None))
 #endif // QT_CONFIG(tooltip)
         self.groupsLbl.setText(QCoreApplication.translate("MainWindow", u"News Groups:", None))
@@ -544,17 +507,22 @@ class Ui_MainWindow(object):
 #endif // QT_CONFIG(tooltip)
         self.obfuscateFileNameCB.setText(QCoreApplication.translate("MainWindow", u"File Name Obfuscation", None))
 #if QT_CONFIG(tooltip)
-        self.autoCompressCB.setToolTip(QCoreApplication.translate("MainWindow", u"compress QuickPosts with a random archive name and password and generate the par2", None))
+        self.keepNfoExtensionCB.setToolTip(QCoreApplication.translate("MainWindow", u"Keep .nfo file(s) visible on the post: the nfo stays inside the rar AND is posted alongside (named like the archive)", None))
 #endif // QT_CONFIG(tooltip)
-        self.autoCompressCB.setText(QCoreApplication.translate("MainWindow", u"Auto Compress", None))
+        self.keepNfoExtensionCB.setText(QCoreApplication.translate("MainWindow", u"keep nfo visible", None))
 #if QT_CONFIG(tooltip)
         self.autoCloseCB.setToolTip(QCoreApplication.translate("MainWindow", u"Auto close Tabs when posted successfully", None))
 #endif // QT_CONFIG(tooltip)
         self.autoCloseCB.setText(QCoreApplication.translate("MainWindow", u"Auto Close Tabs", None))
 #if QT_CONFIG(tooltip)
-        self.keepNfoExtensionCB.setToolTip(QCoreApplication.translate("MainWindow", u"Keep .nfo file(s) visible on the post: the nfo stays inside the rar AND is posted alongside (named like the archive)", None))
+        self.autoCompressCB.setToolTip(QCoreApplication.translate("MainWindow", u"Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.\n"
+"Unlike the per post box, this choice is saved.", None))
 #endif // QT_CONFIG(tooltip)
-        self.keepNfoExtensionCB.setText(QCoreApplication.translate("MainWindow", u"keep nfo visible", None))
+        self.autoCompressCB.setText(QCoreApplication.translate("MainWindow", u"Enable compression by default on posts", None))
+#if QT_CONFIG(tooltip)
+        self.compressionSettingsBtn.setToolTip(QCoreApplication.translate("MainWindow", u"Where the archives are built, with which rar, in which volume size, and under which default password", None))
+#endif // QT_CONFIG(tooltip)
+        self.compressionSettingsBtn.setText(QCoreApplication.translate("MainWindow", u"Compression Settings", None))
 #if QT_CONFIG(tooltip)
         self.checkForUpdatesCB.setToolTip(QCoreApplication.translate("MainWindow", u"Check once a day for a new ngPost release on GitHub", None))
 #endif // QT_CONFIG(tooltip)

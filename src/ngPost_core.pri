@@ -172,6 +172,7 @@ DEFINES += __USE_HMI__
 SOURCES += \
     $$PWD/hmi/AutoPostWidget.cpp \
     $$PWD/hmi/CheckBoxCenterWidget.cpp \
+    $$PWD/hmi/CompressionSettingsDialog.cpp \
     $$PWD/hmi/PostInfoDialog.cpp \
     $$PWD/hmi/PostingWidget.cpp \
     $$PWD/hmi/SignedListWidget.cpp \
@@ -182,6 +183,8 @@ SOURCES += \
 HEADERS += \
     $$PWD/hmi/AutoPostWidget.h \
     $$PWD/hmi/CheckBoxCenterWidget.h \
+    $$PWD/hmi/CompressionSettingsDialog.h \
+    $$PWD/hmi/DependentControl.h \
     $$PWD/hmi/PostInfoDialog.h \
     $$PWD/hmi/PostingWidget.h \
     $$PWD/hmi/SignedListWidget.h \
@@ -191,6 +194,7 @@ HEADERS += \
 
 FORMS += \
     $$PWD/hmi/AutoPostWidget.ui \
+    $$PWD/hmi/CompressionSettingsDialog.ui \
     $$PWD/hmi/MainWindow.ui \
     $$PWD/hmi/PostingWidget.ui \
     $$PWD/hmi/VpnProfileEditDialog.ui \

@@ -37,10 +37,14 @@
 
 #include "hmi/MainWindow.h"
 #include "hmi/PostingWidget.h"
+#include "hmi/AutoPostWidget.h"
 #include "hmi/CheckBoxCenterWidget.h"
+#include "hmi/CompressionSettingsDialog.h"
 #include "utils/PathHelper.h"
 #include "NgPost.h"
 #include "TestEnv.h"
+
+#include <QBoxLayout>
 
 using ngpost::tests::HomeSandbox;
 
@@ -122,6 +126,42 @@ private slots:
     //! ngPost.conf on its own — the user should never have to find and
     //! click the separate "Save" button just to keep a server they added.
     void add_server_and_edit_fields_persists_without_save_button();
+
+    //! A posting tab reads top to bottom: what the post produces, the files,
+    //! then how they are packed. Each switch sits on the line above the
+    //! settings it commands, which is what makes a greyed one legible.
+    void posting_tab_lines_are_in_the_new_order();
+
+    //! The compression paths, the volume size and the default password are
+    //! configuration, not per post choices: they live in one dialog and no
+    //! longer in every tab, where each copy overwrote the others.
+    void compression_settings_dialog_owns_the_configuration_widgets();
+
+    //! Validating that dialog writes ngPost.conf straight away: a setting typed
+    //! in a dialog must not also require finding the Save button.
+    void compression_settings_dialog_persists_on_validation();
+
+    //! Reported bug: "Limit RAR Number" and "Keep Archives" could not be
+    //! modified any more. They are greyed on purpose — without compression
+    //! ngPost builds nothing to limit or to keep — but a greyed control with
+    //! no explanation reads as a broken one, so each says what it waits for.
+    void greyed_controls_say_what_they_need();
+
+    //! retranslateUi() resets tooltips to the plain .ui text. The requirement
+    //! must come back with the new language instead of being silently lost.
+    void state_tooltips_survive_a_language_change();
+
+    //! The same setting must not follow two different rules depending on the
+    //! tab it is shown in.
+    void auto_post_tab_greys_the_same_controls_as_a_posting_tab();
+
+    //! The default password moved out of the head into the dialog; it must
+    //! still reach the posting tabs, which is the whole point of it.
+    void default_archive_password_still_reaches_the_posting_tabs();
+
+    //! "Keep the archives" is a default held by the dialog: a new tab starts
+    //! with it, and the choice a single post makes must not rewrite it.
+    void keep_archives_default_is_owned_by_the_dialog();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -985,29 +1025,33 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
     QWidget *quickTab = tabs->widget(0);
     QVERIFY(quickTab);
 
-    auto *rarMax = quickTab->findChild<QCheckBox*>(QStringLiteral("rarMaxCB"));
     auto *redundancy = quickTab->findChild<QSpinBox*>(QStringLiteral("redundancySB"));
     auto *compress = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
     auto *par2 = quickTab->findChild<QCheckBox*>(QStringLiteral("par2CB"));
-    QVERIFY2(rarMax, "rarMaxCB not found on Quick tab");
     QVERIFY2(redundancy, "redundancySB not found on Quick tab");
     QVERIFY(compress);
     QVERIFY(par2);
 
-    // Each setting now follows its own switch: the volume limit means nothing
-    // without compression, and a redundancy percentage means nothing without
-    // PAR2. They are greyed until the box above them is ticked.
+    // The redundancy percentage follows PAR2, which itself follows the
+    // compression of this post (see greyed_controls_say_what_they_need).
     compress->setChecked(false);
     par2->setChecked(false);
-    QVERIFY(!rarMax->isEnabled());
     QVERIFY(!redundancy->isEnabled());
 
     compress->setChecked(true);
     par2->setChecked(true);
-    QVERIFY(rarMax->isEnabled());
     QVERIFY(redundancy->isEnabled());
 
-    rarMax->setChecked(false);
+    // The volume limit is a configuration value now: it is set in the dialog,
+    // which writes the file itself, while PAR2_PCT still rides on Save Config.
+    {
+        CompressionSettingsDialog dlg(&ngPost, window);
+        auto *rarMax = dlg.findChild<QCheckBox*>(QStringLiteral("rarMaxCB"));
+        QVERIFY2(rarMax, "rarMaxCB not found in the Compression settings dialog");
+        QVERIFY2(rarMax->isChecked(), "the dialog did not load RAR_MAX from the config");
+        rarMax->setChecked(false);
+        dlg.accept();
+    }
     redundancy->setValue(17);
     QVERIFY(QMetaObject::invokeMethod(window, "onSaveConfig", Qt::DirectConnection));
 
@@ -1020,7 +1064,14 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
              qPrintable(content));
 
     saved.close();
-    rarMax->setChecked(true);
+    {
+        CompressionSettingsDialog dlg(&ngPost, window);
+        auto *rarMax = dlg.findChild<QCheckBox*>(QStringLiteral("rarMaxCB"));
+        QVERIFY(rarMax);
+        QVERIFY2(!rarMax->isChecked(), "the dialog did not reload the state it just wrote");
+        rarMax->setChecked(true);
+        dlg.accept();
+    }
     redundancy->setValue(23);
     QVERIFY(QMetaObject::invokeMethod(window, "onSaveConfig", Qt::DirectConnection));
 
@@ -1079,6 +1130,401 @@ void TestMainWindow::add_server_and_edit_fields_persists_without_save_button()
              qPrintable(content));
     QVERIFY2(content.contains(QStringLiteral("user = bob")),
              qPrintable(content));
+}
+
+namespace {
+
+//! Boots an NgPost on a sandboxed HOME with the given configuration and returns
+//! its initialised MainWindow. Every test below needs the same six lines.
+MainWindow *bootWindow(NgPost &ngPost, const QString &confBody, QString *error)
+{
+    const QString confPath = PathHelper::configFilePath();
+    {
+        QFile conf(confPath);
+        if (!conf.open(QIODevice::WriteOnly | QIODevice::Text))
+        {
+            *error = QStringLiteral("Could not write test config: %1").arg(confPath);
+            return nullptr;
+        }
+        QTextStream s(&conf);
+        s << confBody;
+    }
+
+    *error = ngPost.parseDefaultConfig();
+    if (!error->isEmpty())
+        return nullptr;
+
+    MainWindow *window = ngPost.mainWindowForTest();
+    if (!window)
+    {
+        *error = QStringLiteral("NgPost did not create a GUI MainWindow for the test");
+        return nullptr;
+    }
+    window->init(&ngPost);
+    return window;
+}
+
+//! objectName of the layout or of the widget held by one item of a box layout,
+//! so a test can state the order of the lines rather than their contents.
+QString itemName(QLayoutItem *item)
+{
+    if (!item)
+        return QString();
+    if (QLayout *l = item->layout())
+        return l->objectName();
+    if (QWidget *w = item->widget())
+        return w->objectName();
+    return QStringLiteral("<spacer>");
+}
+
+} // namespace
+
+void TestMainWindow::posting_tab_lines_are_in_the_new_order()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
+    QVERIFY2(window, qPrintable(err));
+
+    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    QVERIFY2(tabs, "postTabWidget not found");
+    QWidget *quickTab = tabs->widget(0);
+    QVERIFY(quickTab);
+
+    auto *column = quickTab->findChild<QVBoxLayout*>(QStringLiteral("verticalLayout"));
+    QVERIFY2(column, "verticalLayout not found on the quick tab");
+
+    QStringList order;
+    for (int i = 0; i < column->count(); ++i)
+        order << itemName(column->itemAt(i));
+
+    const QStringList expected{
+        QStringLiteral("horizontalLayout_9"),  // line A: nzb, nfo, post info sheet
+        QStringLiteral("filesList"),
+        QStringLiteral("horizontalLayout_4"),  // the Select Files / Folder buttons
+        QStringLiteral("packingLayout"),       // one line: how this post is packed
+        QStringLiteral("postLayout"),
+    };
+    QCOMPARE(order, expected);
+
+    // The configuration widgets left the tab for the dialog; a leftover copy
+    // here would silently overwrite what the dialog wrote.
+    QVERIFY(!quickTab->findChild<QLineEdit*>(QStringLiteral("compressPathEdit")));
+    QVERIFY(!quickTab->findChild<QLineEdit*>(QStringLiteral("rarEdit")));
+    QVERIFY(!quickTab->findChild<QLineEdit*>(QStringLiteral("rarSizeEdit")));
+
+    // The check box labels the field it commands, so there is no separate label.
+    QVERIFY(!quickTab->findChild<QLabel*>(QStringLiteral("compressNameLbl")));
+    auto *compressBox = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
+    QVERIFY(compressBox);
+    QVERIFY(compressBox->text().endsWith(QLatin1Char(':')));
+
+    // The volume limit followed the volume size into the dialog.
+    QVERIFY(!quickTab->findChild<QCheckBox*>(QStringLiteral("rarMaxCB")));
+}
+
+void TestMainWindow::compression_settings_dialog_owns_the_configuration_widgets()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
+    QVERIFY2(window, qPrintable(err));
+
+    QVERIFY2(window->findChild<QPushButton*>(QStringLiteral("compressionSettingsBtn")),
+             "the head does not offer the Compression settings button");
+    // The fixed password left the head with everything that served it.
+    QVERIFY(!window->findChild<QCheckBox*>(QStringLiteral("rarPassCB")));
+    QVERIFY(!window->findChild<QLineEdit*>(QStringLiteral("rarPassEdit")));
+
+    CompressionSettingsDialog dlg(&ngPost, window);
+    QVERIFY(dlg.findChild<QLineEdit*>(QStringLiteral("compressPathEdit")));
+    QVERIFY(dlg.findChild<QLineEdit*>(QStringLiteral("rarEdit")));
+    QVERIFY(dlg.findChild<QLineEdit*>(QStringLiteral("rarSizeEdit")));
+    QVERIFY(dlg.findChild<QCheckBox*>(QStringLiteral("rarMaxCB")));
+    QVERIFY(dlg.findChild<QCheckBox*>(QStringLiteral("keepRarDefaultCB")));
+    QVERIFY(dlg.findChild<QCheckBox*>(QStringLiteral("rarPassCB")));
+    QVERIFY(dlg.findChild<QLineEdit*>(QStringLiteral("rarPassEdit")));
+    QVERIFY(dlg.findChild<QSpinBox*>(QStringLiteral("rarLengthSB")));
+}
+
+void TestMainWindow::compression_settings_dialog_persists_on_validation()
+{
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost,
+                                    QStringLiteral("GROUPS = alt.binaries.test\n"
+                                                   "RAR_SIZE = 50\n"),
+                                    &err);
+    QVERIFY2(window, qPrintable(err));
+
+    CompressionSettingsDialog dlg(&ngPost, window);
+    auto *rarSize  = dlg.findChild<QLineEdit*>(QStringLiteral("rarSizeEdit"));
+    auto *passCB   = dlg.findChild<QCheckBox*>(QStringLiteral("rarPassCB"));
+    auto *passEdit = dlg.findChild<QLineEdit*>(QStringLiteral("rarPassEdit"));
+    QVERIFY(rarSize && passCB && passEdit);
+
+    // What the dialog loaded is what the configuration said.
+    QCOMPARE(rarSize->text(), QStringLiteral("50"));
+    QVERIFY(!passCB->isChecked());
+
+    rarSize->setText(QStringLiteral("42"));
+    passCB->setChecked(true);
+    passEdit->setText(QStringLiteral("s3cret"));
+    // Note we deliberately never call onSaveConfig.
+    dlg.accept();
+
+    QFile saved(confPath);
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString content = QString::fromUtf8(saved.readAll());
+    QVERIFY2(content.contains(QStringLiteral("\nRAR_SIZE = 42\n")), qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("\nRAR_PASS = s3cret\n")), qPrintable(content));
+}
+
+void TestMainWindow::greyed_controls_say_what_they_need()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
+    QVERIFY2(window, qPrintable(err));
+
+    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    QVERIFY(tabs);
+    QWidget *quickTab = tabs->widget(0);
+    QVERIFY(quickTab);
+
+    auto *compress   = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
+    auto *par2       = quickTab->findChild<QCheckBox*>(QStringLiteral("par2CB"));
+    auto *keepRar    = quickTab->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
+    auto *nzbPass    = quickTab->findChild<QCheckBox*>(QStringLiteral("nzbPassCB"));
+    auto *nzbPassEd  = quickTab->findChild<QLineEdit*>(QStringLiteral("nzbPassEdit"));
+    auto *redundancy = quickTab->findChild<QSpinBox*>(QStringLiteral("redundancySB"));
+    QVERIFY(compress && par2 && keepRar && nzbPass && nzbPassEd && redundancy);
+
+    compress->setChecked(false);
+
+    // Nothing on the packing line means anything while this post is not
+    // compressed, so the whole line follows that one box.
+    QVERIFY(!keepRar->isEnabled());
+    QVERIFY(!nzbPass->isEnabled());
+    QVERIFY(!nzbPassEd->isEnabled());
+    QVERIFY(!par2->isEnabled());
+    QVERIFY(!redundancy->isEnabled());
+
+    // The point of the change: a greyed control names its switch, so the user
+    // is not left with a dead box and no way to find out why.
+    QVERIFY2(keepRar->toolTip().contains(compress->text()), qPrintable(keepRar->toolTip()));
+    QVERIFY2(nzbPass->toolTip().contains(compress->text()), qPrintable(nzbPass->toolTip()));
+    QVERIFY2(par2->toolTip().contains(compress->text()), qPrintable(par2->toolTip()));
+    QVERIFY2(redundancy->toolTip().contains(compress->text()), qPrintable(redundancy->toolTip()));
+    // and it keeps the help it already carried.
+    QVERIFY2(keepRar->toolTip().contains(QStringLiteral("deleted uppon post success")),
+             qPrintable(keepRar->toolTip()));
+
+    compress->setChecked(true);
+
+    QVERIFY(keepRar->isEnabled());
+    QVERIFY(nzbPass->isEnabled());
+    QVERIFY(par2->isEnabled());
+    // Once reachable, the requirement is gone: it would be noise.
+    QVERIFY2(!keepRar->toolTip().contains(compress->text()), qPrintable(keepRar->toolTip()));
+    QVERIFY2(keepRar->toolTip().contains(QStringLiteral("deleted uppon post success")),
+             qPrintable(keepRar->toolTip()));
+
+    // Two of them keep a second switch of their own, and name that one instead.
+    nzbPass->setChecked(false);
+    QVERIFY(!nzbPassEd->isEnabled());
+    QVERIFY2(nzbPassEd->toolTip().contains(nzbPass->text()), qPrintable(nzbPassEd->toolTip()));
+    nzbPass->setChecked(true);
+    QVERIFY(nzbPassEd->isEnabled());
+
+    par2->setChecked(false);
+    QVERIFY(!redundancy->isEnabled());
+    QVERIFY2(redundancy->toolTip().contains(par2->text()), qPrintable(redundancy->toolTip()));
+    par2->setChecked(true);
+    QVERIFY(redundancy->isEnabled());
+}
+
+void TestMainWindow::state_tooltips_survive_a_language_change()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
+    QVERIFY2(window, qPrintable(err));
+
+    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    QVERIFY(tabs);
+    auto *quickTab = qobject_cast<PostingWidget*>(tabs->widget(0));
+    QVERIFY(quickTab);
+
+    auto *compress = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
+    auto *keepRar  = quickTab->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
+    QVERIFY(compress && keepRar);
+
+    compress->setChecked(false);
+    QVERIFY(!keepRar->toolTip().isEmpty());
+
+    // retranslateUi() resets every tooltip to the plain .ui text. Before the
+    // fix, the requirement was written once and never put back.
+    quickTab->retranslate();
+
+    QVERIFY(!keepRar->isEnabled());
+    QVERIFY2(keepRar->toolTip().contains(compress->text()), qPrintable(keepRar->toolTip()));
+}
+
+void TestMainWindow::auto_post_tab_greys_the_same_controls_as_a_posting_tab()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
+    QVERIFY2(window, qPrintable(err));
+
+    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    QVERIFY(tabs);
+    QWidget *autoTab = tabs->widget(1);
+    QVERIFY(autoTab);
+
+    // The paths and the volume size are gone from here too: one dialog owns them.
+    QVERIFY(!autoTab->findChild<QLineEdit*>(QStringLiteral("compressPathEdit")));
+    QVERIFY(!autoTab->findChild<QLineEdit*>(QStringLiteral("rarEdit")));
+    QVERIFY(!autoTab->findChild<QLineEdit*>(QStringLiteral("rarSizeEdit")));
+
+    QVERIFY(!autoTab->findChild<QCheckBox*>(QStringLiteral("rarMaxCB")));
+
+    auto *compress   = autoTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
+    auto *par2       = autoTab->findChild<QCheckBox*>(QStringLiteral("par2CB"));
+    auto *keepRar    = autoTab->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
+    auto *redundancy = autoTab->findChild<QSpinBox*>(QStringLiteral("redundancySB"));
+    QVERIFY(compress && par2 && keepRar && redundancy);
+
+    // This tab forces PAR2 on when compression goes off (it cannot post folders
+    // without one of the two), so PAR2 is asserted separately from compression.
+    compress->setChecked(false);
+    QVERIFY(!keepRar->isEnabled());
+    QVERIFY2(keepRar->toolTip().contains(compress->text()), qPrintable(keepRar->toolTip()));
+
+    compress->setChecked(true);
+    QVERIFY(keepRar->isEnabled());
+
+    par2->setChecked(false);
+    QVERIFY(!redundancy->isEnabled());
+    QVERIFY2(redundancy->toolTip().contains(par2->text()), qPrintable(redundancy->toolTip()));
+}
+
+void TestMainWindow::default_archive_password_still_reaches_the_posting_tabs()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
+    QVERIFY2(window, qPrintable(err));
+
+    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    QVERIFY(tabs);
+    QWidget *quickTab = tabs->widget(0);
+    QVERIFY(quickTab);
+    auto *nzbPassEdit = quickTab->findChild<QLineEdit*>(QStringLiteral("nzbPassEdit"));
+    QVERIFY(nzbPassEdit);
+    QVERIFY(nzbPassEdit->text().isEmpty());
+
+    CompressionSettingsDialog dlg(&ngPost, window);
+    auto *passCB   = dlg.findChild<QCheckBox*>(QStringLiteral("rarPassCB"));
+    auto *passEdit = dlg.findChild<QLineEdit*>(QStringLiteral("rarPassEdit"));
+    QVERIFY(passCB && passEdit);
+    passCB->setChecked(true);
+    passEdit->setText(QStringLiteral("hunter2"));
+    dlg.accept();
+
+    // What the head used to do live on every keystroke now happens once, when
+    // the dialog is validated.
+    QVERIFY(QMetaObject::invokeMethod(window, "onRarPassUpdated", Qt::DirectConnection,
+                                      Q_ARG(QString, dlg.fixedPassword())));
+    QCOMPARE(nzbPassEdit->text(), QStringLiteral("hunter2"));
+    QVERIFY(window->useFixedPassword());
+    QCOMPARE(window->fixedArchivePassword(), QStringLiteral("hunter2"));
+}
+
+void TestMainWindow::keep_archives_default_is_owned_by_the_dialog()
+{
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
+    QVERIFY2(window, qPrintable(err));
+
+    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    QVERIFY(tabs);
+    QWidget *quickTab = tabs->widget(0);
+    QVERIFY(quickTab);
+    auto *keepRar = quickTab->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
+    QVERIFY(keepRar);
+    QVERIFY(!keepRar->isChecked());
+
+    {
+        CompressionSettingsDialog dlg(&ngPost, window);
+        auto *def = dlg.findChild<QCheckBox*>(QStringLiteral("keepRarDefaultCB"));
+        QVERIFY2(def, "keepRarDefaultCB not found in the Compression settings dialog");
+        QVERIFY(!def->isChecked());
+        def->setChecked(true);
+        dlg.accept();
+    }
+
+    QFile saved(confPath);
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    QString content = QString::fromUtf8(saved.readAll());
+    saved.close();
+    QVERIFY2(content.contains(QStringLiteral("\nKEEP_RAR = true\n")), qPrintable(content));
+    QVERIFY2(!content.contains(QStringLiteral("\n#KEEP_RAR = true\n")), qPrintable(content));
+
+    // A tab opened afterwards starts from that default.
+    PostingWidget *fresh = window->addNewQuickTab(tabs->count() - 1);
+    QVERIFY(fresh);
+    fresh->init();
+    auto *freshKeep = fresh->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
+    QVERIFY(freshKeep);
+    QVERIFY2(freshKeep->isChecked(), "a new tab did not pick up the configured default");
+
+    // But what one post decides stays with that post: saving from it must not
+    // silently turn the default off for every post to come.
+    freshKeep->setChecked(false);
+    tabs->setCurrentIndex(tabs->indexOf(fresh));
+    QVERIFY(QMetaObject::invokeMethod(window, "onSaveConfig", Qt::DirectConnection));
+
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    content = QString::fromUtf8(saved.readAll());
+    QVERIFY2(content.contains(QStringLiteral("\nKEEP_RAR = true\n")), qPrintable(content));
+    QVERIFY2(!content.contains(QStringLiteral("\n#KEEP_RAR = true\n")), qPrintable(content));
 }
 
 QTEST_MAIN(TestMainWindow)

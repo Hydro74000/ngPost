@@ -20,6 +20,7 @@
 
 #include "AutoPostWidget.h"
 #include "ui_AutoPostWidget.h"
+#include "DependentControl.h"
 #include "PostInfoDialog.h"
 #include "PostingWidget.h"
 #include "MainWindow.h"
@@ -52,20 +53,13 @@ AutoPostWidget::~AutoPostWidget()
 
 void AutoPostWidget::init()
 {
-    _ui->rarMaxCB->setChecked(_ngPost->_useRarMax);
-    _ui->rarMaxCB->setEnabled(true);
-
-    _ui->keepRarCB->setChecked(_ngPost->_keepRar);
-
-    _ui->compressPathEdit->setText(_ngPost->_tmpPath);
-    _ui->rarEdit->setText(_ngPost->_rarPath);
-
-    _ui->rarSizeEdit->setText(QString::number(_ngPost->_rarSize));
-    _ui->rarSizeEdit->setValidator(new QIntValidator(1, 1000000, _ui->rarSizeEdit));
+    _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
 
     _ui->redundancySB->setRange(0, 100);
     _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
-    _ui->redundancySB->setEnabled(true);
+    // The label that carried the unit is gone with the row it lived on, so the
+    // suffix carries it instead, as on a posting tab.
+    _ui->redundancySB->setSuffix(QStringLiteral(" %"));
 
     _ui->autoDirEdit->setText(_ngPost->_inputDir);
     _ui->nameLengthSB->setRange(5, 50);
@@ -75,16 +69,17 @@ void AutoPostWidget::init()
 
     _ui->filesList->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
-    connect(_ui->compressPathButton,&QAbstractButton::clicked, this, &AutoPostWidget::onCompressPathClicked);
-    connect(_ui->rarPathButton,     &QAbstractButton::clicked, this, &AutoPostWidget::onRarPathClicked);
     connect(_ui->autoDirButton,     &QAbstractButton::clicked, this, &AutoPostWidget::onSelectAutoDirClicked);
     connect(_ui->scanAutoDirButton, &QAbstractButton::clicked, this, &AutoPostWidget::onScanAutoDirClicked);
     connect(_ui->compressCB,        &QAbstractButton::toggled, this, &AutoPostWidget::onCompressToggled);
     connect(_ui->par2CB,            &QAbstractButton::toggled, this, &AutoPostWidget::onGenPar2Toggled);
 
     setPackingAuto(_ngPost->_packAuto, _ngPost->_packAutoKeywords);
-    if (_ngPost->_keepRar)
-        _ui->keepRarCB->setChecked(true);
+    // setPackingAuto() only emits toggled() when a box actually changes, so the
+    // dependents are refreshed here rather than trusting a signal that may not
+    // have fired. The coupling side effects of the handlers are deliberately
+    // not replayed: opening the tab must not tick PAR2 on the user's behalf.
+    updatePackingDependents();
     _ui->startJobsCB->setChecked(true);
 
     _ui->latestFilesFirstCB->setChecked(true);
@@ -136,8 +131,7 @@ Press the Scan button and remove what you don't want to post ;)\n\
     _hmi->updateParams();
     udatePostingParams();
 
-    bool startPost = _ui->startJobsCB->isChecked(),
-         useRarMax = _ui->rarMaxCB->isChecked();
+    bool startPost = _ui->startJobsCB->isChecked();
     for (const QFileInfo &file : files)
     {
         // "copy nfo alongside other files": a lone .nfo that has a sibling is not
@@ -158,43 +152,13 @@ Press the Scan button and remove what you don't want to post ;)\n\
                                      _postInfoTemplate,
                                      _postInfoOutput,
                                      _postInfoMeta);
-        quickPostWidget->genNameAndPassword(_ngPost->_genName, _ngPost->_genPass, _ngPost->_doPar2, useRarMax);
+        quickPostWidget->genNameAndPassword(_ngPost->_genName, _ngPost->_genPass, _ngPost->_doPar2);
 
         if (startPost)
             quickPostWidget->postFiles(false);
     }
 }
 
-
-void AutoPostWidget::onCompressPathClicked()
-{
-    QString path = QFileDialog::getExistingDirectory(
-                this,
-                tr("Select a Folder"),
-                _ui->compressPathEdit->text(),
-                QFileDialog::ShowDirsOnly);
-
-    if (!path.isEmpty())
-        _ui->compressPathEdit->setText(path);
-}
-
-void AutoPostWidget::onRarPathClicked()
-{
-    QString path = QFileDialog::getOpenFileName(
-                this,
-                tr("Select rar executable"),
-                QFileInfo(_ngPost->_rarPath).absolutePath()
-                );
-
-    if (!path.isEmpty())
-    {
-        QFileInfo fi(path);
-        if (fi.isFile() && fi.isExecutable())
-            _ui->rarEdit->setText(path);
-        else
-            _ngPost->error(tr("the selected file is not executable..."));
-    }
-}
 
 void AutoPostWidget::onSelectAutoDirClicked()
 {
@@ -265,24 +229,12 @@ void AutoPostWidget::onMonitoringClicked()
         _ui->monitorButton->setText(tr("Stop Monitoring"));
     }
 
-    _ui->compressPathEdit->setEnabled(_isMonitoring);
-    _ui->compressPathButton->setEnabled(_isMonitoring);
-    _ui->rarEdit->setEnabled(_isMonitoring);
-    _ui->rarPathButton->setEnabled(_isMonitoring);
-    _ui->rarSizeEdit->setEnabled(_isMonitoring);
-    _ui->rarMaxCB->setEnabled(_isMonitoring);
-    _ui->redundancySB->setEnabled(_isMonitoring);
-
     _ui->autoDirEdit->setEnabled(_isMonitoring);
     _ui->autoDirButton->setEnabled(_isMonitoring);
     _ui->latestFilesFirstCB->setEnabled(_isMonitoring);
     _ui->scanAutoDirButton->setEnabled(_isMonitoring);
 
-    _ui->genNameCB->setEnabled(_isMonitoring);
-    _ui->nameLengthSB->setEnabled(_isMonitoring);
-    _ui->genPassCB->setEnabled(_isMonitoring);
-    _ui->passLengthSB->setEnabled(_isMonitoring);
-
+    _ui->compressCB->setEnabled(_isMonitoring);
     _ui->par2CB->setEnabled(_isMonitoring);
 //    _ui->delFilesCB->setEnabled(_isMonitoring);
 
@@ -290,6 +242,21 @@ void AutoPostWidget::onMonitoringClicked()
     _ui->postButton->setEnabled(_isMonitoring);
 
     _isMonitoring = !_isMonitoring;
+    // While monitoring, the packing options are frozen; otherwise they answer
+    // to their own switch again, so let the handlers decide rather than
+    // leaving a control enabled with nothing to act on.
+    if (_isMonitoring)
+    {
+        _ui->genNameCB->setEnabled(false);
+        _ui->nameLengthSB->setEnabled(false);
+        _ui->genPassCB->setEnabled(false);
+        _ui->passLengthSB->setEnabled(false);
+        _ui->keepRarCB->setEnabled(false);
+        _ui->redundancySB->setEnabled(false);
+    }
+    else
+        updatePackingDependents();
+
     _ui->addMonitoringFolderButton->setEnabled(_isMonitoring);
 
     if (_isMonitoring)
@@ -335,19 +302,38 @@ void AutoPostWidget::onAddMonitoringFolder()
     }
 }
 
+void AutoPostWidget::updatePackingDependents()
+{
+    bool const compress = _ui->compressCB->isChecked();
+    QString const needsCompress = tr("requires: %1").arg(_ui->compressCB->text());
+
+    setDependentEnabled(_ui->genNameCB, compress,
+                        tr("generate a random name for the archive"), needsCompress);
+    setDependentEnabled(_ui->nameLengthSB, compress,
+                        tr("length of the random archive name"), needsCompress);
+    setDependentEnabled(_ui->genPassCB, compress,
+                        tr("generate a random password for the archive or use the fixed one"), needsCompress);
+    setDependentEnabled(_ui->passLengthSB, compress,
+                        tr("length of the random archive password"), needsCompress);
+    setDependentEnabled(_ui->keepRarCB, compress,
+                        tr("by default archives and par2 files are deleted uppon post success but you can choose to keep them"),
+                        needsCompress);
+
+    setDependentEnabled(_ui->redundancySB, _ui->par2CB->isChecked(),
+                        tr("Using PAR2_ARGS from config file: %1").arg(_ngPost->_par2Args),
+                        tr("requires: %1").arg(_ui->par2CB->text()));
+}
+
 void AutoPostWidget::onCompressToggled(bool checked)
 {
-    _ui->genNameCB->setEnabled(checked);
-    _ui->nameLengthSB->setEnabled(checked);
-    _ui->genPassCB->setEnabled(checked);
-    _ui->passLengthSB->setEnabled(checked);
-    _ui->keepRarCB->setEnabled(checked);
+    updatePackingDependents();
     if (!checked && !_ui->par2CB->isChecked())
         _ui->par2CB->setChecked(true);
 }
 
 void AutoPostWidget::onGenPar2Toggled(bool checked)
 {
+    updatePackingDependents();
     if (!checked && !_ui->compressCB->isChecked())
         _ui->compressCB->setChecked(true);
 }
@@ -395,20 +381,11 @@ void AutoPostWidget::udatePostingParams()
     _ngPost->_doPar2     = _ui->par2CB->isChecked();
     _ngPost->_packAuto   = _ngPost->_doCompress || _ngPost->_doPar2;
 
-    _ngPost->_tmpPath    = _ui->compressPathEdit->text();
-    _ngPost->_rarPath    = _ui->rarEdit->text();
+    // The compression paths and the volume size belong to the Compression
+    // settings dialog now: this tab used to hold a second copy of them and
+    // overwrite whatever a posting tab had just written.
     _ngPost->_lengthName = static_cast<uint>(_ui->nameLengthSB->value());
     _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
-    uint val = 0;
-    bool ok  = true;
-    _ngPost->_rarSize = 0;
-    if (!_ui->rarSizeEdit->text().isEmpty())
-    {
-        val = _ui->rarSizeEdit->text().toUInt(&ok);
-        if (ok)
-            _ngPost->_rarSize = val;
-    }
-    _ngPost->_useRarMax = _ui->rarMaxCB->isChecked();
 
     // fetch par2 settings
     _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
@@ -465,8 +442,9 @@ bool AutoPostWidget::deleteFilesOncePosted() const { return _ui->delFilesCB->isC
 void AutoPostWidget::retranslate()
 {
     _ui->retranslateUi(this);
-    _ui->rarMaxCB->setToolTip(tr("limit the number of archive volume to %1 (cf config RAR_MAX)").arg(_ngPost->_rarMax));
-    _ui->redundancySB->setToolTip(tr("Using PAR2_ARGS from config file: %1").arg(_ngPost->_par2Args));
+    // retranslateUi() has just reset the tooltips to the plain .ui text, which
+    // drops what a greyed control is waiting for. Rebuild both halves.
+    updatePackingDependents();
     _ui->filesList->setToolTip(QString("%1<br/><br/>%2<ul><li>%3</li><li>%4</li><li>%5</li></ul>%6").arg(
                                    tr("You can use the <b>Monitor Mode</b>")).arg(
                                    tr("or <b>Generate Posts</b> by adding files:")).arg(

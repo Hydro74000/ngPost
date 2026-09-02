@@ -23,6 +23,7 @@
 #include "PostingWidget.h"
 #include "AutoPostWidget.h"
 #include "NgPost.h"
+#include "CompressionSettingsDialog.h"
 #include "VpnSettingsDialog.h"
 #include "history/PostHistoryService.h"
 #include "history/PostHistoryStore.h"
@@ -282,7 +283,11 @@ void MainWindow::logError(const QString &error) const
 
 bool MainWindow::useFixedPassword() const
 {
-    return _ui->rarPassCB->isChecked();
+    // The fixed password moved out of the head into the Compression settings
+    // dialog, so its state cannot live in a widget between two openings. An
+    // empty RAR_PASS already means "no fixed password" everywhere else in
+    // ngPost, including the command line branch of saveConfig().
+    return !_ngPost->_rarPassFixed.isEmpty();
 }
 
 bool MainWindow::hasAutoCompress() const
@@ -604,28 +609,14 @@ void MainWindow::_initPostingBox()
     connect(_ui->genPoster,         &QAbstractButton::clicked, this, &MainWindow::onGenPoster);
     connect(_ui->obfuscateMsgIdCB,  &QAbstractButton::toggled, this, &MainWindow::onObfucateToggled);
     connect(_ui->uniqueFromCB,      &QAbstractButton::toggled, this, &MainWindow::onUniqueFromToggled);
-    connect(_ui->rarPassCB,         &QAbstractButton::toggled, this, &MainWindow::onRarPassToggled);
-    connect(_ui->genPass,           &QAbstractButton::clicked, this, &MainWindow::onArchivePass);
     connect(_ui->autoCompressCB,    &QAbstractButton::toggled, this, &MainWindow::onAutoCompressToggled);
-    connect(_ui->rarPassEdit,       &QLineEdit::textChanged,   this, &MainWindow::onRarPassUpdated);
+    connect(_ui->compressionSettingsBtn, &QAbstractButton::clicked,
+            this, &MainWindow::onCompressionSettingsClicked);
 
     _ui->fromEdit->setText(_ngPost->xml2txt(_ngPost->_from.c_str()));
     _ui->groupsEdit->setText(_ngPost->groups());
     _ui->uniqueFromCB->setChecked(_ngPost->_genFrom);
     _ui->saveFromCB->setChecked(_ngPost->_saveFrom);
-
-    _ui->rarLengthSB->setValue(static_cast<int>(_ngPost->_lengthPass));
-    if (_ngPost->_rarPassFixed.isEmpty())
-    {
-        _ui->rarPassCB->setChecked(false);
-        onRarPassToggled(false);
-    }
-    else
-    {
-	// Issue #48 we should set the text first!
-        _ui->rarPassEdit->setText(_ngPost->_rarPassFixed);
-        _ui->rarPassCB->setChecked(true);
-    }
 
     _ui->autoCompressCB->setChecked(_ngPost->_packAuto);
     _ui->autoCloseCB->setChecked(_ngPost->_autoCloseTabs);
@@ -714,11 +705,8 @@ void MainWindow::updateParams()
     _ngPost->_genFrom  = _ui->uniqueFromCB->isChecked();
     _ngPost->_saveFrom = _ui->saveFromCB->isChecked();
 
-    if (_ui->rarPassCB->isChecked())
-    {
-        _ngPost->_rarPassFixed = _ui->rarPassEdit->text();
-        _ngPost->_rarPass      = _ngPost->_rarPassFixed;
-    }
+    // The fixed password is no longer read from a widget here: it is owned by
+    // the Compression settings dialog, which writes it straight into NgPost.
 
     _ngPost->enableAutoPacking(_ui->autoCompressCB->isChecked());
     _ngPost->_autoCloseTabs   = _ui->autoCloseCB->isChecked();
@@ -782,13 +770,7 @@ void MainWindow::updateConfigFromUi()
 
 QString MainWindow::fixedArchivePassword() const
 {
-    if (_ui->rarPassCB->isChecked())
-    {
-        QString pass = _ui->rarPassEdit->text();
-        if (!pass.isEmpty())
-            return pass;
-    }
-    return QString();
+    return _ngPost->_rarPassFixed;
 }
 
 namespace {
@@ -1691,15 +1673,6 @@ void MainWindow::onUniqueFromToggled(bool checked)
     _ui->saveFromCB->setEnabled(enabled);
 }
 
-void MainWindow::onRarPassToggled(bool checked)
-{
-    _ui->rarPassEdit->setEnabled(checked);
-    _ui->rarLengthSB->setEnabled(checked);
-    _ui->genPass->setEnabled(checked);
-    if (checked)
-        onRarPassUpdated(_ui->rarPassEdit->text());
-}
-
 void MainWindow::onRarPassUpdated(const QString &fixedPass)
 {
     _ngPost->_rarPassFixed = fixedPass;
@@ -1710,9 +1683,18 @@ void MainWindow::onRarPassUpdated(const QString &fixedPass)
         currentQuickPost->setNzbPassword(fixedPass);
 }
 
-void MainWindow::onArchivePass()
+void MainWindow::onCompressionSettingsClicked()
 {
-    _ui->rarPassEdit->setText(_ngPost->randomPass(static_cast<uint>(_ui->rarLengthSB->value())));
+    CompressionSettingsDialog dlg(_ngPost, this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    // The dialog already wrote everything into NgPost; only the tabs still show
+    // the previous password. An empty one means the default password was
+    // switched off, and ticking a tab's box over an empty field would be a lie.
+    QString const pass = dlg.fixedPassword();
+    if (!pass.isEmpty())
+        onRarPassUpdated(pass);
 }
 
 void MainWindow::onAutoCompressToggled(bool checked)

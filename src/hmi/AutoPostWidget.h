@@ -90,11 +90,14 @@ private:
     //! Values the record sheet can already show for the whole run.
     PostInfoData _postInfoPreview() const;
 
+    //! Greys what compression and PAR2 command, and says what each one waits
+    //! for. Separate from the toggle handlers so it can be replayed without
+    //! replaying their coupling (compress off forces PAR2 on, and back).
+    void updatePackingDependents();
+
 private slots:
     void onSelectFilesClicked();
     void onGenQuickPosts();
-    void onCompressPathClicked();
-    void onRarPathClicked();
     void onSelectAutoDirClicked();
     void onScanAutoDirClicked();
     void onMonitoringClicked();

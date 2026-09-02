@@ -211,9 +211,8 @@ private slots:
 
     void onGenPoster();
     void onUniqueFromToggled(bool checked);
-    void onRarPassToggled(bool checked);
     void onRarPassUpdated(const QString &fixedPass);
-    void onArchivePass();
+    void onCompressionSettingsClicked();
     void onAutoCompressToggled(bool checked);
 
     void onDebugToggled(bool checked);

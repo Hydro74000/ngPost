@@ -76,7 +76,7 @@ public:
     void attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted);
 
     void init();
-    void genNameAndPassword(bool genName, bool genPass, bool doPar2, bool useRarMax);
+    void genNameAndPassword(bool genName, bool genPass, bool doPar2);
     inline uint jobNumber() const;
 
     void handleDropEvent(QDropEvent *e);
@@ -132,9 +132,7 @@ private slots: // for the HMI
     void onCompressCB(bool checked);
     void onPar2CB(bool checked);
     void onGenCompressName();
-    void onCompressPathClicked();
     void onNzbFileClicked();
-    void onRarPathClicked();
 
 
 private:

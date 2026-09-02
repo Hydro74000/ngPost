@@ -132,6 +132,7 @@ use_hmi {
 SOURCES += \
     hmi/AutoPostWidget.cpp \
     hmi/CheckBoxCenterWidget.cpp \
+    hmi/CompressionSettingsDialog.cpp \
     hmi/PostingWidget.cpp \
     hmi/SignedListWidget.cpp \
     hmi/MainWindow.cpp
@@ -139,12 +140,15 @@ SOURCES += \
 HEADERS += \
     hmi/AutoPostWidget.h \
     hmi/CheckBoxCenterWidget.h \
+    hmi/CompressionSettingsDialog.h \
+    hmi/DependentControl.h \
     hmi/PostingWidget.h \
     hmi/SignedListWidget.h \
     hmi/MainWindow.h
 
 FORMS += \
     hmi/AutoPostWidget.ui \
+    hmi/CompressionSettingsDialog.ui \
     hmi/MainWindow.ui \
     hmi/PostingWidget.ui
 }

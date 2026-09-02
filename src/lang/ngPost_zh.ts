@@ -4,7 +4,7 @@
 <context>
     <name>AutoPostWidget</name>
     <message>
-        <location filename="../hmi/AutoPostWidget.ui" line="+294"/>
+        <location filename="../hmi/AutoPostWidget.ui" line="+126"/>
         <source>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</source>
         <translation>当发布的文件旁边有同名的 .nfo 文件（名称相同、扩展名不同）时，将该 .nfo 包含在同一帖子中（单独的 .nfo 不会单独发布）</translation>
     </message>
@@ -14,74 +14,17 @@
         <translation>将 nfo 与其他文件一起发布</translation>
     </message>
     <message>
-        <location line="-283"/>
+        <location line="-115"/>
         <source>Form</source>
         <translation>表格</translation>
     </message>
     <message>
-        <location line="+10"/>
-        <source>compress path: </source>
-        <translation>压缩文件路径: </translation>
-    </message>
-    <message>
-        <location line="+19"/>
-        <source>temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>存放压缩文件以及par2文件的临时文件夹（发布完成后将会被清除）</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>请选择存放压缩文件以及par2文件的临时文件夹（发布完成后将会被清除）</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <location line="+52"/>
-        <location line="+117"/>
+        <location line="+46"/>
         <source>...</source>
         <translation>...</translation>
     </message>
     <message>
-        <location line="-140"/>
-        <source>rar path: </source>
-        <translation>rar程序路径: </translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>full path of the rar executable</source>
-        <translation>rar可执行文件的完整路径</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select rar executable</source>
-        <translation>选择rar可执行文件</translation>
-    </message>
-    <message>
-        <location line="+14"/>
-        <source>vol size:</source>
-        <translation>分卷大小:</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
-        <translation>将rar文件分卷压缩（0为不分卷压缩）</translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>Check the configuration file and define or comment RAR_MAX to activate/deactivate this feature</source>
-        <translation>检查配置文件并定义或注释参数RAR_MAX以激活/停用此功能</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>limit rar number</source>
-        <translation>限制rar文件数目</translation>
-    </message>
-    <message>
-        <location line="+29"/>
-        <source>par2 redundancy (%): </source>
-        <translation>par2恢复记录（%）: </translation>
-    </message>
-    <message>
-        <location line="+19"/>
+        <location line="-35"/>
         <source>&lt;b&gt;Auto Dir&lt;/b&gt; path: </source>
         <translation>&lt;b&gt;自动发布文件夹&lt;/b&gt;路径: </translation>
     </message>
@@ -147,6 +90,7 @@
     </message>
     <message>
         <location line="+12"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+311"/>
         <source>generate a random name for the archive</source>
         <translation>为压缩文件生成随机文件名</translation>
     </message>
@@ -157,11 +101,13 @@
     </message>
     <message>
         <location line="+7"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>length of the random archive name</source>
         <translation>随机压缩包文件名长度</translation>
     </message>
     <message>
         <location line="+14"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>generate a random password for the archive or use the fixed one</source>
         <translation>为压缩文件生成随机密码或者使用指定密码</translation>
     </message>
@@ -172,6 +118,7 @@
     </message>
     <message>
         <location line="+7"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>length of the random archive password</source>
         <translation>压缩文件随机密码长度</translation>
     </message>
@@ -183,6 +130,7 @@
     </message>
     <message>
         <location line="-29"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+2"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation>当发布成功时压缩文件和par2文件将被默认删除但您也可以选择保留他们</translation>
     </message>
@@ -192,7 +140,7 @@
         <translation>保留压缩文件</translation>
     </message>
     <message>
-        <location line="+46"/>
+        <location line="+56"/>
         <source>delete files/folders once they have been successfully posted (careful with that it&apos;s irreversible!!!)</source>
         <translation>当发布成功时删除文件/文件夹（请注意，此操作不可逆!!!）</translation>
     </message>
@@ -203,7 +151,7 @@
     </message>
     <message>
         <location line="+24"/>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+244"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="-111"/>
         <source>Monitor Folder</source>
         <translation>监视文件夹</translation>
     </message>
@@ -228,7 +176,7 @@
         <translation>生成发布文件</translation>
     </message>
     <message>
-        <location filename="../hmi/AutoPostWidget.cpp" line="-123"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="-92"/>
         <source>You can&apos;t use auto posting without compression on folders... (%1)</source>
         <translation>您将无法使用自动发布如果没有开启文件夹压缩... (%1)</translation>
     </message>
@@ -247,23 +195,12 @@ Press the Scan button and remove what you don&apos;t want to post ;)
 （请在列表中选中想要删除的文件，然后使用DEL键或者退格键删除）</translation>
     </message>
     <message>
-        <location line="+44"/>
-        <location line="+30"/>
+        <location line="+43"/>
         <source>Select a Folder</source>
         <translation>选择一个文件夹</translation>
     </message>
     <message>
-        <location line="-18"/>
-        <source>Select rar executable</source>
-        <translation>选择rar可执行文件</translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>the selected file is not executable...</source>
-        <translation>选中的文件不是可执行文件类型...</translation>
-    </message>
-    <message>
-        <location line="+28"/>
+        <location line="+20"/>
         <source>No auto directory selected...</source>
         <translation>没有选择自动发布文件夹...</translation>
     </message>
@@ -311,17 +248,17 @@ It&apos;s possible in command line if MONITOR_IGNORE_DIR is enabled in your conf
     </message>
     <message>
         <location line="+3"/>
-        <location line="+69"/>
+        <location line="+72"/>
         <source>Monitoring %1</source>
         <translation>正在监视%1</translation>
     </message>
     <message>
-        <location line="-67"/>
+        <location line="-70"/>
         <source>Stop Monitoring</source>
         <translation>停止监视功能</translation>
     </message>
     <message>
-        <location line="+49"/>
+        <location line="+52"/>
         <source>Deleting files/folders once posted</source>
         <translation>发布后删除文件/文件夹</translation>
     </message>
@@ -340,22 +277,23 @@ It will be irreversible...</source>
         <translation>选择一个文件夹添加为监测文件夹</translation>
     </message>
     <message>
-        <location line="+57"/>
+        <location line="+18"/>
+        <location line="+16"/>
+        <source>requires: %1</source>
+        <translation>需要：%1</translation>
+    </message>
+    <message>
+        <location line="+42"/>
         <source>Select one or more files</source>
         <translation>选择一个或多个文件</translation>
     </message>
     <message>
-        <location line="+88"/>
-        <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
-        <translation>限制压缩分卷数为%1（在配置文件中设置RAR_MAX）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="-43"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>使用配置文件中的参数PAR2_ARGS：%1</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+126"/>
         <source>You can use the &lt;b&gt;Monitor Mode&lt;/b&gt;</source>
         <translation>您可以使用&lt;b&gt;监视模式&lt;/b&gt;</translation>
     </message>
@@ -413,6 +351,134 @@ It will be irreversible...</source>
         <location line="+21"/>
         <source>Post info defaults saved: model %1, written to %2</source>
         <translation>已保存默认设置：模板 %1，写入 %2</translation>
+    </message>
+</context>
+<context>
+    <name>CompressionSettingsDialog</name>
+    <message>
+        <location filename="../hmi/CompressionSettingsDialog.ui" line="+14"/>
+        <source>Compression settings</source>
+        <translation>压缩设置</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Archives</source>
+        <translation>压缩包</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Compress Path: </source>
+        <translation>压缩路径：</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
+        <translation>存放压缩文件以及par2文件的临时文件夹（发布完成后将会被清除）</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
+        <translation>请选择存放压缩文件以及par2文件的临时文件夹（发布完成后将会被清除）</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+34"/>
+        <source>...</source>
+        <translation>...</translation>
+    </message>
+    <message>
+        <location line="-25"/>
+        <source>RAR Path: </source>
+        <translation>RAR路径：</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>full path of the rar executable</source>
+        <translation>rar可执行文件的完整路径</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>select rar executable</source>
+        <translation>选择rar可执行文件</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Vol size (MB):</source>
+        <translation>分卷大小 (MB)：</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
+        <translation>将rar文件分卷压缩（0为不分卷压缩）</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>cap the number of volumes: ngPost raises the volume size rather than making more of them (config RAR_MAX)</source>
+        <translation>限制分卷数量：ngPost 会加大分卷体积，而不是生成更多分卷（配置项 RAR_MAX）</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Limit RAR Number</source>
+        <translation>限制RAR数量</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>Archives and par2 are deleted once the post succeeds.
+Ticked, they are left in the compression path folder instead.
+This is the default every new post starts with; each post can still decide otherwise (config KEEP_RAR).</source>
+        <translation>发布成功后压缩包和 par2 会被删除。
+勾选后，它们会保留在压缩路径的文件夹中。
+这是每个新发布的默认值；每个发布仍可另行选择（配置项 KEEP_RAR）。</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Keep the archives on disk</source>
+        <translation>在磁盘上保留压缩包</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Archive password</source>
+        <translation>压缩包密码</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>use the same password for every post (config RAR_PASS)</source>
+        <translation>所有发布使用同一个密码（配置项 RAR_PASS）</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Enable the default archive password</source>
+        <translation>启用默认压缩包密码</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>password used for all the archives (it is also written in the header of the nzb file)</source>
+        <translation>用于所有压缩包的密码（也会写入 nzb 文件头）</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
+        <translation>骰子按钮抽取的密码长度（配置项 LENGTH_PASS）</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>generate random password</source>
+        <translation>生成随机密码</translation>
+    </message>
+    <message>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+95"/>
+        <source>Select a Folder</source>
+        <translation>选择一个文件夹</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Select rar executable</source>
+        <translation>选择rar可执行文件</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>the selected file is not executable...</source>
+        <translation>选中的文件不是可执行文件类型...</translation>
     </message>
 </context>
 <context>
@@ -483,12 +549,7 @@ It will be irreversible...</source>
         <translation>每次发布使用新的随机邮箱</translation>
     </message>
     <message>
-        <location line="+25"/>
-        <source>Archive Password:</source>
-        <translation>压缩包密码：</translation>
-    </message>
-    <message>
-        <location line="+59"/>
+        <location line="+33"/>
         <source>News Groups:</source>
         <translation>新闻组：</translation>
     </message>
@@ -513,7 +574,19 @@ It will be irreversible...</source>
         <translation>文件名混淆</translation>
     </message>
     <message>
-        <location line="+67"/>
+        <location line="+44"/>
+        <source>Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.
+Unlike the per post box, this choice is saved.</source>
+        <translation>用 PACK 配置行的打包选项预设每个发布：压缩、随机压缩包名、随机密码和 par2。
+与单个发布的复选框不同，此选择会被保存。</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Compression Settings</source>
+        <translation>压缩设置</translation>
+    </message>
+    <message>
+        <location line="+20"/>
         <source>Check once a day for a new ngPost release on GitHub</source>
         <translation>每天一次检查 GitHub 上的 ngPost 新版本</translation>
     </message>
@@ -523,7 +596,7 @@ It will be irreversible...</source>
         <translation>检查更新</translation>
     </message>
     <message>
-        <location line="-26"/>
+        <location line="-61"/>
         <source>Keep .nfo file(s) visible on the post: the nfo stays inside the rar AND is posted alongside (named like the archive)</source>
         <translation>在帖子中保留.nfo文件可见：nfo保留在rar内并在旁边发布（命名与压缩包相同）</translation>
     </message>
@@ -533,7 +606,7 @@ It will be irreversible...</source>
         <translation>保持nfo可见</translation>
     </message>
     <message>
-        <location line="+30"/>
+        <location line="+65"/>
         <source>Tunnel ngPost connections through OpenVPN or WireGuard (the rest of the system is unaffected)</source>
         <translation>通过 OpenVPN 或 WireGuard 隧道传输 ngPost 连接（系统其他部分不受影响）</translation>
     </message>
@@ -549,7 +622,7 @@ It will be irreversible...</source>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+2593"/>
+        <location filename="../hmi/MainWindow.cpp" line="+2575"/>
         <source>VPN: disabled</source>
         <translation>VPN：已禁用</translation>
     </message>
@@ -574,32 +647,12 @@ It will be irreversible...</source>
         <translation>显示调试信息</translation>
     </message>
     <message>
-        <location line="-497"/>
+        <location line="-457"/>
         <source>generate a new random email for each Post</source>
         <translation>每次发布都使用新的随机邮件地址</translation>
     </message>
     <message>
-        <location line="+25"/>
-        <source>Use a Fixed password for all the Posts</source>
-        <translation>所有的发布使用固定的密码</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>archive password</source>
-        <translation>压缩文件密码</translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>length of the password</source>
-        <translation>密码长度</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>generate random password</source>
-        <translation>生成随机密码</translation>
-    </message>
-    <message>
-        <location line="+26"/>
+        <location line="+33"/>
         <source>add the list of groups separated with a coma (no space)</source>
         <translation>使用逗号来添加新闻组列表（请不要使用空格）</translation>
     </message>
@@ -640,17 +693,7 @@ It will be irreversible...</source>
         <translation>当压缩文件使用随机文件名时，压缩包内的文件名也会被重命名</translation>
     </message>
     <message>
-        <location line="+23"/>
-        <source>compress QuickPosts with a random archive name and password and generate the par2</source>
-        <translation>压缩快速发布文件时使用随机压缩文件名，随机密码以及生成par2文件</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Auto Compress</source>
-        <translation>自动压缩文件</translation>
-    </message>
-    <message>
-        <location line="+7"/>
+        <location line="+33"/>
         <source>Auto close Tabs when posted successfully</source>
         <translation>当发布成功时自动关闭标签页</translation>
     </message>
@@ -660,7 +703,17 @@ It will be irreversible...</source>
         <translation>自动关闭标签页</translation>
     </message>
     <message>
-        <location line="+93"/>
+        <location line="+15"/>
+        <source>Enable compression by default on posts</source>
+        <translation>默认对发布启用压缩</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Where the archives are built, with which rar, in which volume size, and under which default password</source>
+        <translation>压缩包在何处创建、使用哪个 rar、分卷大小以及默认密码</translation>
+    </message>
+    <message>
+        <location line="+82"/>
         <location line="+13"/>
         <source>set the destination path of all the nzb file</source>
         <translation>为所有nzb文件设置目标文件夹</translation>
@@ -728,7 +781,7 @@ It will be irreversible...</source>
         <translation>转到命令行（关闭图形化界面并在命令行环境中继续）</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-928"/>
+        <location filename="../hmi/MainWindow.cpp" line="-909"/>
         <source>on</source>
         <translation>启用</translation>
     </message>
@@ -764,37 +817,37 @@ It will be irreversible...</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+774"/>
+        <location line="+755"/>
         <location line="+173"/>
         <source>Password</source>
         <translation>密码</translation>
     </message>
     <message>
-        <location line="-863"/>
-        <location line="+206"/>
+        <location line="-844"/>
+        <location line="+210"/>
         <source>Default %1</source>
         <translation>默认 %1</translation>
     </message>
     <message>
-        <location line="-202"/>
-        <location line="+206"/>
+        <location line="-206"/>
+        <location line="+210"/>
         <source>Post history, statistics and resume center</source>
         <translation>发贴历史、统计与续传中心</translation>
     </message>
     <message>
-        <location line="-205"/>
-        <location line="+209"/>
+        <location line="-209"/>
+        <location line="+213"/>
         <source>New</source>
         <translation>新建</translation>
     </message>
     <message>
-        <location line="-158"/>
+        <location line="-162"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>平均速度</translation>
     </message>
     <message>
-        <location line="+75"/>
+        <location line="+79"/>
         <source>close while still posting?</source>
         <translation>仍在发布，确认关闭?</translation>
     </message>
@@ -822,13 +875,13 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+489"/>
+        <location line="+466"/>
         <location line="+173"/>
         <source>Files</source>
         <translation>文件</translation>
     </message>
     <message>
-        <location line="-661"/>
+        <location line="-638"/>
         <source>Parameters</source>
         <translation>参数</translation>
     </message>
@@ -884,7 +937,7 @@ Are you sure you want to quit?</source>
         <translation>更新失败</translation>
     </message>
     <message>
-        <location line="+73"/>
+        <location line="+59"/>
         <source>VPN required</source>
         <translation>需要 VPN</translation>
     </message>
@@ -902,7 +955,7 @@ The job stays in the queue.</source>
 任务保留在队列中。</translation>
     </message>
     <message>
-        <location line="+210"/>
+        <location line="+201"/>
         <location line="+117"/>
         <source>Open Resume →</source>
         <translation>打开续传 →</translation>
@@ -1609,9 +1662,9 @@ This also removes all associated file and article records.</source>
         <translation>删除条目</translation>
     </message>
     <message>
-        <location line="-1022"/>
-        <location line="+206"/>
-        <location line="+435"/>
+        <location line="-1003"/>
+        <location line="+210"/>
+        <location line="+412"/>
         <location line="+292"/>
         <source>History</source>
         <translation>历史记录</translation>
@@ -1974,12 +2027,12 @@ This also removes all associated file and article records.</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4435"/>
+        <location line="+4438"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>使用RAR压缩文件夹时删除根（父）文件夹</translation>
     </message>
     <message>
-        <location line="-4432"/>
+        <location line="-4435"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP服务器遵循的格式 (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2137,7 +2190,7 @@ To list the available options use: %2 --help
         <translation>用户已取消发布。</translation>
     </message>
     <message>
-        <location line="+3072"/>
+        <location line="+3075"/>
         <source>VPN warning</source>
         <translation>VPN 警告</translation>
     </message>
@@ -2170,7 +2223,7 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>取消</translation>
     </message>
     <message>
-        <location line="-1752"/>
+        <location line="-1755"/>
         <source>Full debug logs are ON
 </source>
         <translation>已打开完整调试日志
@@ -2710,7 +2763,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
 </translation>
     </message>
     <message>
-        <location line="+685"/>
+        <location line="+688"/>
         <source>ngPost used to keep your settings in a folder named after the program file, so renaming or updating the application (an AppImage is renamed on install and on every update) silently started ngPost with an empty configuration and an empty post history.
 
 The folder is now always called &quot;ngPost&quot;, and your settings have been brought over to it:
@@ -2911,7 +2964,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>## 传给贴后命令；参数中的 __rarPass__ 仍然有效</translation>
     </message>
     <message>
-        <location line="-2722"/>
+        <location line="-2725"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>NZB_UPLOAD_URL (%1)使用了不支持的协议。 您只可以使用%2
@@ -2978,7 +3031,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>应该是一个比率介于 %1 与 %2 之间</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+44"/>
         <source>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it.</source>
         <translation>废弃的关键词 AUTO_COMPRESS, 您应当使用 PACK 命令, 请点击保存来更新您的配置文件, 更新后请再查看.</translation>
     </message>
@@ -2993,7 +3046,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>使用 PACK 命令时使用了错误的关键词: %1. 关键词请使用下面中的 (%2)</translation>
     </message>
     <message>
-        <location line="-1936"/>
+        <location line="-1939"/>
         <source>date</source>
         <translation>日期</translation>
     </message>
@@ -3075,7 +3128,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
 </translation>
     </message>
     <message>
-        <location line="+266"/>
+        <location line="+269"/>
         <source>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</source>
         <translation>VPN：旧的 VPN_CONFIG_PATH 已迁移到配置“Default”</translation>
     </message>
@@ -3816,7 +3869,7 @@ Your active configuration file is:
         <translation>错误: 无法写入默认配置文件: %1</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1100"/>
+        <location filename="../NgPost.h" line="+1104"/>
         <source>PACKing auto using: %1</source>
         <translation>打包功能自动使用: %1</translation>
     </message>
@@ -5339,53 +5392,7 @@ Save the model now?</source>
         <translation>表单</translation>
     </message>
     <message>
-        <location line="+29"/>
-        <source>temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>创建压缩包和par2文件的临时文件夹（发布完成后将被清理）</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)</source>
-        <translation>选择创建压缩包和par2文件的临时文件夹（发布完成后将被清理）</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <location line="+50"/>
-        <source>...</source>
-        <translation>...</translation>
-    </message>
-    <message>
-        <location line="-16"/>
-        <source>full path of the rar executable</source>
-        <translation>rar可执行文件的完整路径</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select rar executable</source>
-        <translation>选择rar可执行文件</translation>
-    </message>
-    <message>
-        <location line="+43"/>
-        <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
-        <translation>将rar压缩文件拆分为多个卷（0为不拆分）</translation>
-    </message>
-    <message>
-        <location line="-125"/>
-        <source>Compress Path: </source>
-        <translation>压缩路径：</translation>
-    </message>
-    <message>
-        <location line="+62"/>
-        <source>RAR Path: </source>
-        <translation>RAR路径：</translation>
-    </message>
-    <message>
-        <location line="+70"/>
-        <source>Limit RAR Number</source>
-        <translation>限制RAR数量</translation>
-    </message>
-    <message>
-        <location line="+39"/>
+        <location line="+94"/>
         <source>Select the files to post (they may be compressed if needed) you can also right click on the files area just above</source>
         <translation>选择要发布的文件（如果需要，可以将其压缩），您也可以在上方的文件区域右键单击进行选择</translation>
     </message>
@@ -5415,37 +5422,34 @@ Save the model now?</source>
         <translation>选择文件夹</translation>
     </message>
     <message>
-        <location line="+33"/>
+        <location line="-115"/>
         <source>NZB file:</source>
         <translation>NZB文件：</translation>
     </message>
     <message>
-        <location line="+71"/>
-        <source>Compress</source>
-        <translation>压缩</translation>
-    </message>
-    <message>
-        <location line="+123"/>
+        <location line="+272"/>
         <source>Gen PAR2</source>
         <translation>生成PAR2</translation>
     </message>
     <message>
-        <location line="-140"/>
+        <location line="-218"/>
         <source>If a .nfo file is present in the original files (before rar/renames), copy it next to the generated nzb (with the same base name)</source>
         <translation>如果原始文件中存在.nfo文件（在rar/重命名之前），则将其复制到生成的nzb旁边（使用相同的基名）</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+115"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+334"/>
         <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
         <translation>骰子按钮抽取的压缩包名称长度（配置项 LENGTH_NAME）</translation>
     </message>
     <message>
         <location line="+63"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-64"/>
         <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
         <translation>骰子按钮抽取的密码长度（配置项 LENGTH_PASS）</translation>
     </message>
     <message>
-        <location line="-97"/>
+        <location line="-175"/>
         <source>Copy NFO alongside the nzb file (if available)</source>
         <translation>将NFO复制到nzb文件旁边（如果可用）</translation>
     </message>
@@ -5465,17 +5469,25 @@ Save the model now?</source>
         <translation> ... </translation>
     </message>
     <message>
-        <location line="+93"/>
+        <location line="+114"/>
+        <source>Compress this post:</source>
+        <translation>压缩此发布：</translation>
+    </message>
+    <message>
+        <location line="+57"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+72"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation>这应该是您要发布的压缩文件的密码</translation>
     </message>
     <message>
         <location line="+13"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-75"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>压缩文件中使用的密码，该密码也将添加到nzb文件的标头中</translation>
     </message>
     <message>
         <location line="+26"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+4"/>
         <source>generate random password</source>
         <translation>生成随机密码</translation>
     </message>
@@ -5486,11 +5498,13 @@ Save the model now?</source>
     </message>
     <message>
         <location line="+10"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+61"/>
         <source>archive name (file name obfuscation)</source>
         <translation>压缩包文件名（文件名混淆）</translation>
     </message>
     <message>
         <location line="+26"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+5"/>
         <source>generate random archive name</source>
         <translation>生成随机压缩包文件名</translation>
     </message>
@@ -5500,38 +5514,35 @@ Save the model now?</source>
         <translation>压缩包密码</translation>
     </message>
     <message>
-        <location line="-254"/>
-        <source>Vol size (MB):</source>
-        <translation>分卷大小 (MB)：</translation>
-    </message>
-    <message>
-        <location line="+30"/>
+        <location line="+93"/>
         <source>Keep Archives</source>
         <translation>保留压缩包</translation>
     </message>
     <message>
-        <location line="+284"/>
+        <location line="-33"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+7"/>
         <source>generate the par2 (the compress option must be selected)</source>
         <translation>生成par2文件（必须使用压缩选项）</translation>
     </message>
     <message>
-        <location line="-287"/>
+        <location line="+30"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-5"/>
         <source>by default archives and par2 files are deleted uppon post success but you can choose to keep them</source>
         <translation>默认情况下，压缩文件和par2文件会在发布成功后删除，但您可以选择保留它们</translation>
     </message>
     <message>
-        <location line="+324"/>
+        <location line="+27"/>
         <source>Let&apos;s Post!</source>
         <translation>让我们开始发布吧！</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+842"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+478"/>
         <source>Post Files</source>
         <translation>发布文件</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="-690"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-664"/>
         <source>There are no selected files to post...</source>
         <translation>没有选中的文件用于发布...</translation>
     </message>
@@ -5559,45 +5570,43 @@ Would you like to overwrite it ?</source>
     </message>
     <message>
         <location line="+47"/>
-        <location line="+614"/>
+        <location line="+588"/>
         <location line="+19"/>
         <source>Stop Posting</source>
         <translation>停止发布</translation>
     </message>
     <message>
-        <location line="-627"/>
-        <location line="+630"/>
+        <location line="-601"/>
+        <location line="+604"/>
         <source>Cancel Posting</source>
         <translation>取消发布</translation>
     </message>
     <message>
-        <location line="-599"/>
+        <location line="-563"/>
         <source>Select one or more files to Post</source>
         <translation>选择一个或多个文件发布</translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+62"/>
         <source>Select a Folder</source>
         <translation>选择一个文件夹</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="-32"/>
+        <location line="+1"/>
+        <location line="+65"/>
+        <location line="+28"/>
+        <location line="+1"/>
+        <source>requires: %1</source>
+        <translation>需要：%1</translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>Create nzb file</source>
         <translation>创建nzb文件</translation>
     </message>
     <message>
-        <location line="+13"/>
-        <source>Select rar executable</source>
-        <translation>选择rar可执行文件</translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>the selected file is not executable...</source>
-        <translation>选中的不是可执行文件...</translation>
-    </message>
-    <message>
-        <location line="+253"/>
+        <location line="+231"/>
         <source>Create a post info file</source>
         <translation>创建信息文件</translation>
     </message>
@@ -5629,17 +5638,12 @@ Some Usenet indexes ask for one.</source>
         <translation>已保存默认设置：模板 %1，写入 %2</translation>
     </message>
     <message>
-        <location line="+68"/>
-        <source>limit the number of archive volume to %1 (cf config RAR_MAX)</source>
-        <translation>限制压缩卷数目为%1（配置文件中参数RAR_MAX）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="-304"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>从配置文件中使用参数PAR2_ARGS: %1</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+379"/>
         <source>You can add files or folder by:</source>
         <translation>您可以通过以下方法来添加文件或文件夹:</translation>
     </message>
