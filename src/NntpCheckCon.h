@@ -26,6 +26,7 @@ class NzbCheck;
 #include <QObject>
 #include <QSslError>
 #include <QTcpSocket>
+#include <QTimer>
 class QSslSocket;
 class QByteArray;
 
@@ -34,6 +35,10 @@ class NntpCheckCon : public QObject
     Q_OBJECT
 
 private:
+    //! Either report this connection finished, or bring it back for another
+    //! try when there is still work and budget left.
+    void _finishOrRetry();
+
     enum class PostingState {
         NOT_CONNECTED = 0,
         CONNECTED,
@@ -52,6 +57,8 @@ private:
 
     PostingState _postingState;
     QString _currentArticle;
+    ushort  _nbRetries; //!< reconnections already spent by this connection
+    QTimer  _watchdog;  //!< fires when the server has gone silent for too long
 
 public:
     NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &srvParams);
@@ -72,6 +79,7 @@ public slots:
 
     void onConnected();
     void onEncrypted();
+    void onWatchdogTimeout();
 
     void onDisconnected(); //!< Handle disconnection
 

@@ -2604,6 +2604,8 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         // Block size, most specific source first. Anything below these is a
         // guess NzbCheck makes from the nzb itself, and says so in its report.
         _nzbCheck->setArticleSize(sArticleSize);
+        _nzbCheck->setSocketTimeOut(_socketTimeOut);
+        _nzbCheck->setMaxRetries(NntpArticle::nbMaxTrySending());
         if (parser.isSet(sOptionNames[Opt::PAR2_BLOCK_SIZE]))
         {
             bool     ok        = false;

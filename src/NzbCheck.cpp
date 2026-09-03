@@ -186,6 +186,8 @@ NzbCheck::NzbCheck()
     , _jsonOutput(false)
     , _unusable(false)
     , _nbCons(0) // only assigned by checkPost(), which a failed check never reaches
+    , _socketTimeOut(30000)
+    , _maxRetries(5)
     , _par2Volumes()
     , _articleVolume()
     , _nbPar2Articles(0)

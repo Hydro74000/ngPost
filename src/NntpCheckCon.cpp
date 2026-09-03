@@ -35,7 +35,15 @@ NntpCheckCon::NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &s
     , _isConnected(false)
     , _postingState(PostingState::NOT_CONNECTED)
     , _currentArticle()
+    , _nbRetries(0)
+    , _watchdog()
 {
+    // A server that accepts the TCP connection and then says nothing used to
+    // hold the whole check open for ever: nothing in this class ever looked at
+    // the socket timeout.
+    _watchdog.setSingleShot(true);
+    connect(&_watchdog, &QTimer::timeout, this, &NntpCheckCon::onWatchdogTimeout);
+
     connect(this,
             &NntpCheckCon::startConnection,
             this,
@@ -139,10 +147,12 @@ void NntpCheckCon::onStartConnection()
         }
     }
     _socket->connectToHost(_srvParams.host, _srvParams.port);
+    _watchdog.start(_nzbCheck->socketTimeOut());
 }
 
 void NntpCheckCon::onKillConnection()
 {
+    _watchdog.stop();
     if (_socket) {
         disconnect(_socket, &QIODevice::readyRead, this, &NntpCheckCon::onReadyRead);
         disconnect(_socket, &QAbstractSocket::disconnected, this, &NntpCheckCon::onDisconnected);
@@ -191,16 +201,66 @@ void NntpCheckCon::onEncrypted()
 
 void NntpCheckCon::onDisconnected()
 {
+    _watchdog.stop();
     if (_socket) {
         _isConnected = false;
         _socket->deleteLater();
         _socket = nullptr;
     }
+    _finishOrRetry();
+}
+
+void NntpCheckCon::onWatchdogTimeout()
+{
+    _nzbCheck->error(tr("[Con #%1] %2:%3 stopped answering after %4 s, dropping the connection")
+                             .arg(_id)
+                             .arg(_srvParams.host)
+                             .arg(_srvParams.port)
+                             .arg(_nzbCheck->socketTimeOut() / 1000));
+    if (!_socket) {
+        _finishOrRetry();
+        return;
+    }
+    disconnect(_socket, &QIODevice::readyRead, this, &NntpCheckCon::onReadyRead);
+    bool const wasConnected = _isConnected;
+    _socket->abort();
+    // abort() only emits disconnected() when the socket had reached the
+    // connected state; a stalled connect leaves us to close the loop ourselves.
+    if (!wasConnected) {
+        _socket->deleteLater();
+        _socket      = nullptr;
+        _isConnected = false;
+        _finishOrRetry();
+    }
+}
+
+void NntpCheckCon::_finishOrRetry()
+{
+    // The article that was in flight never got its answer. Hand it back, or it
+    // is simply never checked and the run quietly reports fewer articles than
+    // the nzb holds -- which is exactly what makes a check "incomplete".
+    if (!_currentArticle.isNull()) {
+        _nzbCheck->requeueArticle(_currentArticle);
+        _currentArticle.clear();
+    }
+
+    if (_nzbCheck->hasArticlesLeft() && _nbRetries < _nzbCheck->maxRetries()) {
+        ++_nbRetries;
+        _nzbCheck->error(tr("[Con #%1] reconnecting (attempt %2 of %3)")
+                                 .arg(_id)
+                                 .arg(_nbRetries)
+                                 .arg(_nzbCheck->maxRetries()));
+        _postingState = PostingState::NOT_CONNECTED;
+        emit startConnection();
+        return;
+    }
+
     emit disconnected(this);
 }
 
 void NntpCheckCon::onReadyRead()
 {
+    _watchdog.stop(); // the server is talking to us
     while (_isConnected && _socket->canReadLine()) {
         QByteArray line = _socket->readLine();
         //        qDebug() << "line: " << line.constData();
@@ -210,6 +270,8 @@ void NntpCheckCon::onReadyRead()
                 _nzbCheck->missingArticle(_currentArticle);
 
             _nzbCheck->articleChecked();
+            _currentArticle.clear(); // answered: no longer in flight
+            _nbRetries = 0;          // the budget is per incident, not per run
             _postingState = PostingState::IDLE;
             _checkNextArticle();
         } else if (_postingState == PostingState::CONNECTED) {
@@ -294,7 +356,7 @@ void NntpCheckCon::_closeConnection()
         if (_socket)
             _socket->deleteLater();
         _socket = nullptr;
-        emit disconnected(this);
+        _finishOrRetry();
     }
 }
 
@@ -308,7 +370,9 @@ void NntpCheckCon::_checkNextArticle()
 
         _postingState = PostingState::CHECKING_ARTICLE;
         _socket->write(QString("%1 %2\r\n").arg(Nntp::STAT).arg(_currentArticle).toLocal8Bit());
+        _watchdog.start(_nzbCheck->socketTimeOut());
     } else {
+        _watchdog.stop();
         if (_nzbCheck->debugMode())
             _nzbCheck->log(tr("[Con #%1] No more Article").arg(_id));
 

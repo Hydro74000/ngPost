@@ -161,6 +161,7 @@ private slots:
     void check_recovery_is_certain_when_blocks_cover_the_loss();
     void check_recovery_is_impossible_when_the_loss_exceeds_the_blocks();
     void check_prorates_the_blocks_of_a_damaged_par2_volume();
+    void check_loses_no_article_when_the_connection_drops();
 
     //! An unknown flag fails with a non-zero exit code. Currently
     //! ERR_WRONG_ARG = 3 but tests assert "non-zero" for resilience to enum
@@ -771,6 +772,40 @@ void TestCliParser::check_prorates_the_blocks_of_a_damaged_par2_volume()
     QCOMPARE(par2.value(QStringLiteral("blocksUsable")).toInt(), 30);
     // The data itself never left, so there is nothing to recover.
     QCOMPARE(par2.value(QStringLiteral("recovery")).toString(), QStringLiteral("notNeeded"));
+}
+
+//! A connection cut mid-check used to take its in-flight article with it: the
+//! reconnection popped a fresh one and the answer for the old one was never
+//! asked for again, so the run ended "incomplete" through its own doing.
+void TestCliParser::check_loses_no_article_when_the_connection_drops()
+{
+    HomeSandbox sandbox;
+
+    MockNntpServer server;
+    // Small enough that the server hangs up after a couple of commands, so the
+    // check has to reconnect several times to get through the nzb.
+    QVERIFY2(server.start({ QStringLiteral("--drop-after-bytes"), QStringLiteral("60") }),
+             "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzb = writeRecoveryNzb(sandbox.rootPath(), QStringLiteral("flaky.nzb"),
+                                         6, 716800, 4, 2);
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--check", nzb },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject articles = report.object().value(QStringLiteral("articles")).toObject();
+    QCOMPARE(articles.value(QStringLiteral("checked")).toInt(), 8);
+    QCOMPARE(articles.value(QStringLiteral("total")).toInt(), 8);
+    QCOMPARE(articles.value(QStringLiteral("missing")).toInt(), 0);
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Complete));
+    QVERIFY2(!r.stderrText.contains(QStringLiteral("INCOMPLETE")),
+             qPrintable(QStringLiteral("the check reported itself incomplete:\n") + r.stderrText));
 }
 
 void TestCliParser::unknown_flag_rejected()

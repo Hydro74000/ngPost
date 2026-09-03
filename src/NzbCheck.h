@@ -105,6 +105,8 @@ private:
 
     QElapsedTimer _timeStart;
     int _nbCons;
+    int    _socketTimeOut; //!< ms a connection may stay silent before we drop it
+    ushort _maxRetries;    //!< reconnections allowed to a single connection
 
     // ---- PAR2 recovery analysis ----
     QVector<Par2Volume> _par2Volumes;
@@ -170,11 +172,19 @@ public:
     inline void setDispProgressBar(bool display);
     inline void setQuiet(bool quiet);
     inline void setJsonOutput(bool json);
+    inline void setSocketTimeOut(int ms);
+    inline void setMaxRetries(ushort nb);
+    inline int socketTimeOut() const;
+    inline ushort maxRetries() const;
     inline void setPar2BlockSize(qint64 bytes, const QString &source);
     inline void setArticleSize(qint64 bytes);
 
     inline void missingArticle(const QString &article);
     inline QString getNextArticle();
+    //! Hand back an article whose answer never came, so a dropped connection
+    //! does not silently remove it from the run.
+    inline void requeueArticle(const QString &article);
+    inline bool hasArticlesLeft() const;
     inline void articleChecked();
 
     //! The check cannot even be attempted (nzb unreadable, no server able to
@@ -235,6 +245,23 @@ void NzbCheck::setJsonOutput(bool json)
 {
     _jsonOutput = json;
 }
+void NzbCheck::setSocketTimeOut(int ms)
+{
+    if (ms > 0)
+        _socketTimeOut = ms;
+}
+void NzbCheck::setMaxRetries(ushort nb)
+{
+    _maxRetries = nb;
+}
+int NzbCheck::socketTimeOut() const
+{
+    return _socketTimeOut;
+}
+ushort NzbCheck::maxRetries() const
+{
+    return _maxRetries;
+}
 
 void NzbCheck::setPar2BlockSize(qint64 bytes, const QString &source)
 {
@@ -277,6 +304,17 @@ QString NzbCheck::getNextArticle()
         return QString();
     else
         return _articles.pop();
+}
+
+void NzbCheck::requeueArticle(const QString &article)
+{
+    if (!article.isNull())
+        _articles.push(article);
+}
+
+bool NzbCheck::hasArticlesLeft() const
+{
+    return !_articles.isEmpty();
 }
 
 void NzbCheck::articleChecked()
