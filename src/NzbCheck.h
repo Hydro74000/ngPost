@@ -210,6 +210,10 @@ public:
     bool hasIntactPar2Metadata() const;
     //! Blocks the missing data articles damage: {clustered, scattered}.
     QPair<int, int> damagedBlockRange() const;
+    //! Share of the data the recovery blocks still cover, in percent, and what
+    //! it was when the post was made. Negative when the nzb does not say how
+    //! big the data is.
+    QPair<double, double> redundancyPercent() const;
     Recovery recoveryVerdict() const;
     inline int exitCode() const;
     inline bool debugMode() const;

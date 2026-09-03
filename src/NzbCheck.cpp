@@ -495,6 +495,18 @@ QPair<int, int> NzbCheck::damagedBlockRange() const
     return { static_cast<int>(clustered), static_cast<int>(qMax(clustered, scattered)) };
 }
 
+QPair<double, double> NzbCheck::redundancyPercent() const
+{
+    // Blocks alone say nothing: forty blocks over a 200 MB post is generous,
+    // over a 40 GB one it is nothing. What predicts whether a post survives
+    // Usenet is the share of itself it can rebuild.
+    if (_dataSizeBytes <= 0 || _par2BlockSize <= 0)
+        return { -1.0, -1.0 };
+    double const data = static_cast<double>(_dataSizeBytes);
+    return { 100.0 * usableRecoveryBlocks() * _par2BlockSize / data,
+             100.0 * totalRecoveryBlocks() * _par2BlockSize / data };
+}
+
 NzbCheck::Recovery NzbCheck::recoveryVerdict() const
 {
     if (_nbMissingDataArticles <= 0)
@@ -555,6 +567,12 @@ void NzbCheck::_printRecoveryAnalysis()
     }
 
     _cout << tr("  Recovery blocks: %1 of %2 still usable").arg(usable).arg(total) << "\n";
+    QPair<double, double> const redundancy = redundancyPercent();
+    if (redundancy.first >= 0.0)
+        _cout << tr("  Redundancy: %1% of the data can still be rebuilt (%2% when it was posted)")
+                     .arg(redundancy.first, 0, 'f', 1)
+                     .arg(redundancy.second, 0, 'f', 1)
+              << "\n";
     _cout << (hasIntactPar2Metadata()
                       ? tr("  PAR2 metadata: available, so a repair knows what to rebuild")
                       : tr("  PAR2 metadata: LOST - every PAR2 file is damaged"))
@@ -658,6 +676,11 @@ void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
     par2[QStringLiteral("damagedBlocksMin")]  = damaged.first;
     par2[QStringLiteral("damagedBlocksMax")]  = damaged.second;
     par2[QStringLiteral("recovery")]          = recoveryName;
+    QPair<double, double> const redundancy = redundancyPercent();
+    if (redundancy.first >= 0.0) {
+        par2[QStringLiteral("redundancyPercent")]         = redundancy.first;
+        par2[QStringLiteral("redundancyPercentOriginal")] = redundancy.second;
+    }
 
     QJsonObject root;
     root[QStringLiteral("nzb")]         = QFileInfo(_nzbPath).absoluteFilePath();
