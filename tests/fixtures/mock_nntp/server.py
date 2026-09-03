@@ -174,7 +174,14 @@ class Session:
                     # Used by --check. Default: report the article exists.
                     parts = cmd_line.split(None, 1)
                     msgid = parts[1].strip("<>") if len(parts) > 1 else "1"
-                    if self.opts.stat_missing:
+                    # --stat-missing hides everything; --missing-ids hides a
+                    # chosen subset, which is what a PAR2 recovery scenario needs
+                    # ("this volume lost one segment, that one is intact").
+                    missing = self.opts.stat_missing or msgid in self.opts.missing_id_set
+                    # Traced so a test can assert the order articles were asked
+                    # in, and how many were asked before the check gave up.
+                    self.log(f"STAT <{msgid}> -> {'430' if missing else '223'}")
+                    if missing:
                         await self.write_line(
                             f"430 No article with message-id <{msgid}>".encode("latin1")
                         )
@@ -307,6 +314,10 @@ def main(argv: list[str]) -> int:
                    help="Sleep N ms before each server reply (default 0)")
     p.add_argument("--stat-missing", action="store_true",
                    help="Reply 430 to STAT (simulates missing articles for --check)")
+    p.add_argument("--missing-ids", default=None,
+                   help="File of message-ids (one per line, angle brackets optional, "
+                        "'#' comments allowed) to report as missing; every other "
+                        "article is reported present")
     p.add_argument("--ssl-port", type=int, default=None,
                    help="If set, also listen on this TCP port wrapped in TLS")
     p.add_argument("--ssl-port-file", default=None,
@@ -316,6 +327,13 @@ def main(argv: list[str]) -> int:
     p.add_argument("--ssl-key", default=None,
                    help="Path to the TLS private key (PEM)")
     opts = p.parse_args(argv)
+
+    opts.missing_id_set: set[str] = set()
+    if opts.missing_ids:
+        for line in Path(opts.missing_ids).read_text(encoding="utf-8").splitlines():
+            line = line.split("#", 1)[0].strip()
+            if line:
+                opts.missing_id_set.add(line.strip("<>"))
 
     return asyncio.run(_run(opts))
 
