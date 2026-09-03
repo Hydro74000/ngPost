@@ -42,6 +42,8 @@
 #include <QThread>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
+#include <system_error>
 
 namespace
 {
@@ -54,6 +56,74 @@ int decimalPadding(uint count)
         count /= 10;
     }
     return padding;
+}
+
+std::filesystem::path toStdPath(QString const &path)
+{
+#if defined(Q_OS_WIN)
+    return std::filesystem::path(reinterpret_cast<wchar_t const *>(path.utf16()));
+#else
+    return std::filesystem::path(QFile::encodeName(path).toStdString());
+#endif
+}
+
+//! Move a path, or fail -- never copy.
+//!
+//! QFile::rename() silently falls back to copying the whole file when the
+//! kernel answers EXDEV, which on a 50 GB post is not a rename at all. No
+//! pre-check predicts EXDEV reliably either: two btrfs subvolumes report the
+//! same QStorageInfo::device() and still refuse rename(2). So ask the kernel
+//! and let it answer. std::filesystem::rename maps to rename(2) on POSIX and
+//! to MoveFileExW without MOVEFILE_COPY_ALLOWED on Windows, so neither copies.
+bool moveWithoutCopying(QString const &from, QString const &to)
+{
+    std::error_code ec;
+    std::filesystem::rename(toStdPath(from), toStdPath(to), ec);
+    return !ec;
+}
+
+//! Restore obfuscated inputs without throwing away failed mappings. The
+//! optional NgPost pointer only supplies monitor suppression; keeping the
+//! filesystem transition here also lets the regression test exercise the
+//! exact production algorithm.
+bool restoreObfuscatedPaths(QMap<QString, QString> &paths,
+                            QString &stagingPath,
+                            NgPost *ngPost,
+                            QList<QPair<QString, QString>> *failedRestores = nullptr)
+{
+    auto it = paths.begin();
+    while (it != paths.end()) {
+        const QString stagedPath = it.key();
+        const QString originalPath = it.value();
+
+        if (ngPost)
+            ngPost->ignoreMonitorPath(originalPath);
+
+        if (QFile::rename(stagedPath, originalPath)) {
+            if (ngPost)
+                ngPost->stopIgnoringMonitorPath(stagedPath);
+            it = paths.erase(it);
+        } else {
+            // Nothing appeared at the destination, so that reservation is moot
+            // -- release it or it would swallow a genuine drop of the same name
+            // later. The staged path keeps its reservation: the file is STILL
+            // there, and that reservation is the only thing stopping the
+            // monitor from adopting it should the staging folder sit inside a
+            // watched tree. It is released on success, when the file leaves.
+            if (ngPost)
+                ngPost->stopIgnoringMonitorPath(originalPath);
+            if (failedRestores)
+                failedRestores->append(qMakePair(stagedPath, originalPath));
+            ++it;
+        }
+    }
+
+    if (paths.isEmpty() && !stagingPath.isEmpty()) {
+        if (!QFileInfo::exists(stagingPath) || QDir().rmdir(stagingPath))
+            stagingPath.clear();
+    }
+
+    return paths.isEmpty() && stagingPath.isEmpty();
 }
 
 QString par2RedundancyArg(bool useParPar, bool useMultiPar, uint redundancy)
@@ -408,15 +478,40 @@ PostingJob::~PostingJob()
     if (_ngPost->debugMode())
         _log("Deleting PostingJob");
 
+    // A queued pre-packing job can be destroyed while its compressor is still
+    // running. Release every process handle before trying to move the user's
+    // source files back, particularly for Windows file-locking semantics.
+    //
+    // This runs on the GUI thread, so the waits are deliberately short: a
+    // compressor answers SIGTERM in milliseconds, and SIGKILL is not negotiable
+    // at all. A wedged process must not freeze the interface for seconds --
+    // failing to reap it only costs us this one restore attempt, which the
+    // caller already treats as retryable.
+    if (_extProc) {
+        disconnect(_extProc, nullptr, this, nullptr);
+        if (_extProc->state() != QProcess::NotRunning) {
+            _extProc->terminate();
+            if (!_extProc->waitForFinished(1500)) {
+                _extProc->kill();
+                if (!_extProc->waitForFinished(500))
+                    _error(tr("Could not stop the external process before restoring source files"));
+            }
+        }
+        _cleanExtProc();
+    }
+
+    // Last resort: a job torn down before onCompressionFinished() ran would
+    // otherwise leave the user's files in the staging folder under a random
+    // name.
+    if (!_obfuscatedFileNames.isEmpty() || !_obfuscationStagingPath.isEmpty())
+        _restoreObfuscatedFileNames();
+
     if (_compressDir) {
         if (hasPostFinishedSuccessfully())
             _cleanCompressDir();
         delete _compressDir;
         _compressDir = nullptr;
     }
-
-    if (_extProc)
-        _cleanExtProc();
 
     qDeleteAll(_filesFailed);
     qDeleteAll(_filesInProgress);
@@ -1108,6 +1203,102 @@ void PostingJob::_copyNfoNextToNzb()
     else
         _error(tr("Couldn't copy nfo %1 to %2").arg(_nfoSrcToCopy, destPath));
 }
+
+//! Give every input file a random name so the archive stores nothing
+//! recognisable, moving it out of its own folder while we are at it.
+//!
+//! Renaming in place used to make the folder monitor see a brand new file and
+//! post it again -- and again after the rename was undone -- which is issue
+//! #193: monitoring plus filename obfuscation looped forever. The staging
+//! folder sits NEXT TO the archive folder rather than inside it, because
+//! _cleanCompressDir() wipes the archive folder recursively on any compression
+//! error and the user's own files must never live inside something we delete.
+void PostingJob::_obfuscateInputFileNames(QString const &tmpFolder, QString const &archiveName)
+{
+    QString const stagingPath = QString("%1/.ngPost_src_%2").arg(tmpFolder, archiveName);
+    QDir          staging(stagingPath);
+    bool const    hasStaging = staging.exists() || staging.mkpath(QStringLiteral("."));
+    if (!hasStaging)
+        _error(tr("Couldn't create the staging folder '%1': obfuscated files will be renamed "
+                  "where they are")
+                   .arg(stagingPath));
+    else
+        _obfuscationStagingPath = stagingPath;
+
+    _files.clear();
+    for (const QFileInfo &fileInfo : _originalFiles) {
+        QString randomBase = _ngPost->randomPass(_ngPost->_lengthName);
+        if (_ngPost->_keepNfoExtension
+            && fileInfo.suffix().compare("nfo", Qt::CaseInsensitive) == 0)
+            randomBase += ".nfo";
+
+        QString const fileName = fileInfo.absoluteFilePath();
+        QString       obfuscatedName;
+        bool          renamed = false;
+
+        if (hasStaging) {
+            obfuscatedName = QString("%1/%2").arg(stagingPath, randomBase);
+            // Whatever appears at that path is us, not something new to post.
+            // Registered before the move, because the watcher can fire on it
+            // the instant it exists.
+            _ngPost->ignoreMonitorPath(obfuscatedName);
+            renamed = moveWithoutCopying(fileName, obfuscatedName);
+            if (!renamed) {
+                _ngPost->stopIgnoringMonitorPath(obfuscatedName);
+                _log(tr("'%1' cannot be moved into the temporary folder without copying it "
+                        "(they are on different filesystems): renaming it where it is instead")
+                         .arg(fileName));
+            }
+        }
+
+        if (!renamed) {
+            // Same folder, so this one is a plain rename whatever the layout.
+            obfuscatedName = QString("%1/%2").arg(fileInfo.absolutePath(), randomBase);
+            _ngPost->ignoreMonitorPath(obfuscatedName);
+            renamed = QFile::rename(fileName, obfuscatedName);
+            if (!renamed)
+                _ngPost->stopIgnoringMonitorPath(obfuscatedName);
+        }
+
+        if (renamed) {
+            _obfuscatedFileNames.insert(obfuscatedName, fileName);
+            _files << QFileInfo(obfuscatedName);
+        } else {
+            _files << fileInfo;
+            _error(tr("Couldn't rename file %1").arg(fileName));
+        }
+    }
+}
+
+//! Put every obfuscated input back under its real name and location. Failed
+//! mappings are retained so cleanup can retry after the external process has
+//! released its handles.
+bool PostingJob::_restoreObfuscatedFileNames()
+{
+    QList<QPair<QString, QString>> failedRestores;
+    const bool restored = restoreObfuscatedPaths(_obfuscatedFileNames,
+                                                  _obfuscationStagingPath,
+                                                  _ngPost,
+                                                  &failedRestores);
+    for (const auto &failure : failedRestores) {
+        _error(tr("Couldn't restore %1 to its original name %2")
+                   .arg(failure.first, failure.second));
+    }
+
+    if (!_obfuscationStagingPath.isEmpty())
+        _error(tr("The staging folder '%1' is not empty: some obfuscated files could not be "
+                  "put back")
+                   .arg(_obfuscationStagingPath));
+    return restored;
+}
+
+#ifdef NGPOST_TESTING
+bool PostingJob::restoreObfuscatedPathsForTest(QMap<QString, QString> &paths,
+                                                QString &stagingPath)
+{
+    return restoreObfuscatedPaths(paths, stagingPath, nullptr);
+}
+#endif
 
 void PostingJob::_delOriginalFiles()
 {
@@ -1906,25 +2097,8 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
 #endif
     args << QString("%1/%2.%3").arg(archiveTmpFolder, archiveName, _use7z ? "7z" : "rar");
 
-    if (_obfuscateFileName) {
-        _files.clear();
-        for (const QFileInfo &fileInfo : _originalFiles) {
-            QString randomBase = _ngPost->randomPass(_ngPost->_lengthName);
-            if (_ngPost->_keepNfoExtension
-                && fileInfo.suffix().compare("nfo", Qt::CaseInsensitive) == 0)
-                randomBase += ".nfo";
-            QString obfuscatedName = QString("%1/%2").arg(fileInfo.absolutePath(), randomBase),
-                    fileName = fileInfo.absoluteFilePath();
-
-            if (QFile::rename(fileName, obfuscatedName)) {
-                _obfuscatedFileNames.insert(obfuscatedName, fileName);
-                _files << QFileInfo(obfuscatedName);
-            } else {
-                _files << fileInfo;
-                _error(tr("Couldn't rename file %1").arg(fileName));
-            }
-        }
-    }
+    if (_obfuscateFileName)
+        _obfuscateInputFileNames(tmpFolder, archiveName);
 
     bool hasDir = false;
     if (_files.size()
@@ -1988,12 +2162,18 @@ void PostingJob::onCompressionFinished(int exitCode)
     _log("[PostingJob::_compressFiles] compression finished...");
 #endif
 
-    if (_obfuscateFileName && !MB_LoadAtomic(_delFilesAfterPost)) {
-        for (auto it = _obfuscatedFileNames.cbegin(), itEnd = _obfuscatedFileNames.cend();
-             it != itEnd;
-             ++it)
-            QFile::rename(it.key(), it.value());
-    }
+    // Unconditional, even with --rm_posted: _delOriginalFiles() removes the
+    // files by their ORIGINAL path, so leaving them renamed meant it deleted
+    // nothing and left the obfuscated copies behind.
+    //
+    // A failure here does NOT cancel the post. The archive is built and
+    // perfectly postable; putting a source file back under its real name is
+    // housekeeping, and throwing away what the user actually asked for to
+    // punish a failed rename is the wrong trade. The mapping is kept, so the
+    // destructor retries once the compressor has released the file.
+    if (_obfuscateFileName && !_restoreObfuscatedFileNames())
+        _error(tr("Some source files are still under their obfuscated name; ngPost will try "
+                  "again when the job ends. The post itself is unaffected."));
 
     if (exitCode != 0) {
         _error(tr("Error during compression: %1").arg(exitCode));

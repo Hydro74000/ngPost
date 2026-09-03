@@ -656,6 +656,11 @@ public:
     inline bool nzbCheck() const;
     int nbMissingArticles() const;
 
+    //! Tell the folder monitor (if any) that a path about to appear is ngPost's
+    //! own doing, so it is not mistaken for a new file to post.
+    void ignoreMonitorPath(const QString &absolutePath);
+    void stopIgnoringMonitorPath(const QString &absolutePath);
+
     inline bool useParPar() const;
     inline bool useMultiPar() const;
     inline bool lastPostingStartCanceled() const;

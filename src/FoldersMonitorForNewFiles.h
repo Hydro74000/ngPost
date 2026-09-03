@@ -25,6 +25,7 @@
 #include <QFileInfoList>
 #include <QFileSystemWatcher>
 #include <QMap>
+#include <QMutex>
 #include <QSet>
 using AtomicBool = QAtomicInteger<unsigned short>; // 16 bit only (faster than using 8 bit variable...)
 using PathSet = QSet<QString>;
@@ -54,7 +55,17 @@ private:
     QMap<QString, FolderScan *> _folders; //!< track files processed (their date might be > _lastCheck)
     AtomicBool _stopListening;
 
+    mutable QMutex _ignoredPathsMutex; //!< the writer is the posting thread, the reader is ours
+    PathSet _ignoredPaths;             //!< paths ngPost itself is about to create
+
     static ulong sMSleep;
+    //! How many consecutive identical (size, mtime) samples make a file "done".
+    //! One is not enough: a copy over SMB, or any tool that pre-allocates,
+    //! holds a stable size for a moment in the middle of the write.
+    static ushort sNbStableScans;
+#if defined(Q_OS_WIN)
+    static ushort sMaxLockRetries; //!< how long to wait on a share violation, in sMSleep units
+#endif
 
 public:
     FoldersMonitorForNewFiles(const QString &folderPath, QObject *parent = nullptr);
@@ -62,6 +73,17 @@ public:
 
     bool addFolder(const QString &folderPath);
     void stopListening();
+
+    //! Declare a path ngPost is about to create itself (an obfuscated input
+    //! file, or that same file being put back). Without this, PostingJob
+    //! renaming the files it is posting makes us report them as new ones and
+    //! the post loops forever -- issue #193. Thread safe: called from the
+    //! posting thread while we run in the monitor thread.
+    void ignoreNextAppearance(const QString &path);
+
+    //! Drop a reservation made by ignoreNextAppearance() that will never be
+    //! used (the rename failed, or the file has left that path for good).
+    void stopIgnoringMonitorPath(const QString &path);
 
 signals:
     void newFileToProcess(const QFileInfo &fileInfo);
@@ -72,6 +94,14 @@ public slots:
 private:
     qint64 _pathSize(QFileInfo &fileInfo) const;
     qint64 _dirSize(const QString &path) const;
+
+    static QString _normalized(const QString &path);
+    bool _consumeIgnoredPath(const QString &absolutePath);
+    void _releaseSpentReservations(const QString &folderPath, const PathSet &scan);
+    ushort _waitUntilFullyWritten(QFileInfo &fileInfo, qint64 &size) const;
+#if defined(Q_OS_WIN)
+    bool _waitUntilNotLocked(const QFileInfo &fileInfo, ushort &nbWait) const;
+#endif
 };
 
 #endif // FOLDERSMONITORFORNEWFILES_H

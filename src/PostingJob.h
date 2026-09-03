@@ -177,7 +177,8 @@ private:
 
     const bool _overwriteNzb;
 
-    QMap<QString, QString> _obfuscatedFileNames;
+    QMap<QString, QString> _obfuscatedFileNames; //!< obfuscated path -> real path, undone after compression
+    QString _obfuscationStagingPath;              //!< folder the obfuscated inputs were moved to (empty if none)
 
     const QList<QString>
         _grpList; //!< Newsgroup where we're posting in a list format to write in the nzb file
@@ -301,6 +302,8 @@ public:
                                             bool useParPar,
                                             bool useMultiPar,
                                             uint redundancy);
+    static bool restoreObfuscatedPathsForTest(QMap<QString, QString> &paths,
+                                              QString &stagingPath);
 #endif
 
 signals:
@@ -369,6 +372,9 @@ private:
     NntpArticle *_readNextArticleIntoBufferPtr(const QString &threadName, char **bufferPtr);
 
     void _delOriginalFiles();
+
+    void _obfuscateInputFileNames(QString const &tmpFolder, QString const &archiveName);
+    bool _restoreObfuscatedFileNames();
 
     void _resolveNfoSource();
     void _copyNfoNextToNzb();

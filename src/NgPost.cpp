@@ -676,6 +676,18 @@ NgPost::~NgPost()
     }
 }
 
+void NgPost::ignoreMonitorPath(const QString &absolutePath)
+{
+    if (_folderMonitor)
+        _folderMonitor->ignoreNextAppearance(absolutePath);
+}
+
+void NgPost::stopIgnoringMonitorPath(const QString &absolutePath)
+{
+    if (_folderMonitor)
+        _folderMonitor->stopIgnoringMonitorPath(absolutePath);
+}
+
 int NgPost::nbMissingArticles() const
 {
     return _nzbCheck->nbMissingArticles();
