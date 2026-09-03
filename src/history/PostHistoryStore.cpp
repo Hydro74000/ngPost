@@ -345,6 +345,7 @@ bool PostHistoryStore::_execSchema(QString *error)
                        "part INTEGER NOT NULL,"
                        "pos INTEGER DEFAULT 0,"
                        "bytes INTEGER DEFAULT 0,"
+                       "body_bytes INTEGER DEFAULT 0,"
                        "status TEXT NOT NULL,"
                        "msg_id TEXT,"
                        "error TEXT,"
@@ -493,6 +494,34 @@ bool PostHistoryStore::_migrateSchema(QSqlDatabase &db, QString *error)
         QSqlQuery q(db);
         if (!q.exec(QStringLiteral(
                 "ALTER TABLE post_info ADD COLUMN article_size_bytes INTEGER"))) {
+            setError(error, q);
+            return false;
+        }
+    }
+
+    // v3 -> v4 records the size of the article as posted (yEnc encoded), which
+    // is what an nzb <segment bytes> must advertise. `bytes` keeps meaning the
+    // slice of the source file, because resolveArticleSizeBytes() reconstructs
+    // the configured article size from it. Rows written before this migration
+    // keep body_bytes = 0 and fall back to `bytes`, as they always did.
+    bool hasArticleBodyBytesColumn = false;
+    {
+        QSqlQuery q(db);
+        if (!q.exec(QStringLiteral("PRAGMA table_info(post_articles)"))) {
+            setError(error, q);
+            return false;
+        }
+        while (q.next()) {
+            if (q.value(1).toString() == QStringLiteral("body_bytes")) {
+                hasArticleBodyBytesColumn = true;
+                break;
+            }
+        }
+    }
+    if (!hasArticleBodyBytesColumn) {
+        QSqlQuery q(db);
+        if (!q.exec(QStringLiteral(
+                "ALTER TABLE post_articles ADD COLUMN body_bytes INTEGER DEFAULT 0"))) {
             setError(error, q);
             return false;
         }
@@ -1317,11 +1346,13 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
 
     if (!prepare(postingArticle,
                  QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
-                                "status, msg_id, error, updated_at)"
-                                "VALUES(?, ?, ?, ?, 'posting', ?, '', ?)"
+                                "status, msg_id, error, updated_at, body_bytes)"
+                                "VALUES(?, ?, ?, ?, 'posting', ?, '', ?, ?)"
                                 "ON CONFLICT(file_id, part) DO UPDATE SET "
                                 "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
                                 "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                "body_bytes=CASE WHEN excluded.body_bytes > 0"
+                                " THEN excluded.body_bytes ELSE body_bytes END,"
                                 "status='posting', msg_id=excluded.msg_id,"
                                 "updated_at=excluded.updated_at "
                                 "WHERE post_articles.status!='posted'"))
@@ -1331,11 +1362,13 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
                                    "VALUES(?, ?, ?, ?, 'posting', ?)"))
         || !prepare(postedArticle,
                     QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
-                                   "status, msg_id, error, updated_at)"
-                                   "VALUES(?, ?, ?, ?, 'posted', ?, '', ?)"
+                                   "status, msg_id, error, updated_at, body_bytes)"
+                                   "VALUES(?, ?, ?, ?, 'posted', ?, '', ?, ?)"
                                    "ON CONFLICT(file_id, part) DO UPDATE SET "
                                    "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
                                    "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                   "body_bytes=CASE WHEN excluded.body_bytes > 0"
+                                   " THEN excluded.body_bytes ELSE body_bytes END,"
                                    "status='posted', msg_id=excluded.msg_id, error='',"
                                    "updated_at=excluded.updated_at"))
         || !prepare(postedAttempt,
@@ -1344,11 +1377,13 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
                                    " AND status='posting'"))
         || !prepare(failedArticle,
                     QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
-                                   "status, msg_id, error, updated_at)"
-                                   "VALUES(?, ?, ?, ?, 'failed', ?, ?, ?)"
+                                   "status, msg_id, error, updated_at, body_bytes)"
+                                   "VALUES(?, ?, ?, ?, 'failed', ?, ?, ?, ?)"
                                    "ON CONFLICT(file_id, part) DO UPDATE SET "
                                    "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
                                    "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                   "body_bytes=CASE WHEN excluded.body_bytes > 0"
+                                   " THEN excluded.body_bytes ELSE body_bytes END,"
                                    "status='failed', msg_id=excluded.msg_id, error=excluded.error,"
                                    "updated_at=excluded.updated_at "
                                    "WHERE post_articles.status!='posted'"))
@@ -1358,11 +1393,13 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
                                    " AND msg_id=? AND status='posting'"))
         || !prepare(unknownArticle,
                     QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
-                                   "status, msg_id, error, updated_at)"
-                                   "VALUES(?, ?, ?, ?, 'unknown', ?, ?, ?)"
+                                   "status, msg_id, error, updated_at, body_bytes)"
+                                   "VALUES(?, ?, ?, ?, 'unknown', ?, ?, ?, ?)"
                                    "ON CONFLICT(file_id, part) DO UPDATE SET "
                                    "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
                                    "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                   "body_bytes=CASE WHEN excluded.body_bytes > 0"
+                                   " THEN excluded.body_bytes ELSE body_bytes END,"
                                    "status='unknown', msg_id=excluded.msg_id, error=excluded.error,"
                                    "updated_at=excluded.updated_at "
                                    "WHERE post_articles.status!='posted'"))
@@ -1394,6 +1431,7 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
             postingArticle.bindValue(3, storedPayloadBytes(event.bytes));
             postingArticle.bindValue(4, event.msgId);
             postingArticle.bindValue(5, stamp);
+            postingArticle.bindValue(6, storedPayloadBytes(event.bodyBytes));
             if (!execPrepared(postingArticle))
                 return false;
 
@@ -1413,6 +1451,7 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
             postedArticle.bindValue(3, storedPayloadBytes(event.bytes));
             postedArticle.bindValue(4, event.msgId);
             postedArticle.bindValue(5, stamp);
+            postedArticle.bindValue(6, storedPayloadBytes(event.bodyBytes));
             if (!execPrepared(postedArticle))
                 return false;
 
@@ -1432,6 +1471,7 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
             failedArticle.bindValue(4, event.msgId);
             failedArticle.bindValue(5, event.error);
             failedArticle.bindValue(6, stamp);
+            failedArticle.bindValue(7, storedPayloadBytes(event.bodyBytes));
             if (!execPrepared(failedArticle))
                 return false;
 
@@ -1452,6 +1492,7 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
             unknownArticle.bindValue(4, event.msgId);
             unknownArticle.bindValue(5, event.error);
             unknownArticle.bindValue(6, stamp);
+            unknownArticle.bindValue(7, storedPayloadBytes(event.bodyBytes));
             if (!execPrepared(unknownArticle))
                 return false;
 
@@ -2159,6 +2200,7 @@ bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QStr
             as.part = valueInt(a, "part");
             as.pos = valueI64(a, "pos");
             as.bytes = valueI64(a, "bytes");
+            as.bodyBytes = valueI64(a, "body_bytes");
             as.msgId = valueString(a, "msg_id");
             as.status = valueString(a, "status");
             details->articlesByFile[fs.id] << as;

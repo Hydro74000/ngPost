@@ -6,10 +6,10 @@
       <group>alt.binaries.test</group>
     </groups>
     <segments>
-      <segment bytes="1024" number="1">MSGID-0</segment>
-      <segment bytes="1024" number="2">MSGID-1</segment>
-      <segment bytes="1024" number="3">MSGID-2</segment>
-      <segment bytes="1024" number="4">MSGID-3</segment>
+      <segment bytes="1155" number="1">MSGID-0</segment>
+      <segment bytes="1158" number="2">MSGID-1</segment>
+      <segment bytes="1158" number="3">MSGID-2</segment>
+      <segment bytes="1158" number="4">MSGID-3</segment>
     </segments>
   </file>
 </nzb>

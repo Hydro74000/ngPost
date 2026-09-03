@@ -882,7 +882,8 @@ void PostHistoryService::enqueueArticlePosting(qint64 fileId,
                                                const QString &msgId,
                                                int attemptNo,
                                                qint64 pos,
-                                               qint64 bytes)
+                                               qint64 bytes,
+                                               qint64 bodyBytes)
 {
     PostHistoryStore::ArticleEvent event;
     event.kind = PostHistoryStore::ArticleEvent::Kind::Posting;
@@ -892,6 +893,7 @@ void PostHistoryService::enqueueArticlePosting(qint64 fileId,
     event.attemptNo = attemptNo;
     event.pos = pos;
     event.bytes = bytes;
+    event.bodyBytes = bodyBytes;
     _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
 }
 
@@ -899,7 +901,8 @@ void PostHistoryService::enqueueArticlePosted(qint64 fileId,
                                               int part,
                                               const QString &msgId,
                                               qint64 pos,
-                                              qint64 bytes)
+                                              qint64 bytes,
+                                              qint64 bodyBytes)
 {
     PostHistoryStore::ArticleEvent event;
     event.kind = PostHistoryStore::ArticleEvent::Kind::Posted;
@@ -908,6 +911,7 @@ void PostHistoryService::enqueueArticlePosted(qint64 fileId,
     event.msgId = msgId;
     event.pos = pos;
     event.bytes = bytes;
+    event.bodyBytes = bodyBytes;
     _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
 }
 
@@ -916,7 +920,8 @@ void PostHistoryService::enqueueArticleFailed(qint64 fileId,
                                               const QString &msgId,
                                               const QString &reason,
                                               qint64 pos,
-                                              qint64 bytes)
+                                              qint64 bytes,
+                                              qint64 bodyBytes)
 {
     PostHistoryStore::ArticleEvent event;
     event.kind = PostHistoryStore::ArticleEvent::Kind::Failed;
@@ -926,6 +931,7 @@ void PostHistoryService::enqueueArticleFailed(qint64 fileId,
     event.error = reason;
     event.pos = pos;
     event.bytes = bytes;
+    event.bodyBytes = bodyBytes;
     _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
 }
 
@@ -934,7 +940,8 @@ void PostHistoryService::enqueueArticleUnknown(qint64 fileId,
                                                const QString &msgId,
                                                const QString &reason,
                                                qint64 pos,
-                                               qint64 bytes)
+                                               qint64 bytes,
+                                               qint64 bodyBytes)
 {
     PostHistoryStore::ArticleEvent event;
     event.kind = PostHistoryStore::ArticleEvent::Kind::Unknown;
@@ -944,6 +951,7 @@ void PostHistoryService::enqueueArticleUnknown(qint64 fileId,
     event.error = reason;
     event.pos = pos;
     event.bytes = bytes;
+    event.bodyBytes = bodyBytes;
     _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
 }
 

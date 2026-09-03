@@ -210,6 +210,26 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
     const qint64 postFullArticleBytesHint = hasExactArticleSize
         ? details.articleSizeBytes
         : inferPostFullArticleBytesHint(details);
+    // Segment sizes have to describe the same thing throughout one nzb. A post
+    // that straddles the v3 -> v4 upgrade has body_bytes on the articles posted
+    // after it and nothing on the ones before, so mixing the two would hand the
+    // client a document where some segments are yEnc encoded sizes and others
+    // are the decoded ones. When even a single article predates the column,
+    // fall back to the decoded sizes everywhere -- the behaviour of every
+    // release before v4.
+    bool useBodyBytes = true;
+    for (const PostHistoryStore::FileSummary &file : details.files) {
+        for (const PostHistoryStore::ArticleSummary &article : details.articlesByFile.value(file.id)) {
+            if (article.status == QStringLiteral("posted") && !article.msgId.isEmpty()
+                && article.bodyBytes <= 0) {
+                useBodyBytes = false;
+                break;
+            }
+        }
+        if (!useBodyBytes)
+            break;
+    }
+
     int repairedArticleBytes = 0;
     for (const PostHistoryStore::FileSummary &file : details.files) {
         const QList<PostHistoryStore::ArticleSummary> articles = details.articlesByFile.value(file.id);
@@ -258,7 +278,11 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
         for (const PostHistoryStore::ArticleSummary &article : articles) {
             if (article.status != QStringLiteral("posted") || article.msgId.isEmpty())
                 continue;
-            qint64 segmentBytes = article.bytes;
+            // What the nzb advertises is the size of the article ON THE SERVER,
+            // i.e. the yEnc encoded body -- roughly 3% larger than the data it
+            // decodes to. `bytes` is that decoded slice, kept for rows written
+            // before body_bytes existed (schema v4).
+            qint64 segmentBytes = useBodyBytes ? article.bodyBytes : article.bytes;
             if (segmentBytes <= 0) {
                 segmentBytes = inferSegmentBytes(file, article.part, fullArticleBytes);
                 ++repairedArticleBytes;

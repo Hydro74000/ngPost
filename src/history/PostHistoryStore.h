@@ -53,7 +53,8 @@ public:
         qint64 fileId = 0;
         int part = 0;
         qint64 pos = 0;
-        qint64 bytes = 0;
+        qint64 bytes = 0;      //!< slice of the SOURCE file this article carries
+        qint64 bodyBytes = 0;  //!< size of the posted article once yEnc encoded
         QString status = QStringLiteral("pending");
         QString msgId;
         QString error;
@@ -71,7 +72,8 @@ public:
         qint64 fileId = 0;
         int part = 0;
         qint64 pos = 0;
-        qint64 bytes = 0;
+        qint64 bytes = 0;     //!< slice of the SOURCE file this article carries
+        qint64 bodyBytes = 0; //!< size of the posted article once yEnc encoded
         int attemptNo = 0;
         QString msgId;
         QString error;
@@ -111,8 +113,15 @@ public:
     struct ArticleSummary {
         qint64 fileId = 0;
         int part = 0;
+        //! pos/bytes describe the slice of the SOURCE file. They are what
+        //! resolveArticleSizeBytes() reconstructs the configured article size
+        //! from, so they must stay the decoded sizes.
         qint64 pos = 0;
         qint64 bytes = 0;
+        //! Size of the article as the server stores it (yEnc encoded body).
+        //! This -- not `bytes` -- is what an nzb <segment bytes> must carry.
+        //! 0 on rows written before schema v4.
+        qint64 bodyBytes = 0;
         QString msgId;
         QString status;
     };
@@ -359,7 +368,7 @@ public:
     //! Bump when the schema changes, and add the matching step in
     //! _migrateSchema(). v1: initial. v2: post_info/post_meta. v3: the frozen
     //! article-size boundary required for a byte-identical resume.
-    static constexpr int kSchemaVersion = 3;
+    static constexpr int kSchemaVersion = 4;
 
 private:
     QString _dbPath;

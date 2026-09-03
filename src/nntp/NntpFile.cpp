@@ -160,7 +160,7 @@ void NntpFile::writeToNZB(QTextStream &stream, const QString &from)
         for (NntpArticle *article : _articles)
         {
             stream << tab << tab << tab << "<segment"
-                   << " bytes=\""  << article->_fileBytes << "\""
+                   << " bytes=\""  << article->nzbBytes() << "\""
                    << " number=\"" << article->_part << "\">"
                    << article->_msgId
                    << "</segment>\n";

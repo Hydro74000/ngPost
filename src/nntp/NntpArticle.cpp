@@ -25,6 +25,7 @@ NntpArticle::NntpArticle(NntpFile *file, uint part, qint64 pos, qint64 bytes,
     _subject(nullptr),
     _body(nullptr),
     _filePos(pos), _fileBytes(bytes),
+    _bodySize(0),
     _nbTrySending(0),
     _msgId(),
     _obfuscateArticles(obfuscateArticles)
@@ -103,6 +104,13 @@ void NntpArticle::yEncBody(const char data[])
     _body = new char[body.size() + 1];
     std::copy(body.begin(), body.end(), _body);
     _body[body.size()] = '\0';
+
+    // What goes in the nzb is the article as the server stores it, so drop the
+    // trailing "." ENDLINE: that is the NNTP end-of-body marker written on the
+    // wire, not part of the article.
+    static const size_t kDotTerminator = 1 + std::char_traits<char>::length(Nntp::ENDLINE);
+    _bodySize = body.size() > kDotTerminator ? static_cast<qint64>(body.size() - kDotTerminator)
+                                             : static_cast<qint64>(body.size());
 }
 
 NntpArticle::~NntpArticle()

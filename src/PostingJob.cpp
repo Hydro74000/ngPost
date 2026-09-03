@@ -612,7 +612,8 @@ void PostingJob::recordHistoryArticlePosting(NntpArticle *article, int attemptNo
                                    article->id(),
                                    attemptNo,
                                    article->filePos(),
-                                   article->fileBytes());
+                                   article->fileBytes(),
+                                   article->nzbBytes());
 }
 
 void PostingJob::recordHistoryArticlePosted(NntpArticle *article)
@@ -624,7 +625,8 @@ void PostingJob::recordHistoryArticlePosted(NntpArticle *article)
                                   static_cast<int>(article->part()),
                                   article->id(),
                                   article->filePos(),
-                                  article->fileBytes());
+                                  article->fileBytes(),
+                                  article->nzbBytes());
 }
 
 void PostingJob::recordHistoryArticleFailed(NntpArticle *article, const QString &reason)
@@ -637,7 +639,8 @@ void PostingJob::recordHistoryArticleFailed(NntpArticle *article, const QString 
                                   article->id(),
                                   reason,
                                   article->filePos(),
-                                  article->fileBytes());
+                                  article->fileBytes(),
+                                  article->nzbBytes());
 }
 
 void PostingJob::recordHistoryArticleUnknown(NntpArticle *article, const QString &reason)
@@ -650,7 +653,8 @@ void PostingJob::recordHistoryArticleUnknown(NntpArticle *article, const QString
                                    article->id(),
                                    reason,
                                    article->filePos(),
-                                   article->fileBytes());
+                                   article->fileBytes(),
+                                   article->nzbBytes());
 }
 
 void PostingJob::onResumeTriggered()

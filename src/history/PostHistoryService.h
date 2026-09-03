@@ -111,29 +111,35 @@ public:
     qint64 upsertFile(const PostHistoryStore::FileRecord &record, QString *error = nullptr);
     void enqueueUpdateFileStatus(qint64 fileId, const QString &status);
 
+    //! \a bytes is the slice of the source file the article carries;
+    //! \a bodyBytes its size once yEnc encoded, i.e. what the nzb advertises.
     void enqueueArticlePosting(qint64 fileId,
                                int part,
                                const QString &msgId,
                                int attemptNo,
                                qint64 pos,
-                               qint64 bytes);
+                               qint64 bytes,
+                               qint64 bodyBytes = 0);
     void enqueueArticlePosted(qint64 fileId,
                               int part,
                               const QString &msgId,
                               qint64 pos,
-                              qint64 bytes);
+                              qint64 bytes,
+                              qint64 bodyBytes = 0);
     void enqueueArticleFailed(qint64 fileId,
                               int part,
                               const QString &msgId,
                               const QString &reason,
                               qint64 pos,
-                              qint64 bytes);
+                              qint64 bytes,
+                              qint64 bodyBytes = 0);
     void enqueueArticleUnknown(qint64 fileId,
                                int part,
                                const QString &msgId,
                                const QString &reason,
                                qint64 pos,
-                               qint64 bytes);
+                               qint64 bytes,
+                               qint64 bodyBytes = 0);
     bool flush(QString *error = nullptr);
 
     bool loadPostDetails(qint64 postId,

@@ -40,6 +40,7 @@ private:
 
     const qint64 _filePos;   //!< position in the File (for yEnc header)
     const qint64 _fileBytes; //!< bytes of the original file that are encoded
+    qint64 _bodySize;        //!< size of the article body once yEnc encoded (what the nzb must advertise)
 
     ushort _nbTrySending;
 
@@ -82,6 +83,7 @@ public:
     inline bool isFirstArticle() const;
 
     inline quint64 size() const;
+    inline qint64 nzbBytes() const;
 
     inline void genNewId();
 
@@ -121,6 +123,14 @@ qint64 NntpArticle::fileBytes() const { return _fileBytes; }
 bool NntpArticle::isFirstArticle() const { return _part == 1; }
 
 quint64 NntpArticle::size() const { return static_cast<quint64>(_fileBytes); }
+
+//! What the <segment bytes="..."> attribute of the nzb must carry: the size of
+//! the article as the server stores it, i.e. the yEnc encoded body with its
+//! =ybegin/=ypart/=yend lines -- NOT the size of the raw data it decodes to
+//! (_fileBytes), which is some 2-3% smaller and made every client under-report
+//! the download size. Falls back to _fileBytes for an article that was never
+//! encoded, so the attribute can never be written as 0.
+qint64 NntpArticle::nzbBytes() const { return _bodySize > 0 ? _bodySize : _fileBytes; }
 void NntpArticle::genNewId() { _id = QUuid::createUuid(); }
 
 void NntpArticle::overwriteMsgId(const QString &serverMsgID){ _msgId = serverMsgID; }
