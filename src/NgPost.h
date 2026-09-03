@@ -85,6 +85,7 @@ public:
         CONF,
         SHUTDOWN_CMD,
         CHECK,
+        CHECK_JSON,
         QUIET,
         PROXY_SOCKS5,
         DISP_PROGRESS,
@@ -495,6 +496,7 @@ public:
 
     void checkForNewVersion() override;
     bool checkSupportSSL();
+    void reportNzbCheckSslUnavailable();
 #ifdef __USE_HMI__
     int startHMI() override;
 #endif
@@ -557,6 +559,7 @@ public:
     inline bool debugMode() const;
     inline bool debugFull() const;
     inline void setDebug(ushort level);
+    bool stdoutIsData() const { return _stdoutIsData; }
 
     inline bool dispPostingFile() const;
 
@@ -655,6 +658,7 @@ public:
 
     inline bool nzbCheck() const;
     int nbMissingArticles() const;
+    int nzbCheckExitCode() const;
 
     //! Tell the folder monitor (if any) that a path about to appear is ngPost's
     //! own doing, so it is not mistaken for a new file to post.

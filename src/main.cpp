@@ -275,19 +275,39 @@ int main(int argc, char* argv[])
         {
             exitCode = app->startEventLoop();
 
+            // The exit code of --check is a verdict, not a count: 0 complete,
+            // 1 articles missing, 3 inconclusive. It used to be the raw number
+            // of missing articles, which POSIX truncates modulo 256 -- 256
+            // missing articles reported success.
             if (app->nzbCheck())
-                exitCode = app->nbMissingArticles();
+                exitCode = app->nzbCheckExitCode();
+        }
+        else if (app->nzbCheck())
+        {
+            // A TLS preflight failure happens after the NZB was parsed but
+            // before the event loop. It still needs a real check verdict and,
+            // with --check_json, its promised machine-readable report.
+            app->reportNzbCheckSslUnavailable();
+            exitCode = app->nzbCheckExitCode();
         }
 #ifdef __DEBUG__
-        std::cout << app->appName() << " closed properly!\n";
-        std::cout.flush();
+        if (!app->stdoutIsData()) {
+            std::cout << app->appName() << " closed properly!\n";
+            std::cout.flush();
+        }
 #endif
     }
     else
     {
+        // A --check that could not even start still owes the caller its
+        // verdict: 3, not a silent 0.
+        if (app->nzbCheck())
+            exitCode = app->nzbCheckExitCode();
 #ifdef __DEBUG__
-        std::cout << "Nothing to do...\n";
-        std::cout.flush();
+        if (!app->stdoutIsData()) {
+            std::cout << "Nothing to do...\n";
+            std::cout.flush();
+        }
 #endif
     }
 

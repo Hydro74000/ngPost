@@ -26,6 +26,8 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QRegularExpression>
 #include <QTime>
 #include <QXmlStreamReader>
@@ -46,8 +48,40 @@ void NzbCheck::onDisconnected(NntpCheckCon *con)
             _cout << "\n" << MB_FLUSH;
         }
 
-        if (!_quietMode) {
-            qint64 duration = _timeStart.elapsed();
+        qint64 const duration = _timeStart.elapsed();
+
+        // A check that never reached the server used to print "0 missing" --
+        // i.e. "all good" -- which is the most dangerous answer it could give.
+        // Tell the three outcomes apart: nothing verified, partially verified,
+        // fully verified.
+        bool const nothingVerified = (_nbListedArticles > 0 && _nbCheckedArticles == 0);
+        if (nothingVerified) {
+            // The denominator here is what the nzb actually lists, not the
+            // expected total the summary reports: an article the nzb does not
+            // list has no Message-ID and was never verifiable in the first
+            // place. Saying "listed" keeps the two figures from reading as a
+            // contradiction.
+            _cerr << tr("ERROR: check FAILED - not one of the %1 article(s) listed in the nzb "
+                        "could be verified. Every connection was refused or dropped: check the "
+                        "credentials, and whether another program is already using all the "
+                        "connections allowed on the server(s).")
+                         .arg(_nbListedArticles)
+                  << "\n"
+                  << MB_FLUSH;
+        } else if (_nbCheckedArticles < _nbListedArticles) {
+            _cerr << tr("ERROR: check INCOMPLETE - only %1 of the %2 article(s) listed in the "
+                        "nzb were verified. Some connections failed (the server's connection "
+                        "limit may have been reached). The missing-article count below is NOT "
+                        "reliable.")
+                         .arg(_nbCheckedArticles)
+                         .arg(_nbListedArticles)
+                  << "\n"
+                  << MB_FLUSH;
+        }
+
+        // Printing "0 missing" right under "not a single article could be
+        // verified" is the very confusion this block exists to remove.
+        if (!_quietMode && !nothingVerified) {
             _cout << tr("Nb Missing Article(s): %1/%2 (check done in %3 (%4 sec) using %5 "
                         "connections on %6 server(s))")
                          .arg(_nbMissingArticles)
@@ -60,6 +94,10 @@ void NzbCheck::onDisconnected(NntpCheckCon *con)
                   << "\n"
                   << MB_FLUSH;
         }
+
+        if (_jsonOutput)
+            _printJsonReport(duration);
+
         qApp->quit();
     }
 }
@@ -67,7 +105,7 @@ void NzbCheck::onDisconnected(NntpCheckCon *con)
 void NzbCheck::onRefreshprogressbarBar()
 {
     float progressbar = static_cast<float>(_nbCheckedArticles);
-    progressbar /= _nbTotalArticles;
+    progressbar /= _nbListedArticles;
 
     _cout << "\r[";
     int pos = static_cast<int>(std::floor(progressbar * sprogressbarBarWidth));
@@ -80,11 +118,11 @@ void NzbCheck::onRefreshprogressbarBar()
             _cout << " ";
     }
     _cout << "] " << int(progressbar * 100) << " %"
-          << " (" << _nbCheckedArticles << " / " << _nbTotalArticles << ")" << tr(" missing: ")
+          << " (" << _nbCheckedArticles << " / " << _nbListedArticles << ")" << tr(" missing: ")
           << _nbMissingArticles;
     _cout.flush();
 
-    if (_nbCheckedArticles < _nbTotalArticles)
+    if (_nbCheckedArticles < _nbListedArticles)
         _progressbarTimer.start(_refreshRate);
 }
 
@@ -95,8 +133,10 @@ NzbCheck::NzbCheck()
     , _cout(stdout)
     , _cerr(stderr)
     , _nbTotalArticles(0)
+    , _nbListedArticles(0)
     , _nbMissingArticles(0)
     , _nbCheckedArticles(0)
+    , _nbMissingArticlesInNzb(0)
     , _nntpServers()
     , _debug(0)
     , _connections()
@@ -104,6 +144,9 @@ NzbCheck::NzbCheck()
     , _progressbarTimer()
     , _refreshRate(sDefaultRefreshRate)
     , _quietMode(false)
+    , _jsonOutput(false)
+    , _unusable(false)
+    , _nbCons(0) // only assigned by checkPost(), which a failed check never reaches
 {}
 
 NzbCheck::~NzbCheck()
@@ -146,6 +189,7 @@ int NzbCheck::parseNzb()
                                       << MB_FLUSH;
 
                             _nbMissingArticles += nbExpectedArticles - nbArticles;
+                            _nbMissingArticlesInNzb += nbExpectedArticles - nbArticles;
                         }
 
                         break;
@@ -165,14 +209,15 @@ int NzbCheck::parseNzb()
                   << MB_FLUSH;
             return -2;
         }
-        _nbTotalArticles = _articles.size();
+        _nbListedArticles = _articles.size();
+        _nbTotalArticles = _nbListedArticles + _nbMissingArticlesInNzb;
         if (!_quietMode)
             _cout << tr("%1 has %2 articles")
                          .arg(QFileInfo(_nzbPath).fileName())
-                         .arg(_nbTotalArticles)
+                         .arg(_nbListedArticles)
                   << "\n"
                   << MB_FLUSH;
-        return _nbTotalArticles;
+        return _nbListedArticles;
     } else {
         _cerr << tr("Error opening nzb file...") << "\n" << MB_FLUSH;
         return -1;
@@ -189,7 +234,15 @@ void NzbCheck::checkPost()
             _nbCons += srvParam->nbCons;
     }
 
-    _nbCons = std::min(_nbTotalArticles, _nbCons);
+    _nbCons = std::min(_nbListedArticles, _nbCons);
+
+    // Keep this invariant local as well as enforcing it in the CLI parser:
+    // without a connection, no disconnected signal can ever end the run.
+    if (_nbCons <= 0) {
+        reportUnusable(tr("the servers enabled for nzb checking have no positive connection count"));
+        QMetaObject::invokeMethod(qApp, "quit", Qt::QueuedConnection);
+        return;
+    }
 
     int nb = 0;
     for (NntpServerParams *srvParam : _nntpServers) {
@@ -224,6 +277,73 @@ void NzbCheck::checkPost()
                 Qt::DirectConnection);
         _progressbarTimer.start(_refreshRate);
     }
+}
+
+void NzbCheck::reportUnusable(const QString &reason)
+{
+    // Idempotent on purpose: with --check_json the whole contract is that
+    // stdout carries exactly one document. Two callers reporting the same
+    // dead end would print two, and no consumer survives that.
+    if (_unusable)
+        return;
+    _unusable = true;
+    _cerr << tr("ERROR: check INCONCLUSIVE - %1").arg(reason) << "\n" << MB_FLUSH;
+    if (_jsonOutput)
+        _printJsonReport(0, reason);
+}
+
+NzbCheck::CheckStatus NzbCheck::checkStatus() const
+{
+    if (_unusable)
+        return CheckStatus::Inconclusive;
+
+    // Anything short of a full sweep means the answer cannot be trusted, no
+    // matter how few articles came back missing.
+    if (_nbListedArticles > 0 && _nbCheckedArticles < _nbListedArticles)
+        return CheckStatus::Inconclusive;
+
+    return _nbMissingArticles == 0 ? CheckStatus::Complete : CheckStatus::Missing;
+}
+
+void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
+{
+    CheckStatus const status = checkStatus();
+
+    QString statusName;
+    switch (status) {
+    case CheckStatus::Complete:
+        statusName = QStringLiteral("complete");
+        break;
+    case CheckStatus::Missing:
+        statusName = QStringLiteral("missing");
+        break;
+    case CheckStatus::Unrecoverable:
+        statusName = QStringLiteral("unrecoverable");
+        break;
+    case CheckStatus::Inconclusive:
+        statusName = QStringLiteral("inconclusive");
+        break;
+    }
+
+    QJsonObject articles;
+    articles[QStringLiteral("total")]        = _nbTotalArticles;
+    articles[QStringLiteral("checked")]      = _nbCheckedArticles;
+    articles[QStringLiteral("missing")]      = _nbMissingArticles;
+    articles[QStringLiteral("missingInNzb")] = _nbMissingArticlesInNzb;
+
+    QJsonObject root;
+    root[QStringLiteral("nzb")]         = QFileInfo(_nzbPath).absoluteFilePath();
+    root[QStringLiteral("status")]      = statusName;
+    root[QStringLiteral("exitCode")]    = static_cast<int>(status);
+    root[QStringLiteral("articles")]    = articles;
+    root[QStringLiteral("servers")]     = nbCheckingServers();
+    root[QStringLiteral("connections")] = _nbCons;
+    root[QStringLiteral("durationMs")]  = durationMs;
+    if (!error.isEmpty())
+        root[QStringLiteral("error")] = error;
+
+    _cout << QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Compact)) << "\n"
+          << MB_FLUSH;
 }
 
 int NzbCheck::nbCheckingServers()

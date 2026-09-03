@@ -116,6 +116,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::SOCK_TIMEOUT,    "sock_timeout"},
     {Opt::PREPARE_PACKING, "prepare_packing"},
     {Opt::CHECK,           "check"},
+    {Opt::CHECK_JSON,      "check_json"},
     {Opt::QUIET,           "quiet"},
 
 
@@ -223,7 +224,8 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::DEBUG_FULL],          tr( "display full debug information")},
     {{"l", sOptionNames[Opt::LANG]},          tr( "application language"), sOptionNames[Opt::LANG]},
 
-    { sOptionNames[Opt::CHECK],               tr( "check nzb file (if articles are available on Usenet) cf https://github.com/mbruel/nzbCheck"), sOptionNames[Opt::CHECK]},
+    { sOptionNames[Opt::CHECK],               tr( "check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)"), sOptionNames[Opt::CHECK]},
+    { sOptionNames[Opt::CHECK_JSON],          tr( "with --check: print a single machine readable JSON report on stdout instead of the human one")},
     { {"q", sOptionNames[Opt::QUIET]},        tr( "quiet mode (no output on stdout)")},
 
     { QStringList{sOptionNames[Opt::HISTORY]}, tr("list structured post history")},
@@ -686,6 +688,11 @@ void NgPost::stopIgnoringMonitorPath(const QString &absolutePath)
 {
     if (_folderMonitor)
         _folderMonitor->stopIgnoringMonitorPath(absolutePath);
+}
+
+int NgPost::nzbCheckExitCode() const
+{
+    return _nzbCheck ? _nzbCheck->exitCode() : 0;
 }
 
 int NgPost::nbMissingArticles() const
@@ -1601,6 +1608,12 @@ bool NgPost::checkSupportSSL()
     return true;
 }
 
+void NgPost::reportNzbCheckSslUnavailable()
+{
+    if (_nzbCheck)
+        _nzbCheck->reportUnusable(tr("SSL support is unavailable"));
+}
+
 void NgPost::doNzbPostCMD(PostingJob *job)
 {
     if (!_postCmdRunner)
@@ -2437,7 +2450,9 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         (parser.isSet(sOptionNames[Opt::EXPORT_POST_INFO])
          || parser.isSet(QStringLiteral("export-post-info")))
         && !parser.isSet(sOptionNames[Opt::OUTPUT]);
-    _stdoutIsData = jsonStdout || regeneratedNzbStdout || postInfoStdout;
+    const bool checkJsonStdout = parser.isSet(sOptionNames[Opt::CHECK])
+                                 && parser.isSet(sOptionNames[Opt::CHECK_JSON]);
+    _stdoutIsData = jsonStdout || regeneratedNzbStdout || postInfoStdout || checkJsonStdout;
     if (_stdoutIsData)
     {
         // Everything ngPost says normally goes to _cout, from 40-odd places.
@@ -2572,17 +2587,55 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
 
     if (parser.isSet(sOptionNames[Opt::CHECK]))
     {
+        bool const jsonReport = parser.isSet(sOptionNames[Opt::CHECK_JSON]);
+
         _nzbCheck = new NzbCheck();
-        _nzbCheck->setDebug(_debug);
-        _nzbCheck->setDispProgressBar(_dispProgressBar||_dispFilesPosting);
-        _nzbCheck->setQuiet(_quiet);
+        // NzbCheck owns a separate stdout stream for its report. Its verbose
+        // traces must therefore be disabled while that stream carries JSON.
+        _nzbCheck->setDebug(jsonReport ? 0 : _debug);
+        // A JSON report is meant to be piped into something: keep stdout to
+        // that one object, progress bar and running commentary included.
+        _nzbCheck->setDispProgressBar(!jsonReport && (_dispProgressBar || _dispFilesPosting));
+        _nzbCheck->setQuiet(_quiet || jsonReport);
+        _nzbCheck->setJsonOutput(jsonReport);
         int nbArticles = _nzbCheck->parseNzb(parser.value(sOptionNames[Opt::CHECK]));
-        if (nbArticles > 0 )
+        if (nbArticles <= 0)
         {
-            _nzbCheck->checkPost(_nntpServers);
-            return true;
+            // parseNzb() has already said what went wrong; what matters here is
+            // that the caller gets a verdict instead of a silent exit 0.
+            _nzbCheck->reportUnusable(tr("the nzb file could not be read"));
+            return false;
         }
-        return false;
+
+        // checkPost() only ever opens connections to servers flagged for
+        // checking. With none of them flagged it opens nothing, no connection
+        // ever reports itself finished, and the event loop used to run forever.
+        int nbCheckServers = 0;
+        int nbCheckConnections = 0;
+        for (NntpServerParams *srvParam : _nntpServers)
+        {
+            if (srvParam->nzbCheck) {
+                ++nbCheckServers;
+                if (srvParam->nbCons > 0)
+                    nbCheckConnections += srvParam->nbCons;
+            }
+        }
+        if (nbCheckServers == 0)
+        {
+            _nzbCheck->reportUnusable(
+                    tr("no server is enabled for nzb checking: set 'nzbCheck = true' on at least "
+                       "one [server] of your configuration"));
+            return false;
+        }
+        if (nbCheckConnections == 0)
+        {
+            _nzbCheck->reportUnusable(
+                    tr("the servers enabled for nzb checking have no positive connection count"));
+            return false;
+        }
+
+        _nzbCheck->checkPost(_nntpServers);
+        return true;
     }
 
     if (!hasHistoryCommand

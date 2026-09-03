@@ -59,9 +59,11 @@ private:
     QTextStream _cout; //!< stream for stdout
     QTextStream _cerr; //!< stream for stderr
 
-    int _nbTotalArticles;
+    int _nbTotalArticles;  //!< expected total, including articles absent from the NZB
+    int _nbListedArticles; //!< Message-IDs present in the NZB and therefore checkable
     int _nbMissingArticles;
     int _nbCheckedArticles;
+    int _nbMissingArticlesInNzb; //!< articles the nzb does not even list (subset of _nbMissingArticles)
 
     QList<NntpServerParams *> _nntpServers; //!< the servers parameters
 
@@ -74,6 +76,8 @@ private:
     const int _refreshRate; //!< refresh rate
 
     bool _quietMode;
+    bool _jsonOutput; //!< --check_json: one machine readable object instead of the human report
+    bool _unusable;   //!< the check could not even be attempted
 
     QElapsedTimer _timeStart;
     int _nbCons;
@@ -87,6 +91,18 @@ public slots:
     void onRefreshprogressbarBar();
 
 public:
+    //! Outcome of a --check run. The value IS the process exit code, so it has
+    //! to stay small and stable: scripts branch on it. (The pre-5.6 exit code
+    //! was the raw number of missing articles, which POSIX truncated modulo
+    //! 256 -- exactly 256 missing articles reported success.)
+    enum class CheckStatus : int
+    {
+        Complete      = 0, //!< every article listed in the nzb is on the server
+        Missing       = 1, //!< articles are missing; repairability not evaluated
+        Unrecoverable = 2, //!< reserved: missing beyond what the PAR2 volumes can repair
+        Inconclusive  = 3  //!< the check could not be completed, the result means nothing
+    };
+
     NzbCheck();
     ~NzbCheck();
 
@@ -99,12 +115,20 @@ public:
     inline void checkPost(const QList<NntpServerParams *> &nntpServers);
     inline void setDispProgressBar(bool display);
     inline void setQuiet(bool quiet);
+    inline void setJsonOutput(bool json);
 
     inline void missingArticle(const QString &article);
     inline QString getNextArticle();
     inline void articleChecked();
 
+    //! The check cannot even be attempted (nzb unreadable, no server able to
+    //! run it). Reports it the way a finished check reports itself, so a caller
+    //! gets a verdict -- and a json object -- either way.
+    void reportUnusable(const QString &reason);
+
     inline int nbMissingArticles() const;
+    CheckStatus checkStatus() const;
+    inline int exitCode() const;
     inline bool debugMode() const;
     inline void setDebug(ushort level);
 
@@ -114,6 +138,9 @@ public:
     inline void error(const QString &aMsg);
     inline void error(const char *aMsg);
     inline void error(const std::string &aMsg);
+
+private:
+    void _printJsonReport(qint64 durationMs, const QString &error = QString());
 };
 
 int NzbCheck::parseNzb(const QString &nzbPath)
@@ -136,10 +163,18 @@ void NzbCheck::setQuiet(bool quiet)
 {
     _quietMode = quiet;
 }
+void NzbCheck::setJsonOutput(bool json)
+{
+    _jsonOutput = json;
+}
 
 void NzbCheck::missingArticle(const QString &article)
 {
-    if (!_quietMode)
+    // One line per missing article drowns the report on a post that has aged
+    // out (tens of thousands of lines, and the progress bar redrawn between
+    // each). The counter and the final summary carry the information; the
+    // per-article detail is a debugging need.
+    if (debugMode())
         _cout << (_dispProgressBar ? "\n" : "") << tr("+ Missing Article on server: ") << article
               << "\n"
               << MB_FLUSH;
@@ -162,6 +197,11 @@ void NzbCheck::articleChecked()
 int NzbCheck::nbMissingArticles() const
 {
     return _nbMissingArticles;
+}
+
+int NzbCheck::exitCode() const
+{
+    return static_cast<int>(checkStatus());
 }
 
 bool NzbCheck::debugMode() const
