@@ -162,6 +162,8 @@ private slots:
     void check_recovery_is_impossible_when_the_loss_exceeds_the_blocks();
     void check_prorates_the_blocks_of_a_damaged_par2_volume();
     void check_loses_no_article_when_the_connection_drops();
+    void check_stops_once_the_post_is_provably_beyond_repair();
+    void check_full_verifies_everything_anyway();
 
     //! An unknown flag fails with a non-zero exit code. Currently
     //! ERR_WRONG_ARG = 3 but tests assert "non-zero" for resilience to enum
@@ -806,6 +808,92 @@ void TestCliParser::check_loses_no_article_when_the_connection_drops()
     QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Complete));
     QVERIFY2(!r.stderrText.contains(QStringLiteral("INCOMPLETE")),
              qPrintable(QStringLiteral("the check reported itself incomplete:\n") + r.stderrText));
+}
+
+//! PAR2 first, then data, and give up as soon as the loss provably exceeds the
+//! blocks: on a large dead post that is the difference between minutes and
+//! seconds. The count it reports is then a floor, and says so.
+void TestCliParser::check_stops_once_the_post_is_provably_beyond_repair()
+{
+    HomeSandbox sandbox;
+    const QString ids = writeMissingIds(
+            sandbox.rootPath(),
+            { QStringLiteral("d1"), QStringLiteral("d2"), QStringLiteral("d3"),
+              QStringLiteral("d4"), QStringLiteral("d5") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzb = writeRecoveryNzb(sandbox.rootPath(), QStringLiteral("dead.nzb"),
+                                         12, 716800, 2, 2);
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--par2_block_size", "716800",
+                              "--check", nzb },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Unrecoverable));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject root = report.object();
+    QVERIFY2(root.value(QStringLiteral("stoppedEarly")).toBool(), "the check did not stop early");
+
+    const QJsonObject articles = root.value(QStringLiteral("articles")).toObject();
+    QVERIFY2(articles.value(QStringLiteral("missingIsALowerBound")).toBool(),
+             "a truncated run must not present its count as a total");
+    QVERIFY2(articles.value(QStringLiteral("checked")).toInt()
+                     < articles.value(QStringLiteral("total")).toInt(),
+             "stopping early should leave articles unchecked");
+
+    // The redundancy has to be known before any data article is weighed against
+    // it, so the PAR2 articles must go out first.
+    QFile log(server.logFile());
+    QVERIFY(log.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QStringList stats = QString::fromUtf8(log.readAll())
+                                      .split(QLatin1Char('\n'))
+                                      .filter(QStringLiteral("STAT <"));
+    QVERIFY2(stats.size() >= 2, "no STAT reached the server");
+    QVERIFY2(stats.at(0).contains(QStringLiteral("<p")) && stats.at(1).contains(QStringLiteral("<p")),
+             qPrintable(QStringLiteral("data was checked before par2:\n") + stats.join('\n')));
+}
+
+//! The same post with --check_full: no shortcut, every article asked for.
+void TestCliParser::check_full_verifies_everything_anyway()
+{
+    HomeSandbox sandbox;
+    const QString ids = writeMissingIds(
+            sandbox.rootPath(),
+            { QStringLiteral("d1"), QStringLiteral("d2"), QStringLiteral("d3"),
+              QStringLiteral("d4"), QStringLiteral("d5") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzb = writeRecoveryNzb(sandbox.rootPath(), QStringLiteral("dead.nzb"),
+                                         12, 716800, 2, 2);
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--check_full",
+                              "--par2_block_size", "716800", "--check", nzb },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Unrecoverable));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    QVERIFY2(!report.object().value(QStringLiteral("stoppedEarly")).toBool(),
+             "--check_full must not stop early");
+
+    const QJsonObject articles = report.object().value(QStringLiteral("articles")).toObject();
+    QCOMPARE(articles.value(QStringLiteral("checked")).toInt(), 14);
+    QCOMPARE(articles.value(QStringLiteral("missing")).toInt(), 5);
+    QVERIFY2(!articles.value(QStringLiteral("missingIsALowerBound")).toBool(),
+             "a complete sweep reports a total, not a floor");
 }
 
 void TestCliParser::unknown_flag_rejected()

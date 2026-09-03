@@ -86,6 +86,7 @@ public:
         SHUTDOWN_CMD,
         CHECK,
         CHECK_JSON,
+        CHECK_FULL,
         QUIET,
         PROXY_SOCKS5,
         DISP_PROGRESS,

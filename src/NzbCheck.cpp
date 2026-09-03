@@ -91,7 +91,19 @@ void NzbCheck::onDisconnected(NntpCheckCon *con)
         // Tell the three outcomes apart: nothing verified, partially verified,
         // fully verified.
         bool const nothingVerified = (_nbListedArticles > 0 && _nbCheckedArticles == 0);
-        if (nothingVerified) {
+        // NzbCheck owns its own stdout stream, so this has to respect quiet mode
+        // by itself: under --check_json that stream carries the report and
+        // nothing else. The json says stoppedEarly on its own.
+        if (_earlyStop && !_quietMode) {
+            _cout << tr("Stopped after %1 of the %2 article(s) listed in the nzb: the loss is "
+                        "already beyond what the PAR2 blocks can repair, so checking the rest "
+                        "would not change the answer. Pass --%3 to check everything anyway.")
+                         .arg(_nbCheckedArticles)
+                         .arg(_nbListedArticles)
+                         .arg(QStringLiteral("check_full"))
+                  << "\n"
+                  << MB_FLUSH;
+        } else if (nothingVerified && !_earlyStop) {
             // The denominator here is what the nzb actually lists, not the
             // expected total the summary reports: an article the nzb does not
             // list has no Message-ID and was never verifiable in the first
@@ -104,7 +116,7 @@ void NzbCheck::onDisconnected(NntpCheckCon *con)
                          .arg(_nbListedArticles)
                   << "\n"
                   << MB_FLUSH;
-        } else if (_nbCheckedArticles < _nbListedArticles) {
+        } else if (!_earlyStop && _nbCheckedArticles < _nbListedArticles) {
             _cerr << tr("ERROR: check INCOMPLETE - only %1 of the %2 article(s) listed in the "
                         "nzb were verified. Some connections failed (the server's connection "
                         "limit may have been reached). The missing-article count below is NOT "
@@ -118,8 +130,15 @@ void NzbCheck::onDisconnected(NntpCheckCon *con)
         // Printing "0 missing" right under "not a single article could be
         // verified" is the very confusion this block exists to remove.
         if (!_quietMode && !nothingVerified) {
-            _cout << tr("Nb Missing Article(s): %1/%2 (check done in %3 (%4 sec) using %5 "
-                        "connections on %6 server(s))")
+            // Two separate tr() calls: lupdate cannot extract a string picked
+            // at run time.
+            QString const summary
+                    = _earlyStop
+                              ? tr("Nb Missing Article(s): at least %1/%2 (stopped early after "
+                                   "%3 (%4 sec) using %5 connections on %6 server(s))")
+                              : tr("Nb Missing Article(s): %1/%2 (check done in %3 (%4 sec) "
+                                   "using %5 connections on %6 server(s))");
+            _cout << summary
                          .arg(_nbMissingArticles)
                          .arg(_nbTotalArticles)
                          .arg(QTime::fromMSecsSinceStartOfDay(static_cast<int>(duration))
@@ -168,7 +187,8 @@ void NzbCheck::onRefreshprogressbarBar()
 NzbCheck::NzbCheck()
     : QObject()
     , _nzbPath()
-    , _articles()
+    , _par2Queue()
+    , _dataQueue()
     , _cout(stdout)
     , _cerr(stderr)
     , _nbTotalArticles(0)
@@ -199,6 +219,9 @@ NzbCheck::NzbCheck()
     , _articleSize(0)
     , _articleSizeFromSubjects(0)
     , _dataSizeBytes(0)
+    , _par2PhaseDone(false)
+    , _earlyStop(false)
+    , _checkFull(false)
 {}
 
 NzbCheck::~NzbCheck()
@@ -293,12 +316,14 @@ int NzbCheck::parseNzb()
                         xmlReader.readNext();
                         QString const articleId = QString("<%1>").arg(
                                 xmlReader.text().toString());
-                        _articles.push(articleId);
                         if (isPar2) {
+                            _par2Queue.push(articleId);
                             _articleVolume.insert(articleId, volumeIdx);
                             ++_nbPar2Articles;
-                        } else
+                        } else {
+                            _dataQueue.push(articleId);
                             ++_nbDataArticles;
+                        }
                     }
                 }
             }
@@ -310,7 +335,7 @@ int NzbCheck::parseNzb()
                   << MB_FLUSH;
             return -2;
         }
-        _nbListedArticles = _articles.size();
+        _nbListedArticles = _par2Queue.size() + _dataQueue.size();
         _nbTotalArticles = _nbListedArticles + _nbMissingArticlesInNzb;
         _resolveSizes();
         if (!_quietMode) {
@@ -491,9 +516,10 @@ NzbCheck::CheckStatus NzbCheck::checkStatus() const
     if (_unusable)
         return CheckStatus::Inconclusive;
 
-    // Anything short of a full sweep means the answer cannot be trusted, no
-    // matter how few articles came back missing.
-    if (_nbListedArticles > 0 && _nbCheckedArticles < _nbListedArticles)
+    // Anything short of a full sweep means the answer cannot be trusted -- with
+    // one exception: a sweep we cut short on purpose, having already proved the
+    // post beyond repair. That is a verdict, not a gap.
+    if (!_earlyStop && _nbListedArticles > 0 && _nbCheckedArticles < _nbListedArticles)
         return CheckStatus::Inconclusive;
 
     if (_nbMissingArticles == 0)
@@ -607,6 +633,8 @@ void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
     articles[QStringLiteral("dataMissing")]  = _nbMissingDataArticles;
     articles[QStringLiteral("par2")]         = _nbPar2Articles;
     articles[QStringLiteral("par2Missing")]  = _nbMissingPar2Articles;
+    // A run cut short knows a floor, not a total: it stopped asking.
+    articles[QStringLiteral("missingIsALowerBound")] = _earlyStop;
 
     QString recoveryName;
     switch (recoveryVerdict()) {
@@ -640,6 +668,7 @@ void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
     root[QStringLiteral("servers")]     = nbCheckingServers();
     root[QStringLiteral("connections")] = _nbCons;
     root[QStringLiteral("durationMs")]  = durationMs;
+    root[QStringLiteral("stoppedEarly")] = _earlyStop;
     if (!error.isEmpty())
         root[QStringLiteral("error")] = error;
 

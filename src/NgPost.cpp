@@ -117,6 +117,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::PREPARE_PACKING, "prepare_packing"},
     {Opt::CHECK,           "check"},
     {Opt::CHECK_JSON,      "check_json"},
+    {Opt::CHECK_FULL,      "check_full"},
     {Opt::QUIET,           "quiet"},
 
 
@@ -227,6 +228,7 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
 
     { sOptionNames[Opt::CHECK],               tr( "check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing but the PAR2 blocks can cover them, 2 = missing beyond what the PAR2 blocks can repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)"), sOptionNames[Opt::CHECK]},
     { sOptionNames[Opt::CHECK_JSON],          tr( "with --check: print a single machine readable JSON report on stdout instead of the human one")},
+    { sOptionNames[Opt::CHECK_FULL],          tr( "with --check: verify every article even once the post is provably beyond repair")},
     { sOptionNames[Opt::PAR2_BLOCK_SIZE],     tr( "with --check: PAR2 slice size in bytes used to create the post, for the recovery analysis (default: derived from the nzb)"), sOptionNames[Opt::PAR2_BLOCK_SIZE]},
     { {"q", sOptionNames[Opt::QUIET]},        tr( "quiet mode (no output on stdout)")},
 
@@ -2600,6 +2602,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _nzbCheck->setDispProgressBar(!jsonReport && (_dispProgressBar || _dispFilesPosting));
         _nzbCheck->setQuiet(_quiet || jsonReport);
         _nzbCheck->setJsonOutput(jsonReport);
+        _nzbCheck->setCheckFull(parser.isSet(sOptionNames[Opt::CHECK_FULL]));
 
         // Block size, most specific source first. Anything below these is a
         // guess NzbCheck makes from the nzb itself, and says so in its report.

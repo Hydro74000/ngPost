@@ -78,7 +78,10 @@ private:
         = "yEnc\\s+\\(\\d+/(\\d+)\\)";
 
     QString _nzbPath;
-    QStack<QString> _articles;
+    //! PAR2 articles are checked first, so the recovery capacity is known
+    //! before a single data article is spent on.
+    QStack<QString> _par2Queue;
+    QStack<QString> _dataQueue;
 
     QTextStream _cout; //!< stream for stdout
     QTextStream _cerr; //!< stream for stderr
@@ -121,6 +124,10 @@ private:
     qint64  _articleSize;             //!< decoded payload per article; derived or configured
     qint64  _articleSizeFromSubjects; //!< tightest bound the subjects give for it
     qint64  _dataSizeBytes;    //!< data announced by the subjects, 0 if they carry none
+
+    bool _par2PhaseDone; //!< every PAR2 article has been handed out
+    bool _earlyStop;     //!< the post is provably beyond repair; stop asking
+    bool _checkFull;     //!< --check_full: never stop early
 
     static const int sDefaultRefreshRate = 200; //!< how often shall we refresh the progressbar bar?
     static const int sprogressbarBarWidth = 50;
@@ -172,6 +179,8 @@ public:
     inline void setDispProgressBar(bool display);
     inline void setQuiet(bool quiet);
     inline void setJsonOutput(bool json);
+    inline void setCheckFull(bool full);
+    inline bool stoppedEarly() const;
     inline void setSocketTimeOut(int ms);
     inline void setMaxRetries(ushort nb);
     inline int socketTimeOut() const;
@@ -245,6 +254,14 @@ void NzbCheck::setJsonOutput(bool json)
 {
     _jsonOutput = json;
 }
+void NzbCheck::setCheckFull(bool full)
+{
+    _checkFull = full;
+}
+bool NzbCheck::stoppedEarly() const
+{
+    return _earlyStop;
+}
 void NzbCheck::setSocketTimeOut(int ms)
 {
     if (ms > 0)
@@ -294,27 +311,50 @@ void NzbCheck::missingArticle(const QString &article)
     if (volume != _articleVolume.constEnd()) {
         ++_nbMissingPar2Articles;
         ++_par2Volumes[*volume].nbMissingArticles;
-    } else
+    } else {
         ++_nbMissingDataArticles;
+
+        // Only ever stop on a loss that no layout can save. "Recoverable if the
+        // losses are clustered" is precisely the case where giving up would
+        // send someone to re-post something a repair would have fixed.
+        if (!_earlyStop && !_checkFull && _par2PhaseDone) {
+            Recovery const verdict = recoveryVerdict();
+            if (verdict == Recovery::Impossible || verdict == Recovery::NoRedundancy)
+                _earlyStop = true;
+        }
+    }
 }
 
 QString NzbCheck::getNextArticle()
 {
-    if (_articles.isEmpty())
+    if (_earlyStop)
         return QString();
-    else
-        return _articles.pop();
+
+    if (!_par2Queue.isEmpty())
+        return _par2Queue.pop();
+
+    // Nothing left to learn about the redundancy: from here on every missing
+    // data article can be weighed against it.
+    _par2PhaseDone = true;
+
+    if (!_dataQueue.isEmpty())
+        return _dataQueue.pop();
+    return QString();
 }
 
 void NzbCheck::requeueArticle(const QString &article)
 {
-    if (!article.isNull())
-        _articles.push(article);
+    if (article.isNull())
+        return;
+    if (_articleVolume.contains(article))
+        _par2Queue.push(article);
+    else
+        _dataQueue.push(article);
 }
 
 bool NzbCheck::hasArticlesLeft() const
 {
-    return !_articles.isEmpty();
+    return !_earlyStop && (!_par2Queue.isEmpty() || !_dataQueue.isEmpty());
 }
 
 void NzbCheck::articleChecked()
