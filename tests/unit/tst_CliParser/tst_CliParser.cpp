@@ -23,13 +23,17 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLibraryInfo>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QStandardPaths>
 #include <QTcpServer>
 
 #include "history/PostHistoryStore.h"
 #include "NgPost.h"
+#include "NzbCheck.h"
 #include "PostingJob.h"
+#include "MockNntpServer.h"
 #include "TestEnv.h"
 
 #ifndef APP_VERSION
@@ -38,6 +42,7 @@
 
 using ngpost::tests::HomeSandbox;
 using ngpost::tests::locateNgPostBinary;
+using ngpost::tests::MockNntpServer;
 
 namespace
 {
@@ -138,6 +143,22 @@ private slots:
     //! server object no block had created, which crashed the process.
     void server_keys_without_a_block_are_not_a_crash();
 
+    //! A check-enabled server with zero configured connections cannot ever
+    //! emit a disconnect signal; reject it before entering the event loop.
+    void check_with_zero_connections_does_not_hang();
+
+    //! Machine-readable check output remains exactly one JSON document even
+    //! when verbose diagnostics were explicitly requested.
+    void check_json_stdout_is_a_single_document();
+
+    //! An unavailable Qt TLS backend is an inconclusive check, never a silent
+    //! success without a JSON report.
+    void check_json_without_tls_is_inconclusive();
+
+    //! Articles announced by the subject but absent from the XML belong in
+    //! the report total without being mistaken for network-checkable IDs.
+    void check_json_total_includes_articles_absent_from_nzb();
+
     //! An unknown flag fails with a non-zero exit code. Currently
     //! ERR_WRONG_ARG = 3 but tests assert "non-zero" for resilience to enum
     //! reordering.
@@ -182,6 +203,10 @@ private slots:
     void multipar_default_args_use_only_slash_switches();
     //! GUI PAR2_PCT must override PAR2_ARGS redundancy for MultiPar (/rr) too.
     void par2_args_redundancy_override_for_multipar();
+
+    //! A failed restoration must retain enough state for a later retry; the
+    //! successful retry then removes the empty staging directory.
+    void obfuscated_source_restore_is_retryable();
 
     //! A file that could not be read makes the post partial, not successful:
     //! such a file never produces a failed article, it is simply set aside.
@@ -406,6 +431,177 @@ void TestCliParser::server_keys_without_a_block_are_not_a_crash()
              qPrintable(QStringLiteral("a pre-[server] configuration must be read, not crash on; exit=%1 out=%2")
                             .arg(r.exitCode)
                             .arg(r.stdoutText + r.stderrText)));
+}
+
+void TestCliParser::check_with_zero_connections_does_not_hang()
+{
+    HomeSandbox sandbox;
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/zero-connections.conf");
+    QFile config(confPath);
+    QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Text));
+    config.write("[server]\n"
+                 "host = 127.0.0.1\n"
+                 "port = 119\n"
+                 "enabled = true\n"
+                 "nzbCheck = true\n"
+                 "connection = 0\n");
+    config.close();
+
+    const QString nzbPath = QStringLiteral(NGPOST_TESTS_ROOT)
+                            + QStringLiteral("/fixtures/nzb/tiny_1seg.golden.nzb");
+    const RunResult result = run(_bin,
+                                 { "-c", confPath, "--check", nzbPath },
+                                 sandbox.rootPath());
+
+    QVERIFY2(!result.timedOut, "--check hung with a zero-connection server");
+    QCOMPARE(result.exitCode,
+             static_cast<int>(NzbCheck::CheckStatus::Inconclusive));
+    QVERIFY2((result.stdoutText + result.stderrText)
+                 .contains(QStringLiteral("INCONCLUSIVE"), Qt::CaseInsensitive),
+             qPrintable(result.stdoutText + result.stderrText));
+}
+
+void TestCliParser::check_json_stdout_is_a_single_document()
+{
+    HomeSandbox sandbox;
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/json-check.conf");
+    QFile config(confPath);
+    QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Text));
+    config.write("[server]\n"
+                 "host = 127.0.0.1\n"
+                 "port = 119\n"
+                 "enabled = true\n"
+                 "nzbCheck = true\n"
+                 "connection = 0\n");
+    config.close();
+
+    const QString nzbPath = QStringLiteral(NGPOST_TESTS_ROOT)
+                            + QStringLiteral("/fixtures/nzb/tiny_1seg.golden.nzb");
+    const RunResult result = run(_bin,
+                                 { "-c", confPath, "--debug", "--check_json",
+                                   "--check", nzbPath },
+                                 sandbox.rootPath());
+
+    QVERIFY2(!result.timedOut, qPrintable(result.stdoutText + result.stderrText));
+    QCOMPARE(result.exitCode,
+             static_cast<int>(NzbCheck::CheckStatus::Inconclusive));
+
+    QJsonParseError parseError;
+    const QJsonDocument report =
+        QJsonDocument::fromJson(result.stdoutText.trimmed().toUtf8(), &parseError);
+    QCOMPARE(parseError.error, QJsonParseError::NoError);
+    QVERIFY(report.isObject());
+    QCOMPARE(report.object().value(QStringLiteral("status")).toString(),
+             QStringLiteral("inconclusive"));
+    QVERIFY2(result.stderrText.contains(QStringLiteral("INCONCLUSIVE"), Qt::CaseInsensitive),
+             qPrintable(result.stderrText));
+}
+
+void TestCliParser::check_json_without_tls_is_inconclusive()
+{
+#if !defined(Q_OS_LINUX)
+    QSKIP("The TLS-plugin mount isolation used by this end-to-end test is Linux-specific");
+#else
+    const QString bwrap = QStandardPaths::findExecutable(QStringLiteral("bwrap"));
+    if (bwrap.isEmpty())
+        QSKIP("bwrap is unavailable; cannot isolate the Qt TLS plugins");
+    const QString tlsPluginPath = QLibraryInfo::path(QLibraryInfo::PluginsPath)
+                                  + QStringLiteral("/tls");
+    if (!QFileInfo(tlsPluginPath).isDir())
+        QSKIP("the Qt TLS plugin directory could not be located");
+
+    HomeSandbox sandbox;
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/tls-check.conf");
+    QFile config(confPath);
+    QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Text));
+    config.write("[server]\n"
+                 "host = 127.0.0.1\n"
+                 "port = 119\n"
+                 "enabled = true\n"
+                 "nzbCheck = true\n"
+                 "connection = 1\n");
+    config.close();
+
+    const QString nzbPath = QStringLiteral(NGPOST_TESTS_ROOT)
+                            + QStringLiteral("/fixtures/nzb/tiny_1seg.golden.nzb");
+    const RunResult result =
+        run(bwrap,
+            { "--die-with-parent",
+              "--ro-bind", "/", "/",
+              "--tmpfs", tlsPluginPath,
+              "--dev-bind", "/dev", "/dev",
+              "--proc", "/proc",
+              _bin, "-c", confPath, "--check_json", "--check", nzbPath },
+            sandbox.rootPath());
+
+    QVERIFY2(!result.timedOut, qPrintable(result.stdoutText + result.stderrText));
+    if (result.stderrText.startsWith(QStringLiteral("bwrap:"), Qt::CaseInsensitive))
+        QSKIP("bwrap is installed but user namespaces are unavailable");
+    QCOMPARE(result.exitCode,
+             static_cast<int>(NzbCheck::CheckStatus::Inconclusive));
+
+    QJsonParseError parseError;
+    const QJsonDocument report =
+        QJsonDocument::fromJson(result.stdoutText.trimmed().toUtf8(), &parseError);
+    QCOMPARE(parseError.error, QJsonParseError::NoError);
+    QVERIFY(report.isObject());
+    QCOMPARE(report.object().value(QStringLiteral("status")).toString(),
+             QStringLiteral("inconclusive"));
+    QVERIFY2(result.stderrText.contains(QStringLiteral("SSL"), Qt::CaseInsensitive),
+             qPrintable(result.stderrText));
+#endif
+}
+
+void TestCliParser::check_json_total_includes_articles_absent_from_nzb()
+{
+    MockNntpServer server;
+    QVERIFY2(server.start(), "failed to start the mock NNTP server");
+
+    HomeSandbox sandbox;
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/missing-in-nzb.conf");
+    QFile config(confPath);
+    QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Text));
+    QTextStream conf(&config);
+    conf << "[server]\n"
+         << "host = 127.0.0.1\n"
+         << "port = " << server.port() << "\n"
+         << "enabled = true\n"
+         << "nzbCheck = true\n"
+         << "connection = 1\n";
+    config.close();
+
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/missing-segments.nzb");
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    nzb.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n"
+              "  <file poster=\"poster\" date=\"0\" "
+              "subject=\"sample.bin yEnc (1/3) 128\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"128\" number=\"1\">"
+              "MSGID-0</segment></segments>\n"
+              "  </file>\n"
+              "</nzb>\n");
+    nzb.close();
+
+    const RunResult result = run(_bin,
+                                 { "-c", confPath, "--check_json", "--check", nzbPath },
+                                 sandbox.rootPath());
+    QVERIFY2(!result.timedOut, qPrintable(result.stdoutText + result.stderrText));
+    QCOMPARE(result.exitCode, static_cast<int>(NzbCheck::CheckStatus::Missing));
+
+    QJsonParseError parseError;
+    const QJsonDocument report =
+        QJsonDocument::fromJson(result.stdoutText.trimmed().toUtf8(), &parseError);
+    QCOMPARE(parseError.error, QJsonParseError::NoError);
+    QVERIFY(report.isObject());
+    QCOMPARE(report.object().value(QStringLiteral("status")).toString(),
+             QStringLiteral("missing"));
+    const QJsonObject articles = report.object().value(QStringLiteral("articles")).toObject();
+    QCOMPARE(articles.value(QStringLiteral("checked")).toInt(), 1);
+    QCOMPARE(articles.value(QStringLiteral("missing")).toInt(), 2);
+    QCOMPARE(articles.value(QStringLiteral("missingInNzb")).toInt(), 2);
+    QCOMPARE(articles.value(QStringLiteral("total")).toInt(), 3);
 }
 
 void TestCliParser::unknown_flag_rejected()
@@ -657,6 +853,46 @@ void TestCliParser::par2_args_redundancy_override_for_multipar()
         QStringLiteral("/rr12"),
         QStringLiteral("/lc4"),
     }));
+}
+
+void TestCliParser::obfuscated_source_restore_is_retryable()
+{
+    QTemporaryDir sandbox;
+    QVERIFY(sandbox.isValid());
+
+    const QString stagingPath = sandbox.filePath(QStringLiteral(".ngPost_src_test"));
+    QVERIFY(QDir().mkpath(stagingPath));
+    const QString stagedPath = stagingPath + QStringLiteral("/random-name.bin");
+    const QString originalPath = sandbox.filePath(QStringLiteral("source.bin"));
+
+    QFile staged(stagedPath);
+    QVERIFY(staged.open(QIODevice::WriteOnly));
+    QCOMPARE(staged.write("original payload"), qint64(16));
+    staged.close();
+
+    QFile occupiedDestination(originalPath);
+    QVERIFY(occupiedDestination.open(QIODevice::WriteOnly));
+    QCOMPARE(occupiedDestination.write("occupied"), qint64(8));
+    occupiedDestination.close();
+
+    QMap<QString, QString> mappings;
+    mappings.insert(stagedPath, originalPath);
+    QString retainedStagingPath = stagingPath;
+
+    QVERIFY(!PostingJob::restoreObfuscatedPathsForTest(mappings, retainedStagingPath));
+    QCOMPARE(mappings.value(stagedPath), originalPath);
+    QCOMPARE(retainedStagingPath, stagingPath);
+    QVERIFY(QFileInfo::exists(stagedPath));
+
+    QVERIFY(QFile::remove(originalPath));
+    QVERIFY(PostingJob::restoreObfuscatedPathsForTest(mappings, retainedStagingPath));
+    QVERIFY(mappings.isEmpty());
+    QVERIFY(retainedStagingPath.isEmpty());
+    QVERIFY(!QFileInfo::exists(stagingPath));
+
+    QFile restored(originalPath);
+    QVERIFY(restored.open(QIODevice::ReadOnly));
+    QCOMPARE(restored.readAll(), QByteArray("original payload"));
 }
 
 namespace
