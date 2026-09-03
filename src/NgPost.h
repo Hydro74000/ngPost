@@ -149,6 +149,7 @@ public:
         PAR2_PCT,
         PAR2_PATH,
         PAR2_ARGS,
+        PAR2_BLOCK_SIZE,
         PACK,
         COMPRESS,
         GEN_PAR2,
@@ -292,6 +293,7 @@ private:
     uint _par2Pct;
     QString _par2Path;
     QString _par2Args;
+    qint64  _par2BlockSize; //!< PAR2 slice size for --check's recovery analysis; 0 = unknown
     QString _par2PathConfig;
 
     bool _doCompress;

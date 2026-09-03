@@ -160,6 +160,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::PAR2_PCT,     "par2_pct"},
     {Opt::PAR2_PATH,    "par2_path"},
     {Opt::PAR2_ARGS,    "par2_args"},
+    {Opt::PAR2_BLOCK_SIZE, "par2_block_size"},
 
     {Opt::AUTO_COMPRESS,"auto_compress"},
     {Opt::PACK,         "pack"},
@@ -224,8 +225,9 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::DEBUG_FULL],          tr( "display full debug information")},
     {{"l", sOptionNames[Opt::LANG]},          tr( "application language"), sOptionNames[Opt::LANG]},
 
-    { sOptionNames[Opt::CHECK],               tr( "check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)"), sOptionNames[Opt::CHECK]},
+    { sOptionNames[Opt::CHECK],               tr( "check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing but the PAR2 blocks can cover them, 2 = missing beyond what the PAR2 blocks can repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)"), sOptionNames[Opt::CHECK]},
     { sOptionNames[Opt::CHECK_JSON],          tr( "with --check: print a single machine readable JSON report on stdout instead of the human one")},
+    { sOptionNames[Opt::PAR2_BLOCK_SIZE],     tr( "with --check: PAR2 slice size in bytes used to create the post, for the recovery analysis (default: derived from the nzb)"), sOptionNames[Opt::PAR2_BLOCK_SIZE]},
     { {"q", sOptionNames[Opt::QUIET]},        tr( "quiet mode (no output on stdout)")},
 
     { QStringList{sOptionNames[Opt::HISTORY]}, tr("list structured post history")},
@@ -356,7 +358,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _storage(nullptr), _ramPath(), _ramRatio(sRamRatioMin),
   #endif
     _tmpPath(), _rarPath(), _rarArgs(), _rarSize(0), _rarMax(sDefaultRarMax), _useRarMax(false),
-    _par2Pct(0), _par2Path(), _par2Args(), _par2PathConfig(),
+    _par2Pct(0), _par2Path(), _par2Args(), _par2PathConfig(), _par2BlockSize(0),
     _doCompress(false), _doPar2(false), _genName(), _genPass(),
     _lengthName(sDefaultLengthName), _lengthPass(sDefaultLengthPass),
     _rarName(), _rarPass(), _rarPassFixed(),
@@ -2598,6 +2600,25 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _nzbCheck->setDispProgressBar(!jsonReport && (_dispProgressBar || _dispFilesPosting));
         _nzbCheck->setQuiet(_quiet || jsonReport);
         _nzbCheck->setJsonOutput(jsonReport);
+
+        // Block size, most specific source first. Anything below these is a
+        // guess NzbCheck makes from the nzb itself, and says so in its report.
+        _nzbCheck->setArticleSize(sArticleSize);
+        if (parser.isSet(sOptionNames[Opt::PAR2_BLOCK_SIZE]))
+        {
+            bool     ok        = false;
+            qint64 const bytes = parser.value(sOptionNames[Opt::PAR2_BLOCK_SIZE]).toLongLong(&ok);
+            if (!ok || bytes <= 0)
+            {
+                _error(tr("Error: --%1 expects a positive number of bytes")
+                               .arg(sOptionNames[Opt::PAR2_BLOCK_SIZE]),
+                       ERROR_CODE::ERR_WRONG_ARG);
+                return false;
+            }
+            _nzbCheck->setPar2BlockSize(bytes, tr("given on the command line"));
+        }
+        else if (_par2BlockSize > 0)
+            _nzbCheck->setPar2BlockSize(_par2BlockSize, tr("from the configuration"));
         int nbArticles = _nzbCheck->parseNzb(parser.value(sOptionNames[Opt::CHECK]));
         if (nbArticles <= 0)
         {
@@ -3888,6 +3909,14 @@ QString NgPost::_parseConfig(const QString &configPath)
                     }
                     else if (opt == sOptionNames[Opt::PAR2_ARGS])
                         _par2Args = val;
+                    else if (opt == sOptionNames[Opt::PAR2_BLOCK_SIZE])
+                    {
+                        qint64 nb = val.toLongLong(&ok);
+                        if (ok && nb > 0)
+                            _par2BlockSize = nb;
+                        else
+                            err += QString("%1 %2\n").arg(sOptionNames[Opt::PAR2_BLOCK_SIZE].toUpper()).arg(tr("should be a positive number of bytes!..."));
+                    }
                     else if (opt == sOptionNames[Opt::LENGTH_NAME])
                     {
                         uint nb = val.toUInt(&ok);

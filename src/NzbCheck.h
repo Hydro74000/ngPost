@@ -22,14 +22,38 @@
 #define NZBCHECK_H
 #include <QCommandLineOption>
 #include <QElapsedTimer>
+#include <QHash>
 #include <QObject>
 #include <QSet>
 #include <QStack>
 #include <QString>
 #include <QTextStream>
 #include <QTimer>
+#include <QVector>
 struct NntpServerParams;
 class NntpCheckCon;
+
+//! One PAR2 file of the post: either the base .par2, which carries only
+//! metadata, or a .volNN+MM.par2, which carries MM recovery blocks.
+struct Par2Volume
+{
+    QString subject;
+    int     blocks             = 0;     //!< recovery blocks, from the .volNN+MM name
+    bool    isVolume           = false; //!< false for the metadata-only base .par2
+    int     nbExpectedArticles = 0;
+    int     nbMissingArticles  = 0;
+
+    bool isIntact() const { return nbMissingArticles == 0; }
+
+    //! Recovery blocks still usable out of this file.
+    //!
+    //! PAR2 is a sequence of independently checksummed packets, and par2cmdline
+    //! scans a file for the ones it can still read, so a volume missing one of
+    //! its twenty articles is not worth zero -- it is worth roughly nineteen
+    //! twentieths of its blocks. Counting it as zero (as ngPostEx does) declares
+    //! repairable posts dead. Rounding down keeps the answer conservative.
+    int usableBlocks() const;
+};
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
 #define MB_FLUSH flush
@@ -82,6 +106,20 @@ private:
     QElapsedTimer _timeStart;
     int _nbCons;
 
+    // ---- PAR2 recovery analysis ----
+    QVector<Par2Volume> _par2Volumes;
+    QHash<QString, int> _articleVolume; //!< par2 article id -> index in _par2Volumes
+    int _nbPar2Articles;
+    int _nbDataArticles;
+    int _nbMissingPar2Articles;
+    int _nbMissingDataArticles;
+
+    qint64  _par2BlockSize;    //!< 0 while unknown
+    QString _blockSizeSource;  //!< how it was obtained, for the report
+    qint64  _articleSize;             //!< decoded payload per article; derived or configured
+    qint64  _articleSizeFromSubjects; //!< tightest bound the subjects give for it
+    qint64  _dataSizeBytes;    //!< data announced by the subjects, 0 if they carry none
+
     static const int sDefaultRefreshRate = 200; //!< how often shall we refresh the progressbar bar?
     static const int sprogressbarBarWidth = 50;
     static const QRegularExpression sNntpArticleYencSubjectRegExp;
@@ -98,9 +136,25 @@ public:
     enum class CheckStatus : int
     {
         Complete      = 0, //!< every article listed in the nzb is on the server
-        Missing       = 1, //!< articles are missing; repairability not evaluated
-        Unrecoverable = 2, //!< reserved: missing beyond what the PAR2 volumes can repair
+        Missing       = 1, //!< articles are missing, the PAR2 blocks can cover them
+        Unrecoverable = 2, //!< missing beyond what the PAR2 volumes can repair
         Inconclusive  = 3  //!< the check could not be completed, the result means nothing
+    };
+
+    //! Where the missing data sits relative to the recovery blocks left.
+    //!
+    //! An article covers a contiguous byte range, so how many PAR2 blocks it
+    //! damages depends on where that range falls against the block boundaries,
+    //! which the nzb does not say. The answer is therefore a range, and when
+    //! the recovery capacity falls inside it the honest verdict is "it depends
+    //! on how the losses are spread" rather than a flat yes or no.
+    enum class Recovery
+    {
+        NotNeeded,       //!< no data article is missing
+        Certain,         //!< even the worst layout is covered
+        LayoutDependent, //!< covered only if the losses are clustered
+        Impossible,      //!< even the best layout is not covered
+        NoRedundancy     //!< no usable PAR2 block at all
     };
 
     NzbCheck();
@@ -116,6 +170,8 @@ public:
     inline void setDispProgressBar(bool display);
     inline void setQuiet(bool quiet);
     inline void setJsonOutput(bool json);
+    inline void setPar2BlockSize(qint64 bytes, const QString &source);
+    inline void setArticleSize(qint64 bytes);
 
     inline void missingArticle(const QString &article);
     inline QString getNextArticle();
@@ -128,6 +184,14 @@ public:
 
     inline int nbMissingArticles() const;
     CheckStatus checkStatus() const;
+
+    // ---- PAR2 recovery analysis ----
+    int  totalRecoveryBlocks() const;
+    int  usableRecoveryBlocks() const;
+    bool hasIntactPar2Metadata() const;
+    //! Blocks the missing data articles damage: {clustered, scattered}.
+    QPair<int, int> damagedBlockRange() const;
+    Recovery recoveryVerdict() const;
     inline int exitCode() const;
     inline bool debugMode() const;
     inline void setDebug(ushort level);
@@ -141,6 +205,10 @@ public:
 
 private:
     void _printJsonReport(qint64 durationMs, const QString &error = QString());
+    void _printRecoveryAnalysis();
+    //! Settle _par2BlockSize / _articleSize once parsing is done, and record
+    //! where each value came from so the report can own up to a guess.
+    void _resolveSizes();
 };
 
 int NzbCheck::parseNzb(const QString &nzbPath)
@@ -168,6 +236,20 @@ void NzbCheck::setJsonOutput(bool json)
     _jsonOutput = json;
 }
 
+void NzbCheck::setPar2BlockSize(qint64 bytes, const QString &source)
+{
+    if (bytes > 0) {
+        _par2BlockSize   = bytes;
+        _blockSizeSource = source;
+    }
+}
+
+void NzbCheck::setArticleSize(qint64 bytes)
+{
+    if (bytes > 0)
+        _articleSize = bytes;
+}
+
 void NzbCheck::missingArticle(const QString &article)
 {
     // One line per missing article drowns the report on a post that has aged
@@ -179,6 +261,14 @@ void NzbCheck::missingArticle(const QString &article)
               << "\n"
               << MB_FLUSH;
     ++_nbMissingArticles;
+
+    // Which side of the post lost it decides whether anything can be repaired.
+    auto const volume = _articleVolume.constFind(article);
+    if (volume != _articleVolume.constEnd()) {
+        ++_nbMissingPar2Articles;
+        ++_par2Volumes[*volume].nbMissingArticles;
+    } else
+        ++_nbMissingDataArticles;
 }
 
 QString NzbCheck::getNextArticle()

@@ -158,6 +158,9 @@ private slots:
     //! Articles announced by the subject but absent from the XML belong in
     //! the report total without being mistaken for network-checkable IDs.
     void check_json_total_includes_articles_absent_from_nzb();
+    void check_recovery_is_certain_when_blocks_cover_the_loss();
+    void check_recovery_is_impossible_when_the_loss_exceeds_the_blocks();
+    void check_prorates_the_blocks_of_a_damaged_par2_volume();
 
     //! An unknown flag fails with a non-zero exit code. Currently
     //! ERR_WRONG_ARG = 3 but tests assert "non-zero" for resilience to enum
@@ -588,7 +591,9 @@ void TestCliParser::check_json_total_includes_articles_absent_from_nzb()
                                  { "-c", confPath, "--check_json", "--check", nzbPath },
                                  sandbox.rootPath());
     QVERIFY2(!result.timedOut, qPrintable(result.stdoutText + result.stderrText));
-    QCOMPARE(result.exitCode, static_cast<int>(NzbCheck::CheckStatus::Missing));
+    // Articles are missing and the nzb carries no PAR2 at all, so nothing can
+    // rebuild them: that is exit code 2, not merely "articles are missing".
+    QCOMPARE(result.exitCode, static_cast<int>(NzbCheck::CheckStatus::Unrecoverable));
 
     QJsonParseError parseError;
     const QJsonDocument report =
@@ -596,12 +601,176 @@ void TestCliParser::check_json_total_includes_articles_absent_from_nzb()
     QCOMPARE(parseError.error, QJsonParseError::NoError);
     QVERIFY(report.isObject());
     QCOMPARE(report.object().value(QStringLiteral("status")).toString(),
-             QStringLiteral("missing"));
+             QStringLiteral("unrecoverable"));
+    QCOMPARE(report.object().value(QStringLiteral("par2")).toObject()
+                     .value(QStringLiteral("recovery")).toString(),
+             QStringLiteral("noRedundancy"));
     const QJsonObject articles = report.object().value(QStringLiteral("articles")).toObject();
     QCOMPARE(articles.value(QStringLiteral("checked")).toInt(), 1);
     QCOMPARE(articles.value(QStringLiteral("missing")).toInt(), 2);
     QCOMPARE(articles.value(QStringLiteral("missingInNzb")).toInt(), 2);
     QCOMPARE(articles.value(QStringLiteral("total")).toInt(), 3);
+}
+
+namespace
+{
+//! Write an nzb with one data file and one PAR2 volume, using predictable
+//! message-ids (d1..dN, p1..pM) so a test can name the ones to hide.
+QString writeRecoveryNzb(const QString &dir,
+                         const QString &name,
+                         int            nbDataArticles,
+                         qint64         articleSize,
+                         int            par2Blocks,
+                         int            nbPar2Articles)
+{
+    QString xml = QStringLiteral(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n");
+
+    xml += QStringLiteral("  <file poster=\"p\" date=\"0\" subject=\"&quot;data.bin&quot; "
+                          "yEnc (1/%1) %2\">\n"
+                          "    <groups><group>alt.binaries.test</group></groups>\n"
+                          "    <segments>\n")
+                   .arg(nbDataArticles)
+                   .arg(articleSize * nbDataArticles);
+    for (int i = 1; i <= nbDataArticles; ++i)
+        xml += QStringLiteral("      <segment bytes=\"1\" number=\"%1\">d%1</segment>\n").arg(i);
+    xml += QStringLiteral("    </segments>\n  </file>\n");
+
+    xml += QStringLiteral("  <file poster=\"p\" date=\"0\" "
+                          "subject=\"&quot;data.vol00+%1.par2&quot; yEnc (1/%2) %3\">\n"
+                          "    <groups><group>alt.binaries.test</group></groups>\n"
+                          "    <segments>\n")
+                   .arg(par2Blocks)
+                   .arg(nbPar2Articles)
+                   .arg(articleSize * nbPar2Articles);
+    for (int i = 1; i <= nbPar2Articles; ++i)
+        xml += QStringLiteral("      <segment bytes=\"1\" number=\"%1\">p%1</segment>\n").arg(i);
+    xml += QStringLiteral("    </segments>\n  </file>\n</nzb>\n");
+
+    const QString path = dir + QLatin1Char('/') + name;
+    QFile f(path);
+    if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+        f.write(xml.toUtf8());
+    return path;
+}
+
+QString writeCheckConf(const QString &dir, quint16 port)
+{
+    const QString path = dir + QStringLiteral("/recovery.conf");
+    QFile config(path);
+    if (config.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream conf(&config);
+        conf << "[server]\n"
+             << "host = 127.0.0.1\n"
+             << "port = " << port << "\n"
+             << "enabled = true\n"
+             << "nzbCheck = true\n"
+             << "connection = 1\n";
+    }
+    return path;
+}
+
+QString writeMissingIds(const QString &dir, const QStringList &ids)
+{
+    const QString path = dir + QStringLiteral("/missing-ids.txt");
+    QFile f(path);
+    if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+        f.write((ids.join(QLatin1Char('\n')) + QLatin1Char('\n')).toUtf8());
+    return path;
+}
+} // namespace
+
+//! One lost article against four recovery blocks: covered whatever the layout.
+void TestCliParser::check_recovery_is_certain_when_blocks_cover_the_loss()
+{
+    HomeSandbox sandbox;
+    const QString ids = writeMissingIds(sandbox.rootPath(), { QStringLiteral("d2") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzb = writeRecoveryNzb(sandbox.rootPath(), QStringLiteral("ok.nzb"),
+                                         4, 716800, 4, 2);
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--par2_block_size", "716800",
+                              "--check", nzb },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Missing));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QCOMPARE(par2.value(QStringLiteral("recovery")).toString(), QStringLiteral("certain"));
+    QCOMPARE(par2.value(QStringLiteral("blocksUsable")).toInt(), 4);
+    QCOMPARE(par2.value(QStringLiteral("damagedBlocksMax")).toInt(), 2);
+}
+
+//! Three lost articles against two blocks: beyond repair at any layout, and the
+//! exit code says so rather than merely "articles are missing".
+void TestCliParser::check_recovery_is_impossible_when_the_loss_exceeds_the_blocks()
+{
+    HomeSandbox sandbox;
+    const QString ids = writeMissingIds(
+            sandbox.rootPath(),
+            { QStringLiteral("d1"), QStringLiteral("d2"), QStringLiteral("d3") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzb = writeRecoveryNzb(sandbox.rootPath(), QStringLiteral("dead.nzb"),
+                                         8, 716800, 2, 2);
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--par2_block_size", "716800",
+                              "--check", nzb },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Unrecoverable));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    QCOMPARE(report.object().value(QStringLiteral("status")).toString(),
+             QStringLiteral("unrecoverable"));
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QCOMPARE(par2.value(QStringLiteral("recovery")).toString(), QStringLiteral("impossible"));
+}
+
+//! A PAR2 volume that lost one of its four articles is not worth zero blocks.
+//! par2cmdline validates each packet on its own and uses what it can still
+//! read, so the volume keeps its share -- 30 of 40 here, not 0.
+void TestCliParser::check_prorates_the_blocks_of_a_damaged_par2_volume()
+{
+    HomeSandbox sandbox;
+    const QString ids = writeMissingIds(sandbox.rootPath(), { QStringLiteral("p1") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzb = writeRecoveryNzb(sandbox.rootPath(), QStringLiteral("degraded.nzb"),
+                                         2, 716800, 40, 4);
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--check", nzb },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Missing));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QCOMPARE(par2.value(QStringLiteral("blocksTotal")).toInt(), 40);
+    QCOMPARE(par2.value(QStringLiteral("blocksUsable")).toInt(), 30);
+    // The data itself never left, so there is nothing to recover.
+    QCOMPARE(par2.value(QStringLiteral("recovery")).toString(), QStringLiteral("notNeeded"));
 }
 
 void TestCliParser::unknown_flag_rejected()

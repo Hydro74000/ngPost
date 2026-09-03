@@ -35,6 +35,42 @@
 const QRegularExpression NzbCheck::sNntpArticleYencSubjectRegExp = QRegularExpression(
     sNntpArticleYencSubjectStrRegExp);
 
+namespace
+{
+//! ".par2" immediately followed by the closing quote or a space, so a data file
+//! called something.par2.rar is not mistaken for one.
+const QRegularExpression sPar2FileRegExp(QStringLiteral("\\.par2\"?\\s"),
+                                         QRegularExpression::CaseInsensitiveOption);
+
+//! ".volNN+MM.par2" -> MM recovery blocks. par2cmdline, ParPar and MultiPar all
+//! use this naming; the base .par2 has no vol part and carries no blocks.
+const QRegularExpression sPar2BlocksRegExp(QStringLiteral("\\.vol\\d+\\+(\\d+)\\.par2"),
+                                           QRegularExpression::CaseInsensitiveOption);
+
+//! ngPost, and most posters, close the subject with the size of the file.
+const QRegularExpression sSubjectSizeRegExp(
+    QStringLiteral("yEnc\\s+\\(\\d+/\\d+\\)\\s+(\\d+)\\s*$"));
+
+qint64 ceilDiv(qint64 numerator, qint64 denominator)
+{
+    return denominator > 0 ? (numerator + denominator - 1) / denominator : 0;
+}
+} // namespace
+
+int Par2Volume::usableBlocks() const
+{
+    if (blocks <= 0)
+        return 0;
+    if (nbMissingArticles <= 0)
+        return blocks;
+    if (nbExpectedArticles <= 0)
+        return 0; // no idea how much of it survived: assume nothing
+    int const present = nbExpectedArticles - nbMissingArticles;
+    if (present <= 0)
+        return 0;
+    return static_cast<int>((static_cast<qint64>(blocks) * present) / nbExpectedArticles);
+}
+
 void NzbCheck::onDisconnected(NntpCheckCon *con)
 {
     _connections.remove(con);
@@ -95,6 +131,9 @@ void NzbCheck::onDisconnected(NntpCheckCon *con)
                   << MB_FLUSH;
         }
 
+        if (!_quietMode && !nothingVerified)
+            _printRecoveryAnalysis();
+
         if (_jsonOutput)
             _printJsonReport(duration);
 
@@ -147,6 +186,17 @@ NzbCheck::NzbCheck()
     , _jsonOutput(false)
     , _unusable(false)
     , _nbCons(0) // only assigned by checkPost(), which a failed check never reaches
+    , _par2Volumes()
+    , _articleVolume()
+    , _nbPar2Articles(0)
+    , _nbDataArticles(0)
+    , _nbMissingPar2Articles(0)
+    , _nbMissingDataArticles(0)
+    , _par2BlockSize(0)
+    , _blockSizeSource()
+    , _articleSize(0)
+    , _articleSizeFromSubjects(0)
+    , _dataSizeBytes(0)
 {}
 
 NzbCheck::~NzbCheck()
@@ -169,6 +219,40 @@ int NzbCheck::parseNzb()
                 int nbArticles = 0, nbExpectedArticles = 0;
                 if (match.hasMatch())
                     nbExpectedArticles = match.captured(1).toInt();
+
+                bool const isPar2 = sPar2FileRegExp.match(subject).hasMatch();
+                int volumeIdx = -1;
+                if (isPar2) {
+                    Par2Volume vol;
+                    vol.subject            = subject;
+                    vol.nbExpectedArticles = nbExpectedArticles;
+                    QRegularExpressionMatch blocks = sPar2BlocksRegExp.match(subject);
+                    if (blocks.hasMatch()) {
+                        vol.blocks   = blocks.captured(1).toInt();
+                        vol.isVolume = true;
+                    }
+                    volumeIdx = _par2Volumes.size();
+                    _par2Volumes.append(vol);
+                } else {
+                    // The announced size is what lets us derive the payload of
+                    // one article, and with it how far a lost article reaches
+                    // into the PAR2 blocks.
+                    QRegularExpressionMatch size = sSubjectSizeRegExp.match(subject);
+                    if (size.hasMatch()) {
+                        qint64 const fileSize = size.captured(1).toLongLong();
+                        _dataSizeBytes += fileSize;
+                        // n articles cover the file and the last one is short,
+                        // so ceil(size/n) is a lower bound on the payload of a
+                        // full article. The largest bound across files is the
+                        // tightest one.
+                        if (nbExpectedArticles > 0) {
+                            qint64 const bound = ceilDiv(fileSize, nbExpectedArticles);
+                            if (bound > _articleSizeFromSubjects)
+                                _articleSizeFromSubjects = bound;
+                        }
+                    }
+                }
+
                 while (!xmlReader.atEnd()) {
                     QXmlStreamReader::TokenType type = xmlReader.readNext();
                     if (type == QXmlStreamReader::TokenType::EndElement
@@ -188,8 +272,16 @@ int NzbCheck::parseNzb()
                                       << "\n"
                                       << MB_FLUSH;
 
-                            _nbMissingArticles += nbExpectedArticles - nbArticles;
-                            _nbMissingArticlesInNzb += nbExpectedArticles - nbArticles;
+                            int const absent = nbExpectedArticles - nbArticles;
+                            _nbMissingArticles += absent;
+                            _nbMissingArticlesInNzb += absent;
+                            // An article the nzb never lists is as lost as one
+                            // the server dropped, and it hurts the same volume.
+                            if (isPar2) {
+                                _nbMissingPar2Articles += absent;
+                                _par2Volumes[volumeIdx].nbMissingArticles += absent;
+                            } else
+                                _nbMissingDataArticles += absent;
                         }
 
                         break;
@@ -197,7 +289,14 @@ int NzbCheck::parseNzb()
                                && xmlReader.name().compare(QLatin1String("segment")) == 0) {
                         ++nbArticles;
                         xmlReader.readNext();
-                        _articles.push(QString("<%1>").arg(xmlReader.text().toString()));
+                        QString const articleId = QString("<%1>").arg(
+                                xmlReader.text().toString());
+                        _articles.push(articleId);
+                        if (isPar2) {
+                            _articleVolume.insert(articleId, volumeIdx);
+                            ++_nbPar2Articles;
+                        } else
+                            ++_nbDataArticles;
                     }
                 }
             }
@@ -211,12 +310,24 @@ int NzbCheck::parseNzb()
         }
         _nbListedArticles = _articles.size();
         _nbTotalArticles = _nbListedArticles + _nbMissingArticlesInNzb;
-        if (!_quietMode)
-            _cout << tr("%1 has %2 articles")
+        _resolveSizes();
+        if (!_quietMode) {
+            _cout << tr("%1 has %2 articles (%3 data, %4 par2 in %5 volume(s))")
                          .arg(QFileInfo(_nzbPath).fileName())
                          .arg(_nbListedArticles)
+                         .arg(_nbDataArticles)
+                         .arg(_nbPar2Articles)
+                         .arg(_par2Volumes.size())
                   << "\n"
                   << MB_FLUSH;
+            if (_par2Volumes.isEmpty())
+                _cout << tr("WARNING: this nzb carries no PAR2 file - nothing can be repaired")
+                      << "\n"
+                      << MB_FLUSH;
+            else
+                _cout << tr("PAR2 recovery blocks: %1").arg(totalRecoveryBlocks()) << "\n"
+                      << MB_FLUSH;
+        }
         return _nbListedArticles;
     } else {
         _cerr << tr("Error opening nzb file...") << "\n" << MB_FLUSH;
@@ -292,6 +403,87 @@ void NzbCheck::reportUnusable(const QString &reason)
         _printJsonReport(0, reason);
 }
 
+void NzbCheck::_resolveSizes()
+{
+    // What the subjects say beats what the configuration says: the latter
+    // describes how we would post, not how this nzb was actually made.
+    if (_articleSizeFromSubjects > 0)
+        _articleSize = _articleSizeFromSubjects;
+
+    if (_par2BlockSize <= 0 && _articleSize > 0) {
+        _par2BlockSize   = _articleSize;
+        _blockSizeSource = tr("guessed from the article size");
+    }
+}
+
+int NzbCheck::totalRecoveryBlocks() const
+{
+    int blocks = 0;
+    for (Par2Volume const &vol : _par2Volumes)
+        blocks += vol.blocks;
+    return blocks;
+}
+
+int NzbCheck::usableRecoveryBlocks() const
+{
+    int blocks = 0;
+    for (Par2Volume const &vol : _par2Volumes)
+        blocks += vol.usableBlocks();
+    return blocks;
+}
+
+bool NzbCheck::hasIntactPar2Metadata() const
+{
+    // The file description and main packets are repeated in every PAR2 file, so
+    // a single intact one is enough to know what to repair.
+    for (Par2Volume const &vol : _par2Volumes) {
+        if (vol.isIntact())
+            return true;
+    }
+    return false;
+}
+
+QPair<int, int> NzbCheck::damagedBlockRange() const
+{
+    int const missing = _nbMissingDataArticles;
+    if (missing <= 0)
+        return { 0, 0 };
+    if (_par2BlockSize <= 0 || _articleSize <= 0)
+        return { missing, missing }; // nothing better to say than one for one
+
+    // Best case: the losses are contiguous, so they span a single run of bytes.
+    qint64 clustered = ceilDiv(static_cast<qint64>(missing) * _articleSize, _par2BlockSize);
+    // Worst case: each lost article sits astride a block boundary on its own,
+    // so it takes out floor(A/B) whole blocks plus the two it straddles.
+    qint64 const perArticle = _articleSize / _par2BlockSize + 1;
+    qint64 scattered = static_cast<qint64>(missing) * perArticle;
+
+    // Neither can exceed the number of blocks the data occupies.
+    if (_dataSizeBytes > 0) {
+        qint64 const dataBlocks = ceilDiv(_dataSizeBytes, _par2BlockSize);
+        clustered = qMin(clustered, dataBlocks);
+        scattered = qMin(scattered, dataBlocks);
+    }
+    clustered = qMax(clustered, qint64(1));
+    return { static_cast<int>(clustered), static_cast<int>(qMax(clustered, scattered)) };
+}
+
+NzbCheck::Recovery NzbCheck::recoveryVerdict() const
+{
+    if (_nbMissingDataArticles <= 0)
+        return Recovery::NotNeeded;
+    if (_par2Volumes.isEmpty() || !hasIntactPar2Metadata() || usableRecoveryBlocks() <= 0)
+        return Recovery::NoRedundancy;
+
+    int const usable = usableRecoveryBlocks();
+    QPair<int, int> const damaged = damagedBlockRange();
+    if (damaged.second <= usable)
+        return Recovery::Certain;
+    if (damaged.first <= usable)
+        return Recovery::LayoutDependent;
+    return Recovery::Impossible;
+}
+
 NzbCheck::CheckStatus NzbCheck::checkStatus() const
 {
     if (_unusable)
@@ -302,7 +494,86 @@ NzbCheck::CheckStatus NzbCheck::checkStatus() const
     if (_nbListedArticles > 0 && _nbCheckedArticles < _nbListedArticles)
         return CheckStatus::Inconclusive;
 
-    return _nbMissingArticles == 0 ? CheckStatus::Complete : CheckStatus::Missing;
+    if (_nbMissingArticles == 0)
+        return CheckStatus::Complete;
+
+    Recovery const recovery = recoveryVerdict();
+    if (recovery == Recovery::Impossible || recovery == Recovery::NoRedundancy)
+        return CheckStatus::Unrecoverable;
+    return CheckStatus::Missing;
+}
+
+void NzbCheck::_printRecoveryAnalysis()
+{
+    if (_par2Volumes.isEmpty() && _nbMissingDataArticles == 0 && _nbMissingPar2Articles == 0)
+        return; // nothing lost and nothing to say about redundancy
+
+    int const usable = usableRecoveryBlocks();
+    int const total  = totalRecoveryBlocks();
+
+    _cout << "\n" << tr("=== Recovery analysis ===") << "\n";
+    _cout << tr("  Data articles: %1 (missing: %2)")
+                 .arg(_nbDataArticles)
+                 .arg(_nbMissingDataArticles)
+          << "\n";
+    _cout << tr("  PAR2 articles: %1 (missing: %2)")
+                 .arg(_nbPar2Articles)
+                 .arg(_nbMissingPar2Articles)
+          << "\n";
+
+    if (_par2Volumes.isEmpty()) {
+        _cout << tr("  No PAR2 file: nothing can be repaired") << "\n" << MB_FLUSH;
+        return;
+    }
+
+    _cout << tr("  Recovery blocks: %1 of %2 still usable").arg(usable).arg(total) << "\n";
+    _cout << (hasIntactPar2Metadata()
+                      ? tr("  PAR2 metadata: available, so a repair knows what to rebuild")
+                      : tr("  PAR2 metadata: LOST - every PAR2 file is damaged"))
+          << "\n";
+
+    if (_nbMissingDataArticles > 0) {
+        QPair<int, int> const damaged = damagedBlockRange();
+        _cout << tr("  Damaged blocks: %1 to %2, depending on how the losses are spread "
+                    "(block size: %3 bytes, %4)")
+                     .arg(damaged.first)
+                     .arg(damaged.second)
+                     .arg(_par2BlockSize)
+                     .arg(_blockSizeSource.isEmpty() ? tr("declared") : _blockSizeSource)
+              << "\n";
+    }
+
+    switch (recoveryVerdict()) {
+    case Recovery::NotNeeded:
+        _cout << tr("  Verdict: COMPLETE - no data article is missing") << "\n";
+        if (_nbMissingPar2Articles > 0 && total > 0)
+            _cout << tr("  Warning: %1% of the recovery blocks are gone; the data is intact "
+                        "today but it is less protected than it was")
+                         .arg(100.0 * (total - usable) / total, 0, 'f', 1)
+                  << "\n";
+        break;
+    case Recovery::Certain:
+        _cout << tr("  Verdict: RECOVERABLE - the remaining blocks cover the loss whatever "
+                    "its layout")
+              << "\n";
+        break;
+    case Recovery::LayoutDependent:
+        _cout << tr("  Verdict: PROBABLY RECOVERABLE - the blocks cover the loss only if it "
+                    "is clustered. Try the repair before re-posting")
+              << "\n";
+        break;
+    case Recovery::Impossible:
+        _cout << tr("  Verdict: UNRECOVERABLE - the loss exceeds the remaining blocks even at "
+                    "best. This post has to be re-posted from the source")
+              << "\n";
+        break;
+    case Recovery::NoRedundancy:
+        _cout << tr("  Verdict: UNRECOVERABLE - data is missing and no usable recovery block "
+                    "is left")
+              << "\n";
+        break;
+    }
+    _cout << MB_FLUSH;
 }
 
 void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
@@ -330,12 +601,40 @@ void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
     articles[QStringLiteral("checked")]      = _nbCheckedArticles;
     articles[QStringLiteral("missing")]      = _nbMissingArticles;
     articles[QStringLiteral("missingInNzb")] = _nbMissingArticlesInNzb;
+    articles[QStringLiteral("data")]         = _nbDataArticles;
+    articles[QStringLiteral("dataMissing")]  = _nbMissingDataArticles;
+    articles[QStringLiteral("par2")]         = _nbPar2Articles;
+    articles[QStringLiteral("par2Missing")]  = _nbMissingPar2Articles;
+
+    QString recoveryName;
+    switch (recoveryVerdict()) {
+    case Recovery::NotNeeded:       recoveryName = QStringLiteral("notNeeded");       break;
+    case Recovery::Certain:         recoveryName = QStringLiteral("certain");         break;
+    case Recovery::LayoutDependent: recoveryName = QStringLiteral("layoutDependent"); break;
+    case Recovery::Impossible:      recoveryName = QStringLiteral("impossible");      break;
+    case Recovery::NoRedundancy:    recoveryName = QStringLiteral("noRedundancy");    break;
+    }
+
+    QPair<int, int> const damaged = damagedBlockRange();
+    QJsonObject par2;
+    par2[QStringLiteral("volumes")]           = _par2Volumes.size();
+    par2[QStringLiteral("blocksTotal")]       = totalRecoveryBlocks();
+    par2[QStringLiteral("blocksUsable")]      = usableRecoveryBlocks();
+    par2[QStringLiteral("metadataAvailable")] = hasIntactPar2Metadata();
+    par2[QStringLiteral("blockSize")]         = _par2BlockSize;
+    par2[QStringLiteral("blockSizeSource")]   = _blockSizeSource.isEmpty()
+                                                     ? QStringLiteral("declared")
+                                                     : _blockSizeSource;
+    par2[QStringLiteral("damagedBlocksMin")]  = damaged.first;
+    par2[QStringLiteral("damagedBlocksMax")]  = damaged.second;
+    par2[QStringLiteral("recovery")]          = recoveryName;
 
     QJsonObject root;
     root[QStringLiteral("nzb")]         = QFileInfo(_nzbPath).absoluteFilePath();
     root[QStringLiteral("status")]      = statusName;
     root[QStringLiteral("exitCode")]    = static_cast<int>(status);
     root[QStringLiteral("articles")]    = articles;
+    root[QStringLiteral("par2")]        = par2;
     root[QStringLiteral("servers")]     = nbCheckingServers();
     root[QStringLiteral("connections")] = _nbCons;
     root[QStringLiteral("durationMs")]  = durationMs;
