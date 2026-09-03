@@ -42,8 +42,16 @@ class NzbCheck : public QObject
     Q_OBJECT
 
 private:
+    // Every NZB ngPost writes ends its <file subject> with the file size:
+    //     [001/846] - "backup.part01.rar" yEnc (1/25) 734003200
+    // The historical pattern anchored the article count on the END of the
+    // subject ("...\\(\\d+/(\\d+)\\)$"), so it never matched a single subject
+    // ngPost itself produces: nbExpectedArticles stayed 0 and the "articles
+    // missing from the nzb" check in parseNzb() was dead code. Match the yEnc
+    // counter wherever it sits instead -- that also covers nyuu, ParPar and
+    // NewsUP, whose subjects carry their own trailing fields.
     static constexpr const char *sNntpArticleYencSubjectStrRegExp
-        = "^\\[\\d+/\\d+\\]\\s+.+\\(\\d+/(\\d+)\\)$";
+        = "yEnc\\s+\\(\\d+/(\\d+)\\)";
 
     QString _nzbPath;
     QStack<QString> _articles;
