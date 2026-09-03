@@ -164,6 +164,18 @@ jobs:
           cd src
           qmake ngPost.pro CONFIG+=release
           make -j$(nproc)
+      - name: Smoke test the built binary
+        run: |
+          # Nothing else in this workflow ever runs what it is about to publish.
+          # --version is enough to catch the failure that actually happens: a
+          # binary that starts but has no working TLS (missing OpenSSL, a Qt
+          # network plugin left out of the bundle) posts nothing at all, and we
+          # only ever found out after the release was live.
+          # argc > 1 means cmd mode, so this needs no display.
+          out=$(./src/ngPost --version 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "SSL support: yes" \
+            || { echo "FAIL: no working SSL in the built binary"; exit 1; }
       - name: Package
         run: |
           VERSION="${{ needs.release-metadata.outputs.package_version }}"
@@ -399,6 +411,18 @@ jobs:
             if ($dumpText -notmatch [regex]::Escape($dll)) {
               throw "ngPost.exe does not declare expected dependency: $dll"
             }
+          }
+      - name: Smoke test the built binary
+        shell: pwsh
+        run: |
+          # The deployment check above proves the DLLs are declared; this proves
+          # they actually load and that TLS works. A Windows build shipping
+          # without a usable OpenSSL starts fine and then posts nothing.
+          # ngPost.pro sets CONFIG += console on Windows, so stdout is captured.
+          $out = & "src/release/ngPost.exe" --version 2>&1 | Out-String
+          Write-Host $out
+          if ($out -notmatch "SSL support: yes") {
+            throw "FAIL: no working SSL in the built binary"
           }
       - name: Install Inno Setup
         shell: pwsh
@@ -705,6 +729,18 @@ jobs:
           make -j$(sysctl -n hw.ncpu)
       - name: Bundle Qt frameworks into .app
         run: macdeployqt src/ngPost.app
+      - name: Smoke test the built binary
+        run: |
+          # Nothing else in this workflow ever runs what it is about to publish.
+          # --version is enough to catch the failure that actually happens: a
+          # binary that starts but has no working TLS (missing OpenSSL, a Qt
+          # network plugin left out of the bundle) posts nothing at all, and we
+          # only ever found out after the release was live.
+          # argc > 1 means cmd mode, so this needs no display.
+          out=$(./src/ngPost.app/Contents/MacOS/ngPost --version 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "SSL support: yes" \
+            || { echo "FAIL: no working SSL in the built binary"; exit 1; }
       - name: Package
         run: |
           VERSION="${{ needs.release-metadata.outputs.package_version }}"
@@ -929,6 +965,17 @@ jobs:
           ls -la dist/
           # Hard fail if zsync file wasn't generated (means UPDATE_INFORMATION wasn't picked up)
           test -f dist/*.AppImage.zsync || { echo "ERROR: .zsync file not generated"; exit 1; }
+      - name: Smoke test the AppImage
+        run: |
+          # Run it the way a user does -- mounted through FUSE, not extracted --
+          # so a missing Qt network plugin or OpenSSL inside the bundle fails
+          # here rather than on someone's machine after the release.
+          cd dist
+          APPIMAGE=$(ls *.AppImage)
+          out=$(./"$APPIMAGE" --version 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "SSL support: yes" \
+            || { echo "FAIL: no working SSL in the AppImage"; exit 1; }
       - name: Verify AppImage is self-contained & update-info embedded
         env:
           APPIMAGE_UPDATE_TAG: ${{ needs.release-metadata.outputs.appimage_update_tag }}
