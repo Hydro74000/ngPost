@@ -69,7 +69,11 @@ int Par2Volume::usableBlocks() const
     int const present = nbExpectedArticles - nbMissingArticles;
     if (present <= 0)
         return 0;
-    return static_cast<int>((static_cast<qint64>(blocks) * present) / nbExpectedArticles);
+    // Pro rata, less one block per missing article. Recovery packets do not
+    // stop politely on article boundaries: a lost article takes its share of
+    // them plus, at worst, the one it cuts in half.
+    qint64 const share = (static_cast<qint64>(blocks) * present) / nbExpectedArticles;
+    return static_cast<int>(qMax(qint64(0), share - nbMissingArticles));
 }
 
 void NzbCheck::onDisconnected(NntpCheckCon *con)
@@ -219,6 +223,7 @@ NzbCheck::NzbCheck()
     , _nbMissingDataArticles(0)
     , _par2BlockSize(0)
     , _blockSizeSource()
+    , _blockSizeMeasured(false)
     , _articleSize(0)
     , _articleSizeFromSubjects(0)
     , _dataSizeBytes(0)
@@ -530,7 +535,10 @@ NzbCheck::Recovery NzbCheck::recoveryVerdict() const
         return Recovery::Certain;
     if (damaged.first <= usable)
         return Recovery::LayoutDependent;
-    return Recovery::Impossible;
+    // Beyond repair -- if the slice size we measured the damage against is
+    // real. Inferred from the nzb it is a guess, and a guess may say "try the
+    // repair", never "this is dead".
+    return _blockSizeMeasured ? Recovery::Impossible : Recovery::LayoutDependent;
 }
 
 NzbCheck::CheckStatus NzbCheck::checkStatus() const
@@ -597,6 +605,10 @@ void NzbCheck::_printRecoveryAnalysis()
                      .arg(_par2BlockSize)
                      .arg(_blockSizeSource.isEmpty() ? tr("declared") : _blockSizeSource)
               << "\n";
+        if (!_blockSizeMeasured)
+            _cout << tr("  The slice size was inferred, not read, so this analysis will not "
+                        "declare the post dead. Pass --par2_block_size to get a firm answer.")
+                  << "\n";
     }
 
     switch (recoveryVerdict()) {
@@ -680,6 +692,7 @@ void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
     par2[QStringLiteral("blocksUsable")]      = usableRecoveryBlocks();
     par2[QStringLiteral("metadataAvailable")] = hasIntactPar2Metadata();
     par2[QStringLiteral("blockSize")]         = _par2BlockSize;
+    par2[QStringLiteral("blockSizeMeasured")] = _blockSizeMeasured;
     par2[QStringLiteral("blockSizeSource")]   = _blockSizeSource.isEmpty()
                                                      ? QStringLiteral("declared")
                                                      : _blockSizeSource;

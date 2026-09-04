@@ -226,7 +226,7 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::DEBUG_FULL],          tr( "display full debug information")},
     {{"l", sOptionNames[Opt::LANG]},          tr( "application language"), sOptionNames[Opt::LANG]},
 
-    { sOptionNames[Opt::CHECK],               tr( "check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing but the PAR2 blocks can cover them, 2 = missing beyond what the PAR2 blocks can repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)"), sOptionNames[Opt::CHECK]},
+    { sOptionNames[Opt::CHECK],               tr( "check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, see the report for whether they can be repaired, 2 = missing beyond any repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)"), sOptionNames[Opt::CHECK]},
     { sOptionNames[Opt::CHECK_JSON],          tr( "with --check: print a single machine readable JSON report on stdout instead of the human one")},
     { sOptionNames[Opt::CHECK_FULL],          tr( "with --check: verify every article even once the post is provably beyond repair")},
     { sOptionNames[Opt::PAR2_BLOCK_SIZE],     tr( "with --check: PAR2 slice size in bytes used to create the post, for the recovery analysis (default: derived from the nzb)"), sOptionNames[Opt::PAR2_BLOCK_SIZE]},

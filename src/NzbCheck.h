@@ -124,6 +124,7 @@ private:
 
     qint64  _par2BlockSize;    //!< 0 while unknown
     QString _blockSizeSource;  //!< how it was obtained, for the report
+    bool    _blockSizeMeasured; //!< false when we had to guess it from the nzb
     qint64  _articleSize;             //!< decoded payload per article; derived or configured
     qint64  _articleSizeFromSubjects; //!< tightest bound the subjects give for it
     qint64  _dataSizeBytes;    //!< data announced by the subjects, 0 if they carry none
@@ -215,6 +216,9 @@ public:
     //! True when every data file told us its size, so _dataSizeBytes is the
     //! whole of the data and not a fragment of it.
     inline bool dataSizeIsComplete() const;
+    //! True when the PAR2 slice size was told to us rather than inferred. Only
+    //! then may the analysis assert that something is beyond repair.
+    inline bool blockSizeIsMeasured() const;
     //! Blocks the missing data articles damage: {clustered, scattered}.
     QPair<int, int> damagedBlockRange() const;
     //! Share of the data the recovery blocks still cover, in percent, and what
@@ -273,6 +277,10 @@ bool NzbCheck::stoppedEarly() const
 {
     return _earlyStop;
 }
+bool NzbCheck::blockSizeIsMeasured() const
+{
+    return _blockSizeMeasured;
+}
 bool NzbCheck::dataSizeIsComplete() const
 {
     return _nbDataFiles > 0 && _nbDataFilesWithSize == _nbDataFiles && _dataSizeBytes > 0;
@@ -298,8 +306,9 @@ ushort NzbCheck::maxRetries() const
 void NzbCheck::setPar2BlockSize(qint64 bytes, const QString &source)
 {
     if (bytes > 0) {
-        _par2BlockSize   = bytes;
-        _blockSizeSource = source;
+        _par2BlockSize     = bytes;
+        _blockSizeSource   = source;
+        _blockSizeMeasured = true;
     }
 }
 
@@ -332,9 +341,15 @@ void NzbCheck::missingArticle(const QString &article)
         // Only ever stop on a loss that no layout can save. "Recoverable if the
         // losses are clustered" is precisely the case where giving up would
         // send someone to re-post something a repair would have fixed.
+        // Stopping is irreversible: it stops asking. Only a fact justifies it.
+        // NoRedundancy is one -- no usable block can repair anything, whatever
+        // the slice size. Impossible is only a fact when the slice size was
+        // told to us; inferred, it is an estimate, and an estimate must not
+        // send anyone off to re-post a whole set.
         if (!_earlyStop && !_checkFull && _par2PhaseDone) {
             Recovery const verdict = recoveryVerdict();
-            if (verdict == Recovery::Impossible || verdict == Recovery::NoRedundancy)
+            if (verdict == Recovery::NoRedundancy
+                || (verdict == Recovery::Impossible && _blockSizeMeasured))
                 _earlyStop = true;
         }
     }

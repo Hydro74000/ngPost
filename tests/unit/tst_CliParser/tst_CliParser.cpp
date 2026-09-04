@@ -168,6 +168,7 @@ private slots:
     void check_detects_par2_when_the_subject_ends_on_the_extension();
     void check_withholds_redundancy_when_a_size_is_missing();
     void check_survives_a_server_that_sends_half_a_line();
+    void check_never_declares_a_post_dead_on_an_inferred_slice_size();
 
     //! An unknown flag fails with a non-zero exit code. Currently
     //! ERR_WRONG_ARG = 3 but tests assert "non-zero" for resilience to enum
@@ -751,7 +752,9 @@ void TestCliParser::check_recovery_is_impossible_when_the_loss_exceeds_the_block
 
 //! A PAR2 volume that lost one of its four articles is not worth zero blocks.
 //! par2cmdline validates each packet on its own and uses what it can still
-//! read, so the volume keeps its share -- 30 of 40 here, not 0.
+//! read, so the volume keeps its share: 40 blocks over 4 articles, one gone,
+//! leaves 30 -- minus one for the packet the article boundary cuts in half,
+//! since recovery packets do not stop politely on article boundaries.
 void TestCliParser::check_prorates_the_blocks_of_a_damaged_par2_volume()
 {
     HomeSandbox sandbox;
@@ -775,7 +778,7 @@ void TestCliParser::check_prorates_the_blocks_of_a_damaged_par2_volume()
     QCOMPARE(err.error, QJsonParseError::NoError);
     const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
     QCOMPARE(par2.value(QStringLiteral("blocksTotal")).toInt(), 40);
-    QCOMPARE(par2.value(QStringLiteral("blocksUsable")).toInt(), 30);
+    QCOMPARE(par2.value(QStringLiteral("blocksUsable")).toInt(), 29);
     // The data itself never left, so there is nothing to recover.
     QCOMPARE(par2.value(QStringLiteral("recovery")).toString(), QStringLiteral("notNeeded"));
 }
@@ -1034,6 +1037,57 @@ void TestCliParser::check_survives_a_server_that_sends_half_a_line()
              "the connection ended too fast to have gone through the watchdog");
     QVERIFY2(r.stderrText.contains(QStringLiteral("stopped answering")),
              qPrintable(QStringLiteral("no watchdog message:\n") + r.stderrText));
+}
+
+//! The slice size decides how much damage a lost article does. Inferred from
+//! the nzb it is a guess, so the analysis may say "try the repair" but never
+//! "this is dead": nothing should send someone off to re-post a whole set on
+//! the strength of an estimate, and nothing should stop the check early either.
+void TestCliParser::check_never_declares_a_post_dead_on_an_inferred_slice_size()
+{
+    HomeSandbox sandbox;
+    const QString ids = writeMissingIds(
+            sandbox.rootPath(),
+            { QStringLiteral("d1"), QStringLiteral("d2"), QStringLiteral("d3") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzb = writeRecoveryNzb(sandbox.rootPath(), QStringLiteral("guessed.nzb"),
+                                         8, 716800, 2, 2);
+
+    // Same nzb, same losses, twice: once letting the check infer the slice
+    // size, once telling it. Only the second may reach a verdict of death.
+    const RunResult inferred = run(_bin,
+                                   { "-c", conf, "--check_json", "--check", nzb },
+                                   sandbox.rootPath());
+    QVERIFY2(!inferred.timedOut, qPrintable(inferred.stdoutText + inferred.stderrText));
+    QCOMPARE(inferred.exitCode, static_cast<int>(NzbCheck::CheckStatus::Missing));
+
+    QJsonParseError err;
+    QJsonDocument report = QJsonDocument::fromJson(inferred.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QVERIFY2(!par2.value(QStringLiteral("blockSizeMeasured")).toBool(),
+             "the slice size should have been inferred here");
+    QCOMPARE(par2.value(QStringLiteral("recovery")).toString(),
+             QStringLiteral("layoutDependent"));
+    QVERIFY2(!report.object().value(QStringLiteral("stoppedEarly")).toBool(),
+             "a guess must not cut the check short");
+
+    const RunResult measured = run(_bin,
+                                   { "-c", conf, "--check_json", "--par2_block_size", "716800",
+                                     "--check", nzb },
+                                   sandbox.rootPath());
+    QVERIFY2(!measured.timedOut, qPrintable(measured.stdoutText + measured.stderrText));
+    QCOMPARE(measured.exitCode, static_cast<int>(NzbCheck::CheckStatus::Unrecoverable));
+    report = QJsonDocument::fromJson(measured.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QVERIFY2(par2.value(QStringLiteral("blockSizeMeasured")).toBool(),
+             "the slice size was given on the command line");
+    QCOMPARE(par2.value(QStringLiteral("recovery")).toString(), QStringLiteral("impossible"));
 }
 
 void TestCliParser::unknown_flag_rejected()
