@@ -115,7 +115,10 @@ private:
     QVector<Par2Volume> _par2Volumes;
     QHash<QString, int> _articleVolume; //!< par2 article id -> index in _par2Volumes
     int _nbPar2Articles;
+    int _nbPar2Answered; //!< PAR2 articles the server has actually answered on
     int _nbDataArticles;
+    int _nbDataFiles;         //!< data files in the nzb
+    int _nbDataFilesWithSize; //!< of which announce their size in the subject
     int _nbMissingPar2Articles;
     int _nbMissingDataArticles;
 
@@ -194,7 +197,8 @@ public:
     //! does not silently remove it from the run.
     inline void requeueArticle(const QString &article);
     inline bool hasArticlesLeft() const;
-    inline void articleChecked();
+    //! \a article is the one that just got its answer, whatever that answer was.
+    inline void articleChecked(const QString &article);
 
     //! The check cannot even be attempted (nzb unreadable, no server able to
     //! run it). Reports it the way a finished check reports itself, so a caller
@@ -208,6 +212,9 @@ public:
     int  totalRecoveryBlocks() const;
     int  usableRecoveryBlocks() const;
     bool hasIntactPar2Metadata() const;
+    //! True when every data file told us its size, so _dataSizeBytes is the
+    //! whole of the data and not a fragment of it.
+    inline bool dataSizeIsComplete() const;
     //! Blocks the missing data articles damage: {clustered, scattered}.
     QPair<int, int> damagedBlockRange() const;
     //! Share of the data the recovery blocks still cover, in percent, and what
@@ -265,6 +272,10 @@ void NzbCheck::setCheckFull(bool full)
 bool NzbCheck::stoppedEarly() const
 {
     return _earlyStop;
+}
+bool NzbCheck::dataSizeIsComplete() const
+{
+    return _nbDataFiles > 0 && _nbDataFilesWithSize == _nbDataFiles && _dataSizeBytes > 0;
 }
 void NzbCheck::setSocketTimeOut(int ms)
 {
@@ -337,9 +348,12 @@ QString NzbCheck::getNextArticle()
     if (!_par2Queue.isEmpty())
         return _par2Queue.pop();
 
-    // Nothing left to learn about the redundancy: from here on every missing
-    // data article can be weighed against it.
-    _par2PhaseDone = true;
+    // The queue emptying only means the last PAR2 article has been handed OUT.
+    // With more connections than PAR2 articles the answers are still in flight,
+    // and weighing a data loss against a redundancy we do not know yet would be
+    // guessing. The phase closes when every one of them has answered.
+    if (_nbPar2Answered >= _nbPar2Articles)
+        _par2PhaseDone = true;
 
     if (!_dataQueue.isEmpty())
         return _dataQueue.pop();
@@ -361,9 +375,11 @@ bool NzbCheck::hasArticlesLeft() const
     return !_earlyStop && (!_par2Queue.isEmpty() || !_dataQueue.isEmpty());
 }
 
-void NzbCheck::articleChecked()
+void NzbCheck::articleChecked(const QString &article)
 {
     ++_nbCheckedArticles;
+    if (_articleVolume.contains(article))
+        ++_nbPar2Answered;
 }
 
 int NzbCheck::nbMissingArticles() const

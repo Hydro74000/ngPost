@@ -164,6 +164,8 @@ private slots:
     void check_loses_no_article_when_the_connection_drops();
     void check_stops_once_the_post_is_provably_beyond_repair();
     void check_full_verifies_everything_anyway();
+    void check_detects_par2_when_the_subject_ends_on_the_extension();
+    void check_withholds_redundancy_when_a_size_is_missing();
 
     //! An unknown flag fails with a non-zero exit code. Currently
     //! ERR_WRONG_ARG = 3 but tests assert "non-zero" for resilience to enum
@@ -894,6 +896,102 @@ void TestCliParser::check_full_verifies_everything_anyway()
     QCOMPARE(articles.value(QStringLiteral("missing")).toInt(), 5);
     QVERIFY2(!articles.value(QStringLiteral("missingIsALowerBound")).toBool(),
              "a complete sweep reports a total, not a floor");
+}
+
+//! A subject that stops right after ".par2" is still a PAR2 file. The detection
+//! used to require a quote or a space behind the extension, so such a file was
+//! counted as data: its blocks vanished from the recovery capacity and its
+//! articles turned every loss into apparent data loss.
+void TestCliParser::check_detects_par2_when_the_subject_ends_on_the_extension()
+{
+    HomeSandbox sandbox;
+
+    MockNntpServer server;
+    QVERIFY2(server.start(), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/bare-par2.nzb");
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    nzb.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n"
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;data.bin&quot; yEnc (1/2) 1433600\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">d1</segment>"
+              "<segment bytes=\"1\" number=\"2\">d2</segment></segments>\n"
+              "  </file>\n"
+              // no quote, no trailing space: the subject ends on the extension
+              "  <file poster=\"p\" date=\"0\" subject=\"data.vol00+04.par2\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">p1</segment></segments>\n"
+              "  </file>\n"
+              "</nzb>\n");
+    nzb.close();
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--check", nzbPath },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QCOMPARE(par2.value(QStringLiteral("volumes")).toInt(), 1);
+    QCOMPARE(par2.value(QStringLiteral("blocksTotal")).toInt(), 4);
+
+    const QJsonObject articles = report.object().value(QStringLiteral("articles")).toObject();
+    QCOMPARE(articles.value(QStringLiteral("par2")).toInt(), 1);
+    QCOMPARE(articles.value(QStringLiteral("data")).toInt(), 2);
+}
+
+//! Redundancy is a share of the data, so it needs the whole of the data. When
+//! only some subjects announce a size, summing them would understate the
+//! denominator and overstate the answer: the figure is withheld instead.
+void TestCliParser::check_withholds_redundancy_when_a_size_is_missing()
+{
+    HomeSandbox sandbox;
+
+    MockNntpServer server;
+    QVERIFY2(server.start(), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/mixed-sizes.nzb");
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    nzb.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n"
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;a.bin&quot; yEnc (1/2) 1433600\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">d1</segment>"
+              "<segment bytes=\"1\" number=\"2\">d2</segment></segments>\n"
+              "  </file>\n"
+              // this one says nothing about its size
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;b.bin&quot; yEnc (1/2)\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">d3</segment>"
+              "<segment bytes=\"1\" number=\"2\">d4</segment></segments>\n"
+              "  </file>\n"
+              "  <file poster=\"p\" date=\"0\" "
+              "subject=\"&quot;a.vol00+04.par2&quot; yEnc (1/1) 716800\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">p1</segment></segments>\n"
+              "  </file>\n"
+              "</nzb>\n");
+    nzb.close();
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--check", nzbPath },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QCOMPARE(par2.value(QStringLiteral("blocksTotal")).toInt(), 4);
+    QVERIFY2(!par2.contains(QStringLiteral("redundancyPercent")),
+             "redundancy must not be computed from a partial data size");
 }
 
 void TestCliParser::unknown_flag_rejected()

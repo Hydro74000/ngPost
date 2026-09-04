@@ -37,9 +37,10 @@ const QRegularExpression NzbCheck::sNntpArticleYencSubjectRegExp = QRegularExpre
 
 namespace
 {
-//! ".par2" immediately followed by the closing quote or a space, so a data file
-//! called something.par2.rar is not mistaken for one.
-const QRegularExpression sPar2FileRegExp(QStringLiteral("\\.par2\"?\\s"),
+//! ".par2" at the end of the name: followed by the closing quote, by a space,
+//! or by nothing at all when the subject stops there. A data file called
+//! something.par2.rar is still not mistaken for one.
+const QRegularExpression sPar2FileRegExp(QStringLiteral("\\.par2(?:\"|\\s|$)"),
                                          QRegularExpression::CaseInsensitiveOption);
 
 //! ".volNN+MM.par2" -> MM recovery blocks. par2cmdline, ParPar and MultiPar all
@@ -64,7 +65,7 @@ int Par2Volume::usableBlocks() const
     if (nbMissingArticles <= 0)
         return blocks;
     if (nbExpectedArticles <= 0)
-        return 0; // no idea how much of it survived: assume nothing
+        return 0; // nothing says how many articles this volume should have
     int const present = nbExpectedArticles - nbMissingArticles;
     if (present <= 0)
         return 0;
@@ -212,6 +213,8 @@ NzbCheck::NzbCheck()
     , _articleVolume()
     , _nbPar2Articles(0)
     , _nbDataArticles(0)
+    , _nbDataFiles(0)
+    , _nbDataFilesWithSize(0)
     , _nbMissingPar2Articles(0)
     , _nbMissingDataArticles(0)
     , _par2BlockSize(0)
@@ -219,6 +222,7 @@ NzbCheck::NzbCheck()
     , _articleSize(0)
     , _articleSizeFromSubjects(0)
     , _dataSizeBytes(0)
+    , _nbPar2Answered(0)
     , _par2PhaseDone(false)
     , _earlyStop(false)
     , _checkFull(false)
@@ -262,8 +266,10 @@ int NzbCheck::parseNzb()
                     // The announced size is what lets us derive the payload of
                     // one article, and with it how far a lost article reaches
                     // into the PAR2 blocks.
+                    ++_nbDataFiles;
                     QRegularExpressionMatch size = sSubjectSizeRegExp.match(subject);
                     if (size.hasMatch()) {
+                        ++_nbDataFilesWithSize;
                         qint64 const fileSize = size.captured(1).toLongLong();
                         _dataSizeBytes += fileSize;
                         // n articles cover the file and the last one is short,
@@ -485,8 +491,10 @@ QPair<int, int> NzbCheck::damagedBlockRange() const
     qint64 const perArticle = _articleSize / _par2BlockSize + 1;
     qint64 scattered = static_cast<qint64>(missing) * perArticle;
 
-    // Neither can exceed the number of blocks the data occupies.
-    if (_dataSizeBytes > 0) {
+    // Neither can exceed the number of blocks the data occupies -- but only a
+    // complete size can cap anything; a partial one would cap too low and
+    // understate the damage.
+    if (dataSizeIsComplete()) {
         qint64 const dataBlocks = ceilDiv(_dataSizeBytes, _par2BlockSize);
         clustered = qMin(clustered, dataBlocks);
         scattered = qMin(scattered, dataBlocks);
@@ -500,7 +508,9 @@ QPair<double, double> NzbCheck::redundancyPercent() const
     // Blocks alone say nothing: forty blocks over a 200 MB post is generous,
     // over a 40 GB one it is nothing. What predicts whether a post survives
     // Usenet is the share of itself it can rebuild.
-    if (_dataSizeBytes <= 0 || _par2BlockSize <= 0)
+    // A partial sum would understate the denominator and overstate the answer,
+    // so the figure is only offered when every data file announced its size.
+    if (!dataSizeIsComplete() || _par2BlockSize <= 0)
         return { -1.0, -1.0 };
     double const data = static_cast<double>(_dataSizeBytes);
     return { 100.0 * usableRecoveryBlocks() * _par2BlockSize / data,

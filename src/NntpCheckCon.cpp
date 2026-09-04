@@ -269,7 +269,7 @@ void NntpCheckCon::onReadyRead()
             if (strncmp(line.constData(), Nntp::getResponse(430), 3) == 0)
                 _nzbCheck->missingArticle(_currentArticle);
 
-            _nzbCheck->articleChecked();
+            _nzbCheck->articleChecked(_currentArticle);
             _currentArticle.clear(); // answered: no longer in flight
             _nbRetries = 0;          // the budget is per incident, not per run
             _postingState = PostingState::IDLE;
