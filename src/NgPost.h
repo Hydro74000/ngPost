@@ -517,6 +517,7 @@ public:
     QString postInfoOutputForTest() const { return _postInfoOutput; }
 
     bool postInfoOnlyOnSuccessForTest() const { return _postInfoOnlySuccess; }
+    qint64 par2BlockSizeForTest() const { return _par2BlockSize; }
     int postCmdTimeoutSecForTest() const { return _postCmdTimeoutSec; }
     bool postCmdFailIsErrorForTest() const { return _postCmdFailIsError; }
     bool postCmdExposePasswordForTest() const { return _postCmdExposePassword; }

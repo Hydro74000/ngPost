@@ -4861,6 +4861,14 @@ void NgPost::saveConfig()
                << "#PAR2_ARGS = create /rr8 /lc40 /lr /rd2 /ss768000     (for Multipar)\n"
                << (_par2Args.isEmpty() ? "" : QString("PAR2_ARGS = %1\n").arg(_par2Args))
                << "\n"
+               << tr("## PAR2 slice size in bytes, used by --check to weigh a loss against the")
+               << "\n"
+               << tr("## recovery blocks. Without it the check infers one and refuses to declare")
+               << "\n"
+               << tr("## a post beyond repair.") << "\n"
+               << "#PAR2_BLOCK_SIZE = 768000\n"
+               << (_par2BlockSize > 0 ? QString("PAR2_BLOCK_SIZE = %1\n").arg(_par2BlockSize) : "")
+               << "\n"
                << "\n"
                << tr("## length of the random generated archive's file name") << "\n"
                << "LENGTH_NAME = " << _lengthName << "\n"

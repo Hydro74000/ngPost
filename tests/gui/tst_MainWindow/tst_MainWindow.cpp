@@ -340,7 +340,8 @@ void TestMainWindow::save_config_round_trips_post_info_keys()
           << "POST_CMD_TIMEOUT = 120\n"
           << "POST_CMD_FAIL_IS_ERROR = true\n"
           << "POST_CMD_EXPOSE_PASSWORD = true\n"
-          << "NZB_UPLOAD_TIMEOUT = 45\n";
+          << "NZB_UPLOAD_TIMEOUT = 45\n"
+          << "PAR2_BLOCK_SIZE = 5242880\n";
     }
 
     int argc = 1;
@@ -368,6 +369,9 @@ void TestMainWindow::save_config_round_trips_post_info_keys()
         QCOMPARE(ngPost.postCmdFailIsErrorForTest(), true);
         QCOMPARE(ngPost.postCmdExposePasswordForTest(), true);
         QCOMPARE(ngPost.nzbUploadTimeoutSecForTest(), 45);
+        // Read but never written back, this one used to vanish on the first
+        // save, and --check then quietly went back to inferring a slice size.
+        QCOMPARE(ngPost.par2BlockSizeForTest(), Q_INT64_C(5242880));
     }
 }
 

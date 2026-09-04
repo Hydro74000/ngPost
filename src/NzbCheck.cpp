@@ -636,6 +636,18 @@ void NzbCheck::_printRecoveryAnalysis()
                   << "\n";
     }
 
+    // The nzb says which files exist, never which of them the PAR2 set actually
+    // covers. ngPost itself copies the visible .nfo in after the PAR2 files are
+    // generated, so that one is in the post but outside the recovery set: if
+    // its article is the one that went missing, no amount of blocks brings it
+    // back. Nothing in the nzb lets a reader tell, so the assumption is stated
+    // rather than silently made.
+    if (_nbMissingDataArticles > 0)
+        _cout << tr("  Assumes every non-PAR2 file is covered by the recovery set. A file added "
+                    "after the PAR2 files were built -- a .nfo kept visible, for instance -- is "
+                    "not, and a loss there cannot be repaired.")
+              << "\n";
+
     switch (recoveryVerdict()) {
     case Recovery::NotNeeded:
         _cout << tr("  Verdict: COMPLETE - no data article is missing") << "\n";
@@ -718,6 +730,9 @@ void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
     par2[QStringLiteral("metadataAvailable")] = hasIntactPar2Metadata();
     par2[QStringLiteral("blockSize")]         = _par2BlockSize;
     par2[QStringLiteral("blockSizeMeasured")] = _blockSizeMeasured;
+    // Coverage of the data files by the recovery set is assumed, not read: the
+    // nzb does not record which files the PAR2 volumes were built over.
+    par2[QStringLiteral("coverageAssumed")]   = true;
     par2[QStringLiteral("blockSizeSource")]   = _blockSizeSource.isEmpty()
                                                      ? QStringLiteral("declared")
                                                      : _blockSizeSource;
