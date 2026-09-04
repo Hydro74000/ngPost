@@ -170,6 +170,7 @@ private slots:
     void check_survives_a_server_that_sends_half_a_line();
     void check_never_declares_a_post_dead_on_an_inferred_slice_size();
     void check_counts_losses_in_separate_files_as_separate_blocks();
+    void check_stops_on_losses_the_nzb_itself_already_declared();
 
     //! An unknown flag fails with a non-zero exit code. Currently
     //! ERR_WRONG_ARG = 3 but tests assert "non-zero" for resilience to enum
@@ -615,7 +616,11 @@ void TestCliParser::check_json_total_includes_articles_absent_from_nzb()
                      .value(QStringLiteral("recovery")).toString(),
              QStringLiteral("noRedundancy"));
     const QJsonObject articles = report.object().value(QStringLiteral("articles")).toObject();
-    QCOMPARE(articles.value(QStringLiteral("checked")).toInt(), 1);
+    // The nzb declares two articles it does not carry and offers no PAR2 to
+    // rebuild them, so the answer is settled before a single STAT goes out.
+    QVERIFY2(report.object().value(QStringLiteral("stoppedEarly")).toBool(),
+             "a post that is already beyond repair should not be checked at all");
+    QCOMPARE(articles.value(QStringLiteral("checked")).toInt(), 0);
     QCOMPARE(articles.value(QStringLiteral("missing")).toInt(), 2);
     QCOMPARE(articles.value(QStringLiteral("missingInNzb")).toInt(), 2);
     QCOMPARE(articles.value(QStringLiteral("total")).toInt(), 3);
@@ -1150,6 +1155,60 @@ void TestCliParser::check_counts_losses_in_separate_files_as_separate_blocks()
     QCOMPARE(par2.value(QStringLiteral("blocksUsable")).toInt(), 1);
     QCOMPARE(par2.value(QStringLiteral("recovery")).toString(), QStringLiteral("impossible"));
     QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Unrecoverable));
+}
+
+//! Articles the nzb never lists are counted at parse time, long before any
+//! connection opens, so no "missing article" event ever fires for them. While
+//! the decision to stop hung off that event alone, a post whose nzb was already
+//! truncated beyond repair was checked from end to end for nothing.
+void TestCliParser::check_stops_on_losses_the_nzb_itself_already_declared()
+{
+    HomeSandbox sandbox;
+
+    MockNntpServer server;
+    QVERIFY2(server.start(), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/truncated.nzb");
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    // The subject announces eight articles; three are listed. The five the nzb
+    // does not carry are already more than two recovery blocks can rebuild.
+    nzb.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n"
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;data.bin&quot; yEnc (1/8) 5734400\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">d1</segment>"
+              "<segment bytes=\"1\" number=\"2\">d2</segment>"
+              "<segment bytes=\"1\" number=\"3\">d3</segment></segments>\n"
+              "  </file>\n"
+              "  <file poster=\"p\" date=\"0\" "
+              "subject=\"&quot;data.vol00+02.par2&quot; yEnc (1/2) 1433600\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">p1</segment>"
+              "<segment bytes=\"1\" number=\"2\">p2</segment></segments>\n"
+              "  </file>\n"
+              "</nzb>\n");
+    nzb.close();
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--par2_block_size", "716800",
+                              "--check", nzbPath },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Unrecoverable));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    QVERIFY2(report.object().value(QStringLiteral("stoppedEarly")).toBool(),
+             "losses the nzb already declared should end the run as soon as the PAR2 "
+             "phase closes");
+
+    // The three data articles it does list were never worth asking about.
+    const QJsonObject articles = report.object().value(QStringLiteral("articles")).toObject();
+    QCOMPARE(articles.value(QStringLiteral("checked")).toInt(), 2);
+    QCOMPARE(articles.value(QStringLiteral("missingInNzb")).toInt(), 5);
 }
 
 void TestCliParser::unknown_flag_rejected()

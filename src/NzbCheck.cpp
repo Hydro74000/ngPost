@@ -100,11 +100,18 @@ void NzbCheck::onDisconnected(NntpCheckCon *con)
         // by itself: under --check_json that stream carries the report and
         // nothing else. The json says stoppedEarly on its own.
         if (_earlyStop && !_quietMode) {
-            _cout << tr("Stopped after %1 of the %2 article(s) listed in the nzb: the loss is "
-                        "already beyond what the PAR2 blocks can repair, so checking the rest "
-                        "would not change the answer. Pass --%3 to check everything anyway.")
+            // Say which fact stopped it: "beyond what the blocks can repair" is
+            // a strange thing to read on a post that has no block at all.
+            QString const reason
+                    = recoveryVerdict() == Recovery::NoRedundancy
+                              ? tr("there is nothing left to rebuild it with")
+                              : tr("the loss is already beyond what the PAR2 blocks can repair");
+            _cout << tr("Stopped after %1 of the %2 article(s) listed in the nzb: %3, so "
+                        "checking the rest would not change the answer. Pass --%4 to check "
+                        "everything anyway.")
                          .arg(_nbCheckedArticles)
                          .arg(_nbListedArticles)
+                         .arg(reason)
                          .arg(QStringLiteral("check_full"))
                   << "\n"
                   << MB_FLUSH;

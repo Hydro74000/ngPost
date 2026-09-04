@@ -245,6 +245,12 @@ public:
     inline void error(const std::string &aMsg);
 
 private:
+    //! Weigh what is known right now against the redundancy left, and stop the
+    //! run if it is provably beyond repair. Called on every loss and when the
+    //! PAR2 phase closes, because the answer is a function of the state and not
+    //! of the event that happened to reveal it.
+    inline void _reevaluateEarlyStop();
+
     void _printJsonReport(qint64 durationMs, const QString &error = QString());
     void _printRecoveryAnalysis();
     //! Settle _par2BlockSize / _articleSize once parsing is done, and record
@@ -352,22 +358,31 @@ void NzbCheck::missingArticle(const QString &article)
         int const dataFile = -owner - 1;
         if (dataFile >= 0 && dataFile < _dataFileMissing.size())
             ++_dataFileMissing[dataFile];
-
-        // Only ever stop on a loss that no layout can save. "Recoverable if the
-        // losses are clustered" is precisely the case where giving up would
-        // send someone to re-post something a repair would have fixed.
-        // Stopping is irreversible: it stops asking. Only a fact justifies it.
-        // NoRedundancy is one -- no usable block can repair anything, whatever
-        // the slice size. Impossible is only a fact when the slice size was
-        // told to us; inferred, it is an estimate, and an estimate must not
-        // send anyone off to re-post a whole set.
-        if (!_earlyStop && !_checkFull && _par2PhaseDone) {
-            Recovery const verdict = recoveryVerdict();
-            if (verdict == Recovery::NoRedundancy
-                || (verdict == Recovery::Impossible && _blockSizeMeasured))
-                _earlyStop = true;
-        }
     }
+
+    // Either kind of loss changes the balance: data raises what has to be
+    // rebuilt, PAR2 lowers what can rebuild it. Hanging the decision off the
+    // data branch alone left a volume dying after the data did unweighed.
+    _reevaluateEarlyStop();
+}
+
+void NzbCheck::_reevaluateEarlyStop()
+{
+    if (_earlyStop || _checkFull || !_par2PhaseDone || _nbMissingDataArticles <= 0)
+        return;
+
+    // Only ever stop on a loss that no layout can save: "recoverable if the
+    // losses are clustered" is precisely the case where giving up would send
+    // someone to re-post something a repair would have fixed. Stopping is
+    // irreversible -- it stops asking -- so only a fact justifies it.
+    // NoRedundancy is one: no usable block can repair anything, whatever the
+    // slice size. Impossible is only a fact when the slice size was told to us;
+    // inferred, it is an estimate, and an estimate must not send anyone off to
+    // re-post a whole set.
+    Recovery const verdict = recoveryVerdict();
+    if (verdict == Recovery::NoRedundancy
+        || (verdict == Recovery::Impossible && _blockSizeMeasured))
+        _earlyStop = true;
 }
 
 QString NzbCheck::getNextArticle()
@@ -382,8 +397,15 @@ QString NzbCheck::getNextArticle()
     // With more connections than PAR2 articles the answers are still in flight,
     // and weighing a data loss against a redundancy we do not know yet would be
     // guessing. The phase closes when every one of them has answered.
-    if (_nbPar2Answered >= _nbPar2Articles)
+    if (_nbPar2Answered >= _nbPar2Articles && !_par2PhaseDone) {
         _par2PhaseDone = true;
+        // Everything already known -- losses seen while the phase was still
+        // open, and articles the nzb never listed, counted back at parse time
+        // -- has never been weighed against the redundancy. Weigh it now.
+        _reevaluateEarlyStop();
+        if (_earlyStop)
+            return QString();
+    }
 
     if (!_dataQueue.isEmpty())
         return _dataQueue.pop();
