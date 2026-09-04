@@ -172,6 +172,10 @@ private slots:
     void check_never_declares_a_post_dead_on_an_inferred_slice_size();
     void check_does_not_write_off_a_volume_it_only_estimated_to_zero();
     void check_holds_the_data_back_until_the_par2_answers_are_in();
+    void check_does_not_charge_a_short_last_article_as_a_full_one();
+    void check_will_not_promise_certainty_without_intact_metadata();
+    void check_gives_no_verdict_when_the_files_disagree_on_article_size();
+    void check_knows_index_only_par2_cannot_mend_anything();
     void check_counts_losses_in_separate_files_as_separate_blocks();
     void check_stops_on_losses_the_nzb_itself_already_declared();
 
@@ -1311,6 +1315,229 @@ void TestCliParser::check_holds_the_data_back_until_the_par2_answers_are_in()
              qPrintable(QStringLiteral("data started %1 ms after the last par2 command, so it "
                                        "did not wait for its answer")
                                 .arg(firstData - lastPar2)));
+}
+
+//! The last article of a file holds the remainder, which can be a single byte.
+//! Charging it a full article's worth of blocks turned a one-block loss into
+//! four and produced UNRECOVERABLE, plus an irreversible early stop, on a post
+//! a repair would have fixed.
+void TestCliParser::check_does_not_charge_a_short_last_article_as_a_full_one()
+{
+    HomeSandbox sandbox;
+    const QString ids = writeMissingIds(sandbox.rootPath(), { QStringLiteral("d2") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/short-tail.nzb");
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    // 716801 bytes in two articles: a full one and a one-byte remainder. d2 is
+    // that remainder, and blocks are 100000 bytes.
+    nzb.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n"
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;data.bin&quot; yEnc (1/2) 716801\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">d1</segment>"
+              "<segment bytes=\"1\" number=\"2\">d2</segment></segments>\n"
+              "  </file>\n"
+              "  <file poster=\"p\" date=\"0\" "
+              "subject=\"&quot;data.vol00+01.par2&quot; yEnc (1/1) 100000\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">p1</segment></segments>\n"
+              "  </file>\n"
+              "</nzb>\n");
+    nzb.close();
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--par2_block_size", "100000",
+                              "--check", nzbPath },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QCOMPARE(par2.value(QStringLiteral("damagedBlocksMin")).toInt(), 1);
+    QVERIFY2(par2.value(QStringLiteral("recovery")).toString() != QStringLiteral("impossible"),
+             "a one-byte article cannot exhaust the redundancy on its own");
+    QVERIFY2(!report.object().value(QStringLiteral("stoppedEarly")).toBool(),
+             "and it certainly must not end the run");
+}
+
+//! Blocks are useless without the packets that say what to rebuild. Not finding
+//! a wholly intact PAR2 file does not prove those are gone -- the format
+//! repeats them in every file -- but it forbids promising they are there.
+void TestCliParser::check_will_not_promise_certainty_without_intact_metadata()
+{
+    HomeSandbox sandbox;
+    // One article gone from the data, and one from each PAR2 volume, so no PAR2
+    // file is wholly intact while plenty of blocks remain.
+    const QString ids = writeMissingIds(
+            sandbox.rootPath(),
+            { QStringLiteral("d1"), QStringLiteral("p1"), QStringLiteral("q1") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/no-intact-par2.nzb");
+    QString xml = QStringLiteral(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n"
+            "  <file poster=\"p\" date=\"0\" subject=\"&quot;data.bin&quot; yEnc (1/20) 14336000\">\n"
+            "    <groups><group>alt.binaries.test</group></groups>\n    <segments>\n");
+    for (int i = 1; i <= 20; ++i)
+        xml += QStringLiteral("      <segment bytes=\"1\" number=\"%1\">d%1</segment>\n").arg(i);
+    xml += QStringLiteral("    </segments>\n  </file>\n");
+    for (const QString &tag : { QStringLiteral("p"), QStringLiteral("q") }) {
+        xml += QStringLiteral("  <file poster=\"p\" date=\"0\" subject=\"&quot;data.vol%1+20.par2"
+                              "&quot; yEnc (1/10) 7168000\">\n"
+                              "    <groups><group>alt.binaries.test</group></groups>\n"
+                              "    <segments>\n")
+                       .arg(tag == QStringLiteral("p") ? QStringLiteral("00")
+                                                       : QStringLiteral("20"));
+        for (int i = 1; i <= 10; ++i) {
+            // Built outside the format string on purpose: "%2%1" would be read
+            // as the single marker %21, which silently collapses every id to
+            // the tag alone and makes the whole fixture meaningless.
+            const QString id = tag + QString::number(i);
+            xml += QStringLiteral("      <segment bytes=\"1\" number=\"%1\">%2</segment>\n")
+                           .arg(i)
+                           .arg(id);
+        }
+        xml += QStringLiteral("    </segments>\n  </file>\n");
+    }
+    xml += QStringLiteral("</nzb>\n");
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    nzb.write(xml.toUtf8());
+    nzb.close();
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--par2_block_size", "716800",
+                              "--check", nzbPath },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QVERIFY2(!par2.value(QStringLiteral("metadataAvailable")).toBool(),
+             qPrintable(QStringLiteral("no PAR2 file should be intact; nzb was:\n%1\nreport:\n%2")
+                                .arg(xml)
+                                .arg(QString::fromUtf8(
+                                        QJsonDocument(report.object()).toJson()))));
+    QCOMPARE(par2.value(QStringLiteral("recovery")).toString(),
+             QStringLiteral("layoutDependent"));
+    // And the guaranteed floor is zero, because both volumes are damaged: what
+    // a pro rata expects is not what the format promises.
+    QCOMPARE(par2.value(QStringLiteral("blocksUsableGuaranteed")).toInt(), 0);
+    QVERIFY2(par2.value(QStringLiteral("blocksUsable")).toInt() > 0,
+             "the likely figure should still be reported");
+}
+
+//! Two files posted with different article sizes cannot both constrain one A.
+//! Collapsing contradictory bounds to a point would turn a contradiction into
+//! a certainty, so the analysis declines to bound the damage at all.
+void TestCliParser::check_gives_no_verdict_when_the_files_disagree_on_article_size()
+{
+    HomeSandbox sandbox;
+    const QString ids = writeMissingIds(sandbox.rootPath(), { QStringLiteral("a1") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/mixed-article-sizes.nzb");
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    // 2 articles of ~716800 in one file, 4 articles of ~100000 in the other:
+    // the bounds are [716800, ...] and [..., 133333], which cannot overlap.
+    nzb.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n"
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;a.bin&quot; yEnc (1/2) 1433600\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">a1</segment>"
+              "<segment bytes=\"1\" number=\"2\">a2</segment></segments>\n"
+              "  </file>\n"
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;b.bin&quot; yEnc (1/4) 400000\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">b1</segment>"
+              "<segment bytes=\"1\" number=\"2\">b2</segment>"
+              "<segment bytes=\"1\" number=\"3\">b3</segment>"
+              "<segment bytes=\"1\" number=\"4\">b4</segment></segments>\n"
+              "  </file>\n"
+              "  <file poster=\"p\" date=\"0\" "
+              "subject=\"&quot;a.vol00+01.par2&quot; yEnc (1/1) 100000\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">p1</segment></segments>\n"
+              "  </file>\n"
+              "</nzb>\n");
+    nzb.close();
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--par2_block_size", "100000",
+                              "--check", nzbPath },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QCOMPARE(par2.value(QStringLiteral("damagedBlocksMax")).toInt(), -1); // unbounded
+    QCOMPARE(par2.value(QStringLiteral("recovery")).toString(),
+             QStringLiteral("layoutDependent"));
+    QVERIFY2(!report.object().value(QStringLiteral("stoppedEarly")).toBool(),
+             "nothing can be concluded, so nothing may be cut short");
+}
+
+//! A post carrying only the base .par2 has an index and no recovery block: it
+//! can say what is broken, not mend it. That is a fact, and it used to be
+//! reported as "every volume lost every one of its articles".
+void TestCliParser::check_knows_index_only_par2_cannot_mend_anything()
+{
+    HomeSandbox sandbox;
+    const QString ids = writeMissingIds(sandbox.rootPath(), { QStringLiteral("d1") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/index-only.nzb");
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    nzb.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n"
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;data.bin&quot; yEnc (1/2) 1433600\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">d1</segment>"
+              "<segment bytes=\"1\" number=\"2\">d2</segment></segments>\n"
+              "  </file>\n"
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;data.par2&quot; yEnc (1/1) 40000\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">p1</segment></segments>\n"
+              "  </file>\n"
+              "</nzb>\n");
+    nzb.close();
+
+    const RunResult r = run(_bin, { "-c", conf, "--check_json", "--check", nzbPath },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Unrecoverable));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QCOMPARE(par2.value(QStringLiteral("volumes")).toInt(), 1);
+    QCOMPARE(par2.value(QStringLiteral("blocksTotal")).toInt(), 0);
+    QCOMPARE(par2.value(QStringLiteral("recovery")).toString(),
+             QStringLiteral("noRecoveryBlocks"));
 }
 
 void TestCliParser::unknown_flag_rejected()

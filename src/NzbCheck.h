@@ -20,6 +20,8 @@
 
 #ifndef NZBCHECK_H
 #define NZBCHECK_H
+#include <climits>
+
 #include <QCommandLineOption>
 #include <QElapsedTimer>
 #include <QHash>
@@ -119,6 +121,15 @@ private:
     //! is not enough -- the damage has to be counted file by file.
     QHash<QString, int> _articleOwner;
     QVector<int>        _dataFileMissing; //!< missing articles, per data file
+    //! The last article of a file is the short one -- it holds whatever is left
+    //! over, possibly a single byte -- so losing it damages far less than
+    //! losing a full one. Knowing whether it is among the losses is the
+    //! difference between "one block" and "the whole of A".
+    QVector<QString>    _dataFileLastArticle;
+    QVector<bool>       _dataFileLastMissing;
+
+    //! -1 would collide with data file 0, which encodes as -(0)-1.
+    static constexpr int kUnknownOwner = INT_MIN;
     int _nbPar2Articles;
     int _nbPar2Answered; //!< PAR2 articles the server has actually answered on
     int _nbDataArticles;
@@ -134,7 +145,10 @@ private:
     //! n articles constrains it to [ceil(S/n), ceil(S/(n-1))-1]: the last
     //! article of a file is short, so its size says less than it seems. The
     //! bounds from every file intersect, and a post of several volumes usually
-    //! pins it tightly -- but never assume it did.
+    //! pins it tightly -- but never assume it did. Both are 0 when those
+    //! constraints contradict each other, which means the files were not all
+    //! posted with the same article size: a contradiction bounds nothing, and
+    //! collapsing it to a point would turn it into a certainty.
     qint64 _articleSizeMin;
     qint64 _articleSizeMax;
     qint64 _subjectArticleMin; //!< tightest lower bound the subjects give
@@ -179,8 +193,9 @@ public:
         Certain,         //!< covered even at the worst end of every estimate
         LayoutDependent, //!< the estimates straddle the answer: try the repair
         Impossible,      //!< not covered even at the best end of every estimate
-        NoPar2AtAll,     //!< the nzb lists no PAR2 file: a fact, not an estimate
-        NoUsableBlocks   //!< every PAR2 volume lost every one of its articles
+        NoPar2AtAll,      //!< the nzb lists no PAR2 file: a fact, not an estimate
+        NoRecoveryBlocks, //!< PAR2 files, but not one recovery block between them
+        NoUsableBlocks    //!< every PAR2 volume lost every one of its articles
     };
 
     NzbCheck();
@@ -239,13 +254,23 @@ public:
     inline bool blockSizeIsMeasured() const;
     //! Blocks the missing data articles damage, at the best and worst ends of
     //! everything we are unsure about: {clustered and small, scattered and big}.
+    //! The upper end is -1 when nothing bounds it -- without an article size
+    //! there is no ceiling to name, and a missing ceiling is not a high one.
     QPair<int, int> damagedBlockRange() const;
     //! Blocks still usable, likewise bounded. The low end assumes a lost
     //! article takes its share of the recovery packets plus the one it cuts in
     //! half; the high end assumes the packets all sat in the articles that
     //! survived, which the PAR2 format allows -- packets carry their own
     //! checksum and may appear in any order.
+    //! {guaranteed, at best}. The guaranteed end counts only volumes that lost
+    //! nothing: PAR2 packets may sit anywhere in a file and carry their own
+    //! checksum, so for a damaged volume the format promises nothing at all --
+    //! every recovery packet could have been in the articles that went missing.
     QPair<int, int> usableBlockRange() const;
+    //! What a damaged volume most likely still holds, pro rata of the articles
+    //! that survived. An expectation, shown to the reader, never used to prove
+    //! anything.
+    int likelyUsableBlocks() const;
     //! Share of the data the recovery blocks still cover, in percent, and what
     //! it was when the post was made. Negative when the nzb does not say how
     //! big the data is.
@@ -371,15 +396,21 @@ void NzbCheck::missingArticle(const QString &article)
 
     // Which side of the post lost it decides whether anything can be repaired,
     // and for data, which file lost it decides how many blocks it costs.
-    int const owner = _articleOwner.value(article, -1);
-    if (owner >= 0) {
+    int const owner = _articleOwner.value(article, kUnknownOwner);
+    if (owner == kUnknownOwner) {
+        // Not from this nzb: count it, attribute it to nothing.
+        ++_nbMissingDataArticles;
+    } else if (owner >= 0) {
         ++_nbMissingPar2Articles;
         ++_par2Volumes[owner].nbMissingArticles;
     } else {
         ++_nbMissingDataArticles;
         int const dataFile = -owner - 1;
-        if (dataFile >= 0 && dataFile < _dataFileMissing.size())
+        if (dataFile >= 0 && dataFile < _dataFileMissing.size()) {
             ++_dataFileMissing[dataFile];
+            if (_dataFileLastArticle.value(dataFile) == article)
+                _dataFileLastMissing[dataFile] = true;
+        }
     }
 
     // Either kind of loss changes the balance: data raises what has to be
@@ -400,8 +431,8 @@ void NzbCheck::_reevaluateEarlyStop()
     // possible damage already exceeds the most blocks that could have survived,
     // measured against a slice size somebody actually told us.
     Recovery const verdict = recoveryVerdict();
-    if (verdict == Recovery::NoPar2AtAll || verdict == Recovery::NoUsableBlocks
-        || verdict == Recovery::Impossible)
+    if (verdict == Recovery::NoPar2AtAll || verdict == Recovery::NoRecoveryBlocks
+        || verdict == Recovery::NoUsableBlocks || verdict == Recovery::Impossible)
         _earlyStop = true;
 }
 

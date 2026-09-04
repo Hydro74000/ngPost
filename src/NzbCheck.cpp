@@ -104,6 +104,7 @@ void NzbCheck::onDisconnected(NntpCheckCon *con)
             // a strange thing to read on a post that has no block at all.
             QString const reason
                     = (recoveryVerdict() == Recovery::NoPar2AtAll
+                       || recoveryVerdict() == Recovery::NoRecoveryBlocks
                        || recoveryVerdict() == Recovery::NoUsableBlocks)
                               ? tr("there is nothing left to rebuild it with")
                               : tr("the loss is already beyond what the PAR2 blocks can repair");
@@ -224,7 +225,10 @@ NzbCheck::NzbCheck()
     , _par2Volumes()
     , _articleOwner()
     , _dataFileMissing()
+    , _dataFileLastArticle()
+    , _dataFileLastMissing()
     , _nbPar2Articles(0)
+    , _nbPar2Answered(0)
     , _nbDataArticles(0)
     , _nbDataFiles(0)
     , _nbDataFilesWithSize(0)
@@ -238,7 +242,6 @@ NzbCheck::NzbCheck()
     , _subjectArticleMin(0)
     , _subjectArticleMax(0)
     , _dataSizeBytes(0)
-    , _nbPar2Answered(0)
     , _par2PhaseDone(false)
     , _earlyStop(false)
     , _checkFull(false)
@@ -266,7 +269,7 @@ int NzbCheck::parseNzb()
                     nbExpectedArticles = match.captured(1).toInt();
 
                 bool const isPar2 = sPar2FileRegExp.match(subject).hasMatch();
-                int volumeIdx = -1, dataFileIdx = -1;
+                int volumeIdx = -1, dataFileIdx = -1, highestSegment = 0;
                 if (isPar2) {
                     Par2Volume vol;
                     vol.subject            = subject;
@@ -284,6 +287,8 @@ int NzbCheck::parseNzb()
                     // into the PAR2 blocks.
                     dataFileIdx = _dataFileMissing.size();
                     _dataFileMissing.append(0);
+                    _dataFileLastArticle.append(QString());
+                    _dataFileLastMissing.append(false);
                     ++_nbDataFiles;
                     QRegularExpressionMatch size = sSubjectSizeRegExp.match(subject);
                     if (size.hasMatch()) {
@@ -336,8 +341,14 @@ int NzbCheck::parseNzb()
                                 _par2Volumes[volumeIdx].nbMissingArticles += absent;
                             } else {
                                 _nbMissingDataArticles += absent;
-                                if (dataFileIdx >= 0)
+                                if (dataFileIdx >= 0) {
                                     _dataFileMissing[dataFileIdx] += absent;
+                                    // The nzb stops short of the announced
+                                    // count, so the final part is one of the
+                                    // ones it does not carry.
+                                    if (highestSegment < nbExpectedArticles)
+                                        _dataFileLastMissing[dataFileIdx] = true;
+                                }
                             }
                         }
 
@@ -345,6 +356,8 @@ int NzbCheck::parseNzb()
                     } else if (type == QXmlStreamReader::TokenType::StartElement
                                && xmlReader.name().compare(QLatin1String("segment")) == 0) {
                         ++nbArticles;
+                        int const segmentNumber
+                                = xmlReader.attributes().value("number").toInt();
                         xmlReader.readNext();
                         QString const articleId = QString("<%1>").arg(
                                 xmlReader.text().toString());
@@ -356,6 +369,13 @@ int NzbCheck::parseNzb()
                             _dataQueue.push(articleId);
                             _articleOwner.insert(articleId, -dataFileIdx - 1);
                             ++_nbDataArticles;
+                            // Segments need not be listed in order, so the last
+                            // one is the highest number, not the last seen.
+                            if (segmentNumber > highestSegment) {
+                                highestSegment = segmentNumber;
+                                if (dataFileIdx >= 0)
+                                    _dataFileLastArticle[dataFileIdx] = articleId;
+                            }
                         }
                     }
                 }
@@ -468,9 +488,17 @@ void NzbCheck::_resolveSizes()
     // What the subjects say beats what the configuration says: the latter
     // describes how we would post, not how this nzb was actually made.
     if (_subjectArticleMin > 0) {
-        _articleSizeMin = _subjectArticleMin;
-        _articleSizeMax = _subjectArticleMax > 0 ? qMax(_subjectArticleMax, _subjectArticleMin)
-                                                 : _subjectArticleMin;
+        if (_subjectArticleMax > 0 && _subjectArticleMax < _subjectArticleMin) {
+            // The files cannot all share one article size -- an nzb built by
+            // concatenating posts, or a file posted with different settings.
+            // Contradictory constraints bound nothing, and collapsing them to
+            // a point would turn a contradiction into a certainty.
+            _articleSizeMin = 0;
+            _articleSizeMax = 0;
+        } else {
+            _articleSizeMin = _subjectArticleMin;
+            _articleSizeMax = _subjectArticleMax > 0 ? _subjectArticleMax : _subjectArticleMin;
+        }
     }
 
     if (_par2BlockSize <= 0 && _articleSizeMin > 0) {
@@ -492,23 +520,36 @@ int NzbCheck::totalRecoveryBlocks() const
 
 int NzbCheck::usableRecoveryBlocks() const
 {
-    return usableBlockRange().first;
+    return likelyUsableBlocks();
 }
 
 QPair<int, int> NzbCheck::usableBlockRange() const
 {
     qint64 low = 0, high = 0;
     for (Par2Volume const &vol : _par2Volumes) {
-        low += vol.usableBlocks();
-        // At best every recovery packet sat in an article that survived. PAR2
-        // packets carry their own checksum and may appear in any order, so
-        // nothing forbids it -- only a volume that lost everything is certainly
-        // worth nothing.
+        // Guaranteed: only a volume that lost nothing. PAR2 packets may appear
+        // in any order and each carries its own checksum, so for a damaged
+        // volume the format promises nothing -- every recovery packet could
+        // have been in the very articles that went missing. A pro rata is a
+        // sensible expectation, not a floor, and a floor is what a proof needs.
+        if (vol.nbMissingArticles <= 0)
+            low += vol.blocks;
+
+        // At best the packets all sat in articles that survived, so only a
+        // volume that lost everything is certainly worth nothing.
         bool const anythingLeft = vol.nbExpectedArticles <= 0
                                   || vol.nbMissingArticles < vol.nbExpectedArticles;
         high += anythingLeft ? vol.blocks : 0;
     }
     return { static_cast<int>(low), static_cast<int>(qMax(low, high)) };
+}
+
+int NzbCheck::likelyUsableBlocks() const
+{
+    int blocks = 0;
+    for (Par2Volume const &vol : _par2Volumes)
+        blocks += vol.usableBlocks();
+    return blocks;
 }
 
 bool NzbCheck::hasIntactPar2Metadata() const
@@ -527,8 +568,11 @@ QPair<int, int> NzbCheck::damagedBlockRange() const
     int const missing = _nbMissingDataArticles;
     if (missing <= 0)
         return { 0, 0 };
-    if (_par2BlockSize <= 0 || _articleSizeMin <= 0)
-        return { missing, missing }; // nothing better to say than one for one
+    // Without an article size nothing bounds the damage from above: a smaller
+    // slice size means more blocks touched with no ceiling to name. At least
+    // one block is gone, and that is the whole of what we know.
+    if (_par2BlockSize <= 0 || _articleSizeMin <= 0 || _articleSizeMax <= 0)
+        return { 1, -1 };
 
     // Best case: within one file the losses are contiguous, so they span a
     // single run of bytes. Across files they cannot be: PAR2 slices restart at
@@ -537,12 +581,28 @@ QPair<int, int> NzbCheck::damagedBlockRange() const
     // The optimistic end takes the smallest article we cannot rule out: a
     // short last article really does damage less than a full one.
     qint64 clustered = 0;
-    for (int perFile : _dataFileMissing) {
-        if (perFile > 0)
-            clustered += ceilDiv(static_cast<qint64>(perFile) * _articleSizeMin, _par2BlockSize);
+    int    attributed = 0;
+    for (int i = 0; i < _dataFileMissing.size(); ++i) {
+        int const perFile = _dataFileMissing.at(i);
+        if (perFile <= 0)
+            continue;
+        attributed += perFile;
+        // The last article of a file holds the remainder, which may be a single
+        // byte. When it is among the losses it costs one block, not a full
+        // article's worth -- counting it as a full one is what turned a
+        // one-block loss into four and sent a repairable post to be re-posted.
+        bool const lastGone = _dataFileLastMissing.value(i, false);
+        int const  fullOnes = lastGone ? perFile - 1 : perFile;
+        qint64 blocks = ceilDiv(static_cast<qint64>(fullOnes) * _articleSizeMin, _par2BlockSize);
+        if (lastGone)
+            blocks += 1;
+        clustered += qMax(blocks, qint64(1));
     }
-    if (clustered <= 0) // losses we could not attribute to a file
-        clustered = ceilDiv(static_cast<qint64>(missing) * _articleSizeMin, _par2BlockSize);
+    // Anything we could not pin to a file still costs at least one block each,
+    // and at most the run they would span together.
+    if (attributed < missing)
+        clustered += ceilDiv(static_cast<qint64>(missing - attributed) * _articleSizeMin,
+                             _par2BlockSize);
 
     // Worst case: a range of A bytes at an arbitrary offset spans
     // floor((A-1)/B) + 2 blocks -- the whole ones it covers plus the two it
@@ -583,9 +643,11 @@ NzbCheck::Recovery NzbCheck::recoveryVerdict() const
     if (_nbMissingDataArticles <= 0)
         return Recovery::NotNeeded;
 
-    // Two facts, in the sense that no estimate stands behind them.
+    // Facts, in the sense that no estimate stands behind them.
     if (_par2Volumes.isEmpty())
         return Recovery::NoPar2AtAll;
+    if (totalRecoveryBlocks() <= 0)
+        return Recovery::NoRecoveryBlocks;
     QPair<int, int> const usable = usableBlockRange();
     if (usable.second <= 0)
         return Recovery::NoUsableBlocks;
@@ -600,9 +662,16 @@ NzbCheck::Recovery NzbCheck::recoveryVerdict() const
     QPair<int, int> const damaged = damagedBlockRange();
     // Proof, not preference: the worst damage still fits inside the fewest
     // blocks we are sure of, or the least damage exceeds the most blocks we
-    // could possibly have. Anything in between is genuinely undecided.
-    if (damaged.second <= usable.first)
-        return Recovery::Certain;
+    // could possibly have. Anything in between is genuinely undecided, and so
+    // is a damage we could not bound from above.
+    if (damaged.second >= 0 && damaged.second <= usable.first) {
+        // Blocks are useless without the packets that say what to rebuild.
+        // Not finding a wholly intact PAR2 file does not prove those are gone
+        // -- the format repeats them -- but it forbids promising they are there.
+        if (hasIntactPar2Metadata())
+            return Recovery::Certain;
+        return Recovery::LayoutDependent;
+    }
     if (damaged.first > usable.second)
         return Recovery::Impossible;
     return Recovery::LayoutDependent;
@@ -624,7 +693,7 @@ NzbCheck::CheckStatus NzbCheck::checkStatus() const
 
     Recovery const recovery = recoveryVerdict();
     if (recovery == Recovery::Impossible || recovery == Recovery::NoPar2AtAll
-        || recovery == Recovery::NoUsableBlocks)
+        || recovery == Recovery::NoRecoveryBlocks || recovery == Recovery::NoUsableBlocks)
         return CheckStatus::Unrecoverable;
     return CheckStatus::Missing;
 }
@@ -657,8 +726,11 @@ void NzbCheck::_printRecoveryAnalysis()
         _cout << tr("  Recovery blocks: %1 of %2 still usable").arg(usableRange.first).arg(total)
               << "\n";
     else
-        _cout << tr("  Recovery blocks: between %1 and %2 of %3 still usable")
+        // Three numbers because they answer three questions: what can be
+        // proven, what is likely, and what is not ruled out.
+        _cout << tr("  Recovery blocks: %1 guaranteed, %2 likely, %3 at best, of %4")
                      .arg(usableRange.first)
+                     .arg(likelyUsableBlocks())
                      .arg(usableRange.second)
                      .arg(total)
               << "\n";
@@ -679,13 +751,19 @@ void NzbCheck::_printRecoveryAnalysis()
 
     if (_nbMissingDataArticles > 0) {
         QPair<int, int> const damaged = damagedBlockRange();
-        _cout << tr("  Damaged blocks: %1 to %2, depending on how the losses are spread "
-                    "(block size: %3 bytes, %4)")
-                     .arg(damaged.first)
-                     .arg(damaged.second)
-                     .arg(_par2BlockSize)
-                     .arg(_blockSizeSource.isEmpty() ? tr("declared") : _blockSizeSource)
-              << "\n";
+        if (damaged.second < 0)
+            _cout << tr("  Damaged blocks: at least %1, with no upper bound - the nzb does not "
+                        "say how big an article is")
+                         .arg(damaged.first)
+                  << "\n";
+        else
+            _cout << tr("  Damaged blocks: %1 to %2, depending on how the losses are spread "
+                        "(block size: %3 bytes, %4)")
+                         .arg(damaged.first)
+                         .arg(damaged.second)
+                         .arg(_par2BlockSize)
+                         .arg(_blockSizeSource.isEmpty() ? tr("declared") : _blockSizeSource)
+                  << "\n";
         if (!_blockSizeMeasured)
             _cout << tr("  The slice size was inferred, not read, so this analysis will not "
                         "declare the post dead. Pass --par2_block_size to get a firm answer.")
@@ -731,6 +809,11 @@ void NzbCheck::_printRecoveryAnalysis()
     case Recovery::NoPar2AtAll:
         _cout << tr("  Verdict: UNRECOVERABLE - data is missing and the nzb carries no PAR2 "
                     "file to rebuild it with")
+              << "\n";
+        break;
+    case Recovery::NoRecoveryBlocks:
+        _cout << tr("  Verdict: UNRECOVERABLE - the PAR2 files carry no recovery block at all, "
+                    "only the index; they can tell you what is broken, not mend it")
               << "\n";
         break;
     case Recovery::NoUsableBlocks:
@@ -781,6 +864,7 @@ void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
     case Recovery::LayoutDependent: recoveryName = QStringLiteral("layoutDependent"); break;
     case Recovery::Impossible:      recoveryName = QStringLiteral("impossible");      break;
     case Recovery::NoPar2AtAll:     recoveryName = QStringLiteral("noPar2AtAll");     break;
+    case Recovery::NoRecoveryBlocks: recoveryName = QStringLiteral("noRecoveryBlocks"); break;
     case Recovery::NoUsableBlocks:  recoveryName = QStringLiteral("noUsableBlocks");  break;
     }
 
@@ -789,8 +873,9 @@ void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
     par2[QStringLiteral("volumes")]           = _par2Volumes.size();
     par2[QStringLiteral("blocksTotal")]       = totalRecoveryBlocks();
     QPair<int, int> const usableRange = usableBlockRange();
-    par2[QStringLiteral("blocksUsable")]      = usableRange.first;
-    par2[QStringLiteral("blocksUsableMax")]   = usableRange.second;
+    par2[QStringLiteral("blocksUsable")]          = likelyUsableBlocks();
+    par2[QStringLiteral("blocksUsableGuaranteed")] = usableRange.first;
+    par2[QStringLiteral("blocksUsableMax")]       = usableRange.second;
     par2[QStringLiteral("metadataAvailable")] = hasIntactPar2Metadata();
     par2[QStringLiteral("blockSize")]         = _par2BlockSize;
     par2[QStringLiteral("blockSizeMeasured")] = _blockSizeMeasured;
