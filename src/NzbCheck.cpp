@@ -214,7 +214,8 @@ NzbCheck::NzbCheck()
     , _socketTimeOut(30000)
     , _maxRetries(5)
     , _par2Volumes()
-    , _articleVolume()
+    , _articleOwner()
+    , _dataFileMissing()
     , _nbPar2Articles(0)
     , _nbDataArticles(0)
     , _nbDataFiles(0)
@@ -255,7 +256,7 @@ int NzbCheck::parseNzb()
                     nbExpectedArticles = match.captured(1).toInt();
 
                 bool const isPar2 = sPar2FileRegExp.match(subject).hasMatch();
-                int volumeIdx = -1;
+                int volumeIdx = -1, dataFileIdx = -1;
                 if (isPar2) {
                     Par2Volume vol;
                     vol.subject            = subject;
@@ -271,6 +272,8 @@ int NzbCheck::parseNzb()
                     // The announced size is what lets us derive the payload of
                     // one article, and with it how far a lost article reaches
                     // into the PAR2 blocks.
+                    dataFileIdx = _dataFileMissing.size();
+                    _dataFileMissing.append(0);
                     ++_nbDataFiles;
                     QRegularExpressionMatch size = sSubjectSizeRegExp.match(subject);
                     if (size.hasMatch()) {
@@ -316,8 +319,11 @@ int NzbCheck::parseNzb()
                             if (isPar2) {
                                 _nbMissingPar2Articles += absent;
                                 _par2Volumes[volumeIdx].nbMissingArticles += absent;
-                            } else
+                            } else {
                                 _nbMissingDataArticles += absent;
+                                if (dataFileIdx >= 0)
+                                    _dataFileMissing[dataFileIdx] += absent;
+                            }
                         }
 
                         break;
@@ -329,10 +335,11 @@ int NzbCheck::parseNzb()
                                 xmlReader.text().toString());
                         if (isPar2) {
                             _par2Queue.push(articleId);
-                            _articleVolume.insert(articleId, volumeIdx);
+                            _articleOwner.insert(articleId, volumeIdx);
                             ++_nbPar2Articles;
                         } else {
                             _dataQueue.push(articleId);
+                            _articleOwner.insert(articleId, -dataFileIdx - 1);
                             ++_nbDataArticles;
                         }
                     }
@@ -489,11 +496,22 @@ QPair<int, int> NzbCheck::damagedBlockRange() const
     if (_par2BlockSize <= 0 || _articleSize <= 0)
         return { missing, missing }; // nothing better to say than one for one
 
-    // Best case: the losses are contiguous, so they span a single run of bytes.
-    qint64 clustered = ceilDiv(static_cast<qint64>(missing) * _articleSize, _par2BlockSize);
-    // Worst case: each lost article sits astride a block boundary on its own,
-    // so it takes out floor(A/B) whole blocks plus the two it straddles.
-    qint64 const perArticle = _articleSize / _par2BlockSize + 1;
+    // Best case: within one file the losses are contiguous, so they span a
+    // single run of bytes. Across files they cannot be: PAR2 slices restart at
+    // every file boundary, so two half-block losses in two files cost two
+    // blocks, not one. The optimistic bound is therefore a sum over files.
+    qint64 clustered = 0;
+    for (int perFile : _dataFileMissing) {
+        if (perFile > 0)
+            clustered += ceilDiv(static_cast<qint64>(perFile) * _articleSize, _par2BlockSize);
+    }
+    if (clustered <= 0) // losses we could not attribute to a file
+        clustered = ceilDiv(static_cast<qint64>(missing) * _articleSize, _par2BlockSize);
+
+    // Worst case: a range of A bytes at an arbitrary offset spans
+    // floor((A-1)/B) + 2 blocks -- the whole ones it covers plus the two it
+    // straddles at either end.
+    qint64 const perArticle = (_articleSize - 1) / _par2BlockSize + 2;
     qint64 scattered = static_cast<qint64>(missing) * perArticle;
 
     // Neither can exceed the number of blocks the data occupies -- but only a

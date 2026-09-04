@@ -169,6 +169,7 @@ private slots:
     void check_withholds_redundancy_when_a_size_is_missing();
     void check_survives_a_server_that_sends_half_a_line();
     void check_never_declares_a_post_dead_on_an_inferred_slice_size();
+    void check_counts_losses_in_separate_files_as_separate_blocks();
 
     //! An unknown flag fails with a non-zero exit code. Currently
     //! ERR_WRONG_ARG = 3 but tests assert "non-zero" for resilience to enum
@@ -1088,6 +1089,67 @@ void TestCliParser::check_never_declares_a_post_dead_on_an_inferred_slice_size()
     QVERIFY2(par2.value(QStringLiteral("blockSizeMeasured")).toBool(),
              "the slice size was given on the command line");
     QCOMPARE(par2.value(QStringLiteral("recovery")).toString(), QStringLiteral("impossible"));
+}
+
+//! PAR2 slices restart at every file boundary, so a half-block loss in each of
+//! two files costs two blocks, not one. Summing the losses across the whole
+//! post before a single ceil() made the optimistic bound too optimistic --
+//! which is the bound the "beyond repair" verdict is measured against.
+void TestCliParser::check_counts_losses_in_separate_files_as_separate_blocks()
+{
+    HomeSandbox sandbox;
+    // One article gone from each of the two files.
+    const QString ids = writeMissingIds(sandbox.rootPath(),
+                                        { QStringLiteral("a2"), QStringLiteral("b2") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/two-files.nzb");
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::WriteOnly | QIODevice::Text));
+    nzb.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n"
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;a.bin&quot; yEnc (1/4) 2867200\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">a1</segment>"
+              "<segment bytes=\"1\" number=\"2\">a2</segment>"
+              "<segment bytes=\"1\" number=\"3\">a3</segment>"
+              "<segment bytes=\"1\" number=\"4\">a4</segment></segments>\n"
+              "  </file>\n"
+              "  <file poster=\"p\" date=\"0\" subject=\"&quot;b.bin&quot; yEnc (1/4) 2867200\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">b1</segment>"
+              "<segment bytes=\"1\" number=\"2\">b2</segment>"
+              "<segment bytes=\"1\" number=\"3\">b3</segment>"
+              "<segment bytes=\"1\" number=\"4\">b4</segment></segments>\n"
+              "  </file>\n"
+              "  <file poster=\"p\" date=\"0\" "
+              "subject=\"&quot;a.vol00+01.par2&quot; yEnc (1/1) 716800\">\n"
+              "    <groups><group>alt.binaries.test</group></groups>\n"
+              "    <segments><segment bytes=\"1\" number=\"1\">p1</segment></segments>\n"
+              "  </file>\n"
+              "</nzb>\n");
+    nzb.close();
+
+    // Blocks of 2 MB against articles of 700 kB: each loss on its own is well
+    // under one block, so summing them first would round the pair down to a
+    // single damaged block and call one recovery block enough.
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--par2_block_size", "2000000",
+                              "--check", nzbPath },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+    QCOMPARE(par2.value(QStringLiteral("damagedBlocksMin")).toInt(), 2);
+    QCOMPARE(par2.value(QStringLiteral("blocksUsable")).toInt(), 1);
+    QCOMPARE(par2.value(QStringLiteral("recovery")).toString(), QStringLiteral("impossible"));
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Unrecoverable));
 }
 
 void TestCliParser::unknown_flag_rejected()

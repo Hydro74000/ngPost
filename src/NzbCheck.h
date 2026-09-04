@@ -113,7 +113,12 @@ private:
 
     // ---- PAR2 recovery analysis ----
     QVector<Par2Volume> _par2Volumes;
-    QHash<QString, int> _articleVolume; //!< par2 article id -> index in _par2Volumes
+    //! Which file each article belongs to, in one structure rather than two:
+    //! >= 0 is an index into _par2Volumes, < 0 is -(data file index + 1).
+    //! PAR2 slices restart at every file boundary, so knowing a loss happened
+    //! is not enough -- the damage has to be counted file by file.
+    QHash<QString, int> _articleOwner;
+    QVector<int>        _dataFileMissing; //!< missing articles, per data file
     int _nbPar2Articles;
     int _nbPar2Answered; //!< PAR2 articles the server has actually answered on
     int _nbDataArticles;
@@ -200,6 +205,8 @@ public:
     inline bool hasArticlesLeft() const;
     //! \a article is the one that just got its answer, whatever that answer was.
     inline void articleChecked(const QString &article);
+    //! True when this article belongs to a PAR2 file rather than to the data.
+    inline bool isPar2Article(const QString &article) const;
 
     //! The check cannot even be attempted (nzb unreadable, no server able to
     //! run it). Reports it the way a finished check reports itself, so a caller
@@ -277,6 +284,10 @@ bool NzbCheck::stoppedEarly() const
 {
     return _earlyStop;
 }
+bool NzbCheck::isPar2Article(const QString &article) const
+{
+    return _articleOwner.value(article, -1) >= 0;
+}
 bool NzbCheck::blockSizeIsMeasured() const
 {
     return _blockSizeMeasured;
@@ -330,13 +341,17 @@ void NzbCheck::missingArticle(const QString &article)
               << MB_FLUSH;
     ++_nbMissingArticles;
 
-    // Which side of the post lost it decides whether anything can be repaired.
-    auto const volume = _articleVolume.constFind(article);
-    if (volume != _articleVolume.constEnd()) {
+    // Which side of the post lost it decides whether anything can be repaired,
+    // and for data, which file lost it decides how many blocks it costs.
+    int const owner = _articleOwner.value(article, -1);
+    if (owner >= 0) {
         ++_nbMissingPar2Articles;
-        ++_par2Volumes[*volume].nbMissingArticles;
+        ++_par2Volumes[owner].nbMissingArticles;
     } else {
         ++_nbMissingDataArticles;
+        int const dataFile = -owner - 1;
+        if (dataFile >= 0 && dataFile < _dataFileMissing.size())
+            ++_dataFileMissing[dataFile];
 
         // Only ever stop on a loss that no layout can save. "Recoverable if the
         // losses are clustered" is precisely the case where giving up would
@@ -379,7 +394,7 @@ void NzbCheck::requeueArticle(const QString &article)
 {
     if (article.isNull())
         return;
-    if (_articleVolume.contains(article))
+    if (isPar2Article(article))
         _par2Queue.push(article);
     else
         _dataQueue.push(article);
@@ -393,7 +408,7 @@ bool NzbCheck::hasArticlesLeft() const
 void NzbCheck::articleChecked(const QString &article)
 {
     ++_nbCheckedArticles;
-    if (_articleVolume.contains(article))
+    if (isPar2Article(article))
         ++_nbPar2Answered;
 }
 
