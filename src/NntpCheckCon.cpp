@@ -126,6 +126,7 @@ void NntpCheckCon::onStartConnection()
             Qt::DirectConnection);
 
     // Resolve through a DNS socket bound to the tunnel IP.
+    bool connecting = false;
     if (routeViaVpn) {
         if (vpn && !vpn->dnsServer().isNull()) {
             QString dnsErr;
@@ -138,15 +139,30 @@ void NntpCheckCon::onStartConnection()
                     static_cast<QSslSocket *>(_socket)
                         ->setPeerVerifyName(_srvParams.host);
                 _socket->connectToHost(records.first(), _srvParams.port);
-                return;
+                connecting = true;
+            } else {
+                _nzbCheck->error(
+                        tr("VPN DNS lookup failed for %1 via %2: %3 — falling back to system DNS")
+                                .arg(_srvParams.host,
+                                     vpn->dnsServer().toString(),
+                                     dnsErr.isEmpty() ? tr("unknown error") : dnsErr));
             }
-            _nzbCheck->error(tr("VPN DNS lookup failed for %1 via %2: %3 — falling back to system DNS")
-                                 .arg(_srvParams.host,
-                                      vpn->dnsServer().toString(),
-                                      dnsErr.isEmpty() ? tr("unknown error") : dnsErr));
         }
     }
-    _socket->connectToHost(_srvParams.host, _srvParams.port);
+    if (!connecting)
+        _socket->connectToHost(_srvParams.host, _srvParams.port);
+
+    // Single arming point. The VPN branch used to return from the middle of
+    // this function, leaving a tunnelled check with no watchdog at all.
+    _watchdog.start(_nzbCheck->socketTimeOut());
+}
+
+void NntpCheckCon::_send(const char *cmd)
+{
+    if (!_socket)
+        return;
+    _socket->write(cmd);
+    // Anything we ask for, we wait for -- with a deadline.
     _watchdog.start(_nzbCheck->socketTimeOut());
 }
 
@@ -260,8 +276,11 @@ void NntpCheckCon::_finishOrRetry()
 
 void NntpCheckCon::onReadyRead()
 {
-    _watchdog.stop(); // the server is talking to us
     while (_isConnected && _socket->canReadLine()) {
+        // Disarmed here and not before the loop: readyRead also fires on half a
+        // line, and stopping the watchdog on that left a server free to send
+        // one byte and then go quiet for ever.
+        _watchdog.stop();
         QByteArray line = _socket->readLine();
         //        qDebug() << "line: " << line.constData();
 
@@ -293,7 +312,7 @@ void NntpCheckCon::onReadyRead()
                     std::string cmd(Nntp::AUTHINFO_USER);
                     cmd += _srvParams.user;
                     cmd += Nntp::ENDLINE;
-                    _socket->write(cmd.c_str());
+                    _send(cmd.c_str());
                 }
             }
         } else if (_postingState == PostingState::AUTH_USER) {
@@ -312,7 +331,7 @@ void NntpCheckCon::onReadyRead()
                 std::string cmd(Nntp::AUTHINFO_PASS);
                 cmd += _srvParams.pass;
                 cmd += Nntp::ENDLINE;
-                _socket->write(cmd.c_str());
+                _send(cmd.c_str());
             }
         } else if (_postingState == PostingState::AUTH_PASS) {
             if (strncmp(line.constData(), Nntp::getResponse(281), 2) != 0) {
@@ -369,8 +388,11 @@ void NntpCheckCon::_checkNextArticle()
             _nzbCheck->log(tr("[Con #%1] Checking article %2").arg(_id).arg(_currentArticle));
 
         _postingState = PostingState::CHECKING_ARTICLE;
-        _socket->write(QString("%1 %2\r\n").arg(Nntp::STAT).arg(_currentArticle).toLocal8Bit());
-        _watchdog.start(_nzbCheck->socketTimeOut());
+        _send(QString("%1 %2\r\n")
+                      .arg(Nntp::STAT)
+                      .arg(_currentArticle)
+                      .toLocal8Bit()
+                      .constData());
     } else {
         _watchdog.stop();
         if (_nzbCheck->debugMode())

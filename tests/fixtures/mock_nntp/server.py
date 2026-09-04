@@ -102,6 +102,17 @@ class Session:
 
     async def serve(self) -> None:
         self.log(f"connect (require_auth={self.opts.require_auth})")
+
+        if self.opts.partial_line:
+            # Half a greeting: readyRead fires on the client, but no complete
+            # line is ever available. A client that disarms its timeout on the
+            # mere arrival of bytes waits here for ever.
+            self.log("sending a partial greeting and going silent")
+            self.writer.write(b"200 ngPost mock NNTP serv")
+            await self.writer.drain()
+            while True:
+                await asyncio.sleep(3600)
+
         await self.write_line(b"200 ngPost mock NNTP server ready (POSTING OK)")
 
         try:
@@ -314,6 +325,9 @@ def main(argv: list[str]) -> int:
                    help="Sleep N ms before each server reply (default 0)")
     p.add_argument("--stat-missing", action="store_true",
                    help="Reply 430 to STAT (simulates missing articles for --check)")
+    p.add_argument("--partial-line", action="store_true",
+                   help="Send the greeting without its terminator and then stay silent, "
+                        "to exercise a client's read timeout on an incomplete line")
     p.add_argument("--missing-ids", default=None,
                    help="File of message-ids (one per line, angle brackets optional, "
                         "'#' comments allowed) to report as missing; every other "

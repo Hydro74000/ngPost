@@ -39,6 +39,10 @@ private:
     //! try when there is still work and budget left.
     void _finishOrRetry();
 
+    //! Write a command and arm the watchdog. Every write goes through here:
+    //! a command sent without arming is a command that can hang for ever.
+    void _send(const char *cmd);
+
     enum class PostingState {
         NOT_CONNECTED = 0,
         CONNECTED,

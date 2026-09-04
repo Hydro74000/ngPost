@@ -18,6 +18,7 @@
 #include <QtTest>
 #include <QDateTime>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -166,6 +167,7 @@ private slots:
     void check_full_verifies_everything_anyway();
     void check_detects_par2_when_the_subject_ends_on_the_extension();
     void check_withholds_redundancy_when_a_size_is_missing();
+    void check_survives_a_server_that_sends_half_a_line();
 
     //! An unknown flag fails with a non-zero exit code. Currently
     //! ERR_WRONG_ARG = 3 but tests assert "non-zero" for resilience to enum
@@ -992,6 +994,46 @@ void TestCliParser::check_withholds_redundancy_when_a_size_is_missing()
     QCOMPARE(par2.value(QStringLiteral("blocksTotal")).toInt(), 4);
     QVERIFY2(!par2.contains(QStringLiteral("redundancyPercent")),
              "redundancy must not be computed from a partial data size");
+}
+
+//! readyRead also fires on half a line. Disarming the watchdog on the mere
+//! arrival of bytes let a server send one fragment and then go quiet for ever,
+//! which is the exact hang the watchdog was added to prevent.
+void TestCliParser::check_survives_a_server_that_sends_half_a_line()
+{
+    HomeSandbox sandbox;
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--partial-line") }), "mock server did not start");
+
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/partial.conf");
+    QFile config(confPath);
+    QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Text));
+    QTextStream conf(&config);
+    // SOCK_TIMEOUT is in seconds and floored at 5; one attempt is enough to
+    // show the deadline works, so no reconnection budget.
+    conf << "SOCK_TIMEOUT = 6\n"
+         << "RETRY = 0\n"
+         << "[server]\n"
+         << "host = 127.0.0.1\n"
+         << "port = " << server.port() << "\n"
+         << "enabled = true\n"
+         << "nzbCheck = true\n"
+         << "connection = 1\n";
+    config.close();
+
+    const QString nzb = writeRecoveryNzb(sandbox.rootPath(), QStringLiteral("stalled.nzb"),
+                                         2, 716800, 4, 2);
+
+    QElapsedTimer elapsed;
+    elapsed.start();
+    const RunResult r = run(_bin, { "-c", confPath, "--check", nzb }, sandbox.rootPath());
+    QVERIFY2(!r.timedOut, "the check hung on a partial line");
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Inconclusive));
+    QVERIFY2(elapsed.elapsed() > 4000,
+             "the connection ended too fast to have gone through the watchdog");
+    QVERIFY2(r.stderrText.contains(QStringLiteral("stopped answering")),
+             qPrintable(QStringLiteral("no watchdog message:\n") + r.stderrText));
 }
 
 void TestCliParser::unknown_flag_rejected()
