@@ -35,17 +35,22 @@
 struct NntpServerParams;
 class NntpCheckCon;
 
-//! One PAR2 file of the post: either the base .par2, which carries only
-//! metadata, or a .volNN+MM.par2, which carries MM recovery blocks.
+//! One PAR2 file of the post: either the conventional metadata base .par2, or
+//! a .volNN+MM.par2, which carries MM recovery blocks.
 struct Par2Volume
 {
     QString subject;
     int     blocks             = 0;     //!< recovery blocks, from the .volNN+MM name
     bool    isVolume           = false; //!< false for the metadata-only base .par2
     int     nbExpectedArticles = 0;
+    int     nbListedArticles   = 0;
     int     nbMissingArticles  = 0;
 
-    bool isIntact() const { return nbMissingArticles == 0; }
+    bool isIntact() const
+    {
+        return nbExpectedArticles > 0 && nbListedArticles >= nbExpectedArticles
+               && nbMissingArticles == 0;
+    }
 
     //! Recovery blocks still usable out of this file.
     //!
@@ -55,6 +60,21 @@ struct Par2Volume
     //! twentieths of its blocks. Counting it as zero (as ngPostEx does) declares
     //! repairable posts dead. Rounding down keeps the answer conservative.
     int usableBlocks() const;
+};
+
+//! Facts and bounds that belong to one data file. Article payload sizes are
+//! deliberately not global: an NZB may concatenate files posted with
+//! different settings, while PAR2 source-slice numbering restarts for each
+//! file.
+struct NzbDataFile
+{
+    int     nbExpectedArticles = 0;
+    int     nbMissingArticles  = 0;
+    QString lastArticle;
+    bool    lastArticleMissing = false;
+    qint64  sizeBytes          = 0;
+    qint64  articleSizeMin     = 0;
+    qint64  articleSizeMax     = 0; //!< 0 when one article gives no finite upper bound
 };
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
@@ -120,13 +140,7 @@ private:
     //! PAR2 slices restart at every file boundary, so knowing a loss happened
     //! is not enough -- the damage has to be counted file by file.
     QHash<QString, int> _articleOwner;
-    QVector<int>        _dataFileMissing; //!< missing articles, per data file
-    //! The last article of a file is the short one -- it holds whatever is left
-    //! over, possibly a single byte -- so losing it damages far less than
-    //! losing a full one. Knowing whether it is among the losses is the
-    //! difference between "one block" and "the whole of A".
-    QVector<QString>    _dataFileLastArticle;
-    QVector<bool>       _dataFileLastMissing;
+    QVector<NzbDataFile> _dataFiles;
 
     //! -1 would collide with data file 0, which encodes as -(0)-1.
     static constexpr int kUnknownOwner = INT_MIN;
@@ -141,19 +155,12 @@ private:
     qint64  _par2BlockSize;    //!< 0 while unknown
     QString _blockSizeSource;  //!< how it was obtained, for the report
     bool    _blockSizeMeasured; //!< false when we had to guess it from the nzb
-    //! Payload of a full article, known only within bounds. A file of S bytes in
-    //! n articles constrains it to [ceil(S/n), ceil(S/(n-1))-1]: the last
-    //! article of a file is short, so its size says less than it seems. The
-    //! bounds from every file intersect, and a post of several volumes usually
-    //! pins it tightly -- but never assume it did. Both are 0 when those
-    //! constraints contradict each other, which means the files were not all
-    //! posted with the same article size: a contradiction bounds nothing, and
-    //! collapsing it to a point would turn it into a certainty.
+    //! A global article payload is retained only to estimate an unknown PAR2
+    //! slice size. It is never evidence for a recovery verdict: proofs use the
+    //! per-file bounds in _dataFiles.
     qint64 _articleSizeMin;
-    qint64 _articleSizeMax;
     qint64 _subjectArticleMin; //!< tightest lower bound the subjects give
     qint64 _subjectArticleMax; //!< tightest upper bound they give, 0 if none
-    qint64  _dataSizeBytes;    //!< data announced by the subjects, 0 if they carry none
 
     bool _par2PhaseDone; //!< every PAR2 article has been handed out
     bool _earlyStop;     //!< the post is provably beyond repair; stop asking
@@ -190,7 +197,7 @@ public:
     enum class Recovery
     {
         NotNeeded,       //!< no data article is missing
-        Certain,         //!< covered even at the worst end of every estimate
+        Certain,         //!< capacity covers the worst case and the base index is intact
         LayoutDependent, //!< the estimates straddle the answer: try the repair
         Impossible,      //!< not covered even at the best end of every estimate
         NoPar2AtAll,      //!< the nzb lists no PAR2 file: a fact, not an estimate
@@ -245,9 +252,11 @@ public:
     // ---- PAR2 recovery analysis ----
     int  totalRecoveryBlocks() const;
     int  usableRecoveryBlocks() const;
-    bool hasIntactPar2Metadata() const;
-    //! True when every data file told us its size, so _dataSizeBytes is the
-    //! whole of the data and not a fragment of it.
+    //! The conventional metadata-only base .par2 is present in full. Recovery
+    //! volumes are not enough: the PAR2 specification requires only a Creator
+    //! packet in each file, so vital packets cannot be inferred from its name.
+    bool hasIntactPar2Index() const;
+    //! True when every data file announced its size.
     inline bool dataSizeIsComplete() const;
     //! True when the PAR2 slice size was told to us rather than inferred. Only
     //! then may the analysis assert that something is beyond repair.
@@ -257,11 +266,6 @@ public:
     //! The upper end is -1 when nothing bounds it -- without an article size
     //! there is no ceiling to name, and a missing ceiling is not a high one.
     QPair<int, int> damagedBlockRange() const;
-    //! Blocks still usable, likewise bounded. The low end assumes a lost
-    //! article takes its share of the recovery packets plus the one it cuts in
-    //! half; the high end assumes the packets all sat in the articles that
-    //! survived, which the PAR2 format allows -- packets carry their own
-    //! checksum and may appear in any order.
     //! {guaranteed, at best}. The guaranteed end counts only volumes that lost
     //! nothing: PAR2 packets may sit anywhere in a file and carry their own
     //! checksum, so for a damaged volume the format promises nothing at all --
@@ -271,10 +275,15 @@ public:
     //! that survived. An expectation, shown to the reader, never used to prove
     //! anything.
     int likelyUsableBlocks() const;
-    //! Share of the data the recovery blocks still cover, in percent, and what
-    //! it was when the post was made. Negative when the nzb does not say how
-    //! big the data is.
+    //! Number of PAR2 source slices occupied by all data files. Each file is
+    //! rounded separately because source-slice numbering restarts at its
+    //! boundary. Negative when the NZB does not announce every file size.
+    qint64 totalDataBlocks() const;
+    //! Share of source slices covered by likely usable recovery blocks and by
+    //! the original block count. Negative when the denominator is unknown.
     QPair<double, double> redundancyPercent() const;
+    //! The same percentage at the guaranteed and best-case ends.
+    QPair<double, double> redundancyPercentRange() const;
     Recovery recoveryVerdict() const;
     inline int exitCode() const;
     inline bool debugMode() const;
@@ -343,7 +352,7 @@ bool NzbCheck::blockSizeIsMeasured() const
 }
 bool NzbCheck::dataSizeIsComplete() const
 {
-    return _nbDataFiles > 0 && _nbDataFilesWithSize == _nbDataFiles && _dataSizeBytes > 0;
+    return _nbDataFiles > 0 && _nbDataFilesWithSize == _nbDataFiles;
 }
 void NzbCheck::setSocketTimeOut(int ms)
 {
@@ -378,7 +387,6 @@ void NzbCheck::setArticleSize(qint64 bytes)
     // made, so it is only a starting point: whatever the subjects say wins.
     if (bytes > 0 && _articleSizeMin <= 0) {
         _articleSizeMin = bytes;
-        _articleSizeMax = bytes;
     }
 }
 
@@ -406,10 +414,10 @@ void NzbCheck::missingArticle(const QString &article)
     } else {
         ++_nbMissingDataArticles;
         int const dataFile = -owner - 1;
-        if (dataFile >= 0 && dataFile < _dataFileMissing.size()) {
-            ++_dataFileMissing[dataFile];
-            if (_dataFileLastArticle.value(dataFile) == article)
-                _dataFileLastMissing[dataFile] = true;
+        if (dataFile >= 0 && dataFile < _dataFiles.size()) {
+            ++_dataFiles[dataFile].nbMissingArticles;
+            if (_dataFiles.at(dataFile).lastArticle == article)
+                _dataFiles[dataFile].lastArticleMissing = true;
         }
     }
 

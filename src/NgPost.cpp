@@ -360,7 +360,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _storage(nullptr), _ramPath(), _ramRatio(sRamRatioMin),
   #endif
     _tmpPath(), _rarPath(), _rarArgs(), _rarSize(0), _rarMax(sDefaultRarMax), _useRarMax(false),
-    _par2Pct(0), _par2Path(), _par2Args(), _par2PathConfig(), _par2BlockSize(0),
+    _par2Pct(0), _par2Path(), _par2Args(), _par2BlockSize(0), _par2PathConfig(),
     _doCompress(false), _doPar2(false), _genName(), _genPass(),
     _lengthName(sDefaultLengthName), _lengthPass(sDefaultLengthPass),
     _rarName(), _rarPass(), _rarPassFixed(),
