@@ -19,6 +19,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QRegularExpression>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -169,6 +170,8 @@ private slots:
     void check_withholds_redundancy_when_a_size_is_missing();
     void check_survives_a_server_that_sends_half_a_line();
     void check_never_declares_a_post_dead_on_an_inferred_slice_size();
+    void check_does_not_write_off_a_volume_it_only_estimated_to_zero();
+    void check_holds_the_data_back_until_the_par2_answers_are_in();
     void check_counts_losses_in_separate_files_as_separate_blocks();
     void check_stops_on_losses_the_nzb_itself_already_declared();
 
@@ -614,7 +617,7 @@ void TestCliParser::check_json_total_includes_articles_absent_from_nzb()
              QStringLiteral("unrecoverable"));
     QCOMPARE(report.object().value(QStringLiteral("par2")).toObject()
                      .value(QStringLiteral("recovery")).toString(),
-             QStringLiteral("noRedundancy"));
+             QStringLiteral("noPar2AtAll"));
     const QJsonObject articles = report.object().value(QStringLiteral("articles")).toObject();
     // The nzb declares two articles it does not carry and offers no PAR2 to
     // rebuild them, so the answer is settled before a single STAT goes out.
@@ -721,7 +724,11 @@ void TestCliParser::check_recovery_is_certain_when_blocks_cover_the_loss()
     const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
     QCOMPARE(par2.value(QStringLiteral("recovery")).toString(), QStringLiteral("certain"));
     QCOMPARE(par2.value(QStringLiteral("blocksUsable")).toInt(), 4);
-    QCOMPARE(par2.value(QStringLiteral("damagedBlocksMax")).toInt(), 2);
+    // Three, not two: the pessimistic end uses the largest article the subjects
+    // still allow. Four articles covering 2867200 bytes pin the payload to
+    // [716800, 955733] -- the last one is short, so the file size says less
+    // than it looks -- and the worst case has to use the top of that.
+    QCOMPARE(par2.value(QStringLiteral("damagedBlocksMax")).toInt(), 3);
 }
 
 //! Three lost articles against two blocks: beyond repair at any layout, and the
@@ -1209,6 +1216,101 @@ void TestCliParser::check_stops_on_losses_the_nzb_itself_already_declared()
     const QJsonObject articles = report.object().value(QStringLiteral("articles")).toObject();
     QCOMPARE(articles.value(QStringLiteral("checked")).toInt(), 2);
     QCOMPARE(articles.value(QStringLiteral("missingInNzb")).toInt(), 5);
+}
+
+//! Losing one of a volume's two articles does not prove its single recovery
+//! block is gone: PAR2 packets carry their own checksum and may sit anywhere
+//! in the file, so the surviving article may hold it whole. The pro rata is a
+//! prudent floor, and a floor of zero is not a measurement -- turning it into
+//! "no redundancy left" and stopping the run on it was asserting a fact from
+//! an estimate.
+void TestCliParser::check_does_not_write_off_a_volume_it_only_estimated_to_zero()
+{
+    HomeSandbox sandbox;
+    const QString ids = writeMissingIds(sandbox.rootPath(),
+                                        { QStringLiteral("d2"), QStringLiteral("p1") });
+
+    MockNntpServer server;
+    QVERIFY2(server.start({ QStringLiteral("--missing-ids"), ids }), "mock server did not start");
+
+    const QString conf = writeCheckConf(sandbox.rootPath(), server.port());
+    // One recovery block spread over two articles, one of them gone.
+    const QString nzb = writeRecoveryNzb(sandbox.rootPath(), QStringLiteral("thin.nzb"),
+                                         4, 716800, 1, 2);
+
+    const RunResult r = run(_bin,
+                            { "-c", conf, "--check_json", "--par2_block_size", "716800",
+                              "--check", nzb },
+                            sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+
+    QJsonParseError err;
+    const QJsonDocument report = QJsonDocument::fromJson(r.stdoutText.trimmed().toUtf8(), &err);
+    QCOMPARE(err.error, QJsonParseError::NoError);
+    const QJsonObject par2 = report.object().value(QStringLiteral("par2")).toObject();
+
+    QCOMPARE(par2.value(QStringLiteral("blocksUsable")).toInt(), 0);   // the prudent floor
+    QCOMPARE(par2.value(QStringLiteral("blocksUsableMax")).toInt(), 1); // what may survive
+    QVERIFY2(par2.value(QStringLiteral("recovery")).toString() != QStringLiteral("noUsableBlocks"),
+             "a floor of zero is not proof the block is gone");
+    QVERIFY2(!report.object().value(QStringLiteral("stoppedEarly")).toBool(),
+             "an estimate must not cut the run short");
+    QCOMPARE(r.exitCode, static_cast<int>(NzbCheck::CheckStatus::Missing));
+}
+
+//! With more connections than PAR2 articles, the spare ones used to race
+//! straight into the data while the PAR2 answers were still in flight -- so the
+//! redundancy was still unknown when the first data losses came back, which is
+//! the one thing checking PAR2 first exists to avoid.
+void TestCliParser::check_holds_the_data_back_until_the_par2_answers_are_in()
+{
+    HomeSandbox sandbox;
+
+    MockNntpServer server;
+    // 150 ms before every reply: wide enough that a connection jumping the gun
+    // is unmistakable in the timestamps.
+    QVERIFY2(server.start({ QStringLiteral("--slow-mode-ms"), QStringLiteral("150") }),
+             "mock server did not start");
+
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/many-cons.conf");
+    QFile config(confPath);
+    QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Text));
+    QTextStream conf(&config);
+    conf << "[server]\n"
+         << "host = 127.0.0.1\n"
+         << "port = " << server.port() << "\n"
+         << "enabled = true\n"
+         << "nzbCheck = true\n"
+         << "connection = 8\n";
+    config.close();
+
+    const QString nzb = writeRecoveryNzb(sandbox.rootPath(), QStringLiteral("wide.nzb"),
+                                         16, 716800, 2, 2);
+    const RunResult r = run(_bin, { "-c", confPath, "--check", nzb }, sandbox.rootPath());
+    QVERIFY2(!r.timedOut, qPrintable(r.stdoutText + r.stderrText));
+
+    QFile log(server.logFile());
+    QVERIFY(log.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QStringList lines = QString::fromUtf8(log.readAll()).split(QLatin1Char('\n'));
+
+    // "[+   106ms] [127.0.0.1:x] STAT <p1> -> 223"
+    const QRegularExpression stamp(QStringLiteral("^\\[\\+\\s*(\\d+)ms\\].*STAT <([^>]+)>"));
+    qint64 lastPar2 = -1, firstData = -1;
+    for (const QString &line : lines) {
+        const QRegularExpressionMatch m = stamp.match(line);
+        if (!m.hasMatch())
+            continue;
+        const qint64 at = m.captured(1).toLongLong();
+        if (m.captured(2).startsWith(QLatin1Char('p')))
+            lastPar2 = qMax(lastPar2, at);
+        else if (firstData < 0)
+            firstData = at;
+    }
+    QVERIFY2(lastPar2 >= 0 && firstData >= 0, "the run did not reach both kinds of article");
+    QVERIFY2(firstData - lastPar2 >= 100,
+             qPrintable(QStringLiteral("data started %1 ms after the last par2 command, so it "
+                                       "did not wait for its answer")
+                                .arg(firstData - lastPar2)));
 }
 
 void TestCliParser::unknown_flag_rejected()

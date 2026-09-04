@@ -25,11 +25,18 @@ import argparse
 import asyncio
 import ssl
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
 
+_START = time.monotonic()
+
+
 def _log(log_path: Optional[Path], msg: str) -> None:
+    # Milliseconds since start: the order of commands says nothing about when
+    # they arrived relative to the replies the server was still sitting on.
+    msg = f"[+{int((time.monotonic() - _START) * 1000):>6d}ms] {msg}"
     print(msg, flush=True)
     if log_path is not None:
         with log_path.open("a", encoding="utf-8") as f:

@@ -130,8 +130,15 @@ private:
     qint64  _par2BlockSize;    //!< 0 while unknown
     QString _blockSizeSource;  //!< how it was obtained, for the report
     bool    _blockSizeMeasured; //!< false when we had to guess it from the nzb
-    qint64  _articleSize;             //!< decoded payload per article; derived or configured
-    qint64  _articleSizeFromSubjects; //!< tightest bound the subjects give for it
+    //! Payload of a full article, known only within bounds. A file of S bytes in
+    //! n articles constrains it to [ceil(S/n), ceil(S/(n-1))-1]: the last
+    //! article of a file is short, so its size says less than it seems. The
+    //! bounds from every file intersect, and a post of several volumes usually
+    //! pins it tightly -- but never assume it did.
+    qint64 _articleSizeMin;
+    qint64 _articleSizeMax;
+    qint64 _subjectArticleMin; //!< tightest lower bound the subjects give
+    qint64 _subjectArticleMax; //!< tightest upper bound they give, 0 if none
     qint64  _dataSizeBytes;    //!< data announced by the subjects, 0 if they carry none
 
     bool _par2PhaseDone; //!< every PAR2 article has been handed out
@@ -169,10 +176,11 @@ public:
     enum class Recovery
     {
         NotNeeded,       //!< no data article is missing
-        Certain,         //!< even the worst layout is covered
-        LayoutDependent, //!< covered only if the losses are clustered
-        Impossible,      //!< even the best layout is not covered
-        NoRedundancy     //!< no usable PAR2 block at all
+        Certain,         //!< covered even at the worst end of every estimate
+        LayoutDependent, //!< the estimates straddle the answer: try the repair
+        Impossible,      //!< not covered even at the best end of every estimate
+        NoPar2AtAll,     //!< the nzb lists no PAR2 file: a fact, not an estimate
+        NoUsableBlocks   //!< every PAR2 volume lost every one of its articles
     };
 
     NzbCheck();
@@ -203,6 +211,9 @@ public:
     //! does not silently remove it from the run.
     inline void requeueArticle(const QString &article);
     inline bool hasArticlesLeft() const;
+    //! True when getNextArticle() returned nothing only because the PAR2 phase
+    //! has not closed yet -- there is work left, just not yet handable out.
+    inline bool waitingForPar2() const;
     //! \a article is the one that just got its answer, whatever that answer was.
     inline void articleChecked(const QString &article);
     //! True when this article belongs to a PAR2 file rather than to the data.
@@ -226,8 +237,15 @@ public:
     //! True when the PAR2 slice size was told to us rather than inferred. Only
     //! then may the analysis assert that something is beyond repair.
     inline bool blockSizeIsMeasured() const;
-    //! Blocks the missing data articles damage: {clustered, scattered}.
+    //! Blocks the missing data articles damage, at the best and worst ends of
+    //! everything we are unsure about: {clustered and small, scattered and big}.
     QPair<int, int> damagedBlockRange() const;
+    //! Blocks still usable, likewise bounded. The low end assumes a lost
+    //! article takes its share of the recovery packets plus the one it cuts in
+    //! half; the high end assumes the packets all sat in the articles that
+    //! survived, which the PAR2 format allows -- packets carry their own
+    //! checksum and may appear in any order.
+    QPair<int, int> usableBlockRange() const;
     //! Share of the data the recovery blocks still cover, in percent, and what
     //! it was when the post was made. Negative when the nzb does not say how
     //! big the data is.
@@ -331,8 +349,12 @@ void NzbCheck::setPar2BlockSize(qint64 bytes, const QString &source)
 
 void NzbCheck::setArticleSize(qint64 bytes)
 {
-    if (bytes > 0)
-        _articleSize = bytes;
+    // The configured size describes how we would post, not how this nzb was
+    // made, so it is only a starting point: whatever the subjects say wins.
+    if (bytes > 0 && _articleSizeMin <= 0) {
+        _articleSizeMin = bytes;
+        _articleSizeMax = bytes;
+    }
 }
 
 void NzbCheck::missingArticle(const QString &article)
@@ -371,17 +393,15 @@ void NzbCheck::_reevaluateEarlyStop()
     if (_earlyStop || _checkFull || !_par2PhaseDone || _nbMissingDataArticles <= 0)
         return;
 
-    // Only ever stop on a loss that no layout can save: "recoverable if the
-    // losses are clustered" is precisely the case where giving up would send
-    // someone to re-post something a repair would have fixed. Stopping is
-    // irreversible -- it stops asking -- so only a fact justifies it.
-    // NoRedundancy is one: no usable block can repair anything, whatever the
-    // slice size. Impossible is only a fact when the slice size was told to us;
-    // inferred, it is an estimate, and an estimate must not send anyone off to
-    // re-post a whole set.
+    // Stopping is irreversible -- it stops asking -- so only a fact justifies
+    // it. NoPar2AtAll and NoUsableBlocks are facts: the nzb lists no PAR2 file,
+    // or every volume lost every one of its articles. Impossible now carries
+    // its own proof, since recoveryVerdict() only returns it when the least
+    // possible damage already exceeds the most blocks that could have survived,
+    // measured against a slice size somebody actually told us.
     Recovery const verdict = recoveryVerdict();
-    if (verdict == Recovery::NoRedundancy
-        || (verdict == Recovery::Impossible && _blockSizeMeasured))
+    if (verdict == Recovery::NoPar2AtAll || verdict == Recovery::NoUsableBlocks
+        || verdict == Recovery::Impossible)
         _earlyStop = true;
 }
 
@@ -407,6 +427,14 @@ QString NzbCheck::getNextArticle()
             return QString();
     }
 
+    // The PAR2 queue is drained but its answers are still in flight. Handing
+    // out data here is what made "PAR2 first" a suggestion rather than an
+    // order: with more connections than PAR2 articles, all the spare ones
+    // raced ahead and the redundancy was still unknown when their losses came
+    // back. Hold them; waitingForPar2() tells the caller to come back shortly.
+    if (!_par2PhaseDone)
+        return QString();
+
     if (!_dataQueue.isEmpty())
         return _dataQueue.pop();
     return QString();
@@ -425,6 +453,11 @@ void NzbCheck::requeueArticle(const QString &article)
 bool NzbCheck::hasArticlesLeft() const
 {
     return !_earlyStop && (!_par2Queue.isEmpty() || !_dataQueue.isEmpty());
+}
+
+bool NzbCheck::waitingForPar2() const
+{
+    return !_earlyStop && !_par2PhaseDone && !_dataQueue.isEmpty();
 }
 
 void NzbCheck::articleChecked(const QString &article)

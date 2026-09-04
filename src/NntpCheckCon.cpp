@@ -36,6 +36,7 @@ NntpCheckCon::NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &s
     , _postingState(PostingState::NOT_CONNECTED)
     , _currentArticle()
     , _nbRetries(0)
+    , _nbPar2Waits(0)
     , _watchdog()
 {
     // A server that accepts the TCP connection and then says nothing used to
@@ -388,11 +389,21 @@ void NntpCheckCon::_checkNextArticle()
             _nzbCheck->log(tr("[Con #%1] Checking article %2").arg(_id).arg(_currentArticle));
 
         _postingState = PostingState::CHECKING_ARTICLE;
+        _nbPar2Waits  = 0;
         _send(QString("%1 %2\r\n")
                       .arg(Nntp::STAT)
                       .arg(_currentArticle)
                       .toLocal8Bit()
                       .constData());
+    } else if (_nzbCheck->waitingForPar2()
+               && _nbPar2Waits++ < _nzbCheck->socketTimeOut() / sPar2WaitMs) {
+        // Nothing to hand out yet, but not because the run is over: the PAR2
+        // answers that close the phase are still on their way. Idle rather
+        // than start on the data, which is what the phase exists to prevent.
+        // Bounded by the socket timeout, so a PAR2 answer that never comes is
+        // dealt with by the watchdog instead of parking us here.
+        _watchdog.stop();
+        QTimer::singleShot(sPar2WaitMs, this, [this]() { _checkNextArticle(); });
     } else {
         _watchdog.stop();
         if (_nzbCheck->debugMode())

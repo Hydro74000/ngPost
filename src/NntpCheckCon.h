@@ -61,7 +61,10 @@ private:
 
     PostingState _postingState;
     QString _currentArticle;
-    ushort  _nbRetries; //!< reconnections already spent by this connection
+    ushort  _nbRetries;   //!< reconnections already spent by this connection
+    ushort  _nbPar2Waits; //!< polls spent waiting for the PAR2 phase to close
+
+    static const int sPar2WaitMs = 25; //!< how long to idle between those polls
     QTimer  _watchdog;  //!< fires when the server has gone silent for too long
 
 public:
