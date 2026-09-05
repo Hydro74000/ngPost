@@ -31,7 +31,11 @@ LIBS    += -lqt6keychain
 # a DLL that nothing imports, which windeployqt then skips.
 linux:!android: QT += dbus
 
-VERSION = 5.5
+# devel carries the next minor. Unstable tags derive from it, so it must stay
+# ahead of the newest stable tag: with VERSION behind, v5.5-unstable sorted
+# below the released v5.5.1 and the update check offered stable to devel users
+# while never offering them the build they had just published.
+VERSION = 5.6
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 # The exact release this binary was built as, e.g. "v5.5" or
