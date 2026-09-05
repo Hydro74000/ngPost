@@ -1828,6 +1828,10 @@ Are you sure you want to quit?</source>
         <source>%1 post(s) can be resumed.</source>
         <translation>%1 post(s) can be resumed.</translation>
     </message>
+    <message>
+        <source>Reset column widths</source>
+        <translation></translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -3909,6 +3913,23 @@ One thing does change for such a script: the old configuration file has no POST_
         <location line="+5"/>
         <source>If you&apos;d like to translate ngPost in your language, it&apos;s easy, please contact me at Matthieu.Bruel@gmail.com</source>
         <translation>If you&apos;d like to translate ngPost into your language, it&apos;s easy, please contact me at Matthieu.Bruel@gmail.com</translation>
+    </message>
+    <message>
+        <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
+        <translation></translation>
+    </message>
+    <message>
+        <source>Do file name obfuscation (the input files are renamed before compression)
+</source>
+        <translation></translation>
+    </message>
+    <message>
+        <source>## 'filename' renames the input files with a random name before compressing</source>
+        <translation></translation>
+    </message>
+    <message>
+        <source>## them, so the archive carries no original name. Both can be asked at once.</source>
+        <translation></translation>
     </message>
 </context>
 <context>

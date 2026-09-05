@@ -42,6 +42,7 @@ class QMenu;
 class QPushButton;
 class QTableWidget;
 class QTabWidget;
+class QTimer;
 class StartupTabBar;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 class QChart;
@@ -116,6 +117,15 @@ private:
     int           _historyPageOffset  = 0;
     int           _historyRefreshGeneration = 0;
 
+    //! The user dragged a history column: ngPost stops sizing them.
+    bool          _historyColumnsResizedByUser = false;
+    //! Set while _fitHistoryColumns() resizes, so its own sections do not read
+    //! as a drag.
+    bool          _resizingHistoryColumns      = false;
+    //! Debounces the write of the column widths: a drag fires one signal per
+    //! pixel, the settings are written once it stops.
+    QTimer       *_historyColumnsSaveTimer     = nullptr;
+
     // Additional history tab widgets needed for retranslation
     QLabel       *_bannerLabel        = nullptr;
     QPushButton  *_bannerResumeBtn    = nullptr;
@@ -145,6 +155,7 @@ public:
     void init(NgPost *ngPost);
 #ifdef NGPOST_TESTING
     QWidget *buildHistoryTabForTest();
+    void     fitHistoryColumnsForTest(bool toContents) { _fitHistoryColumns(toContents); }
     int      startupTabForTest() const { return _startupTab; }
     void     fillTabContextMenuForTest(QMenu &menu, int tabIndex) { _fillTabContextMenu(menu, tabIndex); }
 #endif
@@ -270,6 +281,12 @@ private slots:
     void _onResumeDeleteEntries();
 
     void _onHistoryContextMenu(const QPoint &pos);
+    //! Right click on the history header: offers to hand the column widths
+    //! back to ngPost.
+    void _onHistoryHeaderContextMenu(const QPoint &pos);
+    //! Forget the widths the user set, here and in the settings, and size the
+    //! columns again.
+    void _resetHistoryColumns();
 
     //! Phase 5d/6: a per-row server field (checkbox or text field) changed.
     //! Persist immediately so adding, editing or toggling a server survives
@@ -282,6 +299,14 @@ private:
     QWidget *_buildHistoryTab();
     void     _retranslateHistoryTab();
     void _refreshHistoryViews(bool rewindEmptyPage = true);
+    //! Size the history columns to their content (\a toContents) and hand the
+    //! name column the room the others leave. Does nothing once the user has
+    //! resized a column themselves.
+    void _fitHistoryColumns(bool toContents);
+    //! Column widths kept from the last run, and their write back. Restoring
+    //! any leaves them to the user: _fitHistoryColumns() then stands aside.
+    void _restoreHistoryColumns();
+    void _saveHistoryColumns();
     void _showHistoryDetails(const PostHistoryStore::PostDetails &details);
     bool _startResumePost(qint64 postId, bool askConfirmation = true);
 

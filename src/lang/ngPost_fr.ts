@@ -1831,6 +1831,10 @@ Are you sure you want to quit?</source>
         <source>%1 post(s) can be resumed.</source>
         <translation>%1 post(s) peuvent être repris.</translation>
     </message>
+    <message>
+        <source>Reset column widths</source>
+        <translation>Réinitialiser la largeur des colonnes</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -3921,6 +3925,24 @@ Votre fichier de configuration actif est :
         <location line="+5"/>
         <source>If you&apos;d like to translate ngPost in your language, it&apos;s easy, please contact me at Matthieu.Bruel@gmail.com</source>
         <translation>Si vous souhaitez traduire ngPost dans votre langue, contactez moi sur Matthieu.Bruel@gmail.com, la procédure est simple</translation>
+    </message>
+    <message>
+        <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
+        <translation>renomme les fichiers source avec un nom aléatoire avant de les compresser, ainsi l'archive ne porte pas le nom d'origine (à utiliser avec --compress)</translation>
+    </message>
+    <message>
+        <source>Do file name obfuscation (the input files are renamed before compression)
+</source>
+        <translation>Obfuscation du nom de fichier (les fichiers source sont renommés avant compression)
+</translation>
+    </message>
+    <message>
+        <source>## 'filename' renames the input files with a random name before compressing</source>
+        <translation>## 'filename' renomme les fichiers source avec un nom aléatoire avant de les</translation>
+    </message>
+    <message>
+        <source>## them, so the archive carries no original name. Both can be asked at once.</source>
+        <translation>## compresser, ainsi l'archive ne porte aucun nom d'origine. Les deux à la fois.</translation>
     </message>
 </context>
 <context>

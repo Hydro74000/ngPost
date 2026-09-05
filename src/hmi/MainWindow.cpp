@@ -56,6 +56,7 @@
 #include <QTableWidget>
 #include <QTabWidget>
 #include <QTextStream>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QScreen>
@@ -96,6 +97,15 @@ const QString kMainWindowGeometryKey = QStringLiteral("MainWindow/geometry");
 //! fixed tabs can be picked; no key at all means the first one.
 const QString kStartupTabKey = QStringLiteral("MainWindow/startupTab");
 constexpr int kNbFixedTabs   = 3; //!< quick post, folder monitoring, history
+
+//! Column widths of the history table, as QHeaderView::saveState() writes
+//! them. Absent as long as the user has not resized a column: ngPost then
+//! computes the widths itself, run after run.
+const QString kHistoryColumnsKey = QStringLiteral("MainWindow/historyColumns");
+
+//! Column of the post name in the history table, the one given the room the
+//! others leave (see MainWindow::_fitHistoryColumns).
+constexpr int kHistoryNameColumn = 1;
 
 //! The pinned tab, or -1 when nothing valid is pinned.
 int readStartupTab()
@@ -319,6 +329,9 @@ bool MainWindow::hasAutoCompress() const
 #include <QKeyEvent>
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
+    if (event->type() == QEvent::Resize && _historyTable && obj == _historyTable->viewport())
+        _fitHistoryColumns(false);
+
     if (event->type() == QEvent::KeyPress && obj == _ui->postTabWidget)
     {
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
@@ -355,6 +368,14 @@ void MainWindow::closeEvent(QCloseEvent *event)
     // same size/position (saveGeometry also captures the maximized state).
     QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
     guiSettings.setValue(kMainWindowGeometryKey, saveGeometry());
+
+    // A column dragged in the last half second: its width has not been written
+    // yet, and closing must not be what loses it.
+    if (_historyColumnsSaveTimer && _historyColumnsSaveTimer->isActive())
+    {
+        _historyColumnsSaveTimer->stop();
+        _saveHistoryColumns();
+    }
 
     if (_ngPost->hasPostingJobs())
     {
@@ -1104,6 +1125,7 @@ QWidget *MainWindow::_buildHistoryTab()
 
     // History table — 11 columns
     _historyTable = new QTableWidget(histSplitter);
+    _historyTable->setObjectName(QStringLiteral("historyTable"));
     _historyTable->setColumnCount(11);
     _historyTable->setHorizontalHeaderLabels({
         tr("Date"), tr("Name"), tr("Status"), tr("Size"), tr("Speed"),
@@ -1112,10 +1134,42 @@ QWidget *MainWindow::_buildHistoryTab()
     _historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     _historyTable->setSelectionMode(QAbstractItemView::ExtendedSelection);
     _historyTable->setSortingEnabled(true);
-    _historyTable->horizontalHeader()->setStretchLastSection(false);
-    _historyTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    QHeaderView *historyHeader = _historyTable->horizontalHeader();
+    historyHeader->setStretchLastSection(false);
+    // Every column is draggable, the name one included. It used to be a Stretch
+    // section so that it filled the width, but the header sizes those itself
+    // and the mouse cannot touch them -- the name column, the widest and the
+    // first one anybody wants to narrow, could not be resized at all. The room
+    // is now given to it by _fitHistoryColumns(), which steps aside for good as
+    // soon as the user drags a column of their own.
+    historyHeader->setSectionResizeMode(QHeaderView::Interactive);
+
+    // A drag fires one of these per pixel: the widths are written to the
+    // settings once it has settled, not five hundred times on the way.
+    _historyColumnsSaveTimer = new QTimer(this);
+    _historyColumnsSaveTimer->setSingleShot(true);
+    _historyColumnsSaveTimer->setInterval(500);
+    connect(_historyColumnsSaveTimer, &QTimer::timeout, this, &MainWindow::_saveHistoryColumns);
+
+    connect(historyHeader, &QHeaderView::sectionResized, this, [this](int, int, int) {
+        if (_resizingHistoryColumns)
+            return;
+        _historyColumnsResizedByUser = true;
+        _historyColumnsSaveTimer->start();
+    });
+    // The name column follows the width of the table until then.
+    _historyTable->viewport()->installEventFilter(this);
+
+    // Right click on the header hands the columns back to ngPost.
+    historyHeader->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(historyHeader, &QWidget::customContextMenuRequested,
+            this, &MainWindow::_onHistoryHeaderContextMenu);
+
     _historyTable->verticalHeader()->hide();
     _historyTable->setContextMenuPolicy(Qt::CustomContextMenu);
+
+    // Last, once the header is wired: widths kept from the previous run.
+    _restoreHistoryColumns();
     histSplitter->addWidget(_historyTable);
 
     // Detail panel
@@ -1429,8 +1483,7 @@ void MainWindow::_refreshHistoryViews(bool rewindEmptyPage)
                 _historyTable->setItem(row, col, item);
             }
         }
-        _historyTable->resizeColumnsToContents();
-        _historyTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+        _fitHistoryColumns(true);
         _historyTable->setSortingEnabled(true);
 
         if (_histPrevPageBtn)
@@ -1490,6 +1543,97 @@ void MainWindow::_refreshHistoryViews(bool rewindEmptyPage)
     });
 
     _onStatsRefresh();
+}
+
+void MainWindow::_fitHistoryColumns(bool toContents)
+{
+    // Widths belong to the user from the moment they drag one: a refresh, or a
+    // window resize, must not undo what they set.
+    if (!_historyTable || _historyColumnsResizedByUser)
+        return;
+
+    // sectionResized cannot tell a drag from a resize we asked for, so ours
+    // run behind this flag.
+    _resizingHistoryColumns = true;
+    if (toContents)
+        _historyTable->resizeColumnsToContents();
+
+    QHeaderView *header = _historyTable->horizontalHeader();
+    int          taken  = 0;
+    for (int col = 0; col < _historyTable->columnCount(); ++col)
+        if (col != kHistoryNameColumn)
+            taken += header->sectionSize(col);
+
+    // What the other columns leave goes to the name, whether that widens it or
+    // narrows it: a window made smaller must take the room back, as it did when
+    // the section was a Stretch one. Nothing left at all and the horizontal
+    // scroll bar takes over, again as before.
+    int const room = _historyTable->viewport()->width() - taken;
+    if (room >= header->minimumSectionSize())
+        header->resizeSection(kHistoryNameColumn, room);
+    _resizingHistoryColumns = false;
+}
+
+void MainWindow::_restoreHistoryColumns()
+{
+    if (!_historyTable)
+        return;
+
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    QByteArray const state = guiSettings.value(kHistoryColumnsKey).toByteArray();
+    if (state.isEmpty())
+        return;
+
+    // restoreState() resizes sections, which our handler must not read as a
+    // drag. It also refuses a state that does not fit the table -- a history
+    // written by an ngPost with other columns -- and the widths ngPost computes
+    // itself stay in charge, which is exactly the right fallback.
+    _resizingHistoryColumns = true;
+    bool const restored = _historyTable->horizontalHeader()->restoreState(state);
+    _resizingHistoryColumns = false;
+
+    // Restored widths are the user's: ngPost must not size the columns again.
+    _historyColumnsResizedByUser = restored;
+}
+
+void MainWindow::_saveHistoryColumns()
+{
+    if (!_historyTable)
+        return;
+
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    guiSettings.setValue(kHistoryColumnsKey, _historyTable->horizontalHeader()->saveState());
+    guiSettings.sync();
+}
+
+void MainWindow::_resetHistoryColumns()
+{
+    if (!_historyTable)
+        return;
+
+    // Nothing left in the settings to bring the old widths back on the next
+    // run, and ngPost sizes the columns again from here on.
+    if (_historyColumnsSaveTimer)
+        _historyColumnsSaveTimer->stop();
+    _historyColumnsResizedByUser = false;
+
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    guiSettings.remove(kHistoryColumnsKey);
+    guiSettings.sync();
+
+    _fitHistoryColumns(true);
+}
+
+void MainWindow::_onHistoryHeaderContextMenu(const QPoint &pos)
+{
+    if (!_historyTable)
+        return;
+
+    QMenu    menu(this);
+    QAction *reset = menu.addAction(tr("Reset column widths"));
+    reset->setEnabled(_historyColumnsResizedByUser);
+    if (menu.exec(_historyTable->horizontalHeader()->mapToGlobal(pos)) == reset)
+        _resetHistoryColumns();
 }
 
 PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &files)

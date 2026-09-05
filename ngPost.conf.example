@@ -189,6 +189,9 @@ retry = 5
 
 ## uncomment the following line to obfuscate the subjects of each Article
 ## /!\ CAREFUL you won't find your post if you lose the nzb file /!\
+## 'filename' renames the input files with a random name before compressing
+## them, so the archive carries no original name. Both can be asked at once:
+##   obfuscate = article, filename
 #obfuscate = article
 
 ## remove accents and special characters from the nzb file names

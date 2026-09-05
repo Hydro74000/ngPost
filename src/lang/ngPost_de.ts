@@ -1841,6 +1841,10 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
         <source>%1 post(s) can be resumed.</source>
         <translation>%1 Beitrag/Beiträge kann/können fortgesetzt werden.</translation>
     </message>
+    <message>
+        <source>Reset column widths</source>
+        <translation>Spaltenbreiten zurücksetzen</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -3931,6 +3935,24 @@ Ihre aktive Konfigurationsdatei ist:
         <location line="+5"/>
         <source>If you&apos;d like to translate ngPost in your language, it&apos;s easy, please contact me at Matthieu.Bruel@gmail.com</source>
         <translation>Wenn Sie ngPost in Ihre Sprache übersetzen möchten, geht das ganz einfach. Kontaktieren Sie mich bitte unter Matthieu.Bruel@gmail.com</translation>
+    </message>
+    <message>
+        <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
+        <translation>die Eingabedateien vor dem Komprimieren mit einem zufälligen Namen umbenennen, damit das Archiv den ursprünglichen Namen nicht enthält (mit --compress zu verwenden)</translation>
+    </message>
+    <message>
+        <source>Do file name obfuscation (the input files are renamed before compression)
+</source>
+        <translation>Dateinamen-Verschleierung (die Eingabedateien werden vor dem Komprimieren umbenannt)
+</translation>
+    </message>
+    <message>
+        <source>## 'filename' renames the input files with a random name before compressing</source>
+        <translation>## 'filename' benennt die Eingabedateien vor dem Komprimieren zufällig um, sodass</translation>
+    </message>
+    <message>
+        <source>## them, so the archive carries no original name. Both can be asked at once.</source>
+        <translation>## das Archiv keinen Originalnamen enthält. Beides ist gleichzeitig möglich.</translation>
     </message>
 </context>
 <context>

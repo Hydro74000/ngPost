@@ -1,6 +1,7 @@
 # ngPost (GUI build) entry point.
 #
-# Toggle `use_hmi` off (or build ngPost_cmd.pro) for a headless CLI build.
+# Toggle `use_hmi` off for a headless CLI build. Note that the released
+# binary is this one: it serves both the GUI and the command line.
 # All the heavy lifting — sources, defines, Qt modules, install rules —
 # lives in ngPost.pri / ngPost_core.pri.
 

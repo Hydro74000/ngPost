@@ -29,6 +29,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QAction>
+#include <QHeaderView>
 #include <QMenu>
 #include <QSettings>
 #include <QSignalSpy>
@@ -82,6 +83,14 @@ private slots:
     //! GUI save, which rewrites the whole file. Losing a user setting on the
     //! first save after an update would be the worst kind of regression.
     void save_config_preserves_an_older_configuration();
+
+    //! `obfuscate` names what to obfuscate, and it is a list. File name
+    //! obfuscation was reachable only from the GUI checkbox and saved nowhere,
+    //! so it was lost on every restart; the config has to carry it like the
+    //! rest. A bare `obfuscate = article`, the only spelling older ngPost
+    //! understood, must keep meaning exactly what it used to.
+    void obfuscate_config_key_carries_both_kinds();
+    void obfuscate_config_key_survives_a_save();
 
     //! Every new post info / post command key survives a full round trip:
     //! written in a conf, parsed, saved back by saveConfig, parsed again.
@@ -166,6 +175,17 @@ private slots:
     //! "Keep the archives" is a default held by the dialog: a new tab starts
     //! with it, and the choice a single post makes must not rewrite it.
     void keep_archives_default_is_owned_by_the_dialog();
+
+    //! The history columns belong to the user: every one of them answers to the
+    //! mouse -- the name column was a Stretch section the header sized itself,
+    //! which is why it could not be narrowed -- and a width set by hand is not
+    //! undone by the next refresh.
+    void history_columns_can_be_resized_by_hand();
+
+    //! A width set by hand is kept for the next run, and the header's "Reset
+    //! column widths" gives the columns back to ngPost -- in the settings too,
+    //! or the old widths would come back at the next start.
+    void history_column_widths_survive_a_restart();
 
     //! Nothing pinned: ngPost opens on the quick post tab, no title is bold,
     //! and the tab context menu offers the option unticked -- on the three
@@ -1589,6 +1609,103 @@ bool startupEntryIsTicked(MainWindow *window, int tabIndex)
 }
 } // namespace
 
+void TestMainWindow::history_columns_can_be_resized_by_hand()
+{
+    HomeSandbox sandbox;
+    writeMinimalConf(sandbox.rootPath());
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString parseError = ngPost.parseDefaultConfig();
+    QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY(window);
+    window->init(&ngPost);
+
+    auto *table = window->findChild<QTableWidget*>(QStringLiteral("historyTable"));
+    QVERIFY2(table, "historyTable not found");
+    QHeaderView *header = table->horizontalHeader();
+
+    // Not one column is sized by the header: they all answer to the mouse.
+    for (int col = 0; col < table->columnCount(); ++col)
+        QCOMPARE(header->sectionResizeMode(col), QHeaderView::Interactive);
+
+    // Until the user resizes one, ngPost still fits them to what it displays --
+    // this is what every refresh calls.
+    const int nameColumn = 1;
+    window->fitHistoryColumnsForTest(true);
+    QVERIFY(header->sectionSize(nameColumn) > 0);
+
+    // Narrowing the name column is precisely what a Stretch section refused.
+    header->resizeSection(nameColumn, 120);
+    QCOMPARE(header->sectionSize(nameColumn), 120);
+
+    // And it stays: a refresh no longer resizes the columns behind the user.
+    window->fitHistoryColumnsForTest(true);
+    QCOMPARE(header->sectionSize(nameColumn), 120);
+}
+
+void TestMainWindow::history_column_widths_survive_a_restart()
+{
+    HomeSandbox sandbox;
+    writeMinimalConf(sandbox.rootPath());
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    const QString columnsKey = QStringLiteral("MainWindow/historyColumns");
+    const int     nameColumn = 1;
+
+    {
+        NgPost ngPost(argc, argv);
+        const QString parseError = ngPost.parseDefaultConfig();
+        QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+        MainWindow *window = ngPost.mainWindowForTest();
+        QVERIFY(window);
+        window->init(&ngPost);
+
+        auto *table = window->findChild<QTableWidget*>(QStringLiteral("historyTable"));
+        QVERIFY2(table, "historyTable not found");
+
+        // Nothing is written as long as ngPost owns the widths.
+        {
+            QSettings guiSettings(guiSettingsPath(), QSettings::IniFormat);
+            QVERIFY2(!guiSettings.contains(columnsKey), "widths saved before the user set any");
+        }
+
+        // What a drag does. The write is debounced, so it lands shortly after.
+        table->horizontalHeader()->resizeSection(nameColumn, 137);
+        QTRY_VERIFY(QSettings(guiSettingsPath(), QSettings::IniFormat).contains(columnsKey));
+    }
+
+    // Next run: the columns come back as they were left, and ngPost still does
+    // not size them.
+    {
+        NgPost ngPost(argc, argv);
+        const QString parseError = ngPost.parseDefaultConfig();
+        QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+        MainWindow *window = ngPost.mainWindowForTest();
+        QVERIFY(window);
+        window->init(&ngPost);
+
+        auto *table = window->findChild<QTableWidget*>(QStringLiteral("historyTable"));
+        QVERIFY2(table, "historyTable not found");
+        QCOMPARE(table->horizontalHeader()->sectionSize(nameColumn), 137);
+
+        window->fitHistoryColumnsForTest(true);
+        QCOMPARE(table->horizontalHeader()->sectionSize(nameColumn), 137);
+
+        // "Reset column widths" hands them back, and takes the setting away so
+        // the next run starts from ngPost's own layout again.
+        QVERIFY(QMetaObject::invokeMethod(window, "_resetHistoryColumns", Qt::DirectConnection));
+        QSettings guiSettings(guiSettingsPath(), QSettings::IniFormat);
+        QVERIFY2(!guiSettings.contains(columnsKey), "the reset left the widths behind");
+    }
+}
+
 void TestMainWindow::startup_tab_is_the_quick_post_until_one_is_pinned()
 {
     HomeSandbox sandbox;
@@ -1720,6 +1837,112 @@ void TestMainWindow::pinned_startup_tab_opens_on_the_next_start()
 
         QCOMPARE(tabs->currentIndex(), 0);
         QCOMPARE(tabBar->startupTab(), -1);
+    }
+}
+
+void TestMainWindow::obfuscate_config_key_carries_both_kinds()
+{
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+
+    struct Case
+    {
+        const char *value;
+        bool        articles;
+        bool        fileName;
+    };
+    // "file_name" and "file name" are accepted too: the GUI has always called
+    // this "File Name Obfuscation", and a user copying that wording into the
+    // config should not be met with silence.
+    const QVector<Case> cases = {
+        { "article", true, false },
+        { "filename", false, true },
+        { "article, filename", true, true },
+        { "filename, article", true, true },
+        { "file_name", false, true },
+        { "FileName", false, true },
+    };
+
+    for (Case const &c : cases)
+    {
+        HomeSandbox sandbox;
+        const QString confPath = PathHelper::configFilePath();
+        {
+            QFile conf(confPath);
+            QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+            QTextStream s(&conf);
+            s << "GROUPS = alt.binaries.test\n"
+              << "obfuscate = " << c.value << "\n";
+        }
+
+        NgPost ngPost(argc, argv);
+        QVERIFY2(ngPost.parseDefaultConfig().isEmpty(), c.value);
+        QVERIFY2(ngPost.obfuscateArticlesForTest() == c.articles, c.value);
+        QVERIFY2(ngPost.obfuscateFileNameForTest() == c.fileName, c.value);
+    }
+}
+
+void TestMainWindow::obfuscate_config_key_survives_a_save()
+{
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "GROUPS = alt.binaries.test\n"
+          << "obfuscate = article, filename\n";
+    }
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+
+    {
+        NgPost ngPost(argc, argv);
+        QVERIFY2(ngPost.parseDefaultConfig().isEmpty(), "first parse failed");
+        QVERIFY(ngPost.obfuscateArticlesForTest());
+        QVERIFY(ngPost.obfuscateFileNameForTest());
+        MainWindow *window = ngPost.mainWindowForTest();
+        QVERIFY(window);
+        window->init(&ngPost);
+        ngPost.saveConfig();
+    }
+
+    {
+        NgPost ngPost(argc, argv);
+        QVERIFY2(ngPost.parseDefaultConfig().isEmpty(), "reparse of the saved config failed");
+        QVERIFY2(ngPost.obfuscateArticlesForTest(), "article obfuscation lost on save");
+        QVERIFY2(ngPost.obfuscateFileNameForTest(), "file name obfuscation lost on save");
+    }
+
+    // Nothing enabled must be written commented out, and must still name a
+    // value the user can simply uncomment.
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "GROUPS = alt.binaries.test\n";
+    }
+    {
+        NgPost ngPost(argc, argv);
+        QVERIFY(ngPost.parseDefaultConfig().isEmpty());
+        MainWindow *window = ngPost.mainWindowForTest();
+        QVERIFY(window);
+        window->init(&ngPost);
+        ngPost.saveConfig();
+    }
+    QFile saved(confPath);
+    QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString content = QString::fromUtf8(saved.readAll());
+    QVERIFY2(content.contains(QStringLiteral("#obfuscate = article")),
+             "a disabled obfuscation must stay a commented, uncommentable example");
+    {
+        NgPost ngPost(argc, argv);
+        QVERIFY(ngPost.parseDefaultConfig().isEmpty());
+        QVERIFY2(!ngPost.obfuscateArticlesForTest(), "commented key must stay off");
+        QVERIFY2(!ngPost.obfuscateFileNameForTest(), "commented key must stay off");
     }
 }
 

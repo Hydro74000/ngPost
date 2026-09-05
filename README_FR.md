@@ -93,6 +93,7 @@ Syntaxe: ngPost (options)* (-i <file or folder> | --auto <folder> | --monitor <f
 	-i or --input      : fichier(s) ou dossier(s) à poster. Post rapide. Si dossier, son contenu sera posté (sans recursivité)
 	-o or --output     : chemin complet du fichier nzb
 	-x or --obfuscate  : obfuscation des Articles. ATTENTION, avec cette option, il est impossible de (re)trouver un post sans le fichier nzb
+	--obfuscate_filename : renomme les fichiers source avec un nom aléatoire avant de les compresser, ainsi l'archive ne porte pas le nom d'origine (à utiliser avec --compress). Équivaut à `obfuscate = filename` dans la configuration
 	-g or --groups     : liste de newsgroup où poster (séparés par une virgule et sans espaces)
 	-m or --meta       : extra metadata (typiquement "password=azerty42"). pour poster des archives avec mot de passe (fait avant ngPost)
 	-f or --from       : posteur si vous ne voulez pas un généré aléatoirement

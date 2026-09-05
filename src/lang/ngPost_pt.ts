@@ -1840,6 +1840,10 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <source>%1 post(s) can be resumed.</source>
         <translation>%1 post(s) podem ser retomados.</translation>
     </message>
+    <message>
+        <source>Reset column widths</source>
+        <translation>Redefinir a largura das colunas</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -3930,6 +3934,24 @@ O seu ficheiro de configuração activo é:
         <location line="+5"/>
         <source>If you&apos;d like to translate ngPost in your language, it&apos;s easy, please contact me at Matthieu.Bruel@gmail.com</source>
         <translation>Se você gostaria de traduzir ngPost em seu idioma, é fácil, por favor, entre em contato comigo em Matthieu.Bruel@gmail.com</translation>
+    </message>
+    <message>
+        <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
+        <translation>renomeia os ficheiros de entrada com um nome aleatório antes de os comprimir, para que o arquivo não contenha o nome original (a usar com --compress)</translation>
+    </message>
+    <message>
+        <source>Do file name obfuscation (the input files are renamed before compression)
+</source>
+        <translation>Ofuscação do nome do ficheiro (os ficheiros de entrada são renomeados antes da compressão)
+</translation>
+    </message>
+    <message>
+        <source>## 'filename' renames the input files with a random name before compressing</source>
+        <translation>## 'filename' renomeia os ficheiros de entrada com um nome aleatório antes de os</translation>
+    </message>
+    <message>
+        <source>## them, so the archive carries no original name. Both can be asked at once.</source>
+        <translation>## comprimir, para que o arquivo não contenha nome original. Ambos ao mesmo tempo.</translation>
     </message>
 </context>
 <context>

@@ -133,6 +133,7 @@ public:
         NB_RETRY,
         GEN_FROM,
         OBFUSCATE,
+        OBFUSCATE_FILENAME,
         INPUT_DIR,
         AUTO_DIR,
         MONITOR_DIR,
@@ -517,6 +518,8 @@ public:
     QString postInfoOutputForTest() const { return _postInfoOutput; }
 
     bool postInfoOnlyOnSuccessForTest() const { return _postInfoOnlySuccess; }
+    bool obfuscateArticlesForTest() const { return _obfuscateArticles; }
+    bool obfuscateFileNameForTest() const { return _obfuscateFileName; }
     qint64 par2BlockSizeForTest() const { return _par2BlockSize; }
     int postCmdTimeoutSecForTest() const { return _postCmdTimeoutSec; }
     bool postCmdFailIsErrorForTest() const { return _postCmdFailIsError; }
@@ -764,6 +767,8 @@ private:
 
     void _syntax(char *appName);
     QString _parseConfig(const QString &configPath);
+    //! The value of the `obfuscate` config key for the current settings.
+    QString _obfuscationKinds() const;
 
     //! Tell the user about the config directory adopted at startup by
     //! PathHelper::migrateAppNamedConfigDirIfNeeded(). The GUI adoption happens

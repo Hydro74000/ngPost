@@ -144,6 +144,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::GEN_FROM,     "gen_from"},
 
     {Opt::OBFUSCATE,    "obfuscate"},
+    {Opt::OBFUSCATE_FILENAME, "obfuscate_filename"},
     {Opt::INPUT_DIR,    "inputdir"},
     {Opt::GROUP_POLICY, "group_policy"},
 
@@ -260,6 +261,7 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
 
 // general options
     {{"x", sOptionNames[Opt::OBFUSCATE]},     tr("obfuscate the subjects of the articles (CAREFUL you won't find your post if you lose the nzb file)")},
+    {QStringList{sOptionNames[Opt::OBFUSCATE_FILENAME], "obfuscate-filename"}, tr("rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)")},
     {{"g", sOptionNames[Opt::GROUPS]},        tr("newsgroups where to post the files (coma separated without space)"), sOptionNames[Opt::GROUPS]},
     {{"m", sOptionNames[Opt::META]},          tr("one of your fields, written in the post info file AND published in the nzb header (typically \"password=qwerty42\")"), sOptionNames[Opt::META]},
     {QStringList{sOptionNames[Opt::POST_META], "post-meta"}, tr("one of your fields, written in the post info file only, never published in the nzb (ex: \"title=Photo backup 2026\")"), sOptionNames[Opt::POST_META]},
@@ -1932,6 +1934,18 @@ bool NgPost::_addMeta(const QString &keyValue, MetaScope scope)
     return true;
 }
 
+//! When nothing is enabled the line is written commented out, so it still has
+//! to name something the user can uncomment.
+QString NgPost::_obfuscationKinds() const
+{
+    QStringList kinds;
+    if (_obfuscateArticles)
+        kinds << QStringLiteral("article");
+    if (_obfuscateFileName)
+        kinds << QStringLiteral("filename");
+    return kinds.isEmpty() ? QStringLiteral("article") : kinds.join(QStringLiteral(", "));
+}
+
 PostingJobOptions NgPost::_baseJobOptions() const
 {
     PostingJobOptions opt;
@@ -2807,6 +2821,14 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _cout << tr("Do article obfuscation (the subject of each Article will be a UUID)\n") << MB_FLUSH;
     }
 
+    if (parser.isSet(sOptionNames[Opt::OBFUSCATE_FILENAME])
+        || parser.isSet(QStringLiteral("obfuscate-filename")))
+    {
+        _obfuscateFileName = true;
+        _cout << tr("Do file name obfuscation (the input files are renamed before compression)\n")
+              << MB_FLUSH;
+    }
+
 
     if (parser.isSet(sOptionNames[Opt::THREAD]))
     {
@@ -3623,10 +3645,26 @@ QString NgPost::_parseConfig(const QString &configPath)
                     }
                     else if (opt == sOptionNames[Opt::OBFUSCATE])
                     {
-                        if (val.toLower().startsWith("article"))
+                        // Historically a single word, and "article" was the only
+                        // one understood. It is a list now, so that file name
+                        // obfuscation -- until 5.6 reachable only from the GUI
+                        // checkbox, and lost on every restart -- can be asked
+                        // for in the configuration like everything else.
+                        for (QString const &kind : val.toLower().split(QLatin1Char(',')))
                         {
-                            _obfuscateArticles = true;
-                            qDebug() << "Do article obfuscation (the subject of each Article will be a UUID)\n";
+                            QString const what = kind.trimmed();
+                            if (what.startsWith(QLatin1String("article")))
+                            {
+                                _obfuscateArticles = true;
+                                qDebug() << "Do article obfuscation (the subject of each Article will be a UUID)\n";
+                            }
+                            else if (what.startsWith(QLatin1String("filename"))
+                                     || what.startsWith(QLatin1String("file_name"))
+                                     || what.startsWith(QLatin1String("file name")))
+                            {
+                                _obfuscateFileName = true;
+                                qDebug() << "Do file name obfuscation (the input files are renamed before compression)\n";
+                            }
                         }
                     }
                     else if (opt == sOptionNames[Opt::GROUP_POLICY])
@@ -4504,6 +4542,7 @@ void NgPost::_dumpParams() const
              << " policy: " << sGroupPolicies[_groupPolicy].toUpper()
              << "\narticleSize: " << sArticleSize
              << ", obfuscate articles: " << _obfuscateArticles
+             << ", obfuscate file name: " << _obfuscateFileName
              << ", disp progress bar: " << _dispProgressBar
              << ", disp posting files: " << _dispFilesPosting
              << ", logInFile (GUI only): " << (_logFile == nullptr ? "NO" : "YES")
@@ -4707,7 +4746,10 @@ void NgPost::saveConfig()
                << "\n"
                << tr("## uncomment the following line to obfuscate the subjects of each Article") << "\n"
                << tr("## /!\\ CAREFUL you won't find your post if you lose the nzb file /!\\") << "\n"
-               << (_obfuscateArticles ? "" : "#") << "obfuscate = article\n"
+               << tr("## 'filename' renames the input files with a random name before compressing") << "\n"
+               << tr("## them, so the archive carries no original name. Both can be asked at once.") << "\n"
+               << (_obfuscateArticles || _obfuscateFileName ? "" : "#") << "obfuscate = "
+               << _obfuscationKinds() << "\n"
                << "\n"
                << tr("## remove accents and special characters from the nzb file names") << "\n"
                << (_removeAccentsOnNzbFileName  ? "" : "#") << "NZB_RM_ACCENTS = true\n"

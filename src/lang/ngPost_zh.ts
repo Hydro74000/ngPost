@@ -1841,6 +1841,10 @@ This also removes all associated file and article records.</source>
         <source>%1 post(s) can be resumed.</source>
         <translation>%1 个帖子可以续传。</translation>
     </message>
+    <message>
+        <source>Reset column widths</source>
+        <translation>重置列宽</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -3931,6 +3935,24 @@ Your active configuration file is:
         <location line="+5"/>
         <source>If you&apos;d like to translate ngPost in your language, it&apos;s easy, please contact me at Matthieu.Bruel@gmail.com</source>
         <translation>如果您愿意将ngPost翻译成您使用的语言，这很简单，请通过以下方式与我联系:  Matthieu.Bruel@gmail.com</translation>
+    </message>
+    <message>
+        <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
+        <translation>压缩前用随机名称重命名输入文件，使压缩包不携带原始文件名（与 --compress 一起使用）</translation>
+    </message>
+    <message>
+        <source>Do file name obfuscation (the input files are renamed before compression)
+</source>
+        <translation>文件名混淆（输入文件在压缩前被重命名）
+</translation>
+    </message>
+    <message>
+        <source>## 'filename' renames the input files with a random name before compressing</source>
+        <translation>## 'filename' 在压缩前用随机名称重命名输入文件，</translation>
+    </message>
+    <message>
+        <source>## them, so the archive carries no original name. Both can be asked at once.</source>
+        <translation>## 使压缩包不携带任何原始文件名。两者可同时启用。</translation>
     </message>
 </context>
 <context>

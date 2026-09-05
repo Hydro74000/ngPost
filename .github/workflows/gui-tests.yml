@@ -88,3 +88,70 @@ jobs:
             tests/gui/**/*.stdout.log
             tests/gui/**/Testing/**/*.xml
           if-no-files-found: ignore
+
+  gui-windows:
+    name: Windows MSVC GUI tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: '==3.2.0'
+          version: '6.8.2'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtcharts'
+          cache: true
+
+      - name: Build QtKeychain
+        shell: pwsh
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git $env:TEMP\qtkeychain
+          cd $env:TEMP\qtkeychain
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON `
+                -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$env:QT_ROOT_DIR"
+          cmake --build build --config Release
+          cmake --install build --config Release
+
+      - name: Build ngPost (tests' RESOURCES + locateNgPostBinary fallback)
+        shell: pwsh
+        run: |
+          cd src
+          New-Item -ItemType Directory -Force -Path resources/lang | Out-Null
+          Get-ChildItem lang/ngPost_*.ts | ForEach-Object {
+            lrelease $_.FullName -qm "resources/lang/$($_.BaseName).qm"
+          }
+          qmake ngPost.pro -spec win32-msvc CONFIG+=release
+          nmake
+
+      - name: Build GUI tests
+        shell: pwsh
+        run: |
+          cd tests/gui
+          qmake gui.pro -spec win32-msvc CONFIG+=release
+          nmake
+
+      - name: Run GUI tests under offscreen QPA
+        env:
+          NGPOST_BIN: ${{ github.workspace }}\src\release\ngPost.exe
+          QT_QPA_PLATFORM: offscreen
+        shell: bash
+        run: |
+          bash .github/scripts/run-qt-tests.sh tests/gui "GUI"
+
+      - name: Upload Test Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-test-logs-windows
+          path: |
+            tests/gui/**/*.log
+            tests/gui/**/*.stdout.log
+            tests/gui/**/Testing/**/*.xml
+          if-no-files-found: ignore
