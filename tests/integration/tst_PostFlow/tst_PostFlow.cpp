@@ -26,6 +26,8 @@
 #include <QJsonObject>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QRegularExpression>
+#include <QSet>
 #include <QStandardPaths>
 #include <QXmlStreamReader>
 
@@ -164,6 +166,12 @@ private slots:
     //! plaintext filename. Posts a file whose name is a fingerprint string
     //! we then grep for.
     void obfuscation_hides_filename_in_article_headers();
+
+    //! With `-x`, the yEnc name of each article is drawn at random. The
+    //! draws must stay varied across the articles of one post: the engine
+    //! behind them is kept per thread rather than rebuilt per article, and a
+    //! degenerate one would hand every article the same name.
+    void obfuscation_gives_each_article_its_own_random_name();
 
     //! The mock drops the connection after N bytes; ngPost must not crash or
     //! hang regardless of whether retry eventually succeeds.
@@ -366,6 +374,61 @@ void TestPostFlow::obfuscation_hides_filename_in_article_headers()
     QVERIFY2(!headers.contains(secret.toUtf8()),
              qPrintable(QStringLiteral("obfuscation leaked filename into article headers:\n%1")
                             .arg(QString::fromLatin1(headers))));
+}
+
+//! The yEnc name of an article, i.e. what follows " name=" on its =ybegin
+//! line. Empty if the article carries no such line.
+static QByteArray yEncName(const QByteArray &article)
+{
+    const int begin = article.indexOf("=ybegin ");
+    if (begin < 0)
+        return {};
+    const int name = article.indexOf(" name=", begin);
+    if (name < 0)
+        return {};
+    const int from = name + int(qstrlen(" name="));
+    const int eol  = article.indexOf("\r\n", from);
+    return eol < 0 ? article.mid(from) : article.mid(from, eol - from);
+}
+
+void TestPostFlow::obfuscation_gives_each_article_its_own_random_name()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    // 3 KiB over 1 KiB articles → 3 segments, so the names can be compared.
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/obf-split.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write(QByteArray(3072, 'z'));
+    }
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/obf-split.nzb");
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:2:nossl").arg(mock.port());
+    QString out;
+    const int exitCode = runNgPost(_bin,
+                                   { "-S", srv, "-i", inPath, "-o", nzbPath,
+                                     "-g", "alt.binaries.test", "-a", "1024", "-x",
+                                     "--quiet", "--disp_progress", "none" },
+                                   sandbox.rootPath(), out);
+    QVERIFY2(exitCode == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    const QStringList arts = mock.receivedArticles();
+    QCOMPARE(arts.size(), 3);
+
+    const QRegularExpression randomName(QStringLiteral("\\A[0-9A-Za-z]{32,62}\\z"));
+    QSet<QByteArray> names;
+    for (const QString &art : arts) {
+        const QByteArray name = yEncName(mock.readArticle(art));
+        QVERIFY2(randomName.match(QString::fromLatin1(name)).hasMatch(),
+                 qPrintable(QStringLiteral("yEnc name is not a 32-62 char random string: '%1'")
+                                    .arg(QString::fromLatin1(name))));
+        names.insert(name);
+    }
+    QCOMPARE(names.size(), arts.size()); // one distinct draw per article
 }
 
 void TestPostFlow::retry_on_dropped_connection()

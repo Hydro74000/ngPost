@@ -49,14 +49,29 @@ NntpArticle::NntpArticle(NntpFile *file, uint part, qint64 pos, qint64 bytes,
     }
 }
 
+namespace
+{
+//! One Mersenne Twister per thread, seeded once from std::random_device.
+//!
+//! Both generators below used to build their own std::random_device and their
+//! own std::mt19937 on every call, so each obfuscated article re-seeded 624
+//! words of state twice before it could even be encoded. Article builders run
+//! one per Poster thread and never share this engine, so keeping it costs no
+//! synchronisation and gives the same quality of draw.
+std::mt19937 &articleRandomEngine()
+{
+    static thread_local std::mt19937 engine{ std::random_device{}() };
+    return engine;
+}
+} // namespace
+
 std::string generateRandomString(int length) {
     static const char alphanum[] =
         "0123456789"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz";
 
-    std::random_device rd;
-    std::mt19937 engine(rd());
+    std::mt19937 &engine = articleRandomEngine();
     std::uniform_int_distribution<> dist(0, sizeof(alphanum) - 2);
 
     std::string randomString;
@@ -69,10 +84,8 @@ std::string generateRandomString(int length) {
 }
 
 int generateRandomStringLength(int start, int end) {
-    std::random_device rd;
-    std::mt19937 engine(rd());
     std::uniform_int_distribution<int> dist(start, end);
-    return dist(engine);
+    return dist(articleRandomEngine());
 }
 
 //! Upper bound on what Yenc::encode writes for \a nbBytes of input, its
