@@ -66,12 +66,6 @@ qint64 saturatedAdd(qint64 left, qint64 right)
     return right > 0 && left > limit - right ? limit : left + right;
 }
 
-qint64 saturatedMultiply(qint64 value, int count)
-{
-    qint64 const limit = std::numeric_limits<qint64>::max();
-    return value > 0 && count > 0 && value > limit / count ? limit : value * count;
-}
-
 qint64 maxBlocksTouched(qint64 bytes, qint64 blockSize)
 {
     // An interval of L bytes starting at the least favourable byte offset can
@@ -88,19 +82,23 @@ int boundedBlockCount(qint64 blocks)
 
 int Par2Volume::usableBlocks() const
 {
-    if (blocks <= 0)
+    if (blocks <= 0 || nbExpectedArticles <= 0)
         return 0;
-    if (nbMissingArticles <= 0)
+    if (isIntact())
         return blocks;
-    if (nbExpectedArticles <= 0)
-        return 0; // nothing says how many articles this volume should have
-    int const present = nbExpectedArticles - nbMissingArticles;
-    if (present <= 0)
+
+    // An unanswered article is not a surviving one. On an incomplete check,
+    // report only the pro-rata share supported by answers already received;
+    // the guaranteed range remains zero until the whole volume is checked.
+    int const confirmedPresent = qMin(
+            nbExpectedArticles, nbCheckedArticles - nbMissingListedArticles);
+    if (confirmedPresent <= 0)
         return 0;
     // Pro rata, less one block per missing article. Recovery packets do not
     // stop politely on article boundaries: a lost article takes its share of
     // them plus, at worst, the one it cuts in half.
-    qint64 const share = (static_cast<qint64>(blocks) * present) / nbExpectedArticles;
+    qint64 const share
+            = (static_cast<qint64>(blocks) * confirmedPresent) / nbExpectedArticles;
     return static_cast<int>(qMax(qint64(0), share - nbMissingArticles));
 }
 
@@ -252,6 +250,7 @@ NzbCheck::NzbCheck()
     , _maxRetries(5)
     , _par2Volumes()
     , _articleOwner()
+    , _dataArticleBytesUpper()
     , _dataFiles()
     , _nbPar2Articles(0)
     , _nbPar2Answered(0)
@@ -293,7 +292,7 @@ int NzbCheck::parseNzb()
                     nbExpectedArticles = match.captured(1).toInt();
 
                 bool const isPar2 = sPar2FileRegExp.match(subject).hasMatch();
-                int volumeIdx = -1, dataFileIdx = -1, highestSegment = 0;
+                int volumeIdx = -1, dataFileIdx = -1;
                 if (isPar2) {
                     Par2Volume vol;
                     vol.subject            = subject;
@@ -318,17 +317,16 @@ int NzbCheck::parseNzb()
                         ++_nbDataFilesWithSize;
                         qint64 const fileSize = size.captured(1).toLongLong();
                         dataFile.sizeBytes = fileSize;
-                        // n articles cover the file, the last one short, so
-                        // (n-1)*A < size <= n*A. That pins A between
-                        // ceil(size/n) and ceil(size/(n-1))-1 for this file.
+                        // Equal-sized parts followed by a short tail are common,
+                        // but yEnc does not require them. Keep this only as a
+                        // rough slice-size estimate; recovery proofs below use
+                        // segment@bytes as an upper bound instead.
                         if (nbExpectedArticles > 0) {
                             qint64 const low = ceilDiv(fileSize, nbExpectedArticles);
-                            dataFile.articleSizeMin = low;
                             if (low > _subjectArticleMin)
                                 _subjectArticleMin = low;
                             if (nbExpectedArticles > 1) {
                                 qint64 const high = ceilDiv(fileSize, nbExpectedArticles - 1) - 1;
-                                dataFile.articleSizeMax = high;
                                 if (_subjectArticleMax <= 0 || high < _subjectArticleMax)
                                     _subjectArticleMax = high;
                             }
@@ -341,8 +339,21 @@ int NzbCheck::parseNzb()
                     QXmlStreamReader::TokenType type = xmlReader.readNext();
                     if (type == QXmlStreamReader::TokenType::EndElement
                         && xmlReader.name().compare(QLatin1String("file")) == 0) {
-                        if (isPar2)
+                        if (isPar2) {
                             _par2Volumes[volumeIdx].nbListedArticles = nbArticles;
+                        } else if (dataFileIdx >= 0) {
+                            NzbDataFile &dataFile = _dataFiles[dataFileIdx];
+                            dataFile.nbListedArticles = nbArticles;
+                            // A complete NZB whose encoded bodies add up to less
+                            // than the decoded file contradicts itself. Its byte
+                            // attributes cannot support an authoritative bound.
+                            if (dataFile.nbExpectedArticles > 0
+                                && nbArticles >= dataFile.nbExpectedArticles
+                                && dataFile.nbListedArticlesWithBytes == nbArticles
+                                && dataFile.listedBytesUpper < dataFile.sizeBytes) {
+                                dataFile.articleByteBoundsConsistent = false;
+                            }
+                        }
                         if (debugMode())
                             _cout << tr("The file '%1' has %2 articles in the nzb (expected: %3)")
                                          .arg(subject)
@@ -370,11 +381,6 @@ int NzbCheck::parseNzb()
                                 _nbMissingDataArticles += absent;
                                 if (dataFileIdx >= 0) {
                                     _dataFiles[dataFileIdx].nbMissingArticles += absent;
-                                    // The nzb stops short of the announced
-                                    // count, so the final part is one of the
-                                    // ones it does not carry.
-                                    if (highestSegment < nbExpectedArticles)
-                                        _dataFiles[dataFileIdx].lastArticleMissing = true;
                                 }
                             }
                         }
@@ -383,8 +389,9 @@ int NzbCheck::parseNzb()
                     } else if (type == QXmlStreamReader::TokenType::StartElement
                                && xmlReader.name().compare(QLatin1String("segment")) == 0) {
                         ++nbArticles;
-                        int const segmentNumber
-                                = xmlReader.attributes().value("number").toInt();
+                        bool bytesOk = false;
+                        qint64 const encodedBytes
+                                = xmlReader.attributes().value("bytes").toLongLong(&bytesOk);
                         xmlReader.readNext();
                         QString const articleId = QString("<%1>").arg(
                                 xmlReader.text().toString());
@@ -396,12 +403,12 @@ int NzbCheck::parseNzb()
                             _dataQueue.push(articleId);
                             _articleOwner.insert(articleId, -dataFileIdx - 1);
                             ++_nbDataArticles;
-                            // Segments need not be listed in order, so the last
-                            // one is the highest number, not the last seen.
-                            if (segmentNumber > highestSegment) {
-                                highestSegment = segmentNumber;
-                                if (dataFileIdx >= 0)
-                                    _dataFiles[dataFileIdx].lastArticle = articleId;
+                            if (dataFileIdx >= 0 && bytesOk && encodedBytes > 0) {
+                                NzbDataFile &dataFile = _dataFiles[dataFileIdx];
+                                ++dataFile.nbListedArticlesWithBytes;
+                                dataFile.listedBytesUpper
+                                        = saturatedAdd(dataFile.listedBytesUpper, encodedBytes);
+                                _dataArticleBytesUpper.insert(articleId, encodedBytes);
                             }
                         }
                     }
@@ -559,10 +566,8 @@ QPair<int, int> NzbCheck::usableBlockRange() const
 
         // At best the packets all sat in articles that survived, so only a
         // volume that lost everything is certainly worth nothing.
-        bool const anythingLeft = vol.nbListedArticles > 0
-                                  && (vol.nbExpectedArticles > 0
-                                              ? vol.nbMissingArticles < vol.nbExpectedArticles
-                                              : vol.nbMissingArticles < vol.nbListedArticles);
+        bool const anythingLeft
+                = vol.nbListedArticles > vol.nbMissingListedArticles;
         high += anythingLeft ? vol.blocks : 0;
     }
     return { boundedBlockCount(low), boundedBlockCount(qMax(low, high)) };
@@ -609,22 +614,33 @@ QPair<int, int> NzbCheck::damagedBlockRange() const
 
         // With no usable size/count, this file still costs one source slice,
         // but the NZB gives no finite ceiling.
-        if (file.sizeBytes <= 0 || file.nbExpectedArticles <= 0
-            || file.articleSizeMin <= 0) {
+        if (file.sizeBytes <= 0 || file.nbExpectedArticles <= 0) {
             damagedMin = saturatedAdd(damagedMin, 1);
             upperBounded = false;
             continue;
         }
 
-        bool const lastGone = file.lastArticleMissing;
-        int const  fullOnes = qMax(0, perFile - (lastGone ? 1 : 0));
+        qint64 missingListedBytesUpper = 0;
+        for (qint64 bytes : file.missingArticleBytesUpper)
+            missingListedBytesUpper = saturatedAdd(missingListedBytesUpper, bytes);
 
-        // Count bytes before rounding. The short tail and the preceding lost
-        // article may share one source slice; rounding them separately created
-        // a fictitious extra block and a false UNRECOVERABLE verdict.
-        qint64 minBytes = saturatedMultiply(file.articleSizeMin, fullOnes);
-        if (lastGone)
-            minBytes = saturatedAdd(minBytes, 1);
+        // yEnc permits every part to have a different size. The only lower
+        // bound available without downloading =ypart is what cannot fit in all
+        // articles that may still be present. segment@bytes counts the encoded
+        // body, so it safely overstates, never understates, decoded payload.
+        qint64 minBytes = 1;
+        int const possiblePresent = file.nbListedArticles - file.nbMissingListedArticles;
+        int const possiblePresentWithBytes
+                = file.nbListedArticlesWithBytes - file.nbMissingListedArticlesWithBytes;
+        if (file.articleByteBoundsConsistent && possiblePresent >= 0
+            && possiblePresentWithBytes == possiblePresent) {
+            qint64 const possiblePresentBytes
+                    = file.listedBytesUpper >= missingListedBytesUpper
+                              ? file.listedBytesUpper - missingListedBytesUpper
+                              : 0;
+            if (possiblePresentBytes < file.sizeBytes)
+                minBytes = file.sizeBytes - possiblePresentBytes;
+        }
         qint64 const fileMin = qMax(qint64(1), ceilDiv(minBytes, _par2BlockSize));
         damagedMin = saturatedAdd(damagedMin, fileMin);
 
@@ -632,18 +648,15 @@ QPair<int, int> NzbCheck::damagedBlockRange() const
         // ceil(sum(fileSizes)/B). That per-file cap is definitive even when a
         // one-article file gives no finite article-payload upper bound.
         qint64 const fileBlocks = ceilDiv(file.sizeBytes, _par2BlockSize);
-        qint64       fileMax    = fileBlocks;
-        if (file.articleSizeMax > 0) {
-            qint64 scattered = saturatedMultiply(
-                    maxBlocksTouched(file.articleSizeMax, _par2BlockSize), fullOnes);
-            if (lastGone) {
-                qint64 const lastMax = qMax(
-                        qint64(1),
-                        file.sizeBytes
-                                - saturatedMultiply(file.articleSizeMin,
-                                                    file.nbExpectedArticles - 1));
+        qint64 fileMax = fileBlocks;
+        bool const everyMissingArticleHasAnUpperBound
+                = file.nbMissingListedArticles == file.nbMissingArticles
+                  && file.nbMissingListedArticlesWithBytes == file.nbMissingListedArticles;
+        if (file.articleByteBoundsConsistent && everyMissingArticleHasAnUpperBound) {
+            qint64 scattered = 0;
+            for (qint64 bytes : file.missingArticleBytesUpper) {
                 scattered = saturatedAdd(
-                        scattered, maxBlocksTouched(lastMax, _par2BlockSize));
+                        scattered, maxBlocksTouched(bytes, _par2BlockSize));
             }
             fileMax = qMin(fileBlocks, scattered);
         }
@@ -721,11 +734,11 @@ NzbCheck::Recovery NzbCheck::recoveryVerdict() const
     // could possibly have. Anything in between is genuinely undecided, and so
     // is a damage we could not bound from above.
     if (damaged.second >= 0 && damaged.second <= usable.first) {
-        // Blocks are useless without the packets that say what to rebuild. An
-        // intact conventional base index is the only evidence STAT can provide
-        // without opening and parsing every recovery volume.
+        // STAT proves that the conventional base file can be downloaded, not
+        // that it contains Main/FileDesc/IFSC. Their presence is recommended by
+        // PAR2, not required, so even this favourable case remains probabilistic.
         if (hasIntactPar2Index())
-            return Recovery::Certain;
+            return Recovery::ProbablyRecoverable;
         return Recovery::LayoutDependent;
     }
     if (damaged.first > usable.second)
@@ -809,7 +822,8 @@ void NzbCheck::_printRecoveryAnalysis()
                   << "\n";
     }
     _cout << (hasIntactPar2Index()
-                      ? tr("  PAR2 metadata: the conventional base index is intact")
+                      ? tr("  PAR2 metadata: the conventional base index was verified in full, "
+                           "but STAT cannot prove which packets it contains")
                       : tr("  PAR2 metadata: not proven by the nzb. Recovery volumes are not "
                            "required to repeat the vital packets, even when intact"))
           << "\n";
@@ -818,7 +832,7 @@ void NzbCheck::_printRecoveryAnalysis()
         QPair<int, int> const damaged = damagedBlockRange();
         if (damaged.second < 0)
             _cout << tr("  Damaged blocks: at least %1, with no upper bound - the nzb does not "
-                        "say how big an article is")
+                        "provide enough trustworthy file and segment sizes")
                          .arg(damaged.first)
                   << "\n";
         else
@@ -865,9 +879,10 @@ void NzbCheck::_printRecoveryAnalysis()
                       << "\n";
         }
         break;
-    case Recovery::Certain:
-        _cout << tr("  Verdict: RECOVERABLE - with the conventional base index intact, the "
-                    "remaining blocks cover the loss whatever its layout")
+    case Recovery::ProbablyRecoverable:
+        _cout << tr("  Verdict: PROBABLY RECOVERABLE - the remaining blocks cover the loss, "
+                    "and the conventional base index is available, but STAT cannot verify its "
+                    "vital packets. Try the repair")
               << "\n";
         break;
     case Recovery::LayoutDependent:
@@ -935,7 +950,9 @@ void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
     QString recoveryName;
     switch (recoveryVerdict()) {
     case Recovery::NotNeeded:       recoveryName = QStringLiteral("notNeeded");       break;
-    case Recovery::Certain:         recoveryName = QStringLiteral("certain");         break;
+    case Recovery::ProbablyRecoverable:
+        recoveryName = QStringLiteral("probablyRecoverable");
+        break;
     case Recovery::LayoutDependent: recoveryName = QStringLiteral("layoutDependent"); break;
     case Recovery::Impossible:      recoveryName = QStringLiteral("impossible");      break;
     case Recovery::NoPar2AtAll:     recoveryName = QStringLiteral("noPar2AtAll");     break;
@@ -951,10 +968,16 @@ void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)
     par2[QStringLiteral("blocksUsable")]          = likelyUsableBlocks();
     par2[QStringLiteral("blocksUsableGuaranteed")] = usableRange.first;
     par2[QStringLiteral("blocksUsableMax")]       = usableRange.second;
-    par2[QStringLiteral("metadataAvailable")] = hasIntactPar2Index();
-    par2[QStringLiteral("metadataSource")] = hasIntactPar2Index()
-                                                        ? QStringLiteral("intactBaseIndex")
-                                                        : QStringLiteral("notProvenFromNzb");
+    bool const baseIndexAvailable = hasIntactPar2Index();
+    // STAT never downloads packet contents. Preserve the old field, but make
+    // its epistemic meaning honest and expose the weaker fact separately.
+    par2[QStringLiteral("metadataAvailable")] = false;
+    par2[QStringLiteral("metadataProven")] = false;
+    par2[QStringLiteral("metadataAssumedFromBaseIndex")] = baseIndexAvailable;
+    par2[QStringLiteral("baseIndexAvailable")] = baseIndexAvailable;
+    par2[QStringLiteral("metadataSource")] = baseIndexAvailable
+                                                       ? QStringLiteral("assumedFromIntactBaseIndex")
+                                                       : QStringLiteral("notProvenFromNzb");
     par2[QStringLiteral("blockSize")]         = _par2BlockSize;
     par2[QStringLiteral("blockSizeMeasured")] = _blockSizeMeasured;
     // Coverage of the data files by the recovery set is assumed, not read: the

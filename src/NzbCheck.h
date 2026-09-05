@@ -40,16 +40,18 @@ class NntpCheckCon;
 struct Par2Volume
 {
     QString subject;
-    int     blocks             = 0;     //!< recovery blocks, from the .volNN+MM name
-    bool    isVolume           = false; //!< false for the metadata-only base .par2
-    int     nbExpectedArticles = 0;
-    int     nbListedArticles   = 0;
-    int     nbMissingArticles  = 0;
+    int     blocks                    = 0; //!< recovery blocks, from the .volNN+MM name
+    bool    isVolume                  = false; //!< false for the metadata-only base .par2
+    int     nbExpectedArticles        = 0;
+    int     nbListedArticles          = 0;
+    int     nbCheckedArticles         = 0;
+    int     nbMissingArticles         = 0;
+    int     nbMissingListedArticles = 0;
 
     bool isIntact() const
     {
         return nbExpectedArticles > 0 && nbListedArticles >= nbExpectedArticles
-               && nbMissingArticles == 0;
+               && nbCheckedArticles >= nbListedArticles && nbMissingArticles == 0;
     }
 
     //! Recovery blocks still usable out of this file.
@@ -62,19 +64,21 @@ struct Par2Volume
     int usableBlocks() const;
 };
 
-//! Facts and bounds that belong to one data file. Article payload sizes are
-//! deliberately not global: an NZB may concatenate files posted with
-//! different settings, while PAR2 source-slice numbering restarts for each
-//! file.
+//! Facts and bounds that belong to one data file. The NZB segment byte count is
+//! the encoded article-body size; it is therefore only an upper bound on the
+//! decoded payload. It must never be treated as an exact article size.
 struct NzbDataFile
 {
-    int     nbExpectedArticles = 0;
-    int     nbMissingArticles  = 0;
-    QString lastArticle;
-    bool    lastArticleMissing = false;
-    qint64  sizeBytes          = 0;
-    qint64  articleSizeMin     = 0;
-    qint64  articleSizeMax     = 0; //!< 0 when one article gives no finite upper bound
+    int     nbExpectedArticles                 = 0;
+    int     nbListedArticles                   = 0;
+    int     nbListedArticlesWithBytes          = 0;
+    int     nbMissingArticles                  = 0;
+    int     nbMissingListedArticles            = 0;
+    int     nbMissingListedArticlesWithBytes = 0;
+    qint64  sizeBytes                          = 0;
+    qint64  listedBytesUpper                   = 0;
+    QVector<qint64> missingArticleBytesUpper;
+    bool    articleByteBoundsConsistent        = true;
 };
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
@@ -140,6 +144,9 @@ private:
     //! PAR2 slices restart at every file boundary, so knowing a loss happened
     //! is not enough -- the damage has to be counted file by file.
     QHash<QString, int> _articleOwner;
+    //! Encoded body size from segment@bytes. For data articles only, and used
+    //! solely as an upper bound on the decoded payload.
+    QHash<QString, qint64> _dataArticleBytesUpper;
     QVector<NzbDataFile> _dataFiles;
 
     //! -1 would collide with data file 0, which encodes as -(0)-1.
@@ -197,7 +204,7 @@ public:
     enum class Recovery
     {
         NotNeeded,       //!< no data article is missing
-        Certain,         //!< capacity covers the worst case and the base index is intact
+        ProbablyRecoverable, //!< blocks suffice; vital metadata is only conventional
         LayoutDependent, //!< the estimates straddle the answer: try the repair
         Impossible,      //!< not covered even at the best end of every estimate
         NoPar2AtAll,      //!< the nzb lists no PAR2 file: a fact, not an estimate
@@ -252,9 +259,8 @@ public:
     // ---- PAR2 recovery analysis ----
     int  totalRecoveryBlocks() const;
     int  usableRecoveryBlocks() const;
-    //! The conventional metadata-only base .par2 is present in full. Recovery
-    //! volumes are not enough: the PAR2 specification requires only a Creator
-    //! packet in each file, so vital packets cannot be inferred from its name.
+    //! Every article of the conventional base .par2 was verified by STAT. This
+    //! does not prove which PAR2 packets it contains.
     bool hasIntactPar2Index() const;
     //! True when every data file announced its size.
     inline bool dataSizeIsComplete() const;
@@ -411,13 +417,19 @@ void NzbCheck::missingArticle(const QString &article)
     } else if (owner >= 0) {
         ++_nbMissingPar2Articles;
         ++_par2Volumes[owner].nbMissingArticles;
+        ++_par2Volumes[owner].nbMissingListedArticles;
     } else {
         ++_nbMissingDataArticles;
         int const dataFile = -owner - 1;
         if (dataFile >= 0 && dataFile < _dataFiles.size()) {
-            ++_dataFiles[dataFile].nbMissingArticles;
-            if (_dataFiles.at(dataFile).lastArticle == article)
-                _dataFiles[dataFile].lastArticleMissing = true;
+            NzbDataFile &file = _dataFiles[dataFile];
+            ++file.nbMissingArticles;
+            ++file.nbMissingListedArticles;
+            qint64 const bytesUpper = _dataArticleBytesUpper.value(article, 0);
+            if (bytesUpper > 0) {
+                ++file.nbMissingListedArticlesWithBytes;
+                file.missingArticleBytesUpper.append(bytesUpper);
+            }
         }
     }
 
@@ -502,8 +514,11 @@ bool NzbCheck::waitingForPar2() const
 void NzbCheck::articleChecked(const QString &article)
 {
     ++_nbCheckedArticles;
-    if (isPar2Article(article))
+    int const owner = _articleOwner.value(article, kUnknownOwner);
+    if (owner >= 0 && owner < _par2Volumes.size()) {
         ++_nbPar2Answered;
+        ++_par2Volumes[owner].nbCheckedArticles;
+    }
 }
 
 int NzbCheck::nbMissingArticles() const
