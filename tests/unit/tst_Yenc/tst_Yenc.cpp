@@ -9,6 +9,7 @@
 
 #include <vector>
 
+#include "nntp/NntpArticle.h"
 #include "utils/Yenc.h"
 
 class TestYenc : public QObject
@@ -38,6 +39,13 @@ private slots:
     //! Stress test on 1 MiB of random data — must not write past the buffer
     //! (`dataSize*2 + 2` extra bytes for worst-case escape + CRLF + NUL).
     void encode_large_buffer_no_overflow();
+
+    //! NntpArticle::yEncWorstCaseSize() is what sizes the single allocation
+    //! yEncBody() builds the whole body in, so the encoder must never write
+    //! more than it promises — including on inputs chosen to escape every
+    //! single byte, which is where the old 4x over-allocation was hiding.
+    void worst_case_bound_is_never_exceeded();
+    void worst_case_bound_is_never_exceeded_data();
 };
 
 void TestYenc::encode_empty_input()
@@ -136,6 +144,60 @@ void TestYenc::encode_large_buffer_no_overflow()
     QVERIFY2(n < qint64(N * 4 + 16), "encode wrote past allocated buffer");
     QCOMPARE(dst[static_cast<size_t>(n) - 1], uchar(0)); // trailing NUL
     QVERIFY(crc != 0);
+}
+
+void TestYenc::worst_case_bound_is_never_exceeded_data()
+{
+    QTest::addColumn<QByteArray>("input");
+
+    // Each of these bytes becomes an escape pair after the +42 shift, so a
+    // buffer full of them is the encoder's absolute worst case.
+    const struct { const char *name; char byte; } escaping[] = {
+        { "all NUL escapes", '\xD6' },
+        { "all LF escapes",  '\xE0' },
+        { "all CR escapes",  '\xE3' },
+        { "all '=' escapes", '\x13' },
+    };
+    for (const auto &e : escaping)
+        QTest::newRow(e.name) << QByteArray(300000, e.byte);
+
+    // Line-start-only escapes, and a mix that keeps hitting column 0.
+    QTest::newRow("all spaces") << QByteArray(300000, char(' ' - 42));
+    QTest::newRow("all dots") << QByteArray(300000, char('.' - 42));
+
+    QByteArray alternating(300000, '\0');
+    for (int i = 0; i < alternating.size(); ++i)
+        alternating[i] = (i & 1) ? '\x13' : char(' ' - 42);
+    QTest::newRow("alternating escape/space") << alternating;
+
+    QByteArray random(300000, '\0');
+    for (int i = 0; i < random.size(); ++i)
+        random[i] = static_cast<char>((i * 7919) & 0xFF);
+    QTest::newRow("pseudo random") << random;
+
+    QTest::newRow("empty") << QByteArray();
+    QTest::newRow("single byte") << QByteArray(1, '\x13');
+}
+
+void TestYenc::worst_case_bound_is_never_exceeded()
+{
+    QFETCH(QByteArray, input);
+
+    const size_t bound = NntpArticle::yEncWorstCaseSize(input.size());
+
+    // A canary right past the bound catches a write that overruns it.
+    std::vector<uchar> dst(bound + 64, 0xAB);
+    quint32 crc = 0;
+
+    const qint64 written = Yenc::encode(input.constData(), input.size(), dst.data(), crc);
+
+    QVERIFY2(written > 0, "encode returned a non-positive length");
+    QVERIFY2(written <= qint64(bound),
+             qPrintable(QString("encode wrote %1 bytes for a bound of %2")
+                                .arg(written).arg(bound)));
+    QCOMPARE(dst[static_cast<size_t>(written) - 1], uchar(0)); // trailing NUL
+    for (size_t i = bound; i < dst.size(); ++i)
+        QCOMPARE(dst[i], uchar(0xAB)); // nothing written past the bound
 }
 
 QTEST_APPLESS_MAIN(TestYenc)

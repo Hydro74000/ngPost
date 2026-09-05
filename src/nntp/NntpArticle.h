@@ -58,6 +58,11 @@ public:
 
     void yEncBody(const char data[]);
 
+    //! Upper bound on what Yenc::encode writes for \a nbBytes of input, its
+    //! trailing NUL included. yEncBody() sizes its single allocation with it;
+    //! exposed so the encoder and the bound can be fuzzed against each other.
+    static size_t yEncWorstCaseSize(qint64 nbBytes);
+
     ~NntpArticle();
 
     QString str() const;
