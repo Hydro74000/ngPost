@@ -98,7 +98,21 @@ private:
     static QString _normalized(const QString &path);
     bool _consumeIgnoredPath(const QString &absolutePath);
     void _releaseSpentReservations(const QString &folderPath, const PathSet &scan);
-    ushort _waitUntilFullyWritten(QFileInfo &fileInfo, qint64 &size) const;
+
+    //! A path the scan just reported as new, and the last (size, mtime) sample
+    //! taken of it. nbStable counts how many consecutive samples came back
+    //! identical; sNbStableScans of them mean the write is over.
+    struct PendingPath
+    {
+        QFileInfo fileInfo;
+        qint64    size = 0;
+        QDateTime lastModified;
+        ushort    nbStable = 0;
+    };
+
+    //! Hand a settled path over to the posting side, after the Windows
+    //! "is anyone still writing this?" check where that question has an answer.
+    void _emitSettledPath(const PendingPath &entry, ushort nbWait);
 #if defined(Q_OS_WIN)
     bool _waitUntilNotLocked(const QFileInfo &fileInfo, ushort &nbWait) const;
 #endif

@@ -100,6 +100,14 @@ void FoldersMonitorForNewFiles::onDirectoryChanged(const QString &folderPath)
     // iterate new paths
     PathSet newFiles = newScan; // this will detach!
     newFiles.subtract(folderScan->previousScan);
+
+    // Every new entry is watched in the same rounds, rather than each one
+    // being followed to completion before the next is even looked at. A drop
+    // of N files used to cost N * sNbStableScans * sMSleep before the last one
+    // reached the posting side; it now costs what the slowest single file
+    // costs, because one sleep serves the whole batch.
+    QList<PendingPath> pending;
+    pending.reserve(newFiles.size());
     for (const QString &fileName : newFiles) {
         if (MB_LoadAtomic(_stopListening))
             break;
@@ -122,38 +130,49 @@ void FoldersMonitorForNewFiles::onDirectoryChanged(const QString &folderPath)
             continue;
         }
 
-        qint64 size = _pathSize(fi);
-        qDebug() << "[directoryChanged] processing new file: " << filePath << ", size: " << size
-                 << ", lastModif: " << fi.lastModified();
+        PendingPath entry;
+        entry.fileInfo     = fi;
+        entry.size         = _pathSize(entry.fileInfo);
+        entry.lastModified = entry.fileInfo.lastModified();
 
-        ushort nbWait = _waitUntilFullyWritten(fi, size);
+        qDebug() << "[directoryChanged] processing new file: " << filePath
+                 << ", size: " << entry.size << ", lastModif: " << entry.lastModified;
 
-#if defined(Q_OS_WIN)
-        // Windows is the only platform where "is another process still writing
-        // this?" has an answer, and the size going quiet is not it (issue #112).
-        if (fi.exists() && !fi.isDir() && !_waitUntilNotLocked(fi, nbWait))
-            qDebug() << "[directoryChanged] WARNING: still locked by another process after "
-                     << nbWait * sMSleep << " msec, processing anyway: " << filePath;
-#endif
+        pending.append(entry);
+    }
 
-        if (fi.exists()) {
-            qDebug() << "[directoryChanged] after " << nbWait * sMSleep << " msec, "
-                     << "ready to process file: " << filePath << ", size: " << size
-                     << ", lastModif: " << fi.lastModified();
+    ushort nbWait = 0;
+    while (!pending.isEmpty() && !MB_LoadAtomic(_stopListening)) {
+        QThread::msleep(sMSleep);
+        ++nbWait;
 
-            if (!MB_LoadAtomic(_stopListening))
-                emit newFileToProcess(fi);
-#ifdef __DEBUG__
-            if (fi.isDir()) {
-                for (QFileInfo &subFile :
-                     QDir(fi.absoluteFilePath())
-                         .entryInfoList(QDir::Files | QDir::Hidden | QDir::System | QDir::Dirs
-                                        | QDir::NoDotAndDotDot))
-                    qDebug() << "\t- " << subFile.fileName() << ": size: " << _pathSize(subFile);
+        // Backwards, so removing a settled entry does not skip the next one.
+        for (int i = pending.size() - 1; i >= 0; --i) {
+            PendingPath &entry = pending[i];
+
+            if (!entry.fileInfo.exists()) {
+                qDebug() << "[directoryChanged] ignoring temporary file: "
+                         << entry.fileInfo.absoluteFilePath();
+                pending.removeAt(i);
+                continue;
             }
-#endif
-        } else
-            qDebug() << "[directoryChanged] ignoring temporary file: " << filePath;
+
+            qint64 const    newSize     = _pathSize(entry.fileInfo);
+            QDateTime const newModified = entry.fileInfo.lastModified();
+            if (newSize == entry.size && newModified == entry.lastModified)
+                ++entry.nbStable;
+            else
+                entry.nbStable = 0; // it moved again: start counting over
+
+            entry.size         = newSize;
+            entry.lastModified = newModified;
+
+            if (entry.nbStable < sNbStableScans)
+                continue;
+
+            _emitSettledPath(entry, nbWait);
+            pending.removeAt(i);
+        }
     }
 
     // Anything still reserved for this folder that the scan just saw is now
@@ -217,31 +236,39 @@ bool FoldersMonitorForNewFiles::_consumeIgnoredPath(const QString &absolutePath)
     return _ignoredPaths.remove(absolutePath);
 }
 
-//! Block until the path stops changing, and report how many intervals it took.
-//! \a size is left holding the settled size.
-ushort FoldersMonitorForNewFiles::_waitUntilFullyWritten(QFileInfo &fileInfo, qint64 &size) const
+void FoldersMonitorForNewFiles::_emitSettledPath(const PendingPath &entry, ushort nbWait)
 {
-    ushort nbWait = 0, nbStable = 0;
-    qint64 lastSize = _pathSize(fileInfo);
-    QDateTime lastModified = fileInfo.lastModified();
+    QFileInfo fi = entry.fileInfo;
 
-    while (fileInfo.exists() && nbStable < sNbStableScans) {
-        QThread::msleep(sMSleep);
-        ++nbWait;
+#if defined(Q_OS_WIN)
+    // Windows is the only platform where "is another process still writing
+    // this?" has an answer, and the size going quiet is not it (issue #112).
+    if (fi.exists() && !fi.isDir() && !_waitUntilNotLocked(fi, nbWait))
+        qDebug() << "[directoryChanged] WARNING: still locked by another process after "
+                 << nbWait * sMSleep << " msec, processing anyway: " << fi.absoluteFilePath();
+#endif
 
-        qint64 const newSize = _pathSize(fileInfo);
-        QDateTime const newModified = fileInfo.lastModified();
-        if (newSize == lastSize && newModified == lastModified)
-            ++nbStable;
-        else
-            nbStable = 0; // it moved again: start counting over
-
-        lastSize = newSize;
-        lastModified = newModified;
+    if (!fi.exists()) {
+        qDebug() << "[directoryChanged] ignoring temporary file: " << fi.absoluteFilePath();
+        return;
     }
 
-    size = lastSize;
-    return nbWait;
+    qDebug() << "[directoryChanged] after " << nbWait * sMSleep << " msec, "
+             << "ready to process file: " << fi.absoluteFilePath() << ", size: " << entry.size
+             << ", lastModif: " << fi.lastModified();
+
+    if (!MB_LoadAtomic(_stopListening))
+        emit newFileToProcess(fi);
+
+#ifdef __DEBUG__
+    if (fi.isDir()) {
+        for (QFileInfo &subFile :
+             QDir(fi.absoluteFilePath())
+                 .entryInfoList(QDir::Files | QDir::Hidden | QDir::System | QDir::Dirs
+                                | QDir::NoDotAndDotDot))
+            qDebug() << "\t- " << subFile.fileName() << ": size: " << _pathSize(subFile);
+    }
+#endif
 }
 
 #if defined(Q_OS_WIN)

@@ -20,6 +20,7 @@
 #include <QtTest>
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -58,6 +59,12 @@ private slots:
 
     //! Reservations are keyed by resolved path, not by the spelling used.
     void a_reservation_matches_an_unnormalized_path();
+
+    //! Several files dropped at once. Each one used to be followed to
+    //! completion before the next was even sampled, so a batch cost N times
+    //! one file's stability wait and the last file reached the posting side
+    //! long after it had settled. They are watched in the same rounds now.
+    void a_batch_of_files_is_reported_in_one_wait();
 
 private:
     QString _write(const QString &name, const QByteArray &content = "payload");
@@ -208,6 +215,34 @@ void TestFoldersMonitor::a_reservation_matches_an_unnormalized_path()
 
     QVERIFY2(_spy->isEmpty(),
              qPrintable(QStringLiteral("reported: ") + reported(*_spy).join(',')));
+}
+
+void TestFoldersMonitor::a_batch_of_files_is_reported_in_one_wait()
+{
+    QStringList expected;
+    for (int i = 0; i < 6; ++i) {
+        const QString name = QStringLiteral("batch%1.rar").arg(i);
+        QVERIFY(!_write(name).isEmpty());
+        expected << name;
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+    _sweep();
+    const qint64 elapsed = timer.elapsed();
+
+    QStringList got = reported(*_spy);
+    got.sort();
+    QCOMPARE(got, expected);
+
+    // A single file settles in sNbStableScans x sMSleep, 2 s with the shipped
+    // values. Six files taken one after the other is ~12 s; taken in the same
+    // rounds it is ~2 s. Half the sequential cost is a wide enough margin for
+    // the assertion to be about the algorithm and not about this machine.
+    QVERIFY2(elapsed < 6000,
+             qPrintable(QStringLiteral("a batch of %1 files took %2 ms: the per-file "
+                                       "stability wait is being paid once per file")
+                                .arg(expected.size()).arg(elapsed)));
 }
 
 QTEST_MAIN(TestFoldersMonitor)
