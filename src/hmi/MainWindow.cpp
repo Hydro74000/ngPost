@@ -93,6 +93,13 @@ QString guiSettingsFilePath()
 }
 const QString kMainWindowGeometryKey = QStringLiteral("MainWindow/geometry");
 
+//! How many lines the log pane keeps. Nothing ever purged this document, so
+//! a long session -- or debug level 2, where each article emits several lines
+//! from the posting threads -- grew it for the lifetime of the process, and
+//! every append cost a little more than the one before. Old lines now scroll
+//! out of the document, not just out of view.
+constexpr int kMaxLogBlocks = 5000;
+
 //! Tab ngPost opens on, as an index in the post tab widget. Only the three
 //! fixed tabs can be picked; no key at all means the first one.
 const QString kStartupTabKey = QStringLiteral("MainWindow/startupTab");
@@ -186,6 +193,8 @@ MainWindow::MainWindow(QWidget *parent) :
     const QByteArray savedGeometry = guiSettings.value(kMainWindowGeometryKey).toByteArray();
     if (!savedGeometry.isEmpty())
         restoreGeometry(savedGeometry);
+
+    _ui->logBrowser->document()->setMaximumBlockCount(kMaxLogBlocks);
 
     connect(_ui->clearLogButton, &QAbstractButton::clicked, _ui->logBrowser, &QTextEdit::clear);
     connect(_ui->debugBox,       &QAbstractButton::toggled, this,            &MainWindow::onDebugToggled);
