@@ -41,6 +41,7 @@ private:
     const qint64 _filePos;   //!< position in the File (for yEnc header)
     const qint64 _fileBytes; //!< bytes of the original file that are encoded
     qint64 _bodySize;        //!< size of the article body once yEnc encoded (what the nzb must advertise)
+    qint64 _bodyWireSize;    //!< bytes of _body to write on the socket, "." terminator included
 
     ushort _nbTrySending;
 
@@ -114,6 +115,7 @@ void NntpArticle::freeMemory()
     {
         delete[] _body;
         _body = nullptr;
+        _bodyWireSize = 0;
     }
 }
 

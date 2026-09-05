@@ -92,7 +92,11 @@ public:
     inline int getId() const; //!< NntpConnection id: iSocketDescriptor
 
     inline void write(const QByteArray &aBuffer); //!< write on the socket
-    inline void write(const char *aBuffer);       //!< write on the socket
+
+    //! Write \a size bytes on the socket. Every call site knows the length
+    //! already, and letting QIODevice recover it means a strlen over a
+    //! ~700 KB article body on each send.
+    inline void write(const char *aBuffer, qint64 size);
 
     inline void resetErrorCount();
     inline bool isConnected() const;
@@ -155,9 +159,9 @@ void NntpConnection::write(const QByteArray &aBuffer)
 {
     _socket->write(aBuffer);
 }
-void NntpConnection::write(const char *aBuffer)
+void NntpConnection::write(const char *aBuffer, qint64 size)
 {
-    _socket->write(aBuffer);
+    _socket->write(aBuffer, size);
 }
 
 void NntpConnection::resetErrorCount()

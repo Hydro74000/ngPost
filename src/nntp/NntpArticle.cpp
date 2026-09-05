@@ -27,6 +27,7 @@ NntpArticle::NntpArticle(NntpFile *file, uint part, qint64 pos, qint64 bytes,
     _body(nullptr),
     _filePos(pos), _fileBytes(bytes),
     _bodySize(0),
+    _bodyWireSize(0),
     _nbTrySending(0),
     _msgId(),
     _obfuscateArticles(obfuscateArticles)
@@ -150,6 +151,7 @@ void NntpArticle::yEncBody(const char data[])
     ptr += tailLen;
 
     size_t const bodySize = static_cast<size_t>(ptr - _body);
+    _bodyWireSize         = static_cast<qint64>(bodySize);
 
     // What goes in the nzb is the article as the server stores it, so drop the
     // trailing "." ENDLINE: that is the NNTP end-of-body marker written on the
@@ -193,8 +195,8 @@ void NntpArticle::write(NntpConnection *con, const std::string &idSignature)
     ++_nbTrySending;
     const std::string articleHeader = header(idSignature);
     _nntpFile->onArticlePostingStarted(this, _nbTrySending);
-    con->write(articleHeader.c_str());
-    con->write(_body);
+    con->write(articleHeader.data(), static_cast<qint64>(articleHeader.size()));
+    con->write(_body, _bodyWireSize);
 }
 
 std::string NntpArticle::header(const std::string &idSignature) const
@@ -224,7 +226,8 @@ void NntpArticle::dumpToFile(const QString &path, const std::string &articleIdSi
         return;
     }
 
-    file.write(header(articleIdSignature).c_str());
-    file.write(_body);
+    std::string const articleHeader = header(articleIdSignature);
+    file.write(articleHeader.data(), static_cast<qint64>(articleHeader.size()));
+    file.write(_body, _bodyWireSize);
     file.close();
 }
