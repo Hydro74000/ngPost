@@ -45,6 +45,12 @@ ArticleBuilder::~ArticleBuilder()
 
 NntpArticle *ArticleBuilder::getNextArticle(const QString &threadName)
 {
+    // _buffer is shared between the _builderThread and any posting thread
+    // that falls back to building its own Article, so it needs a lock of its
+    // own. It must stay scoped strictly inside this function: see the lock
+    // ordering note in onPrepareNextArticle().
+    QMutexLocker bufferLock(&_secureBuffer);
+
     _job->_secureDiskAccess.lock();
     NntpArticle *article = _job->_readNextArticleIntoBufferPtr(threadName, &_buffer);
     _job->_secureDiskAccess.unlock();
@@ -59,9 +65,21 @@ NntpArticle *ArticleBuilder::getNextArticle(const QString &threadName)
 
 void ArticleBuilder::onPrepareNextArticle()
 {
-    QMutexLocker lock(&_poster->_secureArticles); // thread safety (coming from _builderThread)
-
+    // Reading the file and yEnc encoding it is milliseconds of work that
+    // needs nothing from the Poster's queue. Holding _secureArticles across
+    // all of it made every connection thread coming to collect an Article
+    // wait out a whole encoding, on the very mutex the builder needs back to
+    // hand that Article over. The lock now covers the enqueue alone.
+    //
+    // The order the two mutexes are taken in matters. Poster::getNextArticle()
+    // holds _secureArticles and can then reach _secureBuffer through
+    // getNextArticle() below, so this path must never hold _secureBuffer
+    // while waiting for _secureArticles. getNextArticle() releases it before
+    // returning, which is what stops the two orders from meeting.
     NntpArticle *article = getNextArticle(_poster->_builderThread.objectName());
     if (article)
+    {
+        QMutexLocker lock(&_poster->_secureArticles); // coming from _builderThread
         _poster->_articles.enqueue(article);
+    }
 }

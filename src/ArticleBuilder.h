@@ -21,6 +21,7 @@
 #ifndef ARTICLEBUILDER_H
 #define ARTICLEBUILDER_H
 
+#include <QMutex>
 #include <QObject>
 class NgPost;
 class Poster;
@@ -46,6 +47,13 @@ private:
     PostingJob *const _job;
 
     char *_buffer; //!< buffer to read the current file to build an Article
+
+    //! Guards _buffer, which has two callers: the _builderThread through
+    //! onPrepareNextArticle(), and any posting thread through
+    //! Poster::getNextArticle() when it finds the queue empty. Held strictly
+    //! inside getNextArticle() -- see onPrepareNextArticle() for the lock
+    //! ordering that depends on it.
+    QMutex _secureBuffer;
 
 signals:
     void scheduleNextArticle();
