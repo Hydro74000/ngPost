@@ -368,7 +368,7 @@ public:
     //! Bump when the schema changes, and add the matching step in
     //! _migrateSchema(). v1: initial. v2: post_info/post_meta. v3: the frozen
     //! article-size boundary required for a byte-identical resume.
-    static constexpr int kSchemaVersion = 4;
+    static constexpr int kSchemaVersion = 5;
 
 private:
     QString _dbPath;

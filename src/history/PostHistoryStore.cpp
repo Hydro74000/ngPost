@@ -61,8 +61,16 @@ QSqlDatabase dbFor(const QString &connectionName, const QString &dbPath, QString
     }
 
     QSqlQuery pragma(db);
-    if (newConnection)
+    if (newConnection) {
         pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
+        // Under WAL, NORMAL is the durability the mode is designed around: a
+        // crash or a kill still cannot corrupt the database, only the very
+        // last transactions can be lost on a power cut. The default FULL
+        // fsyncs on every commit, and the article flush commits in batches
+        // while a post runs -- with callers of upsertFile(), deletePost() and
+        // purgePassword() blocking behind that flush.
+        pragma.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
+    }
     pragma.exec(QStringLiteral("PRAGMA busy_timeout=5000"));
     pragma.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
     return db;
@@ -340,6 +348,11 @@ bool PostHistoryStore::_execSchema(QString *error)
                        "status TEXT NOT NULL,"
                        "FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,"
                        "UNIQUE(post_id, ordinal))"),
+        // post_articles is WITHOUT ROWID: the rows live in the (file_id, part)
+        // key itself. It is the largest table in the database and every hot
+        // query on it is keyed that way, so a rowid table paid for a full
+        // second copy of the key in an automatic index, plus a hop through
+        // that index to reach the row on each upsert.
         QStringLiteral("CREATE TABLE IF NOT EXISTS post_articles ("
                        "file_id INTEGER NOT NULL,"
                        "part INTEGER NOT NULL,"
@@ -351,7 +364,7 @@ bool PostHistoryStore::_execSchema(QString *error)
                        "error TEXT,"
                        "updated_at TEXT,"
                        "FOREIGN KEY(file_id) REFERENCES post_files(id) ON DELETE CASCADE,"
-                       "PRIMARY KEY(file_id, part))"),
+                       "PRIMARY KEY(file_id, part)) WITHOUT ROWID"),
         QStringLiteral("CREATE TABLE IF NOT EXISTS post_article_attempts ("
                        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                        "file_id INTEGER NOT NULL,"
@@ -524,6 +537,64 @@ bool PostHistoryStore::_migrateSchema(QSqlDatabase &db, QString *error)
                 "ALTER TABLE post_articles ADD COLUMN body_bytes INTEGER DEFAULT 0"))) {
             setError(error, q);
             return false;
+        }
+    }
+
+    // v4 -> v5 turns post_articles WITHOUT ROWID, for the reason spelled out
+    // next to its CREATE TABLE. SQLite cannot convert a table in place, so
+    // this is the rebuild its documentation prescribes: create, copy, drop,
+    // rename, recreate the index. It rides the transaction _execSchema()
+    // opened around us, so it commits whole or not at all, and a database
+    // already in that shape is skipped -- which is what makes an interrupted
+    // upgrade safe to re-enter.
+    bool articlesAreWithoutRowId = false;
+    {
+        QSqlQuery q(db);
+        if (!q.exec(QStringLiteral("SELECT sql FROM sqlite_master "
+                                   "WHERE type='table' AND name='post_articles'"))) {
+            setError(error, q);
+            return false;
+        }
+        if (q.next())
+            articlesAreWithoutRowId = q.value(0).toString().contains(
+                    QStringLiteral("WITHOUT ROWID"), Qt::CaseInsensitive);
+    }
+    if (!articlesAreWithoutRowId) {
+        static QStringList const rebuild = {
+            QStringLiteral("CREATE TABLE post_articles_v5 ("
+                           "file_id INTEGER NOT NULL,"
+                           "part INTEGER NOT NULL,"
+                           "pos INTEGER DEFAULT 0,"
+                           "bytes INTEGER DEFAULT 0,"
+                           "body_bytes INTEGER DEFAULT 0,"
+                           "status TEXT NOT NULL,"
+                           "msg_id TEXT,"
+                           "error TEXT,"
+                           "updated_at TEXT,"
+                           "FOREIGN KEY(file_id) REFERENCES post_files(id) ON DELETE CASCADE,"
+                           "PRIMARY KEY(file_id, part)) WITHOUT ROWID"),
+            // The EXISTS clause is not a filter on real data: an article row
+            // whose file is gone is one the foreign key says cannot exist and
+            // that nothing can read, and ON DELETE CASCADE would have taken
+            // it. Copying it would fail the constraint and abort the whole
+            // upgrade, which is a far worse outcome than leaving it behind.
+            QStringLiteral("INSERT INTO post_articles_v5(file_id, part, pos, bytes,"
+                           "body_bytes, status, msg_id, error, updated_at) "
+                           "SELECT a.file_id, a.part, a.pos, a.bytes, a.body_bytes, a.status,"
+                           "a.msg_id, a.error, a.updated_at FROM post_articles a "
+                           "WHERE EXISTS (SELECT 1 FROM post_files f WHERE f.id = a.file_id)"),
+            QStringLiteral("DROP TABLE post_articles"),
+            QStringLiteral("ALTER TABLE post_articles_v5 RENAME TO post_articles"),
+            QStringLiteral("CREATE INDEX IF NOT EXISTS idx_articles_status "
+                           "ON post_articles(status)"),
+        };
+
+        for (QString const &step : rebuild) {
+            QSqlQuery q(db);
+            if (!q.exec(step)) {
+                setError(error, q);
+                return false;
+            }
         }
     }
 
