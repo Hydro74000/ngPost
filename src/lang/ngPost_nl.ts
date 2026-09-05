@@ -898,6 +898,10 @@ Weet je zeker dat je wilt stoppen?</translation>
         <translation>Quick menu tabbladen</translation>
     </message>
     <message>
+        <source>Open this tab on startup</source>
+        <translation>Dit tabblad openen bij het opstarten</translation>
+    </message>
+    <message>
         <location line="+2"/>
         <location line="+2"/>
         <source>Close All finished Tabs</source>

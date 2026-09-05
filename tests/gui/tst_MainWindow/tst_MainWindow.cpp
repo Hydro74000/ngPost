@@ -28,6 +28,9 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QAction>
+#include <QMenu>
+#include <QSettings>
 #include <QSignalSpy>
 #include <QSpinBox>
 #include <QTabWidget>
@@ -37,6 +40,7 @@
 
 #include "hmi/MainWindow.h"
 #include "hmi/PostingWidget.h"
+#include "hmi/StartupTabBar.h"
 #include "hmi/AutoPostWidget.h"
 #include "hmi/CheckBoxCenterWidget.h"
 #include "hmi/CompressionSettingsDialog.h"
@@ -162,6 +166,17 @@ private slots:
     //! "Keep the archives" is a default held by the dialog: a new tab starts
     //! with it, and the choice a single post makes must not rewrite it.
     void keep_archives_default_is_owned_by_the_dialog();
+
+    //! Nothing pinned: ngPost opens on the quick post tab, no title is bold,
+    //! and the tab context menu offers the option unticked -- on the three
+    //! fixed tabs only. Picking it pins the tab and writes the setting at
+    //! once; picking it again on the same tab takes the setting away.
+    void startup_tab_is_the_quick_post_until_one_is_pinned();
+
+    //! What was pinned is what opens on the next start, bold and ticked. A
+    //! value that no longer points at a fixed tab is ignored rather than
+    //! opening on nothing.
+    void pinned_startup_tab_opens_on_the_next_start();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -1529,6 +1544,183 @@ void TestMainWindow::keep_archives_default_is_owned_by_the_dialog()
     content = QString::fromUtf8(saved.readAll());
     QVERIFY2(content.contains(QStringLiteral("\nKEEP_RAR = true\n")), qPrintable(content));
     QVERIFY2(!content.contains(QStringLiteral("\n#KEEP_RAR = true\n")), qPrintable(content));
+}
+
+namespace
+{
+//! The startup tab lives in the GUI preferences INI, next to the window
+//! geometry -- not in ngPost.conf, which is the posting configuration.
+QString guiSettingsPath()
+{
+    return PathHelper::configDir() + QStringLiteral("/ngPost_gui.ini");
+}
+
+//! Minimal configuration: these tests only need NgPost to parse and build its
+//! window.
+void writeMinimalConf(const QString &tmpDir)
+{
+    QFile conf(PathHelper::configFilePath());
+    QVERIFY2(conf.open(QIODevice::WriteOnly | QIODevice::Text), "could not write the test config");
+    QTextStream s(&conf);
+    s << "GROUPS = alt.binaries.test\n"
+      << "TMP_DIR = " << tmpDir << "\n";
+}
+
+//! Pick "Open this tab on startup" in the context menu of \a tabIndex, the
+//! way a right click on that tab then a click on the entry would.
+void pickStartupEntry(MainWindow *window, int tabIndex)
+{
+    QMenu menu;
+    window->fillTabContextMenuForTest(menu, tabIndex);
+    QAction *startup = menu.actions().value(0);
+    QVERIFY2(startup && startup->isCheckable(),
+             qPrintable(QStringLiteral("no startup entry on tab %1").arg(tabIndex)));
+    startup->trigger();
+}
+
+//! Whether that entry is ticked in the context menu of \a tabIndex -- false
+//! too when the entry is not there at all, which no caller expects.
+bool startupEntryIsTicked(MainWindow *window, int tabIndex)
+{
+    QMenu menu;
+    window->fillTabContextMenuForTest(menu, tabIndex);
+    QAction *startup = menu.actions().value(0);
+    return startup && startup->isCheckable() && startup->isChecked();
+}
+} // namespace
+
+void TestMainWindow::startup_tab_is_the_quick_post_until_one_is_pinned()
+{
+    HomeSandbox sandbox;
+    writeMinimalConf(sandbox.rootPath());
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString parseError = ngPost.parseDefaultConfig();
+    QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+
+    MainWindow *window = ngPost.mainWindowForTest();
+    QVERIFY(window);
+    window->init(&ngPost);
+
+    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    QVERIFY2(tabs, "postTabWidget not found");
+    auto *tabBar = qobject_cast<StartupTabBar*>(tabs->tabBar());
+    QVERIFY2(tabBar, "the post tab widget does not carry a StartupTabBar");
+
+    // Nothing pinned: the quick post tab, and no title in bold.
+    QCOMPARE(window->startupTabForTest(), -1);
+    QCOMPARE(tabs->currentIndex(), 0);
+    QCOMPARE(tabBar->startupTab(), -1);
+
+    // The three fixed tabs offer the option, unticked...
+    for (int tabIndex = 0; tabIndex < 3; ++tabIndex)
+    {
+        QMenu menu;
+        window->fillTabContextMenuForTest(menu, tabIndex);
+        QAction *startup = menu.actions().value(0);
+        QVERIFY2(startup && startup->isCheckable(),
+                 qPrintable(QStringLiteral("tab %1 has no startup entry").arg(tabIndex)));
+        QVERIFY(!startup->isChecked());
+    }
+    // ... the "New" tab does not: its menu starts with "Close All finished Tabs".
+    {
+        QMenu menu;
+        window->fillTabContextMenuForTest(menu, tabs->count() - 1);
+        QAction *first = menu.actions().value(0);
+        QVERIFY(first && !first->isCheckable());
+    }
+
+    // Pin the history tab: bold right away, saved right away, and the user is
+    // left on the tab they were reading.
+    pickStartupEntry(window, 2);
+    QCOMPARE(window->startupTabForTest(), 2);
+    QCOMPARE(tabBar->startupTab(), 2);
+    QCOMPARE(tabs->currentIndex(), 0);
+    {
+        QSettings guiSettings(guiSettingsPath(), QSettings::IniFormat);
+        QCOMPARE(guiSettings.value(QStringLiteral("MainWindow/startupTab")).toInt(), 2);
+    }
+
+    // The tick follows the pinned tab, and only it.
+    QVERIFY(startupEntryIsTicked(window, 2));
+    QVERIFY(!startupEntryIsTicked(window, 1));
+
+    // Pinning another tab moves the setting rather than adding one.
+    pickStartupEntry(window, 1);
+    QCOMPARE(tabBar->startupTab(), 1);
+    {
+        QSettings guiSettings(guiSettingsPath(), QSettings::IniFormat);
+        QCOMPARE(guiSettings.value(QStringLiteral("MainWindow/startupTab")).toInt(), 1);
+    }
+
+    // Picking it again on the tab that is already the startup one clears the
+    // setting: back to unspecified, and the key leaves the file.
+    pickStartupEntry(window, 1);
+    QCOMPARE(window->startupTabForTest(), -1);
+    QCOMPARE(tabBar->startupTab(), -1);
+    {
+        QSettings guiSettings(guiSettingsPath(), QSettings::IniFormat);
+        QVERIFY2(!guiSettings.contains(QStringLiteral("MainWindow/startupTab")),
+                 "unpinning left the setting behind");
+    }
+}
+
+void TestMainWindow::pinned_startup_tab_opens_on_the_next_start()
+{
+    HomeSandbox sandbox;
+    writeMinimalConf(sandbox.rootPath());
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+
+    {
+        QSettings guiSettings(guiSettingsPath(), QSettings::IniFormat);
+        guiSettings.setValue(QStringLiteral("MainWindow/startupTab"), 1);
+    }
+    {
+        NgPost ngPost(argc, argv);
+        const QString parseError = ngPost.parseDefaultConfig();
+        QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+        MainWindow *window = ngPost.mainWindowForTest();
+        QVERIFY(window);
+        window->init(&ngPost);
+
+        auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+        QVERIFY(tabs);
+        auto *tabBar = qobject_cast<StartupTabBar*>(tabs->tabBar());
+        QVERIFY(tabBar);
+
+        QCOMPARE(tabs->currentIndex(), 1);
+        QCOMPARE(tabBar->startupTab(), 1);
+        QVERIFY(startupEntryIsTicked(window, 1));
+    }
+
+    // A value pointing at no fixed tab (an old setting, a hand edited file)
+    // is ignored: the quick post tab, with nothing in bold.
+    {
+        QSettings guiSettings(guiSettingsPath(), QSettings::IniFormat);
+        guiSettings.setValue(QStringLiteral("MainWindow/startupTab"), 7);
+    }
+    {
+        NgPost ngPost(argc, argv);
+        const QString parseError = ngPost.parseDefaultConfig();
+        QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
+        MainWindow *window = ngPost.mainWindowForTest();
+        QVERIFY(window);
+        window->init(&ngPost);
+
+        auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+        QVERIFY(tabs);
+        auto *tabBar = qobject_cast<StartupTabBar*>(tabs->tabBar());
+        QVERIFY(tabBar);
+
+        QCOMPARE(tabs->currentIndex(), 0);
+        QCOMPARE(tabBar->startupTab(), -1);
+    }
 }
 
 QTEST_MAIN(TestMainWindow)

@@ -1496,6 +1496,10 @@ Are you sure you want to quit?</source>
         <translation></translation>
     </message>
     <message>
+        <source>Open this tab on startup</source>
+        <translation></translation>
+    </message>
+    <message>
         <location line="+2"/>
         <location line="+2"/>
         <source>Close All finished Tabs</source>

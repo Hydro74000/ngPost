@@ -38,9 +38,11 @@ class QComboBox;
 class QDateEdit;
 class QLabel;
 class QLineEdit;
+class QMenu;
 class QPushButton;
 class QTableWidget;
 class QTabWidget;
+class StartupTabBar;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 class QChart;
 #else
@@ -64,6 +66,11 @@ private:
     STATE           _state;
     PostingWidget  *_quickJobTab;
     AutoPostWidget *_autoPostTab;
+
+    //! Tab opened when ngPost starts: 0 quick post, 1 folder monitoring,
+    //! 2 history, and -1 when the user never picked one -- which is the quick
+    //! post tab, without a setting written anywhere.
+    int             _startupTab;
 
     static const bool sDefaultServerSSL   = true;
     static const int  sDefaultConnections = 5;
@@ -138,6 +145,8 @@ public:
     void init(NgPost *ngPost);
 #ifdef NGPOST_TESTING
     QWidget *buildHistoryTabForTest();
+    int      startupTabForTest() const { return _startupTab; }
+    void     fillTabContextMenuForTest(QMenu &menu, int tabIndex) { _fillTabContextMenu(menu, tabIndex); }
 #endif
 
     void updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded, const QString &avgSpeed = "0 B/s"
@@ -206,6 +215,10 @@ private slots:
 
     void onTabContextMenu(const QPoint &point);
     void onCloseAllFinishedQuickTabs();
+
+    //! Tab context menu: pin \a tabIndex as the tab to open at startup, or
+    //! unpin it when it already is the one.
+    void onToggleStartupTab(int tabIndex);
 
 
 
@@ -276,6 +289,10 @@ private:
     int  _serverRow(QObject *delButton);
     PostingWidget *_getPostWidget(int tabIndex) const;
     int _getPostWidgetIndex(PostingWidget *postWidget) const;
+
+    StartupTabBar *_startupTabBar() const;
+    void _fillTabContextMenu(QMenu &menu, int tabIndex);
+    void _applyStartupTab();
 
 
     static const QString sGroupBoxStyle;

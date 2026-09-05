@@ -19,8 +19,10 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFrame,
     QGroupBox, QHBoxLayout, QHeaderView, QLabel,
     QLineEdit, QMainWindow, QMenuBar, QProgressBar,
     QPushButton, QSizePolicy, QSpacerItem, QSpinBox,
-    QSplitter, QTabWidget, QTableWidget, QTableWidgetItem,
-    QTextBrowser, QTextEdit, QVBoxLayout, QWidget)
+    QSplitter, QTableWidget, QTableWidgetItem, QTextBrowser,
+    QTextEdit, QVBoxLayout, QWidget)
+
+from hmi.StartupTabBar import StartupTabWidget
 import resources_rc
 
 class Ui_MainWindow(object):
@@ -338,7 +340,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_3 = QVBoxLayout(self.fileBox)
         self.verticalLayout_3.setObjectName(u"verticalLayout_3")
         self.verticalLayout_3.setContentsMargins(-1, 20, -1, -1)
-        self.postTabWidget = QTabWidget(self.fileBox)
+        self.postTabWidget = StartupTabWidget(self.fileBox)
         self.postTabWidget.setObjectName(u"postTabWidget")
         self.tab = QWidget()
         self.tab.setObjectName(u"tab")

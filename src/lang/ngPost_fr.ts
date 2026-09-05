@@ -1499,6 +1499,10 @@ Are you sure you want to quit?</source>
         <translation>Menu des Posts Rapides</translation>
     </message>
     <message>
+        <source>Open this tab on startup</source>
+        <translation>Ouvrir cet onglet au démarrage</translation>
+    </message>
+    <message>
         <location line="+2"/>
         <location line="+2"/>
         <source>Close All finished Tabs</source>

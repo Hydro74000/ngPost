@@ -180,6 +180,7 @@ SOURCES += \
     $$PWD/hmi/PostInfoDialog.cpp \
     $$PWD/hmi/PostingWidget.cpp \
     $$PWD/hmi/SignedListWidget.cpp \
+    $$PWD/hmi/StartupTabBar.cpp \
     $$PWD/hmi/MainWindow.cpp \
     $$PWD/hmi/VpnProfileEditDialog.cpp \
     $$PWD/hmi/VpnSettingsDialog.cpp
@@ -192,6 +193,7 @@ HEADERS += \
     $$PWD/hmi/PostInfoDialog.h \
     $$PWD/hmi/PostingWidget.h \
     $$PWD/hmi/SignedListWidget.h \
+    $$PWD/hmi/StartupTabBar.h \
     $$PWD/hmi/MainWindow.h \
     $$PWD/hmi/VpnProfileEditDialog.h \
     $$PWD/hmi/VpnSettingsDialog.h

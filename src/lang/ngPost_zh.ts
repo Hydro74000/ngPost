@@ -896,6 +896,10 @@ Are you sure you want to quit?</source>
         <translation>快速标签页菜单</translation>
     </message>
     <message>
+        <source>Open this tab on startup</source>
+        <translation>启动时打开此标签页</translation>
+    </message>
+    <message>
         <location line="+2"/>
         <location line="+2"/>
         <source>Close All finished Tabs</source>

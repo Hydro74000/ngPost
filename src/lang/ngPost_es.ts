@@ -1507,6 +1507,10 @@ Are you sure you want to quit?</source>
         <translation>Menú de Pestañas Rápidas</translation>
     </message>
     <message>
+        <source>Open this tab on startup</source>
+        <translation>Abrir esta pestaña al iniciar</translation>
+    </message>
+    <message>
         <location line="+2"/>
         <location line="+2"/>
         <source>Close All finished Tabs</source>

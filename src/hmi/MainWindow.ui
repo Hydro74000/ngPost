@@ -558,7 +558,7 @@ Unlike the per post box, this choice is saved.</string>
           <number>20</number>
          </property>
          <item>
-          <widget class="QTabWidget" name="postTabWidget">
+          <widget class="StartupTabWidget" name="postTabWidget">
            <property name="currentIndex">
             <number>1</number>
            </property>
@@ -753,6 +753,13 @@ Unlike the per post box, this choice is saved.</string>
    </property>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>StartupTabWidget</class>
+   <extends>QTabWidget</extends>
+   <header location="global">hmi/StartupTabBar.h</header>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="../resources/resources.qrc"/>
  </resources>

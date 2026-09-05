@@ -22,6 +22,7 @@
 #include "ui_MainWindow.h"
 #include "PostingWidget.h"
 #include "AutoPostWidget.h"
+#include "StartupTabBar.h"
 #include "NgPost.h"
 #include "CompressionSettingsDialog.h"
 #include "VpnSettingsDialog.h"
@@ -90,6 +91,20 @@ QString guiSettingsFilePath()
     return PathHelper::configDir() + QStringLiteral("/ngPost_gui.ini");
 }
 const QString kMainWindowGeometryKey = QStringLiteral("MainWindow/geometry");
+
+//! Tab ngPost opens on, as an index in the post tab widget. Only the three
+//! fixed tabs can be picked; no key at all means the first one.
+const QString kStartupTabKey = QStringLiteral("MainWindow/startupTab");
+constexpr int kNbFixedTabs   = 3; //!< quick post, folder monitoring, history
+
+//! The pinned tab, or -1 when nothing valid is pinned.
+int readStartupTab()
+{
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    bool      ok    = false;
+    int const index = guiSettings.value(kStartupTabKey, -1).toInt(&ok);
+    return (ok && index >= 0 && index < kNbFixedTabs) ? index : -1;
+}
 }
 
 
@@ -123,7 +138,8 @@ MainWindow::MainWindow(QWidget *parent) :
     _ngPost(nullptr),
     _state(STATE::IDLE),
     _quickJobTab(nullptr),
-    _autoPostTab(nullptr)
+    _autoPostTab(nullptr),
+    _startupTab(-1)
 {
     setAcceptDrops(true);
 
@@ -210,7 +226,6 @@ void MainWindow::init(NgPost *ngPost)
     connect(tabBar, &QTabBar::tabCloseRequested,          this, &MainWindow::onCloseJob);
     _ui->postTabWidget->setTabsClosable(true);
     _ui->postTabWidget->installEventFilter(this);
-//    _ui->postTabWidget->setCurrentIndex(1);
 
     setJobLabel(1);
 
@@ -224,6 +239,12 @@ void MainWindow::init(NgPost *ngPost)
     _initPostingBox();
     _quickJobTab->init();
     _autoPostTab->init();
+
+    // Every tab is built: open on the one the user pinned from the tab context
+    // menu. Nothing pinned is the quick post tab, where ngPost has always
+    // started.
+    _startupTab = readStartupTab();
+    _applyStartupTab();
 
     _ui->goCmdButton->hide();
 //    connect(_ui->goCmdButton, &QAbstractButton::clicked, _ngPost, &NgPost::onGoCMD, Qt::QueuedConnection);
@@ -481,17 +502,63 @@ void MainWindow::onTabContextMenu(const QPoint &point)
     if (point.isNull())
         return;
 
-//    QTabBar *tabBar = _ui->postTabWidget->tabBar();
-//    int tabIndex = tabBar->tabAt(point);
-//    PostingWidget *currentPostWidget = _getPostWidget(tabIndex);
     QMenu menu(tr("Quick Tabs Menu"), this);
+    _fillTabContextMenu(menu, _ui->postTabWidget->tabBar()->tabAt(point));
+    menu.exec(QCursor::pos());
+}
+
+void MainWindow::_fillTabContextMenu(QMenu &menu, int tabIndex)
+{
+    // Only the three fixed tabs can be the startup one: the quick post tabs
+    // after them are created on the fly and gone by the next launch.
+    if (tabIndex >= 0 && tabIndex < kNbFixedTabs)
+    {
+        QAction *startupAction = menu.addAction(tr("Open this tab on startup"));
+        startupAction->setCheckable(true);
+        startupAction->setChecked(_startupTab == tabIndex);
+        connect(startupAction, &QAction::triggered,
+                this, [this, tabIndex]() { onToggleStartupTab(tabIndex); });
+        menu.addSeparator();
+    }
+
 #if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
     QAction *action = menu.addAction(QIcon(":/icons/clear.png"), tr("Close All finished Tabs"), this, &MainWindow::onCloseAllFinishedQuickTabs);
 #else
     QAction *action = menu.addAction(QIcon(":/icons/clear.png"), tr("Close All finished Tabs"), this, SLOT(onCloseAllFinishedQuickTabs));
 #endif
     action->setEnabled(hasFinishedPosts());
-    menu.exec(QCursor::pos());
+}
+
+StartupTabBar *MainWindow::_startupTabBar() const
+{
+    return _ui->postTabWidget->startupTabBar();
+}
+
+void MainWindow::_applyStartupTab()
+{
+    _startupTabBar()->setStartupTab(_startupTab);
+    _ui->postTabWidget->setCurrentIndex(_startupTab < 0 ? 0 : _startupTab);
+}
+
+void MainWindow::onToggleStartupTab(int tabIndex)
+{
+    if (tabIndex < 0 || tabIndex >= kNbFixedTabs)
+        return;
+
+    // Picking the tab that already opens at startup takes the setting away:
+    // back to nothing chosen, which is the quick post tab again.
+    _startupTab = (_startupTab == tabIndex) ? -1 : tabIndex;
+
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    if (_startupTab < 0)
+        guiSettings.remove(kStartupTabKey);
+    else
+        guiSettings.setValue(kStartupTabKey, _startupTab);
+    guiSettings.sync(); // saved now, not when ngPost is closed
+
+    // The bold moves at once; the tick is read from _startupTab the next time
+    // the menu is opened, so it follows on its own.
+    _startupTabBar()->setStartupTab(_startupTab);
 }
 
 bool MainWindow::hasFinishedPosts() const

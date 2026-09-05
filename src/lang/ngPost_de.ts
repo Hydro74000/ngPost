@@ -1508,6 +1508,10 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
         <translation>Quick Tabs Menü</translation>
     </message>
     <message>
+        <source>Open this tab on startup</source>
+        <translation>Diese Registerkarte beim Start öffnen</translation>
+    </message>
+    <message>
         <location line="+2"/>
         <location line="+2"/>
         <source>Close All finished Tabs</source>

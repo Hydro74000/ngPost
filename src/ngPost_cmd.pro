@@ -135,6 +135,7 @@ SOURCES += \
     hmi/CompressionSettingsDialog.cpp \
     hmi/PostingWidget.cpp \
     hmi/SignedListWidget.cpp \
+    hmi/StartupTabBar.cpp \
     hmi/MainWindow.cpp
 
 HEADERS += \
@@ -144,6 +145,7 @@ HEADERS += \
     hmi/DependentControl.h \
     hmi/PostingWidget.h \
     hmi/SignedListWidget.h \
+    hmi/StartupTabBar.h \
     hmi/MainWindow.h
 
 FORMS += \

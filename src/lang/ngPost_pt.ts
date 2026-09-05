@@ -896,6 +896,10 @@ Tem certeza que deseja sair?</translation>
         <translation>Menu Rápido de Abas</translation>
     </message>
     <message>
+        <source>Open this tab on startup</source>
+        <translation>Abrir esta aba ao iniciar</translation>
+    </message>
+    <message>
         <location line="+2"/>
         <location line="+2"/>
         <source>Close All finished Tabs</source>
