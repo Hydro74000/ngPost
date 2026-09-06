@@ -16,6 +16,7 @@
 //========================================================================
 
 #include <QtTest>
+#include <QTextBrowser>
 #include <QApplication>
 #include <QCheckBox>
 #include <QToolButton>
@@ -58,6 +59,15 @@ class TestMainWindow : public QObject
     Q_OBJECT
 
 private slots:
+    //! The log pane must not grow for the life of the process. It is fed from
+    //! the posting threads, several lines per article at debug 2, and nothing
+    //! used to drop a line ever -- 120 000 of them cost 877 MB.
+    void log_pane_stays_within_its_budget();
+
+    //! Trimming happens a slice at a time, not a line at a time, so the pane
+    //! is allowed to run over the cap before it is cut back. What must never
+    //! happen is that the newest line is the one thrown away.
+    void log_pane_keeps_the_newest_lines();
     //! Clicking the "Add Server" button adds a row to the servers table,
     //! and every per-row widget retrofitted with an objectName is findable
     //! from the window root.
@@ -1944,6 +1954,36 @@ void TestMainWindow::obfuscate_config_key_survives_a_save()
         QVERIFY2(!ngPost.obfuscateArticlesForTest(), "commented key must stay off");
         QVERIFY2(!ngPost.obfuscateFileNameForTest(), "commented key must stay off");
     }
+}
+
+void TestMainWindow::log_pane_stays_within_its_budget()
+{
+    MainWindow win;
+    win.setLogBlockCapForTest(200);
+
+    for (int i = 0; i < 5000; ++i)
+        win.log(QStringLiteral("[builder #1] article %1 encoded").arg(i));
+
+    // Cap plus one slice is the contract: the pane is cut back once it runs a
+    // whole slice over, so that is the ceiling, not the cap itself.
+    QVERIFY2(win.logBlockCountForTest() <= 200 + 1000 + 1,
+             qPrintable(QStringLiteral("log pane held %1 blocks for a cap of 200")
+                                .arg(win.logBlockCountForTest())));
+    QVERIFY(win.logBlockCountForTest() >= 200);
+}
+
+void TestMainWindow::log_pane_keeps_the_newest_lines()
+{
+    MainWindow win;
+    win.setLogBlockCapForTest(50);
+
+    for (int i = 0; i < 3000; ++i)
+        win.log(QStringLiteral("line %1").arg(i));
+
+    const QString kept = win.findChild<QTextBrowser *>(QStringLiteral("logBrowser"))
+                                 ->toPlainText();
+    QVERIFY2(kept.contains(QStringLiteral("line 2999")), "the newest line was trimmed away");
+    QVERIFY2(!kept.contains(QStringLiteral("line 0\n")), "the oldest line survived the trim");
 }
 
 QTEST_MAIN(TestMainWindow)

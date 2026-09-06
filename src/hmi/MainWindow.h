@@ -73,6 +73,10 @@ private:
     //! post tab, without a setting written anywhere.
     int             _startupTab;
 
+    //! Lines the log pane currently keeps. Derived from a memory budget that
+    //! grows with the debug level; see _applyLogCapacity().
+    int             _logBlockCap;
+
     static const bool sDefaultServerSSL   = true;
     static const int  sDefaultConnections = 5;
     static const int  sDefaultServerPort  = 563;
@@ -157,6 +161,9 @@ public:
     QWidget *buildHistoryTabForTest();
     void     fitHistoryColumnsForTest(bool toContents) { _fitHistoryColumns(toContents); }
     int      startupTabForTest() const { return _startupTab; }
+    int      logBlockCapForTest() const { return _logBlockCap; }
+    int      logBlockCountForTest() const;
+    void     setLogBlockCapForTest(int blocks) { _logBlockCap = blocks; }
     void     fillTabContextMenuForTest(QMenu &menu, int tabIndex) { _fillTabContextMenu(menu, tabIndex); }
 #endif
 
@@ -294,6 +301,14 @@ private slots:
     void _onServerFieldEdited();
 
 private:
+    //! Re-derive how many lines the log pane keeps from \a debugLevel and
+    //! apply it. Called at construction, once NgPost is known, and whenever
+    //! the debug level changes.
+    void _applyLogCapacity(int debugLevel);
+
+    //! Drop the oldest lines once the pane is a whole slice over its budget.
+    void _trimLogPane() const;
+
     void _initServerBox();
     void _initPostingBox();
     QWidget *_buildHistoryTab();

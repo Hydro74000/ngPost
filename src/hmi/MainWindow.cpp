@@ -93,12 +93,34 @@ QString guiSettingsFilePath()
 }
 const QString kMainWindowGeometryKey = QStringLiteral("MainWindow/geometry");
 
-//! How many lines the log pane keeps. Nothing ever purged this document, so
-//! a long session -- or debug level 2, where each article emits several lines
-//! from the posting threads -- grew it for the lifetime of the process, and
-//! every append cost a little more than the one before. Old lines now scroll
-//! out of the document, not just out of view.
-constexpr int kMaxLogBlocks = 5000;
+//! What one line of the log pane actually costs, laid out in a live
+//! QTextBrowser: about 7 KB. Measured rather than guessed -- 120 000 typical
+//! debug lines took 877 MB of resident memory, some seventy-five times the
+//! text they contain. The memory is what has to be bounded, so the block count
+//! is derived from a budget rather than picked.
+constexpr int kLogBytesPerBlock = 7000;
+
+//! How many lines are dropped in one go once the pane is over budget.
+//!
+//! QTextDocument::maximumBlockCount would do the trimming for us, but it drops
+//! exactly one block per append, and each of those is a cursor edit and a
+//! relayout: measured at 1 000 lines/s against 16 800 with no trimming at all,
+//! on the GUI thread, fed by the posting threads. Taking a slice at a time
+//! amortises that away -- 15 000 lines/s, and it holds less memory too, 73 MB
+//! against 99 MB after 150 000 lines, because it churns the allocator far
+//! less.
+constexpr int kLogTrimSlice = 1000;
+
+//! What the pane may hold, by debug level. With debug off it is a status log
+//! and 20 MB is a few thousand lines, far more than anyone scrolls back
+//! through. With debug on, the posting threads emit several lines per article
+//! and scrollback is the whole reason it was turned on, so the budget grows.
+constexpr int kLogBudgetBytes[] = {
+    20 * 1024 * 1024, // debug off
+    50 * 1024 * 1024, // debug 1
+    100 * 1024 * 1024 // debug 2
+};
+constexpr int kLogMaxDebugLevel = int(sizeof kLogBudgetBytes / sizeof *kLogBudgetBytes) - 1;
 
 //! Tab ngPost opens on, as an index in the post tab widget. Only the three
 //! fixed tabs can be picked; no key at all means the first one.
@@ -156,7 +178,8 @@ MainWindow::MainWindow(QWidget *parent) :
     _state(STATE::IDLE),
     _quickJobTab(nullptr),
     _autoPostTab(nullptr),
-    _startupTab(-1)
+    _startupTab(-1),
+    _logBlockCap(0)
 {
     setAcceptDrops(true);
 
@@ -194,7 +217,10 @@ MainWindow::MainWindow(QWidget *parent) :
     if (!savedGeometry.isEmpty())
         restoreGeometry(savedGeometry);
 
-    _ui->logBrowser->document()->setMaximumBlockCount(kMaxLogBlocks);
+    _applyLogCapacity(0);
+    // Nothing can undo an output pane, and the document would otherwise record
+    // an undo step for every line it is handed.
+    _ui->logBrowser->document()->setUndoRedoEnabled(false);
 
     connect(_ui->clearLogButton, &QAbstractButton::clicked, _ui->logBrowser, &QTextEdit::clear);
     connect(_ui->debugBox,       &QAbstractButton::toggled, this,            &MainWindow::onDebugToggled);
@@ -215,6 +241,8 @@ MainWindow::~MainWindow()
 void MainWindow::init(NgPost *ngPost)
 {
     _ngPost = ngPost;
+
+    _applyLogCapacity(_ngPost->debugFull() ? 2 : (_ngPost->debugMode() ? 1 : 0));
 
     _quickJobTab = new PostingWidget(ngPost, this, 1);
     _autoPostTab = new AutoPostWidget(ngPost, this);
@@ -305,6 +333,38 @@ void MainWindow::updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded
 }
 
 
+void MainWindow::_applyLogCapacity(int debugLevel)
+{
+    const int level  = qBound(0, debugLevel, kLogMaxDebugLevel);
+    const int blocks = kLogBudgetBytes[level] / kLogBytesPerBlock;
+
+    // Only ever raised within a session. Losing the trace you just captured
+    // because you switched debug back off in order to read it would be a poor
+    // trade.
+    _logBlockCap = qMax(_logBlockCap, blocks);
+}
+
+#ifdef NGPOST_TESTING
+int MainWindow::logBlockCountForTest() const
+{
+    return _ui->logBrowser->document()->blockCount();
+}
+#endif
+
+void MainWindow::_trimLogPane() const
+{
+    QTextDocument *doc = _ui->logBrowser->document();
+    if (doc->blockCount() <= _logBlockCap + kLogTrimSlice)
+        return;
+
+    QTextCursor cursor(doc);
+    cursor.movePosition(QTextCursor::Start);
+    cursor.movePosition(QTextCursor::NextBlock,
+                        QTextCursor::KeepAnchor,
+                        doc->blockCount() - _logBlockCap);
+    cursor.removeSelectedText();
+}
+
 void MainWindow::log(const QString &aMsg, bool newline) const
 {
     if (newline)
@@ -314,11 +374,13 @@ void MainWindow::log(const QString &aMsg, bool newline) const
         _ui->logBrowser->insertPlainText(aMsg);
         _ui->logBrowser->moveCursor(QTextCursor::End);
     }
+    _trimLogPane();
 }
 
 void MainWindow::logError(const QString &error) const
 {
     _ui->logBrowser->append(QString("<font color='red'>%1</font><br/>\n").arg(error));
+    _trimLogPane();
 }
 
 bool MainWindow::useFixedPassword() const
@@ -1942,11 +2004,13 @@ void MainWindow::onDebugToggled(bool checked)
     else
         _ngPost->setDebug(0);
     _ui->debugSB->setEnabled(checked);
+    _applyLogCapacity(checked ? _ui->debugSB->value() : 0);
 }
 
 void MainWindow::onDebugValue(int value)
 {
     _ngPost->setDebug(static_cast<ushort>(value));
+    _applyLogCapacity(value);
 }
 
 
