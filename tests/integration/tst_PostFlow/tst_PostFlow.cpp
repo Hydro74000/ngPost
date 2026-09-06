@@ -173,6 +173,13 @@ private slots:
     //! degenerate one would hand every article the same name.
     void obfuscation_gives_each_article_its_own_random_name();
 
+    //! The yEnc format calls for eight hex digits in pcrc32. The payload below
+    //! is chosen so its CRC32 is 0x051e59f4 -- a zero top nibble, which the
+    //! unpadded formatting used to write as seven digits. One article in
+    //! sixteen looks like this, so the assertion is deterministic rather than
+    //! left to chance.
+    void yenc_pcrc32_is_padded_to_eight_digits();
+
     //! The mock drops the connection after N bytes; ngPost must not crash or
     //! hang regardless of whether retry eventually succeeds.
     void retry_on_dropped_connection();
@@ -429,6 +436,42 @@ void TestPostFlow::obfuscation_gives_each_article_its_own_random_name()
         names.insert(name);
     }
     QCOMPARE(names.size(), arts.size()); // one distinct draw per article
+}
+
+void TestPostFlow::yenc_pcrc32_is_padded_to_eight_digits()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    // zlib.crc32(b"ngPost pcrc32 padding fixture 10") == 0x051e59f4
+    const QByteArray payload("ngPost pcrc32 padding fixture 10");
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/pcrc32.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        QCOMPARE(in.write(payload), qint64(payload.size()));
+    }
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/pcrc32.nzb");
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+    QString out;
+    const int exitCode = runNgPost(_bin,
+                                   { "-S", srv, "-i", inPath, "-o", nzbPath,
+                                     "-g", "alt.binaries.test",
+                                     "--quiet", "--disp_progress", "none" },
+                                   sandbox.rootPath(), out);
+    QVERIFY2(exitCode == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    const QStringList arts = mock.receivedArticles();
+    QCOMPARE(arts.size(), 1);
+    const QByteArray article = mock.readArticle(arts.first());
+
+    const QRegularExpression pcrc(QStringLiteral("pcrc32=([0-9a-f]*)"));
+    const QRegularExpressionMatch m = pcrc.match(QString::fromLatin1(article));
+    QVERIFY2(m.hasMatch(), "the article body carries no =yend pcrc32 field");
+    QCOMPARE(m.captured(1), QStringLiteral("051e59f4"));
 }
 
 void TestPostFlow::retry_on_dropped_connection()

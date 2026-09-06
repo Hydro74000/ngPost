@@ -153,9 +153,13 @@ void NntpArticle::yEncBody(const char data[])
     qint64 const encoded = Yenc::encode(data, _fileBytes, reinterpret_cast<uchar *>(ptr), crc32);
     ptr += encoded - 1; // Yenc::encode counts its own NUL, which the tail overwrites
 
+    // %08x, not %x: the yEnc format calls for eight hex digits, and a CRC
+    // whose top nibble is zero -- one article in sixteen -- used to be written
+    // a digit short. Lenient decoders never minded; ones that compare the
+    // field as a string do.
     int const tailLen = std::snprintf(ptr,
                                       kTailCapacity,
-                                      "%s=yend size=%lld pcrc32=%x%s.%s",
+                                      "%s=yend size=%lld pcrc32=%08x%s.%s",
                                       Nntp::ENDLINE,
                                       static_cast<long long>(_fileBytes),
                                       crc32,
