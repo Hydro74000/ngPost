@@ -80,7 +80,27 @@ public slots:
 
 private:
     PostingJob       *const _postingJob;
-    const QFileInfo         _file;      //!< original file
+
+    //! Everything this class needs from the QFileInfo it was handed, resolved
+    //! once at construction.
+    //!
+    //! Keeping the QFileInfo and querying it on demand was a data race:
+    //! NntpArticle::yEncBody() reads the name and the size outside the disk
+    //! lock, and consecutive articles of one file are encoded by the builder
+    //! threads of different Posters. QFileInfo is reentrant, not thread-safe --
+    //! size() stats lazily and writes the answer into a shared private.
+    //!
+    //! Nothing is lost by freezing them: _nbAticles is already computed from
+    //! this same size at construction, so a value read later could only ever
+    //! disagree with the article count the whole post is built on. The one
+    //! rename ngPost performs itself, for filename obfuscation, is undone in
+    //! onCompressionFinished() before _initPosting() creates any NntpFile.
+    const QString           _absoluteFilePath;
+    const QString           _absoluteDirPath;
+    const QString           _displayName; //!< bare file name, as posted
+    const std::string       _fileNameUtf8;
+    const qint64            _fileSizeBytes;
+
     const uint              _num;       //!< file number
     const uint              _nbFiles;   //!< total number of file
     const int               _padding;
@@ -98,29 +118,29 @@ void NntpFile::addArticle(NntpArticle *article) { _articles.push_back(article); 
 
 QString NntpFile::stats() const
 {
-    return QString("[%1 ok / %2] %3").arg(_posted.size()).arg(_nbAticles).arg(_file.absoluteFilePath());
+    return QString("[%1 ok / %2] %3").arg(_posted.size()).arg(_nbAticles).arg(_absoluteFilePath);
 }
 QString NntpFile::path() const
 {
-	return _file.absoluteFilePath();
+    return _absoluteFilePath;
 }
 
 QString NntpFile::directoryPath() const
 {
-    return _file.absolutePath();
+    return _absoluteDirPath;
 }
 
 QString NntpFile::name() const {
     return QString("[%1/%2] %3").arg(_num, _padding, 10,  QChar('0')).arg(
-                _nbFiles).arg(_file.fileName());
+                _nbFiles).arg(_displayName);
 }
 QString NntpFile::nameWithQuotes() const {
     return QString("[%1/%2] \"%3\"").arg(_num, _padding, 10,  QChar('0')).arg(
-                _nbFiles).arg(_file.fileName());
+                _nbFiles).arg(_displayName);
 }
 
-std::string NntpFile::fileName() const { return _file.fileName().toStdString(); }
-qint64 NntpFile::fileSize() const { return _file.size(); }
+std::string NntpFile::fileName() const { return _fileNameUtf8; }
+qint64 NntpFile::fileSize() const { return _fileSizeBytes; }
 uint NntpFile::nbArticles() const { return _nbAticles; }
 uint NntpFile::nbFailedArticles() const { return static_cast<uint>(_failed.size()); }
 bool NntpFile::hasFailedArticles() const { return _failed.size() != 0; }

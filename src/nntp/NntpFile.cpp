@@ -40,9 +40,14 @@ NntpFile::NntpFile(PostingJob *postingJob, const QFileInfo &file,
                    const QList<QString> &grpList):
     QObject(),
     _postingJob(postingJob),
-    _file(file), _num(num), _nbFiles(nbFiles), _padding(padding),
+    _absoluteFilePath(file.absoluteFilePath()),
+    _absoluteDirPath(file.absolutePath()),
+    _displayName(file.fileName()),
+    _fileNameUtf8(file.fileName().toStdString()),
+    _fileSizeBytes(file.size()),
+    _num(num), _nbFiles(nbFiles), _padding(padding),
     _grpList(grpList), _groups(grpList.join(",").toStdString()),
-    _nbAticles(articleCount(file.size(), postingJob->articleSizeBytes())),
+    _nbAticles(articleCount(_fileSizeBytes, postingJob->articleSizeBytes())),
     _articles(),
     _historyFileId(0),
     _posted(), _failed()
@@ -60,7 +65,7 @@ NntpFile::NntpFile(PostingJob *postingJob, const QFileInfo &file,
 NntpFile::~NntpFile()
 {
 #if defined(__DEBUG__) && defined(LOG_CONSTRUCTORS)
-    qDebug() << "Destruction nntpFile: " << _file.absoluteFilePath();
+    qDebug() << "Destruction nntpFile: " << _absoluteFilePath;
 #endif
     qDeleteAll(_articles);
 }
@@ -148,8 +153,8 @@ void NntpFile::writeToNZB(QTextStream &stream, const QString &from)
 #endif
                << QString(" subject=\"[%1/%2] - &quot;").arg(_num, _padding, 10,  QChar('0')).arg(_nbFiles)
 //               << " subject=\""  << "[" << _num << "/" << _nbFiles << "] - &quot;"
-               << NgPost::escapeXML(_file.fileName())
-               << "&quot; yEnc (1/"<< _nbAticles << ") " << _file.size() << "\">\n";
+               << NgPost::escapeXML(_displayName)
+               << "&quot; yEnc (1/"<< _nbAticles << ") " << _fileSizeBytes << "\">\n";
 
         stream << tab << tab << "<groups>\n";
         for (const QString &grp : _grpList)
