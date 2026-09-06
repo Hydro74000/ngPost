@@ -79,7 +79,6 @@ public:
     void dumpToFile(const QString &path, const std::string &articleIdSignature);
 
     std::string header(const std::string &idSignature) const;
-    inline std::string body() const;
     inline QString id() const;
     inline uint part() const;
     inline NntpFile *nntpFile() const;
@@ -118,8 +117,6 @@ void NntpArticle::freeMemory()
         _bodyWireSize = 0;
     }
 }
-
-std::string NntpArticle::body() const { return _body; }
 
 QString NntpArticle::id() const { return _msgId; }
 uint NntpArticle::part() const{ return _part; }

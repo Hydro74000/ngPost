@@ -83,13 +83,9 @@ public:
     inline void startThreads();
     void stopThreads();
 
-    bool prepareArticlesInAdvance();
     void scheduleArticlesInAdvance(int rounds);
 
     bool isPosting() const;
-
-private:
-    NntpArticle *_prepareNextArticle(const QString &threadName, bool fillQueue = true);
 };
 
 void Poster::lockQueue()

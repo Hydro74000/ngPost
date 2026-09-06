@@ -95,7 +95,7 @@ NntpArticle *Poster::getNextArticle(const QString &conPrefix)
                 _job->_log(
                     QString("[%1][Poster::getNextArticle] no article prepared...").arg(conPrefix));
 
-            article = _prepareNextArticle(conPrefix, false);
+            article = _articleBuilder->getNextArticle(conPrefix);
         }
     }
 
@@ -125,44 +125,11 @@ void Poster::releaseArticle(const QString &conPrefix, NntpArticle *article)
 }
 #endif
 
-bool Poster::prepareArticlesInAdvance()
-{
-    bool canProduceAll = true;
-    int nbArticlesToPrepare = _nntpConnections.size();
-    for (int i = 0; i < nbArticlesToPrepare; ++i) {
-        if (!_prepareNextArticle(_builderThread.objectName())) {
-#ifdef __DEBUG__
-            _job->_log(
-                QString("[%1] prepareArticlesInAdvance : no more Articles to produce after i = %1")
-                    .arg(_builderThread.objectName())
-                    .arg(i));
-#endif
-            canProduceAll = false;
-            break;
-        }
-    }
-#ifdef __DEBUG__
-    _job->_log(QString("[%1] prepareArticlesInAdvance: Article queue size:  %1")
-                   .arg(_builderThread.objectName())
-                   .arg(_articles.size()));
-#endif
-
-    return canProduceAll;
-}
-
 void Poster::scheduleArticlesInAdvance(int rounds)
 {
     const int nbArticlesToPrepare = rounds * _nntpConnections.size();
     for (int i = 0; i < nbArticlesToPrepare; ++i)
         emit _articleBuilder->scheduleNextArticle();
-}
-
-NntpArticle *Poster::_prepareNextArticle(const QString &threadName, bool fillQueue)
-{
-    NntpArticle *article = _articleBuilder->getNextArticle(threadName);
-    if (article && fillQueue)
-        _articles.enqueue(article);
-    return article;
 }
 
 bool Poster::isPosting() const
