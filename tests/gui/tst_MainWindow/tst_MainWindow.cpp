@@ -16,6 +16,7 @@
 //========================================================================
 
 #include <QtTest>
+#include <QTextBlock>
 #include <QTextBrowser>
 #include <QApplication>
 #include <QCheckBox>
@@ -68,6 +69,19 @@ private slots:
     //! is allowed to run over the cap before it is cut back. What must never
     //! happen is that the newest line is the one thrown away.
     void log_pane_keeps_the_newest_lines();
+
+    //! Compression progress in the normal GUI mode is written as repeated
+    //! "*" fragments with newline=false. Split it before QTextDocument ever
+    //! has to lay out one pathological block.
+    void log_pane_bounds_fragments_without_newlines();
+
+    //! readAllStandardOutput() can return a large accumulated chunk at once;
+    //! that input must be split before insertion too, not repaired afterwards.
+    void log_pane_bounds_one_large_fragment_without_newline();
+
+    //! Splitting must preserve natural line separators and never bisect one
+    //! non-BMP character's UTF-16 surrogate pair.
+    void log_pane_fragment_splitting_preserves_text_boundaries();
     //! Clicking the "Add Server" button adds a row to the servers table,
     //! and every per-row widget retrofitted with an objectName is findable
     //! from the window root.
@@ -1984,6 +1998,85 @@ void TestMainWindow::log_pane_keeps_the_newest_lines()
                                  ->toPlainText();
     QVERIFY2(kept.contains(QStringLiteral("line 2999")), "the newest line was trimmed away");
     QVERIFY2(!kept.contains(QStringLiteral("line 0\n")), "the oldest line survived the trim");
+}
+
+static int longestLogBlock(const QTextDocument *document)
+{
+    int longest = 0;
+    for (QTextBlock block = document->begin(); block.isValid(); block = block.next())
+        longest = qMax(longest, block.length() - 1); // exclude the block separator
+    return longest;
+}
+
+void TestMainWindow::log_pane_bounds_fragments_without_newlines()
+{
+    MainWindow win;
+    const int blockCharacterCap = win.logMaxBlockCharactersForTest();
+
+    win.log(QStringLiteral("old-marker"), false);
+    const QString fragment(100, QLatin1Char('*'));
+    for (int i = 0; i < 2000; ++i)
+        win.log(fragment, false);
+    win.log(QStringLiteral("new-marker"), false);
+
+    QTextBrowser *browser = win.findChild<QTextBrowser *>(QStringLiteral("logBrowser"));
+    QVERIFY(browser);
+    QVERIFY2(win.logBlockCountForTest() > 1, "the fragment stream remained one block");
+    QCOMPARE(longestLogBlock(browser->document()), blockCharacterCap);
+
+    QString kept = browser->toPlainText();
+    kept.remove(QLatin1Char('\n')); // only the deliberate safety boundaries
+    QCOMPARE(kept,
+             QStringLiteral("old-marker") + QString(200000, QLatin1Char('*'))
+                 + QStringLiteral("new-marker"));
+}
+
+void TestMainWindow::log_pane_bounds_one_large_fragment_without_newline()
+{
+    MainWindow win;
+    const QString payload(200021, QLatin1Char('x'));
+    win.log(payload, false);
+
+    QTextBrowser *browser = win.findChild<QTextBrowser *>(QStringLiteral("logBrowser"));
+    QVERIFY(browser);
+    QVERIFY(win.logBlockCountForTest() > 1);
+    QCOMPARE(longestLogBlock(browser->document()), win.logMaxBlockCharactersForTest());
+
+    QString kept = browser->toPlainText();
+    kept.remove(QLatin1Char('\n'));
+    QCOMPARE(kept, payload);
+}
+
+void TestMainWindow::log_pane_fragment_splitting_preserves_text_boundaries()
+{
+    MainWindow win;
+    const int cap = win.logMaxBlockCharactersForTest();
+    const QString emoji = QString::fromUtf8("\xF0\x9F\x99\x82");
+    const QString payload = QString(cap - 1, QLatin1Char('a')) + emoji
+        + QStringLiteral("b\r\nc\rd\ne") + QChar(0x2028) + QStringLiteral("f")
+        + QChar(0x2029) + QString(cap + 3, QLatin1Char('z'));
+    win.log(payload, false);
+
+    QTextBrowser *browser = win.findChild<QTextBrowser *>(QStringLiteral("logBrowser"));
+    QVERIFY(browser);
+    QVERIFY(longestLogBlock(browser->document()) <= cap);
+    for (QTextBlock block = browser->document()->begin(); block.isValid(); block = block.next()) {
+        const QString text = block.text();
+        QVERIFY2(text.isEmpty() || !text.front().isLowSurrogate(),
+                 "a block starts with the low half of a surrogate pair");
+        QVERIFY2(text.isEmpty() || !text.back().isHighSurrogate(),
+                 "a block ends with the high half of a surrogate pair");
+    }
+
+    QString flattened;
+    for (QTextBlock block = browser->document()->begin(); block.isValid(); block = block.next())
+        flattened += block.text();
+    QString expected = payload;
+    expected.remove(QLatin1Char('\r'));
+    expected.remove(QLatin1Char('\n'));
+    expected.remove(QChar(0x2028));
+    expected.remove(QChar(0x2029));
+    QCOMPARE(flattened, expected);
 }
 
 QTEST_MAIN(TestMainWindow)

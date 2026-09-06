@@ -71,6 +71,17 @@ public:
     FoldersMonitorForNewFiles(const QString &folderPath, QObject *parent = nullptr);
     ~FoldersMonitorForNewFiles();
 
+#ifdef NGPOST_TESTING
+    static bool retryWriteLockForTest(ushort &lockRetries, ushort maxRetries)
+    {
+        return _retryWriteLock(lockRetries, maxRetries);
+    }
+    static quint64 writeLockWaitMsForTest(ushort maxRetries, ulong sleepMs)
+    {
+        return _writeLockWaitMs(maxRetries, sleepMs);
+    }
+#endif
+
     bool addFolder(const QString &folderPath);
     void stopListening();
 
@@ -96,6 +107,8 @@ private:
     qint64 _dirSize(const QString &path) const;
 
     static QString _normalized(const QString &path);
+    static bool _retryWriteLock(ushort &lockRetries, ushort maxRetries);
+    static quint64 _writeLockWaitMs(ushort maxRetries, ulong sleepMs);
     bool _consumeIgnoredPath(const QString &absolutePath);
     void _releaseSpentReservations(const QString &folderPath, const PathSet &scan);
 

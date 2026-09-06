@@ -66,6 +66,11 @@ private slots:
     //! long after it had settled. They are watched in the same rounds now.
     void a_batch_of_files_is_reported_in_one_wait();
 
+    //! The legacy Windows loop waited after each of 30 locked probes. The
+    //! round-based loop must preserve those 30 complete intervals, and its
+    //! diagnostic must report their duration rather than its final probe.
+    void write_lock_retry_budget_matches_legacy_patience();
+
 private:
     QString _write(const QString &name, const QByteArray &content = "payload");
     //! One sweep of the folder, as the watcher would trigger it.
@@ -243,6 +248,23 @@ void TestFoldersMonitor::a_batch_of_files_is_reported_in_one_wait()
              qPrintable(QStringLiteral("a batch of %1 files took %2 ms: the per-file "
                                        "stability wait is being paid once per file")
                                 .arg(expected.size()).arg(elapsed)));
+}
+
+void TestFoldersMonitor::write_lock_retry_budget_matches_legacy_patience()
+{
+    ushort retries = 0;
+    int waits = 0;
+    while (FoldersMonitorForNewFiles::retryWriteLockForTest(retries, 30))
+        ++waits;
+
+    QCOMPARE(waits, 30);
+    QCOMPARE(retries, ushort(31)); // final probe after the thirtieth wait
+    QCOMPARE(FoldersMonitorForNewFiles::writeLockWaitMsForTest(30, 1000), quint64(30000));
+
+    retries = 0;
+    QVERIFY(!FoldersMonitorForNewFiles::retryWriteLockForTest(retries, 0));
+    QCOMPARE(retries, ushort(1));
+    QCOMPARE(FoldersMonitorForNewFiles::writeLockWaitMsForTest(0, 1000), quint64(0));
 }
 
 QTEST_MAIN(TestFoldersMonitor)

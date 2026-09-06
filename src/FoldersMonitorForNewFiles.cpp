@@ -37,6 +37,16 @@ ushort FoldersMonitorForNewFiles::sNbStableScans = 2;
 ushort FoldersMonitorForNewFiles::sMaxLockRetries = 30;
 #endif
 
+bool FoldersMonitorForNewFiles::_retryWriteLock(ushort &lockRetries, ushort maxRetries)
+{
+    return ++lockRetries <= maxRetries;
+}
+
+quint64 FoldersMonitorForNewFiles::_writeLockWaitMs(ushort maxRetries, ulong sleepMs)
+{
+    return static_cast<quint64>(maxRetries) * static_cast<quint64>(sleepMs);
+}
+
 FoldersMonitorForNewFiles::FoldersMonitorForNewFiles(const QString &folderPath, QObject *parent)
     : QObject(parent)
     , _monitor()
@@ -177,10 +187,13 @@ void FoldersMonitorForNewFiles::onDirectoryChanged(const QString &folderPath)
             // here would hold up the sampling of every other file in the
             // batch, which is exactly what the rounds exist to avoid.
             if (!entry.fileInfo.isDir() && _isWriteLockedByAnotherProcess(entry.fileInfo)) {
-                if (++entry.lockRetries < sMaxLockRetries)
+                // The first probe is immediate. Continue through retry N so
+                // N complete sleep intervals elapse before we give up on the
+                // following probe, matching the old blocking loop's patience.
+                if (_retryWriteLock(entry.lockRetries, sMaxLockRetries))
                     continue;
                 qDebug() << "[directoryChanged] WARNING: still locked by another process after "
-                         << entry.lockRetries * sMSleep
+                         << _writeLockWaitMs(sMaxLockRetries, sMSleep)
                          << " msec, processing anyway: " << entry.fileInfo.absoluteFilePath();
             }
 #endif

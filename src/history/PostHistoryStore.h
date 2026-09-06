@@ -224,6 +224,12 @@ public:
     explicit PostHistoryStore(const QString &dbPath = QString(), bool storePasswords = true);
     ~PostHistoryStore();
 
+#ifdef NGPOST_TESTING
+    //! Shorten lock-contention tests without changing the production timeout.
+    static void setBusyTimeoutForTest(int milliseconds);
+    static void resetBusyTimeoutForTest();
+#endif
+
     void configure(const QString &dbPath, bool storePasswords);
     void closeConnection();
     QString dbPath() const;

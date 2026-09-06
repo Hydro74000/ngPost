@@ -163,6 +163,7 @@ public:
     int      startupTabForTest() const { return _startupTab; }
     int      logBlockCapForTest() const { return _logBlockCap; }
     int      logBlockCountForTest() const;
+    int      logMaxBlockCharactersForTest() const;
     void     setLogBlockCapForTest(int blocks) { _logBlockCap = blocks; }
     void     fillTabContextMenuForTest(QMenu &menu, int tabIndex) { _fillTabContextMenu(menu, tabIndex); }
 #endif
@@ -301,10 +302,14 @@ private slots:
     void _onServerFieldEdited();
 
 private:
-    //! Re-derive how many lines the log pane keeps from \a debugLevel and
-    //! apply it. Called at construction, once NgPost is known, and whenever
-    //! the debug level changes.
+    //! Re-derive the block limit of the log pane from \a debugLevel. Called
+    //! at construction, once NgPost is known, and whenever the debug level
+    //! changes.
     void _applyLogCapacity(int debugLevel);
+
+    //! Insert a stream fragment without allowing one QTextDocument block to
+    //! grow large enough to make layout stall.
+    void _insertBoundedLogText(const QString &text) const;
 
     //! Drop the oldest lines once the pane is a whole slice over its budget.
     void _trimLogPane() const;

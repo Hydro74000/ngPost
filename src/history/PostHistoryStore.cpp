@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
+#include <QDebug>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -20,6 +21,21 @@
 
 namespace
 {
+
+constexpr int kSqliteBusyTimeoutMs = 5000;
+
+#ifdef NGPOST_TESTING
+int sSqliteBusyTimeoutMs = kSqliteBusyTimeoutMs;
+#endif
+
+int sqliteBusyTimeoutMs()
+{
+#ifdef NGPOST_TESTING
+    return sSqliteBusyTimeoutMs;
+#else
+    return kSqliteBusyTimeoutMs;
+#endif
+}
 
 QString nowIso()
 {
@@ -46,32 +62,92 @@ void setError(QString *error, const QSqlDatabase &db)
 QSqlDatabase dbFor(const QString &connectionName, const QString &dbPath, QString *error)
 {
     QSqlDatabase db;
-    bool newConnection = false;
     if (QSqlDatabase::contains(connectionName))
-        db = QSqlDatabase::database(connectionName);
+        db = QSqlDatabase::database(connectionName, false);
     else {
         db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
         db.setDatabaseName(dbPath);
-        newConnection = true;
     }
 
-    if (!db.isOpen() && !db.open()) {
+    const bool openedNow = !db.isOpen();
+    if (openedNow && !db.open()) {
         setError(error, db);
         return db;
     }
 
     QSqlQuery pragma(db);
-    if (newConnection) {
-        pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
+    // journal_mode needs an exclusive lock when the database is not already
+    // in WAL mode. Give a short-lived reader a chance to finish before the
+    // mode switch, but do not assume that waiting guarantees the switch.
+    const QString busyTimeout = QStringLiteral("PRAGMA busy_timeout=%1").arg(sqliteBusyTimeoutMs());
+    if (!pragma.exec(busyTimeout)) {
+        setError(error, pragma);
+        db.close();
+        return db;
+    }
+
+    if (openedNow) {
+        QString journalMode;
+        QString walFailure;
+        if (pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL")) && pragma.next()) {
+            journalMode = pragma.value(0).toString();
+        } else {
+            walFailure = pragma.lastError().text();
+            if (walFailure.isEmpty())
+                walFailure = QStringLiteral("no journal mode returned");
+        }
+        pragma.finish();
+
         // Under WAL, NORMAL is the durability the mode is designed around: a
         // crash or a kill still cannot corrupt the database, only the very
         // last transactions can be lost on a power cut. The default FULL
         // fsyncs on every commit, and the article flush commits in batches
         // while a post runs -- with callers of upsertFile(), deletePost() and
-        // purgePassword() blocking behind that flush.
-        pragma.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
+        // purgePassword() blocking behind that flush. PRAGMA journal_mode may
+        // execute successfully while returning another mode (or fail under a
+        // long-lived reader), so NORMAL is safe only after checking its row.
+        const bool walEnabled =
+            journalMode.compare(QStringLiteral("wal"), Qt::CaseInsensitive) == 0;
+        const QString synchronousMode = walEnabled ? QStringLiteral("NORMAL")
+                                                   : QStringLiteral("FULL");
+        const int expectedSynchronous = walEnabled ? 1 : 2;
+        if (!pragma.exec(QStringLiteral("PRAGMA synchronous=%1").arg(synchronousMode))) {
+            setError(error, pragma);
+            db.close();
+            return db;
+        }
+        if (!pragma.exec(QStringLiteral("PRAGMA synchronous")) || !pragma.next()) {
+            if (error) {
+                const QString sqlError = pragma.lastError().text();
+                *error = sqlError.isEmpty()
+                    ? QStringLiteral("SQLite did not return its synchronous mode")
+                    : sqlError;
+            }
+            db.close();
+            return db;
+        }
+        const int effectiveSynchronous = pragma.value(0).toInt();
+        pragma.finish();
+        if (effectiveSynchronous != expectedSynchronous) {
+            if (error) {
+                *error = QStringLiteral("SQLite synchronous mode is %1, expected %2")
+                             .arg(effectiveSynchronous)
+                             .arg(expectedSynchronous);
+            }
+            db.close();
+            return db;
+        }
+
+        if (!walEnabled && dbPath != QStringLiteral(":memory:")) {
+            const QString reason = journalMode.isEmpty()
+                ? walFailure
+                : QStringLiteral("journal_mode=%1").arg(journalMode);
+            qWarning().noquote()
+                << QStringLiteral("[PostHistoryStore] WAL unavailable for '%1' (%2); "
+                                  "using synchronous=FULL")
+                       .arg(dbPath, reason);
+        }
     }
-    pragma.exec(QStringLiteral("PRAGMA busy_timeout=5000"));
     pragma.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
     return db;
 }
@@ -206,6 +282,18 @@ PostHistoryStore::~PostHistoryStore()
 {
     closeConnection();
 }
+
+#ifdef NGPOST_TESTING
+void PostHistoryStore::setBusyTimeoutForTest(int milliseconds)
+{
+    sSqliteBusyTimeoutMs = qMax(0, milliseconds);
+}
+
+void PostHistoryStore::resetBusyTimeoutForTest()
+{
+    sSqliteBusyTimeoutMs = kSqliteBusyTimeoutMs;
+}
+#endif
 
 void PostHistoryStore::configure(const QString &dbPath, bool storePasswords)
 {

@@ -56,6 +56,7 @@
 #include <QTableWidget>
 #include <QTabWidget>
 #include <QTextStream>
+#include <QTextBlock>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QLabel>
@@ -110,6 +111,13 @@ constexpr int kLogBytesPerBlock = 7000;
 //! against 99 MB after 150 000 lines, because it churns the allocator far
 //! less.
 constexpr int kLogTrimSlice = 1000;
+
+//! QTextDocument lays out one whole block as a unit. A compressor's normal
+//! progress display is an unbroken stream of log("*", false), and a 100k
+//! character block already makes the GUI visibly stall. Split such streams
+//! early enough that layout remains cheap; the normal block budget then
+//! bounds their total lifetime like every other log line.
+constexpr int kLogMaxBlockCharacters = 2048;
 
 //! What the pane may hold, by debug level. With debug off it is a status log
 //! and 20 MB is a few thousand lines, far more than anyone scrolls back
@@ -349,7 +357,72 @@ int MainWindow::logBlockCountForTest() const
 {
     return _ui->logBrowser->document()->blockCount();
 }
+
+int MainWindow::logMaxBlockCharactersForTest() const
+{
+    return kLogMaxBlockCharacters;
+}
 #endif
+
+void MainWindow::_insertBoundedLogText(const QString &text) const
+{
+    QTextCursor cursor = _ui->logBrowser->textCursor();
+    cursor.movePosition(QTextCursor::End);
+
+    qsizetype pos = 0;
+    while (pos < text.size()) {
+        const QChar ch = text.at(pos);
+        const bool lineBreak = ch == QLatin1Char('\r') || ch == QLatin1Char('\n')
+            || ch.category() == QChar::Separator_Line
+            || ch.category() == QChar::Separator_Paragraph;
+        if (lineBreak) {
+            // QTextDocument treats CRLF as one paragraph boundary. Normalise
+            // every supported separator to the same explicit block operation.
+            if (ch == QLatin1Char('\r') && pos + 1 < text.size()
+                && text.at(pos + 1) == QLatin1Char('\n'))
+                ++pos;
+            cursor.insertBlock();
+            ++pos;
+            continue;
+        }
+
+        qsizetype runEnd = pos + 1;
+        while (runEnd < text.size()) {
+            const QChar candidate = text.at(runEnd);
+            if (candidate == QLatin1Char('\r') || candidate == QLatin1Char('\n')
+                || candidate.category() == QChar::Separator_Line
+                || candidate.category() == QChar::Separator_Paragraph)
+                break;
+            ++runEnd;
+        }
+
+        while (pos < runEnd) {
+            const int currentLength = qMax(0, cursor.block().length() - 1);
+            if (currentLength >= kLogMaxBlockCharacters) {
+                cursor.insertBlock();
+                continue;
+            }
+
+            qsizetype take = qMin<qsizetype>(kLogMaxBlockCharacters - currentLength,
+                                             runEnd - pos);
+            // The limit is expressed in UTF-16 units, but never split a
+            // surrogate pair merely because it straddles the boundary.
+            if (pos + take < runEnd && text.at(pos + take - 1).isHighSurrogate()
+                && text.at(pos + take).isLowSurrogate()) {
+                if (take == 1) {
+                    cursor.insertBlock();
+                    continue;
+                }
+                --take;
+            }
+            cursor.insertText(text.mid(pos, take));
+            pos += take;
+        }
+    }
+
+    _ui->logBrowser->setTextCursor(cursor);
+    _ui->logBrowser->ensureCursorVisible();
+}
 
 void MainWindow::_trimLogPane() const
 {
@@ -370,10 +443,7 @@ void MainWindow::log(const QString &aMsg, bool newline) const
     if (newline)
         _ui->logBrowser->append(aMsg);
     else
-    {
-        _ui->logBrowser->insertPlainText(aMsg);
-        _ui->logBrowser->moveCursor(QTextCursor::End);
-    }
+        _insertBoundedLogText(aMsg);
     _trimLogPane();
 }
 
