@@ -154,6 +154,11 @@ private slots:
     //! dump dir.
     void post_split_file_matches_segment_count();
 
+    //! A builder may still be yEnc-encoding a reserved article when another
+    //! builder reaches EOF. Connections must wait for that in-flight article,
+    //! not close merely because their queue is momentarily empty.
+    void multi_poster_waits_for_in_flight_articles_at_eof();
+
     //! Post over SSL using the mock's TLS port. ngPost rejects the
     //! mock's self-signed cert (no `--insecure-ssl` flag exists yet — this
     //! is current production behaviour). The test asserts the cert rejection
@@ -298,6 +303,44 @@ void TestPostFlow::post_split_file_matches_segment_count()
 
     const QStringList arts = mock.receivedArticles();
     QCOMPARE(arts.size(), 8);
+}
+
+void TestPostFlow::multi_poster_waits_for_in_flight_articles_at_eof()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    // Two posters reserve these two parts concurrently. The second part is
+    // deliberately tiny, so its builder can reach EOF while the first one is
+    // still encoding. Before the in-flight hand-off was represented in
+    // Poster, both connections closed and the process waited forever with the
+    // encoded articles stranded in their queues.
+    constexpr qint64 articleSize = 2 * 1024 * 1024;
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/uneven-split.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        QVERIFY(in.resize(articleSize + 1));
+    }
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/uneven-split.nzb");
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:2:nossl").arg(mock.port());
+    QString out;
+    const int exitCode = runNgPost(_bin,
+                                   { "-S", srv, "-i", inPath, "-o", nzbPath,
+                                     "-g", "alt.binaries.test",
+                                     "-a", QString::number(articleSize),
+                                     "-t", "4", // two Posters, one connection each
+                                     "--quiet", "--disp_progress", "none" },
+                                   sandbox.rootPath(), out, 10000);
+    QVERIFY2(exitCode == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    QCOMPARE(mock.receivedArticles().size(), 2);
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::ReadOnly));
+    QCOMPARE(countSegmentsInNzb(nzb.readAll()), 2);
 }
 
 void TestPostFlow::ssl_rejects_self_signed_cert()

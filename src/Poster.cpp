@@ -35,6 +35,8 @@ Poster::Poster(PostingJob *job, ushort id)
     , _nntpConnections()
     , _articles()
     , _secureArticles()
+    , _articleBuildInProgress(false)
+    , _articleBuilt()
 {
     _builderThread.setObjectName(QString("Builder #%1").arg(id));
     _connectionsThread.setObjectName(QString("Poster #%1").arg(id));
@@ -76,6 +78,19 @@ uint Poster::nbActiveConnections() const
 NntpArticle *Poster::getNextArticle(const QString &conPrefix)
 {
     QMutexLocker lock(&_secureArticles); // thread safety (coming from a posting thread)
+
+    if (MB_LoadAtomic(_job->_stopPosting))
+        return nullptr;
+
+    // The builder reserves the source slice under PostingJob's disk lock, then
+    // yEnc-encodes it outside this queue lock. During that interval another
+    // builder can reach EOF and set _noMoreFiles. An empty queue therefore
+    // cannot be treated as end-of-input until our own in-flight article has
+    // either been enqueued or failed to build. Waiting on the condition keeps
+    // the queue mutex available to the builder for that hand-off.
+    while (_articles.isEmpty() && _articleBuildInProgress
+           && !MB_LoadAtomic(_job->_stopPosting))
+        _articleBuilt.wait(&_secureArticles);
 
     if (MB_LoadAtomic(_job->_stopPosting))
         return nullptr;

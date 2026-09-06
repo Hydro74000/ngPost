@@ -25,6 +25,7 @@
 #include <QQueue>
 #include <QThread>
 #include <QVector>
+#include <QWaitCondition>
 class NgPost;
 class ArticleBuilder;
 class NntpConnection;
@@ -60,6 +61,13 @@ private:
 
     QQueue<NntpArticle *> _articles;
     QMutex _secureArticles;
+
+    //! True while the dedicated builder has reserved an article but has not
+    //! handed it to this Poster's queue yet. A temporarily empty queue is not
+    //! end-of-input while this is set, even if another builder has already set
+    //! PostingJob::_noMoreFiles after reserving the final source slice.
+    bool _articleBuildInProgress;
+    QWaitCondition _articleBuilt;
 
 public:
     Poster(PostingJob *job, ushort id);

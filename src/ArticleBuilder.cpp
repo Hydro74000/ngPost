@@ -76,10 +76,18 @@ void ArticleBuilder::onPrepareNextArticle()
     // getNextArticle() below, so this path must never hold _secureBuffer
     // while waiting for _secureArticles. getNextArticle() releases it before
     // returning, which is what stops the two orders from meeting.
+    {
+        QMutexLocker lock(&_poster->_secureArticles);
+        _poster->_articleBuildInProgress = true;
+    }
+
     NntpArticle *article = getNextArticle(_poster->_builderThread.objectName());
-    if (article)
+
     {
         QMutexLocker lock(&_poster->_secureArticles); // coming from _builderThread
-        _poster->_articles.enqueue(article);
+        if (article)
+            _poster->_articles.enqueue(article);
+        _poster->_articleBuildInProgress = false;
+        _poster->_articleBuilt.wakeAll();
     }
 }
