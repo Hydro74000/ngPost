@@ -170,6 +170,21 @@ void FoldersMonitorForNewFiles::onDirectoryChanged(const QString &folderPath)
             if (entry.nbStable < sNbStableScans)
                 continue;
 
+#if defined(Q_OS_WIN)
+            // Windows is the only platform where "is another process still
+            // writing this?" has an answer, and the size going quiet is not it
+            // (issue #112). One probe per round, not a blocking wait: waiting
+            // here would hold up the sampling of every other file in the
+            // batch, which is exactly what the rounds exist to avoid.
+            if (!entry.fileInfo.isDir() && _isWriteLockedByAnotherProcess(entry.fileInfo)) {
+                if (++entry.lockRetries < sMaxLockRetries)
+                    continue;
+                qDebug() << "[directoryChanged] WARNING: still locked by another process after "
+                         << entry.lockRetries * sMSleep
+                         << " msec, processing anyway: " << entry.fileInfo.absoluteFilePath();
+            }
+#endif
+
             _emitSettledPath(entry, nbWait);
             pending.removeAt(i);
         }
@@ -240,14 +255,6 @@ void FoldersMonitorForNewFiles::_emitSettledPath(const PendingPath &entry, ushor
 {
     QFileInfo fi = entry.fileInfo;
 
-#if defined(Q_OS_WIN)
-    // Windows is the only platform where "is another process still writing
-    // this?" has an answer, and the size going quiet is not it (issue #112).
-    if (fi.exists() && !fi.isDir() && !_waitUntilNotLocked(fi, nbWait))
-        qDebug() << "[directoryChanged] WARNING: still locked by another process after "
-                 << nbWait * sMSleep << " msec, processing anyway: " << fi.absoluteFilePath();
-#endif
-
     if (!fi.exists()) {
         qDebug() << "[directoryChanged] ignoring temporary file: " << fi.absoluteFilePath();
         return;
@@ -272,7 +279,7 @@ void FoldersMonitorForNewFiles::_emitSettledPath(const PendingPath &entry, ushor
 }
 
 #if defined(Q_OS_WIN)
-bool FoldersMonitorForNewFiles::_waitUntilNotLocked(const QFileInfo &fileInfo, ushort &nbWait) const
+bool FoldersMonitorForNewFiles::_isWriteLockedByAnotherProcess(const QFileInfo &fileInfo) const
 {
     // The question is "does anyone hold this open for writing?", and
     // dwShareMode = FILE_SHARE_READ asks exactly that: we tolerate other
@@ -281,26 +288,24 @@ bool FoldersMonitorForNewFiles::_waitUntilNotLocked(const QFileInfo &fileInfo, u
     // process holds its write handle. GENERIC_READ is all we request, so this
     // also works on a read-only share -- opening for writing would report
     // "locked" forever on any file we simply are not allowed to write.
-    for (ushort nbRetries = 0; nbRetries < sMaxLockRetries; ++nbRetries) {
-        QString const native = QDir::toNativeSeparators(fileInfo.absoluteFilePath());
-        HANDLE handle = ::CreateFileW(reinterpret_cast<LPCWSTR>(native.utf16()),
-                                      GENERIC_READ,
-                                      FILE_SHARE_READ,
-                                      nullptr,
-                                      OPEN_EXISTING,
-                                      FILE_ATTRIBUTE_NORMAL,
-                                      nullptr);
-        if (handle != INVALID_HANDLE_VALUE) {
-            ::CloseHandle(handle);
-            return true;
-        }
-        if (::GetLastError() != ERROR_SHARING_VIOLATION)
-            return true; // gone, or denied for another reason: not ours to solve
-
-        QThread::msleep(sMSleep);
-        ++nbWait;
+    //
+    // One attempt, and no sleeping: the caller retries once per round, so a
+    // file somebody else is still writing no longer holds up the sampling of
+    // every other file in the batch.
+    QString const native = QDir::toNativeSeparators(fileInfo.absoluteFilePath());
+    HANDLE handle = ::CreateFileW(reinterpret_cast<LPCWSTR>(native.utf16()),
+                                  GENERIC_READ,
+                                  FILE_SHARE_READ,
+                                  nullptr,
+                                  OPEN_EXISTING,
+                                  FILE_ATTRIBUTE_NORMAL,
+                                  nullptr);
+    if (handle != INVALID_HANDLE_VALUE) {
+        ::CloseHandle(handle);
+        return false;
     }
-    return false;
+    // Gone, or denied for another reason: not ours to solve, and not a lock.
+    return ::GetLastError() == ERROR_SHARING_VIOLATION;
 }
 #endif
 

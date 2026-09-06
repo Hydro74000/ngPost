@@ -108,13 +108,18 @@ private:
         qint64    size = 0;
         QDateTime lastModified;
         ushort    nbStable = 0;
+        //! Rounds spent waiting for another process to release its write
+        //! handle. Windows only; nothing sets it elsewhere.
+        ushort    lockRetries = 0;
     };
 
     //! Hand a settled path over to the posting side, after the Windows
     //! "is anyone still writing this?" check where that question has an answer.
     void _emitSettledPath(const PendingPath &entry, ushort nbWait);
 #if defined(Q_OS_WIN)
-    bool _waitUntilNotLocked(const QFileInfo &fileInfo, ushort &nbWait) const;
+    //! Is another process still holding this open for writing? One probe, no
+    //! waiting: the round loop is what provides the retries.
+    bool _isWriteLockedByAnotherProcess(const QFileInfo &fileInfo) const;
 #endif
 };
 
