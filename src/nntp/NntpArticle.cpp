@@ -88,6 +88,32 @@ int generateRandomStringLength(int start, int end) {
     return dist(articleRandomEngine());
 }
 
+namespace
+{
+//! Widest decimal rendering of the integers the yEnc lines carry: ten digits
+//! for a 32-bit unsigned, twenty for a signed 64-bit with its minus sign.
+constexpr size_t kMaxUIntDigits = 10;
+constexpr size_t kMaxI64Digits  = 20;
+constexpr size_t kEndlineLen    = std::char_traits<char>::length(Nntp::ENDLINE);
+constexpr size_t kCrc32Digits   = 8; //!< pcrc32 is written %08x, so always eight
+
+//! Capacities for the three fixed-format pieces of the body: the literal text
+//! of each format string -- sizeof() counts its NUL, which is the terminator
+//! we need -- plus the worst case of every field it interpolates.
+//!
+//! Sizing them this way is what rules truncation out. snprintf cannot shorten
+//! what always fits, so its return value is exact, and no runtime branch is
+//! needed to catch a failure that cannot happen. That matters for the tail in
+//! particular: its return value advances the write pointer, and a truncated
+//! one would have set _bodyWireSize past the end of the allocation.
+constexpr size_t kHeadCapacity = sizeof("=ybegin part= total= line=128 size= name=")
+                               + 2 * kMaxUIntDigits + kMaxI64Digits;
+constexpr size_t kYpartCapacity = sizeof("=ypart begin= end=")
+                                + 2 * kEndlineLen + 2 * kMaxI64Digits;
+constexpr size_t kTailCapacity = sizeof("=yend size= pcrc32=.")
+                               + 3 * kEndlineLen + kMaxI64Digits + kCrc32Digits;
+} // namespace
+
 //! Upper bound on what Yenc::encode writes for \a nbBytes of input, its
 //! trailing NUL included.
 //!
@@ -112,29 +138,21 @@ void NntpArticle::yEncBody(const char data[])
     // lines first, then Yenc::encode writing straight behind them, then the
     // =yend line. Going through a std::stringstream and its str() copy meant
     // four passes over ~700 KB and 15 allocations for exactly these bytes.
-    char       head[192];
-    int const  headLen  = std::snprintf(head,
-                                       sizeof head,
-                                       "=ybegin part=%u total=%u line=128 size=%lld name=",
-                                       _part,
-                                       _nntpFile->nbArticles(),
-                                       static_cast<long long>(_nntpFile->fileSize()));
-    char       ypart[160];
-    int const  ypartLen = std::snprintf(ypart,
-                                        sizeof ypart,
-                                        "%s=ypart begin=%lld end=%lld%s",
-                                        Nntp::ENDLINE,
-                                        static_cast<long long>(_filePos + 1),
-                                        static_cast<long long>(_filePos + _fileBytes),
-                                        Nntp::ENDLINE);
-    // Both are bounded by the width of their integer types and cannot truncate
-    // in the sizes above; bail out rather than post a malformed article if a
-    // platform ever proves otherwise.
-    if (headLen < 0 || headLen >= static_cast<int>(sizeof head) || ypartLen < 0
-        || ypartLen >= static_cast<int>(sizeof ypart))
-        return;
-
-    static constexpr size_t kTailCapacity = 96; //!< "=yend size=... pcrc32=..." + "." + ENDLINE
+    char      head[kHeadCapacity];
+    int const headLen = std::snprintf(head,
+                                      sizeof head,
+                                      "=ybegin part=%u total=%u line=128 size=%lld name=",
+                                      _part,
+                                      _nntpFile->nbArticles(),
+                                      static_cast<long long>(_nntpFile->fileSize()));
+    char      ypart[kYpartCapacity];
+    int const ypartLen = std::snprintf(ypart,
+                                       sizeof ypart,
+                                       "%s=ypart begin=%lld end=%lld%s",
+                                       Nntp::ENDLINE,
+                                       static_cast<long long>(_filePos + 1),
+                                       static_cast<long long>(_filePos + _fileBytes),
+                                       Nntp::ENDLINE);
 
     size_t const capacity = static_cast<size_t>(headLen) + filename.size()
                           + static_cast<size_t>(ypartLen) + yEncWorstCaseSize(_fileBytes)
@@ -165,6 +183,10 @@ void NntpArticle::yEncBody(const char data[])
                                       crc32,
                                       Nntp::ENDLINE,
                                       Nntp::ENDLINE);
+    // Exact by construction, see kTailCapacity: this advances the pointer that
+    // sets _bodyWireSize, so a truncated count would run the socket write off
+    // the end of the buffer.
+    Q_ASSERT(tailLen > 0 && static_cast<size_t>(tailLen) < kTailCapacity);
     ptr += tailLen;
 
     size_t const bodySize = static_cast<size_t>(ptr - _body);
@@ -173,7 +195,7 @@ void NntpArticle::yEncBody(const char data[])
     // What goes in the nzb is the article as the server stores it, so drop the
     // trailing "." ENDLINE: that is the NNTP end-of-body marker written on the
     // wire, not part of the article.
-    static const size_t kDotTerminator = 1 + std::char_traits<char>::length(Nntp::ENDLINE);
+    constexpr size_t kDotTerminator = 1 + kEndlineLen;
     _bodySize = bodySize > kDotTerminator ? static_cast<qint64>(bodySize - kDotTerminator)
                                           : static_cast<qint64>(bodySize);
 }
