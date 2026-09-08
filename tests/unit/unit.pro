@@ -4,6 +4,7 @@ TEMPLATE = subdirs
 
 SUBDIRS = \
     tst_Yenc \
+    tst_NntpFile \
     tst_PathHelper \
     tst_PostHistory \
     tst_PostInfoTemplate \

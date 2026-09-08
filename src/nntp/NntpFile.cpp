@@ -26,15 +26,12 @@
 #include <QDebug>
 #include <QMutexLocker>
 
-namespace
-{
-uint articleCount(qint64 fileSize, qint64 articleSize)
+uint NntpFile::articleCount(qint64 fileSize, qint64 articleSize)
 {
     if (fileSize <= 0 || articleSize <= 0)
         return 0;
     return static_cast<uint>(fileSize / articleSize + (fileSize % articleSize ? 1 : 0));
 }
-} // namespace
 
 NntpFile::NntpFile(PostingJob *postingJob, const QFileInfo &file,
                    uint num, uint nbFiles, int padding,

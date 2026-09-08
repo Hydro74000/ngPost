@@ -46,6 +46,17 @@ public:
 
     inline void addArticle(NntpArticle *article);
 
+    //! How many articles a file of \a fileSize bytes is cut into with an
+    //! article payload of \a articleSize bytes. Zero for a non-positive size,
+    //! which is what keeps an empty or vanished file from being posted as one
+    //! empty article.
+    //!
+    //! Public, like NntpArticle::yEncWorstCaseSize, so the arithmetic that
+    //! decides how many pieces every posted file is cut into can be tested on
+    //! its own rather than only through a full posting run: an off-by-one here
+    //! would silently truncate or pad every post.
+    static uint articleCount(qint64 fileSize, qint64 articleSize);
+
     void writeToNZB(QTextStream &stream, const QString &from);
 
     inline QString stats() const;
