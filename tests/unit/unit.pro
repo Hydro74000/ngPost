@@ -5,6 +5,7 @@ TEMPLATE = subdirs
 SUBDIRS = \
     tst_Yenc \
     tst_NntpFile \
+    tst_VpnSocketBinder \
     tst_PathHelper \
     tst_PostHistory \
     tst_PostInfoTemplate \
