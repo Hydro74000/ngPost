@@ -150,6 +150,18 @@ POST_HISTORY = /nzb/ngPost_history.csv
 ## Character used to separate fields in the history posting file
 #FIELD_SEPARATOR = ;
 
+## SQLite database holding the post history, the statistics and the resume
+## information. This is the modern history; POST_HISTORY above is the legacy
+## csv and the two are independent.
+## Defaults to ngPost_history.sqlite next to this configuration file.
+#POST_DB = /nzb/ngPost_history.sqlite
+
+## Store archive passwords in that database (true by default).
+## They are kept in clear text so that "resume" and "regenerate nzb" can still
+## open your archives later. Set it to false if you would rather keep no copy
+## of them, at the cost of having to remember the password of every post.
+#HISTORY_STORE_PASSWORDS = false
+
 GROUPS   = alt.binaries.test,alt.binaries.misc
 
 ## If you give several Groups (comma separated) you've 3 policy when posting:
@@ -193,6 +205,17 @@ retry = 5
 ## them, so the archive carries no original name. Both can be asked at once:
 ##   obfuscate = article, filename
 #obfuscate = article
+
+## when obfuscating file names, leave the .nfo extension visible instead of
+## renaming it like the rest (only meaningful with 'obfuscate = filename')
+#KEEP_NFO_EXTENSION = true
+
+## copy the .nfo found next to the posted files beside the generated nzb
+#NZB_COPY_NFO = true
+
+## auto posting: include a sibling .nfo (same base name, .nfo extension) in the
+## post itself, alongside the files it describes
+#AUTO_INCLUDE_NFO = true
 
 ## remove accents and special characters from the nzb file names
 NZB_RM_ACCENTS = true
@@ -330,6 +353,12 @@ PAR2_PCT = 8
 #PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q   (for parpar)
 #PAR2_ARGS = c -l -m1024 -r8 -s768000                 (for par2cmdline)
 #PAR2_ARGS = create /rr8 /lc40 /lr /rd2 /ss768000     (for Multipar)
+
+## par2 slice (block) size in bytes, used by --check to work out how much of a
+## damaged post the recovery files can actually repair.
+## Leave it out unless you set an explicit slice size in PAR2_ARGS: ngPost then
+## cannot know it, and reports the recovery capacity as unknown.
+#PAR2_BLOCK_SIZE = 768000
 
 
 ## length of the random generated archive's file name
