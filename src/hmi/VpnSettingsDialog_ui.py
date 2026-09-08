@@ -146,7 +146,7 @@ class Ui_VpnSettingsDialog(object):
         self.footerLayout.setObjectName(u"footerLayout")
         self.licencesLink = QLabel(VpnSettingsDialog)
         self.licencesLink.setObjectName(u"licencesLink")
-        self.licencesLink.setTextFormat(Qt.TextFormat.RichText)
+        self.licencesLink.setTextFormat(Qt.RichText)
 
         self.footerLayout.addWidget(self.licencesLink)
 
@@ -156,7 +156,7 @@ class Ui_VpnSettingsDialog(object):
 
         self.buttonBox = QDialogButtonBox(VpnSettingsDialog)
         self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setStandardButtons(QDialogButtonBox.StandardButton.Close)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Close)
 
         self.footerLayout.addWidget(self.buttonBox)
 
@@ -192,3 +192,4 @@ class Ui_VpnSettingsDialog(object):
         self.logBox.setTitle(QCoreApplication.translate("VpnSettingsDialog", u"Log", None))
         self.licencesLink.setText(QCoreApplication.translate("VpnSettingsDialog", u"<a href=\"about:licences\">About licences</a>", None))
     # retranslateUi
+
