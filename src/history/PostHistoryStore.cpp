@@ -59,6 +59,37 @@ void setError(QString *error, const QSqlDatabase &db)
         *error = db.lastError().text();
 }
 
+//! Restrict the history database to its owner.
+//!
+//! It holds every archive password when HISTORY_STORE_PASSWORDS is on -- which
+//! is the default -- so it is as sensitive as any credential file, yet the
+//! SQLite driver creates it with the process umask, typically world readable.
+//! The -wal and -shm sidecars carry committed rows too, so they get the same
+//! treatment; they only exist once WAL is established, hence the call site.
+//!
+//! Best effort by design: a database on a filesystem with no Unix permissions
+//! (a network share, exFAT, Windows) must keep working. A failure here is
+//! reported to the log, never turned into a history subsystem failure.
+void restrictHistoryDbPermissions(const QString &dbPath)
+{
+    if (dbPath.isEmpty() || dbPath == QStringLiteral(":memory:"))
+        return;
+    const QFileDevice::Permissions ownerOnly =
+        QFileDevice::ReadOwner | QFileDevice::WriteOwner;
+    for (const QString &suffix : { QString(), QStringLiteral("-wal"), QStringLiteral("-shm") }) {
+        const QString path = dbPath + suffix;
+        QFileInfo const info(path);
+        if (!info.exists() || info.permissions() == ownerOnly)
+            continue;
+        if (!QFile::setPermissions(path, ownerOnly)) {
+            qWarning().noquote()
+                << QStringLiteral("[PostHistoryStore] could not restrict '%1' to its owner; "
+                                  "it may be readable by other users of this machine")
+                       .arg(path);
+        }
+    }
+}
+
 QSqlDatabase dbFor(const QString &connectionName, const QString &dbPath, QString *error)
 {
     QSqlDatabase db;
@@ -128,6 +159,8 @@ QSqlDatabase dbFor(const QString &connectionName, const QString &dbPath, QString
         }
         const int effectiveSynchronous = pragma.value(0).toInt();
         pragma.finish();
+
+        restrictHistoryDbPermissions(dbPath);
         // Only a *weaker* setting breaks the durability this code reasons
         // about. A build that reports EXTRA where FULL was asked is safer, not
         // broken, and losing the whole history over it would turn a preference
