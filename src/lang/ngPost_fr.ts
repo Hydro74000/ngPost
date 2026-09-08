@@ -625,7 +625,7 @@ Contrairement à la case du post, ce choix est sauvegardé.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3090"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3089"/>
         <source>VPN: disabled</source>
         <translation>VPN : désactivé</translation>
     </message>
@@ -774,7 +774,7 @@ Contrairement à la case du post, ce choix est sauvegardé.</translation>
         <translation>allez en mode Terminal (fermeture de l&apos;IHM et passage en ligne de commande)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1209"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1208"/>
         <source>Host (name or IP)</source>
         <translation>Serveur (DNS ou IP)</translation>
     </message>
@@ -805,13 +805,13 @@ Contrairement à la case du post, ce choix est sauvegardé.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1056"/>
+        <location line="+1055"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>Mot de Passe</translation>
     </message>
     <message>
-        <location line="-1129"/>
+        <location line="-1128"/>
         <location line="+397"/>
         <source>Default %1</source>
         <translation>Défaut %1</translation>
@@ -902,13 +902,13 @@ Fermez cet autre ngPost pour utiliser le VPN ici. Si aucun ne tourne, vous pouve
     </message>
     <message>
         <location line="+1"/>
-        <location line="+563"/>
+        <location line="+562"/>
         <location line="+174"/>
         <source>Files</source>
         <translation>Fichiers</translation>
     </message>
     <message>
-        <location line="-736"/>
+        <location line="-735"/>
         <source>Parameters</source>
         <translation>Paramètres</translation>
     </message>
@@ -953,7 +953,7 @@ Fermez cet autre ngPost pour utiliser le VPN ici. Si aucun ne tourne, vous pouve
         <translation>Échec de la mise à jour</translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+78"/>
         <source>VPN required</source>
         <translation>VPN requis</translation>
     </message>
@@ -971,12 +971,12 @@ The job stays in the queue.</source>
 Le job reste dans la file d&apos;attente.</translation>
     </message>
     <message>
-        <location line="-577"/>
+        <location line="-576"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>Ces réglages n&apos;ont pas pu être supprimés. Voir le journal VPN pour le détail.</translation>
     </message>
     <message>
-        <location line="+591"/>
+        <location line="+590"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>Le VPN configuré dans ngPost semble déjà actif ; un autre ngPost l&apos;utilise peut-être. Voir les réglages VPN.</translation>
     </message>
@@ -1579,7 +1579,7 @@ Cela supprime aussi tous les enregistrements de fichiers et d&apos;articles asso
         <translation>VPN : échec</translation>
     </message>
     <message>
-        <location line="-2475"/>
+        <location line="-2474"/>
         <source>close while still posting?</source>
         <translation>Quitter en cours de Post?</translation>
     </message>
@@ -1611,7 +1611,7 @@ Are you sure you want to quit?</source>
         <translation>Fermer tous les onglets des Posts finis</translation>
     </message>
     <message>
-        <location line="+1493"/>
+        <location line="+1492"/>
         <source>Quick Post is working..</source>
         <translation>Post en cours..</translation>
     </message>
@@ -1758,9 +1758,9 @@ Are you sure you want to quit?</source>
         <translation>Supprimer l&apos;entrée</translation>
     </message>
     <message>
-        <location line="-1320"/>
+        <location line="-1319"/>
         <location line="+397"/>
-        <location line="+509"/>
+        <location line="+508"/>
         <location line="+325"/>
         <source>History</source>
         <translation>Historique</translation>

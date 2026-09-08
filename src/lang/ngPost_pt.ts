@@ -622,7 +622,7 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3090"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3089"/>
         <source>VPN: disabled</source>
         <translation>VPN: desativado</translation>
     </message>
@@ -781,7 +781,7 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
         <translation>vá por linha de comando (feche o GUI e continue no shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1210"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1209"/>
         <source>on</source>
         <translation>on</translation>
     </message>
@@ -817,13 +817,13 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1056"/>
+        <location line="+1055"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>Senha</translation>
     </message>
     <message>
-        <location line="-1129"/>
+        <location line="-1128"/>
         <location line="+397"/>
         <source>Default %1</source>
         <translation>Padrão %1</translation>
@@ -853,7 +853,11 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
 Another ngPost is using it, most likely an older version.
 
 Close that other ngPost to use the VPN here.</source>
-        <translation type="unfinished"></translation>
+        <translation>A VPN configurada no ngPost parece já estar em execução.
+
+Outro ngPost está a utilizá-la, muito provavelmente uma versão mais antiga.
+
+Feche esse outro ngPost para utilizar a VPN aqui.</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -862,32 +866,36 @@ Close that other ngPost to use the VPN here.</source>
 Another ngPost may be using it.
 
 Close that other ngPost to use the VPN here. If none is running, you can remove these leftover settings.</source>
-        <translation type="unfinished"></translation>
+        <translation>A VPN configurada no ngPost parece já estar em execução.
+
+Outro ngPost poderá estar a utilizá-la.
+
+Feche esse outro ngPost para utilizar a VPN aqui. Se não houver nenhum em execução, pode remover estas definições residuais.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The VPN seems to be already in use</source>
-        <translation type="unfinished"></translation>
+        <translation>A VPN parece já estar em utilização</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation>Fechar</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Remove leftover settings...</source>
-        <translation type="unfinished"></translation>
+        <translation>Remover definições residuais...</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Another ngPost is using them.</source>
-        <translation type="unfinished"></translation>
+        <translation>Outro ngPost está a utilizá-las.</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN</translation>
     </message>
     <message>
         <location line="+219"/>
@@ -918,13 +926,13 @@ Tem certeza que deseja sair?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+563"/>
+        <location line="+562"/>
         <location line="+174"/>
         <source>Files</source>
         <translation>Arquivos</translation>
     </message>
     <message>
-        <location line="-736"/>
+        <location line="-735"/>
         <source>Parameters</source>
         <translation>Parâmetros</translation>
     </message>
@@ -985,7 +993,7 @@ Tem certeza que deseja sair?</translation>
         <translation>Atualização falhou</translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+78"/>
         <source>VPN required</source>
         <translation>VPN necessário</translation>
     </message>
@@ -1003,44 +1011,44 @@ The job stays in the queue.</source>
 O trabalho fica na fila.</translation>
     </message>
     <message>
-        <location line="-577"/>
+        <location line="-576"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível remover estas definições. Consulte o registo da VPN para mais detalhes.</translation>
     </message>
     <message>
-        <location line="+591"/>
+        <location line="+590"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
-        <translation type="unfinished"></translation>
+        <translation>A VPN configurada no ngPost parece já estar em execução; outro ngPost poderá estar a utilizá-la. Consulte as definições da VPN.</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>VPN recovery exhausted</source>
-        <translation type="unfinished"></translation>
+        <translation>Recuperação da VPN esgotada</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>The posting job is paused and preserved for a later resume.</source>
-        <translation type="unfinished"></translation>
+        <translation>A tarefa de publicação está em pausa e foi preservada para retomar mais tarde.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Retry</source>
-        <translation type="unfinished"></translation>
+        <translation>Tentar novamente</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Stop and preserve for resume</source>
-        <translation type="unfinished"></translation>
+        <translation>Parar e preservar para retomar</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>VPN recovery</source>
-        <translation type="unfinished"></translation>
+        <translation>Recuperação da VPN</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>The VPN recovery could not be restarted.</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível reiniciar a recuperação da VPN.</translation>
     </message>
     <message>
         <location line="+202"/>
@@ -1610,12 +1618,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
     <message>
         <location line="+2"/>
         <source>VPN: in use by another instance</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: em utilização por outra instância</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>VPN: reconnecting...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: a reconectar...</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -1759,9 +1767,9 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>Excluir entrada</translation>
     </message>
     <message>
-        <location line="-1320"/>
+        <location line="-1319"/>
         <location line="+397"/>
-        <location line="+509"/>
+        <location line="+508"/>
         <location line="+325"/>
         <source>History</source>
         <translation>Histórico</translation>
@@ -3390,22 +3398,22 @@ O seu ficheiro de configuração activo é:
     <message>
         <location line="+147"/>
         <source>## tunnel selected ngPost connections through an embedded VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>## encaminhar as ligações selecionadas do ngPost através de uma VPN integrada</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>## CLI only: wait for the machine-wide VPN lease (0 fails immediately; range 0..1440)</source>
-        <translation type="unfinished"></translation>
+        <translation>## apenas CLI: aguardar a reserva da VPN a nível da máquina (0 falha de imediato; intervalo 0..1440)</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>## VPN recovery attempts (0 = unlimited; range 0..1000)</source>
-        <translation type="unfinished"></translation>
+        <translation>## tentativas de recuperação da VPN (0 = ilimitado; intervalo 0..1000)</translation>
     </message>
     <message>
         <location line="+20"/>
         <source>## disabling auto-resume still preserves unconfirmed articles as unknown</source>
-        <translation type="unfinished"></translation>
+        <translation>## desativar a retoma automática continua a preservar os artigos não confirmados como desconhecidos</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -3460,102 +3468,102 @@ O seu ficheiro de configuração activo é:
     <message>
         <location line="-4063"/>
         <source>check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, see the report for whether they can be repaired, 2 = missing beyond any repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)</source>
-        <translation type="unfinished"></translation>
+        <translation>verificar o ficheiro nzb (se os artigos estão disponíveis na Usenet). Código de saída: 0 = todos os artigos presentes, 1 = faltam artigos, consulte o relatório para saber se são reparáveis, 2 = perda irreparável, 3 = sem veredicto (nzb ilegível, nenhum servidor ativado para verificação, ou ligações falhadas)</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>with --check: print a single machine readable JSON report on stdout instead of the human one</source>
-        <translation type="unfinished"></translation>
+        <translation>com --check: imprimir um único relatório JSON legível por máquina no stdout em vez do relatório humano</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>with --check: verify every article even once the post is provably beyond repair</source>
-        <translation type="unfinished"></translation>
+        <translation>com --check: verificar todos os artigos mesmo quando a publicação é comprovadamente irreparável</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>with --check: PAR2 slice size in bytes used to create the post, for the recovery analysis (default: derived from the nzb)</source>
-        <translation type="unfinished"></translation>
+        <translation>com --check: tamanho do bloco PAR2 em bytes usado para criar a publicação, para a análise de recuperação (por omissão: deduzido do nzb)</translation>
     </message>
     <message>
         <location line="+97"/>
         <source>remove unowned ngPost VPN resources after rechecking them (requires --yes)</source>
-        <translation type="unfinished"></translation>
+        <translation>remover recursos VPN do ngPost sem proprietário após nova verificação (requer --yes)</translation>
     </message>
     <message>
         <location line="+301"/>
         <source>VPN recovery exhausted; the post was preserved for resume.</source>
-        <translation type="unfinished"></translation>
+        <translation>Recuperação da VPN esgotada; a publicação foi preservada para retoma.</translation>
     </message>
     <message>
         <location line="+1075"/>
         <source>SSL support is unavailable</source>
-        <translation type="unfinished"></translation>
+        <translation>O suporte de SSL não está disponível</translation>
     </message>
     <message>
         <location line="+110"/>
         <source>The post remains paused until the requested VPN stop completes.</source>
-        <translation type="unfinished"></translation>
+        <translation>A publicação permanece em pausa até que a paragem solicitada da VPN termine.</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>The post remains paused until VPN recovery completes.</source>
-        <translation type="unfinished"></translation>
+        <translation>A publicação permanece em pausa até que a recuperação da VPN termine.</translation>
     </message>
     <message>
         <location line="+866"/>
         <source>Error: --vpn-cleanup-unattributed requires --yes because it can interrupt another ngPost tunnel.</source>
-        <translation type="unfinished"></translation>
+        <translation>Erro: --vpn-cleanup-unattributed requer --yes porque pode interromper o túnel de outro ngPost.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>VPN resources were not removed.</source>
-        <translation type="unfinished"></translation>
+        <translation>Os recursos da VPN não foram removidos.</translation>
     </message>
     <message>
         <location line="+66"/>
         <source>Error: --%1 expects a positive number of bytes</source>
-        <translation type="unfinished"></translation>
+        <translation>Erro: --%1 espera um número positivo de bytes</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>given on the command line</source>
-        <translation type="unfinished"></translation>
+        <translation>indicado na linha de comandos</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>from the configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>a partir da configuração</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>the nzb file could not be read</source>
-        <translation type="unfinished"></translation>
+        <translation>não foi possível ler o ficheiro nzb</translation>
     </message>
     <message>
         <location line="+20"/>
         <source>no server is enabled for nzb checking: set &apos;nzbCheck = true&apos; on at least one [server] of your configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>nenhum servidor está ativado para a verificação de nzb: defina «nzbCheck = true» em pelo menos um [server] da sua configuração</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>the servers enabled for nzb checking have no positive connection count</source>
-        <translation type="unfinished"></translation>
+        <translation>os servidores ativados para a verificação de nzb não têm um número de ligações positivo</translation>
     </message>
     <message>
         <location line="+921"/>
         <source>Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5.</source>
-        <translation type="unfinished"></translation>
+        <translation>Aviso: VPN_LEASE_WAIT_MINUTES deve estar entre 0 e 1440; será usado 5.</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Warning: VPN_RECOVERY_MAX_ATTEMPTS must be in 0..1000; using 0 (unlimited).</source>
-        <translation type="unfinished"></translation>
+        <translation>Aviso: VPN_RECOVERY_MAX_ATTEMPTS deve estar entre 0 e 1000; será usado 0 (ilimitado).</translation>
     </message>
     <message>
         <location line="+398"/>
         <source>should be a positive number of bytes!...</source>
-        <translation type="unfinished"></translation>
+        <translation>deveria ser um número positivo de bytes!...</translation>
     </message>
     <message>
         <location line="+156"/>
@@ -4046,17 +4054,17 @@ O seu ficheiro de configuração activo é:
     <message>
         <location line="+6"/>
         <source>## PAR2 slice size in bytes, used by --check to weigh a loss against the</source>
-        <translation type="unfinished"></translation>
+        <translation>## tamanho do bloco PAR2 em bytes, usado por --check para comparar uma perda com os</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>## recovery blocks. Without it the check infers one and refuses to declare</source>
-        <translation type="unfinished"></translation>
+        <translation>## blocos de recuperação. Sem ele, a verificação deduz um e recusa-se a declarar</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>## a post beyond repair.</source>
-        <translation type="unfinished"></translation>
+        <translation>## uma publicação como irreparável.</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -4199,12 +4207,12 @@ O seu ficheiro de configuração activo é:
     <message>
         <location line="+19"/>
         <source>[Con #%1] %2:%3 stopped answering after %4 s, dropping the connection</source>
-        <translation type="unfinished"></translation>
+        <translation>[Lig. #%1] %2:%3 deixou de responder após %4 s; a ligação será terminada</translation>
     </message>
     <message>
         <location line="+34"/>
         <source>[Con #%1] reconnecting (attempt %2 of %3)</source>
-        <translation type="unfinished"></translation>
+        <translation>[Lig. #%1] a reconectar (tentativa %2 de %3)</translation>
     </message>
     <message>
         <location line="+34"/>
@@ -4338,32 +4346,32 @@ O seu ficheiro de configuração activo é:
     <message>
         <location filename="../NzbCheck.cpp" line="+135"/>
         <source>there is nothing left to rebuild it with</source>
-        <translation type="unfinished"></translation>
+        <translation>não resta nada com que o reconstruir</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>the loss is already beyond what the PAR2 blocks can repair</source>
-        <translation type="unfinished"></translation>
+        <translation>a perda já excede o que os blocos PAR2 conseguem reparar</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Stopped after %1 of the %2 article(s) listed in the nzb: %3, so checking the rest would not change the answer. Pass --%4 to check everything anyway.</source>
-        <translation type="unfinished"></translation>
+        <translation>Parou após %1 dos %2 artigos listados no nzb: %3, pelo que verificar os restantes não alteraria a resposta. Use --%4 para verificar tudo mesmo assim.</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>ERROR: check FAILED - not one of the %1 article(s) listed in the nzb could be verified. Every connection was refused or dropped: check the credentials, and whether another program is already using all the connections allowed on the server(s).</source>
-        <translation type="unfinished"></translation>
+        <translation>ERRO: verificação FALHADA – nenhum dos %1 artigos listados no nzb pôde ser verificado. Todas as ligações foram recusadas ou terminadas: verifique as credenciais e se outro programa já está a usar todas as ligações permitidas no(s) servidor(es).</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>ERROR: check INCOMPLETE - only %1 of the %2 article(s) listed in the nzb were verified. Some connections failed (the server&apos;s connection limit may have been reached). The missing-article count below is NOT reliable.</source>
-        <translation type="unfinished"></translation>
+        <translation>ERRO: verificação INCOMPLETA – apenas %1 dos %2 artigos listados no nzb foram verificados. Algumas ligações falharam (o limite de ligações do servidor pode ter sido atingido). A contagem de artigos em falta abaixo NÃO é fiável.</translation>
     </message>
     <message>
         <location line="+17"/>
         <source>Nb Missing Article(s): at least %1/%2 (stopped early after %3 (%4 sec) using %5 connections on %6 server(s))</source>
-        <translation type="unfinished"></translation>
+        <translation>N.º de artigos em falta: pelo menos %1/%2 (parou antecipadamente após %3 (%4 s) usando %5 ligações em %6 servidor(es))</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -4388,147 +4396,147 @@ O seu ficheiro de configuração activo é:
     <message>
         <location line="+63"/>
         <source>%1 has %2 articles (%3 data, %4 par2 in %5 volume(s))</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 tem %2 artigos (%3 de dados, %4 par2 em %5 volume(s))</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>WARNING: this nzb carries no PAR2 file - nothing can be repaired</source>
-        <translation type="unfinished"></translation>
+        <translation>AVISO: este nzb não contém qualquer ficheiro PAR2 – nada pode ser reparado</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>PAR2 recovery blocks: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Blocos de recuperação PAR2: %1</translation>
     </message>
     <message>
         <location line="+73"/>
         <source>ERROR: check INCONCLUSIVE - %1</source>
-        <translation type="unfinished"></translation>
+        <translation>ERRO: verificação INCONCLUSIVA – %1</translation>
     </message>
     <message>
         <location line="+23"/>
         <source>guessed from the article size</source>
-        <translation type="unfinished"></translation>
+        <translation>deduzido a partir do tamanho do artigo</translation>
     </message>
     <message>
         <location line="+240"/>
         <source>=== Recovery analysis ===</source>
-        <translation type="unfinished"></translation>
+        <translation>=== Análise de recuperação ===</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>  Data articles: %1 (missing: %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>  Artigos de dados: %1 (em falta: %2)</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>  PAR2 articles: %1 (missing: %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>  Artigos PAR2: %1 (em falta: %2)</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  No PAR2 file: nothing can be repaired</source>
-        <translation type="unfinished"></translation>
+        <translation>  Sem ficheiro PAR2: nada pode ser reparado</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Recovery blocks: %1 of %2 still usable</source>
-        <translation type="unfinished"></translation>
+        <translation>  Blocos de recuperação: %1 de %2 ainda utilizáveis</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Recovery blocks: %1 guaranteed, %2 likely, %3 at best, of %4</source>
-        <translation type="unfinished"></translation>
+        <translation>  Blocos de recuperação: %1 garantidos, %2 prováveis, %3 no melhor dos casos, de %4</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>  Redundancy: %1% of the source slices can be rebuilt (%2% when it was posted)</source>
-        <translation type="unfinished"></translation>
+        <translation>  Redundância: %1 % dos blocos de origem podem ser reconstruídos (%2 % aquando da publicação)</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Redundancy: %1% of source slices guaranteed, %2% likely, %3% at best (%4% when posted)</source>
-        <translation type="unfinished"></translation>
+        <translation>  Redundância: %1 % dos blocos de origem garantido, %2 % provável, %3 % no melhor dos casos (%4 % aquando da publicação)</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>  PAR2 metadata: the conventional base index was verified in full, but STAT cannot prove which packets it contains</source>
-        <translation type="unfinished"></translation>
+        <translation>  Metadados PAR2: o índice base convencional foi verificado na íntegra, mas o STAT não consegue provar que pacotes contém</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>  PAR2 metadata: not proven by the nzb. Recovery volumes are not required to repeat the vital packets, even when intact</source>
-        <translation type="unfinished"></translation>
+        <translation>  Metadados PAR2: não comprovados pelo nzb. Os volumes de recuperação não são obrigados a repetir os pacotes vitais, mesmo intactos</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>  Damaged blocks: at least %1, with no upper bound - the nzb does not provide enough trustworthy file and segment sizes</source>
-        <translation type="unfinished"></translation>
+        <translation>  Blocos danificados: pelo menos %1, sem limite superior – o nzb não fornece tamanhos de ficheiro e de segmento suficientemente fiáveis</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Damaged blocks: %1 to %2, depending on article and slice layout (block size: %3 bytes, %4)</source>
-        <translation type="unfinished"></translation>
+        <translation>  Blocos danificados: %1 a %2, consoante a disposição de artigos e blocos (tamanho de bloco: %3 bytes, %4)</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>declared</source>
-        <translation type="unfinished"></translation>
+        <translation>declarado</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>  The slice size was inferred, not read, so this analysis will not declare the post dead. Pass --par2_block_size to get a firm answer.</source>
-        <translation type="unfinished"></translation>
+        <translation>  O tamanho de bloco foi deduzido, não lido, pelo que esta análise não declarará a publicação perdida. Use --par2_block_size para obter uma resposta firme.</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>  Assumes every non-PAR2 file is covered by the recovery set. A file added after the PAR2 files were built -- a .nfo kept visible, for instance -- is not, and a loss there cannot be repaired.</source>
-        <translation type="unfinished"></translation>
+        <translation>  Assume que todos os ficheiros que não são PAR2 estão cobertos pelo conjunto de recuperação. Um ficheiro adicionado depois de os PAR2 terem sido criados — por exemplo, um .nfo mantido visível — não está, e uma perda aí não pode ser reparada.</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>  Verdict: COMPLETE - no data article is missing</source>
-        <translation type="unfinished"></translation>
+        <translation>  Veredicto: COMPLETO – não falta qualquer artigo de dados</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>  Warning: %1% of the recovery blocks are gone; the data is intact today but it is less protected than it was</source>
-        <translation type="unfinished"></translation>
+        <translation>  Aviso: %1 % dos blocos de recuperação desapareceram; hoje os dados estão intactos, mas menos protegidos do que estavam</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Warning: %1% to %2% of the recovery blocks may be gone (%3% likely); the data is intact today but less protected</source>
-        <translation type="unfinished"></translation>
+        <translation>  Aviso: %1 % a %2 % dos blocos de recuperação podem ter desaparecido (%3 % provável); hoje os dados estão intactos, mas menos protegidos</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>  Verdict: PROBABLY RECOVERABLE - the remaining blocks cover the loss, and the conventional base index is available, but STAT cannot verify its vital packets. Try the repair</source>
-        <translation type="unfinished"></translation>
+        <translation>  Veredicto: PROVAVELMENTE RECUPERÁVEL – os blocos restantes cobrem a perda e o índice base convencional está disponível, mas o STAT não consegue verificar os seus pacotes vitais. Tente a reparação</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Verdict: INDETERMINATE - the nzb does not expose enough packet and slice information to prove recovery or failure. Try the repair before re-posting</source>
-        <translation type="unfinished"></translation>
+        <translation>  Veredicto: INDETERMINADO – o nzb não expõe informação suficiente de pacotes e blocos para provar a recuperação ou o fracasso. Tente a reparação antes de voltar a publicar</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Verdict: UNRECOVERABLE - the loss exceeds the remaining blocks even at best. This post has to be re-posted from the source</source>
-        <translation type="unfinished"></translation>
+        <translation>  Veredicto: IRRECUPERÁVEL – a perda excede os blocos restantes mesmo no melhor dos casos. Esta publicação tem de ser refeita a partir da origem</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Verdict: UNRECOVERABLE - data is missing and the nzb carries no PAR2 file to rebuild it with</source>
-        <translation type="unfinished"></translation>
+        <translation>  Veredicto: IRRECUPERÁVEL – faltam dados e o nzb não contém qualquer ficheiro PAR2 com que os reconstruir</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Verdict: UNRECOVERABLE - the PAR2 files carry no recovery block at all, only the index; they can tell you what is broken, not mend it</source>
-        <translation type="unfinished"></translation>
+        <translation>  Veredicto: IRRECUPERÁVEL – os ficheiros PAR2 não contêm qualquer bloco de recuperação, apenas o índice; podem dizer-lhe o que está danificado, não repará-lo</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Verdict: UNRECOVERABLE - data is missing and every PAR2 volume lost every one of its articles</source>
-        <translation type="unfinished"></translation>
+        <translation>  Veredicto: IRRECUPERÁVEL – faltam dados e todos os volumes PAR2 perderam todos os seus artigos</translation>
     </message>
     <message>
         <location line="-463"/>
@@ -4538,7 +4546,7 @@ O seu ficheiro de configuração activo é:
     <message>
         <location line="+20"/>
         <source>the servers enabled for nzb checking have no positive connection count</source>
-        <translation type="unfinished"></translation>
+        <translation>os servidores ativados para a verificação de nzb não têm um número de ligações positivo</translation>
     </message>
     <message>
         <location line="+28"/>
@@ -4606,7 +4614,7 @@ O seu ficheiro de configuração activo é:
     <message>
         <location line="+17"/>
         <source>file %1 has no confirmed article and is left out of the NZB</source>
-        <translation type="unfinished"></translation>
+        <translation>o ficheiro %1 não tem qualquer artigo confirmado e é excluído do NZB</translation>
     </message>
     <message>
         <location line="+42"/>
@@ -4645,22 +4653,22 @@ O seu ficheiro de configuração activo é:
     <message>
         <location line="+12"/>
         <source>Failed to send credentials to the VPN helper</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível enviar as credenciais ao auxiliar da VPN</translation>
     </message>
     <message>
         <location line="+166"/>
         <source>Waiting for VPN lease held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>A aguardar a reserva da VPN detida pelo ngPost PID %1 (auxiliar %2)</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>VPN lease is held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>A reserva da VPN é detida pelo ngPost PID %1 (auxiliar %2)</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>The installed VPN helper is version 1; update it before connecting.</source>
-        <translation type="unfinished"></translation>
+        <translation>O auxiliar da VPN instalado é da versão 1; atualize-o antes de ligar.</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -4670,32 +4678,32 @@ O seu ficheiro de configuração activo é:
     <message>
         <location line="+66"/>
         <source>VPN helper crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>O auxiliar da VPN falhou</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>VPN helper exited with code %1</source>
-        <translation type="unfinished"></translation>
+        <translation>O auxiliar da VPN terminou com o código %1</translation>
     </message>
     <message>
         <location line="+174"/>
         <source>OpenVPN service: starting tunnel via %1 (management on loopback port %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>Serviço OpenVPN: a iniciar o túnel via %1 (gestão na porta de loopback %2)</translation>
     </message>
     <message>
         <location line="+34"/>
         <source>Could not connect to OpenVPN management on loopback port %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível ligar à gestão do OpenVPN na porta de loopback %1</translation>
     </message>
     <message>
         <location line="+71"/>
         <source>Connected to openvpn management socket; authenticating</source>
-        <translation type="unfinished"></translation>
+        <translation>Ligado ao socket de gestão do openvpn; a autenticar</translation>
     </message>
     <message>
         <location line="+119"/>
         <source>OpenVPN process exited</source>
-        <translation type="unfinished"></translation>
+        <translation>O processo do OpenVPN terminou</translation>
     </message>
     <message>
         <location line="-389"/>
@@ -4715,27 +4723,27 @@ O seu ficheiro de configuração activo é:
     <message>
         <location line="+17"/>
         <source>Could not allocate a loopback OpenVPN management port</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível atribuir uma porta de gestão do OpenVPN em loopback</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Could not secure the OpenVPN runtime directory</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível proteger o diretório de execução do OpenVPN</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>Could not create the OpenVPN management password file</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível criar o ficheiro de palavra-passe de gestão do OpenVPN</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>Could not write the OpenVPN management password file</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível escrever o ficheiro de palavra-passe de gestão do OpenVPN</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Could not secure the OpenVPN management password file</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível proteger o ficheiro de palavra-passe de gestão do OpenVPN</translation>
     </message>
     <message>
         <location line="+20"/>
@@ -5557,22 +5565,22 @@ Guardar o modelo agora?</translation>
     <message>
         <location line="+20"/>
         <source>Couldn&apos;t create the staging folder &apos;%1&apos;: obfuscated files will be renamed where they are</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível criar a pasta intermédia «%1»: os ficheiros ofuscados serão renomeados onde estão</translation>
     </message>
     <message>
         <location line="+26"/>
         <source>&apos;%1&apos; cannot be moved into the temporary folder without copying it (they are on different filesystems): renaming it where it is instead</source>
-        <translation type="unfinished"></translation>
+        <translation>«%1» não pode ser movido para a pasta temporária sem ser copiado (estão em sistemas de ficheiros diferentes): será renomeado onde está</translation>
     </message>
     <message>
         <location line="+36"/>
         <source>Couldn&apos;t restore %1 to its original name %2</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível restaurar %1 para o seu nome original %2</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The staging folder &apos;%1&apos; is not empty: some obfuscated files could not be put back</source>
-        <translation type="unfinished"></translation>
+        <translation>A pasta intermédia «%1» não está vazia: alguns ficheiros ofuscados não puderam ser repostos</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -5655,7 +5663,10 @@ Guardar o modelo agora?</translation>
 failed: %2
 unknown: %3
 </source>
-        <translation type="unfinished"></translation>
+        <translation>publicados: %1
+falhados: %2
+desconhecidos: %3
+</translation>
     </message>
     <message>
         <location line="+21"/>
@@ -5758,17 +5769,17 @@ unknown: %3
     <message>
         <location line="-835"/>
         <source>Could not stop the external process before restoring source files</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível parar o processo externo antes de restaurar os ficheiros de origem</translation>
     </message>
     <message>
         <location line="+216"/>
         <source>Could not persist interrupted article state: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível guardar o estado do artigo interrompido: %1</translation>
     </message>
     <message>
         <location line="+1374"/>
         <source>Post interrupted with %1 ambiguous article(s); resume data was preserved.</source>
-        <translation type="unfinished"></translation>
+        <translation>Publicação interrompida com %1 artigo(s) ambíguo(s); os dados de retoma foram preservados.</translation>
     </message>
     <message>
         <location line="+147"/>
@@ -5786,7 +5797,7 @@ unknown: %3
     <message>
         <location line="+18"/>
         <source>Some source files are still under their obfuscated name; ngPost will try again when the job ends. The post itself is unaffected.</source>
-        <translation type="unfinished"></translation>
+        <translation>Alguns ficheiros de origem mantêm ainda o nome ofuscado; o ngPost tentará novamente quando a tarefa terminar. A publicação em si não é afetada.</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -6444,107 +6455,107 @@ Alguns índices Usenet pedem um.</translation>
     <message>
         <location line="-1295"/>
         <source>The machine-wide VPN lease security descriptor could not be created (Windows error %1).</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível criar o descritor de segurança da reserva da VPN a nível da máquina (erro do Windows %1).</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>The machine-wide VPN lease could not be opened (Windows error %1).</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível abrir a reserva da VPN a nível da máquina (erro do Windows %1).</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Another ngPost instance owns the machine-wide VPN lease. %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Outra instância do ngPost detém a reserva da VPN a nível da máquina. %1</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>The machine-wide VPN lease could not be acquired (Windows error %1).</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível adquirir a reserva da VPN a nível da máquina (erro do Windows %1).</translation>
     </message>
     <message>
         <location line="+29"/>
         <source>Could not create or secure the Windows VPN runtime directory: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível criar ou proteger o diretório de execução da VPN do Windows: %1</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>Could not publish or secure the Windows VPN owner manifest: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível publicar ou proteger o manifesto de proprietário da VPN do Windows: %1</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Owner metadata is unavailable.</source>
-        <translation type="unfinished"></translation>
+        <translation>Os metadados do proprietário não estão disponíveis.</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Owner metadata is malformed.</source>
-        <translation type="unfinished"></translation>
+        <translation>Os metadados do proprietário estão malformados.</translation>
     </message>
     <message>
         <location line="+360"/>
         <source>The installed VPN helper is version 1; update it before connecting.</source>
-        <translation type="unfinished"></translation>
+        <translation>O auxiliar da VPN instalado é da versão 1; atualize-o antes de ligar.</translation>
     </message>
     <message>
         <location line="+49"/>
         <source>VPN: could not create the protected OpenVPN authentication file</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: não foi possível criar o ficheiro protegido de autenticação do OpenVPN</translation>
     </message>
     <message>
         <location line="+251"/>
         <source>VPN: tunnel health restored</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: estado do túnel restabelecido</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>VPN: tunnel health is uncertain — %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: o estado do túnel é incerto — %1</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>OpenVPN recovery budget exhausted</source>
-        <translation type="unfinished"></translation>
+        <translation>Orçamento de recuperação do OpenVPN esgotado</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>VPN: OpenVPN is reconnecting internally (attempt %1)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: o OpenVPN está a reconectar internamente (tentativa %1)</translation>
     </message>
     <message>
         <location line="+30"/>
         <source>VPN restart attempt %1 failed: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>A tentativa de reinício %1 da VPN falhou: %2</translation>
     </message>
     <message>
         <location line="+41"/>
         <source>VPN: restart scheduled in %1 second(s)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: reinício agendado dentro de %1 segundo(s)</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>VPN recovery budget exhausted</source>
-        <translation type="unfinished"></translation>
+        <translation>Orçamento de recuperação da VPN esgotado</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>VPN: external restart attempt %1 (recovery attempt %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: tentativa de reinício externo %1 (tentativa de recuperação %2)</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>VPN restart failed</source>
-        <translation type="unfinished"></translation>
+        <translation>Falhou o reinício da VPN</translation>
     </message>
     <message>
         <location line="+393"/>
         <source>could not stage bundled VPN executable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>não foi possível preparar o executável da VPN incluído: %1</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>could not secure staged VPN executable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>não foi possível proteger o executável da VPN preparado: %1</translation>
     </message>
     <message>
         <location line="+43"/>
@@ -6594,37 +6605,37 @@ Alguns índices Usenet pedem um.</translation>
     <message>
         <location line="+133"/>
         <source>VPN startup preflight could not read %1; no cleanup attempted</source>
-        <translation type="unfinished"></translation>
+        <translation>A verificação prévia de arranque da VPN não conseguiu ler %1; não foi tentada qualquer limpeza</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>VPN startup manifest is malformed; no cleanup attempted</source>
-        <translation type="unfinished"></translation>
+        <translation>O manifesto de arranque da VPN está malformado; não foi tentada qualquer limpeza</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>An orphaned VPN session was detected, but the v2 helper is not installed</source>
-        <translation type="unfinished"></translation>
+        <translation>Foi detetada uma sessão VPN órfã, mas o auxiliar v2 não está instalado</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>An orphaned VPN session was detected, but the installed helper is version 1; no cleanup attempted</source>
-        <translation type="unfinished"></translation>
+        <translation>Foi detetada uma sessão VPN órfã, mas o auxiliar instalado é da versão 1; não foi tentada qualquer limpeza</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Startup: cleaned an orphaned VPN v2 session</source>
-        <translation type="unfinished"></translation>
+        <translation>Arranque: limpou-se uma sessão VPN v2 órfã</translation>
     </message>
     <message>
         <location line="+95"/>
         <source>The installed VPN helper is version 1; no cleanup was attempted.</source>
-        <translation type="unfinished"></translation>
+        <translation>O auxiliar da VPN instalado é da versão 1; não foi tentada qualquer limpeza.</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>VPN cleanup timed out</source>
-        <translation type="unfinished"></translation>
+        <translation>Tempo esgotado na limpeza da VPN</translation>
     </message>
     <message>
         <location line="+44"/>
@@ -6644,12 +6655,12 @@ Alguns índices Usenet pedem um.</translation>
     <message>
         <location line="+34"/>
         <source>ngPost has no VPN support on this operating system.</source>
-        <translation type="unfinished"></translation>
+        <translation>O ngPost não tem suporte de VPN neste sistema operativo.</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Another ngPost instance owns the machine-wide VPN lease.</source>
-        <translation type="unfinished"></translation>
+        <translation>Outra instância do ngPost detém a reserva da VPN a nível da máquina.</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -6674,7 +6685,9 @@ Abra as opções VPN com o botão VPN e verifique a configuração, ou edite a c
         <source>Use VPN is enabled for NNTP server(s): %1, but %2
 
 Edit the server configuration and clear its Use VPN setting to post to it without a tunnel.</source>
-        <translation type="unfinished"></translation>
+        <translation>«Utilizar VPN» está ativado para o(s) servidor(es) NNTP: %1, mas %2
+
+Edite a configuração do servidor e desative «Utilizar VPN» para publicar nele sem túnel.</translation>
     </message>
     <message>
         <location line="+17"/>
@@ -6709,12 +6722,12 @@ Edit the server configuration and clear its Use VPN setting to post to it withou
     <message>
         <location line="+1"/>
         <source>VPN lease busy</source>
-        <translation type="unfinished"></translation>
+        <translation>Reserva da VPN ocupada</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>reconnecting...</source>
-        <translation type="unfinished"></translation>
+        <translation>a reconectar...</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -7042,12 +7055,12 @@ Se recusar, o perfil será guardado SEM credenciais. O OpenVPN irá então pedi-
     <message>
         <location line="+9"/>
         <source>Disconnect VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>Desligar a VPN</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>A posting job currently depends on this VPN. Disconnecting will pause that job until you resume it manually. Continue?</source>
-        <translation type="unfinished"></translation>
+        <translation>Existe atualmente uma tarefa de publicação que depende desta VPN. Ao desligar, essa tarefa ficará em pausa até a retomar manualmente. Continuar?</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -7149,17 +7162,17 @@ O seu ficheiro de configuração em &lt;configDir&gt;/vpn/ e as suas credenciais
     <message>
         <location line="+104"/>
         <source>Waiting for VPN lease held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>A aguardar a reserva da VPN detida pelo ngPost PID %1 (auxiliar %2)</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>VPN lease is held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>A reserva da VPN é detida pelo ngPost PID %1 (auxiliar %2)</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>The installed VPN helper is version 1; update it before connecting.</source>
-        <translation type="unfinished"></translation>
+        <translation>O auxiliar da VPN instalado é da versão 1; atualize-o antes de ligar.</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -7169,12 +7182,12 @@ O seu ficheiro de configuração em &lt;configDir&gt;/vpn/ e as suas credenciais
     <message>
         <location line="+62"/>
         <source>VPN helper crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>O auxiliar da VPN falhou</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>VPN helper exited with code %1</source>
-        <translation type="unfinished"></translation>
+        <translation>O auxiliar da VPN terminou com o código %1</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -7209,12 +7222,12 @@ O seu ficheiro de configuração em &lt;configDir&gt;/vpn/ e as suas credenciais
     <message>
         <location line="+28"/>
         <source>WireGuard parent watchdog exited unexpectedly</source>
-        <translation type="unfinished"></translation>
+        <translation>O vigia do processo-pai do WireGuard terminou inesperadamente</translation>
     </message>
     <message>
         <location line="+25"/>
         <source>Could not start the WireGuard parent watchdog</source>
-        <translation type="unfinished"></translation>
+        <translation>Não foi possível iniciar o vigia do processo-pai do WireGuard</translation>
     </message>
     <message>
         <location line="+20"/>

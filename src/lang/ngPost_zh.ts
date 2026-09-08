@@ -622,7 +622,7 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3090"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3089"/>
         <source>VPN: disabled</source>
         <translation>VPN：已禁用</translation>
     </message>
@@ -781,7 +781,7 @@ Unlike the per post box, this choice is saved.</source>
         <translation>转到命令行（关闭图形化界面并在命令行环境中继续）</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1210"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1209"/>
         <source>on</source>
         <translation>启用</translation>
     </message>
@@ -817,13 +817,13 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1056"/>
+        <location line="+1055"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>密码</translation>
     </message>
     <message>
-        <location line="-1129"/>
+        <location line="-1128"/>
         <location line="+397"/>
         <source>Default %1</source>
         <translation>默认 %1</translation>
@@ -853,7 +853,11 @@ Unlike the per post box, this choice is saved.</source>
 Another ngPost is using it, most likely an older version.
 
 Close that other ngPost to use the VPN here.</source>
-        <translation type="unfinished"></translation>
+        <translation>ngPost 中配置的 VPN 似乎已在运行。
+
+另一个 ngPost 正在使用它，很可能是较旧的版本。
+
+请关闭那个 ngPost，以便在此处使用 VPN。</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -862,32 +866,36 @@ Close that other ngPost to use the VPN here.</source>
 Another ngPost may be using it.
 
 Close that other ngPost to use the VPN here. If none is running, you can remove these leftover settings.</source>
-        <translation type="unfinished"></translation>
+        <translation>ngPost 中配置的 VPN 似乎已在运行。
+
+可能有另一个 ngPost 正在使用它。
+
+请关闭那个 ngPost，以便在此处使用 VPN。若没有任何实例在运行，您可以移除这些残留设置。</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The VPN seems to be already in use</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 似乎已在使用中</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation>关闭</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Remove leftover settings...</source>
-        <translation type="unfinished"></translation>
+        <translation>移除残留设置…</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Another ngPost is using them.</source>
-        <translation type="unfinished"></translation>
+        <translation>另一个 ngPost 正在使用它们。</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN</translation>
     </message>
     <message>
         <location line="+219"/>
@@ -918,13 +926,13 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+563"/>
+        <location line="+562"/>
         <location line="+174"/>
         <source>Files</source>
         <translation>文件</translation>
     </message>
     <message>
-        <location line="-736"/>
+        <location line="-735"/>
         <source>Parameters</source>
         <translation>参数</translation>
     </message>
@@ -985,7 +993,7 @@ Are you sure you want to quit?</source>
         <translation>更新失败</translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+78"/>
         <source>VPN required</source>
         <translation>需要 VPN</translation>
     </message>
@@ -1003,44 +1011,44 @@ The job stays in the queue.</source>
 任务保留在队列中。</translation>
     </message>
     <message>
-        <location line="-577"/>
+        <location line="-576"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
-        <translation type="unfinished"></translation>
+        <translation>无法移除这些设置。详情请查看 VPN 日志。</translation>
     </message>
     <message>
-        <location line="+591"/>
+        <location line="+590"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
-        <translation type="unfinished"></translation>
+        <translation>ngPost 中配置的 VPN 似乎已在运行；可能有另一个 ngPost 正在使用它。请查看 VPN 设置。</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>VPN recovery exhausted</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 恢复次数已用尽</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>The posting job is paused and preserved for a later resume.</source>
-        <translation type="unfinished"></translation>
+        <translation>发布任务已暂停并保留，可稍后续传。</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Retry</source>
-        <translation type="unfinished"></translation>
+        <translation>重试</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Stop and preserve for resume</source>
-        <translation type="unfinished"></translation>
+        <translation>停止并保留以便续传</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>VPN recovery</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 恢复</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>The VPN recovery could not be restarted.</source>
-        <translation type="unfinished"></translation>
+        <translation>无法重新启动 VPN 恢复。</translation>
     </message>
     <message>
         <location line="+202"/>
@@ -1611,12 +1619,12 @@ This also removes all associated file and article records.</source>
     <message>
         <location line="+2"/>
         <source>VPN: in use by another instance</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：正被另一个实例使用</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>VPN: reconnecting...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：正在重新连接…</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -1760,9 +1768,9 @@ This also removes all associated file and article records.</source>
         <translation>删除条目</translation>
     </message>
     <message>
-        <location line="-1320"/>
+        <location line="-1319"/>
         <location line="+397"/>
-        <location line="+509"/>
+        <location line="+508"/>
         <location line="+325"/>
         <source>History</source>
         <translation>历史记录</translation>
@@ -3391,22 +3399,22 @@ Your active configuration file is:
     <message>
         <location line="+147"/>
         <source>## tunnel selected ngPost connections through an embedded VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>## 将选定的 ngPost 连接通过内置 VPN 建立隧道</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>## CLI only: wait for the machine-wide VPN lease (0 fails immediately; range 0..1440)</source>
-        <translation type="unfinished"></translation>
+        <translation>## 仅命令行：等待全机范围的 VPN 占用（0 表示立即失败；范围 0..1440）</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>## VPN recovery attempts (0 = unlimited; range 0..1000)</source>
-        <translation type="unfinished"></translation>
+        <translation>## VPN 恢复尝试次数（0 = 无限制；范围 0..1000）</translation>
     </message>
     <message>
         <location line="+20"/>
         <source>## disabling auto-resume still preserves unconfirmed articles as unknown</source>
-        <translation type="unfinished"></translation>
+        <translation>## 关闭自动续传后，未确认的文章仍会以“未知”状态保留</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -3461,102 +3469,102 @@ Your active configuration file is:
     <message>
         <location line="-4063"/>
         <source>check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, see the report for whether they can be repaired, 2 = missing beyond any repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)</source>
-        <translation type="unfinished"></translation>
+        <translation>检查 nzb 文件（文章在 Usenet 上是否可用）。退出码：0 = 所有文章齐全，1 = 有文章缺失，是否可修复请见报告，2 = 缺失且无法修复，3 = 无结论（nzb 不可读、未启用任何检查服务器，或连接失败）</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>with --check: print a single machine readable JSON report on stdout instead of the human one</source>
-        <translation type="unfinished"></translation>
+        <translation>配合 --check：在 stdout 输出单个机器可读的 JSON 报告，而非人类可读报告</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>with --check: verify every article even once the post is provably beyond repair</source>
-        <translation type="unfinished"></translation>
+        <translation>配合 --check：即使已可证明该发布无法修复，仍校验每一篇文章</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>with --check: PAR2 slice size in bytes used to create the post, for the recovery analysis (default: derived from the nzb)</source>
-        <translation type="unfinished"></translation>
+        <translation>配合 --check：创建该发布时所用的 PAR2 分块大小（字节），用于恢复能力分析（默认：从 nzb 推导）</translation>
     </message>
     <message>
         <location line="+97"/>
         <source>remove unowned ngPost VPN resources after rechecking them (requires --yes)</source>
-        <translation type="unfinished"></translation>
+        <translation>重新核查后移除无归属的 ngPost VPN 资源（需要 --yes）</translation>
     </message>
     <message>
         <location line="+301"/>
         <source>VPN recovery exhausted; the post was preserved for resume.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 恢复次数已用尽；发布已保留以便续传。</translation>
     </message>
     <message>
         <location line="+1075"/>
         <source>SSL support is unavailable</source>
-        <translation type="unfinished"></translation>
+        <translation>SSL 支持不可用</translation>
     </message>
     <message>
         <location line="+110"/>
         <source>The post remains paused until the requested VPN stop completes.</source>
-        <translation type="unfinished"></translation>
+        <translation>在所请求的 VPN 停止完成之前，发布将保持暂停。</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>The post remains paused until VPN recovery completes.</source>
-        <translation type="unfinished"></translation>
+        <translation>在 VPN 恢复完成之前，发布将保持暂停。</translation>
     </message>
     <message>
         <location line="+866"/>
         <source>Error: --vpn-cleanup-unattributed requires --yes because it can interrupt another ngPost tunnel.</source>
-        <translation type="unfinished"></translation>
+        <translation>错误：--vpn-cleanup-unattributed 需要配合 --yes，因为它可能中断另一个 ngPost 的隧道。</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>VPN resources were not removed.</source>
-        <translation type="unfinished"></translation>
+        <translation>未移除 VPN 资源。</translation>
     </message>
     <message>
         <location line="+66"/>
         <source>Error: --%1 expects a positive number of bytes</source>
-        <translation type="unfinished"></translation>
+        <translation>错误：--%1 需要一个正的字节数</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>given on the command line</source>
-        <translation type="unfinished"></translation>
+        <translation>由命令行给出</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>from the configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>来自配置文件</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>the nzb file could not be read</source>
-        <translation type="unfinished"></translation>
+        <translation>无法读取该 nzb 文件</translation>
     </message>
     <message>
         <location line="+20"/>
         <source>no server is enabled for nzb checking: set &apos;nzbCheck = true&apos; on at least one [server] of your configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>没有启用任何用于 nzb 检查的服务器：请在配置中至少一个 [server] 上设置 &apos;nzbCheck = true&apos;</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>the servers enabled for nzb checking have no positive connection count</source>
-        <translation type="unfinished"></translation>
+        <translation>已启用 nzb 检查的服务器连接数不为正</translation>
     </message>
     <message>
         <location line="+921"/>
         <source>Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5.</source>
-        <translation type="unfinished"></translation>
+        <translation>警告：VPN_LEASE_WAIT_MINUTES 必须在 0..1440 之间；将使用 5。</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Warning: VPN_RECOVERY_MAX_ATTEMPTS must be in 0..1000; using 0 (unlimited).</source>
-        <translation type="unfinished"></translation>
+        <translation>警告：VPN_RECOVERY_MAX_ATTEMPTS 必须在 0..1000 之间；将使用 0（无限制）。</translation>
     </message>
     <message>
         <location line="+398"/>
         <source>should be a positive number of bytes!...</source>
-        <translation type="unfinished"></translation>
+        <translation>应为正的字节数！…</translation>
     </message>
     <message>
         <location line="+156"/>
@@ -4047,17 +4055,17 @@ Your active configuration file is:
     <message>
         <location line="+6"/>
         <source>## PAR2 slice size in bytes, used by --check to weigh a loss against the</source>
-        <translation type="unfinished"></translation>
+        <translation>## PAR2 分块大小（字节），--check 用它来衡量损失与</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>## recovery blocks. Without it the check infers one and refuses to declare</source>
-        <translation type="unfinished"></translation>
+        <translation>## 恢复块之间的关系。若缺少该值，检查会自行推测并拒绝断定</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>## a post beyond repair.</source>
-        <translation type="unfinished"></translation>
+        <translation>## 某个发布已无法修复。</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -4200,12 +4208,12 @@ Your active configuration file is:
     <message>
         <location line="+19"/>
         <source>[Con #%1] %2:%3 stopped answering after %4 s, dropping the connection</source>
-        <translation type="unfinished"></translation>
+        <translation>[连接 #%1] %2:%3 在 %4 秒后停止响应，正在断开该连接</translation>
     </message>
     <message>
         <location line="+34"/>
         <source>[Con #%1] reconnecting (attempt %2 of %3)</source>
-        <translation type="unfinished"></translation>
+        <translation>[连接 #%1] 正在重新连接（第 %2 次，共 %3 次）</translation>
     </message>
     <message>
         <location line="+34"/>
@@ -4339,32 +4347,32 @@ Your active configuration file is:
     <message>
         <location filename="../NzbCheck.cpp" line="+135"/>
         <source>there is nothing left to rebuild it with</source>
-        <translation type="unfinished"></translation>
+        <translation>已无任何可用于重建的数据</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>the loss is already beyond what the PAR2 blocks can repair</source>
-        <translation type="unfinished"></translation>
+        <translation>损失已超出 PAR2 块所能修复的范围</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Stopped after %1 of the %2 article(s) listed in the nzb: %3, so checking the rest would not change the answer. Pass --%4 to check everything anyway.</source>
-        <translation type="unfinished"></translation>
+        <translation>在 nzb 所列 %2 篇文章中检查了 %1 篇后停止：%3，继续检查其余的不会改变结论。若仍要全部检查，请使用 --%4。</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>ERROR: check FAILED - not one of the %1 article(s) listed in the nzb could be verified. Every connection was refused or dropped: check the credentials, and whether another program is already using all the connections allowed on the server(s).</source>
-        <translation type="unfinished"></translation>
+        <translation>错误：检查失败 — nzb 所列 %1 篇文章无一能被校验。所有连接均被拒绝或断开：请检查凭据，以及是否有其他程序已占满服务器允许的全部连接数。</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>ERROR: check INCOMPLETE - only %1 of the %2 article(s) listed in the nzb were verified. Some connections failed (the server&apos;s connection limit may have been reached). The missing-article count below is NOT reliable.</source>
-        <translation type="unfinished"></translation>
+        <translation>错误：检查不完整 — nzb 所列 %2 篇文章中仅校验了 %1 篇。部分连接失败（可能已达服务器连接上限）。下方的缺失文章数并不可靠。</translation>
     </message>
     <message>
         <location line="+17"/>
         <source>Nb Missing Article(s): at least %1/%2 (stopped early after %3 (%4 sec) using %5 connections on %6 server(s))</source>
-        <translation type="unfinished"></translation>
+        <translation>缺失文章数：至少 %1/%2（在 %3（%4 秒）后提前停止，使用 %5 个连接，涉及 %6 台服务器）</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -4389,147 +4397,147 @@ Your active configuration file is:
     <message>
         <location line="+63"/>
         <source>%1 has %2 articles (%3 data, %4 par2 in %5 volume(s))</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 共有 %2 篇文章（%3 篇数据，%4 篇 par2，分布于 %5 个卷）</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>WARNING: this nzb carries no PAR2 file - nothing can be repaired</source>
-        <translation type="unfinished"></translation>
+        <translation>警告：该 nzb 不含 PAR2 文件 — 无法修复任何内容</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>PAR2 recovery blocks: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>PAR2 恢复块：%1</translation>
     </message>
     <message>
         <location line="+73"/>
         <source>ERROR: check INCONCLUSIVE - %1</source>
-        <translation type="unfinished"></translation>
+        <translation>错误：检查无定论 — %1</translation>
     </message>
     <message>
         <location line="+23"/>
         <source>guessed from the article size</source>
-        <translation type="unfinished"></translation>
+        <translation>根据文章大小推测</translation>
     </message>
     <message>
         <location line="+240"/>
         <source>=== Recovery analysis ===</source>
-        <translation type="unfinished"></translation>
+        <translation>=== 恢复能力分析 ===</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>  Data articles: %1 (missing: %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>  数据文章：%1（缺失：%2）</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>  PAR2 articles: %1 (missing: %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>  PAR2 文章：%1（缺失：%2）</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  No PAR2 file: nothing can be repaired</source>
-        <translation type="unfinished"></translation>
+        <translation>  无 PAR2 文件：无法修复任何内容</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Recovery blocks: %1 of %2 still usable</source>
-        <translation type="unfinished"></translation>
+        <translation>  恢复块：%2 个中仍有 %1 个可用</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Recovery blocks: %1 guaranteed, %2 likely, %3 at best, of %4</source>
-        <translation type="unfinished"></translation>
+        <translation>  恢复块：共 %4 个，其中 %1 个确定可用、%2 个可能可用、最多 %3 个</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>  Redundancy: %1% of the source slices can be rebuilt (%2% when it was posted)</source>
-        <translation type="unfinished"></translation>
+        <translation>  冗余度：可重建 %1% 的源分块（发布时为 %2%）</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Redundancy: %1% of source slices guaranteed, %2% likely, %3% at best (%4% when posted)</source>
-        <translation type="unfinished"></translation>
+        <translation>  冗余度：源分块的 %1% 确定可重建、%2% 可能、最多 %3%（发布时为 %4%）</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>  PAR2 metadata: the conventional base index was verified in full, but STAT cannot prove which packets it contains</source>
-        <translation type="unfinished"></translation>
+        <translation>  PAR2 元数据：常规基础索引已完整校验，但 STAT 无法证明其中包含哪些数据包</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>  PAR2 metadata: not proven by the nzb. Recovery volumes are not required to repeat the vital packets, even when intact</source>
-        <translation type="unfinished"></translation>
+        <translation>  PAR2 元数据：nzb 无法证明。即便完好，恢复卷也并不必然重复包含关键数据包</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>  Damaged blocks: at least %1, with no upper bound - the nzb does not provide enough trustworthy file and segment sizes</source>
-        <translation type="unfinished"></translation>
+        <translation>  受损块：至少 %1 个，无上限 — nzb 未提供足够可信的文件与分段大小</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Damaged blocks: %1 to %2, depending on article and slice layout (block size: %3 bytes, %4)</source>
-        <translation type="unfinished"></translation>
+        <translation>  受损块：%1 至 %2 个，取决于文章与分块布局（块大小：%3 字节，%4）</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>declared</source>
-        <translation type="unfinished"></translation>
+        <translation>已声明</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>  The slice size was inferred, not read, so this analysis will not declare the post dead. Pass --par2_block_size to get a firm answer.</source>
-        <translation type="unfinished"></translation>
+        <translation>  分块大小为推测所得而非读取，因此本分析不会判定该发布已彻底损毁。请使用 --par2_block_size 以获得确切结论。</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>  Assumes every non-PAR2 file is covered by the recovery set. A file added after the PAR2 files were built -- a .nfo kept visible, for instance -- is not, and a loss there cannot be repaired.</source>
-        <translation type="unfinished"></translation>
+        <translation>  假定所有非 PAR2 文件都在恢复集覆盖范围内。在 PAR2 文件生成之后才加入的文件——例如保持可见的 .nfo——并不在其中，此处的损失无法修复。</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>  Verdict: COMPLETE - no data article is missing</source>
-        <translation type="unfinished"></translation>
+        <translation>  结论：完整 — 没有缺失任何数据文章</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>  Warning: %1% of the recovery blocks are gone; the data is intact today but it is less protected than it was</source>
-        <translation type="unfinished"></translation>
+        <translation>  警告：已丢失 %1% 的恢复块；数据目前完好，但保护程度已不如从前</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Warning: %1% to %2% of the recovery blocks may be gone (%3% likely); the data is intact today but less protected</source>
-        <translation type="unfinished"></translation>
+        <translation>  警告：可能已丢失 %1% 至 %2% 的恢复块（%3% 为可能值）；数据目前完好，但保护程度下降</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>  Verdict: PROBABLY RECOVERABLE - the remaining blocks cover the loss, and the conventional base index is available, but STAT cannot verify its vital packets. Try the repair</source>
-        <translation type="unfinished"></translation>
+        <translation>  结论：很可能可恢复 — 剩余块足以覆盖损失，且常规基础索引可用，但 STAT 无法校验其关键数据包。请尝试修复</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Verdict: INDETERMINATE - the nzb does not expose enough packet and slice information to prove recovery or failure. Try the repair before re-posting</source>
-        <translation type="unfinished"></translation>
+        <translation>  结论：无法判定 — nzb 未提供足够的数据包与分块信息以证明可恢复或已失败。请在重新发布前先尝试修复</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Verdict: UNRECOVERABLE - the loss exceeds the remaining blocks even at best. This post has to be re-posted from the source</source>
-        <translation type="unfinished"></translation>
+        <translation>  结论：无法恢复 — 即便在最好情况下，损失也超过剩余块。此发布必须从源重新发布</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Verdict: UNRECOVERABLE - data is missing and the nzb carries no PAR2 file to rebuild it with</source>
-        <translation type="unfinished"></translation>
+        <translation>  结论：无法恢复 — 数据缺失，且 nzb 不含可用于重建的 PAR2 文件</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Verdict: UNRECOVERABLE - the PAR2 files carry no recovery block at all, only the index; they can tell you what is broken, not mend it</source>
-        <translation type="unfinished"></translation>
+        <translation>  结论：无法恢复 — PAR2 文件完全不含恢复块，只有索引；它们能告诉你哪里损坏，却无法修复</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Verdict: UNRECOVERABLE - data is missing and every PAR2 volume lost every one of its articles</source>
-        <translation type="unfinished"></translation>
+        <translation>  结论：无法恢复 — 数据缺失，且每个 PAR2 卷都丢失了其全部文章</translation>
     </message>
     <message>
         <location line="-463"/>
@@ -4539,7 +4547,7 @@ Your active configuration file is:
     <message>
         <location line="+20"/>
         <source>the servers enabled for nzb checking have no positive connection count</source>
-        <translation type="unfinished"></translation>
+        <translation>已启用 nzb 检查的服务器连接数不为正</translation>
     </message>
     <message>
         <location line="+28"/>
@@ -4607,7 +4615,7 @@ Your active configuration file is:
     <message>
         <location line="+17"/>
         <source>file %1 has no confirmed article and is left out of the NZB</source>
-        <translation type="unfinished"></translation>
+        <translation>文件 %1 没有任何已确认的文章，将不纳入 NZB</translation>
     </message>
     <message>
         <location line="+42"/>
@@ -4646,22 +4654,22 @@ Your active configuration file is:
     <message>
         <location line="+12"/>
         <source>Failed to send credentials to the VPN helper</source>
-        <translation type="unfinished"></translation>
+        <translation>无法将凭据发送给 VPN 辅助程序</translation>
     </message>
     <message>
         <location line="+166"/>
         <source>Waiting for VPN lease held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>正在等待 ngPost PID %1（辅助程序 %2）持有的 VPN 占用释放</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>VPN lease is held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 占用权由 ngPost PID %1（辅助程序 %2）持有</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>The installed VPN helper is version 1; update it before connecting.</source>
-        <translation type="unfinished"></translation>
+        <translation>已安装的 VPN 辅助程序为版本 1；请先更新再连接。</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -4671,32 +4679,32 @@ Your active configuration file is:
     <message>
         <location line="+66"/>
         <source>VPN helper crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 辅助程序已崩溃</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>VPN helper exited with code %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 辅助程序以代码 %1 退出</translation>
     </message>
     <message>
         <location line="+174"/>
         <source>OpenVPN service: starting tunnel via %1 (management on loopback port %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN 服务：正通过 %1 启动隧道（管理端口为环回端口 %2）</translation>
     </message>
     <message>
         <location line="+34"/>
         <source>Could not connect to OpenVPN management on loopback port %1</source>
-        <translation type="unfinished"></translation>
+        <translation>无法连接到环回端口 %1 上的 OpenVPN 管理接口</translation>
     </message>
     <message>
         <location line="+71"/>
         <source>Connected to openvpn management socket; authenticating</source>
-        <translation type="unfinished"></translation>
+        <translation>已连接到 openvpn 管理套接字；正在认证</translation>
     </message>
     <message>
         <location line="+119"/>
         <source>OpenVPN process exited</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN 进程已退出</translation>
     </message>
     <message>
         <location line="-389"/>
@@ -4716,27 +4724,27 @@ Your active configuration file is:
     <message>
         <location line="+17"/>
         <source>Could not allocate a loopback OpenVPN management port</source>
-        <translation type="unfinished"></translation>
+        <translation>无法分配 OpenVPN 环回管理端口</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Could not secure the OpenVPN runtime directory</source>
-        <translation type="unfinished"></translation>
+        <translation>无法保护 OpenVPN 运行时目录</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>Could not create the OpenVPN management password file</source>
-        <translation type="unfinished"></translation>
+        <translation>无法创建 OpenVPN 管理密码文件</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>Could not write the OpenVPN management password file</source>
-        <translation type="unfinished"></translation>
+        <translation>无法写入 OpenVPN 管理密码文件</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Could not secure the OpenVPN management password file</source>
-        <translation type="unfinished"></translation>
+        <translation>无法保护 OpenVPN 管理密码文件</translation>
     </message>
     <message>
         <location line="+20"/>
@@ -5558,22 +5566,22 @@ Save the model now?</source>
     <message>
         <location line="+20"/>
         <source>Couldn&apos;t create the staging folder &apos;%1&apos;: obfuscated files will be renamed where they are</source>
-        <translation type="unfinished"></translation>
+        <translation>无法创建暂存目录“%1”：混淆文件将就地重命名</translation>
     </message>
     <message>
         <location line="+26"/>
         <source>&apos;%1&apos; cannot be moved into the temporary folder without copying it (they are on different filesystems): renaming it where it is instead</source>
-        <translation type="unfinished"></translation>
+        <translation>无法在不复制的情况下将“%1”移入临时目录（两者位于不同文件系统）：改为就地重命名</translation>
     </message>
     <message>
         <location line="+36"/>
         <source>Couldn&apos;t restore %1 to its original name %2</source>
-        <translation type="unfinished"></translation>
+        <translation>无法将 %1 恢复为原名 %2</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The staging folder &apos;%1&apos; is not empty: some obfuscated files could not be put back</source>
-        <translation type="unfinished"></translation>
+        <translation>暂存目录“%1”不为空：部分混淆文件无法还原</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -5656,7 +5664,10 @@ Save the model now?</source>
 failed: %2
 unknown: %3
 </source>
-        <translation type="unfinished"></translation>
+        <translation>已发布：%1
+失败：%2
+未知：%3
+</translation>
     </message>
     <message>
         <location line="+21"/>
@@ -5759,17 +5770,17 @@ unknown: %3
     <message>
         <location line="-835"/>
         <source>Could not stop the external process before restoring source files</source>
-        <translation type="unfinished"></translation>
+        <translation>在恢复源文件之前无法停止外部进程</translation>
     </message>
     <message>
         <location line="+216"/>
         <source>Could not persist interrupted article state: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>无法保存中断文章的状态：%1</translation>
     </message>
     <message>
         <location line="+1374"/>
         <source>Post interrupted with %1 ambiguous article(s); resume data was preserved.</source>
-        <translation type="unfinished"></translation>
+        <translation>发布中断，存在 %1 篇状态不明的文章；续传数据已保留。</translation>
     </message>
     <message>
         <location line="+147"/>
@@ -5787,7 +5798,7 @@ unknown: %3
     <message>
         <location line="+18"/>
         <source>Some source files are still under their obfuscated name; ngPost will try again when the job ends. The post itself is unaffected.</source>
-        <translation type="unfinished"></translation>
+        <translation>部分源文件仍使用混淆后的名称；ngPost 将在任务结束时重试。发布本身不受影响。</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -6445,107 +6456,107 @@ Some Usenet indexes ask for one.</source>
     <message>
         <location line="-1295"/>
         <source>The machine-wide VPN lease security descriptor could not be created (Windows error %1).</source>
-        <translation type="unfinished"></translation>
+        <translation>无法创建全机范围 VPN 占用的安全描述符（Windows 错误 %1）。</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>The machine-wide VPN lease could not be opened (Windows error %1).</source>
-        <translation type="unfinished"></translation>
+        <translation>无法打开全机范围的 VPN 占用（Windows 错误 %1）。</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Another ngPost instance owns the machine-wide VPN lease. %1</source>
-        <translation type="unfinished"></translation>
+        <translation>另一个 ngPost 实例持有全机范围的 VPN 占用权。%1</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>The machine-wide VPN lease could not be acquired (Windows error %1).</source>
-        <translation type="unfinished"></translation>
+        <translation>无法获取全机范围的 VPN 占用（Windows 错误 %1）。</translation>
     </message>
     <message>
         <location line="+29"/>
         <source>Could not create or secure the Windows VPN runtime directory: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>无法创建或保护 Windows VPN 运行时目录：%1</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>Could not publish or secure the Windows VPN owner manifest: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>无法发布或保护 Windows VPN 所有者清单：%1</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Owner metadata is unavailable.</source>
-        <translation type="unfinished"></translation>
+        <translation>所有者元数据不可用。</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Owner metadata is malformed.</source>
-        <translation type="unfinished"></translation>
+        <translation>所有者元数据格式不正确。</translation>
     </message>
     <message>
         <location line="+360"/>
         <source>The installed VPN helper is version 1; update it before connecting.</source>
-        <translation type="unfinished"></translation>
+        <translation>已安装的 VPN 辅助程序为版本 1；请先更新再连接。</translation>
     </message>
     <message>
         <location line="+49"/>
         <source>VPN: could not create the protected OpenVPN authentication file</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：无法创建受保护的 OpenVPN 认证文件</translation>
     </message>
     <message>
         <location line="+251"/>
         <source>VPN: tunnel health restored</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：隧道状态已恢复</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>VPN: tunnel health is uncertain — %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：隧道状态不确定 — %1</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>OpenVPN recovery budget exhausted</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN 恢复配额已用尽</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>VPN: OpenVPN is reconnecting internally (attempt %1)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：OpenVPN 正在内部重新连接（第 %1 次尝试）</translation>
     </message>
     <message>
         <location line="+30"/>
         <source>VPN restart attempt %1 failed: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 第 %1 次重启尝试失败：%2</translation>
     </message>
     <message>
         <location line="+41"/>
         <source>VPN: restart scheduled in %1 second(s)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：将在 %1 秒后重启</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>VPN recovery budget exhausted</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 恢复配额已用尽</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>VPN: external restart attempt %1 (recovery attempt %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN：外部重启第 %1 次尝试（恢复第 %2 次尝试）</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>VPN restart failed</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 重启失败</translation>
     </message>
     <message>
         <location line="+393"/>
         <source>could not stage bundled VPN executable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>无法暂存内置的 VPN 可执行文件：%1</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>could not secure staged VPN executable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>无法保护已暂存的 VPN 可执行文件：%1</translation>
     </message>
     <message>
         <location line="+43"/>
@@ -6595,37 +6606,37 @@ Some Usenet indexes ask for one.</source>
     <message>
         <location line="+133"/>
         <source>VPN startup preflight could not read %1; no cleanup attempted</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 启动预检无法读取 %1；未尝试清理</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>VPN startup manifest is malformed; no cleanup attempted</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 启动清单格式不正确；未尝试清理</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>An orphaned VPN session was detected, but the v2 helper is not installed</source>
-        <translation type="unfinished"></translation>
+        <translation>检测到孤立的 VPN 会话，但未安装 v2 辅助程序</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>An orphaned VPN session was detected, but the installed helper is version 1; no cleanup attempted</source>
-        <translation type="unfinished"></translation>
+        <translation>检测到孤立的 VPN 会话，但已安装的辅助程序为版本 1；未尝试清理</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Startup: cleaned an orphaned VPN v2 session</source>
-        <translation type="unfinished"></translation>
+        <translation>启动：已清理一个孤立的 VPN v2 会话</translation>
     </message>
     <message>
         <location line="+95"/>
         <source>The installed VPN helper is version 1; no cleanup was attempted.</source>
-        <translation type="unfinished"></translation>
+        <translation>已安装的 VPN 辅助程序为版本 1；未尝试清理。</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>VPN cleanup timed out</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 清理超时</translation>
     </message>
     <message>
         <location line="+44"/>
@@ -6645,12 +6656,12 @@ Some Usenet indexes ask for one.</source>
     <message>
         <location line="+34"/>
         <source>ngPost has no VPN support on this operating system.</source>
-        <translation type="unfinished"></translation>
+        <translation>ngPost 在此操作系统上不支持 VPN。</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Another ngPost instance owns the machine-wide VPN lease.</source>
-        <translation type="unfinished"></translation>
+        <translation>另一个 ngPost 实例持有全机范围的 VPN 占用权。</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -6675,7 +6686,9 @@ VPN 未正确配置：%2
         <source>Use VPN is enabled for NNTP server(s): %1, but %2
 
 Edit the server configuration and clear its Use VPN setting to post to it without a tunnel.</source>
-        <translation type="unfinished"></translation>
+        <translation>已为 NNTP 服务器启用“使用 VPN”：%1，但 %2
+
+请编辑服务器配置并取消其“使用 VPN”设置，以便不经隧道向其发布。</translation>
     </message>
     <message>
         <location line="+17"/>
@@ -6710,12 +6723,12 @@ Edit the server configuration and clear its Use VPN setting to post to it withou
     <message>
         <location line="+1"/>
         <source>VPN lease busy</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 占用中</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>reconnecting...</source>
-        <translation type="unfinished"></translation>
+        <translation>正在重新连接…</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -7043,12 +7056,12 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
     <message>
         <location line="+9"/>
         <source>Disconnect VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>断开 VPN</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>A posting job currently depends on this VPN. Disconnecting will pause that job until you resume it manually. Continue?</source>
-        <translation type="unfinished"></translation>
+        <translation>当前有发布任务依赖此 VPN。断开后该任务将暂停，直到您手动续传。是否继续？</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -7150,17 +7163,17 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
     <message>
         <location line="+104"/>
         <source>Waiting for VPN lease held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>正在等待 ngPost PID %1（辅助程序 %2）持有的 VPN 占用释放</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>VPN lease is held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 占用权由 ngPost PID %1（辅助程序 %2）持有</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>The installed VPN helper is version 1; update it before connecting.</source>
-        <translation type="unfinished"></translation>
+        <translation>已安装的 VPN 辅助程序为版本 1；请先更新再连接。</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -7170,12 +7183,12 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
     <message>
         <location line="+62"/>
         <source>VPN helper crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 辅助程序已崩溃</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>VPN helper exited with code %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN 辅助程序以代码 %1 退出</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -7210,12 +7223,12 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
     <message>
         <location line="+28"/>
         <source>WireGuard parent watchdog exited unexpectedly</source>
-        <translation type="unfinished"></translation>
+        <translation>WireGuard 父进程看门狗意外退出</translation>
     </message>
     <message>
         <location line="+25"/>
         <source>Could not start the WireGuard parent watchdog</source>
-        <translation type="unfinished"></translation>
+        <translation>无法启动 WireGuard 父进程看门狗</translation>
     </message>
     <message>
         <location line="+20"/>

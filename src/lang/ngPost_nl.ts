@@ -624,7 +624,7 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3090"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3089"/>
         <source>VPN: disabled</source>
         <translation>VPN: uitgeschakeld</translation>
     </message>
@@ -783,7 +783,7 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
         <translation>go command line (close the GUI and continue in the shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1210"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1209"/>
         <source>on</source>
         <translation>aan</translation>
     </message>
@@ -819,13 +819,13 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1056"/>
+        <location line="+1055"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>Wachtwoord</translation>
     </message>
     <message>
-        <location line="-1129"/>
+        <location line="-1128"/>
         <location line="+397"/>
         <source>Default %1</source>
         <translation>Standaard %1</translation>
@@ -855,7 +855,11 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
 Another ngPost is using it, most likely an older version.
 
 Close that other ngPost to use the VPN here.</source>
-        <translation type="unfinished"></translation>
+        <translation>De in ngPost geconfigureerde VPN lijkt al te draaien.
+
+Een andere ngPost gebruikt hem, waarschijnlijk een oudere versie.
+
+Sluit die andere ngPost om de VPN hier te gebruiken.</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -864,32 +868,36 @@ Close that other ngPost to use the VPN here.</source>
 Another ngPost may be using it.
 
 Close that other ngPost to use the VPN here. If none is running, you can remove these leftover settings.</source>
-        <translation type="unfinished"></translation>
+        <translation>De in ngPost geconfigureerde VPN lijkt al te draaien.
+
+Mogelijk gebruikt een andere ngPost hem.
+
+Sluit die andere ngPost om de VPN hier te gebruiken. Draait er geen, dan kunt u deze achtergebleven instellingen verwijderen.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The VPN seems to be already in use</source>
-        <translation type="unfinished"></translation>
+        <translation>De VPN lijkt al in gebruik te zijn</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Close</source>
-        <translation type="unfinished"></translation>
+        <translation>Sluiten</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Remove leftover settings...</source>
-        <translation type="unfinished"></translation>
+        <translation>Achtergebleven instellingen verwijderen...</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Another ngPost is using them.</source>
-        <translation type="unfinished"></translation>
+        <translation>Een andere ngPost gebruikt ze.</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN</translation>
     </message>
     <message>
         <location line="+219"/>
@@ -920,13 +928,13 @@ Weet je zeker dat je wilt stoppen?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+563"/>
+        <location line="+562"/>
         <location line="+174"/>
         <source>Files</source>
         <translation>Bestanden</translation>
     </message>
     <message>
-        <location line="-736"/>
+        <location line="-735"/>
         <source>Parameters</source>
         <translation>Parameters</translation>
     </message>
@@ -987,7 +995,7 @@ Weet je zeker dat je wilt stoppen?</translation>
         <translation>Update mislukt</translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+78"/>
         <source>VPN required</source>
         <translation>VPN vereist</translation>
     </message>
@@ -1005,44 +1013,44 @@ The job stays in the queue.</source>
 De taak blijft in de wachtrij.</translation>
     </message>
     <message>
-        <location line="-577"/>
+        <location line="-576"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
-        <translation type="unfinished"></translation>
+        <translation>Deze instellingen konden niet worden verwijderd. Zie het VPN-logboek voor details.</translation>
     </message>
     <message>
-        <location line="+591"/>
+        <location line="+590"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
-        <translation type="unfinished"></translation>
+        <translation>De in ngPost geconfigureerde VPN lijkt al te draaien; mogelijk gebruikt een andere ngPost hem. Zie de VPN-instellingen.</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>VPN recovery exhausted</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-herstel uitgeput</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>The posting job is paused and preserved for a later resume.</source>
-        <translation type="unfinished"></translation>
+        <translation>De posttaak is gepauzeerd en bewaard om later te hervatten.</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>Retry</source>
-        <translation type="unfinished"></translation>
+        <translation>Opnieuw proberen</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Stop and preserve for resume</source>
-        <translation type="unfinished"></translation>
+        <translation>Stoppen en bewaren om te hervatten</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>VPN recovery</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-herstel</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>The VPN recovery could not be restarted.</source>
-        <translation type="unfinished"></translation>
+        <translation>Het VPN-herstel kon niet opnieuw worden gestart.</translation>
     </message>
     <message>
         <location line="+202"/>
@@ -1612,12 +1620,12 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     <message>
         <location line="+2"/>
         <source>VPN: in use by another instance</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: in gebruik door een andere instantie</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>VPN: reconnecting...</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: opnieuw verbinden...</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -1761,9 +1769,9 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Item verwijderen</translation>
     </message>
     <message>
-        <location line="-1320"/>
+        <location line="-1319"/>
         <location line="+397"/>
-        <location line="+509"/>
+        <location line="+508"/>
         <location line="+325"/>
         <source>History</source>
         <translation>Geschiedenis</translation>
@@ -1987,22 +1995,22 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     <message>
         <location line="+2"/>
         <source>check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, see the report for whether they can be repaired, 2 = missing beyond any repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)</source>
-        <translation type="unfinished"></translation>
+        <translation>nzb-bestand controleren (of de artikelen op Usenet beschikbaar zijn). Afsluitcode: 0 = alle artikelen aanwezig, 1 = artikelen ontbreken, zie het rapport of ze te herstellen zijn, 2 = verlies buiten elk herstel, 3 = geen oordeel (nzb onleesbaar, geen server ingeschakeld voor controle, of verbindingen mislukt)</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>with --check: print a single machine readable JSON report on stdout instead of the human one</source>
-        <translation type="unfinished"></translation>
+        <translation>met --check: één machineleesbaar JSON-rapport op stdout afdrukken in plaats van het menselijke</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>with --check: verify every article even once the post is provably beyond repair</source>
-        <translation type="unfinished"></translation>
+        <translation>met --check: elk artikel controleren, ook als bewezen is dat de post niet meer te herstellen is</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>with --check: PAR2 slice size in bytes used to create the post, for the recovery analysis (default: derived from the nzb)</source>
-        <translation type="unfinished"></translation>
+        <translation>met --check: PAR2-blokgrootte in bytes waarmee de post is gemaakt, voor de herstelanalyse (standaard: afgeleid uit de nzb)</translation>
     </message>
     <message>
         <location line="+21"/>
@@ -2184,12 +2192,12 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     <message>
         <location line="+12"/>
         <source>remove unowned ngPost VPN resources after rechecking them (requires --yes)</source>
-        <translation type="unfinished"></translation>
+        <translation>eigenaarloze ngPost-VPN-bronnen verwijderen na hercontrole (vereist --yes)</translation>
     </message>
     <message>
         <location line="+301"/>
         <source>VPN recovery exhausted; the post was preserved for resume.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-herstel uitgeput; de post is bewaard om te hervatten.</translation>
     </message>
     <message>
         <location line="+962"/>
@@ -2219,7 +2227,7 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     <message>
         <location line="+41"/>
         <source>SSL support is unavailable</source>
-        <translation type="unfinished"></translation>
+        <translation>SSL-ondersteuning is niet beschikbaar</translation>
     </message>
     <message>
         <location line="+76"/>
@@ -2229,12 +2237,12 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     <message>
         <location line="+34"/>
         <source>The post remains paused until the requested VPN stop completes.</source>
-        <translation type="unfinished"></translation>
+        <translation>De post blijft gepauzeerd totdat het gevraagde stoppen van de VPN is voltooid.</translation>
     </message>
     <message>
         <location line="+16"/>
         <source>The post remains paused until VPN recovery completes.</source>
-        <translation type="unfinished"></translation>
+        <translation>De post blijft gepauzeerd totdat het VPN-herstel is voltooid.</translation>
     </message>
     <message>
         <location line="+591"/>
@@ -2263,42 +2271,42 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
     <message>
         <location line="+124"/>
         <source>Error: --vpn-cleanup-unattributed requires --yes because it can interrupt another ngPost tunnel.</source>
-        <translation type="unfinished"></translation>
+        <translation>Fout: --vpn-cleanup-unattributed vereist --yes omdat het een andere ngPost-tunnel kan onderbreken.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>VPN resources were not removed.</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-bronnen zijn niet verwijderd.</translation>
     </message>
     <message>
         <location line="+66"/>
         <source>Error: --%1 expects a positive number of bytes</source>
-        <translation type="unfinished"></translation>
+        <translation>Fout: --%1 verwacht een positief aantal bytes</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>given on the command line</source>
-        <translation type="unfinished"></translation>
+        <translation>opgegeven op de opdrachtregel</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>from the configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>uit de configuratie</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>the nzb file could not be read</source>
-        <translation type="unfinished"></translation>
+        <translation>het nzb-bestand kon niet worden gelezen</translation>
     </message>
     <message>
         <location line="+20"/>
         <source>no server is enabled for nzb checking: set &apos;nzbCheck = true&apos; on at least one [server] of your configuration</source>
-        <translation type="unfinished"></translation>
+        <translation>geen enkele server is ingeschakeld voor nzb-controle: zet &apos;nzbCheck = true&apos; bij ten minste één [server] in uw configuratie</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>the servers enabled for nzb checking have no positive connection count</source>
-        <translation type="unfinished"></translation>
+        <translation>de voor nzb-controle ingeschakelde servers hebben geen positief aantal verbindingen</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -3090,12 +3098,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location line="-157"/>
         <source>Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5.</source>
-        <translation type="unfinished"></translation>
+        <translation>Waarschuwing: VPN_LEASE_WAIT_MINUTES moet tussen 0 en 1440 liggen; 5 wordt gebruikt.</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Warning: VPN_RECOVERY_MAX_ATTEMPTS must be in 0..1000; using 0 (unlimited).</source>
-        <translation type="unfinished"></translation>
+        <translation>Waarschuwing: VPN_RECOVERY_MAX_ATTEMPTS moet tussen 0 en 1000 liggen; 0 (onbeperkt) wordt gebruikt.</translation>
     </message>
     <message>
         <location line="+214"/>
@@ -3121,7 +3129,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     <message>
         <location line="+156"/>
         <source>should be a positive number of bytes!...</source>
-        <translation type="unfinished"></translation>
+        <translation>moet een positief aantal bytes zijn!...</translation>
     </message>
     <message>
         <location line="+121"/>
@@ -3620,22 +3628,22 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <location line="+147"/>
         <source>## tunnel selected ngPost connections through an embedded VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>## geselecteerde ngPost-verbindingen door een ingebouwde VPN leiden</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>## CLI only: wait for the machine-wide VPN lease (0 fails immediately; range 0..1440)</source>
-        <translation type="unfinished"></translation>
+        <translation>## alleen CLI: wachten op de machinebrede VPN-reservering (0 mislukt meteen; bereik 0..1440)</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>## VPN recovery attempts (0 = unlimited; range 0..1000)</source>
-        <translation type="unfinished"></translation>
+        <translation>## VPN-herstelpogingen (0 = onbeperkt; bereik 0..1000)</translation>
     </message>
     <message>
         <location line="+20"/>
         <source>## disabling auto-resume still preserves unconfirmed articles as unknown</source>
-        <translation type="unfinished"></translation>
+        <translation>## het uitschakelen van automatisch hervatten bewaart onbevestigde artikelen nog steeds als onbekend</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -4051,17 +4059,17 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <location line="+6"/>
         <source>## PAR2 slice size in bytes, used by --check to weigh a loss against the</source>
-        <translation type="unfinished"></translation>
+        <translation>## PAR2-blokgrootte in bytes, waarmee --check een verlies afweegt tegen de</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>## recovery blocks. Without it the check infers one and refuses to declare</source>
-        <translation type="unfinished"></translation>
+        <translation>## herstelblokken. Zonder deze leidt de controle er een af en weigert ze</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>## a post beyond repair.</source>
-        <translation type="unfinished"></translation>
+        <translation>## een post als onherstelbaar te verklaren.</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -4204,12 +4212,12 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <location line="+19"/>
         <source>[Con #%1] %2:%3 stopped answering after %4 s, dropping the connection</source>
-        <translation type="unfinished"></translation>
+        <translation>[Verb. #%1] %2:%3 reageert niet meer na %4 s, de verbinding wordt verbroken</translation>
     </message>
     <message>
         <location line="+34"/>
         <source>[Con #%1] reconnecting (attempt %2 of %3)</source>
-        <translation type="unfinished"></translation>
+        <translation>[Verb. #%1] opnieuw verbinden (poging %2 van %3)</translation>
     </message>
     <message>
         <location line="+34"/>
@@ -4343,32 +4351,32 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <location filename="../NzbCheck.cpp" line="+135"/>
         <source>there is nothing left to rebuild it with</source>
-        <translation type="unfinished"></translation>
+        <translation>er is niets meer om het mee te herstellen</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>the loss is already beyond what the PAR2 blocks can repair</source>
-        <translation type="unfinished"></translation>
+        <translation>het verlies overtreft al wat de PAR2-blokken kunnen herstellen</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>Stopped after %1 of the %2 article(s) listed in the nzb: %3, so checking the rest would not change the answer. Pass --%4 to check everything anyway.</source>
-        <translation type="unfinished"></translation>
+        <translation>Gestopt na %1 van de %2 artikelen in de nzb: %3, het controleren van de rest zou het antwoord niet veranderen. Gebruik --%4 om toch alles te controleren.</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>ERROR: check FAILED - not one of the %1 article(s) listed in the nzb could be verified. Every connection was refused or dropped: check the credentials, and whether another program is already using all the connections allowed on the server(s).</source>
-        <translation type="unfinished"></translation>
+        <translation>FOUT: controle MISLUKT – geen enkel van de %1 artikelen in de nzb kon worden geverifieerd. Elke verbinding werd geweigerd of verbroken: controleer de inloggegevens en of een ander programma al alle op de server(s) toegestane verbindingen gebruikt.</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>ERROR: check INCOMPLETE - only %1 of the %2 article(s) listed in the nzb were verified. Some connections failed (the server&apos;s connection limit may have been reached). The missing-article count below is NOT reliable.</source>
-        <translation type="unfinished"></translation>
+        <translation>FOUT: controle ONVOLLEDIG – slechts %1 van de %2 artikelen in de nzb zijn geverifieerd. Sommige verbindingen mislukten (mogelijk is de verbindingslimiet van de server bereikt). Het onderstaande aantal ontbrekende artikelen is NIET betrouwbaar.</translation>
     </message>
     <message>
         <location line="+17"/>
         <source>Nb Missing Article(s): at least %1/%2 (stopped early after %3 (%4 sec) using %5 connections on %6 server(s))</source>
-        <translation type="unfinished"></translation>
+        <translation>Aantal ontbrekende artikelen: minstens %1/%2 (vroegtijdig gestopt na %3 (%4 s) met %5 verbindingen op %6 server(s))</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -4393,147 +4401,147 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <location line="+63"/>
         <source>%1 has %2 articles (%3 data, %4 par2 in %5 volume(s))</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 heeft %2 artikelen (%3 data, %4 par2 in %5 volume(s))</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>WARNING: this nzb carries no PAR2 file - nothing can be repaired</source>
-        <translation type="unfinished"></translation>
+        <translation>WAARSCHUWING: deze nzb bevat geen PAR2-bestand – er kan niets worden hersteld</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>PAR2 recovery blocks: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>PAR2-herstelblokken: %1</translation>
     </message>
     <message>
         <location line="+73"/>
         <source>ERROR: check INCONCLUSIVE - %1</source>
-        <translation type="unfinished"></translation>
+        <translation>FOUT: controle NIET SLUITEND – %1</translation>
     </message>
     <message>
         <location line="+23"/>
         <source>guessed from the article size</source>
-        <translation type="unfinished"></translation>
+        <translation>afgeleid uit de artikelgrootte</translation>
     </message>
     <message>
         <location line="+240"/>
         <source>=== Recovery analysis ===</source>
-        <translation type="unfinished"></translation>
+        <translation>=== Herstelanalyse ===</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>  Data articles: %1 (missing: %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>  Data-artikelen: %1 (ontbrekend: %2)</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>  PAR2 articles: %1 (missing: %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>  PAR2-artikelen: %1 (ontbrekend: %2)</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  No PAR2 file: nothing can be repaired</source>
-        <translation type="unfinished"></translation>
+        <translation>  Geen PAR2-bestand: er kan niets worden hersteld</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Recovery blocks: %1 of %2 still usable</source>
-        <translation type="unfinished"></translation>
+        <translation>  Herstelblokken: %1 van %2 nog bruikbaar</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Recovery blocks: %1 guaranteed, %2 likely, %3 at best, of %4</source>
-        <translation type="unfinished"></translation>
+        <translation>  Herstelblokken: %1 gegarandeerd, %2 waarschijnlijk, %3 hooguit, van %4</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>  Redundancy: %1% of the source slices can be rebuilt (%2% when it was posted)</source>
-        <translation type="unfinished"></translation>
+        <translation>  Redundantie: %1 % van de bronblokken kan worden hersteld (%2 % bij het plaatsen)</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Redundancy: %1% of source slices guaranteed, %2% likely, %3% at best (%4% when posted)</source>
-        <translation type="unfinished"></translation>
+        <translation>  Redundantie: %1 % van de bronblokken gegarandeerd, %2 % waarschijnlijk, %3 % hooguit (%4 % bij het plaatsen)</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>  PAR2 metadata: the conventional base index was verified in full, but STAT cannot prove which packets it contains</source>
-        <translation type="unfinished"></translation>
+        <translation>  PAR2-metagegevens: de gebruikelijke basisindex is volledig geverifieerd, maar STAT kan niet bewijzen welke pakketten hij bevat</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>  PAR2 metadata: not proven by the nzb. Recovery volumes are not required to repeat the vital packets, even when intact</source>
-        <translation type="unfinished"></translation>
+        <translation>  PAR2-metagegevens: niet bewezen door de nzb. Herstelvolumes hoeven de vitale pakketten niet te herhalen, zelfs niet wanneer ze intact zijn</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>  Damaged blocks: at least %1, with no upper bound - the nzb does not provide enough trustworthy file and segment sizes</source>
-        <translation type="unfinished"></translation>
+        <translation>  Beschadigde blokken: minstens %1, zonder bovengrens – de nzb levert niet genoeg betrouwbare bestands- en segmentgroottes</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Damaged blocks: %1 to %2, depending on article and slice layout (block size: %3 bytes, %4)</source>
-        <translation type="unfinished"></translation>
+        <translation>  Beschadigde blokken: %1 tot %2, afhankelijk van de artikel- en blokindeling (blokgrootte: %3 bytes, %4)</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>declared</source>
-        <translation type="unfinished"></translation>
+        <translation>opgegeven</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>  The slice size was inferred, not read, so this analysis will not declare the post dead. Pass --par2_block_size to get a firm answer.</source>
-        <translation type="unfinished"></translation>
+        <translation>  De blokgrootte is afgeleid, niet gelezen, dus deze analyse verklaart de post niet verloren. Gebruik --par2_block_size voor een sluitend antwoord.</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>  Assumes every non-PAR2 file is covered by the recovery set. A file added after the PAR2 files were built -- a .nfo kept visible, for instance -- is not, and a loss there cannot be repaired.</source>
-        <translation type="unfinished"></translation>
+        <translation>  Gaat ervan uit dat elk niet-PAR2-bestand door de herstelset wordt gedekt. Een bestand dat is toegevoegd nadat de PAR2-bestanden zijn gemaakt – bijvoorbeeld een zichtbaar gehouden .nfo – valt daarbuiten, en verlies daar is niet te herstellen.</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>  Verdict: COMPLETE - no data article is missing</source>
-        <translation type="unfinished"></translation>
+        <translation>  Oordeel: VOLLEDIG – er ontbreekt geen enkel data-artikel</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>  Warning: %1% of the recovery blocks are gone; the data is intact today but it is less protected than it was</source>
-        <translation type="unfinished"></translation>
+        <translation>  Waarschuwing: %1 % van de herstelblokken is verdwenen; de data is vandaag intact maar minder beschermd dan voorheen</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Warning: %1% to %2% of the recovery blocks may be gone (%3% likely); the data is intact today but less protected</source>
-        <translation type="unfinished"></translation>
+        <translation>  Waarschuwing: %1 % tot %2 % van de herstelblokken kan verdwenen zijn (%3 % waarschijnlijk); de data is vandaag intact maar minder beschermd</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>  Verdict: PROBABLY RECOVERABLE - the remaining blocks cover the loss, and the conventional base index is available, but STAT cannot verify its vital packets. Try the repair</source>
-        <translation type="unfinished"></translation>
+        <translation>  Oordeel: WAARSCHIJNLIJK HERSTELBAAR – de resterende blokken dekken het verlies en de gebruikelijke basisindex is beschikbaar, maar STAT kan de vitale pakketten niet verifiëren. Probeer de reparatie</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Verdict: INDETERMINATE - the nzb does not expose enough packet and slice information to prove recovery or failure. Try the repair before re-posting</source>
-        <translation type="unfinished"></translation>
+        <translation>  Oordeel: ONBEPAALD – de nzb biedt niet genoeg pakket- en blokinformatie om herstel of mislukking te bewijzen. Probeer de reparatie voordat u opnieuw plaatst</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>  Verdict: UNRECOVERABLE - the loss exceeds the remaining blocks even at best. This post has to be re-posted from the source</source>
-        <translation type="unfinished"></translation>
+        <translation>  Oordeel: ONHERSTELBAAR – het verlies overtreft zelfs in het beste geval de resterende blokken. Deze post moet vanaf de bron opnieuw worden geplaatst</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Verdict: UNRECOVERABLE - data is missing and the nzb carries no PAR2 file to rebuild it with</source>
-        <translation type="unfinished"></translation>
+        <translation>  Oordeel: ONHERSTELBAAR – er ontbreken gegevens en de nzb bevat geen PAR2-bestand om ze mee te herstellen</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Verdict: UNRECOVERABLE - the PAR2 files carry no recovery block at all, only the index; they can tell you what is broken, not mend it</source>
-        <translation type="unfinished"></translation>
+        <translation>  Oordeel: ONHERSTELBAAR – de PAR2-bestanden bevatten helemaal geen herstelblok, alleen de index; ze kunnen zeggen wat kapot is, niet het repareren</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>  Verdict: UNRECOVERABLE - data is missing and every PAR2 volume lost every one of its articles</source>
-        <translation type="unfinished"></translation>
+        <translation>  Oordeel: ONHERSTELBAAR – er ontbreken gegevens en elk PAR2-volume is al zijn artikelen kwijt</translation>
     </message>
     <message>
         <location line="-463"/>
@@ -4543,7 +4551,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <location line="+20"/>
         <source>the servers enabled for nzb checking have no positive connection count</source>
-        <translation type="unfinished"></translation>
+        <translation>de voor nzb-controle ingeschakelde servers hebben geen positief aantal verbindingen</translation>
     </message>
     <message>
         <location line="+28"/>
@@ -4611,7 +4619,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <location line="+17"/>
         <source>file %1 has no confirmed article and is left out of the NZB</source>
-        <translation type="unfinished"></translation>
+        <translation>bestand %1 heeft geen bevestigd artikel en wordt uit de NZB weggelaten</translation>
     </message>
     <message>
         <location line="+42"/>
@@ -4650,22 +4658,22 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <location line="+12"/>
         <source>Failed to send credentials to the VPN helper</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon de inloggegevens niet naar het VPN-hulpprogramma sturen</translation>
     </message>
     <message>
         <location line="+166"/>
         <source>Waiting for VPN lease held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>Wachten op de VPN-reservering van ngPost PID %1 (hulpprogramma %2)</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>VPN lease is held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>De VPN-reservering is in handen van ngPost PID %1 (hulpprogramma %2)</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>The installed VPN helper is version 1; update it before connecting.</source>
-        <translation type="unfinished"></translation>
+        <translation>Het geïnstalleerde VPN-hulpprogramma is versie 1; werk het bij voordat u verbinding maakt.</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -4675,32 +4683,32 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <location line="+66"/>
         <source>VPN helper crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-hulpprogramma is vastgelopen</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>VPN helper exited with code %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-hulpprogramma afgesloten met code %1</translation>
     </message>
     <message>
         <location line="+174"/>
         <source>OpenVPN service: starting tunnel via %1 (management on loopback port %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN-service: tunnel starten via %1 (beheer op loopbackpoort %2)</translation>
     </message>
     <message>
         <location line="+34"/>
         <source>Could not connect to OpenVPN management on loopback port %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon geen verbinding maken met het OpenVPN-beheer op loopbackpoort %1</translation>
     </message>
     <message>
         <location line="+71"/>
         <source>Connected to openvpn management socket; authenticating</source>
-        <translation type="unfinished"></translation>
+        <translation>Verbonden met de openvpn-beheersocket; bezig met verifiëren</translation>
     </message>
     <message>
         <location line="+119"/>
         <source>OpenVPN process exited</source>
-        <translation type="unfinished"></translation>
+        <translation>OpenVPN-proces is afgesloten</translation>
     </message>
     <message>
         <location line="-389"/>
@@ -4720,27 +4728,27 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <location line="+17"/>
         <source>Could not allocate a loopback OpenVPN management port</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon geen loopback-beheerpoort voor OpenVPN toewijzen</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Could not secure the OpenVPN runtime directory</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon de OpenVPN-runtimemap niet beveiligen</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>Could not create the OpenVPN management password file</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon het OpenVPN-beheerwachtwoordbestand niet aanmaken</translation>
     </message>
     <message>
         <location line="+9"/>
         <source>Could not write the OpenVPN management password file</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon het OpenVPN-beheerwachtwoordbestand niet schrijven</translation>
     </message>
     <message>
         <location line="+12"/>
         <source>Could not secure the OpenVPN management password file</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon het OpenVPN-beheerwachtwoordbestand niet beveiligen</translation>
     </message>
     <message>
         <location line="+20"/>
@@ -5562,22 +5570,22 @@ Het model nu opslaan?</translation>
     <message>
         <location line="+20"/>
         <source>Couldn&apos;t create the staging folder &apos;%1&apos;: obfuscated files will be renamed where they are</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon de tussenmap &apos;%1&apos; niet aanmaken: versluierde bestanden worden ter plaatse hernoemd</translation>
     </message>
     <message>
         <location line="+26"/>
         <source>&apos;%1&apos; cannot be moved into the temporary folder without copying it (they are on different filesystems): renaming it where it is instead</source>
-        <translation type="unfinished"></translation>
+        <translation>&apos;%1&apos; kan niet naar de tijdelijke map worden verplaatst zonder kopiëren (ze staan op verschillende bestandssystemen): wordt in plaats daarvan ter plaatse hernoemd</translation>
     </message>
     <message>
         <location line="+36"/>
         <source>Couldn&apos;t restore %1 to its original name %2</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon %1 niet terugzetten naar de oorspronkelijke naam %2</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>The staging folder &apos;%1&apos; is not empty: some obfuscated files could not be put back</source>
-        <translation type="unfinished"></translation>
+        <translation>De tussenmap &apos;%1&apos; is niet leeg: sommige versluierde bestanden konden niet worden teruggezet</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -5660,7 +5668,10 @@ Het model nu opslaan?</translation>
 failed: %2
 unknown: %3
 </source>
-        <translation type="unfinished"></translation>
+        <translation>geplaatst: %1
+mislukt: %2
+onbekend: %3
+</translation>
     </message>
     <message>
         <location line="+21"/>
@@ -5763,17 +5774,17 @@ unknown: %3
     <message>
         <location line="-835"/>
         <source>Could not stop the external process before restoring source files</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon het externe proces niet stoppen voordat de bronbestanden werden hersteld</translation>
     </message>
     <message>
         <location line="+216"/>
         <source>Could not persist interrupted article state: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon de staat van het onderbroken artikel niet opslaan: %1</translation>
     </message>
     <message>
         <location line="+1374"/>
         <source>Post interrupted with %1 ambiguous article(s); resume data was preserved.</source>
-        <translation type="unfinished"></translation>
+        <translation>Post onderbroken met %1 dubbelzinnig(e) artikel(en); hervattingsgegevens zijn bewaard.</translation>
     </message>
     <message>
         <location line="+147"/>
@@ -5791,7 +5802,7 @@ unknown: %3
     <message>
         <location line="+18"/>
         <source>Some source files are still under their obfuscated name; ngPost will try again when the job ends. The post itself is unaffected.</source>
-        <translation type="unfinished"></translation>
+        <translation>Sommige bronbestanden dragen nog hun versluierde naam; ngPost probeert het opnieuw wanneer de taak eindigt. De post zelf blijft ongemoeid.</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -6449,107 +6460,107 @@ Sommige Usenet-indexen vragen erom.</translation>
     <message>
         <location line="-1295"/>
         <source>The machine-wide VPN lease security descriptor could not be created (Windows error %1).</source>
-        <translation type="unfinished"></translation>
+        <translation>De beveiligingsdescriptor voor de machinebrede VPN-reservering kon niet worden aangemaakt (Windows-fout %1).</translation>
     </message>
     <message>
         <location line="+13"/>
         <source>The machine-wide VPN lease could not be opened (Windows error %1).</source>
-        <translation type="unfinished"></translation>
+        <translation>De machinebrede VPN-reservering kon niet worden geopend (Windows-fout %1).</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>Another ngPost instance owns the machine-wide VPN lease. %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Een andere ngPost-instantie bezit de machinebrede VPN-reservering. %1</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>The machine-wide VPN lease could not be acquired (Windows error %1).</source>
-        <translation type="unfinished"></translation>
+        <translation>De machinebrede VPN-reservering kon niet worden verkregen (Windows-fout %1).</translation>
     </message>
     <message>
         <location line="+29"/>
         <source>Could not create or secure the Windows VPN runtime directory: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon de Windows-VPN-runtimemap niet aanmaken of beveiligen: %1</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>Could not publish or secure the Windows VPN owner manifest: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Kon het Windows-VPN-eigenaarsmanifest niet publiceren of beveiligen: %1</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>Owner metadata is unavailable.</source>
-        <translation type="unfinished"></translation>
+        <translation>Eigenaarsmetagegevens zijn niet beschikbaar.</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>Owner metadata is malformed.</source>
-        <translation type="unfinished"></translation>
+        <translation>Eigenaarsmetagegevens zijn ongeldig.</translation>
     </message>
     <message>
         <location line="+360"/>
         <source>The installed VPN helper is version 1; update it before connecting.</source>
-        <translation type="unfinished"></translation>
+        <translation>Het geïnstalleerde VPN-hulpprogramma is versie 1; werk het bij voordat u verbinding maakt.</translation>
     </message>
     <message>
         <location line="+49"/>
         <source>VPN: could not create the protected OpenVPN authentication file</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: kon het beveiligde OpenVPN-authenticatiebestand niet aanmaken</translation>
     </message>
     <message>
         <location line="+251"/>
         <source>VPN: tunnel health restored</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: tunnelconditie hersteld</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>VPN: tunnel health is uncertain — %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: tunnelconditie is onzeker — %1</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>OpenVPN recovery budget exhausted</source>
-        <translation type="unfinished"></translation>
+        <translation>Budget voor OpenVPN-herstel uitgeput</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>VPN: OpenVPN is reconnecting internally (attempt %1)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: OpenVPN maakt intern opnieuw verbinding (poging %1)</translation>
     </message>
     <message>
         <location line="+30"/>
         <source>VPN restart attempt %1 failed: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-herstartpoging %1 mislukt: %2</translation>
     </message>
     <message>
         <location line="+41"/>
         <source>VPN: restart scheduled in %1 second(s)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: herstart gepland over %1 seconde(n)</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>VPN recovery budget exhausted</source>
-        <translation type="unfinished"></translation>
+        <translation>Budget voor VPN-herstel uitgeput</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>VPN: external restart attempt %1 (recovery attempt %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN: externe herstartpoging %1 (herstelpoging %2)</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>VPN restart failed</source>
-        <translation type="unfinished"></translation>
+        <translation>Herstarten van de VPN mislukt</translation>
     </message>
     <message>
         <location line="+393"/>
         <source>could not stage bundled VPN executable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>kon het meegeleverde VPN-uitvoerbestand niet klaarzetten: %1</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>could not secure staged VPN executable: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>kon het klaargezette VPN-uitvoerbestand niet beveiligen: %1</translation>
     </message>
     <message>
         <location line="+43"/>
@@ -6599,37 +6610,37 @@ Sommige Usenet-indexen vragen erom.</translation>
     <message>
         <location line="+133"/>
         <source>VPN startup preflight could not read %1; no cleanup attempted</source>
-        <translation type="unfinished"></translation>
+        <translation>De VPN-startcontrole kon %1 niet lezen; geen opruiming geprobeerd</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>VPN startup manifest is malformed; no cleanup attempted</source>
-        <translation type="unfinished"></translation>
+        <translation>Het VPN-startmanifest is ongeldig; geen opruiming geprobeerd</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>An orphaned VPN session was detected, but the v2 helper is not installed</source>
-        <translation type="unfinished"></translation>
+        <translation>Er is een verweesde VPN-sessie gedetecteerd, maar het v2-hulpprogramma is niet geïnstalleerd</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>An orphaned VPN session was detected, but the installed helper is version 1; no cleanup attempted</source>
-        <translation type="unfinished"></translation>
+        <translation>Er is een verweesde VPN-sessie gedetecteerd, maar het geïnstalleerde hulpprogramma is versie 1; geen opruiming geprobeerd</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>Startup: cleaned an orphaned VPN v2 session</source>
-        <translation type="unfinished"></translation>
+        <translation>Opstart: een verweesde VPN-v2-sessie opgeruimd</translation>
     </message>
     <message>
         <location line="+95"/>
         <source>The installed VPN helper is version 1; no cleanup was attempted.</source>
-        <translation type="unfinished"></translation>
+        <translation>Het geïnstalleerde VPN-hulpprogramma is versie 1; er is geen opruiming geprobeerd.</translation>
     </message>
     <message>
         <location line="+15"/>
         <source>VPN cleanup timed out</source>
-        <translation type="unfinished"></translation>
+        <translation>Time-out bij het opruimen van de VPN</translation>
     </message>
     <message>
         <location line="+44"/>
@@ -6649,12 +6660,12 @@ Sommige Usenet-indexen vragen erom.</translation>
     <message>
         <location line="+34"/>
         <source>ngPost has no VPN support on this operating system.</source>
-        <translation type="unfinished"></translation>
+        <translation>ngPost biedt geen VPN-ondersteuning op dit besturingssysteem.</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>Another ngPost instance owns the machine-wide VPN lease.</source>
-        <translation type="unfinished"></translation>
+        <translation>Een andere ngPost-instantie bezit de machinebrede VPN-reservering.</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -6679,7 +6690,9 @@ Open de VPN-opties met de VPN-knop en controleer de instellingen, of bewerk de s
         <source>Use VPN is enabled for NNTP server(s): %1, but %2
 
 Edit the server configuration and clear its Use VPN setting to post to it without a tunnel.</source>
-        <translation type="unfinished"></translation>
+        <translation>&apos;VPN gebruiken&apos; is ingeschakeld voor NNTP-server(s): %1, maar %2
+
+Bewerk de serverconfiguratie en schakel &apos;VPN gebruiken&apos; uit om er zonder tunnel naartoe te posten.</translation>
     </message>
     <message>
         <location line="+17"/>
@@ -6714,12 +6727,12 @@ Edit the server configuration and clear its Use VPN setting to post to it withou
     <message>
         <location line="+1"/>
         <source>VPN lease busy</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-reservering bezet</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>reconnecting...</source>
-        <translation type="unfinished"></translation>
+        <translation>opnieuw verbinden...</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -7047,12 +7060,12 @@ Weigert u, dan wordt het profiel ZONDER inloggegevens opgeslagen. OpenVPN vraagt
     <message>
         <location line="+9"/>
         <source>Disconnect VPN</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN verbreken</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>A posting job currently depends on this VPN. Disconnecting will pause that job until you resume it manually. Continue?</source>
-        <translation type="unfinished"></translation>
+        <translation>Er is momenteel een posttaak die van deze VPN afhangt. Bij het verbreken wordt die taak gepauzeerd totdat u hem handmatig hervat. Doorgaan?</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -7154,17 +7167,17 @@ Zijn configuratiebestand onder &lt;configDir&gt;/vpn/ en zijn inloggegevens in d
     <message>
         <location line="+104"/>
         <source>Waiting for VPN lease held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>Wachten op de VPN-reservering van ngPost PID %1 (hulpprogramma %2)</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>VPN lease is held by ngPost PID %1 (helper %2)</source>
-        <translation type="unfinished"></translation>
+        <translation>De VPN-reservering is in handen van ngPost PID %1 (hulpprogramma %2)</translation>
     </message>
     <message>
         <location line="+10"/>
         <source>The installed VPN helper is version 1; update it before connecting.</source>
-        <translation type="unfinished"></translation>
+        <translation>Het geïnstalleerde VPN-hulpprogramma is versie 1; werk het bij voordat u verbinding maakt.</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -7174,12 +7187,12 @@ Zijn configuratiebestand onder &lt;configDir&gt;/vpn/ en zijn inloggegevens in d
     <message>
         <location line="+62"/>
         <source>VPN helper crashed</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-hulpprogramma is vastgelopen</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>VPN helper exited with code %1</source>
-        <translation type="unfinished"></translation>
+        <translation>VPN-hulpprogramma afgesloten met code %1</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -7214,12 +7227,12 @@ Zijn configuratiebestand onder &lt;configDir&gt;/vpn/ en zijn inloggegevens in d
     <message>
         <location line="+28"/>
         <source>WireGuard parent watchdog exited unexpectedly</source>
-        <translation type="unfinished"></translation>
+        <translation>De WireGuard-ouderbewaker is onverwacht afgesloten</translation>
     </message>
     <message>
         <location line="+25"/>
         <source>Could not start the WireGuard parent watchdog</source>
-        <translation type="unfinished"></translation>
+        <translation>De WireGuard-ouderbewaker kon niet worden gestart</translation>
     </message>
     <message>
         <location line="+20"/>
