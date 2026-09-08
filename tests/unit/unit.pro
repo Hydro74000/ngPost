@@ -14,4 +14,5 @@ SUBDIRS = \
     tst_FoldersMonitor \
     tst_UpdateChecker \
     tst_WireGuardBackend \
-    tst_WindowsBindHelper
+    tst_WindowsBindHelper \
+    tst_WindowsSecurity
