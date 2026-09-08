@@ -67,7 +67,12 @@ public:
     //! in PostingJobOptions.h so that the options can carry it.
     using ResumeFileState = PostingJobResumeFileState;
 
+    enum class PauseReason { None, User, ConnectionBackoff, VpnRecovery };
+    Q_ENUM(PauseReason)
+
 private:
+    static PauseReason _mergedPauseReason(PauseReason current, PauseReason incoming);
+
     NgPost *const _ngPost; //!< handle on the application to access global configs
 
     //! Frozen at construction: a job may wait in the queue while the global
@@ -186,7 +191,14 @@ private:
 
     bool _use7z;
 
-    bool _isPaused;
+    //! Read by the NNTP worker threads to stop article admission before the
+    //! queued connection-kill events arrive.
+    AtomicBool _isPaused;
+    PauseReason _pauseReason;
+    //! Frozen when the job enters ngPost's queue. `_vpnRetained` prevents a
+    //! recovery/user-resume transition from reference-counting it twice.
+    bool _vpnRequired;
+    bool _vpnRetained;
 
     QTimer _resumeTimer;
 
@@ -211,8 +223,15 @@ public:
 
     qint64 articleSizeBytes() const { return _articleSizeBytes; }
 
-    void pause();
+    void pause(PauseReason reason = PauseReason::User);
     void resume();
+    bool resumeIfPausedFor(PauseReason reason);
+    bool waitForVpnAfterUserResume();
+
+#ifdef NGPOST_TESTING
+    static PauseReason mergePauseReasonForTest(PauseReason current, PauseReason incoming)
+    { return _mergedPauseReason(current, incoming); }
+#endif
 
     inline QString avgSpeed() const;
 
@@ -222,6 +241,7 @@ public:
     inline uint nbArticlesTotal() const;
     inline uint nbArticlesUploaded() const;
     inline uint nbArticlesFailed() const;
+    uint nbArticlesUnknown() const;
     inline bool hasUploaded() const;
 
     inline const QString &nzbName() const;
@@ -278,6 +298,7 @@ public:
     inline bool isPosting() const;
 
     inline bool isPaused() const;
+    inline PauseReason pauseReason() const { return _pauseReason; }
 
     inline const QString &nzbFilePath() const;
     inline const QString &originalDirectory() const;
@@ -644,7 +665,7 @@ bool PostingJob::isPosting() const
 }
 bool PostingJob::isPaused() const
 {
-    return _isPaused;
+    return MB_LoadAtomic(_isPaused) != 0x0;
 }
 
 const QString &PostingJob::nzbFilePath() const

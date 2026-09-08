@@ -698,7 +698,7 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+2575"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3090"/>
         <source>VPN: disabled</source>
         <translation>VPN: disabled</translation>
     </message>
@@ -755,7 +755,7 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="-1717"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1852"/>
         <location line="+159"/>
         <source>Clear</source>
         <translation>Clear</translation>
@@ -771,7 +771,7 @@ Unlike the per post box, this choice is saved.</source>
         <translation>Switch to the command line (close the GUI and continue the program in the shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-908"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1209"/>
         <source>Host (name or IP)</source>
         <translation></translation>
     </message>
@@ -802,37 +802,80 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+755"/>
-        <location line="+173"/>
+        <location line="+1056"/>
+        <location line="+174"/>
         <source>Password</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-844"/>
-        <location line="+210"/>
+        <location line="-1129"/>
+        <location line="+397"/>
         <source>Default %1</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-206"/>
-        <location line="+210"/>
+        <location line="-393"/>
+        <location line="+397"/>
         <source>Post history, statistics and resume center</source>
         <translation>Post history, statistics and resume center</translation>
     </message>
     <message>
-        <location line="-209"/>
-        <location line="+213"/>
+        <location line="-396"/>
+        <location line="+400"/>
         <source>New</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-162"/>
+        <location line="-344"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+136"/>
+        <location line="+17"/>
+        <source>The VPN configured in ngPost already seems to be running.
+
+Another ngPost is using it, most likely an older version.
+
+Close that other ngPost to use the VPN here.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The VPN configured in ngPost already seems to be running.
+
+Another ngPost may be using it.
+
+Close that other ngPost to use the VPN here. If none is running, you can remove these leftover settings.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>The VPN seems to be already in use</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Close</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Remove leftover settings...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Another ngPost is using them.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>VPN</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+277"/>
         <source>Immediate speed (avg on %1 sec) - (nb Articles uploaded / total number of Articles) - avg speed</source>
         <translation></translation>
     </message>
@@ -848,13 +891,13 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+466"/>
-        <location line="+173"/>
+        <location line="+563"/>
+        <location line="+174"/>
         <source>Files</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-638"/>
+        <location line="-736"/>
         <source>Parameters</source>
         <translation></translation>
     </message>
@@ -864,7 +907,7 @@ Unlike the per post box, this choice is saved.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+130"/>
+        <location line="+176"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
         <translation>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
@@ -899,7 +942,7 @@ Unlike the per post box, this choice is saved.</source>
         <translation>Update failed</translation>
     </message>
     <message>
-        <location line="+59"/>
+        <location line="+79"/>
         <source>VPN required</source>
         <translation>VPN required</translation>
     </message>
@@ -917,7 +960,47 @@ The job stays in the queue.</source>
 The job stays in the queue.</translation>
     </message>
     <message>
-        <location line="+201"/>
+        <location line="-577"/>
+        <source>These settings could not be removed. See the VPN log for details.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+591"/>
+        <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>VPN recovery exhausted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>The posting job is paused and preserved for a later resume.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Retry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Stop and preserve for resume</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>VPN recovery</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>The VPN recovery could not be restarted.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+202"/>
         <location line="+117"/>
         <source>Open Resume →</source>
         <translation>Open Resume →</translation>
@@ -942,84 +1025,84 @@ The job stays in the queue.</translation>
     </message>
     <message>
         <location line="-151"/>
-        <location line="+242"/>
+        <location line="+275"/>
         <source>Previous</source>
         <translation>Previous</translation>
     </message>
     <message>
-        <location line="-241"/>
-        <location line="+242"/>
+        <location line="-274"/>
+        <location line="+275"/>
         <source>Next</source>
         <translation>Next</translation>
     </message>
     <message>
-        <location line="-235"/>
+        <location line="-268"/>
         <location line="+39"/>
         <location line="+7"/>
-        <location line="+127"/>
-        <location line="+127"/>
+        <location line="+128"/>
+        <location line="+159"/>
         <location line="+23"/>
-        <location line="+772"/>
+        <location line="+868"/>
         <source>Name</source>
         <translation>Name</translation>
     </message>
     <message>
-        <location line="-1095"/>
+        <location line="-1224"/>
         <location line="+39"/>
         <location line="+7"/>
-        <location line="+127"/>
-        <location line="+127"/>
+        <location line="+128"/>
+        <location line="+159"/>
         <location line="+23"/>
-        <location line="+772"/>
+        <location line="+868"/>
         <source>Status</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location line="-1095"/>
+        <location line="-1224"/>
         <location line="+39"/>
-        <location line="+134"/>
-        <location line="+127"/>
-        <location line="+795"/>
+        <location line="+135"/>
+        <location line="+159"/>
+        <location line="+891"/>
         <source>Size</source>
         <translation>Size</translation>
     </message>
     <message>
-        <location line="-1094"/>
-        <location line="+173"/>
+        <location line="-1223"/>
+        <location line="+174"/>
         <source>Articles</source>
         <translation>Articles</translation>
     </message>
     <message>
-        <location line="-173"/>
-        <location line="+173"/>
-        <location line="+1222"/>
+        <location line="-174"/>
+        <location line="+174"/>
+        <location line="+1350"/>
         <source>Failed</source>
         <translation>Failed</translation>
     </message>
     <message>
-        <location line="-1395"/>
+        <location line="-1524"/>
         <location line="+38"/>
-        <location line="+135"/>
-        <location line="+126"/>
+        <location line="+136"/>
+        <location line="+158"/>
         <source>Groups</source>
         <translation>Groups</translation>
     </message>
     <message>
-        <location line="-294"/>
-        <location line="+205"/>
+        <location line="-327"/>
+        <location line="+238"/>
         <source>Regenerate NZB…</source>
         <translation>Regenerate NZB…</translation>
     </message>
     <message>
-        <location line="-204"/>
-        <location line="+205"/>
-        <location line="+1447"/>
+        <location line="-237"/>
+        <location line="+238"/>
+        <location line="+1543"/>
         <source>Export info file…</source>
         <translation>Export info file…</translation>
     </message>
     <message>
-        <location line="-1645"/>
-        <location line="+249"/>
+        <location line="-1774"/>
+        <location line="+282"/>
         <source>Period:</source>
         <translation>Period:</translation>
     </message>
@@ -1029,7 +1112,7 @@ The job stays in the queue.</translation>
         <translation>History refresh failed: %1</translation>
     </message>
     <message>
-        <location line="+49"/>
+        <location line="+48"/>
         <source>No entries</source>
         <translation>No entries</translation>
     </message>
@@ -1039,7 +1122,7 @@ The job stays in the queue.</translation>
         <translation>Entries %1-%2</translation>
     </message>
     <message>
-        <location line="+80"/>
+        <location line="+171"/>
         <source>Resume post</source>
         <translation>Resume post</translation>
     </message>
@@ -1052,12 +1135,12 @@ Only missing or failed articles will be re-sent.</translation>
     </message>
     <message>
         <location line="+15"/>
-        <location line="+933"/>
+        <location line="+939"/>
         <source>Resume failed</source>
         <translation>Resume failed</translation>
     </message>
     <message>
-        <location line="-931"/>
+        <location line="-937"/>
         <source>This post could not be resumed.</source>
         <translation>This post could not be resumed.</translation>
     </message>
@@ -1069,7 +1152,7 @@ Only missing or failed articles will be re-sent.</translation>
 %1</translation>
     </message>
     <message>
-        <location line="+355"/>
+        <location line="+361"/>
         <source>Automatic Shutdown?</source>
         <translation></translation>
     </message>
@@ -1455,7 +1538,7 @@ This also removes all associated file and article records.</translation>
         <translation>Password for &lt;b&gt;%1&lt;/b&gt;:</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+30"/>
         <source>VPN: starting...</source>
         <translation>VPN: starting...</translation>
     </message>
@@ -1466,6 +1549,16 @@ This also removes all associated file and article records.</translation>
     </message>
     <message>
         <location line="+2"/>
+        <source>VPN: in use by another instance</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>VPN: reconnecting...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>VPN: stopping...</source>
         <translation>VPN: stopping...</translation>
     </message>
@@ -1475,38 +1568,39 @@ This also removes all associated file and article records.</translation>
         <translation>VPN: failed</translation>
     </message>
     <message>
-        <location line="-2240"/>
+        <location line="-2475"/>
         <source>close while still posting?</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-233"/>
+        <location line="-436"/>
         <source>on</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+234"/>
+        <location line="+437"/>
         <source>ngPost is currently posting.
 Are you sure you want to quit?</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+145"/>
+        <location line="+143"/>
         <source>Quick Tabs Menu</source>
         <translation></translation>
     </message>
     <message>
+        <location line="+11"/>
         <source>Open this tab on startup</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+9"/>
         <location line="+2"/>
         <source>Close All finished Tabs</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+1282"/>
+        <location line="+1493"/>
         <source>Quick Post is working..</source>
         <translation></translation>
     </message>
@@ -1522,7 +1616,7 @@ Are you sure you want to quit?</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-967"/>
+        <location line="-1096"/>
         <location line="+128"/>
         <source>All statuses</source>
         <translation>All statuses</translation>
@@ -1538,13 +1632,13 @@ Are you sure you want to quit?</source>
         <location line="+46"/>
         <location line="+51"/>
         <location line="+46"/>
-        <location line="+149"/>
+        <location line="+182"/>
         <location line="+75"/>
         <source>Refresh</source>
         <translation>Refresh</translation>
     </message>
     <message>
-        <location line="-369"/>
+        <location line="-402"/>
         <location line="+147"/>
         <source>Search:</source>
         <translation>Search:</translation>
@@ -1552,12 +1646,12 @@ Are you sure you want to quit?</source>
     <message>
         <location line="-146"/>
         <location line="+149"/>
-        <location line="+949"/>
+        <location line="+1078"/>
         <source>Status:</source>
         <translation>Status:</translation>
     </message>
     <message>
-        <location line="-1073"/>
+        <location line="-1202"/>
         <location line="+1"/>
         <location line="+136"/>
         <location line="+7"/>
@@ -1592,243 +1686,244 @@ Are you sure you want to quit?</source>
         <location line="-168"/>
         <location line="+31"/>
         <location line="+138"/>
-        <location line="+111"/>
+        <location line="+144"/>
         <source>Group:</source>
         <translation>Group:</translation>
     </message>
     <message>
-        <location line="-264"/>
+        <location line="-297"/>
         <location line="+39"/>
-        <location line="+134"/>
-        <location line="+127"/>
+        <location line="+135"/>
+        <location line="+159"/>
         <source>Date</source>
         <translation>Date</translation>
     </message>
     <message>
-        <location line="-300"/>
-        <location line="+173"/>
+        <location line="-333"/>
+        <location line="+174"/>
         <source>Speed</source>
         <translation>Speed</translation>
     </message>
     <message>
-        <location line="-172"/>
-        <location line="+173"/>
+        <location line="-173"/>
+        <location line="+174"/>
         <source>NZB path</source>
         <translation>NZB path</translation>
     </message>
     <message>
-        <location line="-169"/>
-        <location line="+194"/>
-        <location line="+352"/>
-        <location line="+471"/>
+        <location line="-170"/>
+        <location line="+227"/>
+        <location line="+351"/>
+        <location line="+568"/>
         <source>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</source>
         <translation>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</translation>
     </message>
     <message>
-        <location line="-1014"/>
-        <location line="+205"/>
-        <location line="+1454"/>
+        <location line="-1143"/>
+        <location line="+238"/>
+        <location line="+1550"/>
         <source>Copy password</source>
         <translation>Copy password</translation>
     </message>
     <message>
-        <location line="-1658"/>
-        <location line="+205"/>
-        <location line="+1043"/>
+        <location line="-1787"/>
+        <location line="+238"/>
+        <location line="+1139"/>
         <source>Purge password</source>
         <translation>Purge password</translation>
     </message>
     <message>
-        <location line="-1247"/>
-        <location line="+205"/>
+        <location line="-1376"/>
+        <location line="+238"/>
         <source>Open NZB location</source>
         <translation>Open NZB location</translation>
     </message>
     <message>
-        <location line="-204"/>
+        <location line="-237"/>
         <location line="+53"/>
-        <location line="+152"/>
+        <location line="+185"/>
         <location line="+120"/>
         <source>Delete entry</source>
         <translation>Delete entry</translation>
     </message>
     <message>
-        <location line="-1003"/>
-        <location line="+210"/>
-        <location line="+412"/>
-        <location line="+292"/>
+        <location line="-1320"/>
+        <location line="+397"/>
+        <location line="+509"/>
+        <location line="+325"/>
         <source>History</source>
         <translation>History</translation>
     </message>
     <message>
-        <location line="-228"/>
-        <location line="+238"/>
+        <location line="-261"/>
+        <location line="+271"/>
         <source>Last 7 days</source>
         <translation>Last 7 days</translation>
     </message>
     <message>
-        <location line="-237"/>
-        <location line="+237"/>
+        <location line="-270"/>
+        <location line="+270"/>
         <source>Last 30 days</source>
         <translation>Last 30 days</translation>
     </message>
     <message>
-        <location line="-236"/>
-        <location line="+236"/>
+        <location line="-269"/>
+        <location line="+269"/>
         <source>Last 90 days</source>
         <translation>Last 90 days</translation>
     </message>
     <message>
-        <location line="-235"/>
-        <location line="+236"/>
+        <location line="-268"/>
+        <location line="+269"/>
         <source>This year</source>
         <translation>This year</translation>
     </message>
     <message>
-        <location line="-235"/>
-        <location line="+235"/>
+        <location line="-268"/>
+        <location line="+268"/>
         <source>All time</source>
         <translation>All time</translation>
     </message>
     <message>
-        <location line="-231"/>
-        <location line="+234"/>
-        <location line="+1118"/>
+        <location line="-264"/>
+        <location line="+267"/>
+        <location line="+1214"/>
         <source>All groups</source>
         <translation>All groups</translation>
     </message>
     <message>
-        <location line="-1344"/>
-        <location line="+248"/>
+        <location line="-1473"/>
+        <location line="+281"/>
         <source>Volume and failures per day</source>
         <translation>Volume and failures per day</translation>
     </message>
     <message>
-        <location line="-252"/>
-        <location line="+256"/>
+        <location line="-285"/>
+        <location line="+289"/>
         <source>Timeline</source>
         <translation>Timeline</translation>
     </message>
     <message>
-        <location line="-255"/>
-        <location line="+263"/>
+        <location line="-288"/>
+        <location line="+296"/>
         <source>By group</source>
         <translation>By group</translation>
     </message>
     <message>
-        <location line="-262"/>
-        <location line="+273"/>
+        <location line="-295"/>
+        <location line="+306"/>
         <source>Top posts</source>
         <translation>Top posts</translation>
     </message>
     <message>
-        <location line="-270"/>
-        <location line="+255"/>
+        <location line="-303"/>
+        <location line="+288"/>
         <source>Posts by newsgroup</source>
         <translation>Posts by newsgroup</translation>
     </message>
     <message>
-        <location line="-335"/>
-        <location line="+352"/>
+        <location line="-368"/>
+        <location line="+385"/>
         <source>Stats</source>
         <translation>Stats</translation>
     </message>
     <message>
-        <location line="-265"/>
-        <location line="+272"/>
-        <location line="+238"/>
-        <location line="+934"/>
+        <location line="-298"/>
+        <location line="+305"/>
+        <location line="+237"/>
+        <location line="+1031"/>
         <source>&lt;i&gt;Select a post to see resume details.&lt;/i&gt;</source>
         <translation>&lt;i&gt;Select a post to see resume details.&lt;/i&gt;</translation>
     </message>
     <message>
-        <location line="-1441"/>
-        <location line="+277"/>
+        <location line="-1570"/>
+        <location line="+310"/>
         <source>Posted</source>
         <translation>Posted</translation>
     </message>
     <message>
-        <location line="-277"/>
-        <location line="+277"/>
+        <location line="-310"/>
+        <location line="+310"/>
         <source>To repost</source>
         <translation>To repost</translation>
     </message>
     <message>
-        <location line="-277"/>
-        <location line="+277"/>
+        <location line="-310"/>
+        <location line="+310"/>
         <source>Unknown</source>
         <translation>Unknown</translation>
     </message>
     <message>
-        <location line="-277"/>
-        <location line="+277"/>
+        <location line="-310"/>
+        <location line="+310"/>
         <source>Reason</source>
         <translation>Reason</translation>
     </message>
     <message>
-        <location line="-271"/>
-        <location line="+281"/>
+        <location line="-304"/>
+        <location line="+314"/>
         <source>Abandon</source>
         <translation>Abandon</translation>
     </message>
     <message>
-        <location line="-277"/>
-        <location line="+278"/>
-        <location line="+1239"/>
+        <location line="-310"/>
+        <location line="+311"/>
+        <location line="+1335"/>
         <source>Purge resume data</source>
         <translation>Purge resume data</translation>
     </message>
     <message>
-        <location line="-1513"/>
-        <location line="+275"/>
+        <location line="-1642"/>
+        <location line="+308"/>
         <source>Ignore (session)</source>
         <translation>Ignore (session)</translation>
     </message>
     <message>
-        <location line="-378"/>
+        <location line="-411"/>
         <location line="+91"/>
-        <location line="+284"/>
+        <location line="+317"/>
         <location line="+24"/>
-        <location line="+1299"/>
+        <location line="+1395"/>
         <source>Resume</source>
         <translation>Resume</translation>
     </message>
     <message>
-        <location line="-1606"/>
-        <location line="+289"/>
+        <location line="-1735"/>
+        <location line="+322"/>
         <source>Resume posting the selected post(s) from where they stopped</source>
         <translation>Resume posting the selected post(s) from where they stopped</translation>
     </message>
     <message>
-        <location line="-285"/>
-        <location line="+286"/>
+        <location line="-318"/>
+        <location line="+319"/>
         <source>Mark selected post(s) as abandoned (keep history entry)</source>
         <translation>Mark selected post(s) as abandoned (keep history entry)</translation>
     </message>
     <message>
-        <location line="-282"/>
-        <location line="+283"/>
+        <location line="-315"/>
+        <location line="+316"/>
         <source>Delete the technical resume data for selected post(s)</source>
         <translation>Delete the technical resume data for selected post(s)</translation>
     </message>
     <message>
-        <location line="-279"/>
-        <location line="+280"/>
+        <location line="-312"/>
+        <location line="+313"/>
         <source>Hide selected post(s) from this view for this session</source>
         <translation>Hide selected post(s) from this view for this session</translation>
     </message>
     <message>
-        <location line="-276"/>
-        <location line="+277"/>
+        <location line="-309"/>
+        <location line="+310"/>
         <source>Permanently delete selected post(s) from the history database</source>
         <translation>Permanently delete selected post(s) from the history database</translation>
     </message>
     <message>
-        <location line="+173"/>
+        <location line="+172"/>
         <source>%1 post(s) can be resumed.</source>
         <translation>%1 post(s) can be resumed.</translation>
     </message>
     <message>
+        <location line="+129"/>
         <source>Reset column widths</source>
         <translation></translation>
     </message>
@@ -1836,7 +1931,7 @@ Are you sure you want to quit?</source>
 <context>
     <name>NgPost</name>
     <message>
-        <location filename="../NgPost.cpp" line="+218"/>
+        <location filename="../NgPost.cpp" line="+225"/>
         <source>Help: display syntax</source>
         <translation></translation>
     </message>
@@ -1866,7 +1961,27 @@ Are you sure you want to quit?</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+2"/>
+        <source>check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, see the report for whether they can be repaired, 2 = missing beyond any repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>with --check: print a single machine readable JSON report on stdout instead of the human one</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>with --check: verify every article even once the post is provably beyond repair</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>with --check: PAR2 slice size in bytes used to create the post, for the recovery analysis (default: derived from the nzb)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+21"/>
         <source>parse directory and post every file/folder separately. You must use --compress, should add --gen_par2, --gen_name and --gen_pass</source>
         <translation></translation>
     </message>
@@ -1896,7 +2011,7 @@ Are you sure you want to quit?</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+2"/>
         <source>newsgroups where to post the files (coma separated without space)</source>
         <translation></translation>
     </message>
@@ -2007,12 +2122,12 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4438"/>
+        <location line="+4772"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-4435"/>
+        <location line="-4769"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation></translation>
     </message>
@@ -2047,12 +2162,22 @@ Are you sure you want to quit?</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+684"/>
+        <location line="+12"/>
+        <source>remove unowned ngPost VPN resources after rechecking them (requires --yes)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+301"/>
+        <source>VPN recovery exhausted; the post was preserved for resume.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+466"/>
         <source>Refusing to overwrite the post history: %1</source>
         <translation>Refusing to overwrite the post history: %1</translation>
     </message>
     <message>
-        <location line="+488"/>
+        <location line="+496"/>
         <source>MONITOR_IGNORE_DIR ON =&gt; Ignoring new incoming folder %1</source>
         <translation></translation>
     </message>
@@ -2077,12 +2202,27 @@ Are you sure you want to quit?</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+108"/>
+        <location line="+41"/>
+        <source>SSL support is unavailable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+76"/>
         <source> =&gt; closing application</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+566"/>
+        <location line="+34"/>
+        <source>The post remains paused until the requested VPN stop completes.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>The post remains paused until VPN recovery completes.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+551"/>
         <source>Shutdown process failed (exit code %1).</source>
         <translation>Shutdown process failed (exit code %1).</translation>
     </message>
@@ -2097,7 +2237,7 @@ Are you sure you want to quit?</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+87"/>
+        <location line="+93"/>
         <source>Cancelling monitoring job: %1</source>
         <translation></translation>
     </message>
@@ -2107,14 +2247,54 @@ Are you sure you want to quit?</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+48"/>
         <source>Error syntax: %1
 To list the available options use: %2 --help
 </source>
         <translation></translation>
     </message>
     <message>
-        <location line="+176"/>
+        <location line="+124"/>
+        <source>Error: --vpn-cleanup-unattributed requires --yes because it can interrupt another ngPost tunnel.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>VPN resources were not removed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+66"/>
+        <source>Error: --%1 expects a positive number of bytes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>given on the command line</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>from the configuration</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>the nzb file could not be read</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>no server is enabled for nzb checking: set &apos;nzbCheck = true&apos; on at least one [server] of your configuration</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>the servers enabled for nzb checking have no positive connection count</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
         <source>Error syntax: you should provide at least one input file or directory using the option -i, --auto or --monitor</source>
         <translation></translation>
     </message>
@@ -2140,38 +2320,33 @@ To list the available options use: %2 --help
         <translation></translation>
     </message>
     <message>
-        <location line="-186"/>
+        <location line="-246"/>
         <source>Extra logs are ON
 </source>
         <translation></translation>
     </message>
     <message>
-        <location line="-2304"/>
-        <source>check nzb file (if articles are available on Usenet) cf https://github.com/mbruel/nzbCheck</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="-2478"/>
         <source>quiet mode (no output on stdout)</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+63"/>
+        <location line="+64"/>
         <source>Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</source>
         <translation>Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</translation>
     </message>
     <message>
-        <location line="+1295"/>
+        <location line="+1398"/>
         <source>SSL issue on your system...</source>
         <translation>SSL issue on your system...</translation>
     </message>
     <message>
-        <location line="+446"/>
+        <location line="+491"/>
         <source>no packing needed for next pending job %1</source>
         <translation>no packing needed for next pending job %1</translation>
     </message>
     <message>
-        <location line="+89"/>
+        <location line="+88"/>
         <source>start non packing job...</source>
         <translation>start non packing job...</translation>
     </message>
@@ -2186,12 +2361,12 @@ To list the available options use: %2 --help
         <translation>Cancelled pending job?</translation>
     </message>
     <message>
-        <location line="-958"/>
+        <location line="-1010"/>
         <source>Posting canceled by user.</source>
         <translation>Posting canceled by user.</translation>
     </message>
     <message>
-        <location line="+3075"/>
+        <location line="+3289"/>
         <source>VPN warning</source>
         <translation>VPN warning</translation>
     </message>
@@ -2224,13 +2399,13 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>Cancel</translation>
     </message>
     <message>
-        <location line="-1755"/>
+        <location line="-1890"/>
         <source>Full debug logs are ON
 </source>
         <translation></translation>
     </message>
     <message>
-        <location line="+120"/>
+        <location line="+180"/>
         <source>Error syntax: --auto only works with --compress or --gen_par2 or --pack with at least the keywords COMPRESS or GEN_PAR2 in PACK config</source>
         <translation>Error syntax: --auto only works with --compress or --gen_par2 or --pack with at least the keywords COMPRESS or GEN_PAR2 in PACK config</translation>
     </message>
@@ -2247,18 +2422,18 @@ That&apos;s not the case for &apos;%1&apos; which contains folders: %2</translat
         <translation>Error syntax: --monitor only works with --compress or with --gen_par2 ONLY IF MONITOR_IGNORE_DIR is enabled in config (--pack can be used)</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+49"/>
         <source>You should give an integer for the number of threads (option -t)</source>
         <translation></translation>
     </message>
     <message>
         <location line="+139"/>
-        <location line="+738"/>
+        <location line="+795"/>
         <source>Generate new random poster for each post</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-707"/>
+        <location line="-764"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation></translation>
     </message>
@@ -2330,19 +2505,19 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+112"/>
+        <location line="+133"/>
         <source>the nzbPath &apos;%1&apos; is not writable...
 </source>
         <translation></translation>
     </message>
     <message>
-        <location line="-1557"/>
+        <location line="-1684"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation></translation>
     </message>
     <message>
-        <location line="+1705"/>
+        <location line="+1852"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost starts logging: %1</translation>
     </message>
@@ -2352,7 +2527,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Error opening log file: &apos;%1&apos;</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+40"/>
         <source>Group Policy: one group per Post</source>
         <translation></translation>
     </message>
@@ -2367,7 +2542,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-1807"/>
+        <location line="-1970"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation></translation>
@@ -2380,7 +2555,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+1867"/>
+        <location line="+2030"/>
         <source>should be a directory!...</source>
         <translation></translation>
     </message>
@@ -2415,17 +2590,17 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Wrong keywords for PACK: %1. It should be a subset of (%2)</translation>
     </message>
     <message>
-        <location line="-1939"/>
+        <location line="-2102"/>
         <source>date</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-1631"/>
+        <location line="-1771"/>
         <source>use configuration file (default: the per-user ngPost configuration folder)</source>
         <translation>use configuration file (default: the per-user ngPost configuration folder)</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+12"/>
         <source>list structured post history</source>
         <translation>list structured post history</translation>
     </message>
@@ -2505,7 +2680,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>structured SQLite history database path</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+15"/>
         <source>one of your fields, written in the post info file AND published in the nzb header (typically &quot;password=qwerty42&quot;)</source>
         <translation>one of your fields, written in the post info file AND published in the nzb header (typically &quot;password=qwerty42&quot;)</translation>
     </message>
@@ -2615,17 +2790,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>select the active VPN profile by name (must already exist in the config)</translation>
     </message>
     <message>
-        <location line="+229"/>
-        <source>VPN could not be established — aborting pending jobs</source>
-        <translation>VPN could not be established — aborting pending jobs</translation>
-    </message>
-    <message>
-        <location line="+11"/>
+        <location line="+273"/>
         <source>VPN required but unavailable: %1</source>
         <translation>VPN required but unavailable: %1</translation>
     </message>
     <message>
-        <location line="+170"/>
+        <location line="+232"/>
         <source>History database error: %1</source>
         <translation>History database error: %1</translation>
     </message>
@@ -2769,13 +2939,13 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Post info file written: %1</translation>
     </message>
     <message>
-        <location line="+210"/>
-        <location line="+224"/>
+        <location line="+218"/>
+        <location line="+257"/>
         <source>AUTO_INCLUDE_NFO ON =&gt; %1 will be bundled with its sibling, not posted alone</source>
         <translation>AUTO_INCLUDE_NFO ON =&gt; %1 will be bundled with its sibling, not posted alone</translation>
     </message>
     <message>
-        <location line="-105"/>
+        <location line="-129"/>
         <source>Waiting for the post commands to finish before exiting...</source>
         <translation>Waiting for the post commands to finish before exiting...</translation>
     </message>
@@ -2785,7 +2955,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Waiting for the post commands to finish...</translation>
     </message>
     <message>
-        <location line="+127"/>
+        <location line="+151"/>
         <source>AUTO_INCLUDE_NFO ON =&gt; bundling %1 in the post of %2</source>
         <translation>AUTO_INCLUDE_NFO ON =&gt; bundling %1 in the post of %2</translation>
     </message>
@@ -2835,18 +3005,18 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Error: metadata &apos;%1&apos; is given both as public (--meta) and private (--post_meta); choose one.</translation>
     </message>
     <message>
-        <location line="+240"/>
+        <location line="+251"/>
         <source>Recovering: starting next job that wasn&apos;t pre-packed</source>
         <translation>Recovering: starting next job that wasn&apos;t pre-packed</translation>
     </message>
     <message>
-        <location line="-770"/>
-        <location line="+1116"/>
+        <location line="-822"/>
+        <location line="+1184"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</translation>
     </message>
     <message>
-        <location line="+108"/>
+        <location line="+179"/>
         <source>Error syntax: --rm_posted option is only available with --auto or --monitor</source>
         <translation>Error syntax: --rm_posted option is only available with --auto or --monitor</translation>
     </message>
@@ -2861,7 +3031,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Error syntax: --vpn_profile &apos;%1&apos; does not match any profile defined in the config</translation>
     </message>
     <message>
-        <location line="+119"/>
+        <location line="+127"/>
         <source>Error: --post_info_output can&apos;t be empty</source>
         <translation>Error: --post_info_output can&apos;t be empty</translation>
     </message>
@@ -2877,7 +3047,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     </message>
     <message>
         <location line="+86"/>
-        <location line="+697"/>
+        <location line="+754"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE must be a positive integer</translation>
     </message>
@@ -2903,7 +3073,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
 </translation>
     </message>
     <message>
-        <location line="+269"/>
+        <location line="+277"/>
         <source>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</source>
         <translation>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</translation>
     </message>
@@ -2913,7 +3083,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+6"/>
         <source>you can provide servers in one string using -S and/or split the parameters for ONE SINGLE server (this will overwrite the configuration file)</source>
         <translation></translation>
     </message>
@@ -3163,7 +3333,22 @@ Your active configuration file is:
         <translation>WARNING: </translation>
     </message>
     <message>
-        <location line="-196"/>
+        <location line="-814"/>
+        <source>Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Warning: VPN_RECOVERY_MAX_ATTEMPTS must be in 0..1000; using 0 (unlimited).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+398"/>
+        <source>should be a positive number of bytes!...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+210"/>
         <source>Warning: this configuration file is the one ngPost adopted when it moved your settings to &quot;%1&quot;.
 It has no POST_DB line, so this run records its posts in
     %2
@@ -3217,12 +3402,12 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="+119"/>
+        <location line="+120"/>
         <source>History: could not remove the canceled post %1: %2</source>
         <translation>History: could not remove the canceled post %1: %2</translation>
     </message>
     <message>
-        <location line="+72"/>
+        <location line="+89"/>
         <source># ngPost configuration file</source>
         <translation></translation>
     </message>
@@ -3397,7 +3582,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>## given to a post command; __rarPass__ in the arguments still works</translation>
     </message>
     <message>
-        <location line="+81"/>
+        <location line="+84"/>
         <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
         <translation>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</translation>
     </message>
@@ -3407,17 +3592,17 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>## (internal) last update check timestamp, epoch seconds — managed automatically</translation>
     </message>
     <message>
-        <location line="+3"/>
-        <source>## tunnel ngPost connections through an embedded VPN (Linux v1)</source>
-        <translation>## tunnel ngPost connections through an embedded VPN (Linux v1)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="+4"/>
         <source>## the VPN affects ngPost only; the rest of the system is unchanged</source>
         <translation>## the VPN affects ngPost only; the rest of the system is unchanged</translation>
     </message>
     <message>
-        <location line="+44"/>
+        <location line="+25"/>
+        <source>## disabling auto-resume still preserves unconfirmed articles as unknown</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+23"/>
         <source>## Shortcut for automatic packing for both GUI and CMD using --pack</source>
         <translation>## Shortcut for automatic packing for both GUI and CMD using --pack</translation>
     </message>
@@ -3442,7 +3627,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="-132"/>
+        <location line="-139"/>
         <source>## nzb files are normally all created in nzbPath</source>
         <translation></translation>
     </message>
@@ -3582,7 +3767,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+6"/>
         <source>## remove accents and special characters from the nzb file names</source>
         <translation></translation>
     </message>
@@ -3592,7 +3777,22 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+8"/>
+        <source>## tunnel selected ngPost connections through an embedded VPN</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>## CLI only: wait for the machine-wide VPN lease (0 fails immediately; range 0..1440)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>## VPN recovery attempts (0 = unlimited; range 0..1000)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
         <source>## when obfuscating file names, keep the .nfo extension visible</source>
         <translation>## when obfuscating file names, keep the .nfo extension visible</translation>
     </message>
@@ -3627,12 +3827,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>## you can disable this feature and thus stop a post when you loose the network</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location line="+3"/>
+        <location line="+4"/>
         <source>## if there is no activity on a connection it will be closed and restarted</source>
         <translation></translation>
     </message>
@@ -3818,7 +4013,22 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+6"/>
+        <source>## PAR2 slice size in bytes, used by --check to weigh a loss against the</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>## recovery blocks. Without it the check infers one and refuses to declare</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>## a post beyond repair.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
         <source>## length of the random generated archive&apos;s file name</source>
         <translation></translation>
     </message>
@@ -3845,7 +4055,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="-4766"/>
+        <location line="-5119"/>
         <source>Auto Posting</source>
         <translation></translation>
     </message>
@@ -3855,7 +4065,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1104"/>
+        <location filename="../NgPost.h" line="+1143"/>
         <source>PACKing auto using: %1</source>
         <translation>PACKing auto using: %1</translation>
     </message>
@@ -3915,19 +4125,23 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>If you&apos;d like to translate ngPost into your language, it&apos;s easy, please contact me at Matthieu.Bruel@gmail.com</translation>
     </message>
     <message>
+        <location filename="../NgPost.cpp" line="+199"/>
         <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
         <translation></translation>
     </message>
     <message>
+        <location line="+2701"/>
         <source>Do file name obfuscation (the input files are renamed before compression)
 </source>
         <translation></translation>
     </message>
     <message>
-        <source>## 'filename' renames the input files with a random name before compressing</source>
+        <location line="+1981"/>
+        <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation></translation>
     </message>
     <message>
+        <location line="+1"/>
         <source>## them, so the archive carries no original name. Both can be asked at once.</source>
         <translation></translation>
     </message>
@@ -3935,7 +4149,7 @@ One thing does change for such a script: the old configuration file has no POST_
 <context>
     <name>NntpCheckCon</name>
     <message>
-        <location filename="../NntpCheckCon.cpp" line="+77"/>
+        <location filename="../NntpCheckCon.cpp" line="+86"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</translation>
     </message>
@@ -3945,7 +4159,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>VPN bind failed on %1: %2 (local addresses visible to Qt: %3)</translation>
     </message>
     <message>
-        <location line="+48"/>
+        <location line="+50"/>
         <source>VPN DNS lookup failed for %1 via %2: %3 — falling back to system DNS</source>
         <translation>VPN DNS lookup failed for %1 via %2: %3 — falling back to system DNS</translation>
     </message>
@@ -3955,13 +4169,23 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>unknown error</translation>
     </message>
     <message>
-        <location line="+38"/>
+        <location line="+54"/>
         <location line="+10"/>
         <source>[Con #%1] Connected</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+19"/>
+        <source>[Con #%1] %2:%3 stopped answering after %4 s, dropping the connection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+34"/>
+        <source>[Con #%1] reconnecting (attempt %2 of %3)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+34"/>
         <source>[Connection #%1] Error connecting to server %2:%3</source>
         <translation></translation>
     </message>
@@ -3981,7 +4205,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+21"/>
         <source>[Con #%1] No more Article</source>
         <translation></translation>
     </message>
@@ -3989,7 +4213,7 @@ One thing does change for such a script: the old configuration file has no POST_
 <context>
     <name>NntpConnection</name>
     <message>
-        <location filename="../NntpConnection.cpp" line="+132"/>
+        <location filename="../NntpConnection.cpp" line="+139"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</translation>
     </message>
@@ -4014,37 +4238,23 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>connection killed before server confirmation</translation>
     </message>
     <message>
-        <location line="+40"/>
-        <source>Article FAIL2: %1 (on %2)</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location line="+12"/>
+        <location line="+55"/>
         <source>connection closed before server confirmation</source>
         <translation>connection closed before server confirmation</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+24"/>
         <source>Connection lost, trying to reconnect! (nb disconnected: %1)</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+2"/>
+        <location line="+5"/>
         <source>connection lost before server confirmation</source>
         <translation>connection lost before server confirmation</translation>
     </message>
     <message>
-        <location line="+10"/>
-        <source>Article FAIL3: %1 (on %2)</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location line="+8"/>
-        <source>Closing connection, Failed Article: %1</source>
-        <translation></translation>
-    </message>
-    <message>
-        <location line="+98"/>
+        <location line="+100"/>
         <source>Closing Connection due to ERROR on post command: &apos;%2&apos; (%1 skipped)
 </source>
         <translation></translation>
@@ -4080,7 +4290,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="+27"/>
+        <location line="+28"/>
         <source>[Connection #%1] Error connecting to server %2:%3</source>
         <translation></translation>
     </message>
@@ -4095,7 +4305,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+37"/>
         <source>start sending article: %1</source>
         <translation></translation>
     </message>
@@ -4103,17 +4313,47 @@ One thing does change for such a script: the old configuration file has no POST_
 <context>
     <name>NzbCheck</name>
     <message>
-        <location filename="../NzbCheck.cpp" line="+51"/>
+        <location filename="../NzbCheck.cpp" line="+135"/>
+        <source>there is nothing left to rebuild it with</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>the loss is already beyond what the PAR2 blocks can repair</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Stopped after %1 of the %2 article(s) listed in the nzb: %3, so checking the rest would not change the answer. Pass --%4 to check everything anyway.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>ERROR: check FAILED - not one of the %1 article(s) listed in the nzb could be verified. Every connection was refused or dropped: check the credentials, and whether another program is already using all the connections allowed on the server(s).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>ERROR: check INCOMPLETE - only %1 of the %2 article(s) listed in the nzb were verified. Some connections failed (the server&apos;s connection limit may have been reached). The missing-article count below is NOT reliable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>Nb Missing Article(s): at least %1/%2 (stopped early after %3 (%4 sec) using %5 connections on %6 server(s))</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
         <source>Nb Missing Article(s): %1/%2 (check done in %3 (%4 sec) using %5 connections on %6 server(s))</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+40"/>
         <source> missing: </source>
         <translation></translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+139"/>
         <source>The file &apos;%1&apos; has %2 articles in the nzb (expected: %3)</source>
         <translation></translation>
     </message>
@@ -4123,22 +4363,167 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="+28"/>
-        <source>%1 has %2 articles</source>
-        <translation></translation>
+        <location line="+63"/>
+        <source>%1 has %2 articles (%3 data, %4 par2 in %5 volume(s))</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>WARNING: this nzb carries no PAR2 file - nothing can be repaired</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>PAR2 recovery blocks: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+73"/>
+        <source>ERROR: check INCONCLUSIVE - %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>guessed from the article size</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+240"/>
+        <source>=== Recovery analysis ===</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>  Data articles: %1 (missing: %2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>  PAR2 articles: %1 (missing: %2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>  No PAR2 file: nothing can be repaired</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>  Recovery blocks: %1 of %2 still usable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Recovery blocks: %1 guaranteed, %2 likely, %3 at best, of %4</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>  Redundancy: %1% of the source slices can be rebuilt (%2% when it was posted)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>  Redundancy: %1% of source slices guaranteed, %2% likely, %3% at best (%4% when posted)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>  PAR2 metadata: the conventional base index was verified in full, but STAT cannot prove which packets it contains</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>  PAR2 metadata: not proven by the nzb. Recovery volumes are not required to repeat the vital packets, even when intact</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+7"/>
+        <source>  Damaged blocks: at least %1, with no upper bound - the nzb does not provide enough trustworthy file and segment sizes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Damaged blocks: %1 to %2, depending on article and slice layout (block size: %3 bytes, %4)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>declared</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>  The slice size was inferred, not read, so this analysis will not declare the post dead. Pass --par2_block_size to get a firm answer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>  Assumes every non-PAR2 file is covered by the recovery set. A file added after the PAR2 files were built -- a .nfo kept visible, for instance -- is not, and a loss there cannot be repaired.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>  Verdict: COMPLETE - no data article is missing</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>  Warning: %1% of the recovery blocks are gone; the data is intact today but it is less protected than it was</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Warning: %1% to %2% of the recovery blocks may be gone (%3% likely); the data is intact today but less protected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>  Verdict: PROBABLY RECOVERABLE - the remaining blocks cover the loss, and the conventional base index is available, but STAT cannot verify its vital packets. Try the repair</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>  Verdict: INDETERMINATE - the nzb does not expose enough packet and slice information to prove recovery or failure. Try the repair before re-posting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>  Verdict: UNRECOVERABLE - the loss exceeds the remaining blocks even at best. This post has to be re-posted from the source</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Verdict: UNRECOVERABLE - data is missing and the nzb carries no PAR2 file to rebuild it with</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Verdict: UNRECOVERABLE - the PAR2 files carry no recovery block at all, only the index; they can tell you what is broken, not mend it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Verdict: UNRECOVERABLE - data is missing and every PAR2 volume lost every one of its articles</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-463"/>
         <source>Error opening nzb file...</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+20"/>
+        <source>the servers enabled for nzb checking have no positive connection count</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+28"/>
         <source>Using %1 Connections</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../NzbCheck.h" line="+135"/>
+        <location filename="../NzbCheck.h" line="+406"/>
         <source>+ Missing Article on server: </source>
         <translation></translation>
     </message>
@@ -4176,7 +4561,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>the stored article size is inconsistent with the post history; refusing to rebuild the NZB</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+45"/>
         <source>file %1 contains unknown articles</source>
         <translation>file %1 contains unknown articles</translation>
     </message>
@@ -4196,7 +4581,12 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>history for successful file %1 is incomplete; refusing to replace the NZB</translation>
     </message>
     <message>
-        <location line="+39"/>
+        <location line="+17"/>
+        <source>file %1 has no confirmed article and is left out of the NZB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+42"/>
         <source>%1 article segment sizes were missing in history and rebuilt from file metadata</source>
         <translation>%1 article segment sizes were missing in history and rebuilt from file metadata</translation>
     </message>
@@ -4204,83 +4594,143 @@ One thing does change for such a script: the old configuration file has no POST_
 <context>
     <name>OpenVpnBackend</name>
     <message>
-        <location filename="../vpn/OpenVpnBackend.cpp" line="+96"/>
-        <location line="+29"/>
+        <location filename="../vpn/OpenVpnBackend.cpp" line="+115"/>
+        <location line="+34"/>
         <source>Config file not found or unreadable: %1</source>
         <translation>Config file not found or unreadable: %1</translation>
     </message>
     <message>
-        <location line="-22"/>
+        <location line="-25"/>
         <source>Native VPN integration is currently Linux/Windows-only. macOS support is in progress.</source>
         <translation>Native VPN integration is currently Linux/Windows-only. macOS support is in progress.</translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="+33"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found. Install it under /var/lib/ngpost/ or run from the AppImage.</source>
         <translation>Privileged helper script ngpost-vpn-helper.sh not found. Install it under /var/lib/ngpost/ or run from the AppImage.</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+41"/>
         <source>Launching VPN helper: %1 %2</source>
         <translation>Launching VPN helper: %1 %2</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+6"/>
         <source>Failed to start %1/helper</source>
         <translation>Failed to start %1/helper</translation>
     </message>
     <message>
-        <location line="+135"/>
+        <location line="+12"/>
+        <source>Failed to send credentials to the VPN helper</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+166"/>
+        <source>Waiting for VPN lease held by ngPost PID %1 (helper %2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>VPN lease is held by ngPost PID %1 (helper %2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>The installed VPN helper is version 1; update it before connecting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
         <source>Malformed READY from helper: %1</source>
         <translation>Malformed READY from helper: %1</translation>
     </message>
     <message>
-        <location line="+18"/>
-        <source>helper exited (code %1) before tunnel was ready</source>
-        <translation>helper exited (code %1) before tunnel was ready</translation>
+        <location line="+66"/>
+        <source>VPN helper crashed</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+1"/>
+        <source>VPN helper exited with code %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+174"/>
+        <source>OpenVPN service: starting tunnel via %1 (management on loopback port %2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+34"/>
+        <source>Could not connect to OpenVPN management on loopback port %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+71"/>
+        <source>Connected to openvpn management socket; authenticating</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+119"/>
+        <source>OpenVPN process exited</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-389"/>
         <source>pkexec/helper failed to start (binary missing or denied)</source>
         <translation>pkexec/helper failed to start (binary missing or denied)</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+6"/>
         <source>helper process crashed</source>
         <translation>helper process crashed</translation>
     </message>
     <message>
-        <location line="+54"/>
+        <location line="+57"/>
         <source>OpenVPN backend already running</source>
         <translation>OpenVPN backend already running</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+17"/>
+        <source>Could not allocate a loopback OpenVPN management port</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Could not secure the OpenVPN runtime directory</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Could not create the OpenVPN management password file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Could not write the OpenVPN management password file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Could not secure the OpenVPN management password file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+20"/>
         <source>Cannot reach OpenVPNServiceInteractive pipe. Open Services.msc, set &quot;OpenVPN Interactive Service&quot; to Automatic, and start it. If it is not present, re-run the ngPost setup with the OpenVPN Community option.</source>
         <translation>Cannot reach OpenVPNServiceInteractive pipe. Open Services.msc, set &quot;OpenVPN Interactive Service&quot; to Automatic, and start it. If it is not present, re-run the ngPost setup with the OpenVPN Community option.</translation>
     </message>
     <message>
-        <location line="+24"/>
-        <source>OpenVPN service: starting tunnel via %1 (mgmt on 127.0.0.1:7505)</source>
-        <translation>OpenVPN service: starting tunnel via %1 (mgmt on 127.0.0.1:7505)</translation>
-    </message>
-    <message>
-        <location line="+5"/>
+        <location line="+31"/>
         <source>Failed to send startup data to OpenVPN service pipe</source>
         <translation>Failed to send startup data to OpenVPN service pipe</translation>
     </message>
     <message>
-        <location line="+25"/>
-        <source>Could not connect to openvpn management on 127.0.0.1:7505</source>
-        <translation>Could not connect to openvpn management on 127.0.0.1:7505</translation>
-    </message>
-    <message>
-        <location line="+36"/>
+        <location line="+64"/>
         <source>OpenVPN service: unparsable response (%1 bytes): %2</source>
         <translation>OpenVPN service: unparsable response (%1 bytes): %2</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+8"/>
         <source>OpenVPN service refused start (code 0x%1): %2</source>
         <translation>OpenVPN service refused start (code 0x%1): %2</translation>
     </message>
@@ -4288,16 +4738,6 @@ One thing does change for such a script: the old configuration file has no POST_
         <location line="+6"/>
         <source>OpenVPN service spawned openvpn.exe (%1)</source>
         <translation>OpenVPN service spawned openvpn.exe (%1)</translation>
-    </message>
-    <message>
-        <location line="+20"/>
-        <source>Connected to openvpn management socket</source>
-        <translation>Connected to openvpn management socket</translation>
-    </message>
-    <message>
-        <location line="+95"/>
-        <source>openvpn exited before the tunnel was ready</source>
-        <translation>openvpn exited before the tunnel was ready</translation>
     </message>
 </context>
 <context>
@@ -4972,7 +5412,7 @@ Save the model now?</translation>
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+600"/>
+        <location filename="../PostingJob.cpp" line="+762"/>
         <source>&lt;h3&gt;Start Post #%1: %2&lt;/h3&gt;</source>
         <translation></translation>
     </message>
@@ -5008,17 +5448,27 @@ Save the model now?</translation>
         <translation></translation>
     </message>
     <message>
-        <location line="-131"/>
+        <location line="-265"/>
+        <source>Could not stop the external process before restoring source files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+120"/>
         <source>History: could not flush pending article events: %1</source>
         <translation>History: could not flush pending article events: %1</translation>
     </message>
     <message>
-        <location line="+92"/>
+        <location line="+96"/>
+        <source>Could not persist interrupted article state: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
         <source>Try to resume posting</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+57"/>
+        <location line="+56"/>
         <source>Using TMP_RAM path as temporary folder. Post size: %1</source>
         <translation></translation>
     </message>
@@ -5096,7 +5546,27 @@ Save the model now?</translation>
         <translation>Copied nfo file %1 next to the nzb: %2</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+20"/>
+        <source>Couldn&apos;t create the staging folder &apos;%1&apos;: obfuscated files will be renamed where they are</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+26"/>
+        <source>&apos;%1&apos; cannot be moved into the temporary folder without copying it (they are on different filesystems): renaming it where it is instead</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+36"/>
+        <source>Couldn&apos;t restore %1 to its original name %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>The staging folder &apos;%1&apos; is not empty: some obfuscated files could not be put back</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
         <source>Deleting posted %1: %2</source>
         <translation></translation>
     </message>
@@ -5171,7 +5641,7 @@ Save the model now?</translation>
         <translation>History: could not record the size of post %1: %2</translation>
     </message>
     <message>
-        <location line="+154"/>
+        <location line="+156"/>
         <source>History: could not record the outcome of post %1: %2</source>
         <translation>History: could not record the outcome of post %1: %2</translation>
     </message>
@@ -5233,18 +5703,36 @@ Save the model now?</translation>
         <translation></translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+13"/>
+        <source>posted: %1
+failed: %2
+unknown: %3
+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+21"/>
         <source>, archive password: ***</source>
         <translation>, archive password: ***</translation>
     </message>
     <message>
-        <location line="+154"/>
+        <location line="+10"/>
+        <source>Post interrupted with %1 ambiguous article(s); resume data was preserved.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+147"/>
         <location line="+4"/>
         <source>Compressing files</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+116"/>
+        <location line="+33"/>
+        <source>Some source files are still under their obfuscated name; ngPost will try again when the job ends. The post itself is unaffected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+89"/>
         <source>you can&apos;t post folders without compression...</source>
         <translation>you can&apos;t post folders without compression...</translation>
     </message>
@@ -5260,7 +5748,7 @@ Save the model now?</translation>
         <translation></translation>
     </message>
     <message>
-        <location line="-334"/>
+        <location line="-343"/>
         <source>%1 / %2 articles FAILED to be uploaded (even with %3 retries)...
 </source>
         <translation></translation>
@@ -5277,24 +5765,24 @@ Save the model now?</translation>
         <translation></translation>
     </message>
     <message>
-        <location line="+86"/>
+        <location line="+106"/>
         <location line="+3"/>
         <source>postSize: %1 MB =&gt; volSize: %2</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+27"/>
+        <location line="-852"/>
         <source>Couldn&apos;t rename file %1</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+59"/>
+        <location line="+921"/>
         <source>=&gt; rar exit code: %1
 </source>
         <translation></translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+22"/>
         <source>Error during compression: %1</source>
         <translation></translation>
     </message>
@@ -5350,12 +5838,12 @@ Save the model now?</translation>
         <translation></translation>
     </message>
     <message>
-        <location line="-1885"/>
+        <location line="-2091"/>
         <source>History: could not create post record: %1</source>
         <translation>History: could not create post record: %1</translation>
     </message>
     <message>
-        <location line="+90"/>
+        <location line="+165"/>
         <source>History: missing resume state for file %1</source>
         <translation>History: missing resume state for file %1</translation>
     </message>
@@ -5365,7 +5853,7 @@ Save the model now?</translation>
         <translation>History: could not create file record: %1</translation>
     </message>
     <message>
-        <location line="+1038"/>
+        <location line="+1150"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>Could not regenerate final NZB from history: %1</translation>
     </message>
@@ -5375,7 +5863,7 @@ Save the model now?</translation>
         <translation>NZB history warning: %1</translation>
     </message>
     <message>
-        <location line="-376"/>
+        <location line="-378"/>
         <source>[%1] skipping already posted article %2 from %3</source>
         <translation>[%1] skipping already posted article %2 from %3</translation>
     </message>
@@ -5759,22 +6247,23 @@ Some Usenet indexes ask for one.</translation>
 <context>
     <name>VpnManager</name>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="+585"/>
+        <location filename="../vpn/VpnManager.cpp" line="+1184"/>
         <source>VPN: failed — %1</source>
         <translation>VPN: failed — %1</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="-17"/>
+        <location line="+1"/>
         <source>VPN: tunnel stopped</source>
         <translation>VPN: tunnel stopped</translation>
     </message>
     <message>
-        <location line="+46"/>
+        <location line="+91"/>
         <source>VPN: backend not supported on this platform yet</source>
         <translation>VPN: backend not supported on this platform yet</translation>
     </message>
     <message>
-        <location line="+250"/>
+        <location line="+296"/>
         <source>VPN install: timed out</source>
         <translation>VPN install: timed out</translation>
     </message>
@@ -5784,35 +6273,30 @@ Some Usenet indexes ask for one.</translation>
         <translation>VPN: uninstall script not found at %1</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>VPN uninstall: timed out</source>
         <translation>VPN uninstall: timed out</translation>
     </message>
     <message>
-        <location line="+165"/>
-        <source>Startup: cleaned up stale VPN state</source>
-        <translation>Startup: cleaned up stale VPN state</translation>
-    </message>
-    <message>
-        <location line="+75"/>
+        <location line="+470"/>
         <source>The VPN helper is not installed. Open the VPN dialog and click Install.</source>
         <translation>The VPN helper is not installed. Open the VPN dialog and click Install.</translation>
     </message>
     <message>
-        <location line="-1077"/>
+        <location line="-1699"/>
         <location line="+10"/>
-        <location line="+1071"/>
+        <location line="+1694"/>
         <source>No active VPN profile / configuration is selected.</source>
         <translation>No active VPN profile / configuration is selected.</translation>
     </message>
     <message>
-        <location line="-1064"/>
-        <location line="+1069"/>
+        <location line="-1687"/>
+        <location line="+1692"/>
         <source>The VPN configuration file is missing or unreadable: %1</source>
         <translation>The VPN configuration file is missing or unreadable: %1</translation>
     </message>
     <message>
-        <location line="-985"/>
+        <location line="-1608"/>
         <source>Disconnect the active VPN before changing its WireGuard configuration.</source>
         <translation>Disconnect the active VPN before changing its WireGuard configuration.</translation>
     </message>
@@ -5832,7 +6316,7 @@ Some Usenet indexes ask for one.</translation>
         <translation>Could not remove the replacement WireGuard service %1 after the old service failed to uninstall.</translation>
     </message>
     <message>
-        <location line="+149"/>
+        <location line="+160"/>
         <source>VPN: no active profile — nothing to start</source>
         <translation>VPN: no active profile — nothing to start</translation>
     </message>
@@ -5842,12 +6326,7 @@ Some Usenet indexes ask for one.</translation>
         <translation>VPN: config file missing for profile &apos;%1&apos; (%2)</translation>
     </message>
     <message>
-        <location line="+21"/>
-        <source>VPN: could not create auth file — openvpn will prompt</source>
-        <translation>VPN: could not create auth file — openvpn will prompt</translation>
-    </message>
-    <message>
-        <location line="+2"/>
+        <location line="+77"/>
         <source>VPN: no credentials in keychain for &apos;%1&apos; (relying on .ovpn inline)</source>
         <translation>VPN: no credentials in keychain for &apos;%1&apos; (relying on .ovpn inline)</translation>
     </message>
@@ -5857,7 +6336,7 @@ Some Usenet indexes ask for one.</translation>
         <translation>VPN: connecting profile &apos;%1&apos; (%2)…</translation>
     </message>
     <message>
-        <location line="+60"/>
+        <location line="+98"/>
         <source>VPN: backend reports ready (%1, %2) — waiting for the address to become bindable</source>
         <translation>VPN: backend reports ready (%1, %2) — waiting for the address to become bindable</translation>
     </message>
@@ -5887,7 +6366,7 @@ Some Usenet indexes ask for one.</translation>
         <translation>VPN: tun IP %1 was reported by the backend but the kernel never bound it to an interface (waited %2 ms). Visible local addresses: %3. Aborting to avoid a leaking bind.</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+24"/>
         <source>VPN: connected on %1 (%2), DNS %3</source>
         <translation>VPN: connected on %1 (%2), DNS %3</translation>
     </message>
@@ -5897,7 +6376,7 @@ Some Usenet indexes ask for one.</translation>
         <translation>VPN: connected on %1 (%2) — no DNS captured, system resolver in use</translation>
     </message>
     <message>
-        <location line="+260"/>
+        <location line="+514"/>
         <source>required VPN resource is missing or unreadable: %1</source>
         <translation>required VPN resource is missing or unreadable: %1</translation>
     </message>
@@ -5912,7 +6391,7 @@ Some Usenet indexes ask for one.</translation>
         <translation>could not make staged VPN resource executable: %1</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+46"/>
         <source>VPN backend prerequisites detected (OpenVPN / WireGuard for Windows).</source>
         <translation>VPN backend prerequisites detected (OpenVPN / WireGuard for Windows).</translation>
     </message>
@@ -5927,12 +6406,118 @@ Some Usenet indexes ask for one.</translation>
         <translation>VPN: could not create a temporary install directory</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="-409"/>
+        <location line="+415"/>
         <source>VPN: %1</source>
         <translation>VPN: %1</translation>
     </message>
     <message>
+        <location line="-1295"/>
+        <source>The machine-wide VPN lease security descriptor could not be created (Windows error %1).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>The machine-wide VPN lease could not be opened (Windows error %1).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location line="+8"/>
+        <source>Another ngPost instance owns the machine-wide VPN lease. %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>The machine-wide VPN lease could not be acquired (Windows error %1).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>Could not create or secure the Windows VPN runtime directory: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Could not publish or secure the Windows VPN owner manifest: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Owner metadata is unavailable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Owner metadata is malformed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+360"/>
+        <source>The installed VPN helper is version 1; update it before connecting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+49"/>
+        <source>VPN: could not create the protected OpenVPN authentication file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+251"/>
+        <source>VPN: tunnel health restored</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>VPN: tunnel health is uncertain — %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>OpenVPN recovery budget exhausted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>VPN: OpenVPN is reconnecting internally (attempt %1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>VPN restart attempt %1 failed: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+41"/>
+        <source>VPN: restart scheduled in %1 second(s)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>VPN recovery budget exhausted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>VPN: external restart attempt %1 (recovery attempt %2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>VPN restart failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+393"/>
+        <source>could not stage bundled VPN executable: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>could not secure staged VPN executable: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+43"/>
         <source>Running VPN install: %1 %2 %3</source>
         <translation>Running VPN install: %1 %2 %3</translation>
     </message>
@@ -5942,7 +6527,7 @@ Some Usenet indexes ask for one.</translation>
         <translation>On Windows, uninstall OpenVPN Community / WireGuard for Windows from &quot;Add or Remove Programs&quot; if you want to fully remove VPN support.</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+19"/>
         <source>Running VPN uninstall: %1 %2</source>
         <translation>Running VPN uninstall: %1 %2</translation>
     </message>
@@ -5977,12 +6562,47 @@ Some Usenet indexes ask for one.</translation>
         <translation>WireGuard tunnel service removed.</translation>
     </message>
     <message>
-        <location line="+94"/>
+        <location line="+133"/>
+        <source>VPN startup preflight could not read %1; no cleanup attempted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>VPN startup manifest is malformed; no cleanup attempted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>An orphaned VPN session was detected, but the v2 helper is not installed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>An orphaned VPN session was detected, but the installed helper is version 1; no cleanup attempted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Startup: cleaned an orphaned VPN v2 session</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+95"/>
+        <source>The installed VPN helper is version 1; no cleanup was attempted.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>VPN cleanup timed out</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+44"/>
         <source>(unnamed server)</source>
         <translation>(unnamed server)</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+13"/>
         <source>Master switch (VPN_AUTO_CONNECT) is ON but no VPN helper is installed - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</source>
         <translation>Master switch (VPN_AUTO_CONNECT) is ON but no VPN helper is installed - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</translation>
     </message>
@@ -5992,12 +6612,22 @@ Some Usenet indexes ask for one.</translation>
         <translation>Master switch (VPN_AUTO_CONNECT) is ON but the VPN is not correctly configured (%1) - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</translation>
     </message>
     <message>
-        <location line="+38"/>
+        <location line="+34"/>
+        <source>ngPost has no VPN support on this operating system.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Another ngPost instance owns the machine-wide VPN lease.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>The last VPN attempt failed. Open the VPN dialog and try again.</source>
         <translation>The last VPN attempt failed. Open the VPN dialog and try again.</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+6"/>
         <source>Use VPN is enabled for NNTP server(s): %1.
 
 The VPN is not correctly configured: %2
@@ -6010,7 +6640,14 @@ The VPN is not correctly configured: %2
 Open the VPN options with the VPN button and check the VPN configuration, or edit the server configuration and disable VPN by clearing its Use VPN checkbox.</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+9"/>
+        <source>Use VPN is enabled for NNTP server(s): %1, but %2
+
+Edit the server configuration and clear its Use VPN setting to post to it without a tunnel.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+17"/>
         <source>Auto-starting VPN for incoming job...</source>
         <translation>Auto-starting VPN for incoming job...</translation>
     </message>
@@ -6020,7 +6657,7 @@ Open the VPN options with the VPN button and check the VPN configuration, or edi
         <translation>Could not start the VPN.</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+66"/>
         <source>Queue empty for %1 s — disconnecting VPN</source>
         <translation>Queue empty for %1 s — disconnecting VPN</translation>
     </message>
@@ -6038,6 +6675,16 @@ Open the VPN options with the VPN button and check the VPN configuration, or edi
         <location line="+1"/>
         <source>connected</source>
         <translation>connected</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>VPN lease busy</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>reconnecting...</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+1"/>
@@ -6363,7 +7010,17 @@ If you decline, the profile will be saved WITHOUT credentials. OpenVPN will then
         <translation>No active VPN profile selected.</translation>
     </message>
     <message>
-        <location line="+22"/>
+        <location line="+9"/>
+        <source>Disconnect VPN</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>A posting job currently depends on this VPN. Disconnecting will pause that job until you resume it manually. Continue?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
         <source>No profile</source>
         <translation>No profile</translation>
     </message>
@@ -6417,7 +7074,7 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
         <translation>VPN uninstall failed. See the log for details.</translation>
     </message>
     <message>
-        <location line="+57"/>
+        <location line="+59"/>
         <source>VPN tunnel is installed. Connect / Disconnect will not prompt.</source>
         <translation>VPN tunnel is installed. Connect / Disconnect will not prompt.</translation>
     </message>
@@ -6435,52 +7092,72 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
 <context>
     <name>WireGuardBackend</name>
     <message>
-        <location filename="../vpn/WireGuardBackend.cpp" line="+133"/>
+        <location filename="../vpn/WireGuardBackend.cpp" line="+149"/>
         <source>Config file not found or unreadable: %1</source>
         <translation>Config file not found or unreadable: %1</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+8"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found</source>
         <translation>Privileged helper script ngpost-vpn-helper.sh not found</translation>
     </message>
     <message>
-        <location line="-24"/>
+        <location line="-28"/>
         <source>Native VPN integration is currently Linux-only. macOS support is in progress.</source>
         <translation>Native VPN integration is currently Linux-only. macOS support is in progress.</translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+62"/>
         <source>Launching VPN helper: %1 %2</source>
         <translation>Launching VPN helper: %1 %2</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+5"/>
         <source>Failed to start %1/helper</source>
         <translation>Failed to start %1/helper</translation>
     </message>
     <message>
-        <location line="+74"/>
+        <location line="+104"/>
+        <source>Waiting for VPN lease held by ngPost PID %1 (helper %2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>VPN lease is held by ngPost PID %1 (helper %2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>The installed VPN helper is version 1; update it before connecting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
         <source>Malformed READY from helper: %1</source>
         <translation>Malformed READY from helper: %1</translation>
     </message>
     <message>
-        <location line="+17"/>
-        <source>helper exited (code %1) before tunnel was ready</source>
-        <translation>helper exited (code %1) before tunnel was ready</translation>
+        <location line="+62"/>
+        <source>VPN helper crashed</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+0"/>
+        <source>VPN helper exited with code %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>pkexec/helper failed to start</source>
         <translation>pkexec/helper failed to start</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+6"/>
         <source>helper process crashed</source>
         <translation>helper process crashed</translation>
     </message>
     <message>
-        <location line="+70"/>
+        <location line="+87"/>
         <source>WireGuard config not found: %1</source>
         <translation>WireGuard config not found: %1</translation>
     </message>
@@ -6490,14 +7167,24 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
         <translation>Starting WireGuard service: %1</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+8"/>
         <source>sc start timed out — is the tunnel registered? (re-import the profile)</source>
         <translation>sc start timed out — is the tunnel registered? (re-import the profile)</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+9"/>
         <source>sc start failed (exit %1) — make sure the WireGuard tunnel was installed via wireguard.exe /installtunnelservice and that runtime ACL grants you START.</source>
         <translation>sc start failed (exit %1) — make sure the WireGuard tunnel was installed via wireguard.exe /installtunnelservice and that runtime ACL grants you START.</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>WireGuard parent watchdog exited unexpectedly</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Could not start the WireGuard parent watchdog</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+20"/>
@@ -6505,7 +7192,7 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
         <translation>WireGuard tunnel did not come up within 20s</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+12"/>
         <source>Could not parse local IP from WireGuard config</source>
         <translation>Could not parse local IP from WireGuard config</translation>
     </message>

@@ -24,6 +24,7 @@
 #include "NntpArticle.h"
 #include <QTextStream>
 #include <QDebug>
+#include <QMutexLocker>
 
 namespace
 {
@@ -50,7 +51,7 @@ NntpFile::NntpFile(PostingJob *postingJob, const QFileInfo &file,
     _nbAticles(articleCount(_fileSizeBytes, postingJob->articleSizeBytes())),
     _articles(),
     _historyFileId(0),
-    _posted(), _failed()
+    _posted(), _failed(), _unknown(), _unknownMutex()
 {
 #if defined(__DEBUG__) && defined(LOG_CONSTRUCTORS)
     qDebug() << "Creation NntpFile: " << file.absoluteFilePath()
@@ -87,6 +88,10 @@ void NntpFile::onArticlePosted(quint64 size)
              << ", id: " << article->id();
 #endif
     _posted.insert(part);
+    {
+        QMutexLocker lock(&_unknownMutex);
+        _unknown.remove(part);
+    }
     _postingJob->recordHistoryArticlePosted(article);
     article->freeMemory(); // free resources
 
@@ -111,6 +116,10 @@ void NntpFile::onArticleFailed(quint64 size)
              << ", id: " << article->id();
 #endif
     _failed.insert(part);
+    {
+        QMutexLocker lock(&_unknownMutex);
+        _unknown.remove(part);
+    }
     _postingJob->recordHistoryArticleFailed(article, QStringLiteral("article failed after retry"));
     article->freeMemory(); // free resources
 
@@ -184,7 +193,17 @@ void NntpFile::onArticlePostingStarted(NntpArticle *article, int attemptNo)
 
 void NntpFile::markArticleUnknown(NntpArticle *article, const QString &reason)
 {
+    if (article) {
+        QMutexLocker lock(&_unknownMutex);
+        _unknown.insert(article->part());
+    }
     _postingJob->recordHistoryArticleUnknown(article, reason);
+}
+
+uint NntpFile::nbUnknownArticles() const
+{
+    QMutexLocker lock(&_unknownMutex);
+    return static_cast<uint>(_unknown.size());
 }
 
 QString NntpFile::missingArticles() const

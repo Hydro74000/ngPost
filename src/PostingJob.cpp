@@ -340,7 +340,10 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _grpList(options.grpList)
     , _from(options.from)
     , _use7z(false)
-    , _isPaused(false)
+    , _isPaused(0x0)
+    , _pauseReason(PauseReason::None)
+    , _vpnRequired(false)
+    , _vpnRetained(false)
     , _resumeTimer()
     , _isActiveJob(false)
     , _historyPostId(options.resumeHistoryPostId)
@@ -526,24 +529,74 @@ PostingJob::~PostingJob()
         delete _file;
 }
 
-void PostingJob::pause()
+PostingJob::PauseReason PostingJob::_mergedPauseReason(PauseReason current,
+                                                       PauseReason incoming)
 {
+    if (incoming == PauseReason::User)
+        return PauseReason::User;
+    if (current == PauseReason::User)
+        return PauseReason::User;
+    if (incoming == PauseReason::VpnRecovery)
+        return PauseReason::VpnRecovery;
+    return current;
+}
+
+void PostingJob::pause(PauseReason reason)
+{
+    if (MB_LoadAtomic(_isPaused)) {
+        _pauseReason = _mergedPauseReason(_pauseReason, reason);
+        // Neither a user pause nor VPN recovery may be undone by a stale
+        // connection-backoff timeout. The callback is guarded as well; stopping
+        // here avoids leaving an unnecessary wake-up pending.
+        if (_pauseReason != PauseReason::ConnectionBackoff)
+            _resumeTimer.stop();
+        return;
+    }
     _log("Pause posting...");
+    // Publish the admission barrier before queuing connection shutdown. A
+    // fast NNTP reply must not let a worker reserve/send one more article in
+    // the interval before its killConnection event is processed.
+    _isPaused = 0x1;
+    _pauseReason = reason;
+    _pauseTimer.start();
     for (NntpConnection *con : _nntpConnections)
         emit con->killConnection();
-
-    _isPaused = true;
-    _pauseTimer.start();
 }
 
 void PostingJob::resume()
 {
+    if (!MB_LoadAtomic(_isPaused))
+        return;
     _log("Resume posting...");
+    // Clear the worker-visible barrier before startConnection is queued. The
+    // connection thread is allowed to run concurrently as soon as emit()
+    // returns.
+    _isPaused = 0x0;
+    _pauseReason = PauseReason::None;
+    _pauseDuration += _pauseTimer.elapsed();
+    // A VPN interruption can supersede ConnectionBackoff after every socket
+    // was moved to the closed set. The ordinary backoff callback no longer
+    // runs in that case, so recovery itself must restore the connection set.
+    if (_nntpConnections.isEmpty() && !_closedConnections.isEmpty())
+        _nntpConnections.swap(_closedConnections);
     for (NntpConnection *con : _nntpConnections)
         emit con->startConnection();
+}
 
-    _isPaused = false;
-    _pauseDuration += _pauseTimer.elapsed();
+bool PostingJob::resumeIfPausedFor(PauseReason reason)
+{
+    if (!MB_LoadAtomic(_isPaused) || _pauseReason != reason)
+        return false;
+    resume();
+    return true;
+}
+
+bool PostingJob::waitForVpnAfterUserResume()
+{
+    if (!MB_LoadAtomic(_isPaused) || _pauseReason != PauseReason::User)
+        return false;
+    _pauseReason = PauseReason::VpnRecovery;
+    return true;
 }
 
 QString PostingJob::sslSupportInfo()
@@ -655,15 +708,25 @@ void PostingJob::recordHistoryArticleUnknown(NntpArticle *article, const QString
                                    article->filePos(),
                                    article->fileBytes(),
                                    article->nzbBytes());
+    // An unknown state is the crash-recovery boundary: do not leave it in the
+    // normal batching window, because a second abrupt stop could otherwise
+    // resurrect the preceding "posting" state and lose the ambiguity marker.
+    QString error;
+    if (!history->flush(&error))
+        _error(tr("Could not persist interrupted article state: %1").arg(error));
 }
 
 void PostingJob::onResumeTriggered()
 {
-    if (_isPaused) {
-        _log(tr("Try to resume posting"));
-        _nntpConnections.swap(_closedConnections);
-        _ngPost->resume();
-    }
+    // This timer belongs exclusively to the ordinary NNTP reconnect backoff.
+    // It may still expire after a user or VPN pause superseded that reason;
+    // in that case it must not move connections or resume the job.
+    if (!MB_LoadAtomic(_isPaused) || _pauseReason != PauseReason::ConnectionBackoff)
+        return;
+
+    _log(tr("Try to resume posting"));
+    _nntpConnections.swap(_closedConnections);
+    _ngPost->resume();
 }
 
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
@@ -1000,7 +1063,7 @@ void PostingJob::onDisconnectedConnection(NntpConnection *con)
                 if (_ngPost->_tryResumePostWhenConnectionLost) {
                     int sleepDurationInSec = _ngPost->waitDurationBeforeAutoResume();
                     _log(tr("Sleep for %1 sec before trying to reconnect").arg(sleepDurationInSec));
-                    _ngPost->pause();
+                    pause(PauseReason::ConnectionBackoff);
                     _resumeTimer.start(sleepDurationInSec * 1000);
                 } else {
                     _finishPosting();
@@ -1600,10 +1663,11 @@ void PostingJob::_finishPosting()
     // the pause, but in that terminal path it is never called again; without
     // this, the exported active duration and average speed include the whole
     // final pause.
-    if (_isPaused && _pauseTimer.isValid()) {
+    if (MB_LoadAtomic(_isPaused) && _pauseTimer.isValid()) {
         _pauseDuration += _pauseTimer.elapsed();
         _pauseTimer.invalidate();
-        _isPaused = false;
+        _isPaused = 0x0;
+        _pauseReason = PauseReason::None;
     }
 
     _stopPosting = 0x1;
@@ -1618,10 +1682,6 @@ void PostingJob::_finishPosting()
 
     _ngPost->_finishPosting(); // to update progress bar
 
-    // 1.: print stats
-    if (_timeStart.isValid())
-        _printStats();
-
     for (NntpConnection *con : _nntpConnections) {
         if (con->thread() == QThread::currentThread())
             con->onKillConnection();
@@ -1634,6 +1694,11 @@ void PostingJob::_finishPosting()
         poster->stopThreads();
 
     _flushHistoryService();
+
+    // Closing the transports above classifies every in-flight article before
+    // the final CLI counters are produced.
+    if (_timeStart.isValid())
+        _printStats();
 
     if (_historyPostId && _ngPost->historyService()) {
         QString status;
@@ -1987,6 +2052,16 @@ void PostingJob::_printStats() const
                   .arg(_nntpConnections.size() + _closedConnections.size())
                   .arg(_posters.size() * 2);
 
+    const uint unknown = nbArticlesUnknown();
+    const uint posted = _nbArticlesUploaded >= _nbArticlesFailed
+        ? _nbArticlesUploaded - _nbArticlesFailed : 0;
+    if (!_ngPost->useHMI()) {
+        msgEnd += tr("posted: %1\nfailed: %2\nunknown: %3\n")
+                      .arg(posted)
+                      .arg(_nbArticlesFailed)
+                      .arg(unknown);
+    }
+
     if (_nbArticlesFailed > 0)
         msgEnd += tr("%1 / %2 articles FAILED to be uploaded (even with %3 retries)...\n")
                       .arg(_nbArticlesFailed)
@@ -2009,6 +2084,26 @@ void PostingJob::_printStats() const
     }
 
     _log(msgEnd);
+
+    // Preserve a non-zero CLI result for an interrupted but resumable post.
+    if (unknown > 0 && !_ngPost->useHMI())
+        emit _ngPost->error(tr("Post interrupted with %1 ambiguous article(s); resume data was preserved.")
+                                .arg(unknown));
+}
+
+uint PostingJob::nbArticlesUnknown() const
+{
+    uint total = 0;
+    for (NntpFile *file : _filesInProgress)
+        if (file)
+            total += file->nbUnknownArticles();
+    for (NntpFile *file : _filesToUpload)
+        if (file)
+            total += file->nbUnknownArticles();
+    for (NntpFile *file : _filesFailed)
+        if (file)
+            total += file->nbUnknownArticles();
+    return total;
 }
 
 bool PostingJob::startCompressFiles(const QString &cmdRar,

@@ -82,6 +82,18 @@ private slots:
     //! Splitting must preserve natural line separators and never bisect one
     //! non-BMP character's UTF-16 surrogate pair.
     void log_pane_fragment_splitting_preserves_text_boundaries();
+
+    //! append() takes its whole argument as one block however long it is, so
+    //! the newline-terminated path and logError() used to bypass the per-block
+    //! cap entirely -- the single very long line the cap exists to split.
+    void log_pane_bounds_whole_lines_and_errors();
+
+    //! Every VPN affordance in the main window must agree with
+    //! VpnManager::vpnPlatformSupported(). On a platform with no VPN
+    //! integration the user must see nothing about it at all -- not a settings
+    //! button offering to install a helper that cannot exist, not a state
+    //! label stuck on "disabled", not a per-server column they cannot act on.
+    void vpn_affordances_follow_platform_support();
     //! Clicking the "Add Server" button adds a row to the servers table,
     //! and every per-row widget retrofitted with an objectName is findable
     //! from the window root.
@@ -2000,6 +2012,21 @@ void TestMainWindow::log_pane_keeps_the_newest_lines()
     QVERIFY2(!kept.contains(QStringLiteral("line 0\n")), "the oldest line survived the trim");
 }
 
+//! The foreground colour actually applied to the last character of the pane.
+//! logError() used to emit an HTML fragment; it now sets a QTextCharFormat, so
+//! the "errors are red" contract needs an assertion of its own.
+static QColor lastLogColour(const QTextDocument *document)
+{
+    QTextBlock const last = document->lastBlock();
+    QColor colour;
+    for (QTextBlock::iterator it = last.begin(); !it.atEnd(); ++it) {
+        QTextFragment const fragment = it.fragment();
+        if (fragment.isValid())
+            colour = fragment.charFormat().foreground().color();
+    }
+    return colour;
+}
+
 static int longestLogBlock(const QTextDocument *document)
 {
     int longest = 0;
@@ -2077,6 +2104,56 @@ void TestMainWindow::log_pane_fragment_splitting_preserves_text_boundaries()
     expected.remove(QChar(0x2028));
     expected.remove(QChar(0x2029));
     QCOMPARE(flattened, expected);
+}
+
+void TestMainWindow::vpn_affordances_follow_platform_support()
+{
+    MainWindow win;
+    const bool supported = VpnManager::vpnPlatformSupported();
+
+    QWidget *settingsBtn = win.findChild<QWidget *>(QStringLiteral("vpnSettingsBtn"));
+    QWidget *stateLbl    = win.findChild<QWidget *>(QStringLiteral("vpnStateLbl"));
+    QVERIFY(settingsBtn);
+    QVERIFY(stateLbl);
+    // isVisibleTo(), not isVisible(): the window is never shown here, and we
+    // are asking whether it *would* appear, which is the user-visible claim.
+    QCOMPARE(settingsBtn->isVisibleTo(&win), supported);
+    QCOMPARE(stateLbl->isVisibleTo(&win), supported);
+
+    QTableWidget *servers = win.findChild<QTableWidget *>(QStringLiteral("serversTable"));
+    QVERIFY(servers);
+    // The table starts empty: its columns only come into being when a row is
+    // added, which is also when the implementation gets its chance to hide the
+    // VPN one.
+    addServer(&win);
+    QVERIFY(MainWindow::kServerUseVpnColumn < servers->columnCount());
+    QCOMPARE(!servers->isColumnHidden(MainWindow::kServerUseVpnColumn), supported);
+}
+
+void TestMainWindow::log_pane_bounds_whole_lines_and_errors()
+{
+    MainWindow win;
+    const int cap = win.logMaxBlockCharactersForTest();
+    QTextBrowser *browser = win.findChild<QTextBrowser *>(QStringLiteral("logBrowser"));
+    QVERIFY(browser);
+
+    // A newline-terminated line far longer than one block.
+    win.log(QString(cap * 4 + 17, QLatin1Char('a')), true);
+    QVERIFY2(win.logBlockCountForTest() > 1, "a long whole line stayed in one block");
+    QCOMPARE(longestLogBlock(browser->document()), cap);
+
+    // The same through logError(), which used to build an HTML fragment.
+    const QString marker = QStringLiteral("ERR-MARKER");
+    win.logError(QString(cap * 3, QLatin1Char('b')) + marker);
+    QCOMPARE(longestLogBlock(browser->document()), cap);
+    QVERIFY2(browser->toPlainText().contains(marker),
+             "the error text did not survive the bounded insertion");
+    QCOMPARE(lastLogColour(browser->document()), QColor(Qt::red));
+
+    // And an ordinary line that follows must not inherit the error colour.
+    win.log(QStringLiteral("back to normal"), true);
+    QVERIFY2(lastLogColour(browser->document()) != QColor(Qt::red),
+             "a plain log line was rendered with the error colour");
 }
 
 QTEST_MAIN(TestMainWindow)

@@ -84,7 +84,13 @@ void VpnSettingsDialog::onStart()
 
 void VpnSettingsDialog::onStop()
 {
-    _manager->stop();
+    if (_manager->hasActiveVpnJobs()
+        && QMessageBox::question(this, tr("Disconnect VPN"),
+             tr("A posting job currently depends on this VPN. Disconnecting "
+                "will pause that job until you resume it manually. Continue?"),
+             QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+        return;
+    _manager->disconnectByUser();
 }
 
 void VpnSettingsDialog::onNewProfile()
@@ -183,8 +189,10 @@ void VpnSettingsDialog::_refreshUi()
     bool installed = _manager->isHelperInstalled();
     bool hasActive = (_manager->activeProfile() != nullptr);
     bool canStart  = installed && hasActive
-                  && (s == VpnManager::State::Disabled || s == VpnManager::State::Failed);
-    bool canStop   = (s == VpnManager::State::Connected || s == VpnManager::State::Starting);
+                  && (s == VpnManager::State::Disabled || s == VpnManager::State::Failed
+                      || s == VpnManager::State::LeaseBusy);
+    bool canStop   = (s == VpnManager::State::Connected || s == VpnManager::State::Starting
+                      || s == VpnManager::State::Reconnecting);
     _ui->startBtn->setEnabled(canStart);
     _ui->stopBtn->setEnabled(canStop);
     _ui->profilesBox->setEnabled(installed);

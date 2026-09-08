@@ -119,6 +119,23 @@ constexpr int kLogTrimSlice = 1000;
 //! bounds their total lifetime like every other log line.
 constexpr int kLogMaxBlockCharacters = 2048;
 
+//! Measured cost of the two things a document holds: ~8 B per character, and
+//! ~6.2 KB of fixed structure per block (a 100-char line costs ~7 KB in
+//! total, a single 100 001-character block 0.8 MB).
+//!
+//! The block count alone stopped being a bound once blocks could legitimately
+//! reach kLogMaxBlockCharacters: a pane full of maximal blocks costs several
+//! times its stated budget. Charging each character its own cost plus its
+//! share of the block structure gives a cap that holds whatever the shape of
+//! the traffic, and that never binds before the block cap on normal lines.
+constexpr int kLogBytesPerCharacter = 8;
+constexpr int kLogBlockOverheadBytes = 6200;
+constexpr int kLogWorstCaseBytesPerCharacter =
+    kLogBytesPerCharacter + kLogBlockOverheadBytes / kLogMaxBlockCharacters;
+
+//! Characters dropped in one go, for the same amortisation reason as above.
+constexpr int kLogCharacterTrimSlice = 64 * 1024;
+
 //! What the pane may hold, by debug level. With debug off it is a status log
 //! and 20 MB is a few thousand lines, far more than anyone scrolls back
 //! through. With debug on, the posting threads emit several lines per article
@@ -179,6 +196,7 @@ const QList<const char *> MainWindow::sServerListHeaders = {
 };
 const QVector<int> MainWindow::sServerListSizes   = {30, 200, 50, 30, 60, 100, 150, 150, sDeleteColumnWidth};
 
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     _ui(new Ui::MainWindow),
@@ -187,11 +205,18 @@ MainWindow::MainWindow(QWidget *parent) :
     _quickJobTab(nullptr),
     _autoPostTab(nullptr),
     _startupTab(-1),
-    _logBlockCap(0)
+    _logBlockCap(0),
+    _logCharacterCap(0)
 {
     setAcceptDrops(true);
 
     _ui->setupUi(this);
+
+    // The servers table has a fixed shape, so give it that shape now rather
+    // than in init(). setCellWidget() cannot place anything into a column that
+    // does not exist, and the VPN column has to exist before it can be hidden.
+    _ui->serversTable->setColumnCount(sServerListHeaders.size());
+    _applyVpnPlatformVisibility();
 
     _ui->serverBox->setStyleSheet(sGroupBoxStyle);
     _ui->fileBox->setStyleSheet(sGroupBoxStyle);
@@ -341,10 +366,54 @@ void MainWindow::updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded
 }
 
 
+//! Ask what to do about a VPN state ngPost did not create. Returns false when
+//! the user cancelled, so the caller can stop rather than open the settings on
+//! top of an unanswered question.
+bool MainWindow::_showUnattributedVpnDecision()
+{
+    VpnManager *vpn = _ngPost->vpnManager();
+    if (!vpn)
+        return true;
+
+    QString const message =
+        _unattributedVpn.legacyOwnerActive
+            ? tr("The VPN configured in ngPost already seems to be running.\n\n"
+                 "Another ngPost is using it, most likely an older version.\n\n"
+                 "Close that other ngPost to use the VPN here.")
+            : tr("The VPN configured in ngPost already seems to be running.\n\n"
+                 "Another ngPost may be using it.\n\n"
+                 "Close that other ngPost to use the VPN here. If none is running, "
+                 "you can remove these leftover settings.");
+
+    QMessageBox box(QMessageBox::Information, tr("The VPN seems to be already in use"),
+                    message, QMessageBox::NoButton, this);
+    box.setDetailedText(_unattributedVpn.diagnostic);
+    QPushButton *close = box.addButton(tr("Close"), QMessageBox::RejectRole);
+    QPushButton *remove = box.addButton(tr("Remove leftover settings..."),
+                                        QMessageBox::DestructiveRole);
+    remove->setEnabled(!_unattributedVpn.legacyOwnerActive);
+    if (_unattributedVpn.legacyOwnerActive)
+        remove->setToolTip(tr("Another ngPost is using them."));
+    box.setDefaultButton(close);
+    box.exec();
+
+    if (box.clickedButton() == remove) {
+        if (vpn->cleanupUnattributed(true))
+            _unattributedVpn = {};
+        else
+            QMessageBox::warning(this, tr("VPN"),
+                                 tr("These settings could not be removed. "
+                                    "See the VPN log for details."));
+    }
+    return true;
+}
+
 void MainWindow::_applyLogCapacity(int debugLevel)
 {
-    const int level  = qBound(0, debugLevel, kLogMaxDebugLevel);
-    const int blocks = kLogBudgetBytes[level] / kLogBytesPerBlock;
+    const int level      = qBound(0, debugLevel, kLogMaxDebugLevel);
+    const int blocks     = kLogBudgetBytes[level] / kLogBytesPerBlock;
+    const int characters = kLogBudgetBytes[level] / kLogWorstCaseBytesPerCharacter;
+    _logCharacterCap     = qMax(_logCharacterCap, characters);
 
     // Only ever raised within a session. Losing the trace you just captured
     // because you switched debug back off in order to read it would be a poor
@@ -364,10 +433,18 @@ int MainWindow::logMaxBlockCharactersForTest() const
 }
 #endif
 
-void MainWindow::_insertBoundedLogText(const QString &text) const
+void MainWindow::_insertBoundedLogText(const QString &text, bool startNewBlock,
+                                       const QTextCharFormat &format) const
 {
     QTextCursor cursor = _ui->logBrowser->textCursor();
     cursor.movePosition(QTextCursor::End);
+    // QTextEdit::append() starts a paragraph of its own, but it also inserts
+    // the whole string as one block however long it is -- which is the case
+    // the per-block cap exists to prevent. Reproduce its paragraph break here
+    // and let the same bounded insertion handle every caller.
+    if (startNewBlock && !_ui->logBrowser->document()->isEmpty())
+        cursor.insertBlock();
+    cursor.setCharFormat(format);
 
     qsizetype pos = 0;
     while (pos < text.size()) {
@@ -415,7 +492,7 @@ void MainWindow::_insertBoundedLogText(const QString &text) const
                 }
                 --take;
             }
-            cursor.insertText(text.mid(pos, take));
+            cursor.insertText(text.mid(pos, take), format);
             pos += take;
         }
     }
@@ -427,29 +504,51 @@ void MainWindow::_insertBoundedLogText(const QString &text) const
 void MainWindow::_trimLogPane() const
 {
     QTextDocument *doc = _ui->logBrowser->document();
-    if (doc->blockCount() <= _logBlockCap + kLogTrimSlice)
+    const bool tooManyBlocks = doc->blockCount() > _logBlockCap + kLogTrimSlice;
+    const bool tooManyCharacters =
+        doc->characterCount() > _logCharacterCap + kLogCharacterTrimSlice;
+    if (!tooManyBlocks && !tooManyCharacters)
+        return;
+
+    // Blocks are the unit either way: dropping whole ones keeps the pane
+    // readable, and with kLogMaxBlockCharacters bounding each of them the
+    // character axis converges in a handful of blocks.
+    int drop = tooManyBlocks ? doc->blockCount() - _logBlockCap : 0;
+    if (tooManyCharacters) {
+        qint64 excess = qint64(doc->characterCount()) - _logCharacterCap;
+        QTextBlock block = doc->firstBlock();
+        int byCharacters = 0;
+        while (block.isValid() && excess > 0 && byCharacters < doc->blockCount() - 1) {
+            excess -= block.length();
+            ++byCharacters;
+            block = block.next();
+        }
+        drop = qMax(drop, byCharacters);
+    }
+    drop = qBound(0, drop, doc->blockCount() - 1);
+    if (drop <= 0)
         return;
 
     QTextCursor cursor(doc);
     cursor.movePosition(QTextCursor::Start);
-    cursor.movePosition(QTextCursor::NextBlock,
-                        QTextCursor::KeepAnchor,
-                        doc->blockCount() - _logBlockCap);
+    cursor.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor, drop);
     cursor.removeSelectedText();
 }
 
 void MainWindow::log(const QString &aMsg, bool newline) const
 {
-    if (newline)
-        _ui->logBrowser->append(aMsg);
-    else
-        _insertBoundedLogText(aMsg);
+    _insertBoundedLogText(aMsg, newline);
     _trimLogPane();
 }
 
 void MainWindow::logError(const QString &error) const
 {
-    _ui->logBrowser->append(QString("<font color='red'>%1</font><br/>\n").arg(error));
+    // A character format rather than an HTML fragment: append() would have to
+    // take the whole error as one block, and an error carrying a long path
+    // list is exactly the unbroken run the per-block cap has to split.
+    QTextCharFormat red;
+    red.setForeground(QBrush(QColor(Qt::red)));
+    _insertBoundedLogText(error, true, red);
     _trimLogPane();
 }
 
@@ -552,7 +651,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
     // orphan tunnel that gets detected as "stale state" on next launch.
     if (VpnManager *vpn = _ngPost->vpnManager()) {
         if (vpn->state() == VpnManager::State::Connected
-            || vpn->state() == VpnManager::State::Starting) {
+            || vpn->state() == VpnManager::State::Starting
+            || vpn->state() == VpnManager::State::Reconnecting) {
             vpn->stop();
             // Spin the event loop briefly so the helper's stdin closure is
             // processed and its trap can run cleanup.
@@ -810,6 +910,24 @@ void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes,
 }
 
 
+//! Hide every VPN affordance where the platform has no VPN integration.
+//!
+//! Idempotent and called from each of the three places that bring one of these
+//! widgets into existence -- the constructor for the button and the label, and
+//! both table-population paths for the column -- because there is no single
+//! moment when all three exist. Hiding rather than removing keeps the column
+//! indices aligned with sServerListHeaders, and keeps a useVpn flag written on
+//! another platform intact in the user's configuration file.
+void MainWindow::_applyVpnPlatformVisibility()
+{
+    if (VpnManager::vpnPlatformSupported())
+        return;
+    _ui->vpnSettingsBtn->setVisible(false);
+    _ui->vpnStateLbl->setVisible(false);
+    if (_ui->serversTable->columnCount() > kServerUseVpnColumn)
+        _ui->serversTable->setColumnHidden(kServerUseVpnColumn, true);
+}
+
 void MainWindow::_initServerBox()
 {
     _ui->serversTable->verticalHeader()->hide();
@@ -822,6 +940,8 @@ void MainWindow::_initServerBox()
         width += size;
     }
 //    _ui->serversTable->setMaximumWidth(width);
+
+    _applyVpnPlatformVisibility();
 
     connect(_ui->addServerButton,   &QAbstractButton::clicked, this, &MainWindow::onAddServer);
 
@@ -861,6 +981,37 @@ void MainWindow::_initPostingBox()
             QMessageBox::warning(this, tr("VPN required"),
                 tr("This job needs the VPN but it cannot be started:\n\n%1\n\n"
                    "The job stays in the queue.").arg(detail));
+        });
+        connect(vpn, &VpnManager::unattributedVpnStateDetected,
+                this, [this](QString const &diagnostic, bool legacyOwnerActive) {
+            // Deliberately not a modal. Finding a tunnel we did not create is
+            // not a failure: ngPost opens, and it still posts to every server
+            // that does not need the VPN. Interrupting the launch with a
+            // dialog on every start -- for as long as the other instance keeps
+            // its tunnel up -- makes the application feel broken when it is
+            // not. The notice goes to the status bar and the VPN log; the
+            // decision is offered where it belongs, in the VPN settings.
+            _unattributedVpn = { true, legacyOwnerActive, diagnostic };
+            statusBar()->showMessage(
+                tr("The VPN configured in ngPost already seems to be running; "
+                   "another ngPost may be using it. See VPN settings."),
+                15000);
+        });
+
+        connect(vpn, &VpnManager::recoveryExhausted,
+                this, [this, vpn](VpnManager::FailureKind) {
+            QMessageBox box(QMessageBox::Critical, tr("VPN recovery exhausted"),
+                tr("The posting job is paused and preserved for a later resume."),
+                QMessageBox::NoButton, this);
+            QPushButton *retry = box.addButton(tr("Retry"), QMessageBox::AcceptRole);
+            QPushButton *stop = box.addButton(tr("Stop and preserve for resume"),
+                                               QMessageBox::RejectRole);
+            box.exec();
+            if (box.clickedButton() == retry && !vpn->retryVpn())
+                QMessageBox::warning(this, tr("VPN recovery"),
+                                     tr("The VPN recovery could not be restarted."));
+            else if (box.clickedButton() == stop)
+                _ngPost->stopActivePostingForResume();
         });
         onVpnStateChanged(vpn->state());
     }
@@ -1978,6 +2129,10 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     delButton->setMaximumWidth(sDeleteColumnWidth);
     connect(delButton, &QAbstractButton::clicked, this, &MainWindow::onDelServer);
     _ui->serversTable->setCellWidget(nbRows, col++, delButton);
+
+    // setCellWidget is what grows the column count, so this is the first
+    // moment the VPN column exists on a table that was not sized up front.
+    _applyVpnPlatformVisibility();
 }
 
 int MainWindow::_serverRow(QObject *delButton)
@@ -2916,7 +3071,11 @@ void MainWindow::_onHistoryContextMenu(const QPoint &pos)
 
 void MainWindow::onVpnSettingsClicked()
 {
+    if (!VpnManager::vpnPlatformSupported())
+        return;
     if (!_ngPost->vpnManager())
+        return;
+    if (_unattributedVpn.detected && !_showUnattributedVpnDecision())
         return;
     VpnSettingsDialog dlg(_ngPost->vpnManager(), this);
     dlg.exec();
@@ -2924,6 +3083,8 @@ void MainWindow::onVpnSettingsClicked()
 
 void MainWindow::onVpnStateChanged(VpnManager::State newState)
 {
+    if (!VpnManager::vpnPlatformSupported())
+        return;
     QString text;
     switch (newState) {
     case VpnManager::State::Disabled:  text = tr("VPN: disabled");                 break;
@@ -2931,6 +3092,8 @@ void MainWindow::onVpnStateChanged(VpnManager::State newState)
     case VpnManager::State::Connected:
         text = tr("VPN: connected (%1)").arg(_ngPost->vpnManager()->tunInterface());
         break;
+    case VpnManager::State::LeaseBusy: text = tr("VPN: in use by another instance"); break;
+    case VpnManager::State::Reconnecting: text = tr("VPN: reconnecting...");          break;
     case VpnManager::State::Stopping:  text = tr("VPN: stopping...");              break;
     case VpnManager::State::Failed:    text = tr("VPN: failed");                   break;
     }

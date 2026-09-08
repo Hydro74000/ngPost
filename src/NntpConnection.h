@@ -66,6 +66,7 @@ private:
 
     PostingState _postingState;
     NntpArticle *_currentArticle;
+    bool _currentArticlePreserved;
     ushort _nbDisconnected;
 
     NgPost *_ngPost;
@@ -146,6 +147,10 @@ private:
 
     void _sendNextArticle();
     void _closeConnection();
+    //! A transport close while an article is awaiting a definitive NNTP
+    //! response is ambiguous: the server may already have accepted it. Keep
+    //! the article resumable independently of VPN state and NO_RESUME_AUTO.
+    void _preserveCurrentArticleAfterTransportLoss(QString const &reason);
 
     inline void deleteSocket();
 };

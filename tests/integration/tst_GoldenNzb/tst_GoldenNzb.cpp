@@ -65,6 +65,13 @@ int runNgPost(const QString &bin, const QStringList &args,
         return -2;
     }
     output = QString::fromLocal8Bit(p.readAll());
+    // A crash must never look like an exit code: QProcess reports the signal
+    // number on Unix, and SIGSEGV is 11 -- exactly ERROR_CODE::ERR_ARTICLE_SIZE.
+    if (p.exitStatus() == QProcess::CrashExit) {
+        output += QStringLiteral("\n[harness] ngPost died on signal %1 instead of exiting\n")
+                          .arg(p.exitCode());
+        return -3;
+    }
     return p.exitCode();
 }
 

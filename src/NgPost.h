@@ -184,6 +184,8 @@ public:
         VPN_BACKEND,        //!< legacy, kept for migration only
         VPN_CONFIG_PATH,    //!< legacy, kept for migration only
         VPN_ACTIVE_PROFILE,
+        VPN_LEASE_WAIT_MINUTES,
+        VPN_RECOVERY_MAX_ATTEMPTS,
         VPN_PROFILE_NAME,        //!< inside [vpn_profile] block
         VPN_PROFILE_BACKEND,
         VPN_PROFILE_CONFIG_FILE,
@@ -192,6 +194,7 @@ public:
         VPN,            //!< CLI-only: master switch on
         NO_VPN,         //!< CLI-only: master switch off
         VPN_PROFILE,    //!< CLI-only: select active profile by name
+        VPN_CLEANUP_UNATTRIBUTED, //!< CLI-only, requires --yes
         HISTORY,
         HISTORY_SHOW,
         HISTORY_IMPORT_CSV,
@@ -215,6 +218,14 @@ private:
 
     static const QMap<Opt, QString> sOptionNames;
 
+    //! The four one-shot VPN overrides (--vpn, --no_vpn, --vpn_profile,
+    //! --vpn-cleanup-unattributed). Where there is no VPN integration they are
+    //! never registered with the parser and never listed by --help, so --vpn
+    //! answers "Unknown option" instead of being accepted and then quietly
+    //! ignored -- posting in the clear is the one outcome a user who asked for
+    //! a tunnel must never silently get.
+    static bool _isVpnOverrideOption(QCommandLineOption const &option);
+
     enum class AppMode { CMD = 0, HMI = 1 }; //!< supposed to be CMD but a simple HMI has been added
 
     enum class ERROR_CODE : ushort {
@@ -236,7 +247,8 @@ private:
         ERR_SERVER_PORT,
         ERR_SERVER_CONS,
         ERR_INPUT_READ,
-        ERR_HISTORY
+        ERR_HISTORY,
+        ERR_VPN
     };
 
 private:
@@ -395,6 +407,9 @@ private:
     //! Exit code a fatal error asked for, < 0 when none. The post commands of
     //! posts that already succeeded still get to finish first.
     int _pendingExitCode;
+    //! Recovery exhaustion must first let the active job close its transports
+    //! and persist every ambiguous article as unknown.
+    bool _pendingExitWaitsForActiveJob;
     //! True when stdout carries data a caller pipes (an exported record sheet),
     //! so every message goes to stderr instead of corrupting it.
     bool _stdoutIsData;
@@ -441,7 +456,7 @@ private:
     //! An upload has no reason to take longer, and it is the only thing that
     //! keeps ngPost from quitting or powering off.
     static const int sDefaultNzbUploadTimeoutSec = 300;
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
     static constexpr const char *sDefaultNzbPath = ""; //!< local folder
     static constexpr const char *sDefaultConfig = "ngPost.conf";
 #else
@@ -547,6 +562,10 @@ public:
     inline bool isPosting() const;
     inline bool hasPostingJobs() const;
     void closeAllPostingJobs();
+    //! Finalize only the active job after a terminal VPN failure. Transport
+    //! shutdown preserves ambiguous articles as unknown, leaving the history
+    //! row available to Resume; queued GUI jobs remain queued.
+    void stopActivePostingForResume();
 
     bool resumePostGui(qint64 postId, PostingWidget *widget = nullptr, QString *error = nullptr);
     bool regenerateNzbGui(qint64 postId, const QString &outPath, bool includePassword = false);
@@ -715,6 +734,8 @@ private:
     void _post(const QFileInfo &fileInfo, const QString &monitorFolder = "");
     void _finishPosting();
     void _discardUnstartedJob(PostingJob *job);
+    void _retainVpnForJob(PostingJob *job);
+    void _releaseVpnForJob(PostingJob *job);
 
     //! Parses one key=value metadata. Returns false (and reports) on a malformed
     //! pair or on a key claimed by both --meta and --post_meta.
@@ -736,7 +757,7 @@ private:
     PostingJobOptions _baseJobOptions() const;
 
     void _startShutdown();
-    void _requestExit(ERROR_CODE code);
+    void _requestExit(ERROR_CODE code, bool waitForActiveJob = false);
 
     //! True when the command line asks for a history command rather than a
     //! post: it both dispatches and tells that no input file is needed.
@@ -937,7 +958,7 @@ int NgPost::getSocketTimeout() const
 }
 QString NgPost::nzbPath() const
 {
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
     if (_nzbPath.isEmpty())
         return _nzbName;
     else

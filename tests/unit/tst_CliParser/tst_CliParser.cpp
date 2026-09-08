@@ -30,6 +30,7 @@
 #include <QProcessEnvironment>
 #include <QStandardPaths>
 #include <QTcpServer>
+#include "vpn/VpnPlatform.h"
 
 #include "history/PostHistoryStore.h"
 #include "NgPost.h"
@@ -55,7 +56,17 @@ struct RunResult
     QString stdoutText;
     QString stderrText;
     bool    timedOut;
+    //! The process died on a signal instead of returning. QProcess reports the
+    //! signal number as the exit code on Unix, and SIGSEGV is 11 -- the very
+    //! value of ERROR_CODE::ERR_ARTICLE_SIZE. A crash was therefore
+    //! indistinguishable from a legitimate rejection, and a segfaulting binary
+    //! made this suite report success. exitCode is forced to kCrashedExitCode
+    //! so no assertion can ever match it by accident.
+    bool    crashed;
 };
+
+//! Impossible for ngPost to return: every ERROR_CODE is a non-negative ushort.
+constexpr int kCrashedExitCode = -3;
 
 RunResult run(const QString &bin,
               const QStringList &args,
@@ -74,16 +85,23 @@ RunResult run(const QString &bin,
         p.setWorkingDirectory(workingDirectory);
     p.start(bin, args);
 
-    RunResult r{ -1, QString(), QString(), false };
+    RunResult r{ -1, QString(), QString(), false, false };
     if (!p.waitForFinished(10000)) {
         r.timedOut = true;
         p.kill();
         p.waitForFinished(2000);
         return r;
     }
-    r.exitCode   = p.exitCode();
     r.stdoutText = QString::fromLocal8Bit(p.readAllStandardOutput());
     r.stderrText = QString::fromLocal8Bit(p.readAllStandardError());
+    r.crashed    = p.exitStatus() == QProcess::CrashExit;
+    if (r.crashed) {
+        r.exitCode = kCrashedExitCode;
+        r.stderrText += QStringLiteral("\n[harness] ngPost died on signal %1 instead of exiting\n")
+                                .arg(p.exitCode());
+    } else {
+        r.exitCode = p.exitCode();
+    }
     return r;
 }
 
@@ -199,6 +217,10 @@ private slots:
     //! message.
     void vpn_profile_unknown_rejected();
 
+    //! Invalid recovery/lease values are diagnosed and replaced with their
+    //! documented safe defaults while parsing an explicit config.
+    void invalid_vpn_recovery_settings_warn_and_fall_back();
+
     //! `--auto <dir>` without `--compress` must error with ERR_AUTO_NO_COMPRESS.
     void auto_dir_without_compress_rejected();
 
@@ -313,7 +335,20 @@ void TestCliParser::help_lists_major_flags()
     QCOMPARE(r.exitCode, 0);
 
     const QString out = r.stdoutText + r.stderrText;
-    for (const char *flag : { "--vpn", "--vpn_profile", "--auto", "--monitor",
+    // The VPN overrides are not registered at all where the platform has no
+    // VPN integration, so --help cannot list them there. Check them separately
+    // rather than weakening the assertion for every other flag.
+#if defined(NGPOST_VPN_SUPPORTED)
+    for (const char *flag : { "--vpn", "--vpn_profile" })
+        QVERIFY2(out.contains(QString::fromLatin1(flag)),
+                 qPrintable(QStringLiteral("help output did not mention '%1'").arg(QString::fromLatin1(flag))));
+#else
+    for (const char *flag : { "--vpn", "--vpn_profile" })
+        QVERIFY2(!out.contains(QString::fromLatin1(flag)),
+                 qPrintable(QStringLiteral("help offered '%1' on a platform with no VPN").arg(QString::fromLatin1(flag))));
+#endif
+
+    for (const char *flag : { "--auto", "--monitor",
                               "--history", "--history-show", "--history_show",
                               "--resume-list", "--resume_list",
                               "--resume-check", "--resume_check",
@@ -416,7 +451,10 @@ void TestCliParser::inspection_and_explicit_config_do_not_adopt()
         run(_bin, { "--history", "--json", "--quiet", "--lang", "fr" },
             sandbox.rootPath());
     QVERIFY2(!migrated.timedOut, "history command timed out");
-    QCOMPARE(migrated.exitCode, 0);
+    QVERIFY2(migrated.exitCode == 0,
+             qPrintable(QStringLiteral("history migration exited with %1\nstdout:\n%2\nstderr:\n%3")
+                            .arg(migrated.exitCode)
+                            .arg(migrated.stdoutText, migrated.stderrText)));
     QJsonParseError jsonError;
     const QJsonDocument json =
         QJsonDocument::fromJson(migrated.stdoutText.trimmed().toUtf8(), &jsonError);
@@ -1886,6 +1924,10 @@ void TestCliParser::vpn_and_no_vpn_mutually_exclusive()
     f.write("hello");
     f.close();
 
+#if !defined(NGPOST_VPN_SUPPORTED)
+    QSKIP("--vpn and --no_vpn are not registered on a platform with no VPN");
+#endif
+
     const RunResult r = run(_bin, { "--vpn", "--no_vpn", "-i", stub }, sandbox.rootPath());
 
     QVERIFY2(!r.timedOut, "process timed out");
@@ -1905,6 +1947,10 @@ void TestCliParser::vpn_profile_unknown_rejected()
     f.write("hello");
     f.close();
 
+#if !defined(NGPOST_VPN_SUPPORTED)
+    QSKIP("--vpn_profile is not registered on a platform with no VPN");
+#endif
+
     const RunResult r = run(_bin,
                             { "--vpn_profile", "NotInTheConfig", "-i", stub },
                             sandbox.rootPath());
@@ -1914,6 +1960,28 @@ void TestCliParser::vpn_profile_unknown_rejected()
     const QString out = r.stdoutText + r.stderrText;
     QVERIFY2(out.contains("does not match any profile", Qt::CaseInsensitive),
              qPrintable(QStringLiteral("expected profile-mismatch error, got: %1").arg(out)));
+}
+
+void TestCliParser::invalid_vpn_recovery_settings_warn_and_fall_back()
+{
+    HomeSandbox sandbox;
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/vpn-limits.conf");
+    QFile config(confPath);
+    QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Text));
+    config.write("VPN_LEASE_WAIT_MINUTES = 1441\n"
+                 "VPN_RECOVERY_MAX_ATTEMPTS = not-a-number\n");
+    config.close();
+
+    const RunResult result = run(_bin, { "-c", confPath, "--history" },
+                                 sandbox.rootPath());
+    QVERIFY2(!result.timedOut, qPrintable(result.stdoutText + result.stderrText));
+    const QString output = result.stdoutText + result.stderrText;
+    QVERIFY2(output.contains(QStringLiteral("VPN_LEASE_WAIT_MINUTES")),
+             qPrintable(output));
+    QVERIFY2(output.contains(QStringLiteral("using 5")), qPrintable(output));
+    QVERIFY2(output.contains(QStringLiteral("VPN_RECOVERY_MAX_ATTEMPTS")),
+             qPrintable(output));
+    QVERIFY2(output.contains(QStringLiteral("using 0")), qPrintable(output));
 }
 
 void TestCliParser::auto_dir_without_compress_rejected()

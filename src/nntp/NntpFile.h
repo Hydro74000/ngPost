@@ -24,6 +24,7 @@
 #include <QVector>
 #include <QSet>
 #include <QFileInfo>
+#include <QMutex>
 class NntpArticle;
 class QTextStream;
 class PostingJob;
@@ -64,6 +65,7 @@ public:
     inline void markAlreadyPosted(uint part);
 
     QString missingArticles() const;
+    uint nbUnknownArticles() const;
     void onArticlePostingStarted(NntpArticle *article, int attemptNo);
     void markArticleUnknown(NntpArticle *article, const QString &reason);
 
@@ -112,6 +114,8 @@ private:
 
     QSet<uint> _posted; //!< part number of the Articles that have been posted (uploaded on the socket)
     QSet<uint> _failed; //!< part number of the Articles that FAILED to be posted (uploaded on the socket)
+    QSet<uint> _unknown; //!< ambiguous transport outcomes, cleared by a definitive later result
+    mutable QMutex _unknownMutex;
 };
 
 void NntpFile::addArticle(NntpArticle *article) { _articles.push_back(article); }

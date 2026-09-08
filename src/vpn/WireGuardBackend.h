@@ -25,6 +25,8 @@ public:
     void stop() override;
     void stopAndWait(int timeoutMs) override;
     bool isRunning() const override;
+    bool restart(quint64 attemptId) override;
+    void setActive(bool active) override;
 
     //! Compute the Windows tunnel service name registered by
     //! `wireguard.exe /installtunnelservice <conf>`. The convention is
@@ -64,6 +66,7 @@ private:
     QProcess  *_proc;
     QByteArray _stdoutBuffer;
     bool       _readySignaled;
+    bool       _protocolV2Seen;
 
 #ifdef Q_OS_WIN
     QString  _winServiceName;   //!< "WireGuardTunnel$<profileBase>"
@@ -71,6 +74,7 @@ private:
     QString  _winIface;
     int      _winPollAttempts;
     class QTimer *_winPollTimer;
+    QProcess *_winWatchdog;      //!< survives ngPost and stops the service when its parent handle closes
 #endif
 };
 

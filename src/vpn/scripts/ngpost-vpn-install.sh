@@ -30,12 +30,20 @@ USER_NAME=$(getent passwd "$PKEXEC_UID" | cut -d: -f1)
 install -d -m 755 /var/lib/ngpost
 install -m 755 -o root -g root "$SRC/ngpost-vpn-helper.sh"    /var/lib/ngpost/
 install -m 755 -o root -g root "$SRC/ngpost-vpn-uninstall.sh" /var/lib/ngpost/
+if [ -d "$SRC/bin" ]; then
+    install -d -m 755 -o root -g root /var/lib/ngpost/bin
+    for tool in openvpn wireguard-go wg; do
+        [ ! -f "$SRC/bin/$tool" ] \
+            || install -m 755 -o root -g root "$SRC/bin/$tool" "/var/lib/ngpost/bin/$tool"
+    done
+fi
 
 # SELinux: relabel as executable so pkexec accepts to run them on Fedora atomic
 # and similar enforcing systems. Quietly skipped where SELinux is absent.
 chcon -t bin_t /var/lib/ngpost/ngpost-vpn-helper.sh    2>/dev/null || true
 chcon -t bin_t /var/lib/ngpost/ngpost-vpn-uninstall.sh 2>/dev/null || true
 restorecon -F /var/lib/ngpost/*.sh                      2>/dev/null || true
+restorecon -RF /var/lib/ngpost/bin                      2>/dev/null || true
 
 # Install the per-user polkit rule. /etc is writable on atomic too.
 install -d -m 755 /etc/polkit-1/rules.d

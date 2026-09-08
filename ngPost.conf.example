@@ -205,13 +205,36 @@ NZB_RM_ACCENTS = true
 ## (internal) last update check timestamp, epoch seconds — managed automatically
 LAST_UPDATE_CHECK = 0
 
+## tunnel selected NNTP connections through the active VPN profile
+VPN_AUTO_CONNECT = false
+#VPN_ACTIVE_PROFILE = My VPN
+
+## CLI only: wait for the exclusive machine-wide VPN lease.
+## Default: 5 minutes; 0 fails immediately; accepted range: 0..1440.
+VPN_LEASE_WAIT_MINUTES = 5
+
+## Number of VPN recovery episodes before leaving a resumable post in error.
+## Default: 0 (unlimited); accepted range: 0..1000.
+VPN_RECOVERY_MAX_ATTEMPTS = 0
+
+## VPN profiles are normally managed from the GUI. The referenced config file
+## lives in ngPost's vpn/ configuration directory; credentials are not stored
+## in this file.
+#[vpn_profile]
+#name = My VPN
+#backend = openvpn
+#config_file = profile.ovpn
+#has_auth = false
+
 
 ## Time to wait (seconds) before trying to resume a Post automatically in case of loss of Network (min: 30)
 RESUME_WAIT = 30
 
 ## By default, ngPost tries to resume a Post if the network is down.
 ## it won't stop trying until the network is back and the post is finished properly
-## you can disable this feature and thus stop a post when you loose the network
+## you can disable automatic retry. An article whose server reply was not
+## received still becomes 'unknown' and remains resumable; the run exits in
+## error instead of silently classifying the article as failed.
 #NO_RESUME_AUTO = true
 
 ## if there is no activity on a connection it will be closed and restarted

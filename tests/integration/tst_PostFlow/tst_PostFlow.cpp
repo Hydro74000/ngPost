@@ -86,6 +86,13 @@ int runNgPost(const QString &bin, const QStringList &args,
         return -2;
     }
     output = QString::fromLocal8Bit(p.readAll());
+    // A crash must never look like an exit code: QProcess reports the signal
+    // number on Unix, and SIGSEGV is 11 -- exactly ERROR_CODE::ERR_ARTICLE_SIZE.
+    if (p.exitStatus() == QProcess::CrashExit) {
+        output += QStringLiteral("\n[harness] ngPost died on signal %1 instead of exiting\n")
+                          .arg(p.exitCode());
+        return -3;
+    }
     return p.exitCode();
 }
 
@@ -188,6 +195,9 @@ private slots:
     //! The mock drops the connection after N bytes; ngPost must not crash or
     //! hang regardless of whether retry eventually succeeds.
     void retry_on_dropped_connection();
+    //! A transport loss after the article body but before 240 is ambiguous,
+    //! even when automatic resume is disabled: preserve it as unknown.
+    void no_resume_transport_loss_is_unknown_and_nonzero();
 
     //! Resuming only the second file of a multi-file post must preserve the
     //! original history row/ordinal instead of overwriting file #1.
@@ -547,6 +557,85 @@ void TestPostFlow::retry_on_dropped_connection()
     // non-zero exit. Either way we want a NON-hanging finish.
     QVERIFY2(code != -1 && code != -2,
              qPrintable(QStringLiteral("ngPost crashed or timed out (code=%1):\n%2").arg(code).arg(out)));
+}
+
+void TestPostFlow::no_resume_transport_loss_is_unknown_and_nonzero()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--drop-before-post-reply" }));
+
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/ambiguous.bin");
+    QFile input(inPath);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("ambiguous");
+    input.close();
+
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/ambiguous.nzb");
+    const QString dbPath = sandbox.rootPath() + QStringLiteral("/history.sqlite");
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/ngPost.conf");
+    QFile conf(confPath);
+    QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+    conf.write("NO_RESUME_AUTO = true\n");
+    conf.close();
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+    QString out;
+    const int code = runNgPost(_bin, {
+        "-c", confPath, "--post_db", dbPath,
+        "-S", srv, "-i", inPath, "-o", nzbPath,
+        "-g", "alt.binaries.test", "-r", "0", "--disp_progress", "none",
+    }, sandbox.rootPath(), out, 30000);
+    QVERIFY2(code > 0,
+             qPrintable(QStringLiteral("ambiguous post must fail non-zero (code=%1):\n%2")
+                            .arg(code).arg(out)));
+    QVERIFY2(out.contains(QStringLiteral("unknown: 1")), qPrintable(out));
+    QVERIFY2(out.contains(QStringLiteral("failed: 0")), qPrintable(out));
+
+    PostHistoryStore store(dbPath, true);
+    QString error;
+    QVERIFY2(store.initialize(&error), qPrintable(error));
+    QList<PostHistoryStore::PostSummary> const posts =
+        store.listPosts(PostHistoryStore::ListFilter(), &error);
+    QVERIFY2(!posts.isEmpty(), qPrintable(error));
+    PostHistoryStore::PostDetails details;
+    QVERIFY2(store.loadPostDetails(posts.first().id, &details, &error), qPrintable(error));
+    QCOMPARE(details.files.size(), 1);
+    QList<PostHistoryStore::ArticleSummary> const articles =
+        details.articlesByFile.value(details.files.first().id);
+    QCOMPARE(articles.size(), 1);
+    QCOMPARE(articles.first().status, QStringLiteral("unknown"));
+    QVERIFY(!articles.first().msgId.isEmpty());
+    const QString ambiguousMsgId = articles.first().msgId;
+    QVERIFY(posts.first().resumable);
+
+    // A later explicit resume must never reuse the Message-ID whose first
+    // server outcome was ambiguous. That is the externally observable part
+    // of genNewId(): duplicate prevention must survive the process boundary.
+    MockNntpServer resumeMock;
+    QVERIFY(resumeMock.start());
+    const QString resumeSrv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl")
+                                  .arg(resumeMock.port());
+    QString resumeOut;
+    const int resumeCode = runNgPost(_bin, {
+        "-S", resumeSrv,
+        "--resume-post", QString::number(posts.first().id),
+        "--yes", "--post_db", dbPath,
+        "--quiet", "--disp_progress", "none",
+    }, sandbox.rootPath(), resumeOut, 30000);
+    QVERIFY2(resumeCode == 0,
+             qPrintable(QStringLiteral("resume exit=%1, output:\n%2")
+                            .arg(resumeCode).arg(resumeOut)));
+    QCOMPARE(resumeMock.receivedArticles().size(), 1);
+    const QByteArray resumedBody =
+        resumeMock.readArticle(resumeMock.receivedArticles().first());
+    const QRegularExpression idPattern(
+        QStringLiteral("(?im)^Message-ID:[ \\t]*<([^>]+)>") );
+    const QRegularExpressionMatch idMatch =
+        idPattern.match(QString::fromLatin1(resumedBody));
+    QVERIFY2(idMatch.hasMatch(), resumedBody.constData());
+    QVERIFY2(idMatch.captured(1) != ambiguousMsgId,
+             "resume reused the Message-ID of an ambiguous upload");
 }
 
 void TestPostFlow::resume_history_post_preserves_original_file_ordinals()

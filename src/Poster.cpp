@@ -63,23 +63,11 @@ void Poster::addConnection(NntpConnection *connection)
     emit connection->startConnection();
 }
 
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-uint Poster::nbActiveConnections() const
-{
-    uint nbActives = 0;
-    for (NntpConnection *con : _nntpConnections) {
-        if (con->isConnected())
-            ++nbActives;
-    }
-    return nbActives;
-}
-#endif
-
 NntpArticle *Poster::getNextArticle(const QString &conPrefix)
 {
     QMutexLocker lock(&_secureArticles); // thread safety (coming from a posting thread)
 
-    if (MB_LoadAtomic(_job->_stopPosting))
+    if (MB_LoadAtomic(_job->_stopPosting) || _job->isPaused())
         return nullptr;
 
     // The builder reserves the source slice under PostingJob's disk lock, then
@@ -89,10 +77,10 @@ NntpArticle *Poster::getNextArticle(const QString &conPrefix)
     // either been enqueued or failed to build. Waiting on the condition keeps
     // the queue mutex available to the builder for that hand-off.
     while (_articles.isEmpty() && _articleBuildInProgress
-           && !MB_LoadAtomic(_job->_stopPosting))
+           && !MB_LoadAtomic(_job->_stopPosting) && !_job->isPaused())
         _articleBuilt.wait(&_secureArticles);
 
-    if (MB_LoadAtomic(_job->_stopPosting))
+    if (MB_LoadAtomic(_job->_stopPosting) || _job->isPaused())
         return nullptr;
 
     if (_ngPost->debugFull())
@@ -121,25 +109,6 @@ NntpArticle *Poster::getNextArticle(const QString &conPrefix)
     return article;
 }
 
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-void Poster::releaseArticle(const QString &conPrefix, NntpArticle *article)
-{
-    QMutexLocker lock(&_secureArticles); // thread safety (coming from a posting thread)
-    if (_ngPost->debugMode())
-        _job->_log(QString("[%1] releasing Article: %2").arg(conPrefix).arg(article->str()));
-
-    // the current NntpConnection releasing the Article will close
-    // so we need at least another one that would try to post the Article
-    if (nbActiveConnections() > 2) {
-        article->resetNbTrySending();
-        _articles.prepend(article);
-    } else {
-        _job->_error(QString("give up on Article: %1").arg(article->str()));
-        emit article->failed(article->size());
-    }
-}
-#endif
-
 void Poster::scheduleArticlesInAdvance(int rounds)
 {
     const int nbArticlesToPrepare = rounds * _nntpConnections.size();
@@ -150,6 +119,11 @@ void Poster::scheduleArticlesInAdvance(int rounds)
 bool Poster::isPosting() const
 {
     return _job->isPosting();
+}
+
+bool Poster::isPaused() const
+{
+    return _job->isPaused();
 }
 
 void Poster::stopThreads()

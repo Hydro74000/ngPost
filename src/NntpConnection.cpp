@@ -49,6 +49,7 @@ NntpConnection::NntpConnection(NgPost *ngPost, int id, const NntpServerParams &s
     , _logPrefix(QString("NntpCon #%1").arg(_id))
     , _postingState(PostingState::NOT_CONNECTED)
     , _currentArticle(nullptr)
+    , _currentArticlePreserved(false)
     , _nbDisconnected(0)
     , _ngPost(ngPost)
     , _poster(nullptr)
@@ -110,6 +111,12 @@ void NntpConnection::onStartConnection()
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
     _log("Starting connection...");
 #endif
+    // A reconnect signal can already be queued when a user/VPN pause publishes
+    // its admission barrier. Do not even create a transport in that window;
+    // resume() will emit a fresh startConnection once the route is healthy.
+    if (_poster && _poster->isPaused())
+        return;
+
     if (_srvParams.useSSL)
         _socket = new QSslSocket();
     else
@@ -240,15 +247,33 @@ void NntpConnection::onKillConnection()
             _socket->waitForDisconnected();
         deleteSocket();
 
-        // Pause/stop can cut an article after the socket write but before the
-        // server reply. Treat it like the other ambiguous network exits.
-        if (_currentArticle) {
-            _currentArticle->nntpFile()->markArticleUnknown(
-                _currentArticle,
-                tr("connection killed before server confirmation"));
-            _currentArticle->genNewId();
-        }
     }
+    // Pause/stop can cut an article after the socket write but before the
+    // server reply. This is independent of whether the socket object survived
+    // until the queued kill slot ran.
+    _preserveCurrentArticleAfterTransportLoss(
+        tr("connection killed before server confirmation"));
+}
+
+void NntpConnection::_preserveCurrentArticleAfterTransportLoss(QString const &reason)
+{
+    if (!_currentArticle)
+        return;
+
+    if (_currentArticlePreserved)
+        return;
+
+    // Persist the Message-ID used by the ambiguous attempt before replacing it:
+    // it is the identifier that may already exist on the server and is needed
+    // for diagnosis/history. A later resume must use a fresh Message-ID.
+    _currentArticle->nntpFile()->markArticleUnknown(_currentArticle, reason);
+    _currentArticlePreserved = true;
+    _currentArticle->genNewId();
+
+    // _currentArticle is deliberately kept. The reconnect path in
+    // onDisconnected() reposts exactly this article, so clearing it here would
+    // drop it. On the terminal paths the connection is finished either way and
+    // _finishPosting() closes every transport before the counters are read.
 }
 
 void NntpConnection::_closeConnection()
@@ -281,25 +306,8 @@ void NntpConnection::_closeConnection()
         if (_socket)
             deleteSocket();
 
-        if (_currentArticle && !_ngPost->tryResumePostWhenConnectionLost()) {
-#ifdef __DISP_ARTICLE_SERVER__
-            if (_ngPost->debugMode())
-                _log(
-                    tr("Article FAIL2: %1 (on %2)").arg(_currentArticle->id()).arg(_srvParams.host));
-#endif
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-            _poster->releaseArticle(_logPrefix, _currentArticle);
-#else
-            emit _currentArticle->failed(_currentArticle->size());
-#endif
-            _currentArticle = nullptr;
-        }
-        else if (_currentArticle) {
-            _currentArticle->nntpFile()->markArticleUnknown(
-                _currentArticle,
-                tr("connection closed before server confirmation"));
-            _currentArticle->genNewId();
-        }
+        _preserveCurrentArticleAfterTransportLoss(
+            tr("connection closed before server confirmation"));
         emit disconnected(this);
     }
 }
@@ -308,41 +316,29 @@ void NntpConnection::onDisconnected()
 {
     if (_socket) {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
-        _error("> disconnected");
+        // A peer disconnect is not by itself an application error: at the
+        // end of a successful post it is the expected transport lifecycle.
+        // Debug-only diagnostic -- the enclosing block is compiled out of
+        // release builds, where _error() therefore never ran either.
+        _log("> disconnected");
 #endif
         _isConnected = false;
 
         deleteSocket();
     }
-    if (_poster->isPosting() && _postingState != PostingState::NO_MORE_FILES
+    if (_poster->isPosting() && !_poster->isPaused()
+        && _postingState != PostingState::NO_MORE_FILES
         && _nbDisconnected++ < NntpArticle::nbMaxTrySending()) {
         // Let's try to reconnect
         _error(
             tr("Connection lost, trying to reconnect! (nb disconnected: %1)").arg(_nbDisconnected));
-        if (_currentArticle) {
-            _currentArticle->nntpFile()->markArticleUnknown(
-                _currentArticle,
-                tr("connection lost before server confirmation"));
-            _currentArticle->genNewId();
-        }
+        _preserveCurrentArticleAfterTransportLoss(
+            tr("connection lost before server confirmation"));
 
         emit startConnection();
     } else {
-        if (_currentArticle) {
-#ifdef __DISP_ARTICLE_SERVER__
-            if (_ngPost->debugMode())
-                _log(
-                    tr("Article FAIL3: %1 (on %2)").arg(_currentArticle->id()).arg(_srvParams.host));
-#endif
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-            _poster->releaseArticle(_logPrefix, _currentArticle);
-#else
-            emit _currentArticle->failed(_currentArticle->size());
-#endif
-            if (_ngPost->debugMode())
-                _error(tr("Closing connection, Failed Article: %1").arg(_currentArticle->str()));
-            _currentArticle = nullptr;
-        }
+        _preserveCurrentArticleAfterTransportLoss(
+            tr("connection lost before server confirmation"));
         emit disconnected(this);
     }
 }
@@ -425,6 +421,10 @@ void NntpConnection::onReadyRead()
 
             if (strncmp(line.constData(), Nntp::getResponse(340), 3) == 0) {
                 _postingState = PostingState::WAITING_ANSWER;
+                // A body is about to go over the wire. It is a new ambiguous
+                // attempt even when this article was preserved on a previous
+                // connection and retained for retry.
+                _currentArticlePreserved = false;
                 _currentArticle->write(this, _ngPost->aticleSignature()); // This will be done async
                 if (_ngPost->dispPostingFile() && _currentArticle->isFirstArticle())
                     emit _currentArticle->nntpFile()->startPosting();
@@ -501,15 +501,16 @@ void NntpConnection::onReadyRead()
                                  .arg(line.constData()));
 #endif
 
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-                    _poster->releaseArticle(_logPrefix, _currentArticle);
-#else
+                    // A complete NNTP reply is definitive. Once this
+                    // article's retry budget is exhausted it is failed; only
+                    // transport loss without a final reply is classified as
+                    // unknown.
                     emit _currentArticle->failed(_currentArticle->size());
-#endif
                 }
             }
             if (_postingState == PostingState::IDLE) {
                 _currentArticle = nullptr;
+                _currentArticlePreserved = false;
                 _sendNextArticle();
             }
         } else if (_postingState == PostingState::CONNECTED) {
@@ -607,8 +608,19 @@ void NntpConnection::onReadyRead()
 
 void NntpConnection::_sendNextArticle()
 {
-    if (!_currentArticle) // in case of error and reconnection, we repost the _currentArticle
+    if (_poster->isPaused())
+        return;
+
+    if (!_currentArticle) { // in case of error and reconnection, we repost the _currentArticle
         _currentArticle = _poster->getNextArticle(_logPrefix);
+        _currentArticlePreserved = false;
+    }
+
+    // Pause can race with getNextArticle() on another thread. Hold an article
+    // already dequeued for the later resume, and treat a null result as an
+    // admission barrier rather than end-of-input.
+    if (_poster->isPaused())
+        return;
 
     if (_currentArticle) {
         _postingState = PostingState::SENDING_ARTICLE;

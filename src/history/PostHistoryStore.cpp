@@ -128,14 +128,25 @@ QSqlDatabase dbFor(const QString &connectionName, const QString &dbPath, QString
         }
         const int effectiveSynchronous = pragma.value(0).toInt();
         pragma.finish();
-        if (effectiveSynchronous != expectedSynchronous) {
+        // Only a *weaker* setting breaks the durability this code reasons
+        // about. A build that reports EXTRA where FULL was asked is safer, not
+        // broken, and losing the whole history over it would turn a preference
+        // into a hard failure of a subsystem the post does not depend on.
+        if (effectiveSynchronous < expectedSynchronous) {
             if (error) {
-                *error = QStringLiteral("SQLite synchronous mode is %1, expected %2")
+                *error = QStringLiteral("SQLite synchronous mode is %1, expected at least %2")
                              .arg(effectiveSynchronous)
                              .arg(expectedSynchronous);
             }
             db.close();
             return db;
+        }
+        if (effectiveSynchronous != expectedSynchronous) {
+            qWarning().noquote()
+                << QStringLiteral("[PostHistoryStore] SQLite reports synchronous=%1 where %2 "
+                                  "was requested; continuing with the stronger setting")
+                       .arg(effectiveSynchronous)
+                       .arg(expectedSynchronous);
         }
 
         if (!walEnabled && dbPath != QStringLiteral(":memory:")) {

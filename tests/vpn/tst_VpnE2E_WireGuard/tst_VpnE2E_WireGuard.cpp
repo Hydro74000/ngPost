@@ -26,7 +26,9 @@
 //========================================================================
 
 #include <QtTest>
+#include <QDateTime>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
@@ -49,6 +51,95 @@ namespace
 QString runScriptsDir()
 {
     return QString::fromLatin1(NGPOST_TESTS_ROOT) + QStringLiteral("/vpn");
+}
+
+QString helperScript()
+{
+    return QString::fromLatin1(NGPOST_SOURCE_ROOT)
+           + QStringLiteral("/src/vpn/scripts/ngpost-vpn-helper.sh");
+}
+
+QString processStartTime(qint64 pid)
+{
+    QFile stat(QStringLiteral("/proc/%1/stat").arg(pid));
+    if (!stat.open(QIODevice::ReadOnly | QIODevice::Text))
+        return QStringLiteral("0");
+    const QByteArray record = stat.readAll().trimmed();
+    const int closeParen = record.lastIndexOf(')');
+    if (closeParen < 0)
+        return QStringLiteral("0");
+    const QList<QByteArray> fields = record.mid(closeParen + 2).split(' ');
+    return fields.size() > 19 ? QString::fromLatin1(fields.at(19))
+                              : QStringLiteral("0");
+}
+
+bool waitForHelperMessage(QProcess *process, QByteArray const &keyword,
+                          QByteArray *output, int timeoutMs = 40000)
+{
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < timeoutMs) {
+        output->append(process->readAll());
+        for (QByteArray const &line : output->split('\n')) {
+            if (line == keyword || line.startsWith(keyword + ' '))
+                return true;
+        }
+        if (process->state() == QProcess::NotRunning)
+            break;
+        process->waitForReadyRead(qMin(500, timeoutMs - static_cast<int>(timer.elapsed())));
+    }
+    output->append(process->readAll());
+    return false;
+}
+
+void startDirectHelper(QProcess *process, QString const &configPath,
+                       qint64 ownerPid, QString const &ownerStart,
+                       QString const &binDir = QString())
+{
+    process->setProcessChannelMode(QProcess::MergedChannels);
+    QStringList args = {
+        QStringLiteral("-n"), QStringLiteral("-E"), QStringLiteral("bash"),
+        helperScript(), QStringLiteral("wireguard"), configPath,
+        QStringLiteral("--protocol"), QStringLiteral("2"),
+        QStringLiteral("--owner-pid"), QString::number(ownerPid),
+        QStringLiteral("--owner-start"), ownerStart,
+        QStringLiteral("--wait-minutes"), QStringLiteral("0")
+    };
+    if (!binDir.isEmpty())
+        args << QStringLiteral("--bin-dir") << binDir;
+    process->start(QStringLiteral("sudo"), args);
+}
+
+bool writeWireGuardDump(QString const &path, qint64 firstHandshake,
+                        quint64 firstTx, qint64 secondHandshake,
+                        quint64 secondTx)
+{
+    QFile dump(path);
+    if (!dump.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+        return false;
+    QTextStream stream(&dump);
+    stream << "private\tpublic\t51820\toff\n"
+           << "peer-a\t(none)\t127.0.0.1:1\t0.0.0.0/0\t"
+           << firstHandshake << "\t0\t" << firstTx << "\t25\n"
+           << "peer-b\t(none)\t127.0.0.1:2\t0.0.0.0/0\t"
+           << secondHandshake << "\t0\t" << secondTx << "\t25\n";
+    return stream.status() == QTextStream::Ok;
+}
+
+QByteArray cleanupAttributedState()
+{
+    QProcess cleanup;
+    cleanup.setProcessChannelMode(QProcess::MergedChannels);
+    cleanup.start(QStringLiteral("sudo"), {
+        QStringLiteral("-n"), QStringLiteral("-E"), QStringLiteral("bash"),
+        helperScript(), QStringLiteral("cleanup-stale"),
+        QStringLiteral("--protocol"), QStringLiteral("2"),
+        QStringLiteral("--owner-pid"), QString::number(QCoreApplication::applicationPid()),
+        QStringLiteral("--owner-start"), processStartTime(QCoreApplication::applicationPid()),
+        QStringLiteral("--nonblocking")
+    });
+    cleanup.waitForFinished(15000);
+    return cleanup.readAll();
 }
 
 //! True when the test environment can reasonably attempt a real WG E2E.
@@ -159,6 +250,10 @@ private slots:
     //! NNTP log shows the connection's peer IP is the tunnel client IP,
     //! not loopback.
     void post_via_wireguard_tunnel_reaches_mock_via_tunnel_ip();
+    void parent_eof_alone_stops_and_cleans_helper();
+    void parent_watchdog_alone_stops_and_cleans_helper();
+    void helper_sigkill_releases_lease_and_next_run_cleans_manifest();
+    void wireguard_health_aggregates_all_emitting_peers();
 };
 
 void TestVpnE2E_WireGuard::initTestCase()
@@ -182,6 +277,7 @@ void TestVpnE2E_WireGuard::initTestCase()
 
 void TestVpnE2E_WireGuard::cleanupTestCase()
 {
+    cleanupAttributedState();
     if (!_stateDir.isEmpty())
         wgServerDown(_stateDir);
 }
@@ -297,6 +393,164 @@ void TestVpnE2E_WireGuard::post_via_wireguard_tunnel_reaches_mock_via_tunnel_ip(
                  "client (%1) — meaning traffic exited the VPN — but the "
                  "mock log only shows non-tunnel addresses. ngPost output:\n%2")
                             .arg(_clientIp).arg(output)));
+}
+
+void TestVpnE2E_WireGuard::parent_eof_alone_stops_and_cleans_helper()
+{
+    // The watched owner remains alive throughout: only stdin EOF can stop
+    // this helper, so the watchdog cannot hide a broken EOF path.
+    QProcess helper;
+    QByteArray output;
+    const qint64 owner = QCoreApplication::applicationPid();
+    startDirectHelper(&helper, _stateDir + QStringLiteral("/client.conf"),
+                      owner, processStartTime(owner));
+    QVERIFY2(helper.waitForStarted(5000), qPrintable(helper.errorString()));
+    QVERIFY2(waitForHelperMessage(&helper, QByteArrayLiteral("READY"), &output),
+             output.constData());
+
+    helper.closeWriteChannel();
+    QVERIFY2(helper.waitForFinished(15000), "helper ignored stdin EOF");
+    output += helper.readAll();
+    QCOMPARE(helper.exitStatus(), QProcess::NormalExit);
+    QCOMPARE(helper.exitCode(), 0);
+    QVERIFY2(!QFileInfo::exists(QStringLiteral("/sys/class/net/ngpost-wg0")),
+             output.constData());
+    QVERIFY(!QFileInfo::exists(QStringLiteral("/run/ngpost-vpn/owner-v2")));
+}
+
+void TestVpnE2E_WireGuard::parent_watchdog_alone_stops_and_cleans_helper()
+{
+    // Keep helper stdin open and kill only the watched owner. This proves the
+    // PID/start-time watchdog independently of the EOF protection.
+    QProcess owner;
+    owner.start(QStringLiteral("sleep"), {QStringLiteral("60")});
+    QVERIFY(owner.waitForStarted(5000));
+    const qint64 ownerPid = owner.processId();
+
+    QProcess helper;
+    QByteArray output;
+    startDirectHelper(&helper, _stateDir + QStringLiteral("/client.conf"),
+                      ownerPid, processStartTime(ownerPid));
+    QVERIFY2(helper.waitForStarted(5000), qPrintable(helper.errorString()));
+    QVERIFY2(waitForHelperMessage(&helper, QByteArrayLiteral("READY"), &output),
+             output.constData());
+
+    owner.kill();
+    owner.waitForFinished(5000);
+    QVERIFY2(helper.waitForFinished(15000), "helper watchdog did not notice parent death");
+    output += helper.readAll();
+    QCOMPARE(helper.exitStatus(), QProcess::NormalExit);
+    QVERIFY2(!QFileInfo::exists(QStringLiteral("/sys/class/net/ngpost-wg0")),
+             output.constData());
+    QVERIFY(!QFileInfo::exists(QStringLiteral("/run/ngpost-vpn/owner-v2")));
+}
+
+void TestVpnE2E_WireGuard::helper_sigkill_releases_lease_and_next_run_cleans_manifest()
+{
+    QProcess helper;
+    QByteArray output;
+    const qint64 owner = QCoreApplication::applicationPid();
+    startDirectHelper(&helper, _stateDir + QStringLiteral("/client.conf"),
+                      owner, processStartTime(owner));
+    QVERIFY2(helper.waitForStarted(5000), qPrintable(helper.errorString()));
+    QVERIFY2(waitForHelperMessage(&helper, QByteArrayLiteral("READY"), &output),
+             output.constData());
+
+    QFile lease(QStringLiteral("/run/lock/ngpost-vpn.lock"));
+    QVERIFY(lease.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QByteArray ownerRecord = lease.readAll();
+    const QRegularExpression helperPidPattern(QStringLiteral(R"((?:^| )helper_pid=(\d+)(?: |$))"));
+    const QRegularExpressionMatch match = helperPidPattern.match(QString::fromLatin1(ownerRecord));
+    QVERIFY2(match.hasMatch(), ownerRecord.constData());
+    const QString helperPid = match.captured(1);
+
+    QCOMPARE(QProcess::execute(QStringLiteral("sudo"),
+                               {QStringLiteral("-n"), QStringLiteral("kill"),
+                                QStringLiteral("-KILL"), helperPid}), 0);
+    QVERIFY(helper.waitForFinished(10000));
+    QVERIFY(QFileInfo::exists(QStringLiteral("/run/ngpost-vpn/owner-v2")));
+    QVERIFY(QFileInfo::exists(QStringLiteral("/sys/class/net/ngpost-wg0")));
+
+    // flock is the authority and must have vanished with the helper even
+    // though its manifest and network objects intentionally remain.
+    QCOMPARE(QProcess::execute(QStringLiteral("sudo"),
+                               {QStringLiteral("-n"), QStringLiteral("flock"),
+                                QStringLiteral("-n"),
+                                QStringLiteral("/run/lock/ngpost-vpn.lock"),
+                                QStringLiteral("true")}), 0);
+
+    const QByteArray cleanupOutput = cleanupAttributedState();
+    QVERIFY2(cleanupOutput.contains("CLEANED"), cleanupOutput.constData());
+    QVERIFY(!QFileInfo::exists(QStringLiteral("/sys/class/net/ngpost-wg0")));
+    QVERIFY(!QFileInfo::exists(QStringLiteral("/run/ngpost-vpn/owner-v2")));
+}
+
+void TestVpnE2E_WireGuard::wireguard_health_aggregates_all_emitting_peers()
+{
+    // Keep the real network-object setup, but replace only `wg setconf/show`
+    // with a deterministic dump. This exercises the helper's production
+    // per-peer state machine and global aggregation, including the 25-second
+    // confirmation window, without depending on two external peers.
+    QTemporaryDir fixture;
+    QVERIFY(fixture.isValid());
+    const QString dumpPath = fixture.path() + QStringLiteral("/wg.dump");
+    const QString fakeWgPath = fixture.path() + QStringLiteral("/wg");
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    QVERIFY(writeWireGuardDump(dumpPath, now, 10, now, 10));
+
+    QFile fakeWg(fakeWgPath);
+    QVERIFY(fakeWg.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+    QTextStream script(&fakeWg);
+    script << "#!/usr/bin/env bash\n"
+              "set -eu\n"
+              "if [ \"${1:-}\" = setconf ]; then exit 0; fi\n"
+              "if [ \"${1:-}\" = show ] && [ \"${3:-}\" = dump ]; then\n"
+              "  exec /bin/cat " << dumpPath << "\n"
+              "fi\n"
+              "exit 1\n";
+    QVERIFY(script.status() == QTextStream::Ok);
+    fakeWg.close();
+    QVERIFY(fakeWg.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                  | QFileDevice::ExeOwner | QFileDevice::ReadGroup
+                                  | QFileDevice::ExeGroup | QFileDevice::ReadOther
+                                  | QFileDevice::ExeOther));
+
+    QProcess helper;
+    QByteArray output;
+    const qint64 owner = QCoreApplication::applicationPid();
+    startDirectHelper(&helper, _stateDir + QStringLiteral("/client.conf"),
+                      owner, processStartTime(owner), fixture.path());
+    QVERIFY2(helper.waitForStarted(5000), qPrintable(helper.errorString()));
+    QVERIFY2(waitForHelperMessage(&helper, QByteArrayLiteral("READY"), &output),
+             output.constData());
+    QCOMPARE(helper.write("ACTIVE\n"), qint64(7));
+    QVERIFY(helper.waitForBytesWritten(2000));
+
+    // Let the helper establish its baseline, then make both peers emit. One
+    // handshake is stale and one is fresh: the aggregate may become SUSPECT,
+    // but must not emit DOWN while an emitting peer remains healthy.
+    QTest::qWait(1500);
+    QVERIFY(writeWireGuardDump(dumpPath, now - 200, 11, now, 11));
+    QVERIFY2(waitForHelperMessage(&helper, QByteArrayLiteral("SUSPECT"), &output, 6000),
+             output.constData());
+    QVERIFY2(!output.contains("\nDOWN ") && !output.startsWith("DOWN "),
+             output.constData());
+
+    // Once every emitting peer is stale and the confirmation period has
+    // elapsed, one global DOWN is expected.
+    QTest::qWait(25000);
+    QVERIFY(writeWireGuardDump(dumpPath, now - 230, 11, now - 230, 11));
+    QVERIFY2(waitForHelperMessage(&helper, QByteArrayLiteral("DOWN"), &output, 6000),
+             output.constData());
+    QCOMPARE(output.count("DOWN backend=wireguard"), 1);
+
+    helper.closeWriteChannel();
+    QVERIFY2(helper.waitForFinished(15000), "helper ignored stdin EOF after health test");
+    output += helper.readAll();
+    QCOMPARE(helper.exitStatus(), QProcess::NormalExit);
+    QCOMPARE(helper.exitCode(), 0);
+    QVERIFY2(!QFileInfo::exists(QStringLiteral("/sys/class/net/ngpost-wg0")),
+             output.constData());
 }
 
 QTEST_MAIN(TestVpnE2E_WireGuard)

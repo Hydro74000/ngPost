@@ -3,6 +3,9 @@
 # and your ngPost config is ngPost.docker.conf.
 # $ docker build -t ngpost .
 # $ docker run -it -v $PWD/files:/root/files -v $PWD/ngPost.docker.conf:/root/.ngPost ngpost ARGUMENTS
+# The integrated Linux VPN additionally requires volatile runtime state:
+# $ docker run -it --tmpfs /run:rw,nosuid,nodev,mode=755 ... ngpost ARGUMENTS
+# ngPost deliberately refuses the VPN when /run is persistent or inaccessible.
 
 FROM debian:10
 

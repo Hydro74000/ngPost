@@ -177,6 +177,10 @@ class Session:
                     await self.write_line(b"335 send the article")
                     body = await self.read_until_dot()
                     self._dump_article(msgid, body)
+                    if self.opts.drop_before_post_reply:
+                        self.log("closing before final IHAVE reply (test injection)")
+                        self.writer.transport.abort()
+                        return
                     await self.write_line(b"235 article transferred ok")
                     continue
 
@@ -185,6 +189,10 @@ class Session:
                     body = await self.read_until_dot()
                     msgid = self._extract_msgid(body)
                     self._dump_article(msgid, body)
+                    if self.opts.drop_before_post_reply:
+                        self.log("closing before final POST reply (test injection)")
+                        self.writer.transport.abort()
+                        return
                     await self.write_line(b"240 article received ok")
                     continue
 
@@ -328,6 +336,8 @@ def main(argv: list[str]) -> int:
                    help="Always reject AUTHINFO PASS with 481")
     p.add_argument("--drop-after-bytes", type=int, default=0,
                    help="Close the connection after N bytes have been received (0 = never)")
+    p.add_argument("--drop-before-post-reply", action="store_true",
+                   help="Accept and dump an article, then close without its final 235/240 reply")
     p.add_argument("--slow-mode-ms", type=int, default=0,
                    help="Sleep N ms before each server reply (default 0)")
     p.add_argument("--stat-missing", action="store_true",

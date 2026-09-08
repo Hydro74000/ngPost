@@ -69,9 +69,6 @@ public:
     QString str() const;
 
     bool tryResend();
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-    inline void resetNbTrySending();
-#endif
 
     void write(NntpConnection *con, const std::string &idSignature);
     inline void freeMemory();
@@ -98,10 +95,6 @@ public:
     inline static void setNbMaxRetry(ushort nbMax);
 
 };
-
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-void NntpArticle::resetNbTrySending() { _nbTrySending = 0; }
-#endif
 
 void NntpArticle::freeMemory()
 {
@@ -135,7 +128,13 @@ quint64 NntpArticle::size() const { return static_cast<quint64>(_fileBytes); }
 //! the download size. Falls back to _fileBytes for an article that was never
 //! encoded, so the attribute can never be written as 0.
 qint64 NntpArticle::nzbBytes() const { return _bodySize > 0 ? _bodySize : _fileBytes; }
-void NntpArticle::genNewId() { _id = QUuid::createUuid(); }
+void NntpArticle::genNewId()
+{
+    _id = QUuid::createUuid();
+    // id() exposes the fully materialised wire Message-ID. It must not keep
+    // reporting the value from an ambiguous attempt after the UUID changes.
+    _msgId.clear();
+}
 
 void NntpArticle::overwriteMsgId(const QString &serverMsgID){ _msgId = serverMsgID; }
 

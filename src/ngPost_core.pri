@@ -58,8 +58,6 @@ DEFINES += __COMPUTE_IMMEDIATE_SPEED__
 
 DEFINES += __USE_TMP_RAM__
 
-DEFINES += __RELEASE_ARTICLES_WHEN_CON_FAILS__
-
 # macro for debuging posting on multiple provides (no need anymore)
 #DEFINES -= __DISP_ARTICLE_SERVER__
 
@@ -121,7 +119,9 @@ SOURCES += \
         $$PWD/vpn/OpenVpnBackend.cpp \
         $$PWD/vpn/VpnManager.cpp \
         $$PWD/vpn/VpnProfile.cpp \
+        $$PWD/vpn/VpnProtocol.cpp \
         $$PWD/vpn/VpnSocketBinder.cpp \
+        $$PWD/vpn/WindowsSecurity.cpp \
         $$PWD/vpn/WindowsBindHelper.cpp \
         $$PWD/vpn/WireGuardBackend.cpp
 
@@ -156,8 +156,11 @@ HEADERS += \
     $$PWD/vpn/OpenVpnBackend.h \
     $$PWD/vpn/VpnBackend.h \
     $$PWD/vpn/VpnManager.h \
+    $$PWD/vpn/VpnPlatform.h \
     $$PWD/vpn/VpnProfile.h \
+    $$PWD/vpn/VpnProtocol.h \
     $$PWD/vpn/VpnSocketBinder.h \
+    $$PWD/vpn/WindowsSecurity.h \
     $$PWD/vpn/WindowsBindHelper.h \
     $$PWD/vpn/WireGuardBackend.h
 

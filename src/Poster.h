@@ -74,14 +74,8 @@ public:
     ~Poster();
 
     void addConnection(NntpConnection *connection);
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-    uint nbActiveConnections() const;
-#endif
 
     NntpArticle *getNextArticle(const QString &conPrefix);
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-    void releaseArticle(const QString &conPrefix, NntpArticle *article);
-#endif
 
     inline void lockQueue();
     inline void unlockQueue();
@@ -94,6 +88,7 @@ public:
     void scheduleArticlesInAdvance(int rounds);
 
     bool isPosting() const;
+    bool isPaused() const;
 };
 
 void Poster::lockQueue()

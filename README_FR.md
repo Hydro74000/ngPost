@@ -44,7 +44,7 @@ Sinon vous pouvez éditer le fichier à la main. Il vous faut remplir:
   - groups (liste des groupes sur lesquels vous postez)
   - TMP_DIR (dossier temporaire pour les archives et par2)
   - RAR_PATH (chemin d'accès complet de l'éxécutable RAR ou 7zip)
-  - VPN_AUTO_CONNECT, VPN_BACKEND et VPN_CONFIG_PATH si vous utilisez le tunnel VPN intégré
+  - VPN_AUTO_CONNECT, VPN_ACTIVE_PROFILE et une section vpn_profile si vous utilisez le tunnel VPN intégré
   - useVpn dans chaque section Server pour indiquer si ce serveur doit passer par le VPN
   - la ou les sections Server
 
@@ -196,15 +196,28 @@ Ensuite:
 
 Quand un serveur est marqué **Use VPN**, ngPost lie ses sockets NNTP à l'adresse IP du tunnel. Si le VPN est requis mais indisponible, ngPost refuse de poster ou de vérifier les articles via ce serveur plutôt que de sortir hors VPN. Le tunnel démarré automatiquement est arrêté après un court délai lorsque la file de posts est vide.<br/>
 
+Le tunnel intégré est exclusif à la machine. En CLI, ngPost attend par défaut cinq minutes que le bail soit libéré et affiche les PID du propriétaire ; l'IHM ne vole jamais le bail. Sous Linux, l'état de session vit uniquement dans `/run` et une ressource sans propriétaire v2 n'est jamais supprimée automatiquement. Pendant une reprise VPN, aucun nouvel article n'est envoyé. Un article sans réponse NNTP définitive devient `unknown` et reste reprenable, tandis qu'une pause demandée par l'utilisateur n'est jamais annulée automatiquement.<br/>
+
+Si ngPost signale des ressources VPN non attribuées, vérifiez d'abord qu'aucune autre instance — y compris une ancienne version — n'est en train de poster. Le nettoyage CLI explicite est `ngPost --vpn-cleanup-unattributed --yes` et peut interrompre un tunnel hérité encore actif. Les identifiants OpenVPN sont transmis au helper privilégié par son entrée standard et ne sont matérialisés que dans le répertoire de session `/run` protégé.<br/>
+
 Les clefs de configuration correspondantes sont:
 <pre>
 VPN_AUTO_CONNECT = false
-VPN_BACKEND = openvpn
-VPN_CONFIG_PATH = /chemin/vers/vpn.ovpn
+VPN_ACTIVE_PROFILE = Mon VPN
+VPN_LEASE_WAIT_MINUTES = 5
+VPN_RECOVERY_MAX_ATTEMPTS = 0
+
+[vpn_profile]
+name = Mon VPN
+backend = openvpn
+config_file = profil.ovpn
+has_auth = false
 
 [server]
 useVpn = true
 </pre>
+
+`VPN_LEASE_WAIT_MINUTES` est réservé au CLI (`0..1440`, `0` échoue immédiatement). `VPN_RECOVERY_MAX_ATTEMPTS` vaut `0` pour une reprise illimitée ou `1..1000` pour borner le run. Dans un conteneur Linux, le VPN exige un `/run` en tmpfs, par exemple `--tmpfs /run:rw,nosuid,nodev,mode=755` ; sinon ngPost échoue avant toute commande réseau.<br/>
 
 
 #### le Post Rapide:

@@ -82,6 +82,9 @@ jobs:
           sudo STATE_DIR=/tmp/wg-preflight bash tests/vpn/wg_server_up.sh
           sudo STATE_DIR=/tmp/wg-preflight bash tests/vpn/wg_server_down.sh
 
+      - name: Test helper lease and manifest contract
+        run: sudo -n HELPER=${{ github.workspace }}/src/vpn/scripts/ngpost-vpn-helper.sh bash tests/vpn/test_helper_lease.sh
+
       - name: Run VPN E2E tests
         env:
           NGPOST_BIN: ${{ github.workspace }}/src/ngPost
@@ -97,7 +100,11 @@ jobs:
       - name: Always tear down any lingering WG state
         if: always()
         run: |
-          # If a test crashed mid-run, the interface may still exist.
+          # If either side crashed mid-run, either interface and the client
+          # policy-routing state may still exist.
+          sudo ip rule del priority 1042 2>/dev/null || true
+          sudo ip route flush table 4242 2>/dev/null || true
+          sudo ip link delete ngpost-wg0 2>/dev/null || true
           sudo ip link delete ngpost-wg 2>/dev/null || true
           for d in /tmp/ngpost-wg /tmp/wg-preflight $(find /tmp -maxdepth 1 -name 'tmp.*' -type d 2>/dev/null); do
             [ -f "$d/ngpost-wg.conf" ] && sudo wg-quick down "$d/ngpost-wg.conf" || true

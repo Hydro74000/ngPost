@@ -15,6 +15,32 @@ TODO: include ParPar instead of par2cmdline?
 TODO: auto RAR size and par2 parameters depending on the inputs size?
 
 ####################################################
+###       Unreleased reliability hotfixes         ###
+####################################################
+
+- A transport loss without a definitive NNTP reply now always classifies the
+  in-flight article as `unknown`, assigns a fresh Message-ID for a later
+  resume and persists that state immediately. This also applies when
+  NO_RESUME_AUTO=true: automatic retry stops, but resumable data is no longer
+  silently turned into `failed`. CLI summaries now include posted, failed and
+  unknown counts, and any unknown article makes the run fail.
+- The integrated VPN now owns its fixed routing resources through one
+  machine-wide lease. Linux session state lives on volatile `/run`; startup
+  never deletes unattributed or legacy resources automatically, and common
+  starts without artifacts require no privilege prompt.
+- VPN helpers use a versioned line protocol with typed failures, owner
+  diagnostics and one terminal event per run. Unexpected helper/tunnel loss
+  suspends only VPN work, preserves ambiguous articles and enters bounded or
+  unlimited recovery with backoff. User pauses remain authoritative. Linux
+  OpenVPN credentials now cross the privilege boundary through helper stdin
+  and only exist as an owner-only file in the volatile session directory.
+- WireGuard health is evaluated per active peer from handshake and transmit
+  counters. OpenVPN retains its own soft reconnect on Linux. Both paths stop
+  new article admission while recovery is in progress.
+- New settings: VPN_LEASE_WAIT_MINUTES (CLI default 5, range 0..1440) and
+  VPN_RECOVERY_MAX_ATTEMPTS (default 0/unlimited, range 0..1000).
+
+####################################################
 ###       Release: ngPost v5.5                   ###
 ###       date:    2026/08/27                    ###
 ####################################################

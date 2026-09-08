@@ -261,6 +261,22 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
             return false;
         }
 
+        // A <file> carrying no segment at all is not a usable NZB entry: no
+        // client can act on it, and emitting it says strictly less than
+        // leaving it out. Count what is actually confirmed first -- the
+        // warnings above already tell the user the file is incomplete.
+        int confirmedSegments = 0;
+        for (const PostHistoryStore::ArticleSummary &article : articles) {
+            if (article.status == QStringLiteral("posted") && !article.msgId.isEmpty())
+                ++confirmedSegments;
+        }
+        if (confirmedSegments == 0) {
+            if (warnings)
+                *warnings << tr("file %1 has no confirmed article and is left out of the NZB")
+                                 .arg(file.postedName);
+            continue;
+        }
+
         stream << tab << "<file poster=\"" << escapeXml(details.from) << "\""
                << " date=\"" << QDateTime::currentSecsSinceEpoch() << "\""
                << QString(" subject=\"[%1/%2] - &quot;")

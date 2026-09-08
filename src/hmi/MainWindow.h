@@ -24,6 +24,7 @@
 #include "vpn/VpnManager.h"
 #include "history/PostHistoryStore.h"
 
+#include <QTextCharFormat>
 #include <QMainWindow>
 #include <QFileInfoList>
 #include <QSet>
@@ -73,9 +74,24 @@ private:
     //! post tab, without a setting written anywhere.
     int             _startupTab;
 
+    //! An unattributed VPN state seen at startup. Recorded rather than shown
+    //! in a modal: nothing is broken, ngPost still runs and still posts to
+    //! every server that does not need the VPN. The decision only matters
+    //! when the user goes to the VPN settings, so it is offered there.
+    struct PendingUnattributedVpn
+    {
+        bool    detected = false;
+        bool    legacyOwnerActive = false;
+        QString diagnostic;
+    };
+    PendingUnattributedVpn _unattributedVpn;
+
     //! Lines the log pane currently keeps. Derived from a memory budget that
     //! grows with the debug level; see _applyLogCapacity().
     int             _logBlockCap;
+    //! Characters the pane may keep. Bounds the case the block count cannot:
+    //! a pane whose blocks all reached kLogMaxBlockCharacters.
+    int             _logCharacterCap;
 
     static const bool sDefaultServerSSL   = true;
     static const int  sDefaultConnections = 5;
@@ -157,6 +173,12 @@ public:
     ~MainWindow() override;
 
     void init(NgPost *ngPost);
+    //! Index of the "Use VPN" column in sServerListHeaders. Named rather than
+    //! written as a literal 4 because the column is hidden wholesale where
+    //! there is no VPN, and an off-by-one there would quietly hide the user's
+    //! password column instead. Shared with the test that checks the hiding.
+    static constexpr int kServerUseVpnColumn = 4;
+
 #ifdef NGPOST_TESTING
     QWidget *buildHistoryTabForTest();
     void     fitHistoryColumnsForTest(bool toContents) { _fitHistoryColumns(toContents); }
@@ -305,16 +327,24 @@ private:
     //! Re-derive the block limit of the log pane from \a debugLevel. Called
     //! at construction, once NgPost is known, and whenever the debug level
     //! changes.
+    bool _showUnattributedVpnDecision();
+
     void _applyLogCapacity(int debugLevel);
 
     //! Insert a stream fragment without allowing one QTextDocument block to
     //! grow large enough to make layout stall.
-    void _insertBoundedLogText(const QString &text) const;
+    //! Append \a text to the log pane, never letting one block grow past
+    //! kLogMaxBlockCharacters. \a startNewBlock reproduces the paragraph break
+    //! QTextEdit::append() would make.
+    void _insertBoundedLogText(const QString &text, bool startNewBlock,
+                               const QTextCharFormat &format = QTextCharFormat()) const;
 
     //! Drop the oldest lines once the pane is a whole slice over its budget.
     void _trimLogPane() const;
 
     void _initServerBox();
+    //! Hide every VPN affordance where the platform has no VPN integration.
+    void _applyVpnPlatformVisibility();
     void _initPostingBox();
     QWidget *_buildHistoryTab();
     void     _retranslateHistoryTab();

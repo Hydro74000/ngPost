@@ -48,18 +48,39 @@ When a server is marked **Use VPN**, ngPost binds that server's NNTP sockets to 
 
 **Windows**: ngPost uses the **OpenVPN Interactive Service** or the **WireGuard for Windows** installation to bind NNTP sockets to the tunnel interface via `IP_UNICAST_IF`. No extra helper is required.
 
+Only one ngPost VPN tunnel may own the machine-wide VPN resources at a time.
+The CLI waits five minutes for that lease by default and reports the owner PID;
+the GUI never steals it. On Linux, session ownership is kept under volatile
+`/run` storage and ambiguous resources are never removed automatically.
+If ngPost reports unattributed VPN resources, first verify that no other
+instance (including an older ngPost) is posting. The explicit CLI cleanup is
+`ngPost --vpn-cleanup-unattributed --yes`; it can interrupt a live legacy
+tunnel. OpenVPN credentials are transferred to the privileged helper over its
+stdin pipe and are materialised only in an owner-only `/run` session directory.
+
 The related configuration keys are:
 
 ```ini
 VPN_AUTO_CONNECT = false
-VPN_BACKEND = openvpn
-VPN_CONFIG_PATH = /path/to/config.ovpn
+VPN_ACTIVE_PROFILE = My VPN
+VPN_LEASE_WAIT_MINUTES = 5
+VPN_RECOVERY_MAX_ATTEMPTS = 0
+
+[vpn_profile]
+name = My VPN
+backend = openvpn
+config_file = profile.ovpn
+has_auth = false
 
 [server]
 useVpn = true
 ```
 
-`VPN_AUTO_CONNECT` starts the tunnel automatically when a job starts and disconnects it after the queue has been empty for a short grace period. The Linux AppImage/release packaging bundles the VPN runtime assets and helper scripts; source builds can install the runtime helper resources under `/var/lib/ngpost`.
+`VPN_AUTO_CONNECT` starts the tunnel automatically when a job starts and disconnects it after the queue has been empty for a short grace period. `VPN_LEASE_WAIT_MINUTES` is CLI-only (`0..1440`, `0` means fail immediately). `VPN_RECOVERY_MAX_ATTEMPTS` is `0` for unlimited recovery or `1..1000` for a bounded run. During recovery, ngPost suspends new articles and preserves any article without a definitive NNTP reply as `unknown`; a user-paused job is never resumed automatically. The Linux AppImage/release packaging bundles the VPN runtime assets and helper scripts; source builds can install helper resources under `/var/lib/ngpost`.
+
+Containers using the integrated Linux VPN must mount `/run` as tmpfs, for
+example `--tmpfs /run:rw,nosuid,nodev,mode=755`. ngPost fails closed before any
+network mutation if the runtime is persistent or the lease cannot be created.
 
 ## Structured History And Resume
 

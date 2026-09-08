@@ -98,8 +98,10 @@ bool MockNntpServer::start(const QStringList &extraArgs, bool withTls)
     _proc.setArguments(args);
     _proc.setProcessChannelMode(QProcess::MergedChannels);
     _proc.start();
-    if (!_proc.waitForStarted(5000))
+    if (!_proc.waitForStarted(5000)) {
+        qWarning().noquote() << "Mock NNTP failed to start:" << _proc.errorString();
         return false;
+    }
 
     auto readPort = [](const QString &path, quint16 &out) {
         if (!QFile::exists(path))
@@ -126,10 +128,15 @@ bool MockNntpServer::start(const QStringList &extraArgs, bool withTls)
         const bool ready = (_port != 0) && (!withTls || _sslPort != 0);
         if (ready)
             return true;
-        if (_proc.state() != QProcess::Running)
+        if (_proc.state() != QProcess::Running) {
+            qWarning().noquote() << "Mock NNTP exited during startup:"
+                                 << _proc.readAll();
             return false;
+        }
         QThread::msleep(50);
     }
+    qWarning().noquote() << "Mock NNTP startup timed out; child output:"
+                         << _proc.readAll();
     return false;
 }
 

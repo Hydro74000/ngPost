@@ -10,19 +10,27 @@
 #include "OpenVpnBackend.h"
 
 #include "VpnManager.h"
+#include "VpnProtocol.h"
+#include "utils/PathHelper.h"
 
 #include <QCoreApplication>
 #include <QFileInfo>
 #include <QHostAddress>
 
 #ifdef Q_OS_WIN
+#  include <QDir>
 #  include <QElapsedTimer>
+#  include <QFile>
 #  include <QLocalSocket>
 #  include <QPointer>
 #  include <QRegularExpression>
+#  include <QTemporaryFile>
+#  include <QTcpServer>
 #  include <QTcpSocket>
 #  include <QThread>
 #  include <QTimer>
+#  include <QUuid>
+#  include "WindowsSecurity.h"
 #endif
 
 OpenVpnBackend::OpenVpnBackend(QObject *parent)
@@ -30,12 +38,17 @@ OpenVpnBackend::OpenVpnBackend(QObject *parent)
     , _proc(nullptr)
     , _stdoutBuffer()
     , _readySignaled(false)
+    , _protocolV2Seen(false)
 #ifdef Q_OS_WIN
     , _winServicePipe(nullptr)
     , _winMgmt(nullptr)
     , _winMgmtBuffer()
     , _winMgmtRetryTimer(nullptr)
     , _winMgmtRetryCount(0)
+    , _winMgmtPort(0)
+    , _winMgmtPassword()
+    , _winMgmtPasswordPath()
+    , _winMgmtAuthenticated(false)
     , _winStopRequested(false)
     , _winTunIface()
     , _winTunIp()
@@ -76,10 +89,14 @@ OpenVpnBackend::~OpenVpnBackend()
         delete _proc;
         _proc = nullptr;
     }
+#ifdef Q_OS_WIN
+    _removeWinManagementPassword();
+#endif
 }
 
 bool OpenVpnBackend::start(QString const &configPathPacked)
 {
+    _resetRunState();
 #ifdef Q_OS_WIN
     // Drive OpenVPN via the official interactive service on Windows. Keep
     // this block scoped because MSVC parses both branches in one function.
@@ -93,47 +110,57 @@ bool OpenVpnBackend::start(QString const &configPathPacked)
         }
         QFileInfo fi(cfg);
         if (!fi.exists() || !fi.isReadable()) {
-            emit failed(tr("Config file not found or unreadable: %1").arg(cfg));
+            _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                                 VpnFailureKind::Configuration,
+                                 tr("Config file not found or unreadable: %1").arg(cfg));
             return false;
         }
         return _startWindowsViaInteractiveService(fi.absoluteFilePath(), auth);
     }
 #elif !defined(Q_OS_LINUX)
     Q_UNUSED(configPathPacked);
-    emit failed(tr("Native VPN integration is currently Linux/Windows-only. "
-                   "macOS support is in progress."));
+    _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                         VpnFailureKind::Configuration,
+                         tr("Native VPN integration is currently Linux/Windows-only. "
+                            "macOS support is in progress."));
     return false;
 #endif
 
     if (_proc && _proc->state() != QProcess::NotRunning)
         return true;
 
-    // The caller (VpnManager::start) may pack an optional --auth-user-pass
-    // file path after a NUL separator: "<configPath>\0<authFilePath>".
-    // This avoids changing the VpnBackend interface signature.
-    QString configPath, authFilePath;
+    // The caller (VpnManager::start) may pack an optional base64 credential
+    // transport record after a NUL separator. It is sent through stdin and
+    // never becomes an argv entry; the helper materialises its private /run
+    // copy only after acquiring the lease.
+    QString configPath, authPipePayload;
     int nulIdx = configPathPacked.indexOf(QChar(QChar::Null));
     if (nulIdx >= 0) {
         configPath   = configPathPacked.left(nulIdx);
-        authFilePath = configPathPacked.mid(nulIdx + 1);
+        authPipePayload = configPathPacked.mid(nulIdx + 1);
     } else {
         configPath = configPathPacked;
     }
 
     QFileInfo fi(configPath);
     if (!fi.exists() || !fi.isReadable()) {
-        emit failed(tr("Config file not found or unreadable: %1").arg(configPath));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::Configuration,
+                             tr("Config file not found or unreadable: %1").arg(configPath));
         return false;
     }
 
     QString helper = VpnManager::helperScriptPath();
     if (helper.isEmpty()) {
-        emit failed(tr("Privileged helper script ngpost-vpn-helper.sh not found. "
-                       "Install it under /var/lib/ngpost/ or run from the AppImage."));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Privileged helper script ngpost-vpn-helper.sh not found. "
+                                "Install it under /var/lib/ngpost/ or run from the AppImage."));
         return false;
     }
 
     _readySignaled = false;
+    _protocolV2Seen = false;
     _stdoutBuffer.clear();
 
     _proc = new QProcess(this);
@@ -146,12 +173,20 @@ bool OpenVpnBackend::start(QString const &configPathPacked)
     connect(_proc, &QProcess::errorOccurred, this, &OpenVpnBackend::onProcessError);
 
     QStringList helperArgs;
-    helperArgs << helper << "openvpn" << fi.absoluteFilePath();
-    QString const binDir = bundledVpnBinDir();
+    helperArgs << helper << "openvpn" << fi.absoluteFilePath()
+               << "--protocol" << "2"
+               << "--owner-pid" << QString::number(QCoreApplication::applicationPid())
+               << "--owner-start" << VpnManager::currentProcessStartTime()
+               << "--wait-minutes" << QString::number(VpnManager::instance()
+                       ? VpnManager::instance()->effectiveLeaseWaitMinutes() : 0);
+    // An installed helper uses the stable, root-owned tool copies installed
+    // beside it. Only an in-bundle development helper needs an explicit path.
+    QString const binDir = helper == QString::fromLatin1(VpnManager::kInstalledHelperPath)
+        ? QString() : bundledVpnBinDir();
     if (!binDir.isEmpty())
         helperArgs << "--bin-dir" << binDir;
-    if (!authFilePath.isEmpty())
-        helperArgs << "--auth-file" << authFilePath;
+    if (!authPipePayload.isEmpty())
+        helperArgs << "--auth-stdin";
 
     // Compose the final argv. The launcher is normally `pkexec`, but
     // `NGPOST_HELPER_LAUNCHER` can swap it for `sudo` etc. (see
@@ -160,41 +195,77 @@ bool OpenVpnBackend::start(QString const &configPathPacked)
     QStringList args = VpnManager::helperLauncherPrefixArgs();
     args += helperArgs;
 
-    // Avoid logging the auth-file path verbatim. The path goes to the
-    // launcher unchanged, but logs are user-visible.
-    QStringList safeArgs = args;
-    if (!authFilePath.isEmpty())
-        safeArgs.replace(safeArgs.size() - 1, QStringLiteral("<authfile>"));
-    emit logLine(tr("Launching VPN helper: %1 %2").arg(launcher, safeArgs.join(' ')));
+    emit logLine(tr("Launching VPN helper: %1 %2").arg(launcher, args.join(' ')));
 
     _proc->start(launcher, args);
     if (!_proc->waitForStarted(5000)) {
-        emit failed(tr("Failed to start %1/helper").arg(launcher));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Failed to start %1/helper").arg(launcher));
         delete _proc;
         _proc = nullptr;
         return false;
+    }
+    if (!authPipePayload.isEmpty()) {
+        QByteArray const command = QByteArrayLiteral("AUTH ")
+            + authPipePayload.toLatin1() + '\n';
+        if (_proc->write(command) != command.size()
+            || (_proc->bytesToWrite() > 0 && !_proc->waitForBytesWritten(5000))) {
+            _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                                 VpnFailureKind::Authentication,
+                                 tr("Failed to send credentials to the VPN helper"));
+            _proc->closeWriteChannel();
+            return false;
+        }
     }
     return true;
 }
 
 void OpenVpnBackend::stop()
 {
+    _requestStop();
 #ifdef Q_OS_WIN
     _stopWindows();
     return;
 #endif
     if (!_proc) {
-        emit stopped();
+        _emitTerminationOnce(VpnTerminationKind::RequestedStop,
+                             VpnFailureKind::None, QString());
         return;
     }
     if (_proc->state() == QProcess::NotRunning) {
-        emit stopped();
+        _emitTerminationOnce(VpnTerminationKind::RequestedStop,
+                             VpnFailureKind::None, QString());
         return;
     }
     // The helper waits on its stdin. Closing it triggers a clean teardown:
     // policy routing removed, openvpn signalled, helper exits.
     // QProcess::finished will then drive us through onProcessFinished.
     _proc->closeWriteChannel();
+}
+
+bool OpenVpnBackend::restart(quint64 attemptId)
+{
+#ifdef Q_OS_WIN
+    Q_UNUSED(attemptId);
+    return false;
+#else
+    if (!_proc || _proc->state() == QProcess::NotRunning)
+        return false;
+    QByteArray command = QByteArrayLiteral("RESTART attempt_id=")
+        + QByteArray::number(attemptId) + '\n';
+    return _proc->write(command) == command.size();
+#endif
+}
+
+void OpenVpnBackend::setActive(bool active)
+{
+#ifndef Q_OS_WIN
+    if (_proc && _proc->state() != QProcess::NotRunning)
+        _proc->write(active ? "ACTIVE\n" : "IDLE\n");
+#else
+    Q_UNUSED(active);
+#endif
 }
 
 void OpenVpnBackend::stopAndWait(int timeoutMs)
@@ -223,7 +294,7 @@ void OpenVpnBackend::stopAndWait(int timeoutMs)
     while (management && management->state() != QAbstractSocket::ConnectedState
            && remaining() > 0) {
         management->abort();
-        management->connectToHost(QHostAddress::LocalHost, 7505);
+        management->connectToHost(QHostAddress::LocalHost, _winMgmtPort);
         if (management->waitForConnected(qMin(500, remaining())))
             break;
         if (remaining() > 0)
@@ -231,6 +302,8 @@ void OpenVpnBackend::stopAndWait(int timeoutMs)
     }
 
     if (management && management->state() == QAbstractSocket::ConnectedState) {
+        if (!_winMgmtAuthenticated)
+            management->write(_winMgmtPassword.toUtf8() + '\n');
         management->write("signal SIGTERM\n");
         management->flush();
         if (management->bytesToWrite() > 0 && remaining() > 0)
@@ -290,48 +363,131 @@ void OpenVpnBackend::_handleLine(QString const &line)
 {
     if (line.isEmpty())
         return;
-    if (line.startsWith(QLatin1String("READY "))) {
-        // READY <iface> <ip> [<dns>]
-        QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-        if (parts.size() >= 3) {
-            QHostAddress ip(parts.at(2));
-            if (!ip.isNull()) {
-                QHostAddress dns;
-                if (parts.size() >= 4 && parts.at(3) != QLatin1String("-"))
-                    dns = QHostAddress(parts.at(3));
-                _readySignaled = true;
-                emit ready(parts.at(1), ip, dns);
-                return;
-            }
-        }
-        emit logLine(tr("Malformed READY from helper: %1").arg(line));
-    }
-    else if (line.startsWith(QLatin1String("ERROR "))) {
-        QString reason = line.mid(6);
-        emit failed(reason);
-    }
-    else if (line.startsWith(QLatin1String("LOG "))) {
-        emit logLine(line.mid(4));
-    }
-    else {
+    VpnProtocol::Message const message = VpnProtocol::parse(line);
+    using Type = VpnProtocol::Type;
+    if (message.type == Type::Invalid) {
         emit logLine(line);
+        return;
+    }
+    if (message.type == Type::Protocol) {
+        _protocolV2Seen = true;
+        return;
+    }
+    if (message.type == Type::Log) {
+        emit logLine(message.detail);
+        return;
+    }
+    if (message.type == Type::Waiting || message.type == Type::Busy) {
+        emit statusLine(message.type == Type::Waiting
+            ? tr("Waiting for VPN lease held by ngPost PID %1 (helper %2)")
+                  .arg(message.fields.value(QStringLiteral("owner_pid")),
+                       message.fields.value(QStringLiteral("helper_pid")))
+            : tr("VPN lease is held by ngPost PID %1 (helper %2)")
+                  .arg(message.fields.value(QStringLiteral("owner_pid")),
+                       message.fields.value(QStringLiteral("helper_pid"))));
+        if (message.type == Type::Waiting)
+            return;
+    }
+    if (message.type == Type::Ready) {
+        if (!_protocolV2Seen || message.legacy) {
+            _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                                 VpnFailureKind::HelperOutdated,
+                                 tr("The installed VPN helper is version 1; update it before connecting."));
+            if (_proc)
+                _proc->closeWriteChannel();
+            return;
+        }
+        QHostAddress const ip(message.fields.value(QStringLiteral("ip")));
+        QHostAddress dns;
+        QString const dnsText = message.fields.value(QStringLiteral("dns"));
+        if (!dnsText.isEmpty() && dnsText != QLatin1String("-"))
+            dns = QHostAddress(dnsText);
+        bool ok = false;
+        quint64 const attemptId = message.fields.value(QStringLiteral("attempt_id")).toULongLong(&ok);
+        if (ip.isNull() || !ok) {
+            emit logLine(tr("Malformed READY from helper: %1").arg(line));
+            return;
+        }
+        _readySignaled = true;
+        _markReady();
+        if (attemptId == 0)
+            emit ready(message.fields.value(QStringLiteral("iface")), ip, dns);
+        else
+            emit restartReady(attemptId, message.fields.value(QStringLiteral("iface")), ip, dns);
+        return;
+    }
+    if (message.type == Type::Suspect) {
+        VpnBackendHealth const health =
+            message.fields.value(QStringLiteral("reason")) == QLatin1String("RECONNECTING")
+                ? VpnBackendHealth::RecoveringInternally : VpnBackendHealth::Suspect;
+        emit healthChanged(health, message.fields.value(QStringLiteral("reason")));
+        return;
+    }
+    if (message.type == Type::Healthy) {
+        emit healthChanged(VpnBackendHealth::Healthy, QString());
+        return;
+    }
+    if (message.type == Type::Down) {
+        emit healthChanged(VpnBackendHealth::Down,
+                           message.fields.value(QStringLiteral("reason")));
+        return;
+    }
+    if (message.type == Type::RestartFailed) {
+        emit restartFailed(message.fields.value(QStringLiteral("attempt_id")).toULongLong(),
+                           vpnFailureKindFromProtocol(
+                               message.fields.value(QStringLiteral("failure")),
+                               VpnFailureKind::TunnelLost),
+                           message.detail);
+        return;
+    }
+
+    VpnFailureKind failure = VpnFailureKind::Internal;
+    if (message.legacy) failure = VpnFailureKind::HelperOutdated;
+    else if (message.type == Type::Busy) failure = VpnFailureKind::LeaseBusy;
+    else if (message.type == Type::LeaseTimeout) failure = VpnFailureKind::LeaseTimeout;
+    else if (message.type == Type::LeaseUnavailable) failure = VpnFailureKind::LeaseUnavailable;
+    else if (message.type == Type::RuntimeNotVolatile) failure = VpnFailureKind::RuntimeNotVolatile;
+    else if (message.type == Type::UnattributedVpnState) failure = VpnFailureKind::UnattributedVpnState;
+    else if (message.type == Type::LegacyOwnerActive) failure = VpnFailureKind::LeaseBusy;
+    else if (message.type == Type::Error)
+        failure = vpnFailureKindFromProtocol(
+            message.fields.value(QStringLiteral("failure")));
+    if (message.isTerminal()) {
+        QString detail = message.detail;
+        if (detail.isEmpty())
+            detail = line;
+        _emitTerminationOnce(_wasReady ? VpnTerminationKind::UnexpectedExit
+                                       : VpnTerminationKind::StartFailure,
+                             failure, detail);
     }
 }
 
 void OpenVpnBackend::onProcessFinished(int exitCode, QProcess::ExitStatus status)
 {
-    Q_UNUSED(status);
-    if (!_readySignaled)
-        emit failed(tr("helper exited (code %1) before tunnel was ready").arg(exitCode));
-    emit stopped();
+    VpnTerminationKind const kind = _stopRequested
+        ? VpnTerminationKind::RequestedStop
+        : (_wasReady ? VpnTerminationKind::UnexpectedExit
+                     : VpnTerminationKind::StartFailure);
+    VpnFailureKind const failure = _stopRequested ? VpnFailureKind::None
+        : (_wasReady ? VpnFailureKind::HelperExited : VpnFailureKind::HelperUnavailable);
+    QString detail = status == QProcess::CrashExit
+        ? tr("VPN helper crashed")
+        : tr("VPN helper exited with code %1").arg(exitCode);
+    _emitTerminationOnce(kind, failure, detail);
 }
 
 void OpenVpnBackend::onProcessError(QProcess::ProcessError err)
 {
     if (err == QProcess::FailedToStart)
-        emit failed(tr("pkexec/helper failed to start (binary missing or denied)"));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("pkexec/helper failed to start (binary missing or denied)"));
     else if (err == QProcess::Crashed)
-        emit failed(tr("helper process crashed"));
+        _emitTerminationOnce(_wasReady ? VpnTerminationKind::UnexpectedExit
+                                       : VpnTerminationKind::StartFailure,
+                             _wasReady ? VpnFailureKind::HelperExited
+                                       : VpnFailureKind::HelperUnavailable,
+                             tr("helper process crashed"));
 }
 
 #ifdef Q_OS_WIN
@@ -349,7 +505,7 @@ void OpenVpnBackend::onProcessError(QProcess::ProcessError err)
 //
 // The service spawns openvpn.exe elevated, parses the options, and returns
 // an ack. Once openvpn is up we connect to its --management TCP port
-// (127.0.0.1:7505) and use the standard management protocol to track state
+// (a dynamic loopback port) and use the standard management protocol to track state
 // changes and signal a clean SIGTERM at disconnect.
 
 QString OpenVpnBackend::_buildOpenVpnOptions(QString const &configPath,
@@ -369,9 +525,12 @@ QString OpenVpnBackend::_buildOpenVpnOptions(QString const &configPath,
     // normal system default route for unrelated apps.
     QStringList parts;
     parts << "--config" << q(configPath)
-          << "--management" << "127.0.0.1" << "7505"
+          << "--management" << "127.0.0.1" << QString::number(_winMgmtPort)
+          << q(_winMgmtPasswordPath)
           << "--management-hold"
           << "--management-query-passwords"
+          << "--management-signal"
+          << "--remap-usr1" << "SIGTERM"
           << "--pull-filter" << "ignore" << "redirect-gateway"
           << "--pull-filter" << "ignore" << "block-outside-dns"
           << "--route" << "0.0.0.0" << "0.0.0.0" << "vpn_gateway" << "9999"
@@ -393,9 +552,59 @@ bool OpenVpnBackend::_startWindowsViaInteractiveService(QString const &configPat
     _winStopRequested = false;
     _winMgmtBuffer.clear();
     _winMgmtRetryCount = 0;
+    _winMgmtAuthenticated = false;
     _winTunIface.clear();
     _winTunIp.clear();
     _winDnsIp.clear();
+
+    QTcpServer portProbe;
+    if (!portProbe.listen(QHostAddress::LocalHost, 0)) {
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Could not allocate a loopback OpenVPN management port"));
+        return false;
+    }
+    _winMgmtPort = portProbe.serverPort();
+    portProbe.close();
+
+    _winMgmtPassword = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    QString const runtimeDir = PathHelper::vpnRuntimeDir();
+    if (!WindowsSecurity::protectOwnerAndSystem(runtimeDir)) {
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Could not secure the OpenVPN runtime directory"));
+        return false;
+    }
+    QTemporaryFile passwordFile(runtimeDir
+                                + QStringLiteral("/management-XXXXXX"));
+    passwordFile.setAutoRemove(false);
+    if (!passwordFile.open()) {
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Could not create the OpenVPN management password file"));
+        return false;
+    }
+    QByteArray const password = _winMgmtPassword.toUtf8() + '\n';
+    if (passwordFile.write(password) != password.size() || !passwordFile.flush()) {
+        passwordFile.close();
+        passwordFile.remove();
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Could not write the OpenVPN management password file"));
+        return false;
+    }
+    _winMgmtPasswordPath = passwordFile.fileName();
+    passwordFile.close();
+    if (!QFile::setPermissions(_winMgmtPasswordPath,
+                               QFileDevice::ReadOwner | QFileDevice::WriteOwner)
+        || !WindowsSecurity::protectOwnerAndSystem(_winMgmtPasswordPath)) {
+        QFile::remove(_winMgmtPasswordPath);
+        _winMgmtPasswordPath.clear();
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Could not secure the OpenVPN management password file"));
+        return false;
+    }
 
     // Open the OpenVPNServiceInteractive named pipe.
     _winServicePipe = new QLocalSocket(this);
@@ -411,10 +620,12 @@ bool OpenVpnBackend::_startWindowsViaInteractiveService(QString const &configPat
         //  - OpenVPNServiceInteractive installed but Start-Type=Manual and
         //    nobody started it (we don't auto-elevate to start a service)
         //  - the user does not have Connect permission to the pipe ACL
-        emit failed(tr("Cannot reach OpenVPNServiceInteractive pipe. "
-                       "Open Services.msc, set \"OpenVPN Interactive Service\" "
-                       "to Automatic, and start it. If it is not present, "
-                       "re-run the ngPost setup with the OpenVPN Community option."));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Cannot reach OpenVPNServiceInteractive pipe. "
+                                "Open Services.msc, set \"OpenVPN Interactive Service\" "
+                                "to Automatic, and start it. If it is not present, "
+                                "re-run the ngPost setup with the OpenVPN Community option."));
         _winServicePipe->deleteLater();
         _winServicePipe = nullptr;
         return false;
@@ -435,12 +646,14 @@ bool OpenVpnBackend::_startWindowsViaInteractiveService(QString const &configPat
     payload.append(encode(options));
     payload.append(encode(stdInput));
 
-    emit logLine(tr("OpenVPN service: starting tunnel via %1 (mgmt on 127.0.0.1:7505)")
-                     .arg(QFileInfo(configPath).fileName()));
+    emit logLine(tr("OpenVPN service: starting tunnel via %1 (management on loopback port %2)")
+                     .arg(QFileInfo(configPath).fileName()).arg(_winMgmtPort));
 
     _winServicePipe->write(payload);
     if (!_winServicePipe->waitForBytesWritten(3000)) {
-        emit failed(tr("Failed to send startup data to OpenVPN service pipe"));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Failed to send startup data to OpenVPN service pipe"));
         _winServicePipe->deleteLater();
         _winServicePipe = nullptr;
         return false;
@@ -448,7 +661,7 @@ bool OpenVpnBackend::_startWindowsViaInteractiveService(QString const &configPat
 
     // The service replies with an ack on the pipe (handled in
     // onWinPipeReadyRead). Meanwhile we set up the management socket
-    // reconnect-with-backoff loop: openvpn won't bind 127.0.0.1:7505 until
+    // reconnect-with-backoff loop: openvpn won't bind its management port until
     // it's been fully spawned, which can take a moment.
     if (!_winMgmtRetryTimer) {
         _winMgmtRetryTimer = new QTimer(this);
@@ -459,13 +672,16 @@ bool OpenVpnBackend::_startWindowsViaInteractiveService(QString const &configPat
             if (_winMgmt->state() != QAbstractSocket::ConnectedState
                 && _winMgmt->state() != QAbstractSocket::ConnectingState) {
                 _winMgmt->abort();
-                _winMgmt->connectToHost(QHostAddress::LocalHost, 7505);
+                _winMgmt->connectToHost(QHostAddress::LocalHost, _winMgmtPort);
             }
             // Re-arm the retry timer; we cancel it once management is up.
             if (++_winMgmtRetryCount < 40) // ~20s
                 _winMgmtRetryTimer->start(500);
             else if (!_readySignaled)
-                emit failed(tr("Could not connect to openvpn management on 127.0.0.1:7505"));
+                _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                                     VpnFailureKind::HelperUnavailable,
+                                     tr("Could not connect to OpenVPN management on loopback port %1")
+                                         .arg(_winMgmtPort));
         });
     }
     _winMgmtRetryCount = 0;
@@ -507,8 +723,10 @@ void OpenVpnBackend::onWinPipeReadyRead()
     }
     if (errCode != 0) {
         QString detail = lines.mid(1).join(' ').trimmed();
-        emit failed(tr("OpenVPN service refused start (code 0x%1): %2")
-                        .arg(errCode, 8, 16, QChar('0')).arg(detail));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::ProcessExited,
+                             tr("OpenVPN service refused start (code 0x%1): %2")
+                                 .arg(errCode, 8, 16, QChar('0')).arg(detail));
         _stopWindows();
         return;
     }
@@ -533,18 +751,7 @@ void OpenVpnBackend::onWinMgmtConnected()
     // actually negotiate.
     if (_winMgmtRetryTimer)
         _winMgmtRetryTimer->stop();
-    emit logLine(tr("Connected to openvpn management socket"));
-    if (_winStopRequested) {
-        _winMgmt->write("signal SIGTERM\n");
-        _winMgmt->flush();
-        return;
-    }
-    // Subscribe to state notifications AND to log events. Without `log on all`,
-    // openvpn won't push PUSH_REPLY lines to us, and we'd never see the
-    // dhcp-option DNS X.X.X.X that we need for the DNS-leak fix on Windows.
-    _winMgmt->write("state on\n");
-    _winMgmt->write("log on all\n");
-    _winMgmt->write("hold release\n");
+    emit logLine(tr("Connected to openvpn management socket; authenticating"));
 }
 
 void OpenVpnBackend::onWinMgmtReadyRead()
@@ -562,6 +769,28 @@ void OpenVpnBackend::onWinMgmtReadyRead()
 
 void OpenVpnBackend::_parseMgmtLine(QString const &line)
 {
+    if (line.startsWith(QLatin1String("ENTER PASSWORD:"))) {
+        if (_winMgmt)
+            _winMgmt->write(_winMgmtPassword.toUtf8() + '\n');
+        return;
+    }
+    if (line.startsWith(QLatin1String("SUCCESS: password is correct"))) {
+        _winMgmtAuthenticated = true;
+        if (!_winMgmt)
+            return;
+        if (_winStopRequested) {
+            _winMgmt->write("signal SIGTERM\n");
+            _winMgmt->flush();
+            return;
+        }
+        // Subscribe after authentication. The management connection is also
+        // the parent-liveness channel on Windows (--management-signal plus
+        // --remap-usr1 SIGTERM).
+        _winMgmt->write("state on all\n");
+        _winMgmt->write("log on all\n");
+        _winMgmt->write("hold release\n");
+        return;
+    }
     // openvpn management protocol — state notifications are prefixed with '>'
     // and follow:
     //   >STATE:timestamp,STATE,description,localIp,serverIp,serverPort,localPort,tunIface
@@ -573,6 +802,7 @@ void OpenVpnBackend::_parseMgmtLine(QString const &line)
             QString iface = (f.size() >= 8) ? f.at(7) : QStringLiteral("openvpn");
             if (!ip.isNull() && !_readySignaled) {
                 _readySignaled = true;
+                _markReady();
                 _winTunIp     = ip;
                 _winTunIface  = iface;
                 emit ready(iface, ip, _winDnsIp);
@@ -601,7 +831,9 @@ void OpenVpnBackend::_parseMgmtLine(QString const &line)
         return;
     }
     if (line.startsWith(QLatin1String(">FATAL:"))) {
-        emit failed(line.mid(7));
+        _emitTerminationOnce(_wasReady ? VpnTerminationKind::UnexpectedExit
+                                       : VpnTerminationKind::StartFailure,
+                             VpnFailureKind::ProcessExited, line.mid(7));
         _stopWindows();
         return;
     }
@@ -627,12 +859,18 @@ void OpenVpnBackend::onWinMgmtDisconnected()
         _winServicePipe->deleteLater();
         _winServicePipe = nullptr;
     }
-    if (!_readySignaled && !_winStopRequested) {
-        emit failed(tr("openvpn exited before the tunnel was ready"));
-    }
+    VpnTerminationKind const kind = _winStopRequested
+        ? VpnTerminationKind::RequestedStop
+        : (_wasReady ? VpnTerminationKind::UnexpectedExit
+                     : VpnTerminationKind::StartFailure);
+    VpnFailureKind const failure = _winStopRequested ? VpnFailureKind::None
+        : (_wasReady ? VpnFailureKind::ProcessExited : VpnFailureKind::HelperUnavailable);
     _readySignaled = false;
     _winStopRequested = false;
-    emit stopped();
+    _winMgmtAuthenticated = false;
+    _removeWinManagementPassword();
+    _emitTerminationOnce(kind, failure, kind == VpnTerminationKind::RequestedStop
+        ? QString() : tr("OpenVPN process exited"));
 }
 
 void OpenVpnBackend::_stopWindows()
@@ -640,6 +878,8 @@ void OpenVpnBackend::_stopWindows()
     _winStopRequested = true;
     if (_winMgmt && _winMgmt->state() == QAbstractSocket::ConnectedState) {
         // openvpn handles signal SIGTERM cleanly and tears down the tunnel.
+        if (!_winMgmtAuthenticated)
+            _winMgmt->write(_winMgmtPassword.toUtf8() + '\n');
         _winMgmt->write("signal SIGTERM\n");
         _winMgmt->flush();
     } else if (_winServicePipe) {
@@ -649,7 +889,22 @@ void OpenVpnBackend::_stopWindows()
         _winServicePipe->disconnectFromServer();
     } else if (!_winMgmtRetryTimer || !_winMgmtRetryTimer->isActive()) {
         // Nothing running.
-        emit stopped();
+        _emitTerminationOnce(VpnTerminationKind::RequestedStop,
+                             VpnFailureKind::None, QString());
     }
+}
+
+void OpenVpnBackend::_removeWinManagementPassword()
+{
+    if (!_winMgmtPasswordPath.isEmpty()) {
+        QFile passwordFile(_winMgmtPasswordPath);
+        if (passwordFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            passwordFile.write(QByteArray(_winMgmtPassword.toUtf8().size(), '\0'));
+            passwordFile.close();
+        }
+        passwordFile.remove();
+    }
+    _winMgmtPassword.clear();
+    _winMgmtPasswordPath.clear();
 }
 #endif // Q_OS_WIN

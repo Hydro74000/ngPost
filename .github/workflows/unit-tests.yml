@@ -20,7 +20,45 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libsecret-1-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libsecret-1-dev shellcheck
+
+      - name: Validate privileged VPN helper
+        run: |
+          scripts=(
+            src/vpn/scripts/ngpost-vpn-helper.sh
+            src/vpn/scripts/ngpost-vpn-install.sh
+            src/vpn/scripts/ngpost-vpn-uninstall.sh
+            tests/vpn/test_helper_lease.sh
+          )
+          for script in "${scripts[@]}"; do
+            bash -n "$script"
+          done
+          shellcheck "${scripts[@]}"
+
+      - name: Verify VPN helper fails closed before network mutation
+        run: |
+          set +e
+          persistent_output=$(docker run --rm \
+            -v "$PWD/src/vpn/scripts/ngpost-vpn-helper.sh:/helper:ro" \
+            ubuntu:24.04 bash /helper cleanup-stale --protocol 2 --nonblocking)
+          persistent_status=$?
+          readonly_output=$(docker run --rm --tmpfs /run:ro \
+            -v "$PWD/src/vpn/scripts/ngpost-vpn-helper.sh:/helper:ro" \
+            ubuntu:24.04 bash /helper cleanup-stale --protocol 2 --nonblocking)
+          readonly_status=$?
+          set -e
+
+          test "$persistent_status" -eq 1
+          test "$(printf '%s\n' "$persistent_output" | wc -l)" -eq 2
+          printf '%s\n' "$persistent_output" | grep -Fxq 'PROTOCOL 2'
+          printf '%s\n' "$persistent_output" | grep -Eq \
+            '^RUNTIME_NOT_VOLATILE path=/run fstype=[^ ]+ detail='
+
+          test "$readonly_status" -eq 1
+          test "$(printf '%s\n' "$readonly_output" | wc -l)" -eq 2
+          printf '%s\n' "$readonly_output" | grep -Fxq 'PROTOCOL 2'
+          printf '%s\n' "$readonly_output" | grep -Eq \
+            '^LEASE_UNAVAILABLE path=/run/lock detail='
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4

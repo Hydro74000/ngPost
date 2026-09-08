@@ -192,6 +192,8 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::VPN_BACKEND,             "vpn_backend"},
     {Opt::VPN_CONFIG_PATH,         "vpn_config_path"},
     {Opt::VPN_ACTIVE_PROFILE,      "vpn_active_profile"},
+    {Opt::VPN_LEASE_WAIT_MINUTES,  "vpn_lease_wait_minutes"},
+    {Opt::VPN_RECOVERY_MAX_ATTEMPTS, "vpn_recovery_max_attempts"},
     {Opt::VPN_PROFILE_NAME,        "name"},
     {Opt::VPN_PROFILE_BACKEND,     "backend"},
     {Opt::VPN_PROFILE_CONFIG_FILE, "config_file"},
@@ -201,6 +203,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::VPN,                     "vpn"},
     {Opt::NO_VPN,                  "no_vpn"},
     {Opt::VPN_PROFILE,             "vpn_profile"},
+    {Opt::VPN_CLEANUP_UNATTRIBUTED,"vpn-cleanup-unattributed"},
     {Opt::HISTORY,                 "history"},
     {Opt::HISTORY_SHOW,            "history_show"},
     {Opt::HISTORY_IMPORT_CSV,      "history_import_csv"},
@@ -326,7 +329,23 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::VPN],                 tr("force all NNTP connections through the configured VPN (master switch ON)")},
     { sOptionNames[Opt::NO_VPN],              tr("disable VPN for this run (master switch OFF, per-server useVpn ignored too)")},
     { sOptionNames[Opt::VPN_PROFILE],         tr("select the active VPN profile by name (must already exist in the config)"), sOptionNames[Opt::VPN_PROFILE]},
+    { sOptionNames[Opt::VPN_CLEANUP_UNATTRIBUTED],
+      tr("remove unowned ngPost VPN resources after rechecking them (requires --yes)")},
 };
+
+bool NgPost::_isVpnOverrideOption(QCommandLineOption const &option)
+{
+    static const QSet<QString> vpnOptionNames = {
+        sOptionNames[Opt::VPN],
+        sOptionNames[Opt::NO_VPN],
+        sOptionNames[Opt::VPN_PROFILE],
+        sOptionNames[Opt::VPN_CLEANUP_UNATTRIBUTED],
+    };
+    for (QString const &name : option.names())
+        if (vpnOptionNames.contains(name))
+            return true;
+    return false;
+}
 
 const QMap<NgPost::GROUP_POLICY, QString> NgPost::sGroupPolicies = {
     {GROUP_POLICY::ALL,       "all"},
@@ -384,7 +403,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _lang("en"), _translators(),
     _netMgr(), _updateChecker(nullptr), _urlNzbUpload(nullptr), _urlNzbUploadStr(),
     _doShutdownWhenDone(false), _shutdownProc(nullptr),
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
     _shutdownCmd(sDefaultShutdownCmdWindows),
 #elif defined(__APPLE__)|| defined(__MACH__)
     _shutdownCmd(sDefaultShutdownCmdMacOS),
@@ -408,7 +427,8 @@ NgPost::NgPost(int &argc, char *argv[]):
     _noPostInfo(false),
     _postCmdTimeoutSec(0), _postCmdFailIsError(false), _postCmdExposePassword(false),
     _nzbUploadTimeoutSec(sDefaultNzbUploadTimeoutSec), _postCmdRunner(nullptr),
-    _waitingForPostCmds(false), _pendingExitCode(-1), _stdoutIsData(false),
+    _waitingForPostCmds(false), _pendingExitCode(-1),
+    _pendingExitWaitsForActiveJob(false), _stdoutIsData(false),
     _stdoutRedirect(nullptr),
     _preparePacking(false),
     _groupPolicy(GROUP_POLICY::ALL),
@@ -436,7 +456,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     // QProcess invokes CreateProcess directly without a shell.
     const QString appDir = QCoreApplication::applicationDirPath();
     QStringList par2Candidates;
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
     // Fallback order: ParPar (preferred — no shell globbing needed via -R),
     // then par2cmdline (par2.exe), then MultiPar (par2j64/par2j). All three are
     // bundled by the Windows installer so par2 generation keeps working even if
@@ -459,7 +479,7 @@ NgPost::NgPost(int &argc, char *argv[]):
         }
     }
 
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
     // Fall back to system-wide installations when no bundled binary was found.
     // Search order: PATH (parpar first, then par2), then QuickPar typical paths.
     if (_par2Path.isEmpty()) {
@@ -493,7 +513,7 @@ NgPost::NgPost(int &argc, char *argv[]):
 
     // check if an embedded rar is available (windows or appImage)
     QString rarEmbedded;
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
     rarEmbedded = QString("%1/rar.exe").arg(QCoreApplication::applicationDirPath());
 #else
     rarEmbedded = QString("%1/rar").arg(QCoreApplication::applicationDirPath());
@@ -522,9 +542,10 @@ NgPost::NgPost(int &argc, char *argv[]):
             Qt::QueuedConnection);
 
     _vpnManager    = new VpnManager(this);
+    _vpnManager->setCliMode(!useHMI());
     // Best-effort sweep of any stale VPN state from a previous crashed run.
     // No-op (and no prompt) if the VPN helper hasn't been installed yet.
-    _vpnManager->runStartupCleanup();
+    _vpnManager->runStartupStaleCleanup();
     // Phase 3 — auto-persist VPN preferences as they change so the user
     // doesn't have to click "Save Config" after every tweak.
     connect(_vpnManager, &VpnManager::configChanged,
@@ -545,19 +566,32 @@ NgPost::NgPost(int &argc, char *argv[]):
     connect(_vpnManager, &VpnManager::stateChanged,
             this, [this](VpnManager::State s) {
         if (s == VpnManager::State::Connected) {
-            if (_activeJob || _pendingJobs.isEmpty()) return;
-            _vpnManager->retainForJob();
+            if (_activeJob) {
+                if (_activeJob->resumeIfPausedFor(PostingJob::PauseReason::VpnRecovery)) {
+#ifdef __USE_HMI__
+                    if (_hmi)
+                        _hmi->setPauseIcon(true);
+#endif
+                    _progressbarTimer.start(_refreshRate);
+                }
+                return;
+            }
+            if (_pendingJobs.isEmpty()) return;
             _activeJob = _pendingJobs.dequeue();
+            _retainVpnForJob(_activeJob);
             emit _activeJob->startPosting(true);
             return;
         }
-        if (s == VpnManager::State::Failed && !useHMI() && !_pendingJobs.isEmpty()) {
-            while (!_pendingJobs.isEmpty())
-                _discardUnstartedJob(_pendingJobs.dequeue());
-            _error(tr("VPN could not be established — aborting pending jobs"),
-                   ERROR_CODE::ERR_WRONG_ARG);
-            _requestExit(ERROR_CODE::ERR_WRONG_ARG);
-        }
+        if (_activeJob
+            && (s == VpnManager::State::Disabled
+                || ((s == VpnManager::State::Failed
+                     || s == VpnManager::State::LeaseBusy)
+                    && !_vpnManager->hasActiveVpnJobs())))
+            // RequestedStop and a failure before READY reset the manager's
+            // count. Keep the job's local association in sync so a later user
+            // retry retains it once. RecoveryExhausted deliberately keeps the
+            // manager count and therefore does not enter this branch.
+            _activeJob->_vpnRetained = false;
     });
     // Blocked admission also needs CLI handling: the GUI shows a popup, but
     // there's no popup in CLI, so without this hook the binary hangs forever
@@ -565,9 +599,56 @@ NgPost::NgPost(int &argc, char *argv[]):
     connect(_vpnManager, &VpnManager::vpnRequiredButUnavailable,
             this, [this](VpnManager::JobBlockReason, QString const &detail) {
         if (useHMI()) return;
+        while (!_pendingJobs.isEmpty())
+            _discardUnstartedJob(_pendingJobs.dequeue());
         _error(tr("VPN required but unavailable: %1").arg(detail),
-               ERROR_CODE::ERR_WRONG_ARG);
-        _requestExit(ERROR_CODE::ERR_WRONG_ARG);
+               ERROR_CODE::ERR_VPN);
+        if (_activeJob) {
+            // A second, VPN-requiring queued job can fail admission while a
+            // direct job is still running. Never kill that successful work.
+            // Conversely, an active VPN job whose backend became terminal has
+            // to close now so its ambiguous articles are flushed as unknown.
+            bool const stopForPreservation = _activeJob->_vpnRequired;
+            if (stopForPreservation)
+                _activeJob->pause(PostingJob::PauseReason::VpnRecovery);
+            _requestExit(ERROR_CODE::ERR_VPN, true);
+            if (stopForPreservation)
+                emit _activeJob->stopPosting();
+        } else {
+            _requestExit(ERROR_CODE::ERR_VPN);
+        }
+    });
+    connect(_vpnManager, &VpnManager::vpnInterrupted,
+            this, [this](VpnManager::FailureKind) {
+        if (_activeJob)
+            _activeJob->pause(PostingJob::PauseReason::VpnRecovery);
+    });
+    connect(_vpnManager, &VpnManager::manualDisconnectRequested,
+            this, [this]() {
+        if (_activeJob)
+            _activeJob->pause(PostingJob::PauseReason::User);
+    });
+    connect(_vpnManager, &VpnManager::recoveryExhausted,
+            this, [this](VpnManager::FailureKind) {
+        if (!useHMI()) {
+            _error(tr("VPN recovery exhausted; the post was preserved for resume."),
+                   ERROR_CODE::ERR_VPN);
+            while (!_pendingJobs.isEmpty())
+                _discardUnstartedJob(_pendingJobs.dequeue());
+        }
+        if (_activeJob) {
+            _activeJob->pause(PostingJob::PauseReason::VpnRecovery);
+            if (!useHMI()) {
+                // Let PostingJob close every connection and flush the unknown
+                // article states before the normal no-jobs barrier exits with
+                // ERR_VPN. Exiting immediately here would recreate the crash
+                // window this recovery path is meant to close.
+                _requestExit(ERROR_CODE::ERR_VPN, true);
+                emit _activeJob->stopPosting();
+            }
+        } else if (!useHMI()) {
+            _requestExit(ERROR_CODE::ERR_VPN);
+        }
     });
 
     _loadTanslators();
@@ -1435,13 +1516,21 @@ void NgPost::onLog(QString msg, bool newline)
 
 void NgPost::onError(QString msg)
 {
-    _error(msg, ERROR_CODE::COMPLETED_WITH_ERRORS);
+    // Worker diagnostics are intentionally generic.  They may arrive after a
+    // typed terminal decision (for example ERR_VPN followed by the final
+    // unknown-article flush); never let that queued diagnostic erase the
+    // actionable CLI exit code.
+    if (_err == ERROR_CODE::NONE)
+        _err = ERROR_CODE::COMPLETED_WITH_ERRORS;
+    _error(msg);
 }
 
 
 void NgPost::onErrorConnecting(QString err)
 {
-    _error(err, ERROR_CODE::COMPLETED_WITH_ERRORS);
+    if (_err == ERROR_CODE::NONE)
+        _err = ERROR_CODE::COMPLETED_WITH_ERRORS;
+    _error(err);
 }
 
 
@@ -1645,9 +1734,10 @@ void NgPost::doNzbPostCMD(PostingJob *job)
 //! A fatal error asked us to stop. Only one thing may still delay it: post
 //! commands of posts that already went out. Killing those would throw away
 //! work that succeeded, just because a later job could not start.
-void NgPost::_requestExit(ERROR_CODE code)
+void NgPost::_requestExit(ERROR_CODE code, bool waitForActiveJob)
 {
     _pendingExitCode = static_cast<int>(code);
+    _pendingExitWaitsForActiveJob = _pendingExitWaitsForActiveJob || waitForActiveJob;
     // A VPN admission failure can be emitted synchronously while CLI parsing
     // is still running, before exec(). Qt ignores exit() in that window.
     QTimer::singleShot(0, this, [this]() { maybeFinishApplication(); });
@@ -1656,6 +1746,8 @@ void NgPost::_requestExit(ERROR_CODE code)
 void NgPost::maybeFinishApplication()
 {
     if (_pendingExitCode >= 0) {
+        if (_pendingExitWaitsForActiveJob && _activeJob)
+            return;
         if (_postCmdRunner && !_postCmdRunner->isIdle()) {
             if (!_waitingForPostCmds) {
                 _waitingForPostCmds = true;
@@ -1705,9 +1797,9 @@ bool NgPost::isPaused() const
 
 void NgPost::pause() const
 {
-    if (_activeJob && !_activeJob->isPaused())
+    if (_activeJob)
     {
-        _activeJob->pause();
+        _activeJob->pause(PostingJob::PauseReason::User);
 #ifdef __USE_HMI__
         if (_hmi)
             _hmi->setPauseIcon(false);
@@ -1719,6 +1811,30 @@ void NgPost::resume()
 {
     if (_activeJob && _activeJob->isPaused())
     {
+        if (_activeJob->pauseReason() == PostingJob::PauseReason::User
+            && _vpnManager && _activeJob->_vpnRequired
+            && (_vpnManager->state() != VpnManager::State::Connected
+                || _vpnManager->health() != VpnManager::VpnHealth::Healthy)) {
+            if (_vpnManager->state() == VpnManager::State::Stopping) {
+                _log(tr("The post remains paused until the requested VPN stop completes."));
+                return;
+            }
+            VpnManager::Admission const admission =
+                _vpnManager->admitJob(_nntpServers, _activeJob->_vpnRequired);
+            if (admission != VpnManager::Admission::Proceed) {
+                if (admission == VpnManager::Admission::Wait
+                    && _activeJob->waitForVpnAfterUserResume())
+                    _retainVpnForJob(_activeJob);
+                return;
+            }
+        }
+        if (_activeJob->pauseReason() == PostingJob::PauseReason::VpnRecovery
+            && _vpnManager
+            && (_vpnManager->state() != VpnManager::State::Connected
+                || _vpnManager->health() != VpnManager::VpnHealth::Healthy)) {
+            _log(tr("The post remains paused until VPN recovery completes."));
+            return;
+        }
         _activeJob->resume();
 #ifdef __USE_HMI__
         if (_hmi)
@@ -2120,11 +2236,10 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
             _hmi->closeTab(_activeJob->widget());
 #endif
 
-        _activeJob->deleteLater();
+        PostingJob *finishedJob = _activeJob;
         _activeJob = nullptr;
-
-        if (_vpnManager)
-            _vpnManager->releaseForJob();
+        _releaseVpnForJob(finishedJob);
+        finishedJob->deleteLater();
 
         if (_pendingJobs.size())
         {
@@ -2133,15 +2248,15 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
             // it now if the VPN can't come up.
             VpnManager::Admission nextAdm = VpnManager::Admission::Proceed;
             if (_vpnManager)
-                nextAdm = _vpnManager->admitJob(_nntpServers);
+                nextAdm = _vpnManager->admitJob(
+                    _nntpServers, _pendingJobs.head()->_vpnRequired);
             if (nextAdm != VpnManager::Admission::Proceed) {
                 // Leave it in pending; the stateChanged(Connected) hook (or
                 // a Blocked->fixed user action) will eventually flush.
                 return;
             }
             _activeJob = _pendingJobs.dequeue();
-            if (_vpnManager)
-                _vpnManager->retainForJob();
+            _retainVpnForJob(_activeJob);
 
 #ifdef __USE_HMI__
             if (_hmi)
@@ -2385,6 +2500,12 @@ void NgPost::closeAllPostingJobs()
         _activeJob->onStopPosting();
 }
 
+void NgPost::stopActivePostingForResume()
+{
+    if (_activeJob)
+        emit _activeJob->stopPosting();
+}
+
 void NgPost::closeAllMonitoringJobs()
 {
     auto it = _pendingJobs.begin();
@@ -2435,7 +2556,15 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     QString appVersion = QString("%1_v%2").arg(sAppName, sVersion);
     QCommandLineParser parser;
     parser.setApplicationDescription(appVersion);
-    parser.addOptions(sCmdOptions);
+    if (VpnManager::vpnPlatformSupported()) {
+        parser.addOptions(sCmdOptions);
+    } else {
+        QList<QCommandLineOption> options;
+        for (QCommandLineOption const &option : sCmdOptions)
+            if (!_isVpnOverrideOption(option))
+                options << option;
+        parser.addOptions(options);
+    }
 
 
     // Process the actual command line arguments given by the user
@@ -2566,6 +2695,17 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
 
     if (_historyService)
         _historyService->configure(_postDbFile, _historyStorePasswords);
+
+    if (parser.isSet(sOptionNames[Opt::VPN_CLEANUP_UNATTRIBUTED])) {
+        if (!parser.isSet(sOptionNames[Opt::YES])) {
+            _error(tr("Error: --vpn-cleanup-unattributed requires --yes because it can interrupt another ngPost tunnel."),
+                   ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+        if (!_vpnManager || !_vpnManager->cleanupUnattributed(true))
+            _error(tr("VPN resources were not removed."), ERROR_CODE::ERR_VPN);
+        return false;
+    }
 
     const bool hasHistoryCommand = _isHistoryCommand(parser);
 
@@ -3405,6 +3545,27 @@ QString NgPost::_parseConfig(const QString &configPath)
             currentVpn.configBaseDir = _loadedConfigDir;
             inVpnProfile = false;
         };
+        // Settle the language before the main loop emits anything. Parsing is
+        // single pass, so a LANG line placed low in the file used to leave
+        // every diagnostic above it in English -- which is exactly the file
+        // layout a translated user ends up with. One cheap scan, then rewind.
+        {
+            QTextStream langScan(&file);
+            while (!langScan.atEnd()) {
+                QString const scanned = langScan.readLine().trimmed();
+                if (scanned.isEmpty() || scanned.startsWith('#') || scanned.startsWith('/'))
+                    continue;
+                int const eq = scanned.indexOf('=');
+                if (eq < 0)
+                    continue;
+                if (scanned.left(eq).trimmed().toLower() == sOptionNames[Opt::LANG]) {
+                    changeLanguage(scanned.mid(eq + 1).trimmed().toLower());
+                    break;
+                }
+            }
+            file.seek(0);
+        }
+
         QTextStream stream(&file);
         while (!stream.atEnd())
         {
@@ -3563,6 +3724,26 @@ QString NgPost::_parseConfig(const QString &configPath)
                     {
                         parsedActiveVpnProfile = val;
                     }
+                    else if (opt == sOptionNames[Opt::VPN_LEASE_WAIT_MINUTES])
+                    {
+                        int minutes = val.toInt(&ok);
+                        if (ok && minutes >= 0 && minutes <= 1440)
+                            _vpnManager->setLeaseWaitMinutes(minutes);
+                        else {
+                            _vpnManager->setLeaseWaitMinutes(5);
+                            _log(tr("Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5."));
+                        }
+                    }
+                    else if (opt == sOptionNames[Opt::VPN_RECOVERY_MAX_ATTEMPTS])
+                    {
+                        int attempts = val.toInt(&ok);
+                        if (ok && attempts >= 0 && attempts <= 1000)
+                            _vpnManager->setRecoveryMaxAttempts(attempts);
+                        else {
+                            _vpnManager->setRecoveryMaxAttempts(0);
+                            _log(tr("Warning: VPN_RECOVERY_MAX_ATTEMPTS must be in 0..1000; using 0 (unlimited)."));
+                        }
+                    }
                     // Legacy single-profile keys (kept for migration only).
                     else if (opt == sOptionNames[Opt::VPN_BACKEND])
                     {
@@ -3618,7 +3799,7 @@ QString NgPost::_parseConfig(const QString &configPath)
                         val = val.toLower();
                         if (val == "true" || val == "on" || val == "1")
                         {
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
                             QString logFilePath = sDefaultLogFile;
 #else
                             QString logFilePath = QString("%1/%2").arg(getenv("HOME")).arg(sDefaultLogFile);
@@ -4107,6 +4288,8 @@ void NgPost::_syntax(char *appName)
           << tr("Syntax: ") << app << " (options)* (-i <file or folder> | --auto <folder> | --monitor <folder>)+\n";
     for (const QCommandLineOption & opt : sCmdOptions)
     {
+        if (!VpnManager::vpnPlatformSupported() && _isVpnOverrideOption(opt))
+            continue;
         if (opt.valueName() == sOptionNames[Opt::SERVER])
             _cout << "\n// " << tr("you can provide servers in one string using -S and/or split the parameters for ONE SINGLE server (this will overwrite the configuration file)") << "\n";
         else if (opt.valueName() == sOptionNames[Opt::TMP_DIR])
@@ -4467,8 +4650,10 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
     //            another action re-triggers a queue advance (typically the
     //            stateChanged(Connected) listener).
     VpnManager::Admission adm = VpnManager::Admission::Proceed;
-    if (_vpnManager)
-        adm = _vpnManager->admitJob(_nntpServers);
+    if (_vpnManager) {
+        job->_vpnRequired = _vpnManager->jobNeedsVpn(_nntpServers);
+        adm = _vpnManager->admitJob(_nntpServers, job->_vpnRequired);
+    }
 
     if (adm == VpnManager::Admission::Blocked
         || adm == VpnManager::Admission::Wait) {
@@ -4495,9 +4680,8 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
     }
     else
     {
-        if (_vpnManager)
-            _vpnManager->retainForJob();
         _activeJob = job;
+        _retainVpnForJob(_activeJob);
         emit job->startPosting(true);
         return true;
     }
@@ -4519,6 +4703,22 @@ void NgPost::_discardUnstartedJob(PostingJob *job)
                    ERROR_CODE::ERR_HISTORY);
     }
     job->deleteLater();
+}
+
+void NgPost::_retainVpnForJob(PostingJob *job)
+{
+    if (!job || !_vpnManager || !job->_vpnRequired || job->_vpnRetained)
+        return;
+    _vpnManager->retainForJob();
+    job->_vpnRetained = true;
+}
+
+void NgPost::_releaseVpnForJob(PostingJob *job)
+{
+    if (!job || !_vpnManager || !job->_vpnRetained)
+        return;
+    job->_vpnRetained = false;
+    _vpnManager->releaseForJob();
 }
 
 #ifdef __DEBUG__
@@ -4762,10 +4962,14 @@ void NgPost::saveConfig()
                << tr("## (internal) last update check timestamp, epoch seconds \xe2\x80\x94 managed automatically") << "\n"
                << "LAST_UPDATE_CHECK = " << _lastUpdateCheckEpoch << "\n"
                << "\n"
-               << tr("## tunnel ngPost connections through an embedded VPN (Linux v1)") << "\n"
+               << tr("## tunnel selected ngPost connections through an embedded VPN") << "\n"
                << tr("## the VPN affects ngPost only; the rest of the system is unchanged") << "\n"
                << "VPN_AUTO_CONNECT = " << (_vpnManager && _vpnManager->autoConnect() ? "true" : "false") << "\n"
                << "VPN_ACTIVE_PROFILE = " << (_vpnManager ? _vpnManager->activeProfileName() : QString()) << "\n"
+               << tr("## CLI only: wait for the machine-wide VPN lease (0 fails immediately; range 0..1440)") << "\n"
+               << "VPN_LEASE_WAIT_MINUTES = " << (_vpnManager ? _vpnManager->leaseWaitMinutes() : 5) << "\n"
+               << tr("## VPN recovery attempts (0 = unlimited; range 0..1000)") << "\n"
+               << "VPN_RECOVERY_MAX_ATTEMPTS = " << (_vpnManager ? _vpnManager->recoveryMaxAttempts() : 0) << "\n"
                << "\n"
                << tr("## when obfuscating file names, keep the .nfo extension visible") << "\n"
                << (_keepNfoExtension ? "" : "#") << "KEEP_NFO_EXTENSION = true\n"
@@ -4784,7 +4988,7 @@ void NgPost::saveConfig()
                << "\n"
                << tr("## By default, ngPost tries to resume a Post if the network is down.") << "\n"
                << tr("## it won't stop trying until the network is back and the post is finished properly") << "\n"
-               << tr("## you can disable this feature and thus stop a post when you loose the network") << "\n"
+               << tr("## disabling auto-resume still preserves unconfirmed articles as unknown") << "\n"
                << (_tryResumePostWhenConnectionLost  ? "#" : "") << "NO_RESUME_AUTO = true\n"
                << "\n"
                << tr("## if there is no activity on a connection it will be closed and restarted") << "\n"
@@ -4888,7 +5092,7 @@ void NgPost::saveConfig()
                << tr("## (in that case, you may need to set also PAR2_ARGS)") << "\n";
         if (!_par2PathConfig.isEmpty())
             stream << "PAR2_PATH = " << _par2PathConfig << "\n";
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
         stream << "#PAR2_PATH = <your_path>parpar.exe\n"
                << "#PAR2_PATH = <your_path>par2j64.exe\n";
 #else
