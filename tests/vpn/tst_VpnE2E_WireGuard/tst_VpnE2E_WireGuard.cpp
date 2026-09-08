@@ -92,6 +92,62 @@ bool waitForHelperMessage(QProcess *process, QByteArray const &keyword,
     return false;
 }
 
+//! A --bin-dir the privileged helper will accept.
+//!
+//! The helper refuses a bundle directory that is not root-owned, or that is
+//! writable by group or other, and that refusal is the entire point of the
+//! flag: a bundle directory anyone could write to would let any local account
+//! swap the `wg` binary that the root helper then executes. Production earns
+//! that ground through the installer, which stages the bundled binaries as
+//! root. A test passing its own QTemporaryDir cannot -- the directory belongs
+//! to the user running the test -- so it has to stage the same way.
+class RootOwnedBinDir
+{
+public:
+    explicit RootOwnedBinDir(QString const &path) : _path(path) { }
+    ~RootOwnedBinDir()
+    {
+        if (_created)
+            QProcess::execute(QStringLiteral("sudo"),
+                              { QStringLiteral("-n"), QStringLiteral("rm"),
+                                QStringLiteral("-rf"), QStringLiteral("--"), _path });
+    }
+
+    RootOwnedBinDir(RootOwnedBinDir const &)            = delete;
+    RootOwnedBinDir &operator=(RootOwnedBinDir const &) = delete;
+
+    //! Create the directory as root:root 0755 and put \a sourceExecutable in it
+    //! under \a toolName, with the same ownership and mode.
+    bool install(QString const &sourceExecutable, QString const &toolName)
+    {
+        // `install -d` sets owner, group and mode in one step, so the
+        // directory is never briefly writable by anyone else.
+        if (QProcess::execute(QStringLiteral("sudo"),
+                              { QStringLiteral("-n"), QStringLiteral("install"),
+                                QStringLiteral("-d"), QStringLiteral("-o"), QStringLiteral("root"),
+                                QStringLiteral("-g"), QStringLiteral("root"),
+                                QStringLiteral("-m"), QStringLiteral("0755"),
+                                QStringLiteral("--"), _path })
+            != 0)
+            return false;
+        _created = true;
+        return QProcess::execute(QStringLiteral("sudo"),
+                                 { QStringLiteral("-n"), QStringLiteral("install"),
+                                   QStringLiteral("-o"), QStringLiteral("root"),
+                                   QStringLiteral("-g"), QStringLiteral("root"),
+                                   QStringLiteral("-m"), QStringLiteral("0755"),
+                                   QStringLiteral("--"), sourceExecutable,
+                                   _path + QLatin1Char('/') + toolName })
+            == 0;
+    }
+
+    QString path() const { return _path; }
+
+private:
+    QString _path;
+    bool    _created = false;
+};
+
 void startDirectHelper(QProcess *process, QString const &configPath,
                        qint64 ownerPid, QString const &ownerStart,
                        QString const &binDir = QString())
@@ -515,11 +571,20 @@ void TestVpnE2E_WireGuard::wireguard_health_aggregates_all_emitting_peers()
                                   | QFileDevice::ExeGroup | QFileDevice::ReadOther
                                   | QFileDevice::ExeOther));
 
+    // fixture.path() belongs to the user running the test, so the helper would
+    // reject it out of hand -- as it should. Only the fake `wg` needs to sit
+    // on root-owned ground; the dump it reads stays in the fixture, because
+    // the test rewrites it as the scenario advances.
+    RootOwnedBinDir binDir(QStringLiteral("/tmp/ngpost-e2e-bin-%1")
+                               .arg(QCoreApplication::applicationPid()));
+    QVERIFY2(binDir.install(fakeWgPath, QStringLiteral("wg")),
+             "could not stage the fake wg into a root-owned bin dir");
+
     QProcess helper;
     QByteArray output;
     const qint64 owner = QCoreApplication::applicationPid();
     startDirectHelper(&helper, _stateDir + QStringLiteral("/client.conf"),
-                      owner, processStartTime(owner), fixture.path());
+                      owner, processStartTime(owner), binDir.path());
     QVERIFY2(helper.waitForStarted(5000), qPrintable(helper.errorString()));
     QVERIFY2(waitForHelperMessage(&helper, QByteArrayLiteral("READY"), &output),
              output.constData());
