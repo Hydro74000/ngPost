@@ -389,9 +389,9 @@ Si vous shouhaitez le traduire dans une autre langue, c'est très simple (Qt fou
 - all ngPost users ;)
 
 
-### Donations
-Je suis Freelance (auto-entrepreneur) depuis fin 2019, travaillant sur plusieurs projets perso. Si vous utilisez ngPost et que vous souhaitez contribuer à l'effort et sa future évolution, merci de penser à faire une petite donation.<br/>
-<br/>
-<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=W2C236U6JNTUA&item_name=ngPost&currency_code=EUR"><img align="left" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="ex0days"></a>
- ou en Bitcoin à cette adresse: **3BGbnvnnBCCqrGuq1ytRqUMciAyMXjXAv6**
-<img align="right" align="bottom" width="120" height="120" src="https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/btc_qr.gif" alt="ngPost_QR">
+### ☕ Soutenir le projet
+
+ngPost est un logiciel libre, gratuit et sans publicité, maintenu avec passion. Si l'application vous fait gagner du temps ou vous rend service au quotidien, vous pouvez soutenir son développement :
+- [Offrez un café au développeur via PayPal](https://paypal.me/ngpost) pour encourager les futures versions et le maintien des protocoles.
+- Laissez une étoile ⭐ sur le dépôt GitHub pour faire connaître le projet.
+- Partagez vos retours, signalements de bugs ou suggestions d'améliorations.

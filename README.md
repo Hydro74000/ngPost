@@ -154,6 +154,13 @@ entries cannot be resumed or used to regenerate complete NZBs.
 
 [Please visit the wiki](https://github.com/Hydro74000/ngPost/wiki/Command-Line-Usage)
 
+## ☕ Support the project
+
+ngPost is free, open-source, and ad-free software maintained with passion. If ngPost saves you time or makes your life easier, you can support its development:
+- [Buy me a coffee via PayPal](https://paypal.me/ngpost) to encourage future versions and fuel active development.
+- Star the repository ⭐ on GitHub to help more people discover it.
+- Share your feedback, bug reports, or feature suggestions.
+
 ### Thanks
 - Matthieu Bruel for the base project
 - Uukrull for his intensive testing and feedbacks and for building all the MacOS packages.
