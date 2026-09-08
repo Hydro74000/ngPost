@@ -318,10 +318,14 @@ acquire_lease || exit 2
 
 lease_fd_identity=$(stat -L -c '%d:%i' "/proc/self/fd/$LEASE_FD" 2>/dev/null || true)
 lease_path_identity=$(stat -L -c '%d:%i' "$LOCK_FILE" 2>/dev/null || true)
-[ -n "$lease_fd_identity" ] && [ "$lease_fd_identity" = "$lease_path_identity" ] \
-    && [ ! -L "$LOCK_FILE" ] \
-    && [ "$(stat -c %u "$LOCK_FILE" 2>/dev/null || echo -1)" = 0 ] \
-    || runtime_failure LEASE_UNAVAILABLE "$LOCK_FILE" "the VPN lease changed or is not owned by root"
+# Written as an explicit negated if rather than `A && B || C`: in that form the
+# trailing branch also runs when an earlier test succeeded but a later one
+# failed, which reads as if-then-else while behaving differently.
+if ! { [ -n "$lease_fd_identity" ] && [ "$lease_fd_identity" = "$lease_path_identity" ] \
+       && [ ! -L "$LOCK_FILE" ] \
+       && [ "$(stat -c %u "$LOCK_FILE" 2>/dev/null || echo -1)" = 0 ]; }; then
+    runtime_failure LEASE_UNAVAILABLE "$LOCK_FILE" "the VPN lease changed or is not owned by root"
+fi
 chmod 0644 "$LOCK_FILE" 2>/dev/null \
     || runtime_failure LEASE_UNAVAILABLE "$LOCK_FILE" "cannot secure the VPN lease"
 
@@ -478,8 +482,12 @@ cleanup_resources() {
     trap 'exit 0' TERM INT HUP
 }
 
-# Called indirectly by the EXIT trap.
-# shellcheck disable=SC2329
+# Invoked by `trap cleanup_all EXIT` below, which ShellCheck before 0.10 does
+# not follow: it reports the function as never called (SC2329) and then every
+# command in its body as unreachable (SC2317). Both are false here -- the trap
+# is the only thing that runs this -- so the invocation is declared rather than
+# the findings silenced wholesale; nothing else in the file is exempted.
+# shellcheck disable=SC2329,SC2317
 cleanup_all() {
     local code=$?
     [ -z "$WATCHDOG_PID" ] || kill "$WATCHDOG_PID" 2>/dev/null || true
@@ -585,7 +593,10 @@ if [ "$ACTION" = cleanup-unattributed ]; then
 fi
 
 case "$ACTION" in openvpn|wireguard) ;; *) terminal_error configuration "unknown backend: $ACTION"; exit 1 ;; esac
-[ -n "$CONFIG" ] && [ -r "$CONFIG" ] || { terminal_error configuration "config is missing or unreadable: $CONFIG"; exit 1; }
+if [ -z "$CONFIG" ] || [ ! -r "$CONFIG" ]; then
+    terminal_error configuration "config is missing or unreadable: $CONFIG"
+    exit 1
+fi
 
 if [ -r "$OWNER_FILE" ]; then
     old_record=$(head -c 2048 "$OWNER_FILE")
