@@ -27,6 +27,13 @@ class QCoreApplication;
 
 class CmdOrGuiApp
 {
+    // _app and _hmi are owned raw pointers deleted in the destructor, and
+    // _ownsApp would be true in both halves of a copy. Only the const _mode
+    // member currently prevents assignment, and nothing prevents copy
+    // construction; the sole subclass happens to be a QObject, which is a
+    // coincidence rather than a guarantee.
+    Q_DISABLE_COPY(CmdOrGuiApp)
+
 protected:
     enum class AppMode : bool {CMD = 0, HMI = 1}; //!< supposed to be CMD but a simple HMI has been added
 

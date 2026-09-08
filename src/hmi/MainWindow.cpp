@@ -933,13 +933,12 @@ void MainWindow::_initServerBox()
     _ui->serversTable->verticalHeader()->hide();
     _ui->serversTable->setColumnCount(sServerListHeaders.size());
 
-    int width = 2, col = 0;
+    // The accumulated total fed a setMaximumWidth() that was commented out
+    // long ago: the table is meant to follow its container, not to pin itself
+    // to the sum of its default column widths.
+    int col = 0;
     for (int size : sServerListSizes)
-    {
         _ui->serversTable->setColumnWidth(col++, size);
-        width += size;
-    }
-//    _ui->serversTable->setMaximumWidth(width);
 
     _applyVpnPlatformVisibility();
 

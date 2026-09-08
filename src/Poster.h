@@ -47,6 +47,12 @@ class Poster
 {
     friend class ArticleBuilder;
 
+    // Copying a Poster would duplicate a running thread pair and a mutex the
+    // builders synchronise on. Its QThread/QMutex members already make the
+    // compiler reject it; saying so here is what stops a reader from having to
+    // work that out from the member list.
+    Q_DISABLE_COPY(Poster)
+
 private:
     const ushort _id;
     NgPost *const _ngPost;
