@@ -158,9 +158,9 @@ void NntpCheckCon::onStartConnection()
     _watchdog.start(_nzbCheck->socketTimeOut());
 }
 
-void NntpCheckCon::_send(const char *cmd)
+void NntpCheckCon::_send(QByteArray const &cmd)
 {
-    if (!_socket)
+    if (!_socket || cmd.isEmpty())
         return;
     _socket->write(cmd);
     // Anything we ask for, we wait for -- with a deadline.
@@ -310,10 +310,18 @@ void NntpCheckCon::onReadyRead()
                 } else {
                     _postingState = PostingState::AUTH_USER;
 
-                    std::string cmd(Nntp::AUTHINFO_USER);
-                    cmd += _srvParams.user;
-                    cmd += Nntp::ENDLINE;
-                    _send(cmd.c_str());
+                    QByteArray const cmd = Nntp::authInfoUser(_srvParams.user);
+                    if (cmd.isEmpty()) {
+                        emit errorConnecting(
+                                tr("[Connection #%1] The configured user for %2:%3 contains a "
+                                   "line break and cannot be sent")
+                                        .arg(_id)
+                                        .arg(_srvParams.host)
+                                        .arg(_srvParams.port));
+                        _closeConnection();
+                        return;
+                    }
+                    _send(cmd);
                 }
             }
         } else if (_postingState == PostingState::AUTH_USER) {
@@ -329,10 +337,18 @@ void NntpCheckCon::onReadyRead()
                 // Continue authentication : send pass info
                 _postingState = PostingState::AUTH_PASS;
 
-                std::string cmd(Nntp::AUTHINFO_PASS);
-                cmd += _srvParams.pass;
-                cmd += Nntp::ENDLINE;
-                _send(cmd.c_str());
+                QByteArray const cmd = Nntp::authInfoPass(_srvParams.pass);
+                if (cmd.isEmpty()) {
+                    emit errorConnecting(
+                            tr("[Connection #%1] The configured password for %2:%3 contains a "
+                               "line break and cannot be sent")
+                                    .arg(_id)
+                                    .arg(_srvParams.host)
+                                    .arg(_srvParams.port));
+                    _closeConnection();
+                    return;
+                }
+                _send(cmd);
             }
         } else if (_postingState == PostingState::AUTH_PASS) {
             if (strncmp(line.constData(), Nntp::getResponse(281), 2) != 0) {
@@ -382,7 +398,26 @@ void NntpCheckCon::_closeConnection()
 
 void NntpCheckCon::_checkNextArticle()
 {
-    _currentArticle = _nzbCheck->getNextArticle();
+    // The command is built before the article is accepted as in flight: the
+    // serialiser is the last gate, and one it refuses must not be waited for.
+    // Parsing already dropped malformed ids, so this loop normally runs once.
+    QByteArray command;
+    while (true) {
+        _currentArticle = _nzbCheck->getNextArticle();
+        if (_currentArticle.isNull())
+            break;
+
+        command = Nntp::statCommand(_currentArticle);
+        if (!command.isEmpty())
+            break;
+
+        _nzbCheck->log(tr("[Con #%1] Refusing to send a malformed article id").arg(_id));
+        // Counted the way a server-side loss is counted, so the PAR2 phase
+        // still closes and the run cannot wait for an answer never asked for.
+        _nzbCheck->missingArticle(_currentArticle);
+        _nzbCheck->articleChecked(_currentArticle);
+        _currentArticle.clear();
+    }
 
     if (!_currentArticle.isNull()) {
         if (_nzbCheck->debugMode())
@@ -390,11 +425,7 @@ void NntpCheckCon::_checkNextArticle()
 
         _postingState = PostingState::CHECKING_ARTICLE;
         _nbPar2Waits  = 0;
-        _send(QString("%1 %2\r\n")
-                      .arg(Nntp::STAT)
-                      .arg(_currentArticle)
-                      .toLocal8Bit()
-                      .constData());
+        _send(command);
     } else if (_nzbCheck->waitingForPar2()
                && _nbPar2Waits++ < _nzbCheck->socketTimeOut() / sPar2WaitMs) {
         // Nothing to hand out yet, but not because the run is over: the PAR2

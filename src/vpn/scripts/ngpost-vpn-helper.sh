@@ -607,10 +607,196 @@ elif has_unattributed_artifacts; then
     exit 3
 fi
 
+# ---------------------------------------------------------------------------
+# OpenVPN profile policy.
+#
+# This helper runs as root, and the Polkit rule lets the configured user reach
+# it without a password. The profile was the way through that boundary: the
+# `plugin` directive loads a shared library into the OpenVPN process, and it
+# does so whatever --script-security says -- scripts and plugins are separate
+# mechanisms, and only the first is governed by that option. Any process
+# running as the user could write a profile naming a library it controls.
+#
+# So the profile is not copied any more: it is regenerated from directives on a
+# whitelist, and anything absent from it is refused rather than passed through.
+# ngPost checks the same lists before it ever calls pkexec, which is where the
+# user gets a readable explanation; this copy is the one that defends the
+# boundary, because the helper must not trust its caller.
+#
+# These four lists are kept identical to src/vpn/OpenVpnConfigPolicy.cpp by
+# tests/unit/tst_OpenVpnConfigPolicy. Edit them together.
+OPENVPN_ALLOWED_DIRECTIVES="
+allow-compression auth auth-nocache auth-retry auth-user-pass block-outside-dns
+cipher client comp-lzo compress connect-retry connect-retry-max connect-timeout
+data-ciphers data-ciphers-fallback dev dev-type dhcp-option disable-occ
+explicit-exit-notify fast-io float fragment hand-window http-proxy
+http-proxy-retry http-proxy-timeout inactive keepalive key-direction link-mtu
+lport mssfix mute mute-replay-warnings ncp-ciphers ncp-disable nobind
+ns-cert-type opt-verify peer-fingerprint persist-key persist-remote-ip
+persist-tun ping ping-exit ping-restart ping-timer-rem port proto pull
+pull-filter rcvbuf redirect-gateway redirect-private remote remote-cert-eku
+remote-cert-ku remote-cert-tls remote-random remote-random-hostname reneg-bytes
+reneg-pkts reneg-sec resolv-retry route route-delay route-metric route-nopull
+rport server-poll-timeout sndbuf socket-flags socks-proxy socks-proxy-retry
+static-challenge suppress-timestamps tls-cipher tls-ciphersuites tls-client
+tls-version-max tls-version-min topology tran-window tun-mtu tun-mtu-extra verb
+verify-x509-name
+"
+
+# Their argument names a file. Inline is preferred; a plain sibling name is
+# accepted so a multi-file provider bundle still imports. Never a path: the
+# process reading it is root, and "ca /etc/shadow" would be a read primitive.
+OPENVPN_FILE_BEARING_DIRECTIVES="
+ca cert crl-verify dh extra-certs http-proxy-user-pass key pkcs12 secret
+tls-auth tls-crypt tls-crypt-v2
+"
+
+# Inline blocks whose body is an opaque blob -- PEM, a static key, a
+# fingerprint list. `connection` is absent on purpose: its body is more
+# directives, and it is validated line by line like the rest of the file.
+OPENVPN_INLINE_BLOB_TAGS="
+ca cert crl-verify dh extra-certs http-proxy-user-pass key peer-fingerprint
+pkcs12 secret tls-auth tls-crypt tls-crypt-v2
+"
+
+# Refused with a name of their own. Everything outside every list here is
+# refused too; these are the ones a profile does not carry by accident.
+OPENVPN_DENIED_DIRECTIVES="
+askpass auth-user-pass-verify capath cd chroot client-config-dir client-connect
+client-disconnect config daemon dev-node down down-pre engine group
+ifconfig-pool-persist ipchange iproute learn-address log log-append management
+management-client management-client-auth management-client-pf
+management-external-cert management-external-key management-hold
+management-query-passwords management-query-proxy management-query-remote
+management-signal management-up-down pkcs11-providers plugin providers
+route-pre-down route-up script-security setcon setenv setenv-safe status
+status-version tls-export-cert tls-verify tmp-dir up up-restart user writepid
+"
+
+#! Rewrite $1 in place, keeping only whitelisted directives. Non-zero, with the
+#! offending directive named on stderr, when the profile must be refused.
+sanitize_openvpn_profile() {
+    local profile=$1 sanitized="$1.sanitized" reason=""
+
+    # awk would silently truncate at a NUL, so a profile holding one is refused
+    # rather than half-read.
+    if [ "$(wc -c < "$profile")" != "$(tr -d '\000' < "$profile" | wc -c)" ]; then
+        terminal_error configuration "the OpenVPN profile contains binary data"
+        return 1
+    fi
+    if [ "$(wc -c < "$profile")" -gt 1048576 ]; then
+        terminal_error configuration "the OpenVPN profile is larger than a profile ever is"
+        return 1
+    fi
+
+    reason=$(awk \
+        -v ALLOWED="$OPENVPN_ALLOWED_DIRECTIVES" \
+        -v FILEB="$OPENVPN_FILE_BEARING_DIRECTIVES" \
+        -v BLOBS="$OPENVPN_INLINE_BLOB_TAGS" \
+        -v DENIED="$OPENVPN_DENIED_DIRECTIVES" '
+        function label(name) {
+            gsub(/[^A-Za-z0-9._-]/, "", name)
+            if (name == "") name = "unprintable"
+            return substr(name, 1, 32)
+        }
+        function fail(kind, name, line) {
+            printf("%s %s line %d", kind, label(name), line) > "/dev/stderr"
+            bad = 1
+            exit 1
+        }
+        function fill(list, set,   n, i, parts) {
+            n = split(list, parts, /[ \t\n]+/)
+            for (i = 1; i <= n; ++i) if (parts[i] != "") set[parts[i]] = 1
+        }
+        function unquote(s) {
+            gsub(/^["\047]|["\047]$/, "", s)
+            return s
+        }
+        BEGIN {
+            fill(ALLOWED, allowed); fill(FILEB, fileb)
+            fill(BLOBS, blob);      fill(DENIED, denied)
+            open = ""; openline = 0; inconn = 0; bad = 0
+        }
+        {
+            line = $0
+            sub(/\r$/, "", line)
+            gsub(/^[ \t]+|[ \t]+$/, "", line)
+
+            if (open != "") {
+                print line
+                if (tolower(line) == "</" open ">") open = ""
+                next
+            }
+            if (line == "" || line ~ /^#/ || line ~ /^;/) next
+
+            if (substr(line, 1, 1) == "<") {
+                if (substr(line, length(line), 1) != ">") fail("malformed-block", line, NR)
+                tag = tolower(substr(line, 2, length(line) - 2))
+                gsub(/^[ \t]+|[ \t]+$/, "", tag)
+                closing = (substr(tag, 1, 1) == "/")
+                name = closing ? substr(tag, 2) : tag
+                if (closing) {
+                    if (name == "connection" && inconn) { inconn = 0; print line; next }
+                    fail("unopened-block", name, NR)
+                }
+                if (name == "connection") {
+                    if (inconn) fail("nested-connection", name, NR)
+                    inconn = 1; print line; next
+                }
+                if (!(name in blob)) fail("unknown-block", name, NR)
+                open = name; openline = NR; print line; next
+            }
+
+            n = split(line, tok, /[ \t]+/)
+            d = unquote(tok[1])
+            while (d ~ /^--/) sub(/^--/, "", d)
+            d = tolower(d)
+
+            if (d in denied) fail("dangerous-directive", d, NR)
+            isfile = (d in fileb)
+            if (!isfile && !(d in allowed)) fail("unreviewed-directive", d, NR)
+            if (d == "auth-user-pass" && n > 1) fail("unsafe-argument", d, NR)
+            if (isfile) {
+                if (n < 2) fail("unsafe-argument", d, NR)
+                arg = unquote(tok[2])
+                # Same rule as OpenVpnConfigPolicy::isPlainSiblingName(): a
+                # plain name, no directory part, no traversal, and nothing a
+                # parser downstream would read back as an option.
+                if (arg !~ /^[A-Za-z0-9._-]+$/ || arg ~ /^-/ || arg == "." \
+                    || arg == ".." || length(arg) > 128) fail("unsafe-argument", d, NR)
+            }
+            print line
+        }
+        END {
+            if (bad) exit 1
+            if (open != "") fail("unclosed-block", open, openline)
+            if (inconn) fail("unclosed-connection", "connection", 0)
+        }
+    ' "$profile" 2>&1 >"$sanitized") || {
+        rm -f "$sanitized"
+        terminal_error configuration "OpenVPN profile refused: ${reason:-unparsable}"
+        return 1
+    }
+
+    mv -- "$sanitized" "$profile" || {
+        rm -f "$sanitized"
+        terminal_error internal "cannot install the sanitized OpenVPN profile"
+        return 1
+    }
+    chmod 0600 "$profile"
+    return 0
+}
+
 mkdir -p "$PRIVATE_DIR" || { terminal_error internal "cannot create private runtime directory"; exit 1; }
 chmod 0700 "$SESSION_DIR" "$PRIVATE_DIR" || { terminal_error internal "cannot secure private runtime directory"; exit 1; }
 cp -- "$CONFIG" "$SESSION_CONFIG" || { terminal_error configuration "cannot copy VPN config into volatile session"; exit 1; }
 chmod 0600 "$SESSION_CONFIG"
+# The session copy is what OpenVPN is handed, so it is the copy that gets
+# regenerated from the whitelist. Before the lease turns into a running root
+# process, and before anything reads a directive out of it.
+if [ "$ACTION" = openvpn ]; then
+    sanitize_openvpn_profile "$SESSION_CONFIG" || exit 1
+fi
 if [ -n "$AUTH_FILE" ] && [ -r "$AUTH_FILE" ]; then
     cp -- "$AUTH_FILE" "$SESSION_AUTH" || { terminal_error authentication "cannot copy authentication file"; exit 1; }
     chmod 0600 "$SESSION_AUTH"

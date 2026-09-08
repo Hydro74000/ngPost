@@ -9,6 +9,8 @@
 
 #include "PathHelper.h"
 
+#include "vpn/WindowsSecurity.h"
+
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -22,6 +24,7 @@
 #include <QThread>
 
 #include <algorithm>
+#include <utility>
 
 #if defined(Q_OS_UNIX)
 #  include <cerrno>
@@ -674,7 +677,103 @@ MigrationRun &migrationRun()
     return run;
 }
 
+//! Every bit that grants access to somebody other than the owner.
+//!
+//! Asked as "is anything beyond the owner set", never as an equality against
+//! the wanted mode: QFileInfo::permissions() also reports the *User* aliases
+//! (ReadUser, WriteUser, ExeUser) for the account the process runs as, so a
+//! file that is exactly 0600 never compares equal to ReadOwner|WriteOwner, and
+//! an equality test reads "still open" for ever.
+constexpr QFileDevice::Permissions kBeyondOwner =
+        QFileDevice::ReadGroup | QFileDevice::WriteGroup | QFileDevice::ExeGroup
+        | QFileDevice::ReadOther | QFileDevice::WriteOther | QFileDevice::ExeOther;
+
+//! True when \a info is reachable by an account other than its owner.
+bool isReadableBeyondOwner(QFileInfo const &info)
+{
+    return (info.permissions() & kBeyondOwner) != QFileDevice::Permissions();
+}
+
 } // namespace
+
+bool restrictToOwner(const QString &path)
+{
+    if (path.isEmpty())
+        return false;
+
+    QFileInfo const info(path);
+    if (!info.exists())
+        return false;
+
+    QFileDevice::Permissions ownerOnly = QFileDevice::ReadOwner | QFileDevice::WriteOwner;
+    if (info.isDir())
+        ownerOnly |= QFileDevice::ExeOwner; // a directory needs it to be entered
+
+    bool ok = !isReadableBeyondOwner(info) || QFile::setPermissions(path, ownerOnly);
+
+#ifdef Q_OS_WIN
+    // Qt maps the POSIX bits onto NTFS without touching the DACL, so the call
+    // above can report success while an ACE inherited from a portable folder
+    // or a shared volume still grants everyone read access. The DACL is what
+    // decides here; the result of the two is the honest answer.
+    ok = WindowsSecurity::protectCurrentUserOnly(path, info.isDir()) && ok;
+#endif
+
+    return ok;
+}
+
+SecretsHardeningResult hardenConfigSecrets()
+{
+    SecretsHardeningResult result;
+
+    QString const dir  = configDirPath();
+    QString const conf = dir + QStringLiteral("/ngPost.conf");
+
+    QStringList targets;
+    targets << dir << conf;
+
+    // Migrations and hand edits leave copies of the credentials beside the
+    // live file. They are exactly as sensitive and were never restricted.
+    QDir const configQDir(dir);
+    if (configQDir.exists()) {
+        QStringList const filters{ QStringLiteral("ngPost.conf.*"),
+                                   QStringLiteral("ngPost.conf") };
+        for (QFileInfo const &sibling :
+             configQDir.entryInfoList(filters, QDir::Files | QDir::Hidden)) {
+            QString const path = sibling.absoluteFilePath();
+            if (!targets.contains(path))
+                targets << path;
+        }
+    }
+
+    for (QString const &path : std::as_const(targets)) {
+        QFileInfo const info(path);
+        if (!info.exists())
+            continue;
+
+        // Reading the mode back is what separates "ngPost had to fix this" from
+        // "it was already private". On Windows that reading says nothing about
+        // the DACL, so the call is made either way and only a failure is worth
+        // a word: reporting a repair on every start would be noise.
+        bool const wasOpen = isReadableBeyondOwner(info);
+        if (!wasOpen) {
+#ifndef Q_OS_WIN
+            continue;
+#endif
+        }
+
+        if (!restrictToOwner(path)) {
+            result.unrepairable << QStringLiteral("%1: %2").arg(
+                    path,
+                    QStringLiteral("ngPost cannot restrict it to you here; move the "
+                                   "configuration onto a filesystem that carries ownership"));
+        } else if (wasOpen) {
+            result.repaired << path;
+        }
+    }
+
+    return result;
+}
 
 QString configDirPath()
 {
@@ -690,7 +789,18 @@ QString configDirPath()
 QString configDir()
 {
     const QString d = configDirPath();
+    bool const wasAbsent = !QFileInfo::exists(d);
     QDir().mkpath(d);
+    // mkpath() applies the umask, so a fresh folder is typically 0755 and its
+    // ngPost.conf -- NNTP and proxy credentials, the fixed archive password --
+    // is listable by every other account on the machine. Restrict it the way
+    // vpnRuntimeDir() already restricts its own. Only on creation: repairing an
+    // existing installation is hardenConfigSecrets()' job, once, at startup,
+    // where the outcome can be reported instead of silently retried on every
+    // single call to this function. A no-op when mkpath() failed: there is then
+    // no folder to restrict, and restrictToOwner() says so.
+    if (wasAbsent)
+        restrictToOwner(d);
     return d;
 }
 

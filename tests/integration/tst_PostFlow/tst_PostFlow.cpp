@@ -31,10 +31,12 @@
 #include <QStandardPaths>
 #include <QXmlStreamReader>
 
+#include "Fixtures.h"
 #include "history/PostHistoryStore.h"
 #include "MockNntpServer.h"
 #include "TestEnv.h"
 
+using ngpost::tests::fixturesDir;
 using ngpost::tests::HomeSandbox;
 using ngpost::tests::MockNntpServer;
 using ngpost::tests::locateNgPostBinary;
@@ -211,6 +213,18 @@ private slots:
     //! bytes of the archive and its parity, WITHOUT the .nfo copied next to
     //! the rar volumes, and the private metadata must not reach the nzb.
     void post_info_file_reports_archive_and_par2_size_only();
+
+    //! An nzb is an untrusted document. A segment whose message-id carries an
+    //! XML-encoded CR/LF used to append a second command to an already
+    //! authenticated NNTP session; the server must see one STAT, for the one
+    //! well-formed segment, and never the injected id.
+    void check_hostile_nzb_sends_one_stat_only();
+
+    //! rar takes its password glued to the switch (-hp<pass>), so it is an
+    //! ordinary argv entry, and the line that logs the command used to print
+    //! it -- in CLI mode, not only under --debug. A job output pasted into a
+    //! bug report carried the archive password with it.
+    void archive_password_never_reaches_the_output();
 };
 
 void TestPostFlow::initTestCase()
@@ -992,6 +1006,152 @@ void TestPostFlow::post_info_file_reports_archive_and_par2_size_only()
     const QString nzbContent = QString::fromUtf8(nzb.readAll());
     QVERIFY2(nzbContent.contains(QStringLiteral("<meta type=\"titre\">")), qPrintable(nzbContent));
     QVERIFY2(!nzbContent.contains(QStringLiteral("326598")), "private metadata leaked into the nzb");
+#endif
+}
+
+void TestPostFlow::check_hostile_nzb_sends_one_stat_only()
+{
+    HomeSandbox    sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    const QString hostile = fixturesDir() + QStringLiteral("/nzb/hostile_crlf_segment.nzb");
+    QVERIFY2(QFile::exists(hostile), qPrintable(hostile));
+
+    // A config file rather than -S: checking needs a server with nzbcheck on,
+    // which the shorthand cannot express.
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/ngPost.conf");
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "[server]\n"
+          << "host = 127.0.0.1\n"
+          << "port = " << mock.port() << "\n"
+          << "ssl = false\n"
+          << "connection = 1\n"
+          << "enabled = true\n"
+          << "nzbcheck = true\n";
+    }
+
+    const QStringList args = {
+        "-c", confPath,
+        "--check", hostile,
+        // The refused segment counts as missing, and with no PAR2 in this nzb
+        // the check would otherwise stop right there -- correctly, since
+        // nothing could repair it -- and never reach the well-formed segment
+        // this test is about.
+        "--check_full",
+        "--disp_progress", "none",
+    };
+
+    QString   out;
+    const int exitCode = runNgPost(_bin, args, sandbox.rootPath(), out);
+    // 0 = all present, 1 = something missing, 2 = missing beyond repair. The
+    // refused segment makes it one of the last two; what the test is really
+    // asserting is what reached the socket.
+    QVERIFY2(exitCode >= 0 && exitCode <= 2,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    QFile log(mock.logFile());
+    QVERIFY(log.open(QIODevice::ReadOnly));
+    const QString serverLog = QString::fromUtf8(log.readAll());
+
+    const QStringList statLines = serverLog.split(QLatin1Char('\n')).filter(
+            QStringLiteral("STAT <"));
+    QVERIFY2(statLines.size() == 1,
+             qPrintable(QStringLiteral("expected exactly one STAT, got %1:\n%2")
+                                .arg(statLines.size())
+                                .arg(serverLog)));
+    QVERIFY2(statLines.first().contains(QStringLiteral("legit-segment@ngpost.test")),
+             qPrintable(statLines.first()));
+    QVERIFY2(!serverLog.contains(QStringLiteral("injected@ngpost.test")),
+             qPrintable(QStringLiteral("the injected command reached the server:\n%1")
+                                .arg(serverLog)));
+    // A 500 would mean the extra line was written and merely not understood.
+    QVERIFY2(!serverLog.contains(QStringLiteral("unknown command")),
+             qPrintable(serverLog));
+    QVERIFY2(out.contains(QStringLiteral("malformed article id")),
+             qPrintable(QStringLiteral("the rejection was not reported to the user:\n%1").arg(out)));
+}
+
+void TestPostFlow::archive_password_never_reaches_the_output()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("the fake rar tool is a shell script");
+#else
+    HomeSandbox    sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    const QString root = sandbox.rootPath();
+
+    // The stand-in records the arguments it was handed, so the test can prove
+    // the password really was passed to the archiver and is therefore missing
+    // from the output because it was masked, not because it was never used.
+    const QString argsDump = root + QStringLiteral("/rar-args.txt");
+    QVERIFY(writeFakeTool(root + "/fakerar",
+                          QStringLiteral("#!/bin/sh\n"
+                                         "printf '%s\\n' \"$@\" > '%1'\n"
+                                         "for a in \"$@\"; do case \"$a\" in *.rar) t=\"$a\";; esac; done\n"
+                                         "head -c 4096 /dev/zero > \"$t\"\n"
+                                         "exit 0\n")
+                                  .arg(argsDump)));
+
+    const QString inPath = root + QStringLiteral("/secret-payload.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write(QByteArray(2048, 'x'));
+    }
+
+    const QString nzbDir = root + QStringLiteral("/nzb");
+    QVERIFY(QDir().mkpath(nzbDir));
+
+    // Distinctive enough that finding it anywhere in the output is unambiguous.
+    const QString secret   = QStringLiteral("Zq7-CANARY-passphrase-9xK");
+    const QString confPath = root + QStringLiteral("/ngPost.conf");
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "nzbPath = " << nzbDir << "\n"
+          << "TMP_DIR = " << root << "\n"
+          << "RAR_PATH = " << root << "/fakerar\n"
+          << "RAR_PASS = " << secret << "\n"
+          << "PACK = compress\n"
+          << "[server]\n"
+          << "host = 127.0.0.1\n"
+          << "port = " << mock.port() << "\n"
+          << "ssl = false\n"
+          << "connection = 1\n"
+          << "enabled = true\n"
+          << "nzbcheck = false\n";
+    }
+
+    // No --quiet and no --debug: the plain CLI run, which is the branch that
+    // used to print the whole argument list because _postWidget is null.
+    QString   out;
+    const int code = runNgPost(_bin,
+                               { "-c", confPath, "-i", inPath,
+                                 "-g", "alt.binaries.test",
+                                 "--pack",
+                                 "--disp_progress", "none" },
+                               sandbox.rootPath(), out);
+    QVERIFY2(code == 0, qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(code).arg(out)));
+
+    QFile dump(argsDump);
+    QVERIFY2(dump.open(QIODevice::ReadOnly), qPrintable(out));
+    const QString rarArgs = QString::fromUtf8(dump.readAll());
+    QVERIFY2(rarArgs.contains(QStringLiteral("-hp") + secret),
+             qPrintable(QStringLiteral("the password never reached rar, so this test proves "
+                                       "nothing. Args were:\n%1").arg(rarArgs)));
+
+    QVERIFY2(!out.contains(secret),
+             qPrintable(QStringLiteral("the archive password reached the CLI output:\n%1").arg(out)));
+    QVERIFY2(out.contains(QStringLiteral("-hp********")),
+             qPrintable(QStringLiteral("the command line was logged without the mask, so this "
+                                       "test is not looking at the line it thinks:\n%1").arg(out)));
 #endif
 }
 

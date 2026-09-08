@@ -540,10 +540,18 @@ void NntpConnection::onReadyRead()
                 } else {
                     _postingState = PostingState::AUTH_USER;
 
-                    std::string cmd(Nntp::AUTHINFO_USER);
-                    cmd += _srvParams.user;
-                    cmd += Nntp::ENDLINE;
-                    _socket->write(cmd.c_str());
+                    QByteArray const cmd = Nntp::authInfoUser(_srvParams.user);
+                    if (cmd.isEmpty()) {
+                        emit errorConnecting(
+                                tr("[Connection #%1] The configured user for %2:%3 contains a "
+                                   "line break and cannot be sent")
+                                        .arg(_id)
+                                        .arg(_srvParams.host)
+                                        .arg(_srvParams.port));
+                        _closeConnection();
+                        return;
+                    }
+                    _socket->write(cmd);
                 }
             }
         } else if (_postingState == PostingState::AUTH_USER) {
@@ -572,10 +580,18 @@ void NntpConnection::onReadyRead()
                 // Continue authentication : send pass info
                 _postingState = PostingState::AUTH_PASS;
 
-                std::string cmd(Nntp::AUTHINFO_PASS);
-                cmd += _srvParams.pass;
-                cmd += Nntp::ENDLINE;
-                _socket->write(cmd.c_str());
+                QByteArray const cmd = Nntp::authInfoPass(_srvParams.pass);
+                if (cmd.isEmpty()) {
+                    emit errorConnecting(
+                            tr("[Connection #%1] The configured password for %2:%3 contains a "
+                               "line break and cannot be sent")
+                                    .arg(_id)
+                                    .arg(_srvParams.host)
+                                    .arg(_srvParams.port));
+                    _closeConnection();
+                    return;
+                }
+                _socket->write(cmd);
             }
         } else if (_postingState == PostingState::AUTH_PASS) {
             if (strncmp(line.constData(), Nntp::getResponse(281), 2) != 0) {

@@ -4572,6 +4572,18 @@ QString NgPost::parseDefaultConfig()
 
     QString conf = PathHelper::configFilePath();
 
+    // After the migrations, so the copies they just made are covered too, and
+    // before anything reads the credentials out of the file. An installation
+    // predating this is left at whatever mode it was first written with --
+    // 0644 under a standard umask, and there are 0777 ones in the wild.
+    PathHelper::SecretsHardeningResult const hardening = PathHelper::hardenConfigSecrets();
+    for (QString const &path : hardening.repaired)
+        _log(tr("Restricted '%1' to your account: it holds your credentials and was "
+                "readable by other users of this machine")
+                     .arg(path));
+    for (QString const &problem : hardening.unrepairable)
+        _error(tr("Warning: %1").arg(problem));
+
     QString err;
     QFileInfo defaultConf(conf);
     if (defaultConf.exists() && defaultConf.isFile())
@@ -5180,6 +5192,14 @@ void NgPost::saveConfig()
             _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
             return;
         }
+        // QSaveFile keeps the permissions of the file it replaced, and gives a
+        // brand new one 0666 minus the umask. Either way it is the NNTP and
+        // proxy credentials plus the fixed archive password sitting in a file
+        // every other account on this machine can read.
+        if (!PathHelper::restrictToOwner(conf))
+            _error(tr("Warning: '%1' holds your credentials but could not be restricted to "
+                      "you; anyone with an account on this machine may be able to read it")
+                           .arg(conf));
         _log(tr("the config '%1' file has been updated").arg(conf));
     }
     else

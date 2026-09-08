@@ -131,9 +131,12 @@ size_t NntpArticle::yEncWorstCaseSize(qint64 nbBytes)
 
 void NntpArticle::yEncBody(const char data[])
 {
+    // The yEnc name closes the =ybegin line, so a file name holding a CR or an
+    // LF would forge the rest of that line -- and the decoder's idea of what
+    // it is writing to disk -- on its own.
     std::string const filename = _obfuscateArticles
                                          ? generateRandomString(generateRandomStringLength(32, 62))
-                                         : _nntpFile->fileName();
+                                         : Nntp::sanitizedHeaderValue(_nntpFile->fileName());
 
     // The body is built in place, in a single allocation: the =ybegin/=ypart
     // lines first, then Yenc::encode writing straight behind them, then the
@@ -246,10 +249,15 @@ std::string NntpArticle::header(const std::string &idSignature) const
 #else
     QByteArray msgId = _id.toByteArray();
 #endif
+    // Sanitised at the point of emission, not at the point of configuration:
+    // a From or a Newsgroups comes from ngPost.conf and a Subject from a file
+    // name, and a Unix file name is free to hold a CR or an LF. Unsanitised,
+    // one such byte ends the header line and turns the rest into a header --
+    // or into a body -- of the attacker's choosing.
     std::stringstream ss;
-    ss << "From: "        << (_from == nullptr ? NgPost::randomStdFrom() : *_from)    << Nntp::ENDLINE
-       << "Newsgroups: "  << _nntpFile->groups()  << Nntp::ENDLINE
-       << "Subject: "     << (_subject == nullptr ? msgId.constData() : _subject) << Nntp::ENDLINE
+    ss << "From: "        << Nntp::sanitizedHeaderValue(_from == nullptr ? NgPost::randomStdFrom() : *_from) << Nntp::ENDLINE
+       << "Newsgroups: "  << Nntp::sanitizedHeaderValue(_nntpFile->groups())  << Nntp::ENDLINE
+       << "Subject: "     << Nntp::sanitizedHeaderValue(_subject == nullptr ? msgId.constData() : _subject) << Nntp::ENDLINE
        << "Message-ID: <" << msgId.constData() << "@" << idSignature << ">" << Nntp::ENDLINE
        << Nntp::ENDLINE;
     _msgId = QString("%1@%2").arg(QString::fromUtf8(msgId.constData()), QString::fromStdString(idSignature));

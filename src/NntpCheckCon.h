@@ -41,7 +41,11 @@ private:
 
     //! Write a command and arm the watchdog. Every write goes through here:
     //! a command sent without arming is a command that can hang for ever.
-    void _send(const char *cmd);
+    //! Send one command, already serialised by Nntp. An empty array is that
+    //! serialiser's refusal and never reaches the socket. There is deliberately
+    //! no raw overload beside it: every command on this connection is built in
+    //! one place, so exactly one CRLF ends each of them.
+    void _send(QByteArray const &cmd);
 
     enum class PostingState {
         NOT_CONNECTED = 0,

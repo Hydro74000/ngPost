@@ -27,6 +27,7 @@
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
 #include "postinfo/PostInfoTemplate.h"
+#include "utils/SecretMasker.h"
 #ifdef __USE_HMI__
 #include "hmi/PostingWidget.h"
 #endif
@@ -2231,12 +2232,14 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
         args << "-r";
 
     // 3.: launch rar
+    // SecretMasker, not join(): -p/-hp carry the archive password, and this
+    // branch is taken in CLI mode as well as under --debug.
     if (_ngPost->debugMode() || !_postWidget)
         _log(QString("[%1] %2: %3 %4\n")
                  .arg(timestamp())
                  .arg(tr("Compressing files"))
                  .arg(cmdRar)
-                 .arg(args.join(" ")));
+                 .arg(SecretMasker::maskedArgs(args)));
     else
         _log(QString("%1...\n").arg(tr("Compressing files")));
     _limitProcDisplay = false;
@@ -2404,7 +2407,7 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
                  .arg(timestamp())
                  .arg(tr("Generating par2"))
                  .arg(_ngPost->_par2Path)
-                 .arg(args.join(" ")));
+                 .arg(SecretMasker::maskedArgs(args)));
     else
         _log(QString("%1...\n").arg(tr("Generating par2")));
     _limitProcDisplay = true;

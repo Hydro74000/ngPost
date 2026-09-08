@@ -60,6 +60,11 @@ private slots:
 
 private:
     void _handleLine(QString const &line);
+
+    //! Refuse a profile carrying anything OpenVpnConfigPolicy has not reviewed,
+    //! reporting which directive and why. The privileged helper repeats this
+    //! check on its own side; this one exists so the user gets the reason.
+    bool _profilePassesPolicy(QString const &configPath);
 #ifdef Q_OS_WIN
     bool _startWindowsViaInteractiveService(QString const &configPath,
                                             QString const &authFilePath);

@@ -20,6 +20,7 @@
 
 #include "NzbCheck.h"
 #include "NntpCheckCon.h"
+#include "nntp/Nntp.h"
 #include "nntp/NntpServerParams.h"
 #include <cmath>
 #include <limits>
@@ -388,13 +389,30 @@ int NzbCheck::parseNzb()
                         break;
                     } else if (type == QXmlStreamReader::TokenType::StartElement
                                && xmlReader.name().compare(QLatin1String("segment")) == 0) {
-                        ++nbArticles;
                         bool bytesOk = false;
                         qint64 const encodedBytes
                                 = xmlReader.attributes().value("bytes").toLongLong(&bytesOk);
                         xmlReader.readNext();
                         QString const articleId = QString("<%1>").arg(
                                 xmlReader.text().toString());
+                        // An nzb is an untrusted document, and an XML entity is
+                        // free to encode a CR/LF inside a segment. Such an id
+                        // would have been pasted straight into "stat <id>" and
+                        // added a second command to an authenticated session.
+                        // Leave it out of the queue entirely; not counting it
+                        // as listed makes the accounting below treat it exactly
+                        // like an article the nzb never named, which is what it
+                        // now is -- nothing here can be checked against a server.
+                        if (!Nntp::isValidMessageId(articleId)) {
+                            _cerr << tr("- rejected a malformed article id in '%1' "
+                                        "(nzb line %2); it cannot be checked")
+                                             .arg(subject)
+                                             .arg(xmlReader.lineNumber())
+                                  << "\n"
+                                  << MB_FLUSH;
+                            continue;
+                        }
+                        ++nbArticles;
                         if (isPar2) {
                             _par2Queue.push(articleId);
                             _articleOwner.insert(articleId, volumeIdx);

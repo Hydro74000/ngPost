@@ -113,10 +113,12 @@ SOURCES += \
         $$PWD/postinfo/PostInfoTemplate.cpp \
         $$PWD/utils/CmdOrGuiApp.cpp \
         $$PWD/utils/PathHelper.cpp \
+        $$PWD/utils/SecretMasker.cpp \
         $$PWD/utils/UpdateChecker.cpp \
         $$PWD/utils/Yenc.cpp \
         $$PWD/vpn/VpnDnsResolver.cpp \
         $$PWD/vpn/OpenVpnBackend.cpp \
+        $$PWD/vpn/OpenVpnConfigPolicy.cpp \
         $$PWD/vpn/VpnManager.cpp \
         $$PWD/vpn/VpnProfile.cpp \
         $$PWD/vpn/VpnProtocol.cpp \
@@ -150,10 +152,12 @@ HEADERS += \
     $$PWD/utils/Macros.h \
     $$PWD/utils/PathHelper.h \
     $$PWD/utils/PureStaticClass.h \
+    $$PWD/utils/SecretMasker.h \
     $$PWD/utils/UpdateChecker.h \
     $$PWD/utils/Yenc.h \
     $$PWD/vpn/VpnDnsResolver.h \
     $$PWD/vpn/OpenVpnBackend.h \
+    $$PWD/vpn/OpenVpnConfigPolicy.h \
     $$PWD/vpn/VpnBackend.h \
     $$PWD/vpn/VpnManager.h \
     $$PWD/vpn/VpnPlatform.h \

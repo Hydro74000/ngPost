@@ -2,7 +2,9 @@
 //========================================================================
 //
 // tst_PathHelper.cpp — XDG / appdata directory resolution, vpn dir layout,
-// non-destructive legacy config migration.
+// non-destructive legacy config migration, and the permissions that keep the
+// configuration -- NNTP and proxy credentials, the fixed archive password --
+// out of reach of the other accounts on the machine.
 //
 //========================================================================
 
@@ -227,6 +229,20 @@ private slots:
 
     //! vpnDir() is "<configDir>/vpn" and is created on demand.
     void vpnDir_subdir_of_configDir_and_created();
+
+    //! A config folder ngPost creates is 0700, not the 0755 the umask gives.
+    void configDir_is_created_owner_only();
+
+    //! restrictToOwner() narrows a file to 0600 and a directory to 0700.
+    void restrictToOwner_narrows_files_and_directories();
+
+    //! The repair pass for installations created before any of this: a 0644 --
+    //! or 0777 -- ngPost.conf and its migration backups are tightened, and
+    //! what it changed is reported so the user learns it had been exposed.
+    void hardenConfigSecrets_repairs_an_existing_installation();
+
+    //! Nothing to repair reports nothing: a second start must be silent.
+    void hardenConfigSecrets_is_quiet_when_already_private();
 
     //! vpnRuntimeDir() must NOT have a leading dot in its final segment
     //! (regression guard for the Windows openvpn breakage fixed in 31c4a8c).
@@ -1117,6 +1133,149 @@ void TestPathHelper::marker_remembers_where_the_config_came_from()
     }
     QCOMPARE(PathHelper::adoptedLegacyConfigDir(), QDir::cleanPath(legacy));
     QVERIFY(PathHelper::adoptedLegacyHistoryPath().isEmpty());
+}
+
+#if defined(Q_OS_UNIX)
+namespace
+{
+//! The permission bits of \a path, or -1 when it cannot be read.
+int posixMode(QString const &path)
+{
+    struct stat st;
+    if (::stat(path.toLocal8Bit().constData(), &st) != 0)
+        return -1;
+    return st.st_mode & 07777;
+}
+}
+#endif
+
+void TestPathHelper::configDir_is_created_owner_only()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX modes; the Windows side is a DACL and is not observable here");
+#else
+    HomeSandbox sandbox;
+
+    // HomeSandbox creates the config folder itself, and configDir() only
+    // restricts the folder it created -- repairing an existing one is
+    // hardenConfigSecrets()' job, once, where it can be reported. Take the
+    // folder away so this call really is the creating one.
+    const QString dir = PathHelper::configDirPath();
+    QVERIFY(QDir(dir).removeRecursively());
+    QVERIFY(!QFileInfo::exists(dir));
+
+    QCOMPARE(PathHelper::configDir(), dir);
+    QVERIFY(QFileInfo(dir).isDir());
+    QCOMPARE(posixMode(dir), 0700);
+#endif
+}
+
+void TestPathHelper::restrictToOwner_narrows_files_and_directories()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX modes; the Windows side is a DACL and is not observable here");
+#else
+    HomeSandbox   sandbox;
+    const QString root = PathHelper::configDir();
+
+    const QString file = root + QStringLiteral("/open.conf");
+    {
+        QFile f(file);
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        f.write("password = hunter2\n");
+    }
+    QVERIFY(QFile::setPermissions(file,
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                          | QFileDevice::ReadGroup
+                                          | QFileDevice::ReadOther));
+    QCOMPARE(posixMode(file), 0644);
+    QVERIFY(PathHelper::restrictToOwner(file));
+    QCOMPARE(posixMode(file), 0600);
+
+    const QString dir = root + QStringLiteral("/open-dir");
+    QVERIFY(QDir().mkpath(dir));
+    QVERIFY(QFile::setPermissions(dir,
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                          | QFileDevice::ExeOwner | QFileDevice::ReadGroup
+                                          | QFileDevice::ExeGroup | QFileDevice::ReadOther
+                                          | QFileDevice::ExeOther));
+    QCOMPARE(posixMode(dir), 0755);
+    QVERIFY(PathHelper::restrictToOwner(dir));
+    QCOMPARE(posixMode(dir), 0700);
+
+    // A path that is not there is a failure, not a silent success: the caller
+    // must never read "restricted" as "there is nothing to worry about".
+    QVERIFY(!PathHelper::restrictToOwner(root + QStringLiteral("/not-here")));
+    QVERIFY(!PathHelper::restrictToOwner(QString()));
+#endif
+}
+
+void TestPathHelper::hardenConfigSecrets_repairs_an_existing_installation()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX modes; the Windows side is a DACL and is not observable here");
+#else
+    HomeSandbox   sandbox;
+    const QString dir  = PathHelper::configDir();
+    const QString conf = PathHelper::configFilePath();
+
+    // What an installation created before this looks like: the folder listable
+    // by everyone, and a config file that a migration left world writable.
+    auto write = [](QString const &path, QFileDevice::Permissions mode) {
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        f.write("PROXY_SOCKS5 = user:pass@10.0.0.1:1080\n");
+        f.close();
+        QVERIFY(QFile::setPermissions(path, mode));
+    };
+
+    const QString backup = dir + QStringLiteral("/ngPost.conf.bak");
+    write(conf, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ReadGroup
+                        | QFileDevice::WriteGroup | QFileDevice::ReadOther
+                        | QFileDevice::WriteOther);
+    write(backup, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ReadGroup
+                          | QFileDevice::ReadOther);
+    QVERIFY(QFile::setPermissions(dir,
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                          | QFileDevice::ExeOwner | QFileDevice::ReadGroup
+                                          | QFileDevice::ExeGroup | QFileDevice::ReadOther
+                                          | QFileDevice::ExeOther));
+    QCOMPARE(posixMode(conf), 0666);
+    QCOMPARE(posixMode(backup), 0644);
+    QCOMPARE(posixMode(dir), 0755);
+
+    const PathHelper::SecretsHardeningResult result = PathHelper::hardenConfigSecrets();
+
+    QCOMPARE(posixMode(dir), 0700);
+    QCOMPARE(posixMode(conf), 0600);
+    QCOMPARE(posixMode(backup), 0600);
+    QVERIFY(result.unrepairable.isEmpty());
+    // The user is told, once, that these had been readable by other accounts.
+    QVERIFY2(result.repaired.contains(dir), qPrintable(result.repaired.join(QLatin1Char(' '))));
+    QVERIFY2(result.repaired.contains(conf), qPrintable(result.repaired.join(QLatin1Char(' '))));
+    QVERIFY2(result.repaired.contains(backup), qPrintable(result.repaired.join(QLatin1Char(' '))));
+#endif
+}
+
+void TestPathHelper::hardenConfigSecrets_is_quiet_when_already_private()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX modes; the Windows side is a DACL and is not observable here");
+#else
+    HomeSandbox sandbox;
+    PathHelper::configDir();
+    {
+        QFile f(PathHelper::configFilePath());
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Text));
+        f.write("lang = EN\n");
+    }
+
+    // The first start repairs whatever the installation had; every start after
+    // it must find nothing to say, or the same warning would greet the user for
+    // ever.
+    PathHelper::hardenConfigSecrets();
+    QVERIFY(PathHelper::hardenConfigSecrets().isClean());
+#endif
 }
 
 QTEST_APPLESS_MAIN(TestPathHelper)

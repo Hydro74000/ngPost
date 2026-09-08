@@ -9,6 +9,8 @@
 
 #include "OpenVpnBackend.h"
 
+#include "OpenVpnConfigPolicy.h"
+
 #include "VpnManager.h"
 #include "VpnProtocol.h"
 #include "utils/PathHelper.h"
@@ -116,6 +118,32 @@ OpenVpnBackend::~OpenVpnBackend()
 #endif
 }
 
+bool OpenVpnBackend::_profilePassesPolicy(QString const &configPath)
+{
+    OpenVpnConfigPolicy::Verdict const verdict = OpenVpnConfigPolicy::inspectFile(configPath);
+    if (verdict.isAccepted())
+        return true;
+
+    QString detail;
+    if (verdict.lineNumber > 0 && !verdict.directive.isEmpty())
+        detail = tr("'%1' on line %2: %3")
+                         .arg(verdict.directive)
+                         .arg(verdict.lineNumber)
+                         .arg(verdict.reason);
+    else if (!verdict.directive.isEmpty())
+        detail = tr("'%1': %2").arg(verdict.directive, verdict.reason);
+    else
+        detail = verdict.reason;
+
+    _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                         VpnFailureKind::Configuration,
+                         tr("This OpenVPN profile was refused because ngPost starts OpenVPN with "
+                            "system privileges and only hands it directives it has reviewed.\n\n"
+                            "%1\n\nProfile: %2")
+                                 .arg(detail, configPath));
+    return false;
+}
+
 bool OpenVpnBackend::start(QString const &configPathPacked)
 {
     _resetRunState();
@@ -137,6 +165,8 @@ bool OpenVpnBackend::start(QString const &configPathPacked)
                                  tr("Config file not found or unreadable: %1").arg(cfg));
             return false;
         }
+        if (!_profilePassesPolicy(fi.absoluteFilePath()))
+            return false;
         return _startWindowsViaInteractiveService(fi.absoluteFilePath(), auth);
     }
 #elif !defined(Q_OS_LINUX)
@@ -171,6 +201,13 @@ bool OpenVpnBackend::start(QString const &configPathPacked)
                              tr("Config file not found or unreadable: %1").arg(configPath));
         return false;
     }
+
+    // Before pkexec, not after: the helper checks this again -- it is the side
+    // that must not trust ngPost -- but refusing here means the user reads what
+    // is wrong with their profile instead of an authentication prompt followed
+    // by a failure.
+    if (!_profilePassesPolicy(fi.absoluteFilePath()))
+        return false;
 
     QString helper = VpnManager::helperScriptPath();
     if (helper.isEmpty()) {

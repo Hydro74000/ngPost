@@ -10,6 +10,7 @@ SUBDIRS = \
     tst_PostHistory \
     tst_PostInfoTemplate \
     tst_VpnProfile \
+    tst_OpenVpnConfigPolicy \
     tst_CliParser \
     tst_FoldersMonitor \
     tst_UpdateChecker \

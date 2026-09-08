@@ -22,8 +22,13 @@
 #define NNTP_H
 
 #include "utils/PureStaticClass.h"
+
+#include <QByteArray>
+#include <QString>
+
 #include <map>
 #include <regex>
+#include <string>
 
 /*!
  * \brief Pure Static class (no instance) to hold Nntp Protocol actions/responses...
@@ -38,9 +43,40 @@ public:
     static constexpr const char* ENDLINE       {"\r\n"};
     static constexpr const char* STAT          {"stat"};
 
+    //! RFC 3977 caps a message-id at 250 octets, angle brackets included.
+    //! Anything longer is a malformed nzb, not an article somebody can post.
+    static constexpr int MAX_MSG_ID_LEN {250};
 
     //! return the response associated to a certain code
     static const char* getResponse(unsigned short aCode);
+
+    // ---- Command serialisation -----------------------------------------
+    //
+    // Every command ngPost puts on the wire is built here, and every one of
+    // these returns either a single CRLF-terminated line or nothing at all.
+    // Building them at the call site is what let a message-id carrying an
+    // encoded CR/LF -- an nzb is an untrusted document -- append a second
+    // command to an already authenticated session.
+
+    //! True when \a messageId may be sent as a command argument: bracketed,
+    //! printable US-ASCII, no space, no inner bracket, no control character,
+    //! and within MAX_MSG_ID_LEN.
+    static bool isValidMessageId(QString const &messageId);
+
+    //! "stat <message-id>\r\n", or an empty array when \a messageId would not
+    //! survive isValidMessageId().
+    static QByteArray statCommand(QString const &messageId);
+
+    //! "authinfo user <user>\r\n" / "authinfo pass <pass>\r\n", or an empty
+    //! array when the credential carries a byte that would end the line early.
+    //! Credentials come from the configuration file, which is edited by hand.
+    static QByteArray authInfoUser(std::string const &user);
+    static QByteArray authInfoPass(std::string const &pass);
+
+    //! \a value with every byte that could end a header line, or forge a new
+    //! one, replaced. For Subject, From, Newsgroups and the yEnc name, whose
+    //! content comes from file names and from the configuration.
+    static std::string sanitizedHeaderValue(std::string const &value);
 
 private:
     static const std::map<unsigned short, const char *> sResponses; //!< Responses map
