@@ -75,6 +75,28 @@ bool hasWindowsActivity(bool servicePipeConnected,
 {
     return servicePipeConnected || hasManagementSocket || retryTimerActive;
 }
+
+char const kMgmtPasswordPrompt[]   = "ENTER PASSWORD:";
+int const  kMgmtPasswordPromptSize = int(sizeof(kMgmtPasswordPrompt)) - 1;
+
+//! openvpn writes its management password prompt without a trailing newline, so
+//! a reader that only ever cuts on '\n' waits for a line openvpn will never
+//! send: the connection sits on "authenticating" for ever. Give the prompt the
+//! newline it lacks, in place, and it leaves by the same door as every other
+//! management line -- one code path answers it, and whatever sits around it in
+//! the buffer is left untouched. Consuming the prompt instead would take
+//! everything before it along, and a line preceding a re-prompt is precisely
+//! what says why the first password was refused.
+void terminateMgmtPasswordPrompt(QByteArray &buffer)
+{
+    auto const idx = buffer.indexOf(kMgmtPasswordPrompt);
+    if (idx < 0)
+        return;
+    auto const end = idx + kMgmtPasswordPromptSize;
+    if (end < buffer.size() && (buffer.at(end) == '\n' || buffer.at(end) == '\r'))
+        return; // already a line of its own
+    buffer.insert(end, '\n');
+}
 #endif
 }
 
@@ -343,6 +365,11 @@ bool OpenVpnBackend::windowsActivityForTest(bool servicePipeConnected,
                                             bool retryTimerActive)
 {
     return hasWindowsActivity(servicePipeConnected, hasManagementSocket, retryTimerActive);
+}
+
+void OpenVpnBackend::terminateMgmtPasswordPromptForTest(QByteArray &buffer)
+{
+    terminateMgmtPasswordPrompt(buffer);
 }
 #endif
 
@@ -758,6 +785,13 @@ void OpenVpnBackend::onWinMgmtReadyRead()
 {
     if (!_winMgmt) return;
     _winMgmtBuffer.append(_winMgmt->readAll());
+
+    // Only while the prompt is still expected: afterwards the same bytes can
+    // legitimately appear inside a >LOG: line, and splitting one in two would
+    // be a new bug of the same family.
+    if (!_winMgmtAuthenticated)
+        terminateMgmtPasswordPrompt(_winMgmtBuffer);
+
     int nl;
     while ((nl = _winMgmtBuffer.indexOf('\n')) >= 0) {
         QByteArray line = _winMgmtBuffer.left(nl).trimmed();
@@ -769,9 +803,13 @@ void OpenVpnBackend::onWinMgmtReadyRead()
 
 void OpenVpnBackend::_parseMgmtLine(QString const &line)
 {
-    if (line.startsWith(QLatin1String("ENTER PASSWORD:"))) {
-        if (_winMgmt)
+    if (line.startsWith(QLatin1String(kMgmtPasswordPrompt))) {
+        if (_winMgmt) {
             _winMgmt->write(_winMgmtPassword.toUtf8() + '\n');
+            // openvpn answers nothing until it has the whole line, so a write
+            // left sitting in the socket buffer is the stall all over again.
+            _winMgmt->flush();
+        }
         return;
     }
     if (line.startsWith(QLatin1String("SUCCESS: password is correct"))) {

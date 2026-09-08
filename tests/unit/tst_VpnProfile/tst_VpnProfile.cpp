@@ -173,6 +173,7 @@ private slots:
     //! Once the service pipe has gone away, the management socket/retry loop
     //! still means OpenVPN is alive and must be stopped during teardown.
     void openvpn_windows_activity_includes_management_phase();
+    void openvpn_management_password_prompt_is_framed_without_losing_bytes();
 
     //! A terminal failure detaches the backend before stopping it, and an
     //! auto-started Wait job is notified even though retainForJob() has not run.
@@ -448,6 +449,49 @@ void TestVpnProfile::openvpn_windows_activity_includes_management_phase()
     QVERIFY(OpenVpnBackend::windowsActivityForTest(true, false, false));
     QVERIFY(OpenVpnBackend::windowsActivityForTest(false, true, false));
     QVERIFY(OpenVpnBackend::windowsActivityForTest(false, false, true));
+}
+
+//! openvpn's management password prompt carries no newline, and the management
+//! reader cuts on newlines only. Until the prompt is framed as a line it never
+//! reaches the parser, no password is ever sent, and the connection stops for
+//! good on "authenticating" -- observed against openvpn 2.7.4 on Windows.
+void TestVpnProfile::openvpn_management_password_prompt_is_framed_without_losing_bytes()
+{
+    // The case that stalled: nothing but the unterminated prompt.
+    QByteArray buffer("ENTER PASSWORD:");
+    OpenVpnBackend::terminateMgmtPasswordPromptForTest(buffer);
+    QCOMPARE(buffer, QByteArray("ENTER PASSWORD:\n"));
+
+    // Bytes ahead of the prompt belong to the parser too. A password refused
+    // and prompted again is exactly the case where dropping them would hide
+    // the only line saying why.
+    buffer = QByteArray("ERROR: bad password\r\nENTER PASSWORD:");
+    OpenVpnBackend::terminateMgmtPasswordPromptForTest(buffer);
+    QCOMPARE(buffer, QByteArray("ERROR: bad password\r\nENTER PASSWORD:\n"));
+
+    // Bytes after it as well, and no second newline is manufactured.
+    buffer = QByteArray("ENTER PASSWORD:>INFO:already talking\r\n");
+    OpenVpnBackend::terminateMgmtPasswordPromptForTest(buffer);
+    QCOMPARE(buffer, QByteArray("ENTER PASSWORD:\n>INFO:already talking\r\n"));
+
+    // Already a line: idempotent, in either line ending.
+    buffer = QByteArray("ENTER PASSWORD:\n");
+    OpenVpnBackend::terminateMgmtPasswordPromptForTest(buffer);
+    QCOMPARE(buffer, QByteArray("ENTER PASSWORD:\n"));
+
+    buffer = QByteArray("ENTER PASSWORD:\r\n");
+    OpenVpnBackend::terminateMgmtPasswordPromptForTest(buffer);
+    QCOMPARE(buffer, QByteArray("ENTER PASSWORD:\r\n"));
+
+    // No prompt, no edit -- including a half-received one, which the next read
+    // will complete.
+    buffer = QByteArray(">INFO:OpenVPN Management Interface\r\n");
+    OpenVpnBackend::terminateMgmtPasswordPromptForTest(buffer);
+    QCOMPARE(buffer, QByteArray(">INFO:OpenVPN Management Interface\r\n"));
+
+    buffer = QByteArray("ENTER PASSW");
+    OpenVpnBackend::terminateMgmtPasswordPromptForTest(buffer);
+    QCOMPARE(buffer, QByteArray("ENTER PASSW"));
 }
 
 void TestVpnProfile::backend_failure_stops_once_and_notifies_waiting_job()

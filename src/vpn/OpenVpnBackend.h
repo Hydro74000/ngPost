@@ -36,6 +36,7 @@ public:
     static bool windowsActivityForTest(bool servicePipeConnected,
                                        bool hasManagementSocket,
                                        bool retryTimerActive);
+    static void terminateMgmtPasswordPromptForTest(QByteArray &buffer);
     void handleProtocolLineForTest(QString const &line) { _handleLine(line); }
     void finishProcessForTest(int exitCode, QProcess::ExitStatus status)
     { onProcessFinished(exitCode, status); }
