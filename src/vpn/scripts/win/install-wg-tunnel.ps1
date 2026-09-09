@@ -16,18 +16,38 @@ param(
     [string]$ConfPath,
 
     [Parameter(Mandatory=$true)]
-    [string]$InvokerUser
+    [string]$InvokerSid
 )
 
 $ErrorActionPreference = "Stop"
 
+# Validate before installing anything. No name lookup in the elevated account.
+$sid = ([System.Security.Principal.SecurityIdentifier]::new($InvokerSid)).Value
+if ($sid -notmatch '^S-1-5-21-\d+-\d+-\d+-\d+$' -and $sid -notmatch '^S-1-12-1-\d+-\d+-\d+-\d+$') {
+    throw 'InvokerSid must identify a local/domain or Azure AD user'
+}
+
 function Find-Wireguard {
     $candidates = @(
-        "C:\Program Files\WireGuard\wireguard.exe",
-        "C:\Program Files (x86)\WireGuard\wireguard.exe"
-    )
+    foreach ($view in @([Microsoft.Win32.RegistryView]::Registry64, [Microsoft.Win32.RegistryView]::Registry32)) {
+        $machine = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $view)
+        $key = $null
+        try {
+            $key = $machine.OpenSubKey('SOFTWARE\Microsoft\Windows\CurrentVersion')
+            foreach ($name in @('ProgramFilesDir', 'ProgramFilesDir (x86)')) {
+                $root = if ($key) { $key.GetValue($name) } else { $null }
+                if ($root -and [IO.Path]::IsPathRooted($root)) {
+                    Join-Path $root 'WireGuard\wireguard.exe'
+                }
+            }
+        } finally {
+            if ($key) { $key.Dispose() }
+            $machine.Dispose()
+        }
+    }
+)
     foreach ($p in $candidates) {
-        if (Test-Path $p) { return $p }
+        if (Test-Path -LiteralPath $p -PathType Leaf) { return $p }
     }
     return $null
 }
@@ -38,7 +58,7 @@ if (-not $wg) {
     exit 2
 }
 
-if (-not (Test-Path $ConfPath)) {
+if (-not (Test-Path -LiteralPath $ConfPath -PathType Leaf)) {
     Write-Error "Config file not found: $ConfPath"
     exit 3
 }
@@ -64,17 +84,7 @@ if (-not $found) {
     exit 4
 }
 
-# Step 2: extend the service ACL.
-# Resolve the invoker's SID from the username.
-try {
-    $sid = (New-Object System.Security.Principal.NTAccount($InvokerUser)).Translate(
-        [System.Security.Principal.SecurityIdentifier]
-    ).Value
-} catch {
-    Write-Error "Could not resolve SID for user '$InvokerUser': $_"
-    exit 5
-}
-
+# Step 2: extend the service ACL for the validated caller SID.
 # Read the current SDDL and append an ACE granting SERVICE_START (RP) and
 # SERVICE_STOP (WP) to the invoking user. sc.exe sdshow returns the whole
 # SDDL on a single line (with leading blank line); collapse to one string
@@ -108,5 +118,5 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-Write-Output "INSTALLED $svc for $InvokerUser"
+Write-Output "INSTALLED $svc for $InvokerSid"
 exit 0

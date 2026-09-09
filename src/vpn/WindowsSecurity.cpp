@@ -51,7 +51,7 @@ bool applyProtectedDacl(QString const &path, wchar_t const *sddl)
 }
 
 //! The string SID of the user this process runs as, empty when unavailable.
-QString currentUserSid()
+QString tokenUserSid()
 {
     HANDLE token = nullptr;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
@@ -81,6 +81,17 @@ QString currentUserSid()
 
 namespace WindowsSecurity
 {
+QString currentUserSid() { return tokenUserSid(); }
+
+QString systemPowerShell()
+{
+    wchar_t directory[MAX_PATH + 1] = {};
+    UINT const length = GetSystemDirectoryW(directory, MAX_PATH + 1);
+    if (!length || length > MAX_PATH) return {};
+    return QString::fromWCharArray(directory, int(length))
+        + QStringLiteral("\\WindowsPowerShell\\v1.0\\powershell.exe");
+}
+
 bool protectCurrentUserOnly(QString const &path, bool inheritable)
 {
     QString const sid = currentUserSid();

@@ -11,6 +11,9 @@
 
 #include "VpnManager.h"
 #include "VpnProtocol.h"
+#ifdef Q_OS_WIN
+#include "WindowsSecurity.h"
+#endif
 
 #include <QCoreApplication>
 #include <QFile>
@@ -436,12 +439,9 @@ void WireGuardBackend::onProcessError(QProcess::ProcessError err)
 bool WireGuardBackend::_queryTunnelInfo(QString *iface, QString *ip, QString *dns) const
 {
     // After the service brings the tunnel up, query its state with wg.exe.
-    // PATH first: WireGuard for Windows does not add its directory to PATH, so
-    // fall back to the Program Files trees -- resolved from the environment,
-    // because the tunnel would otherwise be reported as never coming up on a
-    // machine whose Windows does not live on C:.
-    QString wgPath = QStandardPaths::findExecutable(QStringLiteral("wg.exe"));
-    if (wgPath.isEmpty()) {
+    // Only the machine's Program Files roots, never PATH or environment roots.
+    QString wgPath;
+    {
         for (QString const &root : VpnManager::windowsProgramFilesRoots()) {
             QString const candidate = QDir(root).filePath(QStringLiteral("WireGuard/wg.exe"));
             if (QFileInfo::exists(candidate)) {
@@ -550,7 +550,7 @@ bool WireGuardBackend::_startWindows(QString const &configPath)
         "if ($p.StartTime.ToFileTimeUtc() -eq ([Int64]$env:NGPOST_VPN_PARENT_START)) "
         "{$p.WaitForExit()}"
         "} finally {& sc.exe stop $env:NGPOST_VPN_SERVICE | Out-Null}");
-    _winWatchdog->start(QStringLiteral("powershell.exe"),
+    _winWatchdog->start(WindowsSecurity::systemPowerShell(),
                         {QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"),
                          QStringLiteral("-WindowStyle"), QStringLiteral("Hidden"),
                          QStringLiteral("-Command"), watcher});

@@ -21,12 +21,26 @@ if ($ServiceName.StartsWith($prefix)) {
 Write-Host "Uninstalling tunnel: '$tunnelName' (service: '$ServiceName')"
 
 $candidates = @(
-    "C:\Program Files\WireGuard\wireguard.exe",
-    "C:\Program Files (x86)\WireGuard\wireguard.exe"
+    foreach ($view in @([Microsoft.Win32.RegistryView]::Registry64, [Microsoft.Win32.RegistryView]::Registry32)) {
+        $machine = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine, $view)
+        $key = $null
+        try {
+            $key = $machine.OpenSubKey('SOFTWARE\Microsoft\Windows\CurrentVersion')
+            foreach ($name in @('ProgramFilesDir', 'ProgramFilesDir (x86)')) {
+                $root = if ($key) { $key.GetValue($name) } else { $null }
+                if ($root -and [IO.Path]::IsPathRooted($root)) {
+                    Join-Path $root 'WireGuard\wireguard.exe'
+                }
+            }
+        } finally {
+            if ($key) { $key.Dispose() }
+            $machine.Dispose()
+        }
+    }
 )
 $wg = $null
 foreach ($p in $candidates) {
-    if (Test-Path $p) { $wg = $p; break }
+    if (Test-Path -LiteralPath $p -PathType Leaf) { $wg = $p; break }
 }
 
 $removed = $false

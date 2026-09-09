@@ -156,6 +156,7 @@ HEADERS += \
     $$PWD/utils/PureStaticClass.h \
     $$PWD/utils/SecretMasker.h \
     $$PWD/utils/UpdateChecker.h \
+    $$PWD/utils/WindowsCommandLine.h \
     $$PWD/utils/Yenc.h \
     $$PWD/vpn/VpnDnsResolver.h \
     $$PWD/vpn/OpenVpnBackend.h \

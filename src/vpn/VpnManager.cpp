@@ -28,6 +28,7 @@
 
 #include "nntp/NntpServerParams.h"
 #include "utils/PathHelper.h"
+#include "utils/WindowsCommandLine.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -41,6 +42,7 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QStringList>
 #include <QTemporaryDir>
@@ -1370,18 +1372,15 @@ QString VpnManager::helperScriptPath()
 #ifdef Q_OS_WIN
 QStringList VpnManager::windowsProgramFilesRoots()
 {
-    // windowsOwnerPath() already resolves ProgramData from the environment;
-    // this is the same reasoning for the Program Files trees.
+    // Query machine configuration in both registry views, not user-controlled
+    // environment variables or a hardcoded system drive.
     QStringList roots;
-    for (char const *var : { "ProgramW6432", "ProgramFiles", "ProgramFiles(x86)" }) {
-        QString const root = QString::fromLocal8Bit(qgetenv(var));
-        if (!root.isEmpty() && !roots.contains(root))
-            roots << root;
-    }
-    for (auto const &fallback : { QStringLiteral("C:/Program Files"),
-                                  QStringLiteral("C:/Program Files (x86)") }) {
-        if (!roots.contains(fallback))
-            roots << fallback;
+    for (auto format : {QSettings::Registry64Format, QSettings::Registry32Format}) {
+        QSettings settings(QStringLiteral("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion"), format);
+        for (auto const &key : {QStringLiteral("ProgramFilesDir"), QStringLiteral("ProgramFilesDir (x86)")}) {
+            QString const root = settings.value(key).toString();
+            if (QDir::isAbsolutePath(root) && !roots.contains(root)) roots << root;
+        }
     }
     return roots;
 }
@@ -1637,30 +1636,25 @@ QString findWinScript(QString const &name)
 // negative on failure to even launch.
 int runElevatedPowerShell(QString const &script, QStringList const &args)
 {
-    // Quote each arg for inclusion in a single PowerShell ArgumentList.
-    auto quote = [](QString const &s) {
-        QString q = s;
-        q.replace("'", "''");
-        return "'" + q + "'";
-    };
+    QString const powershell = WindowsSecurity::systemPowerShell();
+    if (powershell.isEmpty()) return -1;
     QStringList psArgs;
     psArgs << "-NoProfile" << "-ExecutionPolicy" << "Bypass"
            << "-File" << script;
     psArgs.append(args);
-    QStringList quoted;
-    for (QString const &a : psArgs)
-        quoted << quote(a);
-
-    QString innerArgList = quoted.join(",");
+    // Start-Process joins ArgumentList without preserving PS quoting. Supply
+    // ONE string already serialized for the child's Win32 argument parser.
+    QString innerArgList = WindowsCommandLine::powershellLiteral(
+        WindowsCommandLine::serialize(psArgs));
     QString outerScript =
-        QStringLiteral("$p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList %1; exit $p.ExitCode")
-            .arg(innerArgList);
+        QStringLiteral("$ErrorActionPreference='Stop'; $p = Start-Process -FilePath %1 -Verb RunAs -Wait -PassThru -ArgumentList %2; exit $p.ExitCode")
+            .arg(WindowsCommandLine::powershellLiteral(powershell), innerArgList);
 
     QProcess p;
-    p.start(QStringLiteral("powershell.exe"),
+    p.start(powershell,
             QStringList() << "-NoProfile" << "-ExecutionPolicy" << "Bypass"
                           << "-Command" << outerScript);
-    if (!p.waitForFinished(120000))
+    if (!p.waitForFinished(120000) || p.exitStatus() != QProcess::NormalExit)
         return -1;
     return p.exitCode();
 }
@@ -1677,10 +1671,14 @@ bool VpnManager::registerWindowsWireGuardTunnel(QString const &confAbsPath)
         emit logLine(tr("install-wg-tunnel.ps1 not found in app bundle"));
         return false;
     }
-    QString user = QString::fromLocal8Bit(qgetenv("USERNAME"));
+    QString const sid = WindowsSecurity::currentUserSid();
+    if (sid.isEmpty()) {
+        emit logLine(tr("Could not determine the caller SID; refusing tunnel installation."));
+        return false;
+    }
     int code = runElevatedPowerShell(script,
         { QStringLiteral("-ConfPath"), confAbsPath,
-          QStringLiteral("-InvokerUser"), user });
+          QStringLiteral("-InvokerSid"), sid });
     if (code != 0) {
         emit logLine(tr("WireGuard tunnel install failed (exit %1)").arg(code));
         return false;

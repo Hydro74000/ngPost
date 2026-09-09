@@ -13,6 +13,10 @@
 namespace WindowsSecurity
 {
 #ifdef Q_OS_WIN
+//! Identity of the actual caller, unaffected by USERNAME/environment spoofing.
+QString currentUserSid();
+//! Absolute system executable, never resolved through PATH.
+QString systemPowerShell();
 //! Replace inherited ACLs with an owner/SYSTEM-only protected DACL.
 bool protectOwnerAndSystem(QString const &path);
 
