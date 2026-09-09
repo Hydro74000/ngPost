@@ -760,7 +760,15 @@ void PostingJob::onStartPosting(bool isActiveJob)
 #endif
 #ifdef __USE_HMI__
     if (_postWidget)
-        _log(tr("<h3>Start Post #%1: %2</h3>").arg(_postWidget->jobNumber()).arg(_nzbName));
+        // Plain text, not an HTML fragment. The log pane builds its content
+        // with a bounded QTextCursor rather than QTextEdit::append(), so markup
+        // reaches the user as literal "<h3>...</h3>"; the very same string is
+        // also written verbatim to the log file, where a tag never belonged
+        // either. Emphasis, where the pane wants it, is a QTextCharFormat --
+        // see MainWindow::logError(). The blank line is layout, so it stays out
+        // of the translated sentence.
+        _log(QStringLiteral("\n")
+             + tr("Start Post #%1: %2").arg(_postWidget->jobNumber()).arg(_nzbName));
     else
 #endif
         _log(QString("\n\n[%1] %2: %3").arg(timestamp()).arg(tr("Start posting")).arg(_nzbName));

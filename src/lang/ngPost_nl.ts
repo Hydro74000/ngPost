@@ -5454,8 +5454,8 @@ Het model nu opslaan?</translation>
     </message>
     <message>
         <location line="+35"/>
-        <source>&lt;h3&gt;Start Post #%1: %2&lt;/h3&gt;</source>
-        <translation>&lt;h3&gt;Start Post #%1: %2&lt;/h3&gt;</translation>
+        <source>Start Post #%1: %2</source>
+        <translation>Start Post #%1: %2</translation>
     </message>
     <message>
         <location line="+3"/>

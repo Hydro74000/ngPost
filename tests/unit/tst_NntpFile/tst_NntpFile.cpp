@@ -138,8 +138,10 @@ void TestNntpFile::message_id_validation_data()
     QTest::newRow("tab")             << QStringLiteral("<a@b\tc>")              << false;
     QTest::newRow("inner open")      << QStringLiteral("<a<b@c>")               << false;
     QTest::newRow("inner close")     << QStringLiteral("<a>b@c>")               << false;
-    QTest::newRow("DEL")             << QStringLiteral("<a@b\x7Fc>")            << false;
-    QTest::newRow("non ascii")       << QString::fromUtf8("<a@b\xC3\xA9c>")     << false;
+    QTest::newRow("DEL")
+            << (QStringLiteral("<a@b") + QChar(0x7F) + QStringLiteral("c>")) << false;
+    QTest::newRow("non ascii")
+            << (QStringLiteral("<a@b") + QChar(0x00E9) + QStringLiteral("c>")) << false;
     QTest::newRow("too long")
             << (QStringLiteral("<") + QString(300, QLatin1Char('a')) + QStringLiteral(">"))
             << false;
@@ -190,8 +192,8 @@ void TestNntpFile::header_values_lose_their_control_characters()
     QCOMPARE(Nntp::sanitizedHeaderValue(std::string("a\0b", 3)), std::string("a_b"));
 
     // UTF-8 is what the headers already carry: folding it would rename files.
-    QCOMPARE(Nntp::sanitizedHeaderValue("\xC3\xA9t\xC3\xA9.mkv"),
-             std::string("\xC3\xA9t\xC3\xA9.mkv"));
+    QCOMPARE(Nntp::sanitizedHeaderValue("\xC3\xA9" "t" "\xC3\xA9" ".mkv"),
+             std::string("\xC3\xA9" "t" "\xC3\xA9" ".mkv"));
 }
 
 QTEST_APPLESS_MAIN(TestNntpFile)

@@ -38,6 +38,8 @@
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QDateTime>
+#include <QDirIterator>
+#include <QRegularExpression>
 #include <QTableWidget>
 #include <QTextStream>
 
@@ -87,6 +89,15 @@ private slots:
     //! the newline-terminated path and logError() used to bypass the per-block
     //! cap entirely -- the single very long line the cap exists to split.
     void log_pane_bounds_whole_lines_and_errors();
+
+    //! The pane inserts text, it never renders markup, so a log message
+    //! carrying an HTML fragment reaches the user as literal tags -- and the
+    //! same string is written verbatim into the log file.
+    void log_pane_shows_markup_as_plain_text();
+
+    //! ...so no log call may pass one. Guards the whole family at the source,
+    //! which is where "<h3>Start Post #1: ...</h3>" escaped review.
+    void no_log_call_passes_html_markup();
 
     //! Every VPN affordance in the main window must agree with
     //! VpnManager::vpnPlatformSupported(). On a platform with no VPN
@@ -2154,6 +2165,58 @@ void TestMainWindow::log_pane_bounds_whole_lines_and_errors()
     win.log(QStringLiteral("back to normal"), true);
     QVERIFY2(lastLogColour(browser->document()) != QColor(Qt::red),
              "a plain log line was rendered with the error colour");
+}
+
+void TestMainWindow::log_pane_shows_markup_as_plain_text()
+{
+    MainWindow win;
+    QTextBrowser *browser = win.findChild<QTextBrowser *>(QStringLiteral("logBrowser"));
+    QVERIFY(browser);
+
+    // Pinned deliberately: rendering markup here would also mean rendering it
+    // in the file names the log is full of, which is the caller's text and not
+    // ngPost's. Emphasis belongs in a QTextCharFormat -- see logError().
+    win.log(QStringLiteral("<h3>Start Post #1: movie.nzb</h3>"), true);
+    QVERIFY2(browser->document()->toPlainText().contains(
+                     QStringLiteral("<h3>Start Post #1: movie.nzb</h3>")),
+             qPrintable(browser->document()->toPlainText()));
+}
+
+void TestMainWindow::no_log_call_passes_html_markup()
+{
+    // Only the tags a log line would plausibly carry, so a message that merely
+    // says "a < b" is not an offender.
+    static QRegularExpression const markupInLogCall(
+            QStringLiteral(R"(_log\s*\(\s*(?:tr|QStringLiteral|QString)\s*\()"
+                           R"("[^"]*<\s*/?\s*(?:h[1-6]|b|i|u|p|br|div|span|font|a|em|strong|pre|code)\b)"));
+
+    QStringList  offenders;
+    QDirIterator it(QStringLiteral(NGPOST_SOURCE_ROOT "/src"),
+                    QStringList{ QStringLiteral("*.cpp") },
+                    QDir::Files,
+                    QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        QString const   path = it.next();
+        QFileInfo const info(path);
+        // Generated and build-tree copies are not sources anyone edits.
+        if (info.fileName().startsWith(QStringLiteral("moc_"))
+            || path.contains(QStringLiteral("/build/")))
+            continue;
+
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+            continue;
+
+        QRegularExpressionMatchIterator m =
+                markupInLogCall.globalMatch(QString::fromUtf8(file.readAll()));
+        while (m.hasNext())
+            offenders << QStringLiteral("%1: %2").arg(info.fileName(),
+                                                      m.next().captured().simplified());
+    }
+
+    QVERIFY2(offenders.isEmpty(),
+             qPrintable(QStringLiteral("log messages carrying markup:\n%1")
+                                .arg(offenders.join(QLatin1Char('\n')))));
 }
 
 QTEST_MAIN(TestMainWindow)

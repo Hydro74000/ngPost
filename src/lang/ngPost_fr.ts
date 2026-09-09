@@ -5435,8 +5435,8 @@ Enregistrer le modèle maintenant ?</translation>
     <name>PostingJob</name>
     <message>
         <location filename="../PostingJob.cpp" line="+762"/>
-        <source>&lt;h3&gt;Start Post #%1: %2&lt;/h3&gt;</source>
-        <translation>&lt;h3&gt;Début du Post #%1: %2&lt;/h3&gt;</translation>
+        <source>Start Post #%1: %2</source>
+        <translation>Début du Post #%1: %2</translation>
     </message>
     <message>
         <location line="+160"/>
