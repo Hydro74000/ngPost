@@ -23,13 +23,24 @@ on:
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  REQUIRE_RELEASE_SIGNATURES: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  test-unit:
+    uses: ./.github/workflows/unit-tests.yml
+  test-integration:
+    uses: ./.github/workflows/integration-tests.yml
+  test-gui:
+    uses: ./.github/workflows/gui-tests.yml
+  test-vpn:
+    uses: ./.github/workflows/vpn-e2e.yml
   release-metadata:
     name: Prepare Release Metadata
     runs-on: ubuntu-latest
@@ -42,7 +53,7 @@ jobs:
       appimage_update_tag: ${{ steps.metadata.outputs.appimage_update_tag }}
       appimage_update_glob: ${{ steps.metadata.outputs.appimage_update_glob }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Compute release identity
         id: metadata
         env:
@@ -127,11 +138,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: release-metadata
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y build-essential cmake libsecret-1-dev
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
@@ -182,6 +193,7 @@ jobs:
           PKG="ngPost-${VERSION}-linux-x86_64"
           mkdir -p "dist/${PKG}"
           cp src/ngPost "dist/${PKG}/"
+          touch "dist/${PKG}/.ngpost-installation"
           cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
           cp -R templates "dist/${PKG}/"
           test -f "dist/${PKG}/templates/post_info_default.txt"
@@ -191,21 +203,22 @@ jobs:
           rm -rf "dist/${PKG}"
           ls -la dist/
       - name: Upload Linux Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binary-linux
           path: dist/*.tar.gz
 
   build-windows:
+    environment: release-signing
     name: Build Windows
     runs-on: windows-latest
     needs: release-metadata
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Enable Developer Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1.13.0
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           aqtversion: '==3.2.0'
           version: '6.8.2'
@@ -427,6 +440,12 @@ jobs:
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
+      - name: Sign Windows application
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX: ${{ secrets.WINDOWS_SIGNING_PFX }}
+          WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+        run: .github/scripts/sign-windows.ps1 -File src/release/ngPost.exe
       - name: Package
         shell: pwsh
         run: |
@@ -434,6 +453,7 @@ jobs:
           $pkg = "ngPost-$version-windows-x86_64"
           New-Item -ItemType Directory -Force -Path "dist/$pkg" | Out-Null
           Copy-Item -Recurse src/release/* "dist/$pkg/"
+          New-Item -ItemType File -Path "dist/$pkg/.ngpost-installation" | Out-Null
           # parpar is staged outside src/release/ so the Inno Setup installer
           # can gate it behind the optional "installparpar" task. For the
           # standalone ZIP we always include it — no install wizard to drive
@@ -678,8 +698,16 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
           Remove-Item -Recurse -Force "dist/$pkg"
           Get-ChildItem dist
+      - name: Sign Windows installer
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX: ${{ secrets.WINDOWS_SIGNING_PFX }}
+          WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+        run: |
+          $setup = Get-ChildItem dist/*-setup.exe | Select-Object -First 1
+          .github/scripts/sign-windows.ps1 -File $setup.FullName
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binary-windows
           path: |
@@ -687,14 +715,15 @@ jobs:
             dist/*.exe
 
   build-macos:
+    environment: release-signing
     name: Build macOS
     # Qt 6.8.2/qmake links AGL; the macOS 26 SDK no longer ships it.
     runs-on: macos-15
     needs: release-metadata
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.2'
           arch: 'clang_64'
@@ -728,7 +757,18 @@ jobs:
           qmake ngPost.pro CONFIG+=release
           make -j$(sysctl -n hw.ncpu)
       - name: Bundle Qt frameworks into .app
-        run: macdeployqt src/ngPost.app
+        run: |
+          macdeployqt src/ngPost.app
+          touch src/ngPost.app/.ngpost-installation
+      - name: Sign and notarize macOS bundle
+        env:
+          MACOS_SIGNING_P12: ${{ secrets.MACOS_SIGNING_P12 }}
+          MACOS_SIGNING_PASSWORD: ${{ secrets.MACOS_SIGNING_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash .github/scripts/sign-macos.sh
       - name: Smoke test the built binary
         run: |
           # Nothing else in this workflow ever runs what it is about to publish.
@@ -746,9 +786,7 @@ jobs:
           VERSION="${{ needs.release-metadata.outputs.package_version }}"
           PKG="ngPost-${VERSION}-macos"
           mkdir -p dist
-          cd src
-          zip -qr "../dist/${PKG}.zip" ngPost.app
-          cd ..
+          ditto -c -k --keepParent src/ngPost.app "dist/${PKG}.zip"
           zip -qj "dist/${PKG}.zip" THIRD_PARTY_LICENSES.md
           zip -qr "dist/${PKG}.zip" templates
           unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_default.txt'
@@ -756,7 +794,7 @@ jobs:
           unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_json.txt'
           ls -la dist/
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binary-macos
           path: dist/*.zip
@@ -766,7 +804,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: release-metadata
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install build & runtime dependencies
         run: |
           sudo apt update
@@ -780,7 +818,7 @@ jobs:
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 \
             libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
       - name: Install Go for wireguard-go fallback
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.24.x'
       - name: Build wireguard-go fallback
@@ -795,7 +833,7 @@ jobs:
           sudo install -m 755 /tmp/wireguard-go/wireguard-go /usr/local/bin/wireguard-go
           wireguard-go --version || true
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
@@ -1028,7 +1066,7 @@ jobs:
           rm -rf squashfs-root
           echo "AppImage is self-contained, update-info embedded, zsync file present."
       - name: Upload AppImage Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: appimage-linux
           path: |
@@ -1038,17 +1076,22 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [release-metadata, build-linux, build-windows, build-macos, build-appimage]
+    needs: [release-metadata, build-linux, build-windows, build-macos, build-appimage, test-unit, test-integration, test-gui, test-vpn]
+    environment: release-signing
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     # Push to master/devel always publishes. A manual workflow_dispatch only
     # publishes when its "publish" input is checked — leaving it unchecked
     # gives a build-only run (artifacts uploaded, no GitHub release created).
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
           merge-multiple: true
@@ -1080,6 +1123,23 @@ jobs:
               exit 1
             }
           done
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          path: artifacts
+          format: spdx-json
+          output-file: artifacts/ngPost.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Sign release manifests
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: python3 .github/scripts/sign-release.py
+      - name: Attest release provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: artifacts/*
       - name: Generate release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1149,7 +1209,7 @@ jobs:
             echo
           } > release-body.md
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ needs.release-metadata.outputs.release_tag }}
           name: ${{ needs.release-metadata.outputs.release_name }}

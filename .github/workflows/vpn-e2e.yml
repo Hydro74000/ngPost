@@ -5,6 +5,7 @@ name: VPN E2E
 # default main.yml stays fast and Linux-only-ish.
 
 on:
+  workflow_call:
   push:
   pull_request:
   workflow_dispatch:
@@ -13,12 +14,15 @@ on:
     # tooling drifts under us.
     - cron: '17 4 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   wg-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install dependencies
         run: |
@@ -29,7 +33,7 @@ jobs:
                                   libxkbcommon-x11-0
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
@@ -112,7 +116,7 @@ jobs:
 
       - name: Upload Test + Server Logs on Failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: vpn-e2e-logs
           path: |
