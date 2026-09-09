@@ -97,7 +97,10 @@ bool helperDeclaresProtocol2(QByteArray const &prefix)
 {
     static const QRegularExpression marker(QStringLiteral(
         "(?:^|\\n)readonly[ \\t]+NGPOST_VPN_HELPER_PROTOCOL=2(?:\\r?\\n|$)"));
-    return marker.match(QString::fromLatin1(prefix)).hasMatch();
+    static const QRegularExpression security(QStringLiteral(
+        "(?:^|\\n)readonly[ \\t]+NGPOST_VPN_HELPER_SECURITY_REVISION=3(?:\\r?\\n|$)"));
+    const QString text = QString::fromLatin1(prefix);
+    return marker.match(text).hasMatch() && security.match(text).hasMatch();
 }
 
 bool helperPathDeclaresProtocol2(QString const &path)
@@ -681,7 +684,7 @@ bool VpnManager::start()
     // The installed script is root-owned and readable, so its immutable v2
     // declaration is a safe, non-privileged capability check.
     if (!helperPathDeclaresProtocol2(helperScriptPath())) {
-        QString const detail = tr("The installed VPN helper is version 1; update it before connecting.");
+        QString const detail = tr("The installed VPN helper needs security revision 3. Open VPN settings and reinstall it with administrator authentication before connecting. An old helper's passwordless authorization remains unsafe until this migration succeeds.");
         _backendFailedDuringStart = true;
         _setState(State::Failed);
         emit logLine(detail);
@@ -1404,7 +1407,7 @@ bool VpnManager::isHelperInstalled() const
     }
     return false;
 #else
-    return QFileInfo::exists(QString::fromLatin1(kInstalledHelperPath));
+    return helperPathDeclaresProtocol2(QString::fromLatin1(kInstalledHelperPath));
 #endif
 }
 

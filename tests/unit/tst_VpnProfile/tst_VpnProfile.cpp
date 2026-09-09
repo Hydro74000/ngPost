@@ -800,8 +800,12 @@ void TestVpnProfile::helper_v2_marker_is_checked_before_elevation()
         QByteArrayLiteral("#!/bin/bash\n# legacy helper\n")));
     QVERIFY(!VpnManager::helperDeclaresProtocol2ForTest(
         QByteArrayLiteral("#!/bin/bash\n# NGPOST_VPN_HELPER_PROTOCOL=2\n")));
-    QVERIFY(VpnManager::helperDeclaresProtocol2ForTest(
+    QVERIFY(!VpnManager::helperDeclaresProtocol2ForTest(
         QByteArrayLiteral("#!/bin/bash\nreadonly NGPOST_VPN_HELPER_PROTOCOL=2\n")));
+    QVERIFY(!VpnManager::helperDeclaresProtocol2ForTest(
+        QByteArrayLiteral("readonly NGPOST_VPN_HELPER_PROTOCOL=2\n# readonly NGPOST_VPN_HELPER_SECURITY_REVISION=3\n")));
+    QVERIFY(VpnManager::helperDeclaresProtocol2ForTest(
+        QByteArrayLiteral("readonly NGPOST_VPN_HELPER_PROTOCOL=2\nreadonly NGPOST_VPN_HELPER_SECURITY_REVISION=3\n")));
 
     QFile current(QString::fromLatin1(NGPOST_SOURCE_ROOT)
                   + QStringLiteral("/src/vpn/scripts/ngpost-vpn-helper.sh"));

@@ -16,6 +16,7 @@
 
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QFileInfo>
 #include <QMessageBox>
 #include <QTextBrowser>
 #include <QVBoxLayout>
@@ -205,8 +206,14 @@ void VpnSettingsDialog::_refreshUi()
 void VpnSettingsDialog::_refreshSetupUi()
 {
     bool const installed = _manager->isHelperInstalled();
+    bool const obsolete = !installed && QFileInfo::exists(QString::fromLatin1(VpnManager::kInstalledHelperPath));
     _ui->installBtn->setVisible(!installed);
-    _ui->uninstallBtn->setVisible(installed);
+    _ui->uninstallBtn->setVisible(installed || obsolete);
+    if (obsolete) {
+        _ui->setupLabel->setText(tr("Security update required: reinstall the VPN helper with administrator authentication. Until then the old passwordless helper remains unsafe."));
+        _ui->setupLabel->setStyleSheet(QStringLiteral("color: #c62828;"));
+        return;
+    }
     if (installed) {
         _ui->setupLabel->setText(
             tr("VPN tunnel is installed. Connect / Disconnect will not prompt."));

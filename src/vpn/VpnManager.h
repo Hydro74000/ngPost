@@ -162,7 +162,7 @@ public:
     static constexpr const char *kInstalledHelperPath =
         "/var/lib/ngpost/ngpost-vpn-helper.sh";
 
-    //! Did the user run "Install" at some point on this machine?
+    //! Is the installed helper current (wire v2, security revision 3 on Linux)?
     bool isHelperInstalled() const;
 
     //! Does this build carry a native VPN integration at all? Compile-time,

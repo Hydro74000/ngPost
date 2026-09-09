@@ -14,12 +14,27 @@
 
 set -euo pipefail
 
+# Authentication must precede revocation. Once elevated, fail closed even if
+# the supplied resources are missing: never leave the old passwordless helper
+# reachable after an unsuccessful upgrade. Atomic replacement also protects
+# against Polkit retaining its old rule briefly while reloading.
+[ "$(id -u)" = 0 ] && [ -n "${PKEXEC_UID:-}" ] \
+    || { echo "ERROR installer requires administrator authentication via pkexec"; exit 1; }
+install -d -m 755 -o root -g root /var/lib/ngpost
+disabled=$(mktemp /var/lib/ngpost/.helper-disabled.XXXXXX)
+chmod 0600 "$disabled"
+mv -fT -- "$disabled" /var/lib/ngpost/ngpost-vpn-helper.sh
+rm -f -- /etc/polkit-1/rules.d/49-ngpost-vpn.rules
+
 SRC="${1:-}"
 [ -n "$SRC" ] || { echo "ERROR usage: $0 <source-dir>"; exit 1; }
 [ -d "$SRC" ] || { echo "ERROR source dir not found: $SRC"; exit 1; }
 [ -r "$SRC/ngpost-vpn-helper.sh"      ] || { echo "ERROR missing helper.sh in $SRC";    exit 1; }
 [ -r "$SRC/ngpost-vpn-uninstall.sh"   ] || { echo "ERROR missing uninstall.sh in $SRC"; exit 1; }
 [ -r "$SRC/49-ngpost-vpn.rules.in"    ] || { echo "ERROR missing polkit rule template"; exit 1; }
+grep -qx 'readonly NGPOST_VPN_HELPER_SECURITY_REVISION=3' "$SRC/ngpost-vpn-helper.sh" \
+    || { echo "ERROR helper security revision 3 required"; exit 1; }
+bash -n "$SRC/ngpost-vpn-helper.sh"
 
 # Must run under pkexec — that's how we discover who is asking.
 [ -n "${PKEXEC_UID:-}" ] || { echo "ERROR no PKEXEC_UID (must run via pkexec)"; exit 1; }
@@ -28,7 +43,10 @@ USER_NAME=$(getent passwd "$PKEXEC_UID" | cut -d: -f1)
 
 # Install runtime scripts. /var/lib stays writable on atomic distros.
 install -d -m 755 /var/lib/ngpost
-install -m 755 -o root -g root "$SRC/ngpost-vpn-helper.sh"    /var/lib/ngpost/
+staged_helper=$(mktemp /var/lib/ngpost/.helper-new.XXXXXX)
+trap 'rm -f -- "$staged_helper"' EXIT
+install -m 755 -o root -g root "$SRC/ngpost-vpn-helper.sh" "$staged_helper"
+mv -fT -- "$staged_helper" /var/lib/ngpost/ngpost-vpn-helper.sh
 install -m 755 -o root -g root "$SRC/ngpost-vpn-uninstall.sh" /var/lib/ngpost/
 if [ -d "$SRC/bin" ]; then
     install -d -m 755 -o root -g root /var/lib/ngpost/bin
