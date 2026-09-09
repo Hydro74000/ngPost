@@ -351,6 +351,10 @@ write_lock_record "$ACTION"
 SESSION_ID="${OWNER_PID:-0}-$(date +%s)-$$-$RANDOM"
 SESSION_DIR=$RUNTIME_DIR/session-$SESSION_ID
 PRIVATE_DIR=$SESSION_DIR/private
+# Files the profile refers to are staged here and nowhere else. Keeping them
+# out of PRIVATE_DIR is what makes a collision with the helper's own session
+# files impossible rather than merely unlisted.
+SESSION_PROFILE_DIR=$PRIVATE_DIR/profile
 SESSION_CONFIG=$PRIVATE_DIR/config
 SESSION_AUTH=$PRIVATE_DIR/auth
 LOG_FILE=$PRIVATE_DIR/backend.log
@@ -626,20 +630,20 @@ fi
 # These four lists are kept identical to src/vpn/OpenVpnConfigPolicy.cpp by
 # tests/unit/tst_OpenVpnConfigPolicy. Edit them together.
 OPENVPN_ALLOWED_DIRECTIVES="
-allow-compression auth auth-nocache auth-retry auth-user-pass block-outside-dns
-cipher client comp-lzo compress connect-retry connect-retry-max connect-timeout
-data-ciphers data-ciphers-fallback dev dev-type dhcp-option disable-occ
-explicit-exit-notify fast-io float fragment hand-window http-proxy
-http-proxy-retry http-proxy-timeout inactive keepalive key-direction link-mtu
-lport mssfix mute mute-replay-warnings ncp-ciphers ncp-disable nobind
-ns-cert-type opt-verify peer-fingerprint persist-key persist-remote-ip
-persist-tun ping ping-exit ping-restart ping-timer-rem port proto pull
-pull-filter rcvbuf redirect-gateway redirect-private remote remote-cert-eku
-remote-cert-ku remote-cert-tls remote-random remote-random-hostname reneg-bytes
-reneg-pkts reneg-sec resolv-retry route route-delay route-metric route-nopull
-rport server-poll-timeout sndbuf socket-flags socks-proxy socks-proxy-retry
-static-challenge suppress-timestamps tls-cipher tls-ciphersuites tls-client
-tls-version-max tls-version-min topology tran-window tun-mtu tun-mtu-extra verb
+allow-compression auth auth-nocache auth-retry auth-user-pass
+block-outside-dns cipher client comp-lzo compress connect-retry
+connect-retry-max connect-timeout data-ciphers data-ciphers-fallback dev
+dev-type dhcp-option disable-occ explicit-exit-notify fast-io float fragment
+hand-window http-proxy http-proxy-retry http-proxy-timeout inactive keepalive
+key-direction link-mtu lport mssfix mute mute-replay-warnings ncp-ciphers
+ncp-disable nobind ns-cert-type opt-verify peer-fingerprint persist-key
+persist-remote-ip persist-tun ping ping-exit ping-restart ping-timer-rem port
+proto pull pull-filter rcvbuf remote remote-cert-eku remote-cert-ku
+remote-cert-tls remote-random remote-random-hostname reneg-bytes reneg-pkts
+reneg-sec resolv-retry route-nopull rport server-poll-timeout sndbuf
+socket-flags socks-proxy socks-proxy-retry static-challenge
+suppress-timestamps tls-cipher tls-ciphersuites tls-client tls-version-max
+tls-version-min topology tran-window tun-mtu tun-mtu-extra verb
 verify-x509-name
 "
 
@@ -647,36 +651,110 @@ verify-x509-name
 # accepted so a multi-file provider bundle still imports. Never a path: the
 # process reading it is root, and "ca /etc/shadow" would be a read primitive.
 OPENVPN_FILE_BEARING_DIRECTIVES="
-ca cert crl-verify dh extra-certs http-proxy-user-pass key pkcs12 secret
-tls-auth tls-crypt tls-crypt-v2
+ca cert crl-verify dh extra-certs key pkcs12 secret tls-auth tls-crypt
+tls-crypt-v2
 "
 
 # Inline blocks whose body is an opaque blob -- PEM, a static key, a
 # fingerprint list. `connection` is absent on purpose: its body is more
 # directives, and it is validated line by line like the rest of the file.
 OPENVPN_INLINE_BLOB_TAGS="
-ca cert crl-verify dh extra-certs http-proxy-user-pass key peer-fingerprint
-pkcs12 secret tls-auth tls-crypt tls-crypt-v2
+ca cert crl-verify dh extra-certs key peer-fingerprint pkcs12 secret tls-auth
+tls-crypt tls-crypt-v2
+"
+
+# Recognised, accepted, and left out of the configuration this helper generates.
+# They are routing statements: --route-nopull governs only what the SERVER
+# pushes, so one written in the profile itself is applied regardless. ngPost
+# does its own policy routing and has no use for them. Dropped rather than
+# refused because redirect-gateway is in very nearly every provider profile,
+# and --route-noexec on the command line below is the second, independent
+# reason no route from a profile is ever installed.
+OPENVPN_DROPPED_DIRECTIVES="
+redirect-gateway redirect-private route route-delay route-metric
 "
 
 # Refused with a name of their own. Everything outside every list here is
 # refused too; these are the ones a profile does not carry by accident.
 OPENVPN_DENIED_DIRECTIVES="
-askpass auth-user-pass-verify capath cd chroot client-config-dir client-connect
-client-disconnect config daemon dev-node down down-pre engine group
-ifconfig-pool-persist ipchange iproute learn-address log log-append management
-management-client management-client-auth management-client-pf
-management-external-cert management-external-key management-hold
-management-query-passwords management-query-proxy management-query-remote
-management-signal management-up-down pkcs11-providers plugin providers
-route-pre-down route-up script-security setcon setenv setenv-safe status
-status-version tls-export-cert tls-verify tmp-dir up up-restart user writepid
+askpass auth-user-pass-verify capath cd chroot client-config-dir
+client-connect client-disconnect config daemon dev-node down down-pre engine
+group http-proxy-user-pass ifconfig-pool-persist ipchange iproute
+learn-address log log-append management management-client
+management-client-auth management-client-pf management-external-cert
+management-external-key management-hold management-query-passwords
+management-query-proxy management-query-remote management-signal
+management-up-down pkcs11-providers plugin providers route-pre-down route-up
+script-security setcon setenv setenv-safe status status-version
+tls-export-cert tls-verify tmp-dir up up-restart user writepid
 "
+
+#! Copy the files listed in "$1.files" -- written by sanitize_openvpn_profile as
+#! it validated them -- out of the caller's directory $2 and into the private
+#! staging directory, as root-owned 0600 copies. OpenVPN is then run with --cd
+#! there, so it never opens a path the caller can still change.
+#!
+#! The list comes from the validating pass and is never re-derived here: a
+#! second parser disagreeing about where an inline block ends turned PEM body
+#! text back into directives, and "key ../config" then overwrote the sanitized
+#! profile itself with the caller's raw file. Each name is checked again below
+#! anyway, so a future drift confines the damage to nothing rather than to a
+#! root write outside the session.
+#!
+#! Symbolic links are refused rather than followed: the caller owns that
+#! directory, so "ca ca.crt" could be a link to a file only root can read --
+#! and a startup failure hands the last lines of OpenVPN's log back to the
+#! caller, which makes that a read-back channel rather than a silent one. The
+#! window between that test and the copy is a race this cannot close from
+#! shell; closing it properly needs an O_NOFOLLOW open.
+stage_openvpn_sibling_files() {
+    local profile=$1 srcdir=$2 refs="$1.files" name src
+    mkdir -p "$SESSION_PROFILE_DIR" || {
+        terminal_error internal "cannot create the profile staging directory"
+        return 1
+    }
+    chmod 0700 "$SESSION_PROFILE_DIR" || {
+        terminal_error internal "cannot secure the profile staging directory"
+        return 1
+    }
+    [ -f "$refs" ] || return 0
+
+    while IFS= read -r name; do
+        [ -n "$name" ] || continue
+        # Second gate, deliberately redundant with the sanitizer: a name is a
+        # plain file name or it is not staged at all. Without this, one bad
+        # character reaches a root cp on both sides of the copy.
+        case "$name" in
+            . | .. | *[!A-Za-z0-9._-]*)
+                terminal_error configuration \
+                    "the OpenVPN profile refers to a file whose name ngPost will not stage"
+                return 1
+                ;;
+        esac
+        src=$srcdir/$name
+        if [ -L "$src" ] || [ ! -f "$src" ]; then
+            terminal_error configuration \
+                "the OpenVPN profile refers to a file that is not a regular file beside it"
+            return 1
+        fi
+        cp -- "$src" "$SESSION_PROFILE_DIR/$name" || {
+            terminal_error configuration "cannot stage a file the OpenVPN profile refers to"
+            return 1
+        }
+        chmod 0600 "$SESSION_PROFILE_DIR/$name" || {
+            terminal_error internal "cannot secure a staged OpenVPN file"
+            return 1
+        }
+    done < <(sort -u -- "$refs")
+    rm -f "$refs"
+    return 0
+}
 
 #! Rewrite $1 in place, keeping only whitelisted directives. Non-zero, with the
 #! offending directive named on stderr, when the profile must be refused.
 sanitize_openvpn_profile() {
-    local profile=$1 sanitized="$1.sanitized" reason=""
+    local profile=$1 sanitized="$1.sanitized" refs="$1.files" reason=""
+    : > "$refs" || { terminal_error internal "cannot record the profile's file list"; return 1; }
 
     # awk would silently truncate at a NUL, so a profile holding one is refused
     # rather than half-read.
@@ -693,7 +771,8 @@ sanitize_openvpn_profile() {
         -v ALLOWED="$OPENVPN_ALLOWED_DIRECTIVES" \
         -v FILEB="$OPENVPN_FILE_BEARING_DIRECTIVES" \
         -v BLOBS="$OPENVPN_INLINE_BLOB_TAGS" \
-        -v DENIED="$OPENVPN_DENIED_DIRECTIVES" '
+        -v DENIED="$OPENVPN_DENIED_DIRECTIVES" \
+        -v DROPPED="$OPENVPN_DROPPED_DIRECTIVES" '
         function label(name) {
             gsub(/[^A-Za-z0-9._-]/, "", name)
             if (name == "") name = "unprintable"
@@ -715,6 +794,7 @@ sanitize_openvpn_profile() {
         BEGIN {
             fill(ALLOWED, allowed); fill(FILEB, fileb)
             fill(BLOBS, blob);      fill(DENIED, denied)
+            fill(DROPPED, dropped)
             open = ""; openline = 0; inconn = 0; bad = 0
         }
         {
@@ -753,9 +833,21 @@ sanitize_openvpn_profile() {
             d = tolower(d)
 
             if (d in denied) fail("dangerous-directive", d, NR)
+            if (d in dropped) next
             isfile = (d in fileb)
             if (!isfile && !(d in allowed)) fail("unreviewed-directive", d, NR)
             if (d == "auth-user-pass" && n > 1) fail("unsafe-argument", d, NR)
+            # OpenVPN takes an authentication FILE as a positional argument to
+            # its proxy directives and hands the content to the proxy the
+            # profile named: the read and the way off the machine in one line.
+            if (d == "http-proxy") {
+                if (n < 3 || n > 5) fail("unsafe-argument", d, NR)
+                if (n >= 4 && unquote(tok[4]) != "auto" \
+                    && unquote(tok[4]) != "auto-nct") fail("unsafe-argument", d, NR)
+                if (n == 5 && tolower(unquote(tok[5])) !~ /^(none|basic|ntlm|ntlm2)$/) \
+                    fail("unsafe-argument", d, NR)
+            }
+            if (d == "socks-proxy" && n > 3) fail("unsafe-argument", d, NR)
             if (isfile) {
                 if (n < 2) fail("unsafe-argument", d, NR)
                 arg = unquote(tok[2])
@@ -764,6 +856,11 @@ sanitize_openvpn_profile() {
                 # parser downstream would read back as an option.
                 if (arg !~ /^[A-Za-z0-9._-]+$/ || arg ~ /^-/ || arg == "." \
                     || arg == ".." || length(arg) > 128) fail("unsafe-argument", d, NR)
+                # Named here, by the pass that just validated it: staging must
+                # never re-parse the profile on its own, because a second state
+                # machine disagreeing about where an inline block ends is what
+                # turns blob content back into directives.
+                print arg > "/dev/fd/3"
             }
             print line
         }
@@ -772,14 +869,14 @@ sanitize_openvpn_profile() {
             if (open != "") fail("unclosed-block", open, openline)
             if (inconn) fail("unclosed-connection", "connection", 0)
         }
-    ' "$profile" 2>&1 >"$sanitized") || {
-        rm -f "$sanitized"
+    ' "$profile" 2>&1 >"$sanitized" 3>"$refs") || {
+        rm -f "$sanitized" "$refs"
         terminal_error configuration "OpenVPN profile refused: ${reason:-unparsable}"
         return 1
     }
 
     mv -- "$sanitized" "$profile" || {
-        rm -f "$sanitized"
+        rm -f "$sanitized" "$refs"
         terminal_error internal "cannot install the sanitized OpenVPN profile"
         return 1
     }
@@ -796,6 +893,7 @@ chmod 0600 "$SESSION_CONFIG"
 # process, and before anything reads a directive out of it.
 if [ "$ACTION" = openvpn ]; then
     sanitize_openvpn_profile "$SESSION_CONFIG" || exit 1
+    stage_openvpn_sibling_files "$SESSION_CONFIG" "$(dirname "$CONFIG")" || exit 1
 fi
 if [ -n "$AUTH_FILE" ] && [ -r "$AUTH_FILE" ]; then
     cp -- "$AUTH_FILE" "$SESSION_AUTH" || { terminal_error authentication "cannot copy authentication file"; exit 1; }
@@ -839,7 +937,17 @@ start_openvpn() {
         # A long-lived child must never inherit the lease. Otherwise a
         # SIGKILL of the supervisor leaves flock owned by OpenVPN forever.
         exec {LEASE_FD}>&-
-        exec "$VPN_EXE" --cd "$(dirname "$CONFIG")" --config "$SESSION_CONFIG" --route-nopull --script-security 0 \
+        # --cd into the staging directory, not the caller's: every file the
+        # profile refers to has been copied there, root-owned, so OpenVPN cannot
+        # be pointed at a symbolic link to somebody else's file. It holds only
+        # those copies, so a profile cannot name one of the helper's own session
+        # files and have it replaced.
+        # --route-noexec on top of --route-nopull: the latter only governs what
+        # the SERVER pushes, while a route written in the profile itself is
+        # applied regardless. The helper owns ngPost's routing; OpenVPN installs
+        # none of its own.
+        exec "$VPN_EXE" --cd "$SESSION_PROFILE_DIR" --config "$SESSION_CONFIG" \
+            --route-nopull --route-noexec --script-security 0 \
             --pull-filter ignore redirect-gateway --pull-filter ignore route \
             --management 127.0.0.1 "$MGMT_PORT" "$MGMT_PASS_FILE" --management-signal \
             --verb 3 "${auth_args[@]}"

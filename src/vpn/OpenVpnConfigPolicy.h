@@ -92,6 +92,10 @@ QStringList deniedDirectives();
 //! inline or with a plain sibling file name, never with a path. Sorted.
 QStringList fileBearingDirectives();
 
+//! Directives recognised but left out of the generated configuration: routing
+//! statements ngPost neither needs nor lets a profile make. Sorted.
+QStringList droppedDirectives();
+
 //! Inline blocks whose body is an opaque blob rather than more directives.
 //! `connection` is absent: its body is validated line by line. Sorted.
 QStringList inlineBlockTags();

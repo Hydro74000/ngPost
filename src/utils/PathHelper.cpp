@@ -752,15 +752,19 @@ SecretsHardeningResult hardenConfigSecrets()
             continue;
 
         // Reading the mode back is what separates "ngPost had to fix this" from
-        // "it was already private". On Windows that reading says nothing about
-        // the DACL, so the call is made either way and only a failure is worth
-        // a word: reporting a repair on every start would be noise.
+        // "it was already private".
+#ifdef Q_OS_WIN
+        // Except on NTFS, where Qt reports the group and other bits as set
+        // whatever the DACL actually says. The question cannot be answered
+        // here, so the DACL is applied every time and only a failure is worth a
+        // word: answering "yes" unconditionally would greet the user with a
+        // repair notice on every single launch.
+        bool const wasOpen = false;
+#else
         bool const wasOpen = isReadableBeyondOwner(info);
-        if (!wasOpen) {
-#ifndef Q_OS_WIN
+        if (!wasOpen)
             continue;
 #endif
-        }
 
         if (!restrictToOwner(path)) {
             result.unrepairable << QStringLiteral("%1: %2").arg(

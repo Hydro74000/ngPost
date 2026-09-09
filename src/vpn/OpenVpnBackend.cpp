@@ -165,6 +165,12 @@ bool OpenVpnBackend::start(QString const &configPathPacked)
                                  tr("Config file not found or unreadable: %1").arg(cfg));
             return false;
         }
+        // Advisory on this platform, unlike Linux. The Interactive Service is
+        // handed the profile's own path, so the sanitized text this check
+        // produced is not what OpenVPN ends up reading and there is no second,
+        // privileged-side check behind it -- the boundary here is the service's
+        // own, which the audit scopes separately. It still refuses a hostile
+        // profile before ngPost asks for elevation, which is worth having.
         if (!_profilePassesPolicy(fi.absoluteFilePath()))
             return false;
         return _startWindowsViaInteractiveService(fi.absoluteFilePath(), auth);

