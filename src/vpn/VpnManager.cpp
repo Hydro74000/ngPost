@@ -662,9 +662,16 @@ QString writeAuthFile(QString const &user, QString const &pass)
 
 bool VpnManager::start()
 {
+    if (_state == State::Stopping) return false;
     _backendFailedDuringStart = false;
     if (_state == State::Starting || _state == State::Connected)
         return true;
+#ifdef Q_OS_WIN
+    if (qobject_cast<WireGuardBackend *>(_currentBackend) && _currentBackend->isRunning()) {
+        emit statusLine(tr("VPN: previous WireGuard service shutdown is not confirmed."));
+        return false;
+    }
+#endif
 
     VpnProfile const *p = activeProfile();
     if (!p) {
@@ -794,6 +801,9 @@ bool VpnManager::_finishBackendStart(bool started)
         if (_state != State::LeaseBusy)
             _setState(State::Failed);
         _stopAndDestroyBackend();
+#ifdef Q_OS_WIN
+        if (_currentBackend && _currentBackend->isRunning()) return false;
+#endif
         _shredRuntimeAuthFile();
 #ifdef Q_OS_WIN
         if (!_recoveryActive)
@@ -854,6 +864,7 @@ void VpnManager::disconnectByUser()
 void VpnManager::onBackendReady(QString const &iface, QHostAddress const &ip,
                                 QHostAddress const &dns)
 {
+    if (_state == State::Stopping) return;
     _tunIface = iface;
     _tunIp    = ip;
     _dnsServer = dns;
@@ -980,6 +991,7 @@ bool VpnManager::_consumeRecoveryAttempt()
 
 void VpnManager::onBackendHealthChanged(VpnBackendHealth health, QString const &reason)
 {
+    if (_state == State::Stopping) return;
     if (health == VpnBackendHealth::Healthy) {
         // HEALTHY is only a liveness transition. READY remains the sole source
         // of the bindable interface/address identity.
@@ -1045,6 +1057,7 @@ void VpnManager::onBackendRestartFailed(quint64 attemptId, FailureKind failure,
 
 void VpnManager::requestRecovery(FailureKind reason)
 {
+    if (_state == State::Stopping && _currentBackend && _currentBackend->isRunning()) return;
     // Recovery is an operational response to a running backend/supervisor
     // incident. Configuration, authentication and lease failures are startup
     // decisions and must remain terminal rather than entering an unrelated
@@ -1104,6 +1117,9 @@ void VpnManager::_performExternalRestart()
 
     _stopAndDestroyBackend();
     _shredRuntimeAuthFile();
+#ifdef Q_OS_WIN
+    if (_currentBackend && _currentBackend->isRunning()) return;
+#endif
     if (!start() && _recoveryActive) {
         if (_recoveryMaxAttempts > 0 && _recoveryAttempts >= _recoveryMaxAttempts)
             _finishRecoveryExhausted(_recoveryReason, tr("VPN restart failed"));
@@ -1121,6 +1137,9 @@ void VpnManager::_finishRecoveryExhausted(FailureKind reason, QString const &det
     _stopAndDestroyBackend();
     _shredRuntimeAuthFile();
     _clearTunnelIdentity();
+#ifdef Q_OS_WIN
+    if (_currentBackend && _currentBackend->isRunning()) return;
+#endif
     _setState(State::Failed);
 #ifdef Q_OS_WIN
     _releaseWindowsLease();
@@ -1159,11 +1178,30 @@ VpnManager::JobBlockReason VpnManager::_blockReasonForFailure(FailureKind failur
     }
 }
 
+void VpnManager::onBackendStopPending(QString const &detail)
+{
+    _recoveryTimer->stop();
+    _healthyResetTimer->stop();
+    _tunPollTimer->stop();
+    _setState(State::Stopping);
+    emit statusLine(detail.isEmpty() ? tr("VPN: waiting for confirmed service shutdown…") : detail);
+    if (_activeJobsNeedingVpn > 0) emit vpnInterrupted(FailureKind::TunnelLost);
+}
+
 void VpnManager::onBackendTerminated(BackendTermination const &termination)
 {
     // Ignore a delayed event from a backend which has already been superseded.
     if (_currentBackend && termination.runId != _currentBackend->runId())
         return;
+
+#ifdef Q_OS_WIN
+    // Manager-side failures (e.g. bind timeout) also need confirmed teardown.
+    auto wg = qobject_cast<WireGuardBackend *>(_currentBackend);
+    if (wg && wg->isRunning()) {
+        wg->failAndStop(termination);
+        return;
+    }
+#endif
 
     _clearTunnelIdentity();
     _cancelAutoDisconnect();
@@ -1194,8 +1232,10 @@ void VpnManager::onBackendTerminated(BackendTermination const &termination)
         && termination.wasReady && (_activeJobsNeedingVpn > 0 || _autoStartedByJob)) {
         _destroyBackend();
         _shredRuntimeAuthFile();
-        requestRecovery(termination.failure == FailureKind::None
-                            ? FailureKind::HelperExited : termination.failure);
+        auto const reason = termination.failure == FailureKind::None
+                            ? FailureKind::HelperExited : termination.failure;
+        if (_recoveryActive) _scheduleExternalRestart(reason);
+        else requestRecovery(reason);
         return;
     }
 
@@ -1271,6 +1311,7 @@ void VpnManager::_instantiateBackend()
     connect(_currentBackend, &VpnBackend::restartFailed, this, &VpnManager::onBackendRestartFailed);
     connect(_currentBackend, &VpnBackend::healthChanged, this, &VpnManager::onBackendHealthChanged);
     connect(_currentBackend, &VpnBackend::terminated, this, &VpnManager::onBackendTerminated);
+    connect(_currentBackend, &VpnBackend::stopPending, this, &VpnManager::onBackendStopPending);
     connect(_currentBackend, &VpnBackend::logLine,    this, &VpnManager::logLine);
     connect(_currentBackend, &VpnBackend::statusLine, this, &VpnManager::statusLine);
 }
@@ -1288,6 +1329,13 @@ void VpnManager::_stopAndDestroyBackend()
     VpnBackend *backend = _currentBackend;
     if (!backend)
         return;
+
+#ifdef Q_OS_WIN
+    if (qobject_cast<WireGuardBackend *>(backend) && backend->isRunning()) {
+        backend->stopAndWait(5000);
+        if (_currentBackend != backend || backend->isRunning()) return;
+    }
+#endif
 
     // Clear the manager pointer first and detach every backend -> manager
     // connection before stopAndWait(). A backend may report its typed terminal
@@ -1740,6 +1788,7 @@ void VpnManager::setBackendForTest(VpnBackend *backend, State state)
         connect(_currentBackend, &VpnBackend::restartFailed, this, &VpnManager::onBackendRestartFailed);
         connect(_currentBackend, &VpnBackend::healthChanged, this, &VpnManager::onBackendHealthChanged);
         connect(_currentBackend, &VpnBackend::terminated, this, &VpnManager::onBackendTerminated);
+        connect(_currentBackend, &VpnBackend::stopPending, this, &VpnManager::onBackendStopPending);
         connect(_currentBackend, &VpnBackend::logLine, this, &VpnManager::logLine);
         connect(_currentBackend, &VpnBackend::statusLine, this, &VpnManager::statusLine);
         _currentBackend->beginRun(++_nextRunId);

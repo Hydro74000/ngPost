@@ -120,6 +120,8 @@ signals:
                        QString const &detail);
     void healthChanged(VpnBackendHealth health, QString const &reason);
     void terminated(BackendTermination const &termination);
+    //! Cleanup is in progress, NOT a terminal event. The service may be active.
+    void stopPending(QString const &detail);
     //! Full verbose stream — every line from the underlying VPN process.
     //! Routed to the dedicated VPN log panel only.
     void logLine(QString const &line);

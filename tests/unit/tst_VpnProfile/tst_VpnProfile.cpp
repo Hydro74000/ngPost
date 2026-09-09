@@ -178,6 +178,7 @@ private slots:
     //! A terminal failure detaches the backend before stopping it, and an
     //! auto-started Wait job is notified even though retainForJob() has not run.
     void backend_failure_stops_once_and_notifies_waiting_job();
+    void pending_stop_retains_backend_and_blocks_start();
     void synchronous_lease_busy_keeps_typed_state();
     void backend_reports_one_terminal_event_per_run();
     void helper_specific_error_then_finished_reports_one_terminal_event();
@@ -492,6 +493,26 @@ void TestVpnProfile::openvpn_management_password_prompt_is_framed_without_losing
     buffer = QByteArray("ENTER PASSW");
     OpenVpnBackend::terminateMgmtPasswordPromptForTest(buffer);
     QCOMPARE(buffer, QByteArray("ENTER PASSW"));
+}
+
+void TestVpnProfile::pending_stop_retains_backend_and_blocks_start()
+{
+    HomeSandbox sandbox;
+    VpnManager manager;
+    auto *backend = new FakeVpnBackend;
+    manager.setBackendForTest(backend, VpnManager::State::Connected);
+    emit backend->stopPending(QStringLiteral("SCM error 5; stop unconfirmed"));
+    QCOMPARE(manager.state(), VpnManager::State::Stopping);
+    QVERIFY(manager.hasBackendForTest());
+    QVERIFY(!manager.start());
+    QVERIFY(manager.hasBackendForTest());
+    manager.requestRecovery(VpnFailureKind::TunnelLost);
+    backend->reportHealth(VpnBackendHealth::Healthy, QStringLiteral("late health"));
+    emit backend->ready(QStringLiteral("late-interface"), QHostAddress("10.1.2.3"), QHostAddress());
+    QCOMPARE(manager.state(), VpnManager::State::Stopping);
+    backend->stop(); // fake finally confirms a terminal RequestedStop
+    QCOMPARE(manager.state(), VpnManager::State::Disabled);
+    QVERIFY(!manager.hasBackendForTest());
 }
 
 void TestVpnProfile::backend_failure_stops_once_and_notifies_waiting_job()

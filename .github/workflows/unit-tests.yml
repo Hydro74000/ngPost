@@ -234,6 +234,16 @@ jobs:
         run: |
           bash .github/scripts/run-qt-tests.sh tests/unit "unit"
 
+      - name: Parse Windows VPN and signing scripts
+        shell: pwsh
+        run: |
+          Get-ChildItem src/vpn/scripts/win/*.ps1, .github/scripts/sign-windows.ps1 | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+          }
+
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

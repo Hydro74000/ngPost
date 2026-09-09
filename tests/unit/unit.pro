@@ -3,6 +3,7 @@
 TEMPLATE = subdirs
 
 SUBDIRS = \
+    tst_WindowsServiceControl \
     tst_WindowsCommandLine \
     tst_RandomToken \
     tst_Yenc \

@@ -125,6 +125,7 @@ SOURCES += \
         $$PWD/vpn/VpnProtocol.cpp \
         $$PWD/vpn/VpnSocketBinder.cpp \
         $$PWD/vpn/WindowsSecurity.cpp \
+        $$PWD/vpn/WindowsServiceControl.cpp \
         $$PWD/vpn/WindowsBindHelper.cpp \
         $$PWD/vpn/WireGuardBackend.cpp
 
@@ -168,6 +169,7 @@ HEADERS += \
     $$PWD/vpn/VpnProtocol.h \
     $$PWD/vpn/VpnSocketBinder.h \
     $$PWD/vpn/WindowsSecurity.h \
+    $$PWD/vpn/WindowsServiceControl.h \
     $$PWD/vpn/WindowsBindHelper.h \
     $$PWD/vpn/WireGuardBackend.h
 

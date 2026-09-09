@@ -64,11 +64,10 @@ if (-not (Test-Path -LiteralPath $ConfPath -PathType Leaf)) {
 }
 
 # Step 1: register the tunnel as a Windows service.
-# wireguard.exe is a Windows GUI-subsystem binary; it forks the service into
-# the background and exits without setting a reliable $LASTEXITCODE on the
-# caller. So we don't trust the exit code — instead we look for the service
-# to appear in SCM as evidence of success.
-& $wg /installtunnelservice $ConfPath
+# Wait for the installer process itself: observing a freshly created STOPPED
+# service is insufficient while wireguard.exe is still about to start it.
+$installer = Start-Process -FilePath $wg -ArgumentList ('/installtunnelservice "' + $ConfPath + '"') -Wait -PassThru
+if ($installer.ExitCode -ne 0) { throw "WireGuard installation failed: $($installer.ExitCode)" }
 
 $baseName = [System.IO.Path]::GetFileNameWithoutExtension($ConfPath)
 $svc = "WireGuardTunnel`$$baseName"
@@ -84,6 +83,27 @@ if (-not $found) {
     exit 4
 }
 
+# Import must leave a manual, stopped service, including when later ACL work
+# fails. A successful sc stop is merely an accepted request, not completion.
+try {
+    sc.exe config $svc start= demand | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Cannot configure $svc as start=demand" }
+    $startType = (Get-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$svc" -Name Start).Start
+    if ($startType -ne 3) { throw "Service $svc is not start=demand" }
+} finally {
+    $service = [System.ServiceProcess.ServiceController]::new($svc)
+    try {
+        $deadline = [DateTime]::UtcNow.AddSeconds(30)
+        do {
+            $service.Refresh()
+            if ($service.Status -eq 'Stopped') { break }
+            if ([DateTime]::UtcNow -ge $deadline) { throw "Service $svc did not reach STOPPED" }
+            if ($service.Status -ne 'StopPending' -and $service.Status -ne 'StartPending') { $service.Stop() }
+            Start-Sleep -Milliseconds 200
+        } while ($true)
+    } finally { $service.Dispose() }
+}
+
 # Step 2: extend the service ACL for the validated caller SID.
 # Read the current SDDL and append an ACE granting SERVICE_START (RP) and
 # SERVICE_STOP (WP) to the invoking user. sc.exe sdshow returns the whole
@@ -92,6 +112,7 @@ if (-not $found) {
 # flag mnemonic like CCLCSW does NOT end the DACL, but the closing paren
 # of the last DACL ACE does).
 $raw = ((sc.exe sdshow $svc) -join '') -replace '\s', ''
+if ($LASTEXITCODE -ne 0) { throw "Cannot read service ACL for $svc" }
 if (-not $raw.StartsWith('D:')) {
     Write-Error "Unexpected SDDL (missing DACL): $raw"
     exit 6
@@ -106,7 +127,7 @@ if ($sBoundary -ge 0) {
 }
 
 # Idempotency: don't append the ACE twice if the script is re-run.
-$newAce = "(A;;RPWP;;;$sid)"
+$newAce = "(A;;CCLCRPWP;;;$sid)" # query config/status, start, stop
 if ($dPart -notlike "*$newAce*") {
     $dPart = $dPart + $newAce
 }

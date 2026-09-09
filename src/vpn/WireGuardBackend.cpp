@@ -13,6 +13,9 @@
 #include "VpnProtocol.h"
 #ifdef Q_OS_WIN
 #include "WindowsSecurity.h"
+#include "WindowsServiceControl.h"
+#include <QElapsedTimer>
+#include <QThread>
 #endif
 
 #include <QCoreApplication>
@@ -95,9 +98,18 @@ WireGuardBackend::~WireGuardBackend()
 {
 #ifdef Q_OS_WIN
     if (_winWatchdog) {
-        _winWatchdog->terminate();
-        _winWatchdog->waitForFinished(2000);
-        delete _winWatchdog;
+        disconnect(_winWatchdog, nullptr, this, nullptr);
+        if (!_winServiceName.isEmpty()) {
+            // A timed-out shutdown must not kill the last parent-death guard.
+            // Leave this independent process alive until ngPost exits.
+            _winWatchdog->setParent(nullptr);
+            connect(_winWatchdog, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+                    _winWatchdog, &QObject::deleteLater);
+        } else {
+            _winWatchdog->kill();
+            _winWatchdog->waitForFinished(2000);
+            delete _winWatchdog;
+        }
         _winWatchdog = nullptr;
     }
 #endif
@@ -252,7 +264,12 @@ void WireGuardBackend::stopAndWait(int timeoutMs)
 {
     stop();
 #ifdef Q_OS_WIN
-    Q_UNUSED(timeoutMs);
+    QElapsedTimer deadline;
+    deadline.start();
+    while (isRunning() && deadline.elapsed() < timeoutMs) {
+        QThread::msleep(50);
+        _pollWindowsStop();
+    }
     return;
 #endif
     if (_proc && _proc->state() != QProcess::NotRunning)
@@ -425,10 +442,8 @@ void WireGuardBackend::onProcessError(QProcess::ProcessError err)
 //   - Disconnect : sc stop  WireGuardTunnel$<name>
 //   - Query info : wg.exe show <name>  → iface, ip, dns
 //
-// We use sc.exe via QProcess rather than calling the Win32 SCM API directly
-// because it keeps the code paths uniform with the rest of the project (we
-// already shell out to a binary on Linux too) and avoids pulling in
-// advapi32-only types into headers that should compile under both OSes.
+// SCM queries use the native API: localized sc.exe text and a successful
+// STOP request cannot prove that the service is actually stopped.
 
 #include <QDir>
 #include <QProcess>
@@ -496,25 +511,12 @@ bool WireGuardBackend::_startWindows(QString const &configPath)
 
     emit logLine(tr("Starting WireGuard service: %1").arg(_winServiceName));
 
-    QProcess sc;
-    sc.start(QStringLiteral("sc.exe"),
-             {QStringLiteral("start"), _winServiceName});
-    if (!sc.waitForFinished(5000)) {
-        _emitTerminationOnce(VpnTerminationKind::StartFailure,
-                             VpnFailureKind::HelperUnavailable,
-                             tr("sc start timed out — is the tunnel registered? "
-                                "(re-import the profile)"));
-        return false;
-    }
-    int code = sc.exitCode();
-    // sc.exe exits 1056 = "service is already running", which we accept.
-    if (code != 0 && code != 1056) {
-        _emitTerminationOnce(VpnTerminationKind::StartFailure,
-                             VpnFailureKind::ProcessExited,
-                             tr("sc start failed (exit %1) — make sure the WireGuard "
-                                "tunnel was installed via wireguard.exe /installtunnelservice "
-                                "and that runtime ACL grants you START.").arg(code));
-        return false;
+    QString startError;
+    if (!WindowsServiceControl::startDemand(_winServiceName, &startError)) {
+        _finishWindowsRun(VpnTerminationKind::StartFailure,
+                          VpnFailureKind::ProcessExited, startError);
+        // Teardown owns this run until SCM confirms it is really stopped.
+        return true;
     }
 
     // A service is not a child process, so it would otherwise outlive a killed
@@ -536,11 +538,10 @@ bool WireGuardBackend::_startWindows(QString const &configPath)
             QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, [this](int, QProcess::ExitStatus) {
         if (!_stopRequested && !_winServiceName.isEmpty()) {
-            _emitTerminationOnce(_wasReady ? VpnTerminationKind::UnexpectedExit
+            _finishWindowsRun(_wasReady ? VpnTerminationKind::UnexpectedExit
                                            : VpnTerminationKind::StartFailure,
                                  VpnFailureKind::HelperExited,
                                  tr("WireGuard parent watchdog exited unexpectedly"));
-            _stopWindows();
         }
     });
     QString const watcher = QStringLiteral(
@@ -549,23 +550,21 @@ bool WireGuardBackend::_startWindows(QString const &configPath)
         "$p=Get-Process -Id ([int]$env:NGPOST_VPN_PARENT_PID);"
         "if ($p.StartTime.ToFileTimeUtc() -eq ([Int64]$env:NGPOST_VPN_PARENT_START)) "
         "{$p.WaitForExit()}"
-        "} finally {& sc.exe stop $env:NGPOST_VPN_SERVICE | Out-Null}");
+        "} finally {"
+        "$s=[System.ServiceProcess.ServiceController]::new($env:NGPOST_VPN_SERVICE);"
+        "if ($s.Status -ne 'Stopped') {$s.Stop(); $s.WaitForStatus('Stopped',[TimeSpan]::FromSeconds(30))}"
+        "}");
     _winWatchdog->start(WindowsSecurity::systemPowerShell(),
                         {QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"),
                          QStringLiteral("-WindowStyle"), QStringLiteral("Hidden"),
                          QStringLiteral("-Command"), watcher});
     if (!_winWatchdog->waitForStarted(3000)) {
-        QProcess rollback;
-        rollback.start(QStringLiteral("sc.exe"),
-                       {QStringLiteral("stop"), _winServiceName});
-        rollback.waitForFinished(5000);
         _winWatchdog->deleteLater();
         _winWatchdog = nullptr;
-        _winServiceName.clear();
-        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+        _finishWindowsRun(VpnTerminationKind::StartFailure,
                              VpnFailureKind::HelperUnavailable,
                              tr("Could not start the WireGuard parent watchdog"));
-        return false;
+        return true;
     }
 
     // Poll briefly for the tunnel to actually come up (wg show returns OK).
@@ -580,9 +579,10 @@ bool WireGuardBackend::_startWindows(QString const &configPath)
 
 void WireGuardBackend::onWinPollTimer()
 {
+    if (_winStopTimer && _winStopTimer->isActive()) return;
     if (++_winPollAttempts > 40) { // 40 * 500ms = 20s
         _winPollTimer->stop();
-        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+        _finishWindowsRun(VpnTerminationKind::StartFailure,
                              VpnFailureKind::TunnelLost,
                              tr("WireGuard tunnel did not come up within 20s"));
         return;
@@ -594,7 +594,7 @@ void WireGuardBackend::onWinPollTimer()
     QHostAddress ipAddr(ip);
     QHostAddress dnsAddr = dns.isEmpty() ? QHostAddress() : QHostAddress(dns);
     if (ipAddr.isNull()) {
-        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+        _finishWindowsRun(VpnTerminationKind::StartFailure,
                              VpnFailureKind::Configuration,
                              tr("Could not parse local IP from WireGuard config"));
         return;
@@ -606,30 +606,57 @@ void WireGuardBackend::onWinPollTimer()
 
 void WireGuardBackend::_stopWindows()
 {
+    _finishWindowsRun(VpnTerminationKind::RequestedStop, VpnFailureKind::None, {});
+}
+
+void WireGuardBackend::_finishWindowsRun(VpnTerminationKind kind,
+                                        VpnFailureKind failure, QString const &detail)
+{
     if (_winPollTimer)
         _winPollTimer->stop();
+    _winPendingTermination.kind = kind;
+    _winPendingTermination.failure = failure;
+    _winPendingTermination.detail = detail;
+    if (!_winStopTimer) {
+        _winStopTimer = new QTimer(this);
+        connect(_winStopTimer, &QTimer::timeout, this, &WireGuardBackend::_pollWindowsStop);
+    }
+    _winStopError.clear();
+    emit stopPending(detail);
+    // Always asynchronous: start() must return before a terminal callback
+    // can destroy its backend; retain the lease throughout cleanup.
+    _winStopTimer->start(500);
+}
+
+void WireGuardBackend::_pollWindowsStop()
+{
+    if (!_winStopTimer || !_winStopTimer->isActive()) return;
+    QString error;
+    auto const result = _winServiceName.isEmpty() ? WindowsServiceControl::StopResult::Stopped
+        : WindowsServiceControl::stopStep(
+            [&] { return WindowsServiceControl::query(_winServiceName, &error); },
+            [&] { return WindowsServiceControl::requestStop(_winServiceName, &error); });
+    if (result != WindowsServiceControl::StopResult::Stopped) {
+        if (result == WindowsServiceControl::StopResult::Failed && error != _winStopError) {
+            _winStopError = error;
+            QString const message = tr("WireGuard stop is NOT confirmed (%1). The tunnel may still be active; retaining ownership and retrying.").arg(error);
+            emit logLine(message);
+            emit statusLine(message);
+        }
+        return;
+    }
+    _winStopTimer->stop();
     if (_winWatchdog) {
         disconnect(_winWatchdog, nullptr, this, nullptr);
-        _winWatchdog->terminate();
-        if (!_winWatchdog->waitForFinished(2000))
-            _winWatchdog->kill();
+        _winWatchdog->kill();
+        _winWatchdog->waitForFinished(2000);
         _winWatchdog->deleteLater();
         _winWatchdog = nullptr;
     }
-    if (_winServiceName.isEmpty()) {
-        _emitTerminationOnce(VpnTerminationKind::RequestedStop,
-                             VpnFailureKind::None, QString());
-        return;
-    }
-    QProcess sc;
-    sc.start(QStringLiteral("sc.exe"),
-             {QStringLiteral("stop"), _winServiceName});
-    sc.waitForFinished(5000);
-    // We don't strictly need to verify exit code: a failed stop just
-    // leaves the tunnel up; the next session will detect.
     _winServiceName.clear();
     _winConfigPath.clear();
-    _emitTerminationOnce(VpnTerminationKind::RequestedStop,
-                         VpnFailureKind::None, QString());
+    _winIface.clear();
+    _emitTerminationOnce(_winPendingTermination.kind, _winPendingTermination.failure,
+                         _winPendingTermination.detail);
 }
 #endif // Q_OS_WIN

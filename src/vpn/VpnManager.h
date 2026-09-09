@@ -307,6 +307,7 @@ private slots:
     void onBackendReady(QString const &iface, QHostAddress const &ip,
                         QHostAddress const &dns);
     void onBackendTerminated(BackendTermination const &termination);
+    void onBackendStopPending(QString const &detail);
     void onBackendHealthChanged(VpnBackendHealth health, QString const &reason);
     void onBackendRestartReady(quint64 attemptId, QString const &iface,
                                QHostAddress const &ip, QHostAddress const &dns);

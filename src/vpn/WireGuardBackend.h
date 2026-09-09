@@ -27,6 +27,11 @@ public:
     bool isRunning() const override;
     bool restart(quint64 attemptId) override;
     void setActive(bool active) override;
+#ifdef Q_OS_WIN
+    void failAndStop(BackendTermination const &event) {
+        _finishWindowsRun(event.kind, event.failure, event.detail);
+    }
+#endif
 
     //! Compute the Windows tunnel service name registered by
     //! `wireguard.exe /installtunnelservice <conf>`. The convention is
@@ -60,6 +65,8 @@ private:
     //! /installtunnelservice + sc sdset for runtime ACL).
     bool _startWindows(QString const &configPath);
     void _stopWindows();
+    void _finishWindowsRun(VpnTerminationKind kind, VpnFailureKind failure, QString const &detail);
+    void _pollWindowsStop();
     bool    _queryTunnelInfo(QString *iface, QString *ip, QString *dns) const;
 #endif
 
@@ -75,6 +82,9 @@ private:
     int      _winPollAttempts;
     class QTimer *_winPollTimer;
     QProcess *_winWatchdog;      //!< survives ngPost and stops the service when its parent handle closes
+    QTimer *_winStopTimer = nullptr;
+    BackendTermination _winPendingTermination;
+    QString _winStopError;
 #endif
 };
 

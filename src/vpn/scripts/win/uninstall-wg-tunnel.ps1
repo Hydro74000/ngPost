@@ -7,7 +7,7 @@ param(
     [string]$ServiceName  # e.g., WireGuardTunnel$MyProfile
 )
 
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Stop"
 
 # Tunnel name = service name with the "WireGuardTunnel$" prefix stripped.
 # Using SubString instead of regex to avoid escaping the literal $ correctly.
@@ -15,10 +15,27 @@ $prefix = 'WireGuardTunnel$'
 if ($ServiceName.StartsWith($prefix)) {
     $tunnelName = $ServiceName.Substring($prefix.Length)
 } else {
-    $tunnelName = $ServiceName
+    throw 'Only a WireGuardTunnel$ service may be removed'
 }
 
 Write-Host "Uninstalling tunnel: '$tunnelName' (service: '$ServiceName')"
+
+# Never delete a service until SCM confirms it is stopped. Missing (1060) is
+# success; access denied and other query errors are NOT evidence of removal.
+sc.exe query $ServiceName 2>$null | Out-Null
+if ($LASTEXITCODE -eq 1060) { Write-Output "UNINSTALLED $ServiceName"; exit 0 }
+if ($LASTEXITCODE -ne 0) { throw "Cannot query service $ServiceName" }
+$service = [System.ServiceProcess.ServiceController]::new($ServiceName)
+try {
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+    do {
+        $service.Refresh()
+        if ($service.Status -eq 'Stopped') { break }
+        if ([DateTime]::UtcNow -ge $deadline) { throw "Service $ServiceName did not reach STOPPED" }
+        if ($service.Status -ne 'StopPending' -and $service.Status -ne 'StartPending') { $service.Stop() }
+        Start-Sleep -Milliseconds 200
+    } while ($true)
+} finally { $service.Dispose() }
 
 $candidates = @(
     foreach ($view in @([Microsoft.Win32.RegistryView]::Registry64, [Microsoft.Win32.RegistryView]::Registry32)) {
@@ -49,19 +66,20 @@ if ($wg) {
     # Poll briefly for the service to actually disappear from SCM.
     for ($i = 0; $i -lt 20; $i++) {
         sc.exe query $ServiceName 2>$null | Out-Null
-        if ($LASTEXITCODE -ne 0) { $removed = $true; break }
+        if ($LASTEXITCODE -eq 1060) { $removed = $true; break }
+        if ($LASTEXITCODE -ne 0) { throw "Cannot confirm removal of $ServiceName" }
         Start-Sleep -Milliseconds 250
     }
 }
 
 if (-not $removed) {
-    # Fallback: stop and delete the service ourselves.
-    sc.exe stop   $ServiceName 2>$null | Out-Null
-    Start-Sleep -Seconds 1
+    # Fallback: the service is already confirmed STOPPED above.
     sc.exe delete $ServiceName 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 1060) { throw "Cannot delete $ServiceName" }
     for ($i = 0; $i -lt 20; $i++) {
         sc.exe query $ServiceName 2>$null | Out-Null
-        if ($LASTEXITCODE -ne 0) { $removed = $true; break }
+        if ($LASTEXITCODE -eq 1060) { $removed = $true; break }
+        if ($LASTEXITCODE -ne 0) { throw "Cannot confirm removal of $ServiceName" }
         Start-Sleep -Milliseconds 250
     }
 }
