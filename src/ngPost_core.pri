@@ -151,6 +151,7 @@ HEADERS += \
     $$PWD/utils/CmdOrGuiApp.h \
     $$PWD/utils/Macros.h \
     $$PWD/utils/PathHelper.h \
+    $$PWD/utils/RandomToken.h \
     $$PWD/utils/PureStaticClass.h \
     $$PWD/utils/SecretMasker.h \
     $$PWD/utils/UpdateChecker.h \

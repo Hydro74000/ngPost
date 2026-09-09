@@ -445,10 +445,6 @@ NgPost::NgPost(int &argc, char *argv[]):
         _hmi->setWindowTitle(QString("%1_v%2").arg(sAppName).arg(sVersion));
 #endif
 
-    // in case we want to generate random uploader (_from not provided)
-//    std::srand(static_cast<uint>(QDateTime::currentMSecsSinceEpoch()));
-    std::srand(QUuid::createUuid().data1); // use more random seed
-
     // check if an embedded par2 implementation sits next to the binary
     // (Windows installer / AppImage). We prefer parpar when present because
     // it does not rely on shell wildcard expansion (see useParPar handling
@@ -1895,7 +1891,7 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
     if (_doCompress)
     {
         if (_genName)
-            _rarName = randomPass(_lengthName);
+            _rarName = randomName(_lengthName);
 
         if (_genPass) // shall we gen password?
             _rarPass = randomPass(_lengthPass);
@@ -2485,12 +2481,7 @@ void NgPost::_error(const QString &error, NgPost::ERROR_CODE code)
 
 QString NgPost::randomPass(uint length) const
 {
-    QString pass, alphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-    int nbLetters = alphabet.length();
-    for (uint i = 0 ; i < length ; ++i)
-        pass.append(alphabet.at(std::rand()%nbLetters));
-
-    return pass;
+    return RandomToken::secret(length);
 }
 
 void NgPost::closeAllPostingJobs()
@@ -3413,7 +3404,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (_doCompress)
     {
         if (_genName)
-            _rarName = randomPass(_lengthName);
+            _rarName = randomName(_lengthName);
 
         if (_genPass)
         {

@@ -1303,7 +1303,7 @@ void PostingJob::_obfuscateInputFileNames(QString const &tmpFolder, QString cons
 
     _files.clear();
     for (const QFileInfo &fileInfo : _originalFiles) {
-        QString randomBase = _ngPost->randomPass(_ngPost->_lengthName);
+        QString randomBase = _ngPost->randomName(_ngPost->_lengthName);
         if (_ngPost->_keepNfoExtension
             && fileInfo.suffix().compare("nfo", Qt::CaseInsensitive) == 0)
             randomBase += ".nfo";
@@ -1605,7 +1605,7 @@ bool PostingJob::_initPosting()
         } else {
             fileGroups = _obfuscateArticles && _ngPost->groupPolicyPerFile()
                          && nbGroups > 1
-                ? QStringList(_grpList.at(std::rand() % nbGroups))
+                ? QStringList(_grpList.at(QRandomGenerator::global()->bounded(nbGroups)))
                 : _grpList;
         }
 

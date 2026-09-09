@@ -364,7 +364,7 @@ void PostingWidget::onPar2CB(bool checked)
 
 void PostingWidget::onGenCompressName()
 {
-    _ui->compressNameEdit->setText(_ngPost->randomPass(static_cast<uint>(_ui->nameLengthSB->value())));
+    _ui->compressNameEdit->setText(_ngPost->randomName(static_cast<uint>(_ui->nameLengthSB->value())));
 }
 
 void PostingWidget::onNzbFileClicked()

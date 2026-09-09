@@ -12,6 +12,7 @@
 #include "utils/PathHelper.h"
 #include "utils/CmdOrGuiApp.h"
 #include "utils/Macros.h"
+#include "utils/RandomToken.h"
 
 #include <QCommandLineOption>
 #include <QDir>
@@ -556,6 +557,7 @@ public:
 
     inline QString randomFrom(ushort length = 13) const;
     QString randomPass(uint length = 13) const;
+    QString randomName(uint length = 13) const { return RandomToken::publicName(length); }
 
     inline QList<QString> languages() const;
 
@@ -887,7 +889,7 @@ QString NgPost::groups() const
 QStringList NgPost::getPostingGroups() const
 {
     if (_groupPolicy == GROUP_POLICY::EACH_POST && _nbGroups > 1)
-        return QStringList(_grpList.at(std::rand() % _nbGroups));
+        return QStringList(_grpList.at(QRandomGenerator::global()->bounded(_nbGroups)));
     else
         return _grpList;
 }
