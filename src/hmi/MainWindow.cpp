@@ -884,6 +884,8 @@ void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes,
     auto *progress = new QProgressDialog(tr("Downloading update..."), tr("Cancel"), 0, 100, this);
     progress->setWindowModality(Qt::WindowModal);
     progress->setAttribute(Qt::WA_DeleteOnClose);
+    progress->setAutoClose(false);
+    progress->setAutoReset(false);
     progress->setMinimumDuration(0);
     progress->setValue(0);
 
@@ -895,16 +897,19 @@ void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes,
                     progress->setValue(static_cast<int>(received));
                 }
             });
-    connect(uc, &UpdateChecker::installStarting, progress, &QProgressDialog::close);
-    connect(uc, &UpdateChecker::downloadFailed, this,
-            [this, progress](const QString &msg) {
+    connect(uc, &UpdateChecker::installStarting, progress, [uc, progress] {
+        // closeEvent emits canceled too. A successful handoff is not a cancel.
+        disconnect(progress, nullptr, uc, nullptr);
+        progress->close();
+    });
+    connect(uc, &UpdateChecker::downloadFailed, progress,
+            [this, uc, progress](const QString &msg) {
+                disconnect(progress, nullptr, uc, nullptr);
                 progress->close();
                 QMessageBox::warning(this, tr("Update failed"), msg);
             });
-    connect(progress, &QProgressDialog::canceled, uc, [uc]() {
-        // Nothing wires this to abort the QNetworkReply for now; close the dialog is enough.
-        Q_UNUSED(uc);
-    });
+    connect(progress, &QProgressDialog::canceled, uc, &UpdateChecker::cancelDownload);
+    connect(progress, &QProgressDialog::canceled, progress, &QObject::deleteLater);
 
     uc->startDownloadAndInstall();
 }

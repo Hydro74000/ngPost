@@ -8,12 +8,107 @@
 #include "utils/UpdateChecker.h"
 
 #include <QtTest>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+
+namespace {
+class FakeUpdateReply : public QNetworkReply {
+public:
+    explicit FakeUpdateReply(QObject *parent) : QNetworkReply(parent) {
+        setAttribute(QNetworkRequest::HttpStatusCodeAttribute, 200);
+        open(QIODevice::ReadOnly);
+    }
+    QByteArray body;
+    bool aborted = false;
+    void abort() override {
+        aborted = true;
+        setError(OperationCanceledError, "canceled");
+        emit finished(); // deliberate synchronous cancellation callback
+    }
+    qint64 bytesAvailable() const override { return body.size() + QNetworkReply::bytesAvailable(); }
+    qint64 readData(char *data, qint64 maximum) override {
+        qint64 size = qMin(maximum, qint64(body.size()));
+        memcpy(data, body.constData(), size_t(size));
+        body.remove(0, size);
+        return size;
+    }
+    void deliver(QByteArray bytes) { body = bytes; emit readyRead(); }
+    void finish() { emit finished(); }
+};
+class FakeUpdateNetwork : public QNetworkAccessManager {
+public:
+    FakeUpdateReply *last = nullptr;
+    QNetworkReply *createRequest(Operation, const QNetworkRequest &, QIODevice *) override {
+        last = new FakeUpdateReply(this);
+        return last;
+    }
+};
+}
 
 class TestUpdateChecker : public QObject
 {
     Q_OBJECT
 
 private slots:
+    void canceled_download_cannot_corrupt_a_retry() {
+        FakeUpdateNetwork network;
+        UpdateChecker checker(nullptr, &network);
+        checker._work.reset(new QTemporaryDir);
+        QVERIFY(checker._work->isValid());
+        QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
+        bool completed = false;
+        checker.downloadFile(QUrl("https://github.com/a"), "first", 8, [&] { completed = true; });
+        auto stale = network.last;
+        stale->deliver("part");
+        checker.cancelDownload();
+        QVERIFY(stale->aborted);
+        QVERIFY(!completed);
+        QCOMPARE(errors.size(), 0);
+        checker._cancelled = false;
+        checker.downloadFile(QUrl("https://github.com/b"), "second", 8, [&] { completed = true; });
+        stale->finish(); // late signal must not clear the new reply or its file
+        network.last->deliver("new data");
+        network.last->finish();
+        QVERIFY(completed);
+        QCOMPARE(errors.size(), 0);
+        QFile output(checker._work->filePath("second"));
+        QVERIFY(output.open(QIODevice::ReadOnly));
+        QCOMPARE(output.readAll(), QByteArray("new data"));
+    }
+    void download_limit_aborts_without_completing() {
+        FakeUpdateNetwork network;
+        UpdateChecker checker(nullptr, &network);
+        checker._work.reset(new QTemporaryDir);
+        bool completed = false;
+        QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
+        checker.downloadFile(QUrl("https://github.com/a"), "archive", 3, [&] { completed = true; });
+        network.last->deliver("too long");
+        QVERIFY(network.last->aborted);
+        QVERIFY(!completed);
+        QCOMPARE(errors.size(), 1);
+    }
+    void teardown_preserves_successful_handoff() {
+        QTemporaryDir work;
+        const QString path = work.path();
+        {
+            UpdateChecker checker(nullptr, nullptr);
+            checker._work.reset(new QTemporaryDir(path + "/transaction-XXXXXX"));
+            checker._work->setAutoRemove(false);
+            checker._handoff = true;
+        }
+        QDir directory(path);
+        const auto transactions = directory.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        QCOMPARE(transactions.size(), 1);
+        QVERIFY(!QFileInfo::exists(path + "/" + transactions.first() + "/cancelled"));
+    }
+    void trusted_urls() {
+        QVERIFY(UpdateChecker::isTrustedDownloadUrl(QUrl("https://github.com/a")));
+        QVERIFY(UpdateChecker::isTrustedDownloadUrl(QUrl("https://release-assets.githubusercontent.com/a")));
+        for (const QString &url : {"http://github.com/a", "https://evilgithub.com/a",
+             "https://github.com.attacker.test/a", "https://user:pass@github.com/a",
+             "https://github.com:444/a", "file:///tmp/archive"})
+            QVERIFY2(!UpdateChecker::isTrustedDownloadUrl(QUrl(url)), qPrintable(url));
+    }
     //! Plain releases order by their numbers, and equal numbers are not newer.
     void stable_releases_order_by_number();
 
@@ -133,5 +228,5 @@ void TestUpdateChecker::a_stable_install_keeps_the_answers_it_had()
     }
 }
 
-QTEST_APPLESS_MAIN(TestUpdateChecker)
+QTEST_GUILESS_MAIN(TestUpdateChecker)
 #include "tst_UpdateChecker.moc"

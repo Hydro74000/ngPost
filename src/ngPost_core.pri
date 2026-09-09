@@ -11,6 +11,7 @@
 lessThan(QT_MAJOR_VERSION, 6): error("ngPost requires Qt 6 (qtkeychain-qt6). Use qmake6, not qmake/qmake-qt5.")
 
 QT += core network sql
+RESOURCES += $$PWD/utils/update/update.qrc
 
 # Cross-platform credential store (QtKeychain) for OpenVPN auth.
 # Packages: Fedora qtkeychain-qt6, Ubuntu libqt6keychain1-dev, brew qtkeychain.

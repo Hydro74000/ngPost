@@ -10,20 +10,28 @@
 #include <QObject>
 #include <QString>
 #include <QUrl>
+#include <QPointer>
+#include <QTemporaryDir>
+#include <QFile>
+#include <memory>
+#include <functional>
 
 class NgPost;
 class QNetworkAccessManager;
 class QNetworkReply;
+class QProcess;
 
 class UpdateChecker : public QObject
 {
     Q_OBJECT
 public:
     explicit UpdateChecker(NgPost *ngPost, QNetworkAccessManager *netMgr, QObject *parent = nullptr);
+    ~UpdateChecker() override;
 
     void checkLatestRelease();
 
     static bool    isAppImage();
+    static bool isTrustedDownloadUrl(const QUrl &url);
 
     //! True when \a candidate supersedes \a current, both given as release
     //! tags. Numbers first; on a tie a stable release beats a pre-release of
@@ -54,16 +62,19 @@ signals:
 
 public slots:
     void startDownloadAndInstall();
+    void cancelDownload();
 
 private slots:
     void onReleaseInfoReceived();
-    void onAssetDownloadFinished();
 
 private:
+#ifdef NGPOST_TESTING
+    friend class TestUpdateChecker;
+#endif
     QString assetNameForCurrentOS(const QString &tag) const;
-    bool    runInstallerWindows(const QString &archivePath);
-    bool    runInstallerMacOS(const QString &archivePath);
-    bool    runInstallerLinux(const QString &archivePath);
+    void downloadFile(const QUrl &url, const QString &name, qint64 cap, std::function<void()> done);
+    void prepareInstall();
+    void failDownload(const QString &message);
 
     static const QString sReleaseApiUrl;
     static const QString sReleaseListApiUrl;
@@ -74,6 +85,15 @@ private:
     NgPost                *_ngPost;
     QNetworkAccessManager *_netMgr;
     QNetworkReply         *_reply;
+    QPointer<QNetworkReply> _downloadReply;
+    QPointer<QProcess> _installer;
+    std::unique_ptr<QTemporaryDir> _work;
+    std::unique_ptr<QFile> _downloadFile;
+    QString _installDir, _python, _openssl;
+    bool _busy = false;
+    bool _cancelled = false;
+    bool _handoff = false;
+    quint64 _generation = 0;
 
     QString _latestTag;
     QString _releaseNotes;
