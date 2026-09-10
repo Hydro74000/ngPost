@@ -229,6 +229,8 @@ public:
     void setAutoStartedByJobForTest(bool value) { _autoStartedByJob = value; }
     void setBackendStartInProgressForTest(bool value) { _backendStartInProgress = value; }
     bool finishBackendStartForTest(bool started) { return _finishBackendStart(started); }
+    void setRuntimeAuthFileForTest(QString const &path) { _runtimeAuthFilePath = path; }
+    void shredRuntimeAuthFileForTest() { _shredRuntimeAuthFile(); }
     static bool linuxOwnerManifestForTest(QByteArray bytes, qint64 *ownerPid,
                                           QString *ownerStart);
     static bool helperDeclaresProtocol2ForTest(QByteArray const &prefix);

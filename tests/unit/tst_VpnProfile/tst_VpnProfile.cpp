@@ -197,6 +197,7 @@ private slots:
     void synchronous_confirmed_cleanup_does_not_reenter_twice();
     void confirmed_recovery_exhaustion_waits_for_stop();
     void confirmed_external_restart_preserves_job_and_attempt();
+    void runtime_auth_cleanup_waits_for_confirmed_shutdown();
     void backend_reports_one_terminal_event_per_run();
     void helper_specific_error_then_finished_reports_one_terminal_event();
     void auto_disconnect_callback_is_guarded_after_suspect();
@@ -678,6 +679,30 @@ void TestVpnProfile::confirmed_external_restart_preserves_job_and_attempt()
         if (entry.first().toString().contains(QStringLiteral("external restart attempt"))) ++attempts;
     QCOMPARE(attempts, 1);
     manager.stop();
+}
+
+void TestVpnProfile::runtime_auth_cleanup_waits_for_confirmed_shutdown()
+{
+    HomeSandbox sandbox;
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    QString const path = temporary.filePath(QStringLiteral("auth.txt"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("fixture-user\nfixture-password\n");
+    file.close();
+    VpnManager manager;
+    auto *backend = new FakeVpnBackend;
+    backend->confirmedShutdown = backend->deferStop = true;
+    manager.setBackendForTest(backend);
+    manager.setRuntimeAuthFileForTest(path);
+    manager.shredRuntimeAuthFileForTest();
+    QVERIFY(QFileInfo::exists(path));
+    QVERIFY(!manager.finishBackendStartForTest(false));
+    manager.shredRuntimeAuthFileForTest();
+    QVERIFY(QFileInfo::exists(path));
+    backend->confirmStopped();
+    QVERIFY(!QFileInfo::exists(path));
 }
 
 void TestVpnProfile::backend_reports_one_terminal_event_per_run()

@@ -818,6 +818,11 @@ bool VpnManager::_finishBackendStart(bool started)
 
 void VpnManager::_shredRuntimeAuthFile()
 {
+    // One policy for start failure, restart and recovery exhaustion: do not
+    // remove credentials while a backend requiring confirmed stop still owns
+    // the tunnel. Each completion path calls us again after termination.
+    if (_currentBackend && _currentBackend->requiresConfirmedStop()
+        && _currentBackend->isRunning()) return;
     if (_runtimeAuthFilePath.isEmpty())
         return;
     QFile f(_runtimeAuthFilePath);
