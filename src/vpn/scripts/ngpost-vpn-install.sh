@@ -38,10 +38,22 @@ grep -qx 'readonly NGPOST_VPN_HELPER_SECURITY_REVISION=3' "$SRC/ngpost-vpn-helpe
     || { echo "ERROR helper security revision 3 required"; exit 1; }
 bash -n "$SRC/ngpost-vpn-helper.sh"
 
-# Must run under pkexec — that's how we discover who is asking.
-[ -n "${PKEXEC_UID:-}" ] || { echo "ERROR no PKEXEC_UID (must run via pkexec)"; exit 1; }
-USER_NAME=$(getent passwd "$PKEXEC_UID" | cut -d: -f1)
-[ -n "$USER_NAME" ] || { echo "ERROR cannot resolve PKEXEC_UID=$PKEXEC_UID"; exit 1; }
+# PKEXEC_UID identifies the authenticated caller. Validate before lookup.
+if ! [[ "$PKEXEC_UID" =~ ^(0|[1-9][0-9]{0,9})$ ]] \
+    || [[ "$PKEXEC_UID" -gt 4294967294 ]]; then
+    echo "ERROR invalid caller UID"
+    exit 1
+fi
+USER_RECORD=$(getent passwd "$PKEXEC_UID")
+USER_ID=$(printf '%s\n' "$USER_RECORD" | cut -d: -f3)
+[[ "$USER_ID" == "$PKEXEC_UID" ]] \
+    || { echo "ERROR cannot resolve caller UID"; exit 1; }
+USER_NAME=$(printf '%s\n' "$USER_RECORD" | cut -d: -f1)
+# Polkit's JavaScript Subject exposes user, not a portable uid property.
+# Allow only ASCII names safe in BOTH sed replacement and a JS string.
+# Unsupported directory-service names fail closed instead of guessing escapes.
+[[ "$USER_NAME" =~ ^[a-zA-Z_][a-zA-Z0-9_.@-]*[$]?$ ]] \
+    || { echo "ERROR unsupported caller name for Polkit rule"; exit 1; }
 
 # Install runtime scripts. /var/lib stays writable on atomic distros.
 install -d -m 755 /var/lib/ngpost
@@ -72,4 +84,4 @@ sed "s|@@USER@@|$USER_NAME|g" "$SRC/49-ngpost-vpn.rules.in" \
 chmod 644 /etc/polkit-1/rules.d/49-ngpost-vpn.rules
 chown root:root /etc/polkit-1/rules.d/49-ngpost-vpn.rules
 
-echo "INSTALLED user=$USER_NAME helper=/var/lib/ngpost/ngpost-vpn-helper.sh"
+echo "INSTALLED uid=$USER_ID helper=/var/lib/ngpost/ngpost-vpn-helper.sh"

@@ -28,9 +28,9 @@ class HelperUpgradeTests(unittest.TestCase):
             installed.chmod(0o755)
             rule.write_text('// legacy passwordless authorization\n')
 
-        def migrate(directory):
+        def migrate(directory, uid='0', extra_env=None):
             return subprocess.run(['bash', str(source / 'scripts/ngpost-vpn-install.sh'),
-                                   str(directory)], env=dict(os.environ, PKEXEC_UID='0'),
+                                   str(directory)], env=dict(os.environ, PKEXEC_UID=uid, **(extra_env or {})),
                                   capture_output=True, text=True, timeout=15)
 
         with tempfile.TemporaryDirectory() as temporary:
@@ -52,7 +52,39 @@ class HelperUpgradeTests(unittest.TestCase):
             self.assertEqual(installed.stat().st_uid, 0)
             self.assertEqual(installed.stat().st_mode & 0o777, 0o755)
             self.assertTrue(rule.exists())
-            self.assertNotIn('@@USER@@', rule.read_text())
+            self.assertNotIn('@@', rule.read_text())
+            self.assertIn('subject.user === "root"', rule.read_text())
+
+            for uid in ('0|bad', '0"bad', '0\\bad', '0&bad', '0\n1', '-1',
+                        '00', '4294967295', '99999999999999999999'):
+                with self.subTest(uid=uid):
+                    legacy()
+                    result = migrate(directory, uid)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(rule.exists())
+                    self.assertEqual(installed.stat().st_mode & 0o111, 0)
+
+            # Directory-service names with JS/sed metacharacters are rejected
+            # before installing anything executable. No account is created.
+            stubs = directory / 'stubs'
+            stubs.mkdir()
+            getent = stubs / 'getent'
+            for name in ('odd"name', 'odd|name', 'odd&name', 'odd\\name',
+                         'odd\nname', 'odd name', 'normal_user', 'User.Name@example', 'machine$'):
+                with self.subTest(name=name):
+                    import shlex
+                    record = name + ':x:0:0:fixture:/tmp:/bin/false'
+                    getent.write_text("#!/bin/sh\nprintf '%s\\n' " + shlex.quote(record) + '\n')
+                    getent.chmod(0o755)
+                    legacy()
+                    result = migrate(directory, extra_env={'PATH': str(stubs) + os.pathsep + os.environ['PATH']})
+                    if name in ('normal_user', 'User.Name@example', 'machine$'):
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertIn('subject.user === "' + name + '"', rule.read_text())
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertFalse(rule.exists())
+                        self.assertEqual(installed.stat().st_mode & 0o111, 0)
 
 
 if __name__ == '__main__':
