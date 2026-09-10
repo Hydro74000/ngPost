@@ -1051,6 +1051,8 @@ jobs:
     needs: [release-metadata, build-linux, build-windows, build-macos, build-appimage, test-unit, test-integration, test-gui, test-vpn]
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     # Push to master/devel always publishes. A manual workflow_dispatch only
     # publishes when its "publish" input is checked — leaving it unchecked
     # gives a build-only run (artifacts uploaded, no GitHub release created).
@@ -1106,6 +1108,12 @@ jobs:
         run: |
           python3 .github/scripts/release-checksums.py
           (cd artifacts && sha256sum --check SHA256SUMS)
+      # GitHub OIDC + Sigstore: no maintainer signing key or paid certificate.
+      # Includes the final packages, SBOM and both checksum manifests.
+      - name: Attest release provenance (keyless)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: artifacts/*
       - name: Generate release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1175,8 +1183,9 @@ jobs:
             echo
             echo "## SHA-256 integrity checks"
             echo
-            echo 'Packages are unsigned. SHA256SUMS and manifest.json are attached to this release.'
+            echo 'Packages have no Windows/Apple code signature. SHA256SUMS and manifest.json are attached.'
             echo 'These hashes verify file integrity, not independent publisher authenticity.'
+            echo 'GitHub keyless provenance is available separately: gh attestation verify FILE -R Hydro74000/ngPost --signer-workflow Hydro74000/ngPost/.github/workflows/release.yml'
             echo
             echo '```text'
             cat artifacts/SHA256SUMS

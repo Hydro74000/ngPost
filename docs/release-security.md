@@ -3,8 +3,9 @@
 À la demande du mainteneur, ngPost ne signe plus ses propres exécutables,
 installateurs ou manifestes. Aucune identité Windows/Apple, aucun secret de
 signature ni approbation de l'environnement release-signing n'est nécessaire
-aux builds et publications. La notarisation Apple et les attestations signées
-ont été retirées du workflow. Les signatures des outils tiers distribués par
+aux builds et publications. La notarisation Apple reste désactivée. Une
+attestation de provenance keyless GitHub est produite séparément, sans clé
+ni certificat à fournir par le mainteneur. Les signatures des outils tiers distribués par
 leurs fournisseurs ne sont pas modifiées.
 
 ## Ce que contient chaque nouvelle release
@@ -55,10 +56,32 @@ Avec tous les artefacts présents dans le même dossier, Linux permet aussi :
 
     sha256sum --check SHA256SUMS
 
+## Provenance keyless, distincte des signatures Windows/Apple
+
+Après les hashes, la CI atteste les paquets définitifs, le SBOM, `SHA256SUMS`
+et `manifest.json` via GitHub OIDC et Sigstore. Le certificat éphémère est
+automatiquement délivré : aucun achat, secret de signature ou environnement
+protégé à configurer. Un échec d'attestation bloque la publication.
+
+Pour vérifier un fichier téléchargé et l'identité du workflow :
+
+    gh attestation verify FICHIER -R Hydro74000/ngPost --signer-workflow Hydro74000/ngPost/.github/workflows/release.yml
+
+Comparer aussi le commit source à celui attendu ; `gh attestation verify`
+permet de l'imposer avec `--source-digest SHA_COMPLET`. Cette valeur doit
+provenir d'une référence de confiance, pas uniquement de la release à vérifier.
+L'attestation lie un digest à une exécution du workflow ; elle ne garantit pas
+l'innocuité du code ni la sécurité d'un workflow compromis. L'updater intégré
+ne vérifie pas encore ces attestations : son contrôle obligatoire reste SHA-256.
+
+Références : [GitHub Actions](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)
+et [vérification CLI](https://cli.github.com/manual/gh_attestation_verify).
+
 ## Protections CI conservées
 
 Permissions contents: read par défaut, contents: write uniquement pour le
-job de publication ; actions épinglées à un SHA complet ; publication
+job de publication, qui possède aussi `id-token: write` et `attestations: write`
+pour la provenance keyless ; actions épinglées à un SHA complet ; publication
 conditionnée aux suites unitaires, intégration, GUI et VPN. Les secrets de
 signature ne sont plus référencés et aucun environnement protégé ne bloque
 la publication. Les dépendances des scripts de compilation ne sont pas toutes
