@@ -1,81 +1,85 @@
-# Publication sécurisée
+# Publications sans certificats — vérification SHA-256
 
-Les workflows disposent de `contents: read` par défaut. Seul le job de
-publication possède les droits d’écriture de release et d’attestation ; il
-dépend des suites unitaires, d’intégration, GUI et VPN. Les actions externes
-sont épinglées à des commits complets. Les dépendances téléchargées par les
-scripts de compilation ne sont pas toutes épinglées : cela reste un chantier
-distinct de reproductibilité de la chaîne de compilation.
+À la demande du mainteneur, ngPost ne signe plus ses propres exécutables,
+installateurs ou manifestes. Aucune identité Windows/Apple, aucun secret de
+signature ni approbation de l'environnement release-signing n'est nécessaire
+aux builds et publications. La notarisation Apple et les attestations signées
+ont été retirées du workflow. Les signatures des outils tiers distribués par
+leurs fournisseurs ne sont pas modifiées.
 
-## État de configuration
+## Ce que contient chaque nouvelle release
 
-La clé publique RSA 4096 bits est maintenant embarquée dans les ressources Qt
-communes aux builds Linux, Windows et macOS (y compris les exécutables fournis
-par les setups). Sa partie privée est stockée dans le secret d’environnement
-GitHub `RELEASE_SIGNING_KEY`, jamais dans le dépôt ou les artefacts.
+- Les paquets Linux, Windows, macOS, les setups et les fichiers AppImage/zsync.
+- Un SBOM SPDX décrivant les composants détectés.
+- SHA256SUMS : une ligne SHA-256 par artefact.
+- manifest.json : tag, nom, taille et SHA-256 de chaque artefact, pour l'updater.
+- Les mêmes hashes, visibles directement dans le texte de la release GitHub.
 
-Empreinte SHA-256 de la clé publique (SPKI DER) :
+Le générateur .github/scripts/release-checksums.py calcule les hashes sur les
+fichiers définitifs, après compilation et packaging. La CI les revérifie avant
+publication. Les manifestes ne sont pas signés et aucun fichier .sig n'est
+produit. Les releases déjà publiées ne sont pas modifiées rétroactivement.
 
-```text
-bd849b083dd61a9598515c09fdd579e3b8ca7d9620ff5073ac06d1fe717c9811
-```
+## Ce que vérifie ngPost
 
-L’environnement `release-signing` est limité aux branches `devel` et `master`
-et demande l’approbation de `Hydro74000`. Le workflow **Release signing key
-check** vérifie la correspondance secret/clé publique sans créer de release.
-Son approbation ne vaut pas approbation du workflow **Build and Release**.
-La première [vérification réelle en CI](https://github.com/Hydro74000/ngPost/actions/runs/34456555994)
-a réussi le 10 septembre 2026 : signature d’une preuve non publiable avec le
-secret GitHub, puis vérification avec la clé publique embarquée.
-Les exécutions manuelles avec `publish: false` utilisent `build-only`, sans
-secret de production ni certificat de plateforme.
+L'updater récupère le manifeste et le paquet depuis la même release GitHub
+via HTTPS et une liste stricte d'hôtes autorisés. Il refuse toute installation
+si le manifeste manque, si le tag ou le nom ne correspond pas, si la taille
+est incorrecte ou si le SHA-256 calculé sur le fichier téléchargé diffère.
 
-Les certificats officiels Windows/Apple ne sont pas créés par cette opération.
-Tant qu’ils manquent, ne pas approuver une publication de production : les
-étapes de signature refuseront de publier sans ces identités. Les builds et
-tests ordinaires continuent sans elles.
+Ce contrôle vérifie l'intégrité par rapport au hash publié. Il ne prouve pas
+indépendamment l'identité de l'éditeur : si le compte GitHub est compromis,
+un attaquant pourrait remplacer à la fois le fichier et son hash. Ce choix
+est explicite, sans prétendre offrir la garantie d'une signature numérique.
 
-## Secrets attendus
+Les systèmes peuvent afficher des avertissements pour les logiciels non
+signés. Le contrôle SHA-256 de ngPost ne remplace pas la confiance de Windows
+ou de Gatekeeper.
 
-L’environnement GitHub `release-signing` utilise les secrets :
+## Vérification manuelle
 
-- `RELEASE_SIGNING_KEY` : clé privée PEM RSA (3072 bits minimum), correspondant
-  à la clé publique dans `src/utils/update/update-key.pem` (déjà configuré) ;
-- `WINDOWS_SIGNING_PFX` (PFX encodé base64), `WINDOWS_SIGNING_PASSWORD` ;
-- `MACOS_SIGNING_P12` (base64), `MACOS_SIGNING_PASSWORD`, `MACOS_SIGNING_IDENTITY`,
-  `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID`.
+Télécharger le paquet et SHA256SUMS depuis la même release. Sous Linux :
 
-Conserver les protections de l’environnement et protéger les tags de release
-selon les règles du dépôt. Aucun secret ni certificat privé de production
-n’est fourni par le code. Sans les identités requises, la publication échoue : elle
-ne retombe pas sur une publication non signée. Une exécution manuelle avec
-`publish: false` permet la compilation sans signature de plateforme.
+    sha256sum ngPost-<version>-linux-x86_64.tar.gz
 
-Les exécutables et installateurs Windows sont signés et vérifiés avec
-Authenticode. Le bundle macOS est signé, soumis à notarisation puis agrafé.
-Le job final produit un SBOM SPDX des artefacts, signe `SHA256SUMS` et le
-`manifest.json` consommé par l’updater, puis atteste les fichiers publiés.
-Ce SBOM décrit ce que l’analyse des paquets binaires détecte, pas une garantie
-d’inventaire exhaustif des dépendances statiquement liées. L’attestation
-identifie le workflow de publication, sans rendre les builds reproductibles.
+Sous macOS :
 
-Le ZIP macOS utilise `ditto --keepParent` pour préserver le bundle signé,
-conformément au [guide de distribution Apple](https://developer.apple.com/documentation/xcode/packaging-mac-software-for-distribution).
+    shasum -a 256 ngPost-<version>-macos.zip
 
-Une publication réelle sur les trois plateformes reste à valider par les
-mainteneurs munis des identités de signature. Le VPN reste exclu de macOS.
+Sous PowerShell :
 
-## Sauvegarde et rotation
+    Get-FileHash .\ngPost-<version>-windows-x86_64.zip -Algorithm SHA256
 
-Une copie locale de la clé privée a été conservée hors du dépôt, dans un
-répertoire accessible uniquement à son propriétaire. La sauvegarder dans un
-coffre chiffré : GitHub ne permet pas de relire la valeur d’un secret.
-Ne pas recréer une paire pour chaque build et ne pas remplacer la clé publique
-seule après déploiement. Une rotation nécessite une transition de confiance
-explicitement conçue et validée pour les clients déjà distribués.
+Comparer le résultat à la ligne du même fichier dans SHA256SUMS.
+Avec tous les artefacts présents dans le même dossier, Linux permet aussi :
 
-Pour vérifier uniquement la partie publique :
+    sha256sum --check SHA256SUMS
 
-```sh
-python3 .github/scripts/check-release-key.py
-```
+## Protections CI conservées
+
+Permissions contents: read par défaut, contents: write uniquement pour le
+job de publication ; actions épinglées à un SHA complet ; publication
+conditionnée aux suites unitaires, intégration, GUI et VPN. Les secrets de
+signature ne sont plus référencés et aucun environnement protégé ne bloque
+la publication. Les dépendances des scripts de compilation ne sont pas toutes
+épinglées ; le SBOM ne garantit pas l'inventaire complet des bibliothèques
+statiquement liées.
+
+La clé privée précédemment créée reste conservée localement hors Git ainsi
+que dans le secret GitHub existant, désormais inutilisé. Elle n'a pas été
+détruite. La clé publique et les scripts de signature retirés restent
+récupérables dans l'historique Git.
+
+Le VPN reste exclu de macOS. Voir checksum-updates.md pour le contrat technique.
+
+## Validation du retrait des signatures
+
+- Build Qt 6 Linux et lancement `--version` réussis, compilation séquentielle `make -j1`.
+- `tst_UpdateChecker` : 13 succès, aucune erreur.
+- Tests Python : 14 succès ; le test privilégié de migration Linux est ignoré
+  hors conteneur jetable explicitement autorisé.
+- Génération des hashes sans secret, concordance fichier/manifeste,
+  reproductibilité, rejet des signatures résiduelles et liens symboliques testés.
+- Hash absent, mal formé ou différent : installation refusée avant extraction.
+- Les six workflows YAML sont syntaxiquement valides. Les builds natifs
+  Windows/macOS et la publication finale restent à confirmer par la nouvelle CI.

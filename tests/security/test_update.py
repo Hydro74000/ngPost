@@ -2,7 +2,6 @@ import importlib.util
 import io
 import json
 from pathlib import Path
-import subprocess
 import tempfile
 import tarfile
 import unittest
@@ -63,25 +62,45 @@ class UpdateTests(unittest.TestCase):
             with mock.patch.object(updater, 'MAX_BYTES', 4), self.assertRaises(ValueError):
                 updater.extract(root / 'a.zip', root / 'out')
 
-    def test_signed_manifest_and_tampering(self):
+    def test_checksum_manifest_and_tampering(self):
         import hashlib
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            subprocess.run(['openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt', 'rsa_keygen_bits:2048', '-out', str(root / 'private')], check=True, capture_output=True)
-            subprocess.run(['openssl', 'pkey', '-in', str(root / 'private'), '-pubout', '-out', str(root / 'key.pem')], check=True, capture_output=True)
             data = b'archive content'
             (root / 'archive').write_bytes(data)
             (root / 'manifest.json').write_text(json.dumps({'schema': 1, 'tag': 'v1.0', 'assets': [{'name': 'a.zip', 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()}]}))
-            subprocess.run(['openssl', 'dgst', '-sha256', '-sign', str(root / 'private'), '-out', str(root / 'manifest.sig'), str(root / 'manifest.json')], check=True)
-            updater.verify(root, 'v1.0', 'a.zip', 'openssl')
+            updater.verify(root, 'v1.0', 'a.zip')
             with self.assertRaises(ValueError):
-                updater.verify(root, 'v2.0', 'a.zip', 'openssl')
+                updater.verify(root, 'v2.0', 'a.zip')
             (root / 'archive').write_bytes(b'X' * len(data))
             with self.assertRaises(ValueError):
-                updater.verify(root, 'v1.0', 'a.zip', 'openssl')
+                updater.verify(root, 'v1.0', 'a.zip')
             (root / 'manifest.json').write_text('{}')
-            with self.assertRaises(subprocess.CalledProcessError):
-                updater.verify(root, 'v1.0', 'a.zip', 'openssl')
+            with self.assertRaises(ValueError):
+                updater.verify(root, 'v1.0', 'a.zip')
+
+    def test_malformed_or_missing_checksum_blocks_before_extraction(self):
+        import hashlib
+        record = {'name': 'a.zip', 'size': 1, 'sha256': hashlib.sha256(b'x').hexdigest()}
+        bad_assets = [[], [record, record], [dict(record, sha256='x')],
+                      [dict(record, sha256=None)], [dict(record, size=True)],
+                      [dict(record, size=-1)], [dict(record, size=1024**3 + 1)],
+                      ['not a record']]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'archive').write_bytes(b'x')
+            with self.assertRaises(FileNotFoundError):
+                updater.verify(root, 'v1', 'a.zip')
+            for assets in bad_assets:
+                (root / 'manifest.json').write_text(json.dumps({'schema': 1, 'tag': 'v1', 'assets': assets}))
+                with self.subTest(assets=assets), mock.patch.object(updater, 'extract') as extract:
+                    with self.assertRaises(ValueError):
+                        updater.prepare(root, 'v1', 'a.zip', root / 'installation')
+                    extract.assert_not_called()
+            for malformed in ('[]', '{"schema":1,"schema":1}', 'x' * (1024**2 + 1)):
+                (root / 'manifest.json').write_text(malformed)
+                with self.assertRaises(ValueError):
+                    updater.verify(root, 'v1', 'a.zip')
 
     def test_windows_failed_second_rename_restores_previous(self):
         with tempfile.TemporaryDirectory() as temporary:

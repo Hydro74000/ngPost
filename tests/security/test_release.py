@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -5,64 +6,63 @@ import subprocess
 import tempfile
 import unittest
 
-
-SCRIPT = Path(__file__).resolve().parents[2] / '.github/scripts/sign-release.py'
-CHECK = SCRIPT.with_name('check-release-key.py')
+SCRIPT = Path(__file__).resolve().parents[2] / '.github/scripts/release-checksums.py'
 
 
-class ReleaseSigningTests(unittest.TestCase):
-    def test_key_provisioning_check(self):
+class ReleaseChecksumTests(unittest.TestCase):
+    def test_hashes_cover_every_artifact_without_keys_and_are_repeatable(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            private, public = root / 'private.pem', root / 'public.pem'
-            subprocess.run(['openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt',
-                            'rsa_keygen_bits:3072', '-out', str(private)], check=True,
-                           capture_output=True)
-            subprocess.run(['openssl', 'pkey', '-in', str(private), '-pubout',
-                            '-out', str(public)], check=True, capture_output=True)
-            command = ['python3', str(CHECK), '--public', str(public)]
-            subprocess.run(command, check=True, capture_output=True)
-            env = dict(os.environ, RELEASE_SIGNING_KEY='')
-            self.assertNotEqual(subprocess.run(command + ['--require-private'], env=env,
-                                capture_output=True).returncode, 0)
-            env['RELEASE_SIGNING_KEY'] = private.read_text()
-            result = subprocess.run(command + ['--require-private'], env=env,
-                                    check=True, capture_output=True)
-            self.assertNotIn(b'PRIVATE KEY', result.stdout + result.stderr)
-            self.assertNotEqual(subprocess.run(['python3', str(CHECK), '--public', str(private)],
-                                capture_output=True).returncode, 0)
-
-    def test_signing_requires_matching_key_and_covers_assets(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / 'artifacts').mkdir()
-            (root / 'artifacts/test.zip').write_bytes(b'package')
-            public = root / 'src/utils/update/update-key.pem'
-            public.parent.mkdir(parents=True)
-            private = root / 'private.pem'
-            subprocess.run(['openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt',
-                            'rsa_keygen_bits:2048', '-out', str(private)], check=True,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run(['openssl', 'pkey', '-in', str(private), '-pubout',
-                            '-out', str(public)], check=True, stdout=subprocess.DEVNULL)
-            env = dict(os.environ, RELEASE_TAG='v-test', RELEASE_SIGNING_KEY='')
+            artifacts = root / 'artifacts'
+            artifacts.mkdir()
+            names = ['ngPost-v5.6-linux.tar.gz', 'ngPost-v5.6-windows.zip',
+                     'ngPost-v5.6-setup.exe', 'ngPost-v5.6-macos.zip',
+                     'ngPost-v5.6.AppImage', 'ngPost-v5.6.AppImage.zsync', 'ngPost.spdx.json']
+            for name in names:
+                (artifacts / name).write_bytes(name.encode())
+            env = {k: v for k, v in os.environ.items() if not any(x in k for x in ('SIGNING', 'APPLE_'))}
+            env['RELEASE_TAG'] = 'v5.6'
             command = ['python3', str(SCRIPT)]
-            self.assertNotEqual(subprocess.run(command, cwd=root, env=env,
-                                capture_output=True).returncode, 0)
-            # The failed run wrote unsigned manifests; don't treat these as input assets.
-            for name in ('manifest.json', 'SHA256SUMS'):
-                (root / 'artifacts' / name).unlink()
-            env['RELEASE_SIGNING_KEY'] = private.read_text()
             subprocess.run(command, cwd=root, env=env, check=True, capture_output=True)
-            manifest = json.loads((root / 'artifacts/manifest.json').read_text())
-            self.assertEqual([a['name'] for a in manifest['assets']], ['test.zip'])
-            for name in ('manifest.json', 'SHA256SUMS'):
-                verify = ['openssl', 'dgst', '-sha256', '-verify', str(public),
-                          '-signature', str(root / 'artifacts' / (name + '.sig')),
-                          str(root / 'artifacts' / name)]
-                subprocess.run(verify, check=True, capture_output=True)
-                (root / 'artifacts' / name).write_bytes(b'tampered')
-                self.assertNotEqual(subprocess.run(verify, capture_output=True).returncode, 0)
-            public.write_text('invalid key')
-            self.assertNotEqual(subprocess.run(command, cwd=root, env=env,
-                                capture_output=True).returncode, 0)
+            manifest = json.loads((artifacts / 'manifest.json').read_text())
+            self.assertEqual(manifest['tag'], 'v5.6')
+            self.assertEqual([a['name'] for a in manifest['assets']], sorted(names))
+            expected_lines = []
+            for asset in manifest['assets']:
+                data = (artifacts / asset['name']).read_bytes()
+                digest = hashlib.sha256(data).hexdigest()
+                self.assertEqual(asset['sha256'], digest)
+                self.assertEqual(asset['size'], len(data))
+                expected_lines.append(digest + '  ' + asset['name'] + '\n')
+            sums = (artifacts / 'SHA256SUMS').read_text()
+            self.assertEqual(sums, ''.join(expected_lines))
+            subprocess.run(command, cwd=root, env=env, check=True, capture_output=True)
+            self.assertEqual(json.loads((artifacts / 'manifest.json').read_text()), manifest)
+            self.assertEqual((artifacts / 'SHA256SUMS').read_text(), sums)
+            self.assertFalse(list(artifacts.glob('*.sig')))
+
+    def test_invalid_assets_and_empty_release_are_rejected(self):
+        for name in (None, 'bad\nname.zip', 'manifest.json.sig'):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                (root / 'artifacts').mkdir()
+                if name:
+                    (root / 'artifacts' / name).write_bytes(b'bad')
+                result = subprocess.run(['python3', str(SCRIPT)], cwd=root,
+                                        env=dict(os.environ, RELEASE_TAG='v5.6'), capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+
+    def test_output_symlinks_are_rejected_without_overwriting_target(self):
+        for name in ('manifest.json', 'SHA256SUMS'):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                artifacts = root / 'artifacts'
+                artifacts.mkdir()
+                target = root / 'keep.txt'
+                target.write_bytes(b'keep')
+                (artifacts / 'app.zip').write_bytes(b'archive')
+                (artifacts / name).symlink_to(target)
+                result = subprocess.run(['python3', str(SCRIPT)], cwd=root,
+                                        env=dict(os.environ, RELEASE_TAG='v5.6'), capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(target.read_bytes(), b'keep')

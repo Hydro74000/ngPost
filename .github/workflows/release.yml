@@ -25,9 +25,6 @@ on:
 permissions:
   contents: read
 
-env:
-  REQUIRE_RELEASE_SIGNATURES: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
-
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -209,7 +206,6 @@ jobs:
           path: dist/*.tar.gz
 
   build-windows:
-    environment: ${{ (github.event_name != 'workflow_dispatch' || inputs.publish) && 'release-signing' || 'build-only' }}
     name: Build Windows
     runs-on: windows-latest
     needs: release-metadata
@@ -440,12 +436,6 @@ jobs:
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
-      - name: Sign Windows application
-        shell: pwsh
-        env:
-          WINDOWS_SIGNING_PFX: ${{ secrets.WINDOWS_SIGNING_PFX }}
-          WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
-        run: .github/scripts/sign-windows.ps1 -File src/release/ngPost.exe
       - name: Package
         shell: pwsh
         run: |
@@ -698,14 +688,6 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
           Remove-Item -Recurse -Force "dist/$pkg"
           Get-ChildItem dist
-      - name: Sign Windows installer
-        shell: pwsh
-        env:
-          WINDOWS_SIGNING_PFX: ${{ secrets.WINDOWS_SIGNING_PFX }}
-          WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
-        run: |
-          $setup = Get-ChildItem dist/*-setup.exe | Select-Object -First 1
-          .github/scripts/sign-windows.ps1 -File $setup.FullName
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -715,7 +697,6 @@ jobs:
             dist/*.exe
 
   build-macos:
-    environment: ${{ (github.event_name != 'workflow_dispatch' || inputs.publish) && 'release-signing' || 'build-only' }}
     name: Build macOS
     # Qt 6.8.2/qmake links AGL; the macOS 26 SDK no longer ships it.
     runs-on: macos-15
@@ -760,15 +741,6 @@ jobs:
         run: |
           macdeployqt src/ngPost.app
           touch src/ngPost.app/.ngpost-installation
-      - name: Sign and notarize macOS bundle
-        env:
-          MACOS_SIGNING_P12: ${{ secrets.MACOS_SIGNING_P12 }}
-          MACOS_SIGNING_PASSWORD: ${{ secrets.MACOS_SIGNING_PASSWORD }}
-          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: bash .github/scripts/sign-macos.sh
       - name: Smoke test the built binary
         run: |
           # Nothing else in this workflow ever runs what it is about to publish.
@@ -1077,11 +1049,8 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     needs: [release-metadata, build-linux, build-windows, build-macos, build-appimage, test-unit, test-integration, test-gui, test-vpn]
-    environment: release-signing
     permissions:
       contents: write
-      id-token: write
-      attestations: write
     # Push to master/devel always publishes. A manual workflow_dispatch only
     # publishes when its "publish" input is checked — leaving it unchecked
     # gives a build-only run (artifacts uploaded, no GitHub release created).
@@ -1131,17 +1100,12 @@ jobs:
           output-file: artifacts/ngPost.spdx.json
           upload-artifact: false
           upload-release-assets: false
-      - name: Sign release manifests
+      - name: Generate and verify release SHA-256 hashes
         env:
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
-          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
         run: |
-          python3 .github/scripts/check-release-key.py --require-private
-          python3 .github/scripts/sign-release.py
-      - name: Attest release provenance
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
-        with:
-          subject-path: artifacts/*
+          python3 .github/scripts/release-checksums.py
+          (cd artifacts && sha256sum --check SHA256SUMS)
       - name: Generate release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1209,6 +1173,14 @@ jobs:
             echo
             cat commits.md
             echo
+            echo "## SHA-256 integrity checks"
+            echo
+            echo 'Packages are unsigned. SHA256SUMS and manifest.json are attached to this release.'
+            echo 'These hashes verify file integrity, not independent publisher authenticity.'
+            echo
+            echo '```text'
+            cat artifacts/SHA256SUMS
+            echo '```'
           } > release-body.md
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2

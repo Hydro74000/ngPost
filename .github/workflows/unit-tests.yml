@@ -39,9 +39,8 @@ jobs:
           done
           shellcheck "${scripts[@]}"
 
-      - name: Test signed updater and release manifests
+      - name: Test SHA-256 updater and release manifests
         run: |
-          python3 .github/scripts/check-release-key.py
           python3 -m unittest discover -s tests/security -v
 
       - name: Verify VPN helper fails closed before network mutation
@@ -236,10 +235,10 @@ jobs:
         run: |
           bash .github/scripts/run-qt-tests.sh tests/unit "unit"
 
-      - name: Parse Windows VPN and signing scripts
+      - name: Parse Windows VPN scripts
         shell: pwsh
         run: |
-          Get-ChildItem src/vpn/scripts/win/*.ps1, .github/scripts/sign-windows.ps1 | ForEach-Object {
+          Get-ChildItem src/vpn/scripts/win/*.ps1 | ForEach-Object {
             $tokens = $null
             $parseErrors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null

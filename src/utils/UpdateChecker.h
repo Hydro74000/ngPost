@@ -89,7 +89,7 @@ private:
     QPointer<QProcess> _installer;
     std::unique_ptr<QTemporaryDir> _work;
     std::unique_ptr<QFile> _downloadFile;
-    QString _installDir, _python, _openssl;
+    QString _installDir, _python;
     bool _busy = false;
     bool _cancelled = false;
     bool _handoff = false;

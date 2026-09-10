@@ -365,11 +365,8 @@ void UpdateChecker::startDownloadAndInstall()
     }
     _python = QStandardPaths::findExecutable(QStringLiteral("python3"));
     if (_python.isEmpty()) _python = QStandardPaths::findExecutable(QStringLiteral("python"));
-    _openssl = QStandardPaths::findExecutable(QStringLiteral("openssl"));
-    QFile key(QStringLiteral(":/update/update-key.pem"));
-    if (_python.isEmpty() || _openssl.isEmpty() || !key.open(QIODevice::ReadOnly)
-        || !key.peek(4096).contains("-----BEGIN PUBLIC KEY-----")) {
-        failDownload(tr("Automatic updates require Python 3.9+, OpenSSL and an embedded release public key. Install this release manually from its verified release page."));
+    if (_python.isEmpty()) {
+        failDownload(tr("Automatic updates require Python 3.9+. Install this release manually after checking its published SHA-256 hash."));
         return;
     }
     _installDir = QCoreApplication::applicationDirPath();
@@ -379,7 +376,7 @@ void UpdateChecker::startDownloadAndInstall()
     _installDir = bundle.absolutePath();
 #endif
     if (!QFileInfo::exists(_installDir + QStringLiteral("/.ngpost-installation"))) {
-        failDownload(tr("This installation has no package ownership marker. Install the signed package manually once before enabling automatic replacement."));
+        failDownload(tr("This installation has no package ownership marker. Install a package manually after checking its SHA-256 hash before enabling automatic replacement."));
         return;
     }
     // Stage on the same filesystem. Replacing /usr/bin or another shared
@@ -395,8 +392,8 @@ void UpdateChecker::startDownloadAndInstall()
         failDownload(tr("Cannot create a private update directory."));
         return;
     }
-    for (const QString &name : {QStringLiteral("install_update.py"), QStringLiteral("update-key.pem")}) {
-        const QString target = _work->filePath(name == QLatin1String("update-key.pem") ? QStringLiteral("key.pem") : name);
+    for (const QString &name : {QStringLiteral("install_update.py")}) {
+        const QString target = _work->filePath(name);
         if (!QFile::copy(QStringLiteral(":/update/") + name, target)
             || !PathHelper::restrictToOwner(target)) {
             failDownload(tr("Cannot stage update verifier."));
@@ -407,12 +404,8 @@ void UpdateChecker::startDownloadAndInstall()
     QUrl manifest = _assetUrl;
     manifest.setPath(_assetUrl.path().left(_assetUrl.path().lastIndexOf('/') + 1) + QStringLiteral("manifest.json"));
     manifest.setQuery(QString());
-    QUrl signature = manifest;
-    signature.setPath(manifest.path() + QStringLiteral(".sig"));
-    downloadFile(manifest, QStringLiteral("manifest.json"), 1024 * 1024, [this, signature] {
-        downloadFile(signature, QStringLiteral("manifest.sig"), 16384, [this] {
-            downloadFile(_assetUrl, QStringLiteral("archive"), _assetSize, [this] { prepareInstall(); });
-        });
+    downloadFile(manifest, QStringLiteral("manifest.json"), 1024 * 1024, [this] {
+        downloadFile(_assetUrl, QStringLiteral("archive"), _assetSize, [this] { prepareInstall(); });
     });
 }
 
@@ -492,7 +485,7 @@ void UpdateChecker::prepareInstall()
         _installer = nullptr;
         if (_cancelled) return;
         if (status != QProcess::NormalExit || code != 0) {
-            failDownload(tr("Signature, extraction or package validation failed: %1")
+            failDownload(tr("SHA-256, extraction or package validation failed: %1")
                          .arg(QString::fromUtf8(process->readAll()).left(2048)));
             return;
         }
@@ -523,6 +516,5 @@ void UpdateChecker::prepareInstall()
     });
     process->start(_python, {QStringLiteral("-I"), _work->filePath(QStringLiteral("install_update.py")),
         QStringLiteral("prepare"), _work->path(), QStringLiteral("--tag"), _latestTag,
-        QStringLiteral("--asset"), _assetFileName, QStringLiteral("--install"), _installDir,
-        QStringLiteral("--openssl"), _openssl});
+        QStringLiteral("--asset"), _assetFileName, QStringLiteral("--install"), _installDir});
 }

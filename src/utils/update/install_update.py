@@ -1,4 +1,8 @@
-"""Signed updates: bounded extraction, directory swap, rollback. No shell."""
+"""SHA-256-checked updates: bounded extraction, directory swap, rollback. No shell.
+
+The manifest comes from the same HTTPS GitHub release as the archive. Hashes
+check integrity against that manifest, NOT independent publisher authenticity.
+"""
 import argparse
 import ctypes
 import hashlib
@@ -133,28 +137,43 @@ def extract(archive, destination):
             raise ValueError('symlink escapes archive')
 
 
-def verify(work, tag, asset, openssl):
-    manifest, signature, key = [work / n for n in ('manifest.json', 'manifest.sig', 'key.pem')]
-    if manifest.stat().st_size > 1024**2 or signature.stat().st_size > 16384:
-        raise ValueError('oversized signature metadata')
-    subprocess.run([openssl, 'dgst', '-sha256', '-verify', str(key), '-signature',
-                    str(signature), str(manifest)], check=True, timeout=15,
-                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    doc = json.loads(manifest.read_bytes())
-    if doc.get('schema') != 1 or doc.get('tag') != tag:
-        raise ValueError('signed manifest is for another release')
-    matches = [a for a in doc['assets'] if a.get('name') == asset]
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('duplicate JSON field')
+        result[key] = value
+    return result
+
+
+def verify(work, tag, asset):
+    manifest = work / 'manifest.json'
+    with manifest.open('rb') as source:
+        encoded = source.read(1024**2 + 1)
+    if len(encoded) > 1024**2:
+        raise ValueError('oversized checksum metadata')
+    doc = json.loads(encoded, object_pairs_hook=unique_object)
+    if not isinstance(doc, dict) or type(doc.get('schema')) is not int or doc['schema'] != 1 or doc.get('tag') != tag:
+        raise ValueError('checksum manifest is malformed or for another release')
+    assets = doc.get('assets')
+    if not isinstance(assets, list) or len(assets) > MAX_ENTRIES or any(not isinstance(a, dict) for a in assets):
+        raise ValueError('invalid asset list')
+    matches = [a for a in assets if a.get('name') == asset]
     if len(matches) != 1:
-        raise ValueError('asset absent or duplicated in signed manifest')
+        raise ValueError('asset absent or duplicated in checksum manifest')
     archive, expected = work / 'archive', matches[0]
+    if (type(expected.get('size')) is not int or not 0 < expected['size'] <= 1024**3
+            or not isinstance(expected.get('sha256'), str)
+            or not re.fullmatch('[0-9a-f]{64}', expected['sha256'])):
+        raise ValueError('invalid asset size or SHA-256 hash')
     if archive.stat().st_size != expected['size']:
-        raise ValueError('signed size mismatch')
+        raise ValueError('archive size mismatch')
     digest = hashlib.sha256()
     with archive.open('rb') as source:
         for block in iter(lambda: source.read(65536), b''):
             digest.update(block)
     if digest.hexdigest() != expected['sha256']:
-        raise ValueError('signed digest mismatch')
+        raise ValueError('SHA-256 hash mismatch')
 
 
 def executable(root):
@@ -167,8 +186,8 @@ def probe(root):
                    env=dict(os.environ, QT_QPA_PLATFORM='offscreen'))
 
 
-def prepare(work, tag, asset, install, openssl):
-    verify(work, tag, asset, openssl)
+def prepare(work, tag, asset, install):
+    verify(work, tag, asset)
     destination = work / 'unpacked'
     extract(work / 'archive', destination)
     root_name = 'ngPost.app' if sys.platform == 'darwin' else asset.removesuffix('.tar.gz').removesuffix('.zip')
@@ -259,13 +278,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('phase', choices=['prepare', 'commit'])
     parser.add_argument('work', type=Path)
-    for option in ('tag', 'asset', 'install', 'openssl'):
+    for option in ('tag', 'asset', 'install'):
         parser.add_argument('--' + option)
     parser.add_argument('--pid', type=int)
     args = parser.parse_args()
     try:
         if args.phase == 'prepare':
-            prepare(args.work, args.tag, args.asset, Path(args.install), args.openssl)
+            prepare(args.work, args.tag, args.asset, Path(args.install))
         else:
             commit(args.work, args.pid)
     except Exception as error:

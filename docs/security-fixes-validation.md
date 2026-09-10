@@ -1,5 +1,11 @@
 # Validation des six correctifs — 10 septembre 2026
 
+**Décision ultérieure du mainteneur :** les signatures et certificats ont été
+retirés au profit de hashes SHA-256 publiés sur GitHub. Les observations de
+signature/provisionnement ci-dessous sont historiques, pas la politique
+actuelle. Voir `release-security.md` et `checksum-updates.md`. La sauvegarde
+privée locale a été préservée et n'est plus utilisée par l'updater ou la CI.
+
 Six commits locaux, dans l’ordre demandé : P0 migration du helper, SEC-04,
 SEC-05, SUP-01, VPN-02, VPN-03. Aucun push ni publication effectué.
 

@@ -1,4 +1,3 @@
 <RCC><qresource prefix="/update">
 <file>install_update.py</file>
-<file>update-key.pem</file>
 </qresource></RCC>

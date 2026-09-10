@@ -1,23 +1,22 @@
-# Signed update contract
+# SHA-256 update contract (unsigned releases)
 
-Automatic updates require Python 3.9+ and the OpenSSL command-line tool on the
-client. Missing tools, an unprovisioned key or an installation without the
+Automatic updates require Python 3.9+ on the client. Missing Python or an installation without the
 `.ngpost-installation` package marker cause an explicit failure before mutation.
 Linux system directories and package-manager installations use manual updates.
 AppImage remains on its separate update path.
 
-The provisioned RSA 4096-bit public key lives in
-`src/utils/update/update-key.pem` and is embedded into every application build.
-The matching private PEM belongs only in the protected release environment's
-`RELEASE_SIGNING_KEY` secret. Never download a verification key from the release
-being verified. Do not rotate this single pinned key in place: a transitional
-trust mechanism must first be designed for clients authenticated by the old key.
+No certificate, key or OpenSSL executable is required by the updater. Qt still
+uses its TLS backend for HTTPS; this change does not disable transport security.
 
-Each release contains `manifest.json` and its binary OpenSSL RSA/SHA-256
-signature `manifest.json.sig`. The manifest is UTF-8 JSON with `schema: 1`,
+Each release contains `manifest.json` and `SHA256SUMS` (not signed).
+The manifest is UTF-8 JSON with `schema: 1`,
 `tag` and `assets`, an array of `{name, size, sha256}` records. The updater
-checks the signed tag, exact asset name, size and SHA-256 before extraction.
-`SHA256SUMS` and `SHA256SUMS.sig` provide the same verification for manual use.
+checks the tag, exact asset name, size and SHA-256 before extraction.
+Malformed hashes, missing metadata and duplicate JSON fields/assets fail closed.
+`SHA256SUMS` provides the same hashes for manual use and is reproduced in the
+GitHub release body. Hashes establish integrity against GitHub metadata, not
+independent publisher authenticity. A compromise replacing both can bypass this
+check. Unsigned releases are an explicit maintainer decision.
 
 Downloads use HTTPS with an exact GitHub host allowlist, validated redirects,
 30-second transfer timeouts and fixed metadata/asset limits. Files are streamed
@@ -30,7 +29,7 @@ headers are capped before tarfile processes them. ZIP64 and GNU sparse metadata
 requiring additional allocations are unsupported. The tarfile processing hook
 is covered by regression tests and must be revalidated on Python upgrades.
 
-The signed candidate must pass `--version` before the application exits.
+The checksum-verified candidate must pass `--version` before the application exits.
 Linux/macOS swap directories atomically using renameat2/renamex_np; unsupported
 filesystems fail without changing the installation. Windows uses two journaled
 directory renames after the application exits; **this is recoverable, not a
@@ -49,6 +48,5 @@ Late callbacks from canceled attempts cannot affect a retry. Programmatic
 closure of the progress dialog and normal application destruction after a
 successful handoff do not cancel the detached transaction.
 
-Native Windows/macOS execution and platform publication credentials must be
-validated in CI before a public release. Removing the public key deliberately
-disables automatic update installation; it is not a trust-on-first-use mechanism.
+Native Windows/macOS execution must still be validated in CI. No platform
+signing identities or signing approvals are required for publication.
