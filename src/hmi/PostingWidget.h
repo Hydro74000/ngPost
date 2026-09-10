@@ -109,6 +109,9 @@ public:
 
     void postFiles(bool updateMainParams);
 
+    //! Empty the tab and its decorations so the next post starts from scratch.
+    void resetForNextPost();
+
 
 public slots: // for PostingJob
     void onFilePosted(QString filePath, uint nbArticles, uint nbFailed);

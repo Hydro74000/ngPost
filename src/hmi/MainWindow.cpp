@@ -2299,6 +2299,19 @@ void MainWindow::onCloseJob(int index)
 
 void MainWindow::closeTab(PostingWidget *postWidget)
 {
+    if (!postWidget)
+        return;
+
+    // The default Quick Post tab is a fixed one: it has no close button and
+    // _getPostWidgetIndex never finds it. Auto close still has to leave it
+    // ready for the next post, so it is emptied instead, back to how it opens.
+    if (postWidget == _quickJobTab)
+    {
+        postWidget->resetForNextPost();
+        _ui->postTabWidget->tabBar()->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
+        return;
+    }
+
     int index = _getPostWidgetIndex(postWidget);
     if (index)
     {

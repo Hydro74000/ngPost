@@ -321,6 +321,27 @@ void PostingWidget::onClearFilesClicked()
     _hmi->clearJobTab(this);
 }
 
+void PostingWidget::resetForNextPost()
+{
+    // Auto close reaches us through NgPost's end of job slot, connected to
+    // PostingJob::postingFinished before ours and so served first: the job is
+    // over, but this tab has not heard it yet. Closing it there simply deletes
+    // it; emptying it has to end the job here first. onPostingJobDone is
+    // already written to be called twice, so the queued one that follows finds
+    // nothing left to do.
+    if (_postingJob)
+        onPostingJobDone();
+
+    // Anything else than an idle tab is not ours to empty: what is listed
+    // belongs to the post using it.
+    if (_state != STATE::IDLE)
+        return;
+
+    // Same emptying as the Clear button, decorations included.
+    onClearFilesClicked();
+    _postingFinished = false;
+}
+
 void PostingWidget::onCompressCB(bool checked)
 {
     // Everything here only means something while ngPost is the one building the
