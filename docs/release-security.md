@@ -24,6 +24,9 @@ L’environnement `release-signing` est limité aux branches `devel` et `master`
 et demande l’approbation de `Hydro74000`. Le workflow **Release signing key
 check** vérifie la correspondance secret/clé publique sans créer de release.
 Son approbation ne vaut pas approbation du workflow **Build and Release**.
+La première [vérification réelle en CI](https://github.com/Hydro74000/ngPost/actions/runs/34456555994)
+a réussi le 10 septembre 2026 : signature d’une preuve non publiable avec le
+secret GitHub, puis vérification avec la clé publique embarquée.
 Les exécutions manuelles avec `publish: false` utilisent `build-only`, sans
 secret de production ni certificat de plateforme.
 

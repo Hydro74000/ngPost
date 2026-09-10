@@ -18,8 +18,10 @@ set -euo pipefail
 # the supplied resources are missing: never leave the old passwordless helper
 # reachable after an unsuccessful upgrade. Atomic replacement also protects
 # against Polkit retaining its old rule briefly while reloading.
-[ "$(id -u)" = 0 ] && [ -n "${PKEXEC_UID:-}" ] \
-    || { echo "ERROR installer requires administrator authentication via pkexec"; exit 1; }
+if [ "$(id -u)" != 0 ] || [ -z "${PKEXEC_UID:-}" ]; then
+    echo "ERROR installer requires administrator authentication via pkexec"
+    exit 1
+fi
 install -d -m 755 -o root -g root /var/lib/ngpost
 disabled=$(mktemp /var/lib/ngpost/.helper-disabled.XXXXXX)
 chmod 0600 "$disabled"

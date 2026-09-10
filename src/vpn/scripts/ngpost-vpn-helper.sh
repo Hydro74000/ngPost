@@ -10,6 +10,8 @@ export LC_ALL=C
 # the top lets them reject a v1 helper before that old helper can touch any
 # interface, route or process.
 readonly NGPOST_VPN_HELPER_PROTOCOL=2
+# Read by VpnManager and the installer as a security capability declaration.
+# shellcheck disable=SC2034
 readonly NGPOST_VPN_HELPER_SECURITY_REVISION=3
 
 TABLE=4242

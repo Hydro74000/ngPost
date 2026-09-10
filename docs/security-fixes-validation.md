@@ -3,6 +3,13 @@
 Six commits locaux, dans l’ordre demandé : P0 migration du helper, SEC-04,
 SEC-05, SUP-01, VPN-02, VPN-03. Aucun push ni publication effectué.
 
+**Suivi du 10 septembre :** ces commits ont depuis été poussés sur `devel`,
+avec le provisionnement de la clé de signature des mises à jour. Le test de
+correspondance du secret GitHub et de la clé publique a réussi en CI ; voir
+`release-security.md`. Les résultats ci-dessous restent le relevé de la
+validation locale initiale. Les certificats officiels Windows/Apple restent
+à fournir ; aucune release n’a été publiée par cette opération.
+
 ## Vérifications exécutées
 
 Les compilations ont été séquentielles, exclusivement avec `make -j1` dans
