@@ -1,7 +1,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/clion+all,qt,qtcreator,cmake,visualstudio
 # Edit at https://www.toptal.com/developers/gitignore?templates=clion+all,qt,qtcreator,cmake,visualstudio
 
-# Release-signing private material must never enter Git. The public PEM is tracked.
+# Private signing backups must never enter Git, even when signing is disabled.
 release-private.pem
 *.pfx
 *.p12

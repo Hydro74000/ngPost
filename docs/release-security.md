@@ -93,9 +93,11 @@ que dans le secret GitHub existant, désormais inutilisé. Elle n'a pas été
 détruite. La clé publique et les scripts de signature retirés restent
 récupérables dans l'historique Git.
 
-Le VPN reste exclu de macOS. Voir checksum-updates.md pour le contrat technique.
+Le VPN reste exclu de macOS. Voir [le contrat technique](checksum-updates.md).
 
 ## Validation du retrait des signatures
+
+Relevé historique du commit `5e31095` :
 
 - Build Qt 6 Linux et lancement `--version` réussis, compilation séquentielle `make -j1`.
 - `tst_UpdateChecker` : 13 succès, aucune erreur.
@@ -106,3 +108,34 @@ Le VPN reste exclu de macOS. Voir checksum-updates.md pour le contrat technique.
 - Hash absent, mal formé ou différent : installation refusée avant extraction.
 - Les six workflows YAML sont syntaxiquement valides. Les builds natifs
   Windows/macOS et la publication finale restent à confirmer par la nouvelle CI.
+
+## Corrections issues de la relecture
+
+- Provenance keyless rétablie, après génération des hashes, avant publication.
+- Le lanceur QTest exige un résumé valide et un vrai test réussi, hors
+  `initTestCase`/`cleanupTestCase`. Seules `tst_WindowsSecurity` et
+  `tst_WindowsBindHelper` peuvent être entièrement ignorées sous Linux/macOS.
+  Une absence de journal ou une suite CLI entièrement ignorée fait échouer la CI.
+- Nettoyage WireGuard Windows asynchrone en cours d'exécution : conservation du
+  backend et de la propriété du tunnel jusqu'à confirmation d'arrêt, puis reprise
+  de la continuation une seule fois. L'arrêt utilisateur annule cette continuation.
+  L'attente synchrone bornée reste réservée à la fermeture de l'application.
+- Le nettoyage du fichier d'authentification est protégé centralement tant qu'un
+  backend exigeant un arrêt confirmé reste actif. Cela ne prétend pas garantir
+  l'effacement physique sur SSD ou système de fichiers à copie sur écriture.
+- L'installateur Linux valide l'UID de `pkexec`, sa résolution et le nom avant
+  interpolation dans la règle Polkit. `subject.uid` n'étant pas exposé par
+  l'interface JavaScript documentée, la règle conserve `subject.user`.
+  Les noms ASCII avec lettres, chiffres, `_`, `.`, `@`, `-`, et `$` final sont
+  acceptés (premier caractère : lettre ou `_`). Les autres noms sont refusés
+  sans réactiver l'ancien helper ni publier une règle partielle.
+  Référence : [interface Subject de Polkit](https://polkit.pages.freedesktop.org/polkit/polkit.8.html).
+
+Vérification locale de cette relecture : 43 succès `tst_VpnProfile`, 16 tests
+Python réussis et test privilégié de migration réussi séparément dans un
+conteneur jetable, sans réseau, limité à 256 Mio. ShellCheck valide le lanceur
+QTest et l'installateur Linux. Les cas testés incluent les UID/noms malveillants,
+les exceptions de suites par plateforme, l'arrêt différé ou immédiat, la
+réactivité de la boucle d'événements, l'annulation utilisateur, la récupération
+et la rétention des identifiants. Les scénarios SCM sont simulés dans ces tests
+portables ; ils ne remplacent pas une validation avec un service Windows réel.
