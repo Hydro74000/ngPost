@@ -40,7 +40,9 @@ jobs:
           shellcheck "${scripts[@]}"
 
       - name: Test signed updater and release manifests
-        run: python3 -m unittest discover -s tests/security -v
+        run: |
+          python3 .github/scripts/check-release-key.py
+          python3 -m unittest discover -s tests/security -v
 
       - name: Verify VPN helper fails closed before network mutation
         run: |

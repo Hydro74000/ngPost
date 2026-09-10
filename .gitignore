@@ -1,6 +1,12 @@
 # Created by https://www.toptal.com/developers/gitignore/api/clion+all,qt,qtcreator,cmake,visualstudio
 # Edit at https://www.toptal.com/developers/gitignore?templates=clion+all,qt,qtcreator,cmake,visualstudio
 
+# Release-signing private material must never enter Git. The public PEM is tracked.
+release-private.pem
+*.pfx
+*.p12
+*.p8
+
 ### CLion+all ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839

@@ -7,9 +7,31 @@ import unittest
 
 
 SCRIPT = Path(__file__).resolve().parents[2] / '.github/scripts/sign-release.py'
+CHECK = SCRIPT.with_name('check-release-key.py')
 
 
 class ReleaseSigningTests(unittest.TestCase):
+    def test_key_provisioning_check(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            private, public = root / 'private.pem', root / 'public.pem'
+            subprocess.run(['openssl', 'genpkey', '-algorithm', 'RSA', '-pkeyopt',
+                            'rsa_keygen_bits:3072', '-out', str(private)], check=True,
+                           capture_output=True)
+            subprocess.run(['openssl', 'pkey', '-in', str(private), '-pubout',
+                            '-out', str(public)], check=True, capture_output=True)
+            command = ['python3', str(CHECK), '--public', str(public)]
+            subprocess.run(command, check=True, capture_output=True)
+            env = dict(os.environ, RELEASE_SIGNING_KEY='')
+            self.assertNotEqual(subprocess.run(command + ['--require-private'], env=env,
+                                capture_output=True).returncode, 0)
+            env['RELEASE_SIGNING_KEY'] = private.read_text()
+            result = subprocess.run(command + ['--require-private'], env=env,
+                                    check=True, capture_output=True)
+            self.assertNotIn(b'PRIVATE KEY', result.stdout + result.stderr)
+            self.assertNotEqual(subprocess.run(['python3', str(CHECK), '--public', str(private)],
+                                capture_output=True).returncode, 0)
+
     def test_signing_requires_matching_key_and_covers_assets(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

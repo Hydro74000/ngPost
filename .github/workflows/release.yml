@@ -209,7 +209,7 @@ jobs:
           path: dist/*.tar.gz
 
   build-windows:
-    environment: release-signing
+    environment: ${{ (github.event_name != 'workflow_dispatch' || inputs.publish) && 'release-signing' || 'build-only' }}
     name: Build Windows
     runs-on: windows-latest
     needs: release-metadata
@@ -715,7 +715,7 @@ jobs:
             dist/*.exe
 
   build-macos:
-    environment: release-signing
+    environment: ${{ (github.event_name != 'workflow_dispatch' || inputs.publish) && 'release-signing' || 'build-only' }}
     name: Build macOS
     # Qt 6.8.2/qmake links AGL; the macOS 26 SDK no longer ships it.
     runs-on: macos-15
@@ -1135,7 +1135,9 @@ jobs:
         env:
           RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
           RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
-        run: python3 .github/scripts/sign-release.py
+        run: |
+          python3 .github/scripts/check-release-key.py --require-private
+          python3 .github/scripts/sign-release.py
       - name: Attest release provenance
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:

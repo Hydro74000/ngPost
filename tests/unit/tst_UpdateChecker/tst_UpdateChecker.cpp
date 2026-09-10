@@ -10,6 +10,7 @@
 #include <QtTest>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QSslKey>
 
 namespace {
 class FakeUpdateReply : public QNetworkReply {
@@ -50,6 +51,15 @@ class TestUpdateChecker : public QObject
     Q_OBJECT
 
 private slots:
+    void production_public_key_is_embedded_in_every_build() {
+        QFile file(QStringLiteral(":/update/update-key.pem"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QByteArray const pem = file.readAll();
+        QVERIFY(!pem.contains("PRIVATE KEY"));
+        QSslKey key(pem, QSsl::Rsa, QSsl::Pem, QSsl::PublicKey);
+        QVERIFY(!key.isNull());
+        QVERIFY(key.length() >= 3072);
+    }
     void canceled_download_cannot_corrupt_a_retry() {
         FakeUpdateNetwork network;
         UpdateChecker checker(nullptr, &network);

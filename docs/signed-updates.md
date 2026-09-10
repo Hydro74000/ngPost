@@ -6,11 +6,12 @@ client. Missing tools, an unprovisioned key or an installation without the
 Linux system directories and package-manager installations use manual updates.
 AppImage remains on its separate update path.
 
-Provision an RSA public key (at least 3072 bits) in
-`src/utils/update/update-key.pem`, review it and commit it before publishing.
+The provisioned RSA 4096-bit public key lives in
+`src/utils/update/update-key.pem` and is embedded into every application build.
 The matching private PEM belongs only in the protected release environment's
 `RELEASE_SIGNING_KEY` secret. Never download a verification key from the release
-being verified. Rotate keys through a release authenticated by the existing key.
+being verified. Do not rotate this single pinned key in place: a transitional
+trust mechanism must first be designed for clients authenticated by the old key.
 
 Each release contains `manifest.json` and its binary OpenSSL RSA/SHA-256
 signature `manifest.json.sig`. The manifest is UTF-8 JSON with `schema: 1`,
@@ -48,6 +49,6 @@ Late callbacks from canceled attempts cannot affect a retry. Programmatic
 closure of the progress dialog and normal application destruction after a
 successful handoff do not cancel the detached transaction.
 
-Native Windows/macOS execution and publication credentials must be validated in
-CI before a public release. An empty key deliberately disables automatic update
-installation; it is not a trust-on-first-use mechanism.
+Native Windows/macOS execution and platform publication credentials must be
+validated in CI before a public release. Removing the public key deliberately
+disables automatic update installation; it is not a trust-on-first-use mechanism.
