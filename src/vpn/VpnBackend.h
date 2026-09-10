@@ -107,6 +107,10 @@ public:
         Q_UNUSED(timeoutMs);
     }
 
+    //! Retain this backend and its lease until terminated confirms shutdown.
+    //! Runtime manager cleanup must use stop(), never block the GUI waiting.
+    virtual bool requiresConfirmedStop() const { return false; }
+
 signals:
     //! Tunnel is up. `dnsServer` may be null if the backend couldn't capture
     //! the DNS pushed by the VPN; in that case ngPost falls back to system DNS

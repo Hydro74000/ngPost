@@ -11,6 +11,7 @@
 #include <QFileDevice>
 #include <QFileInfo>
 #include <QPointer>
+#include <QTimer>
 
 #include "nntp/NntpServerParams.h"
 #include "PostingJob.h"
@@ -69,6 +70,15 @@ public:
     void stop() override
     {
         ++stopCalls;
+        if (deferStop) {
+            emit stopPending(QStringLiteral("waiting for fixture shutdown"));
+            return;
+        }
+        confirmStopped();
+    }
+    bool requiresConfirmedStop() const override { return confirmedShutdown; }
+    void confirmStopped()
+    {
         running = false;
         _requestStop();
         _emitTerminationOnce(VpnTerminationKind::RequestedStop,
@@ -120,6 +130,8 @@ public:
     }
 
     bool running = true;
+    bool confirmedShutdown = false;
+    bool deferStop = false;
     int stopCalls = 0;
     int stopAndWaitCalls = 0;
     int setActiveCalls = 0;
@@ -180,6 +192,11 @@ private slots:
     void backend_failure_stops_once_and_notifies_waiting_job();
     void pending_stop_retains_backend_and_blocks_start();
     void synchronous_lease_busy_keeps_typed_state();
+    void confirmed_cleanup_is_nonblocking_and_resumes_once();
+    void user_stop_cancels_pending_cleanup_continuation();
+    void synchronous_confirmed_cleanup_does_not_reenter_twice();
+    void confirmed_recovery_exhaustion_waits_for_stop();
+    void confirmed_external_restart_preserves_job_and_attempt();
     void backend_reports_one_terminal_event_per_run();
     void helper_specific_error_then_finished_reports_one_terminal_event();
     void auto_disconnect_callback_is_guarded_after_suspect();
@@ -555,6 +572,112 @@ void TestVpnProfile::synchronous_lease_busy_keeps_typed_state()
 
     QCOMPARE(manager.state(), VpnManager::State::LeaseBusy);
     QVERIFY(!manager.hasBackendForTest());
+}
+
+void TestVpnProfile::confirmed_cleanup_is_nonblocking_and_resumes_once()
+{
+    HomeSandbox sandbox;
+    VpnManager manager;
+    auto *backend = new FakeVpnBackend;
+    backend->confirmedShutdown = backend->deferStop = true;
+    manager.setBackendForTest(backend, VpnManager::State::Starting);
+    QPointer<FakeVpnBackend> guard(backend);
+    QElapsedTimer elapsed;
+    elapsed.start();
+    QVERIFY(!manager.finishBackendStartForTest(false));
+    QVERIFY(elapsed.elapsed() < 1000);
+    QCOMPARE(backend->stopCalls, 1);
+    QCOMPARE(backend->stopAndWaitCalls, 0);
+    QVERIFY(manager.hasBackendForTest());
+    QCOMPARE(manager.state(), VpnManager::State::Stopping);
+    QVERIFY(!manager.start());
+    bool eventLoopResponded = false;
+    QTimer::singleShot(0, &manager, [&] { eventLoopResponded = true; });
+    QTRY_VERIFY(eventLoopResponded);
+    QVERIFY(manager.hasBackendForTest());
+    backend->confirmStopped();
+    QVERIFY(!manager.hasBackendForTest());
+    QCOMPARE(manager.state(), VpnManager::State::Failed);
+    backend->confirmStopped();
+    QCOMPARE(manager.state(), VpnManager::State::Failed);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    QVERIFY(guard.isNull());
+}
+
+void TestVpnProfile::user_stop_cancels_pending_cleanup_continuation()
+{
+    HomeSandbox sandbox;
+    VpnManager manager;
+    auto *backend = new FakeVpnBackend;
+    backend->confirmedShutdown = backend->deferStop = true;
+    manager.setBackendForTest(backend);
+    QVERIFY(!manager.finishBackendStartForTest(false));
+    manager.disconnectByUser();
+    backend->confirmStopped();
+    QCOMPARE(manager.state(), VpnManager::State::Disabled);
+    QVERIFY(!manager.hasBackendForTest());
+}
+
+void TestVpnProfile::synchronous_confirmed_cleanup_does_not_reenter_twice()
+{
+    HomeSandbox sandbox;
+    VpnManager manager;
+    auto *backend = new FakeVpnBackend;
+    backend->confirmedShutdown = true;
+    manager.setBackendForTest(backend);
+    QVERIFY(!manager.finishBackendStartForTest(false));
+    QCOMPARE(backend->stopCalls, 1);
+    QCOMPARE(backend->stopAndWaitCalls, 0);
+    QCOMPARE(manager.state(), VpnManager::State::Failed);
+    QVERIFY(!manager.hasBackendForTest());
+}
+
+void TestVpnProfile::confirmed_recovery_exhaustion_waits_for_stop()
+{
+    HomeSandbox sandbox;
+    VpnManager manager;
+    manager.setRecoveryMaxAttempts(1);
+    auto *backend = new FakeVpnBackend;
+    backend->confirmedShutdown = backend->deferStop = true;
+    manager.setBackendForTest(backend);
+    backend->becomeReady();
+    manager.retainForJob();
+    QSignalSpy exhausted(&manager, &VpnManager::recoveryExhausted);
+    backend->reportHealth(VpnBackendHealth::RecoveringInternally);
+    backend->reportHealth(VpnBackendHealth::Healthy);
+    backend->reportHealth(VpnBackendHealth::RecoveringInternally);
+    QCOMPARE(manager.state(), VpnManager::State::Stopping);
+    QCOMPARE(exhausted.size(), 0);
+    QCOMPARE(backend->stopAndWaitCalls, 0);
+    backend->confirmStopped();
+    QCOMPARE(manager.state(), VpnManager::State::Failed);
+    QCOMPARE(exhausted.size(), 1);
+    QVERIFY(manager.hasActiveVpnJobs());
+    QVERIFY(!manager.hasBackendForTest());
+    QVERIFY(manager.tunIp().isNull());
+}
+
+void TestVpnProfile::confirmed_external_restart_preserves_job_and_attempt()
+{
+    HomeSandbox sandbox;
+    VpnManager manager;
+    auto *backend = new FakeVpnBackend;
+    backend->confirmedShutdown = backend->deferStop = true;
+    manager.setBackendForTest(backend);
+    backend->becomeReady();
+    manager.retainForJob();
+    QSignalSpy status(&manager, &VpnManager::statusLine);
+    manager.requestRecovery(VpnFailureKind::TunnelLost);
+    QTRY_COMPARE(backend->stopCalls, 1);
+    QCOMPARE(manager.state(), VpnManager::State::Stopping);
+    backend->confirmStopped();
+    QVERIFY(manager.hasActiveVpnJobs());
+    QVERIFY(!manager.hasBackendForTest());
+    int attempts = 0;
+    for (auto const &entry : status)
+        if (entry.first().toString().contains(QStringLiteral("external restart attempt"))) ++attempts;
+    QCOMPARE(attempts, 1);
+    manager.stop();
 }
 
 void TestVpnProfile::backend_reports_one_terminal_event_per_run()

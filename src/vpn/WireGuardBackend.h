@@ -27,6 +27,13 @@ public:
     bool isRunning() const override;
     bool restart(quint64 attemptId) override;
     void setActive(bool active) override;
+    bool requiresConfirmedStop() const override {
+#ifdef Q_OS_WIN
+        return true;
+#else
+        return false;
+#endif
+    }
 #ifdef Q_OS_WIN
     void failAndStop(BackendTermination const &event) {
         _finishWindowsRun(event.kind, event.failure, event.detail);

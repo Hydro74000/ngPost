@@ -51,9 +51,7 @@
 
 #include <qt6keychain/keychain.h>
 
-#ifdef NGPOST_TESTING
 #include <utility>
-#endif
 
 using QKeychain::ReadPasswordJob;
 using QKeychain::WritePasswordJob;
@@ -585,15 +583,18 @@ void VpnManager::setProfilesFromConfig(QList<VpnProfile> const &profiles,
 VpnManager::~VpnManager()
 {
     _cancelAutoDisconnect();
+    _pendingBackendCleanup = {};
     if (_currentBackend) {
+        VpnBackend *backend = _currentBackend;
+        _currentBackend = nullptr;
+        QObject::disconnect(backend, nullptr, this, nullptr);
         // Synchronously wait for the privileged helper to run its EXIT trap
         // so we don't leave the tunnel + policy routing + openvpn behind
         // when the user quits. 5s is plenty given the trap is mostly
         // local-only ip(8) commands.
-        if (_currentBackend->isRunning())
-            _currentBackend->stopAndWait(5000);
-        delete _currentBackend;
-        _currentBackend = nullptr;
+        if (backend->isRunning())
+            backend->stopAndWait(5000);
+        delete backend;
     }
     _shredRuntimeAuthFile();
 #ifdef Q_OS_WIN
@@ -800,10 +801,11 @@ bool VpnManager::_finishBackendStart(bool started)
         // generic failure merely because the backend returned false.
         if (_state != State::LeaseBusy)
             _setState(State::Failed);
-        _stopAndDestroyBackend();
-#ifdef Q_OS_WIN
-        if (_currentBackend && _currentBackend->isRunning()) return false;
-#endif
+        State const failureState = _state;
+        if (!_stopAndDestroyBackend([this, failureState] {
+                _setState(failureState);
+                _finishBackendStart(false);
+            })) return false;
         _shredRuntimeAuthFile();
 #ifdef Q_OS_WIN
         if (!_recoveryActive)
@@ -833,6 +835,8 @@ void VpnManager::_shredRuntimeAuthFile()
 
 void VpnManager::stop()
 {
+    // User stop cancels any pending restart/start-failure continuation.
+    _pendingBackendCleanup = {};
     if (_state == State::Disabled || _state == State::Stopping)
         return;
 
@@ -1115,12 +1119,17 @@ void VpnManager::_performExternalRestart()
         && _currentBackend->restart(_currentAttemptId))
         return;
 
-    _stopAndDestroyBackend();
+    if (!_stopAndDestroyBackend([this] { _resumeExternalRestart(); })) return;
+    _resumeExternalRestart();
+}
+
+void VpnManager::_resumeExternalRestart()
+{
     _shredRuntimeAuthFile();
-#ifdef Q_OS_WIN
-    if (_currentBackend && _currentBackend->isRunning()) return;
-#endif
+    if (!_recoveryActive) return;
+    _setState(State::Reconnecting);
     if (!start() && _recoveryActive) {
+        if (_pendingBackendCleanup || _state == State::Stopping) return;
         if (_recoveryMaxAttempts > 0 && _recoveryAttempts >= _recoveryMaxAttempts)
             _finishRecoveryExhausted(_recoveryReason, tr("VPN restart failed"));
         else
@@ -1134,12 +1143,11 @@ void VpnManager::_finishRecoveryExhausted(FailureKind reason, QString const &det
     _healthyResetTimer->stop();
     _recoveryActive = false;
     _setHealth(VpnHealth::Restarting);
-    _stopAndDestroyBackend();
+    if (!_stopAndDestroyBackend([this, reason, detail] {
+            _finishRecoveryExhausted(reason, detail);
+        })) return;
     _shredRuntimeAuthFile();
     _clearTunnelIdentity();
-#ifdef Q_OS_WIN
-    if (_currentBackend && _currentBackend->isRunning()) return;
-#endif
     _setState(State::Failed);
 #ifdef Q_OS_WIN
     _releaseWindowsLease();
@@ -1193,6 +1201,18 @@ void VpnManager::onBackendTerminated(BackendTermination const &termination)
     // Ignore a delayed event from a backend which has already been superseded.
     if (_currentBackend && termination.runId != _currentBackend->runId())
         return;
+
+    if (_pendingBackendCleanup) {
+        // Only confirmed shutdown may release the backend or resume work.
+        if (!_currentBackend || _currentBackend->isRunning()) return;
+        auto resume = std::move(_pendingBackendCleanup);
+        _pendingBackendCleanup = {};
+        _clearTunnelIdentity();
+        _cancelAutoDisconnect();
+        _destroyBackend();
+        resume();
+        return;
+    }
 
 #ifdef Q_OS_WIN
     // Manager-side failures (e.g. bind timeout) also need confirmed teardown.
@@ -1319,23 +1339,26 @@ void VpnManager::_instantiateBackend()
 void VpnManager::_destroyBackend()
 {
     if (_currentBackend) {
+        QObject::disconnect(_currentBackend, nullptr, this, nullptr);
         _currentBackend->deleteLater();
         _currentBackend = nullptr;
     }
 }
 
-void VpnManager::_stopAndDestroyBackend()
+bool VpnManager::_stopAndDestroyBackend(std::function<void()> resume)
 {
     VpnBackend *backend = _currentBackend;
     if (!backend)
-        return;
+        return true;
 
-#ifdef Q_OS_WIN
-    if (qobject_cast<WireGuardBackend *>(backend) && backend->isRunning()) {
-        backend->stopAndWait(5000);
-        if (_currentBackend != backend || backend->isRunning()) return;
+    if (backend->requiresConfirmedStop() && backend->isRunning()) {
+        if (_pendingBackendCleanup) return false;
+        _pendingBackendCleanup = resume ? std::move(resume) : [] {};
+        // Keep connections so stopPending and confirmed termination reach us.
+        // Install the continuation first: stop() may emit synchronously.
+        backend->stop();
+        return false;
     }
-#endif
 
     // Clear the manager pointer first and detach every backend -> manager
     // connection before stopAndWait(). A backend may report its typed terminal
@@ -1345,6 +1368,7 @@ void VpnManager::_stopAndDestroyBackend()
     if (backend->isRunning())
         backend->stopAndWait(5000);
     backend->deleteLater();
+    return true;
 }
 
 QString VpnManager::backendToString(Backend b)
@@ -1779,7 +1803,7 @@ void VpnManager::setWireGuardServiceHooksForTest(WireGuardServiceHook registerHo
 
 void VpnManager::setBackendForTest(VpnBackend *backend, State state)
 {
-    _stopAndDestroyBackend();
+    if (!_stopAndDestroyBackend()) return;
     _currentBackend = backend;
     if (_currentBackend) {
         _currentBackend->setParent(this);

@@ -323,9 +323,11 @@ private:
     void _instantiateBackend();
     bool _finishBackendStart(bool started);
     void _destroyBackend();
-    //! Detach all terminal signals before stopping so a synchronous `stopped`
-    //! cannot re-enter VpnManager and destroy the same backend twice.
-    void _stopAndDestroyBackend();
+    //! False means shutdown is pending: keep signals/ownership and invoke
+    //! resume only after confirmed termination. Other backends detach before
+    //! synchronous cleanup. The caller must not continue on false.
+    bool _stopAndDestroyBackend(std::function<void()> resume = {});
+    std::function<void()> _pendingBackendCleanup;
     //! Zero out + delete the short-lived auth-user-pass file we wrote for
     //! the current openvpn invocation, if any.
     void _shredRuntimeAuthFile();
@@ -335,6 +337,7 @@ private:
     void _setHealth(VpnHealth health);
     void _scheduleExternalRestart(FailureKind reason);
     void _performExternalRestart();
+    void _resumeExternalRestart();
     bool _consumeRecoveryAttempt();
 #ifdef Q_OS_WIN
     bool _acquireWindowsLease(QString *detail);
