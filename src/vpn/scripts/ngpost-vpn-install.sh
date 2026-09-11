@@ -34,9 +34,15 @@ SRC="${1:-}"
 [ -r "$SRC/ngpost-vpn-helper.sh"      ] || { echo "ERROR missing helper.sh in $SRC";    exit 1; }
 [ -r "$SRC/ngpost-vpn-uninstall.sh"   ] || { echo "ERROR missing uninstall.sh in $SRC"; exit 1; }
 [ -r "$SRC/49-ngpost-vpn.rules.in"    ] || { echo "ERROR missing polkit rule template"; exit 1; }
-grep -qx 'readonly NGPOST_VPN_HELPER_SECURITY_REVISION=3' "$SRC/ngpost-vpn-helper.sh" \
-    || { echo "ERROR helper security revision 3 required"; exit 1; }
+grep -qx 'readonly NGPOST_VPN_HELPER_SECURITY_REVISION=4' "$SRC/ngpost-vpn-helper.sh" \
+    || { echo "ERROR helper security revision 4 required"; exit 1; }
 bash -n "$SRC/ngpost-vpn-helper.sh"
+# The helper refuses to read a --config or --auth-file the caller could not
+# read itself, and drops privileges to decide that. Without one of these it
+# cannot decide, and would refuse every connection. Fail here, where the
+# message is read, rather than at the first connect attempt.
+command -v setpriv >/dev/null 2>&1 || command -v runuser >/dev/null 2>&1 \
+    || { echo "ERROR setpriv or runuser is required (install util-linux)"; exit 1; }
 
 # PKEXEC_UID identifies the authenticated caller. Validate before lookup.
 if ! [[ "$PKEXEC_UID" =~ ^(0|[1-9][0-9]{0,9})$ ]] \

@@ -12,7 +12,7 @@ export LC_ALL=C
 readonly NGPOST_VPN_HELPER_PROTOCOL=2
 # Read by VpnManager and the installer as a security capability declaration.
 # shellcheck disable=SC2034
-readonly NGPOST_VPN_HELPER_SECURITY_REVISION=3
+readonly NGPOST_VPN_HELPER_SECURITY_REVISION=4
 
 TABLE=4242
 PRIO=1042
@@ -599,11 +599,70 @@ if [ "$ACTION" = cleanup-unattributed ]; then
     exit 0
 fi
 
+#! A polkit rule cannot constrain this helper's arguments: the pkexec action
+#! exposes the program to a rule and nothing else, so --config and --auth-file
+#! are arbitrary paths handed to a root process by whatever invoked it, and the
+#! rule lets the configured user reach that without a password. Root can read
+#! anything, so without this check the caller can aim the helper at a file it
+#! cannot read itself and learn about it second hand -- through a refusal that
+#! names what it choked on, a backend log line echoing the offending content,
+#! the published config hash, or, for --auth-file, OpenVPN sending the first two
+#! lines to whatever `remote` the profile names.
+#!
+#! So require that the caller already has read access. The helper then never
+#! reads on its behalf anything it could not have read alone, and every channel
+#! above stops carrying information the caller did not already hold.
+#!
+#! 0 the caller can read it, 1 it cannot, 2 the question could not be answered.
+#! The test is performed with the privileges actually dropped, so the kernel
+#! answers it: directory traversal and ACLs decide the outcome, where mode-bit
+#! arithmetic on the file alone would wrongly accept a world-readable file
+#! sitting in a directory the caller cannot traverse.
+#!
+#! setpriv is util-linux and runuser is util-linux-core; flock, which this
+#! helper already depends on, is util-linux-core too, so neither tool is
+#! implied by the other. The installer requires one of them to be present, and
+#! being unable to run the check is a refusal here rather than a waiver: this
+#! is what makes the boundary hold.
+caller_can_read() {
+    local path=$1 uid=${PKEXEC_UID:-${SUDO_UID:-}} name
+    # Neither variable set means no lesser caller: the helper was started by
+    # root directly, from an administrator's shell or a unit file.
+    [ -n "$uid" ] || return 0
+    [[ "$uid" =~ ^[0-9]+$ ]] || return 1
+    [ "$uid" != 0 ] || return 0
+    if command -v setpriv >/dev/null 2>&1; then
+        setpriv --reuid "$uid" --regid "$uid" --clear-groups test -r "$path" 2>/dev/null
+        return
+    fi
+    name=$(getent passwd "$uid" 2>/dev/null | cut -d: -f1)
+    if [ -n "$name" ] && command -v runuser >/dev/null 2>&1; then
+        runuser -u "$name" -- test -r "$path" 2>/dev/null
+        return
+    fi
+    return 2
+}
+
+#! Refuse, naming the reason, unless the caller can read $2 on its own.
+require_caller_can_read() {
+    local failure=$1 path=$2 what=$3
+    caller_can_read "$path"
+    case $? in
+        0) return 0 ;;
+        2) terminal_error "$failure" \
+               "cannot verify the caller's access to the $what: setpriv or runuser is required" ;;
+        *) terminal_error "$failure" \
+               "the $what must be readable by the user that started ngPost" ;;
+    esac
+    return 1
+}
+
 case "$ACTION" in openvpn|wireguard) ;; *) terminal_error configuration "unknown backend: $ACTION"; exit 1 ;; esac
 if [ -z "$CONFIG" ] || [ ! -r "$CONFIG" ]; then
     terminal_error configuration "config is missing or unreadable: $CONFIG"
     exit 1
 fi
+require_caller_can_read configuration "$CONFIG" "VPN config" || exit 1
 
 if [ -r "$OWNER_FILE" ]; then
     old_record=$(head -c 2048 "$OWNER_FILE")
@@ -781,8 +840,20 @@ sanitize_openvpn_profile() {
             if (name == "") name = "unprintable"
             return substr(name, 1, 32)
         }
+        # A token that is in none of our lists is not a directive: it is a piece
+        # of whatever file the caller pointed --config at. Naming it back turns
+        # a refusal into a read-back channel, so only tokens that are already
+        # ours are echoed -- those say nothing about the file they came from.
+        # The line number is always safe and is what locates the problem.
+        # ngPost names the real directive to the user from OpenVpnConfigPolicy,
+        # before pkexec is ever reached.
+        function known(name) {
+            return (name in allowed || name in fileb || name in blob \
+                    || name in denied || name in dropped || name == "connection")
+        }
         function fail(kind, name, line) {
-            printf("%s %s line %d", kind, label(name), line) > "/dev/stderr"
+            printf("%s %s line %d", kind, known(name) ? label(name) : "withheld", line) \
+                > "/dev/stderr"
             bad = 1
             exit 1
         }
@@ -887,18 +958,147 @@ sanitize_openvpn_profile() {
     return 0
 }
 
+# ---------------------------------------------------------------------------
+# WireGuard profile policy.
+#
+# `wg setconf` is not `wg-quick`: it never runs PostUp/PreUp, so a WireGuard
+# profile is not the command-execution vector under this helper that an OpenVPN
+# one was. It was still the only caller-supplied file that reached a root
+# process unexamined, and wireguard-tools reports a key it does not recognise by
+# printing the offending line -- straight into the backend log, whose tail is
+# handed back to the caller when startup fails.
+#
+# So the same rule as OpenVPN: recognised sections and keys, or refusal. Nothing
+# else reaches the backend, and nothing the backend echoes can be a line out of
+# a file that is not a WireGuard profile.
+#
+# The wg-quick-only keys are accepted rather than refused: every provider
+# profile carries them, prepare_wg_config strips them from what `wg setconf`
+# actually reads, and the helper parses Address and DNS out of this sanitized
+# copy itself.
+WG_INTERFACE_KEYS="
+address addresses dns fwmark listenport mtu postdown postup predown preup
+privatekey saveconfig table
+"
+WG_PEER_KEYS="
+allowedips endpoint persistentkeepalive presharedkey publickey
+"
+
+#! Rewrite $1 in place, keeping only recognised sections and keys. Non-zero,
+#! with the offending key named on stderr when it is one of ours, when the
+#! profile must be refused.
+sanitize_wireguard_profile() {
+    local profile=$1 sanitized="$1.sanitized" reason=""
+
+    # awk would silently truncate at a NUL, so a profile holding one is refused
+    # rather than half-read.
+    if [ "$(wc -c < "$profile")" != "$(tr -d '\000' < "$profile" | wc -c)" ]; then
+        terminal_error configuration "the WireGuard profile contains binary data"
+        return 1
+    fi
+    if [ "$(wc -c < "$profile")" -gt 1048576 ]; then
+        terminal_error configuration "the WireGuard profile is larger than a profile ever is"
+        return 1
+    fi
+
+    reason=$(awk \
+        -v IFKEYS="$WG_INTERFACE_KEYS" \
+        -v PEERKEYS="$WG_PEER_KEYS" '
+        function label(name) {
+            gsub(/[^A-Za-z0-9._-]/, "", name)
+            if (name == "") name = "unprintable"
+            return substr(name, 1, 32)
+        }
+        # Same reasoning as the OpenVPN sanitizer: a key that is in neither list
+        # is content out of whatever file --config named, never a WireGuard key.
+        function known(name) {
+            return (name in ifkeys || name in peerkeys)
+        }
+        function fail(kind, name, line) {
+            printf("%s %s line %d", kind, known(name) ? label(name) : "withheld", line) \
+                > "/dev/stderr"
+            bad = 1
+            exit 1
+        }
+        function fill(list, set,   n, i, parts) {
+            n = split(list, parts, /[ \t\n]+/)
+            for (i = 1; i <= n; ++i) if (parts[i] != "") set[parts[i]] = 1
+        }
+        BEGIN {
+            fill(IFKEYS, ifkeys); fill(PEERKEYS, peerkeys)
+            section = ""; bad = 0
+        }
+        {
+            line = $0
+            sub(/\r$/, "", line)
+            gsub(/^[ \t]+|[ \t]+$/, "", line)
+            if (line == "" || line ~ /^#/ || line ~ /^;/) next
+
+            # Emitted in canonical spelling: the helper looks for a literal
+            # [Interface] when it reads Address and DNS back out of this file.
+            if (substr(line, 1, 1) == "[") {
+                tag = tolower(line)
+                if (tag == "[interface]") { section = "interface"; print "[Interface]"; next }
+                if (tag == "[peer]")      { section = "peer";      print "[Peer]";      next }
+                fail("unknown-section", line, NR)
+            }
+
+            key = line
+            sub(/[ \t]*=.*/, "", key)
+            gsub(/^[ \t]+|[ \t]+$/, "", key)
+            key = tolower(key)
+
+            if (section == "") fail("key-outside-section", key, NR)
+            if (line !~ /=/) fail("malformed-assignment", key, NR)
+            if (section == "interface") {
+                if (!(key in ifkeys)) fail("unreviewed-key", key, NR)
+            } else {
+                if (!(key in peerkeys)) fail("unreviewed-key", key, NR)
+            }
+            print line
+        }
+        END {
+            if (bad) exit 1
+            if (section == "") {
+                printf("no-section line 0") > "/dev/stderr"
+                exit 1
+            }
+        }
+    ' "$profile" 2>&1 >"$sanitized") || {
+        rm -f "$sanitized"
+        terminal_error configuration "WireGuard profile refused: ${reason:-unparsable}"
+        return 1
+    }
+
+    mv -- "$sanitized" "$profile" || {
+        rm -f "$sanitized"
+        terminal_error internal "cannot install the sanitized WireGuard profile"
+        return 1
+    }
+    chmod 0600 "$profile"
+    return 0
+}
+
 mkdir -p "$PRIVATE_DIR" || { terminal_error internal "cannot create private runtime directory"; exit 1; }
 chmod 0700 "$SESSION_DIR" "$PRIVATE_DIR" || { terminal_error internal "cannot secure private runtime directory"; exit 1; }
 cp -- "$CONFIG" "$SESSION_CONFIG" || { terminal_error configuration "cannot copy VPN config into volatile session"; exit 1; }
 chmod 0600 "$SESSION_CONFIG"
-# The session copy is what OpenVPN is handed, so it is the copy that gets
+# The session copy is what the backend is handed, so it is the copy that gets
 # regenerated from the whitelist. Before the lease turns into a running root
-# process, and before anything reads a directive out of it.
+# process, and before anything reads a directive out of it. ACTION is already
+# constrained to these two above, so the else branch is WireGuard.
 if [ "$ACTION" = openvpn ]; then
     sanitize_openvpn_profile "$SESSION_CONFIG" || exit 1
     stage_openvpn_sibling_files "$SESSION_CONFIG" "$(dirname "$CONFIG")" || exit 1
+else
+    sanitize_wireguard_profile "$SESSION_CONFIG" || exit 1
 fi
 if [ -n "$AUTH_FILE" ] && [ -r "$AUTH_FILE" ]; then
+    # OpenVPN reads the first two lines of this file as username and password
+    # and sends them to whatever `remote` the profile names, so an --auth-file
+    # the caller cannot read itself is an exfiltration primitive, not a
+    # credential.
+    require_caller_can_read authentication "$AUTH_FILE" "authentication file" || exit 1
     cp -- "$AUTH_FILE" "$SESSION_AUTH" || { terminal_error authentication "cannot copy authentication file"; exit 1; }
     chmod 0600 "$SESSION_AUTH"
 fi

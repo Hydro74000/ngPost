@@ -48,7 +48,7 @@ class HelperUpgradeTests(unittest.TestCase):
             legacy()
             result = migrate(directory)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('readonly NGPOST_VPN_HELPER_SECURITY_REVISION=3', installed.read_text())
+            self.assertIn('readonly NGPOST_VPN_HELPER_SECURITY_REVISION=4', installed.read_text())
             self.assertEqual(installed.stat().st_uid, 0)
             self.assertEqual(installed.stat().st_mode & 0o777, 0o755)
             self.assertTrue(rule.exists())
