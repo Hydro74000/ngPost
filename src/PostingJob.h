@@ -325,6 +325,8 @@ public:
                                             uint redundancy);
     static bool restoreObfuscatedPathsForTest(QMap<QString, QString> &paths,
                                               QString &stagingPath);
+    static QSet<QString> unrestoredOriginalsForTest(QMap<QString, QString> const &stillObfuscated)
+    { return _unrestoredOriginals(stillObfuscated); }
 #endif
 
 signals:
@@ -393,6 +395,10 @@ private:
     NntpArticle *_readNextArticleIntoBufferPtr(const QString &threadName, char **bufferPtr);
 
     void _delOriginalFiles();
+
+    //! Original paths whose obfuscated source never made it back to its real
+    //! name, and which _delOriginalFiles() must therefore leave alone.
+    static QSet<QString> _unrestoredOriginals(QMap<QString, QString> const &stillObfuscated);
 
     void _obfuscateInputFileNames(QString const &tmpFolder, QString const &archiveName);
     bool _restoreObfuscatedFileNames();

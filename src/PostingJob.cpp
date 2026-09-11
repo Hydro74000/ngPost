@@ -1376,10 +1376,33 @@ bool PostingJob::restoreObfuscatedPathsForTest(QMap<QString, QString> &paths,
 }
 #endif
 
+//! A failed restore keeps its mapping, so whatever is still in the map names a
+//! source that never made it back to its real name. Deleting that original path
+//! would not delete what was posted -- that file is still in the staging folder
+//! under a random name -- and QFile::rename() fails on an occupied destination,
+//! so the restore having failed is itself the sign that an unrelated file has
+//! appeared there since. The destructor retries the restore afterwards;
+//! removing the newcomer here would destroy a stranger's file and then hand the
+//! path back to ours.
+QSet<QString> PostingJob::_unrestoredOriginals(QMap<QString, QString> const &stillObfuscated)
+{
+    QSet<QString> paths;
+    for (auto it = stillObfuscated.cbegin(); it != stillObfuscated.cend(); ++it)
+        paths.insert(QFileInfo(it.value()).absoluteFilePath());
+    return paths;
+}
+
 void PostingJob::_delOriginalFiles()
 {
+    QSet<QString> const unrestored = _unrestoredOriginals(_obfuscatedFileNames);
+
     for (const QFileInfo &fi : _originalFiles) {
         QString path = fi.absoluteFilePath();
+        if (unrestored.contains(path)) {
+            _error(tr("Not deleting %1: the posted source is still under its obfuscated name")
+                       .arg(path));
+            continue;
+        }
         _log(tr("Deleting posted %1: %2").arg(fi.isDir() ? tr("folder") : tr("file")).arg(path));
         if (fi.isDir()) {
             QDir dir(path);

@@ -255,6 +255,7 @@ private slots:
     //! A failed restoration must retain enough state for a later retry; the
     //! successful retry then removes the empty staging directory.
     void obfuscated_source_restore_is_retryable();
+    void unrestored_sources_are_never_deleted();
 
     //! A file that could not be read makes the post partial, not successful:
     //! such a file never produces a failed article, it is simply set aside.
@@ -2216,6 +2217,34 @@ void TestCliParser::obfuscated_source_restore_is_retryable()
     QFile restored(originalPath);
     QVERIFY(restored.open(QIODevice::ReadOnly));
     QCOMPARE(restored.readAll(), QByteArray("original payload"));
+}
+
+//! --rm_posted deletes the sources by their ORIGINAL path. A restore only ever
+//! fails on an occupied destination, so a mapping still held after the restore
+//! means that path now holds a file that is not the one we posted -- ours is
+//! still in the staging folder. Deleting there would destroy a stranger's file.
+void TestCliParser::unrestored_sources_are_never_deleted()
+{
+    QTemporaryDir sandbox;
+    QVERIFY(sandbox.isValid());
+
+    const QString restoredPath   = sandbox.filePath(QStringLiteral("restored.bin"));
+    const QString unrestoredPath = sandbox.filePath(QStringLiteral("unrestored.bin"));
+
+    // Nothing left in the map: every source made it back, so every original
+    // path is the posted file and is deletable.
+    QMap<QString, QString> nothingPending;
+    QVERIFY(PostingJob::unrestoredOriginalsForTest(nothingPending).isEmpty());
+
+    // One mapping retained by a failed restore.
+    QMap<QString, QString> stillObfuscated;
+    stillObfuscated.insert(sandbox.filePath(QStringLiteral(".staging/random-name")),
+                           unrestoredPath);
+
+    const QSet<QString> skipped = PostingJob::unrestoredOriginalsForTest(stillObfuscated);
+    QCOMPARE(skipped.size(), 1);
+    QVERIFY(skipped.contains(QFileInfo(unrestoredPath).absoluteFilePath()));
+    QVERIFY(!skipped.contains(QFileInfo(restoredPath).absoluteFilePath()));
 }
 
 namespace
