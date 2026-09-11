@@ -12,6 +12,8 @@
 
 # About The Project
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/f3f7f3b992d14700affabf1a2eb7ae94)](https://app.codacy.com/gh/Hydro74000/ngPost?utm_source=github.com&utm_medium=referral&utm_content=Hydro74000/ngPost&utm_campaign=Badge_Grade)
+
 This application is a high-speed command line and GUI Usenet poster for binaries, designed for secure and efficient data posting. Developed with C++17 and [Qt 6.8.2](https://www.qt.io/blog/qt-6.8.2-released), it features file compression, par2 file generation, and a posting queue for managing multiple uploads. The tool automates tasks by scanning folders and posting files, with options for executing commands post-upload and shutting down the computer upon completion.
 
 
