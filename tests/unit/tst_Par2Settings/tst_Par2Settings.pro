@@ -1,0 +1,8 @@
+QT = core testlib
+CONFIG += console testcase c++17
+CONFIG -= app_bundle
+TEMPLATE = app
+TARGET = tst_Par2Settings
+INCLUDEPATH += ../../../src
+SOURCES += tst_Par2Settings.cpp ../../../src/par2/Par2Settings.cpp
+HEADERS += ../../../src/par2/Par2Settings.h

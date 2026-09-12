@@ -63,6 +63,7 @@ public:
     ~AutoPostWidget();
 
     void init();
+    void refreshPar2Default();
 
     void handleKeyEvent(QKeyEvent *keyEvent);
     void handleDropEvent(QDropEvent *e);

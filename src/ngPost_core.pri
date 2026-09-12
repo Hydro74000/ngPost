@@ -108,6 +108,7 @@ SOURCES += \
         $$PWD/PostCmdRunner.cpp \
         $$PWD/Poster.cpp \
         $$PWD/PostingJob.cpp \
+        $$PWD/par2/Par2Settings.cpp \
         $$PWD/nntp/Nntp.cpp \
         $$PWD/nntp/NntpArticle.cpp \
         $$PWD/nntp/NntpFile.cpp \
@@ -181,7 +182,7 @@ HEADERS += \
 # .pro files only have to do `CONFIG += use_hmi ; include(common.pri)` and
 # everything resolves consistently.
 use_hmi {
-QT += gui charts
+QT += gui charts concurrent
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 DEFINES += __USE_HMI__
 
@@ -189,6 +190,7 @@ SOURCES += \
     $$PWD/hmi/AutoPostWidget.cpp \
     $$PWD/hmi/CheckBoxCenterWidget.cpp \
     $$PWD/hmi/CompressionSettingsDialog.cpp \
+    $$PWD/hmi/Par2SettingsDialog.cpp \
     $$PWD/hmi/PostInfoDialog.cpp \
     $$PWD/hmi/PostingWidget.cpp \
     $$PWD/hmi/SignedListWidget.cpp \
@@ -201,6 +203,7 @@ HEADERS += \
     $$PWD/hmi/AutoPostWidget.h \
     $$PWD/hmi/CheckBoxCenterWidget.h \
     $$PWD/hmi/CompressionSettingsDialog.h \
+    $$PWD/hmi/Par2SettingsDialog.h \
     $$PWD/hmi/DependentControl.h \
     $$PWD/hmi/PostInfoDialog.h \
     $$PWD/hmi/PostingWidget.h \

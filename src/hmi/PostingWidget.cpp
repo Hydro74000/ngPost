@@ -62,6 +62,9 @@ PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber) :
     _postInfoMeta()
 {
     _ui->setupUi(this);
+    connect(_ui->filesList->model(), &QAbstractItemModel::rowsInserted, this, &PostingWidget::submissionEligibilityChanged);
+    connect(_ui->filesList->model(), &QAbstractItemModel::rowsRemoved, this, &PostingWidget::submissionEligibilityChanged);
+    connect(_ui->filesList->model(), &QAbstractItemModel::modelReset, this, &PostingWidget::submissionEligibilityChanged);
     _buildPostInfoRow();
 
     connect(_ui->postButton, &QAbstractButton::clicked, this, &PostingWidget::onPostFiles);
@@ -139,6 +142,19 @@ void PostingWidget::onPostingJobDone()
     setIDLE();
 }
 
+bool PostingWidget::canSubmit() const
+{
+    return _state == STATE::IDLE && !_postingJob && !_postingFinished && _ui->filesList->count() > 0;
+}
+
+QFileInfoList PostingWidget::previewFiles() const
+{
+    QFileInfoList files;
+    for (int i = 0; i < _ui->filesList->count(); ++i)
+        files << QFileInfo(_ui->filesList->item(i)->text());
+    return files;
+}
+
 void PostingWidget::onPostFiles()
 {
     postFiles(true);
@@ -176,6 +192,9 @@ void PostingWidget::postFiles(bool updateMainParams)
             _hmi->updateParams();
         }
         udatePostingParams();
+        // A confirmation runs a nested event loop; an Auto Posting event may
+        // update the shared globals while it is open. Keep this tab's values.
+        PostingJobOptions options = _ngPost->_baseJobOptions();
 
         // check if the nzb file name already exist
         QString nzbPath = _ngPost->nzbPath();
@@ -195,7 +214,7 @@ void PostingWidget::postFiles(bool updateMainParams)
 
         _postingFinished = false;
         _state = STATE::POSTING;
-        PostingJobOptions options = _ngPost->_baseJobOptions();
+        emit submissionEligibilityChanged();
         options.nzbFilePath       = nzbPath;
         options.files             = files;
         // in the GUI the list holds exactly what the user dropped, folders included
@@ -249,6 +268,7 @@ void PostingWidget::postFiles(bool updateMainParams)
     else  if (_state == STATE::POSTING)
     {
         _state = STATE::STOPPING;
+        emit submissionEligibilityChanged();
         emit _postingJob->stopPosting();
     }
 }
@@ -302,6 +322,7 @@ void PostingWidget::onSelectFolderClicked()
 
 void PostingWidget::onClearFilesClicked()
 {
+    if (!_postingJob) _postingFinished = false;
     _ui->filesList->clear2();
     // The post information describes the post that was there; leaving it would
     // hand the title of one post to the next one queued in this tab.
@@ -486,8 +507,10 @@ void PostingWidget::init()
 
     _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
 
-    _ui->redundancySB->setRange(0, 100);
-    _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
+    _ui->redundancySB->setRange(-1, 100);
+    _ui->redundancySB->setValue(-1);
+    refreshPar2Default();
+    connect(_ngPost, &NgPost::par2DefaultsChanged, this, &PostingWidget::refreshPar2Default, Qt::UniqueConnection);
     // The suffix travels inside the spin box, so the number stops being an
     // unlabelled one without costing a widget and its layout spacing.
     _ui->redundancySB->setSuffix(QStringLiteral(" %"));
@@ -579,7 +602,7 @@ void PostingWidget::udatePostingParams()
     _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
     // fetch par2 settings
     _ngPost->_doPar2  = _ui->par2CB->isChecked();
-    _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
+    _ngPost->_par2Pct = (_ui->redundancySB->value() < 0 ? _ngPost->_par2PctDefault : static_cast<uint>(_ui->redundancySB->value()));
 
     _ngPost->_keepRar = _ui->keepRarCB->isChecked();
 
@@ -715,7 +738,8 @@ PostInfoData PostingWidget::_postInfoPreview() const
     if (!_ngPost->_genFrom && !_ngPost->_from.empty())
         data.nzbPoster = QString::fromStdString(_ngPost->_from);
 
-    data.par2Pct = _ui->par2CB->isChecked() ? _ui->redundancySB->value() : -1;
+    data.par2Pct = _ui->par2CB->isChecked()
+        ? (_ui->redundancySB->value() < 0 ? int(_ngPost->_par2PctDefault) : _ui->redundancySB->value()) : -1;
 
     QFileInfoList files;
     bool          hasFolder = false;
@@ -749,6 +773,7 @@ bool PostingWidget::writesPostInfoFile() const
 void PostingWidget::retranslate()
 {
     _ui->retranslateUi(this);
+    refreshPar2Default();
     // code built widgets are not touched by retranslateUi()
     retranslatePostInfoTexts();
     // The tooltips of the dependent controls carry both their help text and,
@@ -812,6 +837,8 @@ void PostingWidget::addPath(const QString &path, int currentNbFiles, int isDir)
 {
     if (_ui->filesList->addPathIfNotInList(path, currentNbFiles, isDir))
     {
+        if (!_postingJob) _postingFinished = false;
+        emit submissionEligibilityChanged();
         QFileInfo fileInfo(path);
         if (_ui->nzbFileEdit->text().isEmpty())
         {
@@ -837,6 +864,7 @@ void PostingWidget::setIDLE()
 {
     _ui->postButton->setText(tr("Post Files"));
     _state = STATE::IDLE;
+    emit submissionEligibilityChanged();
 }
 
 void PostingWidget::setPosting()
@@ -844,6 +872,7 @@ void PostingWidget::setPosting()
     _hmi->updateJobTab(this, _hmi->sPostingColor, QIcon(_hmi->sPostingIcon), _postingJob->nzbName());
     _ui->postButton->setText(tr("Stop Posting"));
     _state = STATE::POSTING;
+    emit submissionEligibilityChanged();
 }
 
 void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted)
@@ -867,4 +896,18 @@ void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files,
         _ui->postButton->setText(tr("Cancel Posting"));
         _hmi->updateJobTab(this, _hmi->sPendingColor, QIcon(_hmi->sPendingIcon), job->nzbName());
     }
+}
+
+void PostingWidget::refreshPar2Default()
+{
+    _ui->redundancySB->setSpecialValueText(tr("Global (%1 %)").arg(_ngPost->par2DefaultPercentage()));
+}
+
+void PostingWidget::setPar2PercentageOverride(int percentage)
+{
+    _ui->redundancySB->setValue(percentage);
+}
+bool PostingWidget::hasPar2PercentageOverride() const
+{
+    return _ui->redundancySB->value() >= 0;
 }

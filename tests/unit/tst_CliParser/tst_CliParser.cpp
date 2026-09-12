@@ -2057,6 +2057,12 @@ void TestCliParser::resume_commands_accept_aliases_and_dry_run()
 
 void TestCliParser::par2_args_redundancy_override_for_parpar()
 {
+    for (const QString &redundancy : {QStringLiteral("--recovery-slices=1n*0.6"), QStringLiteral("--recovery-slices 1n*0.6")}) {
+        const auto normalized = PostingJob::buildPar2ArgsForTest("-s1M " + redundancy, true, false, 17);
+        QVERIFY(normalized.contains("-r17%"));
+        QVERIFY(!normalized.join(' ').contains("recovery-slices"));
+        QVERIFY(!normalized.join(' ').contains("0.6"));
+    }
     const QStringList args = PostingJob::buildPar2ArgsForTest(
         QStringLiteral("-s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q"),
         true,

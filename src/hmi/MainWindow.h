@@ -68,6 +68,9 @@ private:
     STATE           _state;
     PostingWidget  *_quickJobTab;
     AutoPostWidget *_autoPostTab;
+    QPushButton *_postAllButton = nullptr;
+    QPushButton *_par2SettingsButton = nullptr;
+    bool _submittingAll = false;
 
     //! Tab opened when ngPost starts: 0 quick post, 1 folder monitoring,
     //! 2 history, and -1 when the user never picked one -- which is the quick
@@ -273,6 +276,9 @@ private slots:
     void onDebugValue(int value);
 
     void onSaveConfig();
+    void onPostAllTabs();
+    void onPar2Settings();
+    void updatePostAllButton();
 
     void onJobTabClicked(int index);
     void onCloseJob(int index);

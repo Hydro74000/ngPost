@@ -352,6 +352,10 @@ Isso Será irreversível...</translation>
         <source>Post info defaults saved: model %1, written to %2</source>
         <translation>Predefinições guardadas: modelo %1, escrita em %2</translation>
     </message>
+    <message>
+        <source>Global (%1 %)</source>
+        <translation>Global (%1 %)</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -479,6 +483,34 @@ Marcada, ficam na pasta do caminho de compressão.
         <location line="+10"/>
         <source>the selected file is not executable...</source>
         <translation>o arquivo selecionado não pode ser executável...</translation>
+    </message>
+    <message>
+        <source>Volume size (MiB):</source>
+        <translation>Tamanho do volume (MiB):</translation>
+    </message>
+    <message>
+        <source>Limit the number of volumes to</source>
+        <translation>Limitar o número de volumes a</translation>
+    </message>
+    <message>
+        <source>The volume size is calculated automatically from the source size and the volume limit.</source>
+        <translation>O tamanho é calculado automaticamente a partir do tamanho dos arquivos e do limite de volumes.</translation>
+    </message>
+    <message>
+        <source>The archive is not split into volumes.</source>
+        <translation>O arquivo não é dividido em volumes.</translation>
+    </message>
+    <message>
+        <source>If necessary, ngPost increases the volume size to meet this limit. The volume limit then takes priority over the size entered.</source>
+        <translation>Se necessário, o ngPost aumenta o tamanho dos volumes para respeitar este limite. O limite tem prioridade sobre o tamanho informado.</translation>
+    </message>
+    <message>
+        <source>The requested volume size is kept; the last volume may be smaller.</source>
+        <translation>O tamanho solicitado é mantido; o último volume pode ser menor.</translation>
+    </message>
+    <message>
+        <source>1 MiB = 1,048,576 bytes. The calculation uses the source size, with rounding.</source>
+        <translation>1 MiB = 1.048.576 bytes. O cálculo usa o tamanho dos arquivos, com arredondamento.</translation>
     </message>
 </context>
 <context>
@@ -1946,6 +1978,18 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <location line="+129"/>
         <source>Reset column widths</source>
         <translation>Redefinir a largura das colunas</translation>
+    </message>
+    <message>
+        <source>PAR2 Settings…</source>
+        <translation>Configurações PAR2…</translation>
+    </message>
+    <message>
+        <source>Post all tabs</source>
+        <translation>Postar todas as abas</translation>
+    </message>
+    <message>
+        <source>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</source>
+        <translation>Enviar %1 posts preparados na ordem das abas. Posts vazios, concluídos, na fila e ativos são ignorados. Requer pelo menos duas abas de postagem.</translation>
     </message>
 </context>
 <context>
@@ -4175,6 +4219,26 @@ O seu ficheiro de configuração activo é:
         <source>## them, so the archive carries no original name. Both can be asked at once.</source>
         <translation>## comprimir, para que o arquivo não contenha nome original. Ambos ao mesmo tempo.</translation>
     </message>
+    <message>
+        <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
+        <translation>RAR_MAX deve ser um inteiro positivo de até 2147483647.</translation>
+    </message>
+    <message>
+        <source>PAR2_TOOL must be auto, parpar, par2cmdline or multipar.</source>
+        <translation>PAR2_TOOL deve ser auto, parpar, par2cmdline ou multipar.</translation>
+    </message>
+    <message>
+        <source>## Optional maximum number of archive volumes; commented means no limit.</source>
+        <translation>## Número máximo opcional de volumes; comentado significa sem limite.</translation>
+    </message>
+    <message>
+        <source>## When enabled, this limit takes priority over RAR_SIZE if a larger volume size is needed.</source>
+        <translation>## Quando ativado, este limite tem prioridade sobre RAR_SIZE se for necessário um tamanho maior.</translation>
+    </message>
+    <message>
+        <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
+        <translation>## O tamanho é calculado com arredondamento a partir dos arquivos; RAR_SIZE não é reescrito neste arquivo.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -5907,6 +5971,14 @@ desconhecidos: %3
         <source>[%1] skipping already posted article %2 from %3</source>
         <translation>[%1] a ignorar artigo já publicado %2 de %3</translation>
     </message>
+    <message>
+        <source>RAR_MAX must be greater than zero.</source>
+        <translation>RAR_MAX deve ser maior que zero.</translation>
+    </message>
+    <message>
+        <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
+        <translation>Tamanho do volume aumentado de %1 MiB para %2 MiB para um limite de %3 volumes.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -6190,6 +6262,10 @@ Alguns índices Usenet pedem um.</translation>
         <location line="-304"/>
         <source>Using PAR2_ARGS from config file: %1</source>
         <translation>Usando PAR2_ARGS do arquivo de configuração: %1</translation>
+    </message>
+    <message>
+        <source>Global (%1 %)</source>
+        <translation>Global (%1 %)</translation>
     </message>
 </context>
 <context>
@@ -7238,6 +7314,256 @@ O seu ficheiro de configuração em &lt;configDir&gt;/vpn/ e as suas credenciais
         <location line="+12"/>
         <source>Could not parse local IP from WireGuard config</source>
         <translation>Não foi possível ler o IP local da configuração WireGuard</translation>
+    </message>
+</context>
+<context>
+    <name>Par2Settings</name>
+    <message>
+        <source>Block size must be a multiple of 4 bytes, below 2 GiB.</source>
+        <translation>O tamanho do bloco deve ser múltiplo de 4 bytes e menor que 2 GiB.</translation>
+    </message>
+    <message>
+        <source>The source block count must be between 1 and 32768.</source>
+        <translation>O número de blocos de origem deve estar entre 1 e 32768.</translation>
+    </message>
+    <message>
+        <source>Choose a positive volume size below the tool's limit.</source>
+        <translation>Escolha um tamanho de volume positivo abaixo do limite da ferramenta.</translation>
+    </message>
+    <message>
+        <source>The recovery volume count must be between 1 and 65535.</source>
+        <translation>O número de volumes de recuperação deve estar entre 1 e 65535.</translation>
+    </message>
+    <message>
+        <source>This combination is not supported by par2cmdline.</source>
+        <translation>Esta combinação não é suportada pelo par2cmdline.</translation>
+    </message>
+    <message>
+        <source>Decimal distribution requires MultiPar.</source>
+        <translation>A distribuição decimal requer o MultiPar.</translation>
+    </message>
+    <message>
+        <source>MultiPar supports a volume count only with equal distribution.</source>
+        <translation>O MultiPar só permite escolher o número de volumes com distribuição igual.</translation>
+    </message>
+    <message>
+        <source>CPU or memory setting exceeds the tool's supported range.</source>
+        <translation>A configuração de CPU ou memória excede a faixa suportada pela ferramenta.</translation>
+    </message>
+</context>
+<context>
+    <name>Par2SettingsDialog</name>
+    <message>
+        <source>indeterminate</source>
+        <translation>indeterminado</translation>
+    </message>
+    <message>
+        <source>PAR2 Settings</source>
+        <translation>Configurações PAR2</translation>
+    </message>
+    <message>
+        <source>Global settings for future posts. Each post can override the redundancy percentage; queued posts keep their settings.</source>
+        <translation>Configurações globais para futuros posts. Cada post pode alterar a porcentagem de redundância; os posts na fila mantêm suas configurações.</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automático</translation>
+    </message>
+    <message>
+        <source>Tool:</source>
+        <translation>Ferramenta:</translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation>Procurar…</translation>
+    </message>
+    <message>
+        <source>Executable:</source>
+        <translation>Executável:</translation>
+    </message>
+    <message>
+        <source>Default redundancy:</source>
+        <translation>Redundância padrão:</translation>
+    </message>
+    <message>
+        <source>Limit to the largest source file</source>
+        <translation>Limitar ao maior arquivo de origem</translation>
+    </message>
+    <message>
+        <source>Target maximum size</source>
+        <translation>Tamanho máximo desejado</translation>
+    </message>
+    <message>
+        <source>Number of recovery volumes</source>
+        <translation>Número de volumes de recuperação</translation>
+    </message>
+    <message>
+        <source>Recovery volumes:</source>
+        <translation>Volumes de recuperação:</translation>
+    </message>
+    <message>
+        <source>Target size:</source>
+        <translation>Tamanho desejado:</translation>
+    </message>
+    <message>
+        <source>Equal</source>
+        <translation>Igual</translation>
+    </message>
+    <message>
+        <source>Uniform</source>
+        <translation>Uniforme</translation>
+    </message>
+    <message>
+        <source>Powers of two</source>
+        <translation>Potências de dois</translation>
+    </message>
+    <message>
+        <source>Decimal weights</source>
+        <translation>Pesos decimais</translation>
+    </message>
+    <message>
+        <source>Distribution:</source>
+        <translation>Distribuição:</translation>
+    </message>
+    <message>
+        <source>Sizes are targets for recovery data. PAR2 metadata can make the final files larger. par2cmdline's native limit follows the largest source file.</source>
+        <translation>Os tamanhos se referem aos dados de recuperação. Os metadados PAR2 podem aumentar o tamanho final. O limite nativo do par2cmdline segue o maior arquivo de origem.</translation>
+    </message>
+    <message>
+        <source>Advanced</source>
+        <translation>Avançado</translation>
+    </message>
+    <message>
+        <source>Exact block size</source>
+        <translation>Tamanho exato do bloco</translation>
+    </message>
+    <message>
+        <source>Target source block count</source>
+        <translation>Quantidade desejada de blocos de origem</translation>
+    </message>
+    <message>
+        <source>Blocks:</source>
+        <translation>Blocos:</translation>
+    </message>
+    <message>
+        <source> bytes</source>
+        <translation> bytes</translation>
+    </message>
+    <message>
+        <source>Block size:</source>
+        <translation>Tamanho do bloco:</translation>
+    </message>
+    <message>
+        <source>Source blocks:</source>
+        <translation>Blocos de origem:</translation>
+    </message>
+    <message>
+        <source>CPU threads:</source>
+        <translation>Threads de CPU:</translation>
+    </message>
+    <message>
+        <source>Enable GPU acceleration</source>
+        <translation>Ativar aceleração por GPU</translation>
+    </message>
+    <message>
+        <source>Find GPUs</source>
+        <translation>Buscar GPUs</translation>
+    </message>
+    <message>
+        <source>ParPar OpenCL device:</source>
+        <translation>Dispositivo OpenCL do ParPar:</translation>
+    </message>
+    <message>
+        <source>Use custom arguments</source>
+        <translation>Usar argumentos personalizados</translation>
+    </message>
+    <message>
+        <source>Custom arguments are kept verbatim; changing tools does not translate them. The post's redundancy overrides recognized redundancy arguments. Output and input paths are supplied by ngPost.</source>
+        <translation>Os argumentos personalizados são preservados; mudar de ferramenta não os traduz. A redundância do post substitui os argumentos reconhecidos. O ngPost fornece os caminhos de entrada e saída.</translation>
+    </message>
+    <message>
+        <source>Arguments:</source>
+        <translation>Argumentos:</translation>
+    </message>
+    <message>
+        <source>Prepare a post to display an estimate.</source>
+        <translation>Prepare um post para exibir uma estimativa.</translation>
+    </message>
+    <message>
+        <source>Select PAR2 executable</source>
+        <translation>Selecionar executável PAR2</translation>
+    </message>
+    <message>
+        <source>Reading source sizes…</source>
+        <translation>Lendo tamanhos dos arquivos…</translation>
+    </message>
+    <message>
+        <source>This par2cmdline build does not support thread selection.</source>
+        <translation>Esta compilação do par2cmdline não permite escolher o número de threads.</translation>
+    </message>
+    <message>
+        <source>Memory (eighths of free RAM):</source>
+        <translation>Memória (oitavos da RAM livre):</translation>
+    </message>
+    <message>
+        <source>Memory (MiB):</source>
+        <translation>Memória (MiB):</translation>
+    </message>
+    <message>
+        <source>GPU acceleration is not supported by par2cmdline. Disable it before changing tools.</source>
+        <translation>O par2cmdline não suporta aceleração por GPU. Desative-a antes de mudar de ferramenta.</translation>
+    </message>
+    <message>
+        <source>The selected executable is unavailable. Select an installed tool or Automatic.</source>
+        <translation>O executável selecionado não está disponível. Escolha uma ferramenta instalada ou Automático.</translation>
+    </message>
+    <message>
+        <source>Checking executable…</source>
+        <translation>Verificando executável…</translation>
+    </message>
+    <message>
+        <source>The executable could not be checked.</source>
+        <translation>Não foi possível verificar o executável.</translation>
+    </message>
+    <message>
+        <source>Executable checked.</source>
+        <translation>Executável verificado.</translation>
+    </message>
+    <message>
+        <source>GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered.</source>
+        <translation>Os detalhes da GPU estão na dica do seletor; também é possível informar um nome ou um ID plataforma:dispositivo.</translation>
+    </message>
+    <message>
+        <source>Estimate unavailable: some source sizes could not be read.</source>
+        <translation>Estimativa indisponível: não foi possível ler alguns tamanhos de origem.</translation>
+    </message>
+    <message>
+        <source>Estimate unavailable: too many source volumes.</source>
+        <translation>Estimativa indisponível: volumes de origem em excesso.</translation>
+    </message>
+    <message>
+        <source>Estimate indeterminate for these arguments or block limits.</source>
+        <translation>Estimativa indeterminada para estes argumentos ou limites de blocos.</translation>
+    </message>
+    <message>
+        <source>Estimate before compression (source sizes and rounding):</source>
+        <translation>Estimativa antes da compactação (tamanhos de origem e arredondamento):</translation>
+    </message>
+    <message>
+        <source>Estimate for the current post:</source>
+        <translation>Estimativa para o post atual:</translation>
+    </message>
+    <message>
+        <source>%1 source blocks of about %2; %3 recovery blocks, about %4.</source>
+        <translation>%1 blocos de origem de cerca de %2; %3 blocos de recuperação, cerca de %4.</translation>
+    </message>
+    <message>
+        <source>Recovery volumes: %1; largest recovery data volume: %2 (metadata excluded).</source>
+        <translation>Volumes de recuperação: %1; maior volume de dados de recuperação: %2 (sem metadados).</translation>
+    </message>
+    <message>
+        <source>This preview uses the global default; the current post has its own redundancy override.</source>
+        <translation>Esta prévia usa o padrão global; o post atual tem sua própria redundância.</translation>
     </message>
 </context>
 </TS>

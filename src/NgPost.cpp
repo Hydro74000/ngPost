@@ -1,3 +1,4 @@
+#include <climits>
 /*
  * Copyright (c) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
  * Copyright (c) 2024-2026 Hydro74000 <acymap@gmail.com>
@@ -161,6 +162,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 
     {Opt::PAR2_PCT,     "par2_pct"},
     {Opt::PAR2_PATH,    "par2_path"},
+    {Opt::PAR2_TOOL,    "par2_tool"},
     {Opt::PAR2_ARGS,    "par2_args"},
     {Opt::PAR2_BLOCK_SIZE, "par2_block_size"},
 
@@ -2071,7 +2073,11 @@ PostingJobOptions NgPost::_baseJobOptions() const
     opt.rarArgs           = _rarArgs;
     opt.rarSize           = _rarSize;
     opt.useRarMax         = _useRarMax;
+    opt.rarMax            = _rarMax;
     opt.par2Pct           = _par2Pct;
+    opt.par2Path          = _par2Path;
+    opt.par2Arguments     = _par2Args;
+    opt.par2Tool          = _par2Tool == par2::Tool::Auto ? par2::detectTool(_par2Path) : _par2Tool;
     opt.doCompress        = _doCompress;
     opt.doPar2            = _doPar2;
     opt.rarName           = _rarName;
@@ -3164,8 +3170,12 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _useRarMax = true;
         bool ok;
         uint nb = parser.value(sOptionNames[Opt::RAR_MAX]).toUInt(&ok);
-        if (ok)
-            _rarMax = nb;
+        if (!ok || nb == 0 || nb > uint(INT_MAX))
+        {
+            _error(tr("RAR_MAX must be a positive integer no greater than 2147483647."), ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+        _rarMax = nb;
     }
     if (parser.isSet(sOptionNames[Opt::PAR2_PCT]))
     {
@@ -3174,6 +3184,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         if (ok)
         {
             _par2Pct = nb;
+            _par2PctDefault = nb;
             if (nb > 0)
                 _doPar2 = true;
         }
@@ -4046,10 +4057,14 @@ QString NgPost::_parseConfig(const QString &configPath)
                     }
                     else if (opt == sOptionNames[Opt::RAR_MAX])
                     {
-                        _useRarMax = true;
                         uint nb = val.toUInt(&ok);
-                        if (ok)
+                        if (!ok || nb == 0 || nb > uint(INT_MAX))
+                            err += tr("RAR_MAX must be a positive integer no greater than 2147483647.") + QLatin1Char('\n');
+                        else
+                        {
+                            _useRarMax = true;
                             _rarMax = nb;
+                        }
                     }
                     else if (opt == sOptionNames[Opt::KEEP_RAR])
                     {
@@ -4108,18 +4123,21 @@ QString NgPost::_parseConfig(const QString &configPath)
                     {
                         uint nb = val.toUInt(&ok);
                         if (ok)
+                        {
                             _par2Pct = nb;
+                            _par2PctDefault = nb;
+                        }
+                    }
+                    else if (opt == sOptionNames[Opt::PAR2_TOOL])
+                    {
+                        if (!par2::parseTool(val, _par2Tool))
+                            err += tr("PAR2_TOOL must be auto, parpar, par2cmdline or multipar.") + QLatin1Char('\n');
                     }
                     else if (opt == sOptionNames[Opt::PAR2_PATH])
                     {
-                        if (!val.isEmpty())
-                        {
-                            QFileInfo fi(val);
-                            if (fi.exists() && fi.isFile() && fi.isExecutable())
-                            {
-                                _par2Path       = val;
-                                _par2PathConfig = val;
-                            }
+                        if (!val.isEmpty()) {
+                            _par2Path = val;
+                            _par2PathConfig = val;
                         }
                     }
                     else if (opt == sOptionNames[Opt::PAR2_ARGS])
@@ -4216,6 +4234,9 @@ QString NgPost::_parseConfig(const QString &configPath)
         flushVpnProfile();
         file.close();
     }
+
+    if (_par2Tool != par2::Tool::Auto && _par2PathConfig.isEmpty())
+        _par2Path = par2::findExecutable(_par2Tool);
 
     if (legacyAutoCompress && !parsedPack)
     {
@@ -5075,9 +5096,9 @@ void NgPost::saveConfig()
                << tr("## feel free to change the value or to comment the next line if you don't want to split the archive") << "\n"
                << "RAR_SIZE = " << _rarSize << "\n"
                << "\n"
-               << tr("## maximum number of archive volumes") << "\n"
-               << tr("## we'll use RAR_SIZE except if it genereates too many volumes") << "\n"
-               << tr("## in that case we'll update rar_size to be <size of post> / rar_max") << "\n"
+               << tr("## Optional maximum number of archive volumes; commented means no limit.") << "\n"
+               << tr("## When enabled, this limit takes priority over RAR_SIZE if a larger volume size is needed.") << "\n"
+               << tr("## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.") << "\n"
                << (_useRarMax ? "" : "#") << "RAR_MAX = " << _rarMax << "\n"
                << "\n"
                << tr("##  keep rar folder after posting (otherwise it is automatically deleted uppon successful post)") << "\n"
@@ -5087,7 +5108,8 @@ void NgPost::saveConfig()
                << (_rarNoRootFolder  ? "" : "#") << "RAR_NO_ROOT_FOLDER = true\n"
                << "\n"
                << tr("## par2 redundancy percentage (0 by default meaning NO par2 generation)") << "\n"
-               << "PAR2_PCT = " << _par2Pct << "\n"
+               << "PAR2_PCT = " << _par2PctDefault << "\n"
+               << "PAR2_TOOL = " << par2::toolName(_par2Tool) << "\n"
                << "\n"
                << tr("## par2 (or alternative) absolute file path") << "\n"
                << tr("## this is only useful if you compile from source (as par2 is included on Windows and the AppImage)") << "\n"

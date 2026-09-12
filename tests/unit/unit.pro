@@ -3,6 +3,7 @@
 TEMPLATE = subdirs
 
 SUBDIRS = \
+    tst_Par2Settings \
     tst_WindowsServiceControl \
     tst_WindowsCommandLine \
     tst_RandomToken \

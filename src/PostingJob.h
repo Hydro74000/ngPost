@@ -105,6 +105,9 @@ private:
     const uint _rarSize;
     const bool _useRarMax;
     const uint _par2Pct;
+    const QString _par2Path;
+    const QString _par2Args;
+    const par2::Tool _par2Tool;
 
     const bool _doCompress;
     const bool _doPar2;

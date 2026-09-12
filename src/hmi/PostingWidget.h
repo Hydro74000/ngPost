@@ -108,10 +108,18 @@ public:
     void setPackingAuto(bool enabled, const QStringList &keys);
 
     void postFiles(bool updateMainParams);
+    bool canSubmit() const;
+    QFileInfoList previewFiles() const;
+    void refreshPar2Default();
+    void setPar2PercentageOverride(int percentage);
+    bool hasPar2PercentageOverride() const;
 
     //! Empty the tab and its decorations so the next post starts from scratch.
     void resetForNextPost();
 
+
+signals:
+    void submissionEligibilityChanged();
 
 public slots: // for PostingJob
     void onFilePosted(QString filePath, uint nbArticles, uint nbFailed);

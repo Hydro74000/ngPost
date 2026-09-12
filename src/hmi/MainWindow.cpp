@@ -1,3 +1,6 @@
+#include "Par2SettingsDialog.h"
+#include <QPointer>
+#include <QScopedValueRollback>
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
@@ -268,16 +271,24 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
+    for (auto *post : findChildren<PostingWidget *>())
+        disconnect(post, nullptr, this, nullptr);
+    if (_ui->postTabWidget) disconnect(_ui->postTabWidget, nullptr, this, nullptr);
     delete _ui;
 }
 
 void MainWindow::init(NgPost *ngPost)
 {
     _ngPost = ngPost;
+    _par2SettingsButton = new QPushButton(tr("PAR2 Settings…"), this);
+    _par2SettingsButton->setObjectName(QStringLiteral("par2SettingsButton"));
+    _ui->horizontalLayout_keepNfo->insertWidget(2, _par2SettingsButton);
+    connect(_par2SettingsButton, &QPushButton::clicked, this, &MainWindow::onPar2Settings);
 
     _applyLogCapacity(_ngPost->debugFull() ? 2 : (_ngPost->debugMode() ? 1 : 0));
 
     _quickJobTab = new PostingWidget(ngPost, this, 1);
+    connect(_quickJobTab, &PostingWidget::submissionEligibilityChanged, this, &MainWindow::updatePostAllButton);
     _autoPostTab = new AutoPostWidget(ngPost, this);
 
     _ui->debugBox->setChecked(_ngPost->debugMode());
@@ -305,6 +316,12 @@ void MainWindow::init(NgPost *ngPost)
     connect(tabBar, &QWidget::customContextMenuRequested, this, &MainWindow::onTabContextMenu);
     connect(tabBar, &QTabBar::tabCloseRequested,          this, &MainWindow::onCloseJob);
     _ui->postTabWidget->setTabsClosable(true);
+    _postAllButton = new QPushButton(_ui->postTabWidget);
+    _postAllButton->setObjectName(QStringLiteral("postAllTabsButton"));
+    _ui->postTabWidget->setCornerWidget(_postAllButton, Qt::TopRightCorner);
+    connect(_postAllButton, &QPushButton::clicked, this, &MainWindow::onPostAllTabs);
+    connect(_ui->postTabWidget, &QTabWidget::currentChanged, this, &MainWindow::updatePostAllButton);
+    updatePostAllButton();
     _ui->postTabWidget->installEventFilter(this);
 
     setJobLabel(1);
@@ -677,6 +694,8 @@ void MainWindow::changeEvent(QEvent *event)
         case QEvent::LanguageChange:
             qDebug() << "MainWindow::changeEvent";
             _ui->retranslateUi(this);
+            if (_par2SettingsButton) _par2SettingsButton->setText(tr("PAR2 Settings…"));
+            updatePostAllButton();
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
             _ui->uploadLbl->setToolTip(tr("Immediate speed (avg on %1 sec) - (nb Articles uploaded / total number of Articles) - avg speed").arg(NgPost::immediateSpeedDuration()));
 #endif
@@ -1938,6 +1957,8 @@ PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &f
         lastTabIdx = _ui->postTabWidget->count() -1;
     PostingWidget *newPostingWidget = new PostingWidget(_ngPost, this, static_cast<uint>(lastTabIdx));
     newPostingWidget->init();
+    connect(newPostingWidget, &PostingWidget::submissionEligibilityChanged, this, &MainWindow::updatePostAllButton);
+    connect(newPostingWidget, &QObject::destroyed, this, &MainWindow::updatePostAllButton);
     // Tab layout: 0=quick (#1), 1=folder, 2=history, 3="+" — so a tab inserted
     // at lastTabIdx becomes the (lastTabIdx-1)-th quick post for display.
     QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(lastTabIdx - 1);
@@ -1950,6 +1971,7 @@ PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &f
     for (const QFileInfo &file : files)
         newPostingWidget->addPath(file.absoluteFilePath(), 0, file.isDir());
 
+    updatePostAllButton();
     return newPostingWidget;
 }
 
@@ -2255,6 +2277,52 @@ void MainWindow::_onServerFieldEdited()
     // user having to find and click the separate "Save Config" button.
     updateServers();
     _ngPost->saveConfig();
+}
+
+void MainWindow::onPar2Settings()
+{
+    auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->currentWidget());
+    const auto *compress = post ? post->findChild<QCheckBox *>(QStringLiteral("compressCB")) : nullptr;
+    Par2SettingsDialog dialog(_ngPost, post ? post->previewFiles() : QFileInfoList{},
+                              compress && compress->isChecked(),
+                              post && post->hasPar2PercentageOverride(), this);
+    dialog.exec();
+}
+
+void MainWindow::updatePostAllButton()
+{
+    if (!_postAllButton)
+        return;
+    int tabs = 0, ready = 0;
+    for (int i = 0; i < _ui->postTabWidget->count(); ++i)
+        if (auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->widget(i))) {
+            ++tabs;
+            ready += post->canSubmit();
+        }
+    _postAllButton->setText(tr("Post all tabs"));
+    _postAllButton->setToolTip(tr("Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.").arg(ready));
+    _postAllButton->setEnabled(!_submittingAll && tabs > 1 && ready > 0);
+}
+
+void MainWindow::onPostAllTabs()
+{
+    if (_submittingAll || !_postAllButton || !_postAllButton->isEnabled())
+        return;
+    {
+        QScopedValueRollback<bool> guard(_submittingAll, true);
+        updatePostAllButton();
+        QList<QPointer<PostingWidget>> posts;
+        for (int i = 0; i < _ui->postTabWidget->count(); ++i)
+            if (auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->widget(i)))
+                if (post->canSubmit())
+                    posts << post;
+        updateServers();
+        updateParams();
+        for (const auto &post : posts)
+            if (post && post->canSubmit())
+                post->postFiles(false);
+    }
+    updatePostAllButton();
 }
 
 void MainWindow::onSaveConfig()

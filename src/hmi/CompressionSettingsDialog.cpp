@@ -1,3 +1,4 @@
+#include <climits>
 //========================================================================
 //
 // Copyright (C) 2026 Hydro74000 <acymap@gmail.com>
@@ -27,9 +28,13 @@ CompressionSettingsDialog::CompressionSettingsDialog(NgPost *ngPost, QWidget *pa
     _ui->compressPathEdit->setText(_ngPost->_tmpPath);
     _ui->rarEdit->setText(_ngPost->_rarPath);
 
-    _ui->rarSizeEdit->setValidator(new QIntValidator(1, 1000000, _ui->rarSizeEdit));
+    _ui->rarSizeEdit->setValidator(new QIntValidator(0, 1000000, _ui->rarSizeEdit));
     _ui->rarSizeEdit->setText(QString::number(_ngPost->_rarSize));
     _ui->rarMaxCB->setChecked(_ngPost->_useRarMax);
+    _ui->rarMaxSB->setValue(static_cast<int>(qMin(_ngPost->_rarMax, uint(INT_MAX))));
+    connect(_ui->rarMaxCB, &QCheckBox::toggled, this, &CompressionSettingsDialog::updateVolumeHelp);
+    connect(_ui->rarSizeEdit, &QLineEdit::textChanged, this, &CompressionSettingsDialog::updateVolumeHelp);
+    updateVolumeHelp();
     _ui->keepRarDefaultCB->setChecked(_ngPost->_keepRarDefault);
 
     _ui->rarLengthSB->setRange(5, 50);
@@ -57,6 +62,11 @@ QString CompressionSettingsDialog::fixedPassword() const
 
 void CompressionSettingsDialog::accept()
 {
+    if (!_ui->rarSizeEdit->hasAcceptableInput())
+    {
+        _ui->rarSizeEdit->setFocus();
+        return;
+    }
     _ngPost->_tmpPath = _ui->compressPathEdit->text();
     _ngPost->_rarPath = _ui->rarEdit->text();
 
@@ -70,6 +80,7 @@ void CompressionSettingsDialog::accept()
     }
 
     _ngPost->_useRarMax  = _ui->rarMaxCB->isChecked();
+    _ngPost->_rarMax = static_cast<uint>(_ui->rarMaxSB->value());
     // Only the default: _keepRar is what the post being prepared decided, and
     // its tab refreshes it before every job.
     _ngPost->_keepRarDefault = _ui->keepRarDefaultCB->isChecked();
@@ -86,6 +97,23 @@ void CompressionSettingsDialog::accept()
     _ngPost->saveConfig();
 
     QDialog::accept();
+}
+
+void CompressionSettingsDialog::updateVolumeHelp()
+{
+    const bool limited = _ui->rarMaxCB->isChecked();
+    _ui->rarMaxSB->setEnabled(limited);
+    QString text;
+    if (_ui->rarSizeEdit->text().toUInt() == 0)
+        text = limited ? tr("The volume size is calculated automatically from the source size and the volume limit.")
+                       : tr("The archive is not split into volumes.");
+    else
+        text = limited ? tr("If necessary, ngPost increases the volume size to meet this limit. The volume limit then takes priority over the size entered.")
+                       : tr("The requested volume size is kept; the last volume may be smaller.");
+    text += QStringLiteral("\n") + tr("1 MiB = 1,048,576 bytes. The calculation uses the source size, with rounding.");
+    _ui->volumeHelpLabel->setText(text);
+    _ui->rarMaxCB->setToolTip(text);
+    _ui->rarMaxSB->setToolTip(text);
 }
 
 void CompressionSettingsDialog::onCompressPathClicked()

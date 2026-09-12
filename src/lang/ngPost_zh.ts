@@ -352,6 +352,10 @@ It will be irreversible...</source>
         <source>Post info defaults saved: model %1, written to %2</source>
         <translation>已保存默认设置：模板 %1，写入 %2</translation>
     </message>
+    <message>
+        <source>Global (%1 %)</source>
+        <translation>全局（%1 %）</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -479,6 +483,34 @@ This is the default every new post starts with; each post can still decide other
         <location line="+10"/>
         <source>the selected file is not executable...</source>
         <translation>选中的文件不是可执行文件类型...</translation>
+    </message>
+    <message>
+        <source>Volume size (MiB):</source>
+        <translation>分卷大小（MiB）：</translation>
+    </message>
+    <message>
+        <source>Limit the number of volumes to</source>
+        <translation>将分卷数量限制为</translation>
+    </message>
+    <message>
+        <source>The volume size is calculated automatically from the source size and the volume limit.</source>
+        <translation>根据源文件大小和分卷数量限制自动计算分卷大小。</translation>
+    </message>
+    <message>
+        <source>The archive is not split into volumes.</source>
+        <translation>归档不拆分为多个分卷。</translation>
+    </message>
+    <message>
+        <source>If necessary, ngPost increases the volume size to meet this limit. The volume limit then takes priority over the size entered.</source>
+        <translation>必要时，ngPost 会增大分卷以满足数量限制。此时数量限制优先于输入的大小。</translation>
+    </message>
+    <message>
+        <source>The requested volume size is kept; the last volume may be smaller.</source>
+        <translation>保持指定的分卷大小；最后一个分卷可能较小。</translation>
+    </message>
+    <message>
+        <source>1 MiB = 1,048,576 bytes. The calculation uses the source size, with rounding.</source>
+        <translation>1 MiB = 1,048,576 字节。根据源文件大小计算并取整。</translation>
     </message>
 </context>
 <context>
@@ -1947,6 +1979,18 @@ This also removes all associated file and article records.</source>
         <location line="+129"/>
         <source>Reset column widths</source>
         <translation>重置列宽</translation>
+    </message>
+    <message>
+        <source>PAR2 Settings…</source>
+        <translation>PAR2 设置…</translation>
+    </message>
+    <message>
+        <source>Post all tabs</source>
+        <translation>发布所有标签页</translation>
+    </message>
+    <message>
+        <source>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</source>
+        <translation>按标签页顺序提交 %1 个已准备的发布任务。跳过空白、已完成、已排队和正在运行的任务。至少需要两个发布标签页。</translation>
     </message>
 </context>
 <context>
@@ -4176,6 +4220,26 @@ Your active configuration file is:
         <source>## them, so the archive carries no original name. Both can be asked at once.</source>
         <translation>## 使压缩包不携带任何原始文件名。两者可同时启用。</translation>
     </message>
+    <message>
+        <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
+        <translation>RAR_MAX 必须是大于零且不超过 2147483647 的整数。</translation>
+    </message>
+    <message>
+        <source>PAR2_TOOL must be auto, parpar, par2cmdline or multipar.</source>
+        <translation>PAR2_TOOL 必须为 auto、parpar、par2cmdline 或 multipar。</translation>
+    </message>
+    <message>
+        <source>## Optional maximum number of archive volumes; commented means no limit.</source>
+        <translation>## 可选的归档分卷数量上限；注释此行表示不限制。</translation>
+    </message>
+    <message>
+        <source>## When enabled, this limit takes priority over RAR_SIZE if a larger volume size is needed.</source>
+        <translation>## 启用后，如果需要更大的分卷，此限制优先于 RAR_SIZE。</translation>
+    </message>
+    <message>
+        <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
+        <translation>## 根据源文件大小计算并取整；不会改写此文件中的 RAR_SIZE。</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -5908,6 +5972,14 @@ unknown: %3
         <source>[%1] skipping already posted article %2 from %3</source>
         <translation>[%1] 跳过已发布的文章 %2 来自 %3</translation>
     </message>
+    <message>
+        <source>RAR_MAX must be greater than zero.</source>
+        <translation>RAR_MAX 必须大于零。</translation>
+    </message>
+    <message>
+        <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
+        <translation>为满足 %3 个分卷的限制，归档分卷大小从 %1 MiB 增至 %2 MiB。</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -6191,6 +6263,10 @@ Some Usenet indexes ask for one.</source>
         <location line="+1"/>
         <source>Bare in mind you can select items in the list and press DEL to remove them</source>
         <translation>请记住，您可以选择列表中的项目，然后按DEL删除它们</translation>
+    </message>
+    <message>
+        <source>Global (%1 %)</source>
+        <translation>全局（%1 %）</translation>
     </message>
 </context>
 <context>
@@ -7239,6 +7315,256 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
         <location line="+12"/>
         <source>Could not parse local IP from WireGuard config</source>
         <translation>无法从 WireGuard 配置中解析本地 IP</translation>
+    </message>
+</context>
+<context>
+    <name>Par2Settings</name>
+    <message>
+        <source>Block size must be a multiple of 4 bytes, below 2 GiB.</source>
+        <translation>块大小必须是 4 字节的倍数，且小于 2 GiB。</translation>
+    </message>
+    <message>
+        <source>The source block count must be between 1 and 32768.</source>
+        <translation>源块数量必须介于 1 和 32768 之间。</translation>
+    </message>
+    <message>
+        <source>Choose a positive volume size below the tool's limit.</source>
+        <translation>请选择大于零且小于工具上限的分卷大小。</translation>
+    </message>
+    <message>
+        <source>The recovery volume count must be between 1 and 65535.</source>
+        <translation>恢复分卷数量必须介于 1 和 65535 之间。</translation>
+    </message>
+    <message>
+        <source>This combination is not supported by par2cmdline.</source>
+        <translation>par2cmdline 不支持此组合。</translation>
+    </message>
+    <message>
+        <source>Decimal distribution requires MultiPar.</source>
+        <translation>十进制权重分配需要 MultiPar。</translation>
+    </message>
+    <message>
+        <source>MultiPar supports a volume count only with equal distribution.</source>
+        <translation>MultiPar 仅在等量分配时支持指定分卷数量。</translation>
+    </message>
+    <message>
+        <source>CPU or memory setting exceeds the tool's supported range.</source>
+        <translation>CPU 或内存设置超出工具支持的范围。</translation>
+    </message>
+</context>
+<context>
+    <name>Par2SettingsDialog</name>
+    <message>
+        <source>indeterminate</source>
+        <translation>无法确定</translation>
+    </message>
+    <message>
+        <source>PAR2 Settings</source>
+        <translation>PAR2 设置</translation>
+    </message>
+    <message>
+        <source>Global settings for future posts. Each post can override the redundancy percentage; queued posts keep their settings.</source>
+        <translation>用于后续发布任务的全局设置。每个任务可单独覆盖冗余百分比；已排队的任务保留原设置。</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>自动</translation>
+    </message>
+    <message>
+        <source>Tool:</source>
+        <translation>工具：</translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation>浏览…</translation>
+    </message>
+    <message>
+        <source>Executable:</source>
+        <translation>可执行文件：</translation>
+    </message>
+    <message>
+        <source>Default redundancy:</source>
+        <translation>默认冗余：</translation>
+    </message>
+    <message>
+        <source>Limit to the largest source file</source>
+        <translation>限制为最大源文件</translation>
+    </message>
+    <message>
+        <source>Target maximum size</source>
+        <translation>目标大小上限</translation>
+    </message>
+    <message>
+        <source>Number of recovery volumes</source>
+        <translation>恢复分卷数量</translation>
+    </message>
+    <message>
+        <source>Recovery volumes:</source>
+        <translation>恢复分卷：</translation>
+    </message>
+    <message>
+        <source>Target size:</source>
+        <translation>目标大小：</translation>
+    </message>
+    <message>
+        <source>Equal</source>
+        <translation>等量</translation>
+    </message>
+    <message>
+        <source>Uniform</source>
+        <translation>均匀</translation>
+    </message>
+    <message>
+        <source>Powers of two</source>
+        <translation>二次幂</translation>
+    </message>
+    <message>
+        <source>Decimal weights</source>
+        <translation>十进制权重</translation>
+    </message>
+    <message>
+        <source>Distribution:</source>
+        <translation>分配方式：</translation>
+    </message>
+    <message>
+        <source>Sizes are targets for recovery data. PAR2 metadata can make the final files larger. par2cmdline's native limit follows the largest source file.</source>
+        <translation>大小目标针对恢复数据。PAR2 元数据可能增大最终文件。par2cmdline 的原生限制以最大源文件为准。</translation>
+    </message>
+    <message>
+        <source>Advanced</source>
+        <translation>高级</translation>
+    </message>
+    <message>
+        <source>Exact block size</source>
+        <translation>精确块大小</translation>
+    </message>
+    <message>
+        <source>Target source block count</source>
+        <translation>目标源块数量</translation>
+    </message>
+    <message>
+        <source>Blocks:</source>
+        <translation>块：</translation>
+    </message>
+    <message>
+        <source> bytes</source>
+        <translation> 字节</translation>
+    </message>
+    <message>
+        <source>Block size:</source>
+        <translation>块大小：</translation>
+    </message>
+    <message>
+        <source>Source blocks:</source>
+        <translation>源块：</translation>
+    </message>
+    <message>
+        <source>CPU threads:</source>
+        <translation>CPU 线程：</translation>
+    </message>
+    <message>
+        <source>Enable GPU acceleration</source>
+        <translation>启用 GPU 加速</translation>
+    </message>
+    <message>
+        <source>Find GPUs</source>
+        <translation>查找 GPU</translation>
+    </message>
+    <message>
+        <source>ParPar OpenCL device:</source>
+        <translation>ParPar OpenCL 设备：</translation>
+    </message>
+    <message>
+        <source>Use custom arguments</source>
+        <translation>使用自定义参数</translation>
+    </message>
+    <message>
+        <source>Custom arguments are kept verbatim; changing tools does not translate them. The post's redundancy overrides recognized redundancy arguments. Output and input paths are supplied by ngPost.</source>
+        <translation>自定义参数按原样保留；切换工具不会转换参数。发布任务的冗余值会覆盖已识别的冗余参数。输入和输出路径由 ngPost 提供。</translation>
+    </message>
+    <message>
+        <source>Arguments:</source>
+        <translation>参数：</translation>
+    </message>
+    <message>
+        <source>Prepare a post to display an estimate.</source>
+        <translation>准备一个发布任务以显示估算。</translation>
+    </message>
+    <message>
+        <source>Select PAR2 executable</source>
+        <translation>选择 PAR2 可执行文件</translation>
+    </message>
+    <message>
+        <source>Reading source sizes…</source>
+        <translation>正在读取源文件大小…</translation>
+    </message>
+    <message>
+        <source>This par2cmdline build does not support thread selection.</source>
+        <translation>此 par2cmdline 构建不支持选择线程数。</translation>
+    </message>
+    <message>
+        <source>Memory (eighths of free RAM):</source>
+        <translation>内存（可用 RAM 的八分之几）：</translation>
+    </message>
+    <message>
+        <source>Memory (MiB):</source>
+        <translation>内存（MiB）：</translation>
+    </message>
+    <message>
+        <source>GPU acceleration is not supported by par2cmdline. Disable it before changing tools.</source>
+        <translation>par2cmdline 不支持 GPU 加速。请在切换工具前禁用它。</translation>
+    </message>
+    <message>
+        <source>The selected executable is unavailable. Select an installed tool or Automatic.</source>
+        <translation>所选可执行文件不可用。请选择已安装的工具或“自动”。</translation>
+    </message>
+    <message>
+        <source>Checking executable…</source>
+        <translation>正在检查可执行文件…</translation>
+    </message>
+    <message>
+        <source>The executable could not be checked.</source>
+        <translation>无法检查可执行文件。</translation>
+    </message>
+    <message>
+        <source>Executable checked.</source>
+        <translation>可执行文件已检查。</translation>
+    </message>
+    <message>
+        <source>GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered.</source>
+        <translation>设备选择框的提示中提供 GPU 详情；也可输入设备名称或“平台:设备”编号。</translation>
+    </message>
+    <message>
+        <source>Estimate unavailable: some source sizes could not be read.</source>
+        <translation>无法估算：部分源文件大小无法读取。</translation>
+    </message>
+    <message>
+        <source>Estimate unavailable: too many source volumes.</source>
+        <translation>无法估算：源分卷过多。</translation>
+    </message>
+    <message>
+        <source>Estimate indeterminate for these arguments or block limits.</source>
+        <translation>无法根据这些参数或块限制确定估算结果。</translation>
+    </message>
+    <message>
+        <source>Estimate before compression (source sizes and rounding):</source>
+        <translation>压缩前估算（源文件大小及取整）：</translation>
+    </message>
+    <message>
+        <source>Estimate for the current post:</source>
+        <translation>当前发布任务的估算：</translation>
+    </message>
+    <message>
+        <source>%1 source blocks of about %2; %3 recovery blocks, about %4.</source>
+        <translation>%1 个源块，每块约 %2；%3 个恢复块，共约 %4。</translation>
+    </message>
+    <message>
+        <source>Recovery volumes: %1; largest recovery data volume: %2 (metadata excluded).</source>
+        <translation>恢复分卷：%1；最大的恢复数据分卷：%2（不含元数据）。</translation>
+    </message>
+    <message>
+        <source>This preview uses the global default; the current post has its own redundancy override.</source>
+        <translation>此预览使用全局默认值；当前发布任务设有独立的冗余值。</translation>
     </message>
 </context>
 </TS>

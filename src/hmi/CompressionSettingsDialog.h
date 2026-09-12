@@ -44,6 +44,7 @@ private slots:
     void onRarPathClicked();
     void onGenPass();
     void onPassToggled(bool checked);
+    void updateVolumeHelp();
 
 private:
     Ui::CompressionSettingsDialog *_ui;

@@ -1,3 +1,4 @@
+#include "par2/Par2Settings.h"
 /*
  * Copyright (c) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
  * Copyright (c) 2024-2026 Hydro74000 <acymap@gmail.com>
@@ -75,6 +76,7 @@ class NgPost : public QObject, public CmdOrGuiApp
     friend class PostingWidget;
     friend class AutoPostWidget;
     friend class CompressionSettingsDialog;
+    friend class Par2SettingsDialog;
     friend class PostingJob;
     friend class UpdateChecker;
 
@@ -151,6 +153,7 @@ public:
 #endif
         PAR2_PCT,
         PAR2_PATH,
+        PAR2_TOOL,
         PAR2_ARGS,
         PAR2_BLOCK_SIZE,
         PACK,
@@ -306,6 +309,8 @@ private:
     uint _rarMax;
     bool _useRarMax;
     uint _par2Pct;
+    uint _par2PctDefault = 0;
+    par2::Tool _par2Tool = par2::Tool::Auto;
     QString _par2Path;
     QString _par2Args;
     qint64  _par2BlockSize; //!< PAR2 slice size for --check's recovery analysis; 0 = unknown
@@ -695,6 +700,7 @@ public:
 
     inline bool useParPar() const;
     inline bool useMultiPar() const;
+    uint par2DefaultPercentage() const { return _par2PctDefault; }
     inline bool lastPostingStartCanceled() const;
 
     inline void enableAutoPacking(bool enable = true);
@@ -703,6 +709,7 @@ public:
     PostHistoryService *historyService() const { return _historyService; }
 
 signals:
+    void par2DefaultsChanged();
     void log(QString msg, bool newline); //!< in case we signal from another thread
     void error(QString msg);             //!< in case we signal from another thread
 
@@ -917,11 +924,11 @@ bool NgPost::nzbCheck() const
 
 inline bool NgPost::useParPar() const
 {
-    return _par2Path.toLower().contains("parpar");
+    return _par2Tool == par2::Tool::ParPar || (_par2Tool == par2::Tool::Auto && par2::detectTool(_par2Path) == par2::Tool::ParPar);
 }
 inline bool NgPost::useMultiPar() const
 {
-    return _par2Path.toLower().contains("par2j");
+    return _par2Tool == par2::Tool::MultiPar || (_par2Tool == par2::Tool::Auto && par2::detectTool(_par2Path) == par2::Tool::MultiPar);
 }
 
 inline bool NgPost::lastPostingStartCanceled() const

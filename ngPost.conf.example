@@ -322,14 +322,17 @@ RAR_PATH = /usr/bin/rar
 #RAR_EXTRA = -ep1 -m0 -k -rr5p
 #RAR_EXTRA = -mx0 -mhe=on   (for 7-zip)
 
-## size in MB of the RAR volumes (0 by default meaning NO split)
+## RAR volume size in MiB (1 MiB = 1048576 bytes; 0 means no split without RAR_MAX)
 ## feel free to change the value or to comment the next line if you don't want to split the archive
 RAR_SIZE = 42
 
-## maximum number of archive volumes
-## we'll use RAR_SIZE except if it genereates too many volumes
-## in that case we'll update rar_size to be <size of post> / rar_max
-RAR_MAX = 99
+## Optional limit on the number of archive volumes (disabled below).
+## When enabled, this limit takes priority: ngPost increases the volume size
+## if needed, based on the source size and the limit, with rounding.
+## The calculated size applies to that post; RAR_SIZE is not rewritten.
+## For fixed 250 MiB volumes, change RAR_SIZE above to 250 and keep RAR_MAX commented.
+#RAR_SIZE = 250
+#RAR_MAX = 99
 
 ## keep rar folder after posting (otherwise it is automatically deleted uppon successful post)
 #KEEP_RAR = true

@@ -136,17 +136,19 @@ QString par2RedundancyArg(bool useParPar, bool useMultiPar, uint redundancy)
     return QString("-r%1").arg(redundancy);
 }
 
-bool isSeparateRedundancyArg(const QString &arg)
+bool isSeparateRedundancyArg(const QString &arg, bool useParPar)
 {
-    return arg.trimmed() == QStringLiteral("-r");
+    return arg.trimmed() == QStringLiteral("-r")
+        || (useParPar && arg.trimmed() == QStringLiteral("--recovery-slices"));
 }
 
-bool isInlineRedundancyArg(const QString &arg, bool useMultiPar)
+bool isInlineRedundancyArg(const QString &arg, bool useMultiPar, bool useParPar)
 {
     const QString trimmed = arg.trimmed();
     if (useMultiPar)
         return trimmed.startsWith(QStringLiteral("/rr"), Qt::CaseInsensitive);
-    return trimmed.startsWith(QStringLiteral("-r")) && trimmed.size() > 2;
+    return (trimmed.startsWith(QStringLiteral("-r")) && trimmed.size() > 2)
+        || (useParPar && trimmed.startsWith(QStringLiteral("--recovery-slices=")));
 }
 
 bool isParParAutoSliceLimitArg(const QString &arg)
@@ -221,7 +223,7 @@ QStringList buildPar2Args(const QString &configuredArgs,
 
     bool hasRedundancy = false;
     for (int i = 0; i < args.size(); ++i) {
-        if (isSeparateRedundancyArg(args.at(i))) {
+        if (isSeparateRedundancyArg(args.at(i), useParPar)) {
             args[i] = redundancyArg;
             if (i + 1 < args.size()
                 && !args.at(i + 1).startsWith(QLatin1Char('-'))
@@ -229,12 +231,11 @@ QStringList buildPar2Args(const QString &configuredArgs,
                 args.removeAt(i + 1);
             }
             hasRedundancy = true;
-            break;
+            continue;
         }
-        if (isInlineRedundancyArg(args.at(i), useMultiPar)) {
+        if (isInlineRedundancyArg(args.at(i), useMultiPar, useParPar)) {
             args[i] = redundancyArg;
             hasRedundancy = true;
-            break;
         }
     }
 
@@ -282,6 +283,11 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _rarSize(options.rarSize)
     , _useRarMax(options.useRarMax)
     , _par2Pct(options.par2Pct)
+    , _par2Path(options.par2Tool == par2::Tool::Auto ? ngPost->_par2Path : options.par2Path)
+    , _par2Args(options.par2Tool == par2::Tool::Auto ? ngPost->_par2Args : options.par2Arguments)
+    , _par2Tool(options.par2Tool == par2::Tool::Auto
+                    ? (ngPost->useParPar() ? par2::Tool::ParPar : ngPost->useMultiPar() ? par2::Tool::MultiPar : par2::Tool::Par2cmdline)
+                    : options.par2Tool)
     , _doCompress(options.doCompress)
     , _doPar2(options.doPar2)
     , _rarName(options.rarName)
@@ -2198,6 +2204,11 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
     }
     if (volSize > 0 || _useRarMax) {
         if (_useRarMax) {
+            if (_options.rarMax == 0) {
+                _error(tr("RAR_MAX must be greater than zero."));
+                return false;
+            }
+            const uint requestedSize = volSize;
             qint64 postSize = 0;
             for (const QFileInfo &fileInfo : _files) {
                 if (fileInfo.isDir())
@@ -2207,11 +2218,14 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
             }
             postSize /= 1024 * 1024; // to get it in MB
             if (volSize > 0) {
-                if (postSize / volSize > _ngPost->_rarMax)
-                    volSize = static_cast<uint>(postSize / _ngPost->_rarMax) + 1;
+                if (postSize / volSize > _options.rarMax)
+                    volSize = static_cast<uint>(postSize / _options.rarMax) + 1;
             } else
-                volSize = static_cast<uint>(postSize / _ngPost->_rarMax) + 1;
+                volSize = static_cast<uint>(postSize / _options.rarMax) + 1;
 
+            if (volSize > requestedSize)
+                _log(tr("Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.")
+                         .arg(requestedSize).arg(volSize).arg(_options.rarMax));
 #ifdef __DEBUG__
             qDebug() << tr("postSize: %1 MB => volSize: %2").arg(postSize).arg(volSize);
 #endif
@@ -2339,11 +2353,11 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
     if (!_canGenPar2())
         return false;
 
-    bool useParPar = _ngPost->useParPar();
+    bool useParPar = (_par2Tool == par2::Tool::ParPar);
 
-    QStringList args = buildPar2Args(_ngPost->_par2Args,
+    QStringList args = buildPar2Args(_par2Args,
                                      useParPar,
-                                     _ngPost->useMultiPar(),
+                                     (_par2Tool == par2::Tool::MultiPar),
                                      redundancy);
 
     QString archiveTmpFolder = QString("%1/%2").arg(tmpFolder, archiveName);
@@ -2364,7 +2378,7 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
 
             // -q (quiet) is a par2cmdline flag; MultiPar's par2j rejects it
             // ("invalid option, -q"), so only add it for par2cmdline.
-            if (!_ngPost->useMultiPar() && _ngPost->_par2Args.isEmpty()
+            if (!(_par2Tool == par2::Tool::MultiPar) && _par2Args.isEmpty()
                 && (_ngPost->debugMode() || !_postWidget))
                 args << "-q"; // remove the progressbar bar
         }
@@ -2379,7 +2393,7 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
 #if defined(Q_OS_WIN)
             QString basePathWin(basePath);
             basePathWin.replace("/", "\\");
-            if (_ngPost->useMultiPar())
+            if ((_par2Tool == par2::Tool::MultiPar))
                 args << QString("/d%1").arg(basePathWin);
             else
                 args << "-B" << basePathWin;
@@ -2437,14 +2451,14 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
         _log(QString("[%1] %2: %3 %4")
                  .arg(timestamp())
                  .arg(tr("Generating par2"))
-                 .arg(_ngPost->_par2Path)
+                 .arg(_par2Path)
                  .arg(SecretMasker::maskedArgs(args)));
     else
         _log(QString("%1...\n").arg(tr("Generating par2")));
     _limitProcDisplay = true;
     _extProcIsPar2 = true;
     _nbProcDisp = 0;
-    _extProc->start(_ngPost->_par2Path, args);
+    _extProc->start(_par2Path, args);
 
     return true;
 }
@@ -2524,7 +2538,7 @@ void PostingJob::onExtProcReadyReadStandardError()
 {
     const QByteArray output = _extProc->readAllStandardError();
 
-    if (_extProcIsPar2 && _ngPost->useParPar()) {
+    if (_extProcIsPar2 && (_par2Tool == par2::Tool::ParPar)) {
         if (_ngPost->debugMode())
             _log(QString::fromLocal8Bit(output), false);
         else if (_isActiveJob) {
@@ -2590,7 +2604,7 @@ bool PostingJob::_canGenPar2() const
         return false;
 
     //2.: check _ is executable
-    QFileInfo fi(_ngPost->_par2Path);
+    QFileInfo fi(_par2Path);
     if (!fi.exists() || !fi.isFile() || !fi.isExecutable()) {
         _error(tr("ERROR: par2 is not available..."));
         return false;

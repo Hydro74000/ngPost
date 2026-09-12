@@ -92,6 +92,14 @@ class Ui_CompressionSettingsDialog(object):
 
         self.rarSizeLayout.addWidget(self.rarMaxCB)
 
+        self.rarMaxSB = QSpinBox(self.toolsBox)
+        self.rarMaxSB.setObjectName(u"rarMaxSB")
+        self.rarMaxSB.setMinimum(1)
+        self.rarMaxSB.setMaximum(2147483647)
+        self.rarMaxSB.setValue(99)
+
+        self.rarSizeLayout.addWidget(self.rarMaxSB)
+
         self.rarSizeSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.rarSizeLayout.addItem(self.rarSizeSpacer)
@@ -102,7 +110,13 @@ class Ui_CompressionSettingsDialog(object):
         self.keepRarDefaultCB = QCheckBox(self.toolsBox)
         self.keepRarDefaultCB.setObjectName(u"keepRarDefaultCB")
 
-        self.toolsForm.setWidget(3, QFormLayout.ItemRole.FieldRole, self.keepRarDefaultCB)
+        self.toolsForm.setWidget(4, QFormLayout.ItemRole.FieldRole, self.keepRarDefaultCB)
+
+        self.volumeHelpLabel = QLabel(self.toolsBox)
+        self.volumeHelpLabel.setObjectName(u"volumeHelpLabel")
+        self.volumeHelpLabel.setWordWrap(True)
+
+        self.toolsForm.setWidget(3, QFormLayout.ItemRole.SpanningRole, self.volumeHelpLabel)
 
 
         self.rootLayout.addWidget(self.toolsBox)
@@ -174,20 +188,21 @@ class Ui_CompressionSettingsDialog(object):
         self.rarPathButton.setToolTip(QCoreApplication.translate("CompressionSettingsDialog", u"select rar executable", None))
 #endif // QT_CONFIG(tooltip)
         self.rarPathButton.setText(QCoreApplication.translate("CompressionSettingsDialog", u"...", None))
-        self.rarSizeLbl.setText(QCoreApplication.translate("CompressionSettingsDialog", u"Vol size (MB):", None))
+        self.rarSizeLbl.setText(QCoreApplication.translate("CompressionSettingsDialog", u"Volume size (MiB):", None))
 #if QT_CONFIG(tooltip)
         self.rarSizeEdit.setToolTip(QCoreApplication.translate("CompressionSettingsDialog", u"to split the rar archive in several volumes (0 to don't split)", None))
 #endif // QT_CONFIG(tooltip)
 #if QT_CONFIG(tooltip)
         self.rarMaxCB.setToolTip(QCoreApplication.translate("CompressionSettingsDialog", u"cap the number of volumes: ngPost raises the volume size rather than making more of them (config RAR_MAX)", None))
 #endif // QT_CONFIG(tooltip)
-        self.rarMaxCB.setText(QCoreApplication.translate("CompressionSettingsDialog", u"Limit RAR Number", None))
+        self.rarMaxCB.setText(QCoreApplication.translate("CompressionSettingsDialog", u"Limit the number of volumes to", None))
 #if QT_CONFIG(tooltip)
         self.keepRarDefaultCB.setToolTip(QCoreApplication.translate("CompressionSettingsDialog", u"Archives and par2 are deleted once the post succeeds.\n"
 "Ticked, they are left in the compression path folder instead.\n"
 "This is the default every new post starts with; each post can still decide otherwise (config KEEP_RAR).", None))
 #endif // QT_CONFIG(tooltip)
         self.keepRarDefaultCB.setText(QCoreApplication.translate("CompressionSettingsDialog", u"Keep the archives on disk", None))
+        self.volumeHelpLabel.setText("")
         self.passwordBox.setTitle(QCoreApplication.translate("CompressionSettingsDialog", u"Archive password", None))
 #if QT_CONFIG(tooltip)
         self.rarPassCB.setToolTip(QCoreApplication.translate("CompressionSettingsDialog", u"use the same password for every post (config RAR_PASS)", None))

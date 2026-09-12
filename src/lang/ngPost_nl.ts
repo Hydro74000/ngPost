@@ -354,6 +354,10 @@ Bestanden worden definitief verwijderd...</translation>
         <source>Post info defaults saved: model %1, written to %2</source>
         <translation>Standaardwaarden opgeslagen: model %1, geschreven naar %2</translation>
     </message>
+    <message>
+        <source>Global (%1 %)</source>
+        <translation>Globaal (%1 %)</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -481,6 +485,34 @@ Dit is de standaard waarmee elke nieuwe post begint; elke post kan alsnog anders
         <location line="+10"/>
         <source>the selected file is not executable...</source>
         <translation>het geselecteerde bestand is niet uitvoerbaar ...</translation>
+    </message>
+    <message>
+        <source>Volume size (MiB):</source>
+        <translation>Volumegrootte (MiB):</translation>
+    </message>
+    <message>
+        <source>Limit the number of volumes to</source>
+        <translation>Aantal volumes beperken tot</translation>
+    </message>
+    <message>
+        <source>The volume size is calculated automatically from the source size and the volume limit.</source>
+        <translation>De volumegrootte wordt automatisch berekend uit de brongrootte en de volumelimiet.</translation>
+    </message>
+    <message>
+        <source>The archive is not split into volumes.</source>
+        <translation>Het archief wordt niet opgesplitst in volumes.</translation>
+    </message>
+    <message>
+        <source>If necessary, ngPost increases the volume size to meet this limit. The volume limit then takes priority over the size entered.</source>
+        <translation>Indien nodig vergroot ngPost de volumes om deze limiet te halen. De volumelimiet krijgt dan voorrang op de ingevoerde grootte.</translation>
+    </message>
+    <message>
+        <source>The requested volume size is kept; the last volume may be smaller.</source>
+        <translation>De gewenste grootte blijft behouden; het laatste volume kan kleiner zijn.</translation>
+    </message>
+    <message>
+        <source>1 MiB = 1,048,576 bytes. The calculation uses the source size, with rounding.</source>
+        <translation>1 MiB = 1.048.576 bytes. De berekening gebruikt de brongrootte, met afronding.</translation>
     </message>
 </context>
 <context>
@@ -1948,6 +1980,18 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <location line="+129"/>
         <source>Reset column widths</source>
         <translation>Kolombreedtes herstellen</translation>
+    </message>
+    <message>
+        <source>PAR2 Settings…</source>
+        <translation>PAR2-instellingen…</translation>
+    </message>
+    <message>
+        <source>Post all tabs</source>
+        <translation>Alle tabbladen posten</translation>
+    </message>
+    <message>
+        <source>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</source>
+        <translation>%1 voorbereide posts in tabvolgorde toevoegen. Lege, voltooide, wachtende en actieve posts worden overgeslagen. Minimaal twee posttabbladen vereist.</translation>
     </message>
 </context>
 <context>
@@ -4180,6 +4224,26 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <source>## them, so the archive carries no original name. Both can be asked at once.</source>
         <translation>## het archief geen oorspronkelijke naam bevat. Beide kunnen tegelijk.</translation>
     </message>
+    <message>
+        <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
+        <translation>RAR_MAX moet een positief geheel getal van maximaal 2147483647 zijn.</translation>
+    </message>
+    <message>
+        <source>PAR2_TOOL must be auto, parpar, par2cmdline or multipar.</source>
+        <translation>PAR2_TOOL moet auto, parpar, par2cmdline of multipar zijn.</translation>
+    </message>
+    <message>
+        <source>## Optional maximum number of archive volumes; commented means no limit.</source>
+        <translation>## Optioneel maximumaantal volumes; een uitgeschakelde regel betekent geen limiet.</translation>
+    </message>
+    <message>
+        <source>## When enabled, this limit takes priority over RAR_SIZE if a larger volume size is needed.</source>
+        <translation>## Indien ingeschakeld krijgt deze limiet voorrang op RAR_SIZE als grotere volumes nodig zijn.</translation>
+    </message>
+    <message>
+        <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
+        <translation>## De grootte wordt berekend uit de bronnen met afronding; RAR_SIZE wordt niet herschreven.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -5912,6 +5976,14 @@ onbekend: %3
         <source>[%1] skipping already posted article %2 from %3</source>
         <translation>[%1] al geplaatst artikel %2 van %3 overgeslagen</translation>
     </message>
+    <message>
+        <source>RAR_MAX must be greater than zero.</source>
+        <translation>RAR_MAX moet groter zijn dan nul.</translation>
+    </message>
+    <message>
+        <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
+        <translation>Archiefvolumegrootte verhoogd van %1 MiB naar %2 MiB voor een limiet van %3 volumes.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -6195,6 +6267,10 @@ Sommige Usenet-indexen vragen erom.</translation>
         <location line="+1"/>
         <source>Bare in mind you can select items in the list and press DEL to remove them</source>
         <translation>Weet dat je items in de lijst kunt selecteren en op DEL kunt drukken om ze te verwijderen</translation>
+    </message>
+    <message>
+        <source>Global (%1 %)</source>
+        <translation>Globaal (%1 %)</translation>
     </message>
 </context>
 <context>
@@ -7243,6 +7319,256 @@ Zijn configuratiebestand onder &lt;configDir&gt;/vpn/ en zijn inloggegevens in d
         <location line="+12"/>
         <source>Could not parse local IP from WireGuard config</source>
         <translation>Kon het lokale IP niet uit de WireGuard-configuratie lezen</translation>
+    </message>
+</context>
+<context>
+    <name>Par2Settings</name>
+    <message>
+        <source>Block size must be a multiple of 4 bytes, below 2 GiB.</source>
+        <translation>De blokgrootte moet een veelvoud van 4 bytes zijn en kleiner dan 2 GiB.</translation>
+    </message>
+    <message>
+        <source>The source block count must be between 1 and 32768.</source>
+        <translation>Het aantal bronblokken moet tussen 1 en 32768 liggen.</translation>
+    </message>
+    <message>
+        <source>Choose a positive volume size below the tool's limit.</source>
+        <translation>Kies een positieve volumegrootte onder de limiet van het hulpmiddel.</translation>
+    </message>
+    <message>
+        <source>The recovery volume count must be between 1 and 65535.</source>
+        <translation>Het aantal herstelvolumes moet tussen 1 en 65535 liggen.</translation>
+    </message>
+    <message>
+        <source>This combination is not supported by par2cmdline.</source>
+        <translation>Deze combinatie wordt niet ondersteund door par2cmdline.</translation>
+    </message>
+    <message>
+        <source>Decimal distribution requires MultiPar.</source>
+        <translation>Decimale verdeling vereist MultiPar.</translation>
+    </message>
+    <message>
+        <source>MultiPar supports a volume count only with equal distribution.</source>
+        <translation>MultiPar ondersteunt een volumeaantal alleen bij gelijke verdeling.</translation>
+    </message>
+    <message>
+        <source>CPU or memory setting exceeds the tool's supported range.</source>
+        <translation>De CPU- of geheugeninstelling valt buiten het ondersteunde bereik.</translation>
+    </message>
+</context>
+<context>
+    <name>Par2SettingsDialog</name>
+    <message>
+        <source>indeterminate</source>
+        <translation>onbepaald</translation>
+    </message>
+    <message>
+        <source>PAR2 Settings</source>
+        <translation>PAR2-instellingen</translation>
+    </message>
+    <message>
+        <source>Global settings for future posts. Each post can override the redundancy percentage; queued posts keep their settings.</source>
+        <translation>Globale instellingen voor toekomstige posts. Elke post kan het redundantiepercentage aanpassen; posts in de wachtrij behouden hun instellingen.</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automatisch</translation>
+    </message>
+    <message>
+        <source>Tool:</source>
+        <translation>Hulpmiddel:</translation>
+    </message>
+    <message>
+        <source>Browse…</source>
+        <translation>Bladeren…</translation>
+    </message>
+    <message>
+        <source>Executable:</source>
+        <translation>Uitvoerbaar bestand:</translation>
+    </message>
+    <message>
+        <source>Default redundancy:</source>
+        <translation>Standaardredundantie:</translation>
+    </message>
+    <message>
+        <source>Limit to the largest source file</source>
+        <translation>Beperken tot het grootste bronbestand</translation>
+    </message>
+    <message>
+        <source>Target maximum size</source>
+        <translation>Gewenste maximumgrootte</translation>
+    </message>
+    <message>
+        <source>Number of recovery volumes</source>
+        <translation>Aantal herstelvolumes</translation>
+    </message>
+    <message>
+        <source>Recovery volumes:</source>
+        <translation>Herstelvolumes:</translation>
+    </message>
+    <message>
+        <source>Target size:</source>
+        <translation>Gewenste grootte:</translation>
+    </message>
+    <message>
+        <source>Equal</source>
+        <translation>Gelijk</translation>
+    </message>
+    <message>
+        <source>Uniform</source>
+        <translation>Gelijkmatig</translation>
+    </message>
+    <message>
+        <source>Powers of two</source>
+        <translation>Machten van twee</translation>
+    </message>
+    <message>
+        <source>Decimal weights</source>
+        <translation>Decimale gewichten</translation>
+    </message>
+    <message>
+        <source>Distribution:</source>
+        <translation>Verdeling:</translation>
+    </message>
+    <message>
+        <source>Sizes are targets for recovery data. PAR2 metadata can make the final files larger. par2cmdline's native limit follows the largest source file.</source>
+        <translation>De groottes gelden voor herstelgegevens. PAR2-metagegevens kunnen bestanden groter maken. De standaardlimiet van par2cmdline volgt het grootste bronbestand.</translation>
+    </message>
+    <message>
+        <source>Advanced</source>
+        <translation>Geavanceerd</translation>
+    </message>
+    <message>
+        <source>Exact block size</source>
+        <translation>Exacte blokgrootte</translation>
+    </message>
+    <message>
+        <source>Target source block count</source>
+        <translation>Gewenst aantal bronblokken</translation>
+    </message>
+    <message>
+        <source>Blocks:</source>
+        <translation>Blokken:</translation>
+    </message>
+    <message>
+        <source> bytes</source>
+        <translation> bytes</translation>
+    </message>
+    <message>
+        <source>Block size:</source>
+        <translation>Blokgrootte:</translation>
+    </message>
+    <message>
+        <source>Source blocks:</source>
+        <translation>Bronblokken:</translation>
+    </message>
+    <message>
+        <source>CPU threads:</source>
+        <translation>CPU-threads:</translation>
+    </message>
+    <message>
+        <source>Enable GPU acceleration</source>
+        <translation>GPU-versnelling inschakelen</translation>
+    </message>
+    <message>
+        <source>Find GPUs</source>
+        <translation>GPU’s zoeken</translation>
+    </message>
+    <message>
+        <source>ParPar OpenCL device:</source>
+        <translation>ParPar OpenCL-apparaat:</translation>
+    </message>
+    <message>
+        <source>Use custom arguments</source>
+        <translation>Aangepaste argumenten gebruiken</translation>
+    </message>
+    <message>
+        <source>Custom arguments are kept verbatim; changing tools does not translate them. The post's redundancy overrides recognized redundancy arguments. Output and input paths are supplied by ngPost.</source>
+        <translation>Aangepaste argumenten blijven ongewijzigd; wisselen van hulpmiddel vertaalt ze niet. De redundantie van de post vervangt herkende redundantieargumenten. ngPost voegt invoer- en uitvoerpaden toe.</translation>
+    </message>
+    <message>
+        <source>Arguments:</source>
+        <translation>Argumenten:</translation>
+    </message>
+    <message>
+        <source>Prepare a post to display an estimate.</source>
+        <translation>Bereid een post voor om een schatting te tonen.</translation>
+    </message>
+    <message>
+        <source>Select PAR2 executable</source>
+        <translation>PAR2-programma selecteren</translation>
+    </message>
+    <message>
+        <source>Reading source sizes…</source>
+        <translation>Brongroottes worden gelezen…</translation>
+    </message>
+    <message>
+        <source>This par2cmdline build does not support thread selection.</source>
+        <translation>Deze par2cmdline-build ondersteunt geen keuze van het aantal threads.</translation>
+    </message>
+    <message>
+        <source>Memory (eighths of free RAM):</source>
+        <translation>Geheugen (achtsten van vrij RAM):</translation>
+    </message>
+    <message>
+        <source>Memory (MiB):</source>
+        <translation>Geheugen (MiB):</translation>
+    </message>
+    <message>
+        <source>GPU acceleration is not supported by par2cmdline. Disable it before changing tools.</source>
+        <translation>par2cmdline ondersteunt geen GPU-versnelling. Schakel deze uit voordat u van hulpmiddel wisselt.</translation>
+    </message>
+    <message>
+        <source>The selected executable is unavailable. Select an installed tool or Automatic.</source>
+        <translation>Het geselecteerde programma is niet beschikbaar. Kies een geïnstalleerd hulpmiddel of Automatisch.</translation>
+    </message>
+    <message>
+        <source>Checking executable…</source>
+        <translation>Programma wordt gecontroleerd…</translation>
+    </message>
+    <message>
+        <source>The executable could not be checked.</source>
+        <translation>Het programma kon niet worden gecontroleerd.</translation>
+    </message>
+    <message>
+        <source>Executable checked.</source>
+        <translation>Programma gecontroleerd.</translation>
+    </message>
+    <message>
+        <source>GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered.</source>
+        <translation>GPU-details staan in de tooltip van de selector; u kunt ook een apparaatnaam of platform:apparaat-ID invoeren.</translation>
+    </message>
+    <message>
+        <source>Estimate unavailable: some source sizes could not be read.</source>
+        <translation>Geen schatting: sommige brongroottes konden niet worden gelezen.</translation>
+    </message>
+    <message>
+        <source>Estimate unavailable: too many source volumes.</source>
+        <translation>Geen schatting: te veel bronvolumes.</translation>
+    </message>
+    <message>
+        <source>Estimate indeterminate for these arguments or block limits.</source>
+        <translation>Schatting onbepaald voor deze argumenten of bloklimieten.</translation>
+    </message>
+    <message>
+        <source>Estimate before compression (source sizes and rounding):</source>
+        <translation>Schatting vóór compressie (brongroottes en afronding):</translation>
+    </message>
+    <message>
+        <source>Estimate for the current post:</source>
+        <translation>Schatting voor de huidige post:</translation>
+    </message>
+    <message>
+        <source>%1 source blocks of about %2; %3 recovery blocks, about %4.</source>
+        <translation>%1 bronblokken van ongeveer %2; %3 herstelblokken, ongeveer %4.</translation>
+    </message>
+    <message>
+        <source>Recovery volumes: %1; largest recovery data volume: %2 (metadata excluded).</source>
+        <translation>Herstelvolumes: %1; grootste volume herstelgegevens: %2 (zonder metagegevens).</translation>
+    </message>
+    <message>
+        <source>This preview uses the global default; the current post has its own redundancy override.</source>
+        <translation>Dit voorbeeld gebruikt de globale standaard; de huidige post heeft een eigen redundantie.</translation>
     </message>
 </context>
 </TS>

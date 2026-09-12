@@ -55,8 +55,10 @@ void AutoPostWidget::init()
 {
     _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
 
-    _ui->redundancySB->setRange(0, 100);
-    _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
+    _ui->redundancySB->setRange(-1, 100);
+    _ui->redundancySB->setValue(-1);
+    refreshPar2Default();
+    connect(_ngPost, &NgPost::par2DefaultsChanged, this, &AutoPostWidget::refreshPar2Default, Qt::UniqueConnection);
     // The label that carried the unit is gone with the row it lived on, so the
     // suffix carries it instead, as on a posting tab.
     _ui->redundancySB->setSuffix(QStringLiteral(" %"));
@@ -147,6 +149,7 @@ Press the Scan button and remove what you don't want to post ;)\n\
 
         PostingWidget *quickPostWidget = _hmi->addNewQuickTab(0, postFiles);
         quickPostWidget->init();
+        quickPostWidget->setPar2PercentageOverride(_ui->redundancySB->value());
         // One choice for the whole run: every post it launches gets it.
         quickPostWidget->setPostInfo(_postInfoCB && _postInfoCB->isChecked(),
                                      _postInfoTemplate,
@@ -388,7 +391,7 @@ void AutoPostWidget::udatePostingParams()
     _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
 
     // fetch par2 settings
-    _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
+    _ngPost->_par2Pct = (_ui->redundancySB->value() < 0 ? _ngPost->_par2PctDefault : static_cast<uint>(_ui->redundancySB->value()));
 
     QFileInfo inputDir(_ui->autoDirEdit->text());
     if (inputDir.exists() && inputDir.isDir() && inputDir.isWritable())
@@ -442,6 +445,7 @@ bool AutoPostWidget::deleteFilesOncePosted() const { return _ui->delFilesCB->isC
 void AutoPostWidget::retranslate()
 {
     _ui->retranslateUi(this);
+    refreshPar2Default();
     // retranslateUi() has just reset the tooltips to the plain .ui text, which
     // drops what a greyed control is waiting for. Rebuild both halves.
     updatePackingDependents();
@@ -608,4 +612,9 @@ void AutoPostWidget::onEditPostInfo()
         _hmi->log(tr("Post info defaults saved: model %1, written to %2")
                       .arg(_ngPost->postInfoTemplatePath(), _ngPost->postInfoOutputPattern()));
     }
+}
+
+void AutoPostWidget::refreshPar2Default()
+{
+    _ui->redundancySB->setSpecialValueText(tr("Global (%1 %)").arg(_ngPost->par2DefaultPercentage()));
 }
