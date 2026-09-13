@@ -15,7 +15,10 @@
 #include <limits>
 
 namespace par2 {
-QVector<Device> openClDevices(const QByteArray &output)
+//! par2j: "/ls2 ... setting limit size must be less than 2 GB". Decimal, so
+//! that the value also stays inside the int the option is parsed into.
+static constexpr qint64 sMultiParSizeLimit = 2000000000LL;
+QVector<Device> openClDevices(const QByteArray &output, bool gpuOnly)
 {
     QVector<Device> result;
     const auto platforms = QJsonDocument::fromJson(output).object().value("platforms").toArray();
@@ -24,11 +27,19 @@ QVector<Device> openClDevices(const QByteArray &output)
         for (int d = 0; d < devices.size(); ++d) {
             const auto device = devices[d].toObject();
             if (device.value("available").toBool() && device.value("supported").toBool()
-                && device.value("type").toString().compare("gpu", Qt::CaseInsensitive) == 0)
+                && (!gpuOnly || device.value("type").toString().compare("gpu", Qt::CaseInsensitive) == 0))
                 result << Device{QString("%1:%2").arg(p).arg(d), device.value("name").toString()};
         }
     }
     return result;
+}
+int openClDeviceCount(const QByteArray &output)
+{
+    const auto platforms = QJsonDocument::fromJson(output).object().value("platforms");
+    if (!platforms.isArray()) return -1;
+    for (const auto &platform : platforms.toArray())
+        if (!platform.toObject().value("devices").isArray()) return -1;
+    return openClDevices(output, false).size();
 }
 QString toolName(Tool tool)
 {
@@ -123,7 +134,8 @@ Settings Settings::read(Tool kind, const QString &arguments)
     }
     const auto args = QProcess::splitCommand(arguments);
     bool autoScale = false;
-    int multiParPerFile = -1; //!< /lr<n>: blocks per recovery file, resolved below; -1 = absent
+    int multiParPerFile = -1; //!< /lr<n>, resolved below; -1 = absent
+    bool multiParByteLimit = false; //!< /ls2 turns that /lr<n> into a byte limit
     QString parparMaximum;
     QSet<QString> seen;
     auto once = [&](const QString &category) {
@@ -174,6 +186,7 @@ Settings Settings::read(Tool kind, const QString &arguments)
                 if (multiParPerFile < 1) s.custom = true;
             }
             else if (a.startsWith("/rf")) { once("volumes"); s.volumes = Volumes::Count; s.volumeCount = number(a.mid(3)); }
+            else if (a == "/ls2") { once("split"); multiParByteLimit = true; }
             else if (a.startsWith("/lc")) {
                 once("threads");
                 bool ok; const uint v = a.mid(3).toUInt(&ok);
@@ -230,15 +243,17 @@ Settings Settings::read(Tool kind, const QString &arguments)
             else s.custom = true;
         }
     }
-    // "/lr<n>" is a number of blocks per recovery file, so it only maps back to
-    // a target size when "/ss" fixed the block size in the same command line.
-    if (multiParPerFile >= 0) {
-        if (multiParPerFile > 0 && s.blocks == Blocks::Size && s.blockBytes >= 4
-            && s.blockBytes <= std::numeric_limits<qint64>::max() / multiParPerFile) {
-            s.volumes = Volumes::Size;
-            s.volumeBytes = s.blockBytes * multiParPerFile;
-        } else
-            s.custom = true; // nothing to convert: keep the line as it was written
+    // "/lr<n>" counts blocks per recovery file, unless "/ls2" turned it into a
+    // byte limit. /ss is only a request: MultiPar can adjust the slice size,
+    // so a block-count limit cannot be translated to bytes without loss.
+    if (multiParByteLimit && multiParPerFile >= 4 && multiParPerFile < sMultiParSizeLimit) {
+        s.volumes = Volumes::Size;
+        s.volumeBytes = multiParPerFile;
+    } else if (multiParByteLimit || multiParPerFile == 0) {
+        // "/ls2" without a byte limit, or with "/lr0", has no guided meaning.
+        s.custom = true;
+    } else if (multiParPerFile > 0) {
+        s.custom = true;
     }
     if (autoScale) {
         if (s.blocks == Blocks::Size && s.blockBytes == 1048576) s.blocks = Blocks::Automatic;
@@ -275,10 +290,9 @@ QString Settings::validate() const
         return QCoreApplication::translate("Par2Settings", "This combination is not supported by par2cmdline.");
     if (tool == Tool::ParPar && distribution == Distribution::Decimal)
         return QCoreApplication::translate("Par2Settings", "Decimal distribution requires MultiPar.");
-    if (tool == Tool::MultiPar && volumes == Volumes::Size
-        && (blocks != Blocks::Size || volumeBytes < blockBytes))
-        return QCoreApplication::translate("Par2Settings", "MultiPar limits a recovery file by block count: "
-                                                           "set an exact block size (Advanced) no larger than the target size.");
+    if (tool == Tool::MultiPar && volumes == Volumes::Size && volumeBytes >= sMultiParSizeLimit)
+        return QCoreApplication::translate("Par2Settings", "MultiPar size targets must be below 2 GB (2000000000 bytes). "
+                                                           "Use custom arguments for limits expressed in blocks.");
     if (tool == Tool::MultiPar && (distribution == Distribution::Uniform
         || (volumes == Volumes::Count && distribution != Distribution::Equal && distribution != Distribution::Automatic)))
         return QCoreApplication::translate("Par2Settings", "MultiPar supports a volume count only with equal distribution.");
@@ -299,12 +313,13 @@ QStringList Settings::arguments(uint redundancy) const
         if (volumes == Volumes::LargestInput) args << "/lr";
         else if (volumes == Volumes::Size) {
             // par2j: "/lr<n> ... This is the max number of blocks in a file, not
-            // max size of file itself". Converting needs the block size, which
-            // validate() demands for this combination. Keep /ls out of guided
-            // arguments: generic /ls splits sources; the special /ls2 + /lr
-            // byte-limit mode remains available through custom arguments.
-            const qint64 perFile = blockBytes > 0 ? volumeBytes / blockBytes : 0;
-            args << QString("/lr%1").arg(qMax<qint64>(1, perFile));
+            // max size of file itself", except that "/ls2 has a special feature
+            // to set limit size of recovery files directly. When both /ls2 and
+            // /lr(limit size) are set, setting number of /lr is recognizned as
+            // file size instead of number of blocks. In this usage, setting
+            // limit size must be less than 2 GB." /ls2 is a mode flag, not a
+            // split size: it leaves the sources alone (checked on par2j 1.3.3.5).
+            args << "/ls2" << QString("/lr%1").arg(volumeBytes);
         }
         else if (volumes == Volumes::Count) args << QString("/rf%1").arg(volumeCount);
         if (threads || gpu) args << QString("/lc%1").arg(threads + (gpu ? 256 : 0));
@@ -342,7 +357,9 @@ QStringList Settings::arguments(uint redundancy) const
 }
 qint64 Settings::exactBlockBytes() const
 {
-    return !custom && blocks == Blocks::Size ? blockBytes : 0;
+    // MultiPar clamps /ss to the source-dependent slice range. Without the
+    // actual archive inputs its requested size is never a guaranteed hint.
+    return !custom && tool != Tool::MultiPar && blocks == Blocks::Size ? blockBytes : 0;
 }
 Estimate Settings::estimate(const QVector<qint64> &sizes, uint redundancy) const
 {
@@ -367,6 +384,7 @@ Estimate Settings::estimate(const QVector<qint64> &sizes, uint redundancy) const
         else e.blockBytes = align(qMax<qint64>(qint64(std::ceil(10 * std::sqrt(double(e.sourceBytes)))),
                                                                qint64(std::ceil(double(e.sourceBytes) / 3000))));
     }
+    if (tool == Tool::MultiPar) e.blockBytes = qMin(e.blockBytes, align(largest));
     for (auto size : sizes) e.sourceBlocks += size / e.blockBytes + (size % e.blockBytes != 0);
     if (e.sourceBlocks > 32768) return e;
     const double recovery = e.sourceBlocks * redundancy / 100.0;
@@ -393,6 +411,7 @@ Estimate Settings::estimate(const QVector<qint64> &sizes, uint redundancy) const
     qint64 cap = e.recoveryBlocks;
     if (volumes == Volumes::Size) cap = volumeBytes / e.blockBytes;
     else if (volumes == Volumes::LargestInput) cap = (largest + e.blockBytes - 1) / e.blockBytes;
+    if (tool == Tool::MultiPar) cap = qMax<qint64>(1, cap);
     if (cap <= 0) { e.valid = false; return e; }
     bool powers = distribution == Distribution::PowersOfTwo
         || (distribution == Distribution::Automatic && tool != Tool::MultiPar);

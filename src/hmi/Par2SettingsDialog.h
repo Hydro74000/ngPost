@@ -56,6 +56,11 @@ private:
     bool _threadsSupported = true;
     QString _probedPath;
     par2::Tool _probedTool = par2::Tool::Auto;
+    //! What the last "--opencl-list" said. ParPar exits 1 without writing a
+    //! single file when GPU work is requested and no device answers, which
+    //! aborts the whole post, so Save has to refuse that combination.
+    enum class GpuScan { Unknown, Running, Failed, None, NoGpu, Found };
+    GpuScan _gpuScan = GpuScan::Unknown;
     par2::Tool selectedTool() const;
     par2::Tool effectiveTool() const;
     par2::Settings settings() const;
@@ -64,6 +69,7 @@ private:
     void updatePreview();
     void selectTool();
     void probeTool();
+    void resetGpuScan();
     void findGpus();
 };
 #endif

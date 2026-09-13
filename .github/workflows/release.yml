@@ -204,7 +204,8 @@ jobs:
           # Same pinned ParPar + par2cmdline as the Windows, AppImage and macOS
           # packages. ngPost picks them up because they sit next to its binary.
           ./.github/scripts/fetch-par2-tools.sh "dist/${PKG}"
-          cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
+          cp ngPost.conf.example ngPost_fr.conf "dist/${PKG}/"
+          cp release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
           cp -R templates "dist/${PKG}/"
           test -f "dist/${PKG}/templates/post_info_default.txt"
           test -f "dist/${PKG}/templates/post_info_baselien.txt"
@@ -392,7 +393,8 @@ jobs:
           # standalone ZIP we always include it — no install wizard to drive
           # the choice, and users who don't want it can just delete the file.
           Copy-Item dist/parpar/parpar.exe "dist/$pkg/parpar.exe" -Force
-          Copy-Item ngPost.conf.example, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
+          Copy-Item ngPost.conf.example, ngPost_fr.conf "dist/$pkg/" -ErrorAction Stop
+          Copy-Item release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item THIRD_PARTY_LICENSES.md "dist/$pkg/" -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path "dist/$pkg/templates" | Out-Null
@@ -632,7 +634,7 @@ jobs:
           end;
 
           // No PAR2_PATH seeding is needed: the installer ships only
-          // ngPost.conf.example (a reference template, not an active config),
+          // reference templates ngPost.conf.example and ngPost_fr.conf,
           // so ngPost regenerates a fresh ngPost.conf in the per-user config
           // dir on first launch. Its runtime auto-detection then picks up the
           // bundled parpar.exe / par2.exe / par2j64.exe sitting next to
@@ -720,6 +722,9 @@ jobs:
           mkdir -p dist
           ditto -c -k --keepParent src/ngPost.app "dist/${PKG}.zip"
           zip -qj "dist/${PKG}.zip" THIRD_PARTY_LICENSES.md
+          zip -qj "dist/${PKG}.zip" ngPost.conf.example ngPost_fr.conf
+          unzip -l "dist/${PKG}.zip" | grep -q 'ngPost.conf.example'
+          unzip -l "dist/${PKG}.zip" | grep -q 'ngPost_fr.conf'
           zip -qr "dist/${PKG}.zip" templates
           unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_default.txt'
           unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_baselien.txt'
@@ -884,7 +889,8 @@ jobs:
           cp src/resources/icons/ngPost.png AppDir/usr/share/icons/hicolor/256x256/apps/
           cp src/resources/icons/ngPost.png AppDir/
           cp ngPost.desktop AppDir/
-          cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md AppDir/ || true
+          cp ngPost.conf.example ngPost_fr.conf AppDir/
+          cp release_notes.txt README* THIRD_PARTY_LICENSES.md AppDir/ || true
           cp -R templates AppDir/
       - name: Locate OpenSSL libraries
         id: openssl
@@ -1015,6 +1021,8 @@ jobs:
           test -f squashfs-root/templates/post_info_default.txt  || { echo "ERROR: default post info model not bundled"; exit 1; }
           test -f squashfs-root/templates/post_info_baselien.txt || { echo "ERROR: Baselien post info model not bundled"; exit 1; }
           test -f squashfs-root/templates/post_info_json.txt     || { echo "ERROR: JSON post info model not bundled"; exit 1; }
+          test -f squashfs-root/ngPost.conf.example              || { echo "ERROR: English config template not bundled"; exit 1; }
+          test -f squashfs-root/ngPost_fr.conf                   || { echo "ERROR: French config template not bundled"; exit 1; }
           # Check the update-information string is embedded in the ELF
           expected_update_info="gh-releases-zsync|Hydro74000|ngPost|$APPIMAGE_UPDATE_TAG|$APPIMAGE_UPDATE_GLOB"
           if ! strings "$APPIMAGE" | grep -Fq "$expected_update_info"; then

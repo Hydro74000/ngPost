@@ -676,7 +676,7 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3175"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3177"/>
         <source>VPN: disabled</source>
         <translation>VPN：已禁用</translation>
     </message>
@@ -835,7 +835,7 @@ Unlike the per post box, this choice is saved.</source>
         <translation>转到命令行（关闭图形化界面并在命令行环境中继续）</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1230"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1232"/>
         <source>on</source>
         <translation>启用</translation>
     </message>
@@ -871,20 +871,20 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1076"/>
+        <location line="+1078"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>密码</translation>
     </message>
     <message>
-        <location line="-1141"/>
+        <location line="-1143"/>
         <location line="+405"/>
-        <location line="+1668"/>
+        <location line="+1670"/>
         <source>Default %1</source>
         <translation>默认 %1</translation>
     </message>
     <message>
-        <location line="-2069"/>
+        <location line="-2071"/>
         <location line="+405"/>
         <source>Post history, statistics and resume center</source>
         <translation>发贴历史、统计与续传中心</translation>
@@ -981,13 +981,13 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+567"/>
+        <location line="+569"/>
         <location line="+174"/>
         <source>Files</source>
         <translation>文件</translation>
     </message>
     <message>
-        <location line="-740"/>
+        <location line="-742"/>
         <source>Parameters</source>
         <translation>参数</translation>
     </message>
@@ -1013,7 +1013,7 @@ Are you sure you want to quit?</source>
         <translation>关闭所有完成发布的标签页</translation>
     </message>
     <message>
-        <location line="+76"/>
+        <location line="+78"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
         <translation>&lt;h3&gt;有新版本：&lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;当前：v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;在 GitHub 上查看版本&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
@@ -1066,12 +1066,12 @@ The job stays in the queue.</source>
 任务保留在队列中。</translation>
     </message>
     <message>
-        <location line="-583"/>
+        <location line="-585"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>无法移除这些设置。详情请查看 VPN 日志。</translation>
     </message>
     <message>
-        <location line="+597"/>
+        <location line="+599"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>ngPost 中配置的 VPN 似乎已在运行；可能有另一个 ngPost 正在使用它。请查看 VPN 设置。</translation>
     </message>
@@ -1823,9 +1823,9 @@ This also removes all associated file and article records.</source>
         <translation>删除条目</translation>
     </message>
     <message>
-        <location line="-1332"/>
+        <location line="-1334"/>
         <location line="+405"/>
-        <location line="+513"/>
+        <location line="+515"/>
         <location line="+325"/>
         <source>History</source>
         <translation>历史记录</translation>
@@ -2004,13 +2004,13 @@ This also removes all associated file and article records.</source>
         <translation>重置列宽</translation>
     </message>
     <message>
-        <location line="-1665"/>
+        <location line="-1667"/>
         <location line="+414"/>
         <source>PAR2 Settings…</source>
         <translation>PAR2 设置…</translation>
     </message>
     <message>
-        <location line="+1605"/>
+        <location line="+1607"/>
         <source>Post all tabs</source>
         <translation>发布所有标签页</translation>
     </message>
@@ -4953,7 +4953,7 @@ Profile: %2</source>
 <context>
     <name>Par2Settings</name>
     <message>
-        <location filename="../par2/Par2Settings.cpp" line="+261"/>
+        <location filename="../par2/Par2Settings.cpp" line="+281"/>
         <source>Block size must be a multiple of 4 bytes, below 2 GiB.</source>
         <translation>块大小必须是 4 字节的倍数，且小于 2 GiB。</translation>
     </message>
@@ -4989,8 +4989,12 @@ Profile: %2</source>
     </message>
     <message>
         <location line="+3"/>
+        <source>Past 2 GB, MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
+        <translation>超过 2 GB 时，MultiPar 只能按块数限制恢复文件：请在“高级”中设置不大于目标大小的精确块大小。</translation>
+    </message>
+    <message>
         <source>MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
-        <translation>MultiPar 按块数限制恢复文件：请在“高级”中设置不超过目标大小的精确块大小。</translation>
+        <translation type="vanished">MultiPar 按块数限制恢复文件：请在“高级”中设置不超过目标大小的精确块大小。</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -5002,17 +5006,21 @@ Profile: %2</source>
         <source>CPU or memory setting exceeds the tool&apos;s supported range.</source>
         <translation>CPU 或内存设置超出工具支持的范围。</translation>
     </message>
+    <message>
+        <source>MultiPar size targets must be below 2 GB (2000000000 bytes). Use custom arguments for limits expressed in blocks.</source>
+        <translation>MultiPar 的目标大小必须小于 2 GB（2000000000 字节）。以块数表示的限制请使用自定义参数。</translation>
+    </message>
 </context>
 <context>
     <name>Par2SettingsDialog</name>
     <message>
         <location filename="../hmi/Par2SettingsDialog.cpp" line="+80"/>
-        <location line="+498"/>
+        <location line="+523"/>
         <source>indeterminate</source>
         <translation>无法确定</translation>
     </message>
     <message>
-        <location line="-486"/>
+        <location line="-511"/>
         <source>PAR2 Settings</source>
         <translation>PAR2 设置</translation>
     </message>
@@ -5184,29 +5192,29 @@ Profile: %2</source>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+295"/>
+        <location line="+320"/>
         <source>Prepare a post to display an estimate.</source>
         <translation>准备一个发布任务以显示估算。</translation>
     </message>
     <message>
-        <location line="-228"/>
+        <location line="-252"/>
         <source>Select PAR2 executable</source>
         <translation>选择 PAR2 可执行文件</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <location line="+218"/>
+        <location line="+11"/>
+        <location line="+239"/>
         <source>Reading source sizes…</source>
         <translation>正在读取源文件大小…</translation>
     </message>
     <message>
-        <location line="-115"/>
-        <location line="+17"/>
+        <location line="-136"/>
+        <location line="+22"/>
         <source>This par2cmdline build does not support thread selection.</source>
         <translation>此 par2cmdline 构建不支持选择线程数。</translation>
     </message>
     <message>
-        <location line="-15"/>
+        <location line="-20"/>
         <source>Memory (eighths of free RAM):</source>
         <translation>内存（可用 RAM 的八分之几）：</translation>
     </message>
@@ -5221,7 +5229,12 @@ Profile: %2</source>
         <translation>par2cmdline 不支持 GPU 加速。请在切换工具前禁用它。</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+4"/>
+        <source>No OpenCL device was found: ParPar would fail and abort the post. Disable GPU acceleration or install an OpenCL driver.</source>
+        <translation>未找到 OpenCL 设备：ParPar 将失败并中止发布。请关闭 GPU 加速或安装 OpenCL 驱动。</translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>The selected executable is unavailable. Select an installed tool or Automatic.</source>
         <translation>所选可执行文件不可用。请选择已安装的工具或“自动”。</translation>
     </message>
@@ -5233,18 +5246,28 @@ Profile: %2</source>
     <message>
         <location line="+4"/>
         <location line="+6"/>
-        <location line="+17"/>
-        <location line="+7"/>
+        <location line="+21"/>
+        <location line="+9"/>
         <source>The executable could not be checked.</source>
         <translation>无法检查可执行文件。</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+13"/>
+        <source>No OpenCL device is installed on this machine.</source>
+        <translation>本机未安装 OpenCL 设备。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>OpenCL is installed but reports no GPU; enter a device ID from the tooltip to use another kind of device.</source>
+        <translation>已安装 OpenCL，但未报告 GPU；可从提示中输入设备 ID 以使用其他类型的设备。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
         <source>GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered.</source>
         <translation>设备选择框的提示中提供 GPU 详情；也可输入设备名称或“平台:设备”编号。</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+9"/>
         <source>Estimate unavailable: some source sizes could not be read.</source>
         <translation>无法估算：部分源文件大小无法读取。</translation>
     </message>
@@ -5285,7 +5308,7 @@ Profile: %2</source>
         <translation>此预览使用全局默认值；当前发布任务设有独立的冗余值。</translation>
     </message>
     <message>
-        <location line="-320"/>
+        <location line="-344"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -5293,6 +5316,30 @@ Profile: %2</source>
         <location line="+1"/>
         <source>Cancel</source>
         <translation>取消</translation>
+    </message>
+    <message>
+        <source>Find OpenCL devices</source>
+        <translation>查找 OpenCL 设备</translation>
+    </message>
+    <message>
+        <source>Requested block size</source>
+        <translation>请求的块大小</translation>
+    </message>
+    <message>
+        <source>MultiPar may adjust the requested block size to the source files and block-count limit. It is not saved as PAR2_BLOCK_SIZE.</source>
+        <translation>MultiPar 可能根据源文件和块数量上限调整请求的块大小。该值不会保存为 PAR2_BLOCK_SIZE。</translation>
+    </message>
+    <message>
+        <source>Checking OpenCL devices. Wait for the result or disable GPU acceleration.</source>
+        <translation>正在检查 OpenCL 设备。请等待结果或禁用 GPU 加速。</translation>
+    </message>
+    <message>
+        <source>OpenCL could not be checked. Check the executable and OpenCL runtime, retry detection, or disable GPU acceleration.</source>
+        <translation>无法检查 OpenCL。请检查可执行文件和 OpenCL 运行时，重新检测或禁用 GPU 加速。</translation>
+    </message>
+    <message>
+        <source>OpenCL devices are available without a physical GPU. CPU devices such as OpenCLOn12 can be selected.</source>
+        <translation>没有物理 GPU 也有可用的 OpenCL 设备。可以选择 OpenCLOn12 等 CPU 设备。</translation>
     </message>
 </context>
 <context>

@@ -698,7 +698,7 @@ Anders als das Kästchen pro Post wird diese Wahl gespeichert.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3175"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3177"/>
         <source>VPN: disabled</source>
         <translation>VPN: deaktiviert</translation>
     </message>
@@ -836,7 +836,7 @@ Anders als das Kästchen pro Post wird diese Wahl gespeichert.</translation>
         <translation>Zur Befehlszeile wechseln (GUI schliessen und das Program in der Shell weiterführen)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1229"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1231"/>
         <source>Host (name or IP)</source>
         <translation>Host (Name oder IP)</translation>
     </message>
@@ -867,20 +867,20 @@ Anders als das Kästchen pro Post wird diese Wahl gespeichert.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1076"/>
+        <location line="+1078"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>Passwort</translation>
     </message>
     <message>
-        <location line="-1141"/>
+        <location line="-1143"/>
         <location line="+405"/>
-        <location line="+1668"/>
+        <location line="+1670"/>
         <source>Default %1</source>
         <translation>Standard %1</translation>
     </message>
     <message>
-        <location line="-2069"/>
+        <location line="-2071"/>
         <location line="+405"/>
         <source>Post history, statistics and resume center</source>
         <translation>Post-Verlauf, Statistik und Fortsetzungszentrale</translation>
@@ -965,13 +965,13 @@ Schließen Sie das andere ngPost, um das VPN hier zu verwenden. Läuft keines, k
     </message>
     <message>
         <location line="+1"/>
-        <location line="+567"/>
+        <location line="+569"/>
         <location line="+174"/>
         <source>Files</source>
         <translation>Dateien</translation>
     </message>
     <message>
-        <location line="-740"/>
+        <location line="-742"/>
         <source>Parameters</source>
         <translation>Parameter</translation>
     </message>
@@ -981,7 +981,7 @@ Schließen Sie das andere ngPost, um das VPN hier zu verwenden. Läuft keines, k
         <translation>Posting-Protokoll</translation>
     </message>
     <message>
-        <location line="+176"/>
+        <location line="+178"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
         <translation>&lt;h3&gt;Neue Version verfügbar: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Aktuell: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;Release auf GitHub anzeigen&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
@@ -1034,12 +1034,12 @@ The job stays in the queue.</source>
 Der Job bleibt in der Warteschlange.</translation>
     </message>
     <message>
-        <location line="-583"/>
+        <location line="-585"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>Diese Einstellungen konnten nicht entfernt werden. Einzelheiten finden Sie im VPN-Protokoll.</translation>
     </message>
     <message>
-        <location line="+597"/>
+        <location line="+599"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>Das in ngPost konfigurierte VPN scheint bereits zu laufen; möglicherweise verwendet es ein anderes ngPost. Siehe VPN-Einstellungen.</translation>
     </message>
@@ -1642,7 +1642,7 @@ Damit verschwinden auch alle zugehörigen Datei- und Artikeleinträge.</translat
         <translation>VPN: Fehler</translation>
     </message>
     <message>
-        <location line="-2543"/>
+        <location line="-2545"/>
         <source>close while still posting?</source>
         <translation>Schließen, obwohl noch gepostet wird?</translation>
     </message>
@@ -1675,7 +1675,7 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
         <translation>Alle fertigen Registerkarten schließen</translation>
     </message>
     <message>
-        <location line="+1546"/>
+        <location line="+1548"/>
         <source>Quick Post is working..</source>
         <translation>Quick Post läuft..</translation>
     </message>
@@ -1823,9 +1823,9 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
         <translation>Eintrag löschen</translation>
     </message>
     <message>
-        <location line="-1332"/>
+        <location line="-1334"/>
         <location line="+405"/>
-        <location line="+513"/>
+        <location line="+515"/>
         <location line="+325"/>
         <source>History</source>
         <translation>Verlauf</translation>
@@ -2004,13 +2004,13 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
         <translation>Spaltenbreiten zurücksetzen</translation>
     </message>
     <message>
-        <location line="-1665"/>
+        <location line="-1667"/>
         <location line="+414"/>
         <source>PAR2 Settings…</source>
         <translation>PAR2-Einstellungen…</translation>
     </message>
     <message>
-        <location line="+1605"/>
+        <location line="+1607"/>
         <source>Post all tabs</source>
         <translation>Alle Tabs posten</translation>
     </message>
@@ -4953,7 +4953,7 @@ Profil: %2</translation>
 <context>
     <name>Par2Settings</name>
     <message>
-        <location filename="../par2/Par2Settings.cpp" line="+261"/>
+        <location filename="../par2/Par2Settings.cpp" line="+281"/>
         <source>Block size must be a multiple of 4 bytes, below 2 GiB.</source>
         <translation>Die Blockgröße muss ein Vielfaches von 4 Bytes und kleiner als 2 GiB sein.</translation>
     </message>
@@ -4989,8 +4989,12 @@ Profil: %2</translation>
     </message>
     <message>
         <location line="+3"/>
+        <source>Past 2 GB, MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
+        <translation>Oberhalb von 2 GB begrenzt MultiPar eine Wiederherstellungsdatei über die Blockanzahl: Legen Sie eine exakte Blockgröße (Erweitert) fest, die die Zielgröße nicht überschreitet.</translation>
+    </message>
+    <message>
         <source>MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
-        <translation>MultiPar begrenzt eine Wiederherstellungsdatei über die Blockanzahl: Legen Sie eine exakte Blockgröße (Erweitert) fest, die die Zielgröße nicht überschreitet.</translation>
+        <translation type="vanished">MultiPar begrenzt eine Wiederherstellungsdatei über die Blockanzahl: Legen Sie eine exakte Blockgröße (Erweitert) fest, die die Zielgröße nicht überschreitet.</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -5002,17 +5006,21 @@ Profil: %2</translation>
         <source>CPU or memory setting exceeds the tool&apos;s supported range.</source>
         <translation>Die CPU- oder Speichereinstellung überschreitet den unterstützten Bereich.</translation>
     </message>
+    <message>
+        <source>MultiPar size targets must be below 2 GB (2000000000 bytes). Use custom arguments for limits expressed in blocks.</source>
+        <translation>Zielgrößen für MultiPar müssen unter 2 GB (2000000000 Bytes) liegen. Verwenden Sie benutzerdefinierte Argumente für Grenzen in Blöcken.</translation>
+    </message>
 </context>
 <context>
     <name>Par2SettingsDialog</name>
     <message>
         <location filename="../hmi/Par2SettingsDialog.cpp" line="+80"/>
-        <location line="+498"/>
+        <location line="+523"/>
         <source>indeterminate</source>
         <translation>unbestimmt</translation>
     </message>
     <message>
-        <location line="-486"/>
+        <location line="-511"/>
         <source>PAR2 Settings</source>
         <translation>PAR2-Einstellungen</translation>
     </message>
@@ -5184,29 +5192,29 @@ Profil: %2</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+295"/>
+        <location line="+320"/>
         <source>Prepare a post to display an estimate.</source>
         <translation>Bereiten Sie einen Post vor, um eine Schätzung anzuzeigen.</translation>
     </message>
     <message>
-        <location line="-228"/>
+        <location line="-252"/>
         <source>Select PAR2 executable</source>
         <translation>PAR2-Programm auswählen</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <location line="+218"/>
+        <location line="+11"/>
+        <location line="+239"/>
         <source>Reading source sizes…</source>
         <translation>Quellgrößen werden gelesen…</translation>
     </message>
     <message>
-        <location line="-115"/>
-        <location line="+17"/>
+        <location line="-136"/>
+        <location line="+22"/>
         <source>This par2cmdline build does not support thread selection.</source>
         <translation>Dieser par2cmdline-Build unterstützt keine Threadauswahl.</translation>
     </message>
     <message>
-        <location line="-15"/>
+        <location line="-20"/>
         <source>Memory (eighths of free RAM):</source>
         <translation>Speicher (Achtel des freien RAM):</translation>
     </message>
@@ -5221,7 +5229,12 @@ Profil: %2</translation>
         <translation>par2cmdline unterstützt keine GPU-Beschleunigung. Deaktivieren Sie sie vor dem Werkzeugwechsel.</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+4"/>
+        <source>No OpenCL device was found: ParPar would fail and abort the post. Disable GPU acceleration or install an OpenCL driver.</source>
+        <translation>Kein OpenCL-Gerät gefunden: ParPar würde fehlschlagen und der Upload würde abgebrochen. Deaktivieren Sie die GPU-Beschleunigung oder installieren Sie einen OpenCL-Treiber.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>The selected executable is unavailable. Select an installed tool or Automatic.</source>
         <translation>Die gewählte Programmdatei ist nicht verfügbar. Wählen Sie ein installiertes Werkzeug oder Automatisch.</translation>
     </message>
@@ -5233,18 +5246,28 @@ Profil: %2</translation>
     <message>
         <location line="+4"/>
         <location line="+6"/>
-        <location line="+17"/>
-        <location line="+7"/>
+        <location line="+21"/>
+        <location line="+9"/>
         <source>The executable could not be checked.</source>
         <translation>Die Programmdatei konnte nicht geprüft werden.</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+13"/>
+        <source>No OpenCL device is installed on this machine.</source>
+        <translation>Auf diesem Rechner ist kein OpenCL-Gerät installiert.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>OpenCL is installed but reports no GPU; enter a device ID from the tooltip to use another kind of device.</source>
+        <translation>OpenCL ist installiert, meldet aber keine GPU. Geben Sie eine Geräte-ID aus dem Tooltip ein, um ein anderes Gerät zu verwenden.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
         <source>GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered.</source>
         <translation>GPU-Details stehen im Tooltip der Geräteauswahl; Gerätename oder Plattform:Gerät-ID können auch eingegeben werden.</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+9"/>
         <source>Estimate unavailable: some source sizes could not be read.</source>
         <translation>Keine Schätzung: Einige Quellgrößen konnten nicht gelesen werden.</translation>
     </message>
@@ -5285,7 +5308,7 @@ Profil: %2</translation>
         <translation>Diese Vorschau verwendet den globalen Standard; der aktuelle Post hat eine eigene Redundanz.</translation>
     </message>
     <message>
-        <location line="-320"/>
+        <location line="-344"/>
         <source>Save</source>
         <translation>Speichern</translation>
     </message>
@@ -5293,6 +5316,30 @@ Profil: %2</translation>
         <location line="+1"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>Find OpenCL devices</source>
+        <translation>OpenCL-Geräte suchen</translation>
+    </message>
+    <message>
+        <source>Requested block size</source>
+        <translation>Gewünschte Blockgröße</translation>
+    </message>
+    <message>
+        <source>MultiPar may adjust the requested block size to the source files and block-count limit. It is not saved as PAR2_BLOCK_SIZE.</source>
+        <translation>MultiPar kann die gewünschte Blockgröße an die Quelldateien und die maximale Blockanzahl anpassen. Sie wird nicht als PAR2_BLOCK_SIZE gespeichert.</translation>
+    </message>
+    <message>
+        <source>Checking OpenCL devices. Wait for the result or disable GPU acceleration.</source>
+        <translation>OpenCL-Geräte werden geprüft. Warten Sie auf das Ergebnis oder deaktivieren Sie die GPU-Beschleunigung.</translation>
+    </message>
+    <message>
+        <source>OpenCL could not be checked. Check the executable and OpenCL runtime, retry detection, or disable GPU acceleration.</source>
+        <translation>OpenCL konnte nicht geprüft werden. Prüfen Sie das Programm und die OpenCL-Laufzeit, wiederholen Sie die Erkennung oder deaktivieren Sie die GPU-Beschleunigung.</translation>
+    </message>
+    <message>
+        <source>OpenCL devices are available without a physical GPU. CPU devices such as OpenCLOn12 can be selected.</source>
+        <translation>OpenCL-Geräte sind ohne physische GPU verfügbar. CPU-Geräte wie OpenCLOn12 können ausgewählt werden.</translation>
     </message>
 </context>
 <context>

@@ -183,7 +183,7 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     // The tool's own wording for "let OpenCL pick": a bare ":" in the list said
     // nothing to anyone. The value still travels in the item data.
     _device->addItem(tr("Automatic (default device)"), QStringLiteral(":"));
-    auto *find = _findGpuButton = new QPushButton(tr("Find GPUs"), this);
+    auto *find = _findGpuButton = new QPushButton(tr("Find OpenCL devices"), this);
     find->setObjectName(QStringLiteral("par2FindGpus"));
     _deviceRow->addWidget(_device, 1);
     _deviceRow->addWidget(find);
@@ -253,6 +253,7 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     _preview->setTextFormat(Qt::PlainText);
     dialogLayout->addWidget(_preview);
     _status = new QLabel(this);
+    _status->setObjectName(QStringLiteral("par2Status"));
     _status->setWordWrap(true);
     dialogLayout->addWidget(_status);
     _buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, this);
@@ -297,20 +298,29 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     for (auto *spin : {_blockBytes, _volumeMiB})
         connect(spin, &QDoubleSpinBox::valueChanged, this, &Par2SettingsDialog::changed);
     connect(_gpu, &QCheckBox::toggled, this, [this](bool enabled) {
-        if (enabled && !_loading && effectiveTool() == par2::Tool::ParPar && _device->count() <= 1)
+        if (enabled && !_loading && effectiveTool() == par2::Tool::ParPar)
             findGpus();
         changed();
     });
     connect(_custom, &QCheckBox::toggled, this, [this](bool custom) {
         if (custom && !_loading && _arguments->toPlainText().isEmpty())
             _arguments->setPlainText(par2::joinArguments(settings().arguments(uint(_percentage->value()))));
+        if (!custom && !_loading && _gpu->isChecked() && _gpuScan == GpuScan::Unknown)
+            findGpus();
         changed();
     });
     connect(_arguments, &QPlainTextEdit::textChanged, this, &Par2SettingsDialog::changed);
     connect(_tool, &QComboBox::currentIndexChanged, this, &Par2SettingsDialog::selectTool);
     connect(_path, &QLineEdit::textChanged, this, [this] {
-        if (!_loading) _pathDirty = true;
+        if (_loading) return;
+        _pathDirty = true;
+        resetGpuScan();
         changed();
+        // Coalesce edits in the same event turn and inspect the current path.
+        QTimer::singleShot(0, this, [this] {
+            if (_gpu->isChecked() && !_custom->isChecked() && _gpuScan == GpuScan::Unknown)
+                findGpus();
+        });
     });
     connect(_path, &QLineEdit::editingFinished, this, &Par2SettingsDialog::probeTool);
     connect(browse, &QPushButton::clicked, this, [this] {
@@ -320,6 +330,9 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     _loading = false;
     updateControls();
     probeTool();
+    // A configuration saved on another machine can arrive with GPU work already
+    // enabled: check the devices now rather than when the post fails.
+    if (_gpu->isChecked() && effectiveTool() == par2::Tool::ParPar) findGpus();
     if (!files.isEmpty()) {
         _scanning = true;
         _preview->setText(tr("Reading source sizes…"));
@@ -414,6 +427,10 @@ void Par2SettingsDialog::updateControls()
     const auto tool = effectiveTool();
     const auto volumes = choice<par2::Volumes>(_volumes);
     const bool cmd = tool == par2::Tool::Par2cmdline, multi = tool == par2::Tool::MultiPar;
+    _volumeMiB->setMaximum(multi && !manual ? 1999999999.0 / 1048576 : 1048576);
+    _blocks->setItemText(_blocks->findData(int(par2::Blocks::Size)),
+                        multi ? tr("Requested block size") : tr("Exact block size"));
+    _blockBytes->setToolTip(multi ? tr("MultiPar may adjust the requested block size to the source files and block-count limit. It is not saved as PAR2_BLOCK_SIZE.") : QString());
     for (auto *combo : {_blocks, _volumes, _distribution}) combo->setEnabled(!manual);
     _arguments->setEnabled(manual);
     _blockBytes->setEnabled(!manual && choice<par2::Blocks>(_blocks) == par2::Blocks::Size);
@@ -430,7 +447,7 @@ void Par2SettingsDialog::updateControls()
     _memoryLabel->setText(multi ? tr("Memory (eighths of free RAM):") : tr("Memory (MiB):"));
     _gpu->setEnabled(!manual && (!cmd || _gpu->isChecked()));
     _device->setEnabled(!manual && tool == par2::Tool::ParPar && _gpu->isChecked());
-    _findGpuButton->setEnabled(_device->isEnabled());
+    _findGpuButton->setEnabled(_device->isEnabled() && _gpuScan != GpuScan::Running);
     _form->setRowVisible(_gpu, !cmd || _gpu->isChecked());
     _form->setRowVisible(_deviceRow, tool == par2::Tool::ParPar);
     allow(_volumes, int(par2::Volumes::Size), !cmd);
@@ -441,6 +458,17 @@ void Par2SettingsDialog::updateControls()
     auto s = settings();
     QString error = s.validate();
     if (!manual && cmd && _gpu->isChecked()) error = tr("GPU acceleration is not supported by par2cmdline. Disable it before changing tools.");
+    // ParPar stops with "Unable to obtain OpenCL device info" and writes no par2
+    // at all, which aborts the post. MultiPar just falls back to the CPU.
+    if (!manual && tool == par2::Tool::ParPar && _gpu->isChecked()) {
+        if (_gpuScan == GpuScan::Unknown || _gpuScan == GpuScan::Running)
+            error = tr("Checking OpenCL devices. Wait for the result or disable GPU acceleration.");
+        else if (_gpuScan == GpuScan::Failed)
+            error = tr("OpenCL could not be checked. Check the executable and OpenCL runtime, retry detection, or disable GPU acceleration.");
+        else if (_gpuScan == GpuScan::None)
+            error = tr("No OpenCL device was found: ParPar would fail and abort the post. "
+                       "Disable GPU acceleration or install an OpenCL driver.");
+    }
     if (!manual && !_threadsSupported && _threads->value() != 0)
         error = tr("This par2cmdline build does not support thread selection.");
     QFileInfo executable(_path->text());
@@ -454,6 +482,7 @@ void Par2SettingsDialog::updateControls()
 void Par2SettingsDialog::selectTool()
 {
     if (_loading) return;
+    resetGpuScan();
     _loading = true;
     _pathDirty = true;
     const auto next = selectedTool();
@@ -470,7 +499,7 @@ void Par2SettingsDialog::selectTool()
     _loading = false;
     changed();
     probeTool();
-    if (_gpu->isChecked() && effectiveTool() == par2::Tool::ParPar && _device->count() <= 1)
+    if (_gpu->isChecked() && effectiveTool() == par2::Tool::ParPar)
         findGpus();
 }
 void Par2SettingsDialog::probeTool()
@@ -508,32 +537,73 @@ void Par2SettingsDialog::probeTool()
     QTimer::singleShot(5000, process, [process] { if (process->state() != QProcess::NotRunning) process->kill(); });
     process->start(path, tool == par2::Tool::MultiPar ? QStringList{} : QStringList{QStringLiteral("--help")});
 }
+void Par2SettingsDialog::resetGpuScan()
+{
+    if (_gpuProbe) {
+        _gpuProbe->disconnect(this);
+        if (_gpuProbe->state() == QProcess::NotRunning) _gpuProbe->deleteLater();
+        else {
+            connect(_gpuProbe, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), _gpuProbe, &QObject::deleteLater);
+            _gpuProbe->kill();
+        }
+        _gpuProbe = nullptr;
+    }
+    _gpuScan = GpuScan::Unknown;
+    const auto selected = settings().device;
+    const QSignalBlocker blocker(_device);
+    while (_device->count() > 1) _device->removeItem(1);
+    _device->setCurrentIndex(0);
+    if (!selected.isEmpty() && selected != QStringLiteral(":")) _device->setCurrentText(selected);
+    _device->setToolTip(QString());
+}
 void Par2SettingsDialog::findGpus()
 {
     if (effectiveTool() != par2::Tool::ParPar || (_gpuProbe && _gpuProbe->state() != QProcess::NotRunning)) return;
-    if (_gpuProbe) _gpuProbe->deleteLater();
+    resetGpuScan();
     _gpuProbe = new QProcess(this);
+    _gpuScan = GpuScan::Running;
+    updateControls();
     auto *process = _gpuProbe;
     const auto path = _path->text();
     process->setProcessChannelMode(QProcess::MergedChannels);
     connect(process, &QProcess::errorOccurred, this, [this, path](QProcess::ProcessError) {
-        if (_path->text() == path && effectiveTool() == par2::Tool::ParPar)
-            _toolStatus->setText(tr("The executable could not be checked."));
+        if (_path->text() != path || effectiveTool() != par2::Tool::ParPar) return;
+        _gpuScan = GpuScan::Failed;
+        _toolStatus->setText(tr("The executable could not be checked."));
+        updateControls();
     });
     connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process, path] {
         if (_path->text() != path || effectiveTool() != par2::Tool::ParPar) return;
         const auto output = process->readAll();
         _device->setToolTip(QString::fromUtf8(output));
         if (process->exitStatus() != QProcess::NormalExit || process->exitCode() != 0) {
+            _gpuScan = GpuScan::Failed;
             _toolStatus->setText(tr("The executable could not be checked."));
+            updateControls();
             return;
         }
         // The text listing filters devices before numbering them. JSON keeps
         // original platform/device indices, including CPUs and unavailable GPUs.
-        for (const auto &device : par2::openClDevices(output))
+        const auto selected = settings().device;
+        const QSignalBlocker blocker(_device);
+        const auto devices = par2::openClDevices(output, false);
+        for (const auto &device : devices)
             if (_device->findData(device.id) < 0)
                 _device->addItem(QString("%1 (%2)").arg(device.name, device.id), device.id);
-        _toolStatus->setText(tr("GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered."));
+        const int selection = _device->findData(selected);
+        if (selection >= 0) _device->setCurrentIndex(selection);
+        const int all = par2::openClDeviceCount(output);
+        _gpuScan = all < 0 ? GpuScan::Failed : !all ? GpuScan::None
+            : par2::openClDevices(output).isEmpty() ? GpuScan::NoGpu : GpuScan::Found;
+        if (_gpuScan == GpuScan::Failed)
+            _toolStatus->setText(tr("The executable could not be checked."));
+        else if (_gpuScan == GpuScan::None)
+            _toolStatus->setText(tr("No OpenCL device is installed on this machine."));
+        else if (_gpuScan == GpuScan::NoGpu)
+            _toolStatus->setText(tr("OpenCL devices are available without a physical GPU. CPU devices such as OpenCLOn12 can be selected."));
+        else
+            _toolStatus->setText(tr("GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered."));
+        updateControls();
     });
     QTimer::singleShot(5000, process, [process] { if (process->state() != QProcess::NotRunning) process->kill(); });
     process->start(path, {QStringLiteral("--opencl-list"), QStringLiteral("--json")});

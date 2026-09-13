@@ -17,7 +17,9 @@ Tool detectTool(const QString &path);
 QString findExecutable(Tool tool);
 QString joinArguments(const QStringList &args);
 struct Device { QString id; QString name; };
-QVector<Device> openClDevices(const QByteArray &output);
+QVector<Device> openClDevices(const QByteArray &output, bool gpuOnly = true);
+//! Available, supported devices, including CPUs; -1 for an invalid listing.
+int openClDeviceCount(const QByteArray &output);
 
 struct Estimate {
     qint64 sourceBytes = 0;

@@ -38,6 +38,14 @@ private slots:
         QCOMPARE(devices[0].name, QString("Card A"));
         QCOMPARE(devices[1].id, QString("1:0"));
         QVERIFY(openClDevices("No OpenCL platforms found").isEmpty());
+        // The dialog has to tell "no driver at all" (ParPar aborts the post)
+        // from "devices, but none of them a GPU" (a device ID still works).
+        QCOMPARE(openClDeviceCount(R"({"type":"opencl_list","platforms":[
+            {"devices":[{"type":"CPU","name":"CPU","available":true,"supported":true}]}]})"), 1);
+        QCOMPARE(openClDeviceCount(R"({"type":"opencl_list","platforms":[]})"), 0);
+        QCOMPARE(openClDeviceCount("No OpenCL platforms found"), -1);
+        QCOMPARE(openClDeviceCount(R"({"platforms":[{"devices":[{"type":"GPU","available":false,"supported":true}]}]})"), 0);
+        QCOMPARE(openClDeviceCount(R"({"platforms":[{}]})"), -1);
     }
     void guided_arguments_roundtrip_data()
     {
@@ -62,7 +70,7 @@ private slots:
         const auto decoded = Settings::read(settings.tool, encoded);
         QVERIFY2(!decoded.custom, qPrintable(encoded));
         QCOMPARE(decoded.arguments(12), settings.arguments(12));
-        QCOMPARE(decoded.exactBlockBytes(), 65536);
+        QCOMPARE(decoded.exactBlockBytes(), settings.tool == Tool::MultiPar ? 0 : 65536);
     }
     void custom_arguments_are_lossless()
     {
@@ -74,6 +82,7 @@ private slots:
                           qMakePair(Tool::ParPar, QString("-s2000 --opencl-process")),
                           qMakePair(Tool::MultiPar, QString("c /ls2 /mwrong")),
                           qMakePair(Tool::MultiPar, QString("c /rr8 /lr2000")),
+                          qMakePair(Tool::MultiPar, QString("c /ss1048576 /rr10 /lr250")),
                           qMakePair(Tool::MultiPar, QString("c /rr8 /sn3000 /lr2000")),
                           qMakePair(Tool::MultiPar, QString("c /ss9223372036854775804 /lr2")),
                           qMakePair(Tool::Par2cmdline, QString("c -l -n10")),
@@ -124,32 +133,62 @@ private slots:
         settings.volumes = Volumes::Size;
         QVERIFY(settings.validate().isEmpty());
         QVERIFY(settings.arguments(10).contains("/rd3"));
-        // par2j counts blocks per recovery file, and never splits the sources.
-        QVERIFY(settings.arguments(10).contains("/lr2"));
-        QVERIFY(!settings.arguments(10).join(' ').contains("/ls"));
+        // "/ls2" turns "/lr" into a byte limit; it is a mode flag, and does not
+        // split the sources the way a real "/ls<size>" would.
+        QVERIFY(settings.arguments(10).contains("/ls2"));
+        QVERIFY(settings.arguments(10).contains("/lr2048"));
         const auto multiPar = Settings::read(Tool::MultiPar, joinArguments(settings.arguments(10)));
         QVERIFY(!multiPar.custom);
         QCOMPARE(multiPar.volumeBytes, 2048);
         QCOMPARE(multiPar.arguments(10), settings.arguments(10));
-        // The 2 GiB PAR2 limit applies to a block, not an entire recovery file.
+        // The byte limit stays available whatever the block policy is.
+        for (auto mode : {Blocks::Automatic, Blocks::Count}) {
+            auto anyBlocks = settings;
+            anyBlocks.blocks = mode;
+            anyBlocks.blockCount = 3000;
+            QVERIFY(anyBlocks.validate().isEmpty());
+            QVERIFY(anyBlocks.arguments(10).contains("/lr2048"));
+            const auto back = Settings::read(Tool::MultiPar, joinArguments(anyBlocks.arguments(10)));
+            QVERIFY(!back.custom);
+            QCOMPARE(back.volumeBytes, 2048);
+        }
+        // /ss can be adjusted by MultiPar: a block count cannot guarantee a
+        // byte target beyond the native /ls2 limit.
         auto largeVolume = settings;
         largeVolume.blockBytes = 1048576;
         largeVolume.volumeBytes = 5LL * 1024 * 1048576;
-        QVERIFY(largeVolume.validate().isEmpty());
-        QVERIFY(largeVolume.arguments(10).contains("/lr5120"));
-        QCOMPARE(Settings::read(Tool::MultiPar, joinArguments(largeVolume.arguments(10))).volumeBytes,
-                 largeVolume.volumeBytes);
-        settings.blocks = Blocks::Automatic; // no block size: no block count to derive
-        QVERIFY(!settings.validate().isEmpty());
-        settings.blocks = Blocks::Size;
-        settings.volumeBytes = 512; // below one block
-        QVERIFY(!settings.validate().isEmpty());
+        QVERIFY(!largeVolume.validate().isEmpty());
+        largeVolume.blocks = Blocks::Automatic; // no block size: no block count to derive
+        QVERIFY(!largeVolume.validate().isEmpty());
+        largeVolume.blocks = Blocks::Size;
+        largeVolume.volumeBytes = largeVolume.blockBytes / 2; // below one block
+        QVERIFY(largeVolume.validate().isEmpty()); // legal, even if no file fits
         settings.volumeBytes = 2048;
         for (auto mode : {Blocks::Automatic, Blocks::Count}) {
             settings.blocks = mode;
             settings.volumes = Volumes::Automatic;
             QVERIFY(!settings.estimate({std::numeric_limits<qint64>::max()}, 10).valid);
         }
+    }
+    void multipar_requested_blocks_are_not_a_check_hint()
+    {
+        auto settings = Settings::read(Tool::MultiPar, "c /ss1048576 /rr10 /ls2 /lr262144000");
+        QVERIFY(!settings.custom);
+        QCOMPARE(settings.exactBlockBytes(), 0);
+        const auto small = settings.estimate({131072}, 10);
+        QVERIFY(small.valid);
+        QCOMPARE(small.blockBytes, 131072);
+        QCOMPARE(small.sourceBlocks, 1);
+        QCOMPARE(small.recoveryBytes, 131072);
+        // Below one slice, the native byte cap still allocates one slice.
+        settings.volumeBytes = 2048;
+        settings.distribution = Distribution::Equal;
+        const auto capped = settings.estimate({131072}, 10);
+        QVERIFY(capped.valid);
+        QCOMPARE(capped.largestRecoveryBytes, 131072);
+        // MultiPar may grow the requested slice to stay under 32768 blocks.
+        // Do not invent the adjusted result when that policy is not estimated.
+        QVERIFY(!settings.estimate({40000LL * 1048576}, 10).valid);
     }
     void real_tools_generate_repairable_files_data()
     {
@@ -198,7 +237,7 @@ private slots:
             process.start(executable, {"--opencl-list", "--json"});
             QVERIFY(process.waitForFinished(30000));
             const auto listing = process.readAll();
-            for (const auto &device : openClDevices(listing))
+            for (const auto &device : openClDevices(listing, false))
                 if (device.id == settings.device) gpuName = device.name;
             QVERIFY2(!gpuName.isEmpty(), listing.constData());
         }

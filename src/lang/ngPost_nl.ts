@@ -678,7 +678,7 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3175"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3177"/>
         <source>VPN: disabled</source>
         <translation>VPN: uitgeschakeld</translation>
     </message>
@@ -837,7 +837,7 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
         <translation>go command line (close the GUI and continue in the shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1230"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1232"/>
         <source>on</source>
         <translation>aan</translation>
     </message>
@@ -873,20 +873,20 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1076"/>
+        <location line="+1078"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>Wachtwoord</translation>
     </message>
     <message>
-        <location line="-1141"/>
+        <location line="-1143"/>
         <location line="+405"/>
-        <location line="+1668"/>
+        <location line="+1670"/>
         <source>Default %1</source>
         <translation>Standaard %1</translation>
     </message>
     <message>
-        <location line="-2069"/>
+        <location line="-2071"/>
         <location line="+405"/>
         <source>Post history, statistics and resume center</source>
         <translation>Postgeschiedenis, statistieken en hervattingscentrum</translation>
@@ -983,13 +983,13 @@ Weet je zeker dat je wilt stoppen?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+567"/>
+        <location line="+569"/>
         <location line="+174"/>
         <source>Files</source>
         <translation>Bestanden</translation>
     </message>
     <message>
-        <location line="-740"/>
+        <location line="-742"/>
         <source>Parameters</source>
         <translation>Parameters</translation>
     </message>
@@ -1015,7 +1015,7 @@ Weet je zeker dat je wilt stoppen?</translation>
         <translation>Sluit alle voltooide tabbladen</translation>
     </message>
     <message>
-        <location line="+76"/>
+        <location line="+78"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
         <translation>&lt;h3&gt;Nieuwe versie beschikbaar: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Huidig: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;Release bekijken op GitHub&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
@@ -1068,12 +1068,12 @@ The job stays in the queue.</source>
 De taak blijft in de wachtrij.</translation>
     </message>
     <message>
-        <location line="-583"/>
+        <location line="-585"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>Deze instellingen konden niet worden verwijderd. Zie het VPN-logboek voor details.</translation>
     </message>
     <message>
-        <location line="+597"/>
+        <location line="+599"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>De in ngPost geconfigureerde VPN lijkt al te draaien; mogelijk gebruikt een andere ngPost hem. Zie de VPN-instellingen.</translation>
     </message>
@@ -1824,9 +1824,9 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Item verwijderen</translation>
     </message>
     <message>
-        <location line="-1332"/>
+        <location line="-1334"/>
         <location line="+405"/>
-        <location line="+513"/>
+        <location line="+515"/>
         <location line="+325"/>
         <source>History</source>
         <translation>Geschiedenis</translation>
@@ -2005,13 +2005,13 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Kolombreedtes herstellen</translation>
     </message>
     <message>
-        <location line="-1665"/>
+        <location line="-1667"/>
         <location line="+414"/>
         <source>PAR2 Settings…</source>
         <translation>PAR2-instellingen…</translation>
     </message>
     <message>
-        <location line="+1605"/>
+        <location line="+1607"/>
         <source>Post all tabs</source>
         <translation>Alle tabbladen posten</translation>
     </message>
@@ -4957,7 +4957,7 @@ Profiel: %2</translation>
 <context>
     <name>Par2Settings</name>
     <message>
-        <location filename="../par2/Par2Settings.cpp" line="+261"/>
+        <location filename="../par2/Par2Settings.cpp" line="+281"/>
         <source>Block size must be a multiple of 4 bytes, below 2 GiB.</source>
         <translation>De blokgrootte moet een veelvoud van 4 bytes zijn en kleiner dan 2 GiB.</translation>
     </message>
@@ -4993,8 +4993,12 @@ Profiel: %2</translation>
     </message>
     <message>
         <location line="+3"/>
+        <source>Past 2 GB, MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
+        <translation>Boven 2 GB begrenst MultiPar een herstelbestand op aantal blokken: stel een exacte blokgrootte (Geavanceerd) in die niet groter is dan de doelgrootte.</translation>
+    </message>
+    <message>
         <source>MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
-        <translation>MultiPar begrenst een herstelbestand op aantal blokken: stel een exacte blokgrootte in (Geavanceerd) die niet groter is dan de doelgrootte.</translation>
+        <translation type="vanished">MultiPar begrenst een herstelbestand op aantal blokken: stel een exacte blokgrootte in (Geavanceerd) die niet groter is dan de doelgrootte.</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -5006,17 +5010,21 @@ Profiel: %2</translation>
         <source>CPU or memory setting exceeds the tool&apos;s supported range.</source>
         <translation>De CPU- of geheugeninstelling valt buiten het ondersteunde bereik.</translation>
     </message>
+    <message>
+        <source>MultiPar size targets must be below 2 GB (2000000000 bytes). Use custom arguments for limits expressed in blocks.</source>
+        <translation>De gewenste grootte voor MultiPar moet kleiner zijn dan 2 GB (2000000000 bytes). Gebruik aangepaste argumenten voor limieten in blokken.</translation>
+    </message>
 </context>
 <context>
     <name>Par2SettingsDialog</name>
     <message>
         <location filename="../hmi/Par2SettingsDialog.cpp" line="+80"/>
-        <location line="+498"/>
+        <location line="+523"/>
         <source>indeterminate</source>
         <translation>onbepaald</translation>
     </message>
     <message>
-        <location line="-486"/>
+        <location line="-511"/>
         <source>PAR2 Settings</source>
         <translation>PAR2-instellingen</translation>
     </message>
@@ -5188,29 +5196,29 @@ Profiel: %2</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+295"/>
+        <location line="+320"/>
         <source>Prepare a post to display an estimate.</source>
         <translation>Bereid een post voor om een schatting te tonen.</translation>
     </message>
     <message>
-        <location line="-228"/>
+        <location line="-252"/>
         <source>Select PAR2 executable</source>
         <translation>PAR2-programma selecteren</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <location line="+218"/>
+        <location line="+11"/>
+        <location line="+239"/>
         <source>Reading source sizes…</source>
         <translation>Brongroottes worden gelezen…</translation>
     </message>
     <message>
-        <location line="-115"/>
-        <location line="+17"/>
+        <location line="-136"/>
+        <location line="+22"/>
         <source>This par2cmdline build does not support thread selection.</source>
         <translation>Deze par2cmdline-build ondersteunt geen keuze van het aantal threads.</translation>
     </message>
     <message>
-        <location line="-15"/>
+        <location line="-20"/>
         <source>Memory (eighths of free RAM):</source>
         <translation>Geheugen (achtsten van vrij RAM):</translation>
     </message>
@@ -5225,7 +5233,12 @@ Profiel: %2</translation>
         <translation>par2cmdline ondersteunt geen GPU-versnelling. Schakel deze uit voordat u van hulpmiddel wisselt.</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+4"/>
+        <source>No OpenCL device was found: ParPar would fail and abort the post. Disable GPU acceleration or install an OpenCL driver.</source>
+        <translation>Geen OpenCL-apparaat gevonden: ParPar zou mislukken en de post zou worden afgebroken. Schakel GPU-versnelling uit of installeer een OpenCL-stuurprogramma.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>The selected executable is unavailable. Select an installed tool or Automatic.</source>
         <translation>Het geselecteerde programma is niet beschikbaar. Kies een geïnstalleerd hulpmiddel of Automatisch.</translation>
     </message>
@@ -5237,18 +5250,28 @@ Profiel: %2</translation>
     <message>
         <location line="+4"/>
         <location line="+6"/>
-        <location line="+17"/>
-        <location line="+7"/>
+        <location line="+21"/>
+        <location line="+9"/>
         <source>The executable could not be checked.</source>
         <translation>Het programma kon niet worden gecontroleerd.</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+13"/>
+        <source>No OpenCL device is installed on this machine.</source>
+        <translation>Op deze machine is geen OpenCL-apparaat geïnstalleerd.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>OpenCL is installed but reports no GPU; enter a device ID from the tooltip to use another kind of device.</source>
+        <translation>OpenCL is geïnstalleerd maar meldt geen GPU; voer een apparaat-ID uit de tooltip in om een ander soort apparaat te gebruiken.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
         <source>GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered.</source>
         <translation>GPU-details staan in de tooltip van de selector; u kunt ook een apparaatnaam of platform:apparaat-ID invoeren.</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+9"/>
         <source>Estimate unavailable: some source sizes could not be read.</source>
         <translation>Geen schatting: sommige brongroottes konden niet worden gelezen.</translation>
     </message>
@@ -5289,7 +5312,7 @@ Profiel: %2</translation>
         <translation>Dit voorbeeld gebruikt de globale standaard; de huidige post heeft een eigen redundantie.</translation>
     </message>
     <message>
-        <location line="-320"/>
+        <location line="-344"/>
         <source>Save</source>
         <translation>Opslaan</translation>
     </message>
@@ -5297,6 +5320,30 @@ Profiel: %2</translation>
         <location line="+1"/>
         <source>Cancel</source>
         <translation>Annuleren</translation>
+    </message>
+    <message>
+        <source>Find OpenCL devices</source>
+        <translation>OpenCL-apparaten zoeken</translation>
+    </message>
+    <message>
+        <source>Requested block size</source>
+        <translation>Gevraagde blokgrootte</translation>
+    </message>
+    <message>
+        <source>MultiPar may adjust the requested block size to the source files and block-count limit. It is not saved as PAR2_BLOCK_SIZE.</source>
+        <translation>MultiPar kan de gevraagde blokgrootte aanpassen aan de bronbestanden en het maximale aantal blokken. Deze wordt niet opgeslagen als PAR2_BLOCK_SIZE.</translation>
+    </message>
+    <message>
+        <source>Checking OpenCL devices. Wait for the result or disable GPU acceleration.</source>
+        <translation>OpenCL-apparaten worden gecontroleerd. Wacht op het resultaat of schakel GPU-versnelling uit.</translation>
+    </message>
+    <message>
+        <source>OpenCL could not be checked. Check the executable and OpenCL runtime, retry detection, or disable GPU acceleration.</source>
+        <translation>OpenCL kon niet worden gecontroleerd. Controleer het programma en de OpenCL-runtime, probeer opnieuw of schakel GPU-versnelling uit.</translation>
+    </message>
+    <message>
+        <source>OpenCL devices are available without a physical GPU. CPU devices such as OpenCLOn12 can be selected.</source>
+        <translation>Er zijn OpenCL-apparaten beschikbaar zonder fysieke GPU. CPU-apparaten zoals OpenCLOn12 kunnen worden geselecteerd.</translation>
     </message>
 </context>
 <context>

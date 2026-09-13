@@ -59,6 +59,7 @@
 #include "MockNntpServer.h"
 #include <QDoubleSpinBox>
 #include <QDialogButtonBox>
+#include <QTemporaryDir>
 #include <QMessageBox>
 #include <QPointer>
 #include "utils/PathHelper.h"
@@ -78,6 +79,11 @@ private slots:
     void par2_dialog_defaults_overrides_and_cancel();
     void par2_dialog_preserves_exact_volume_bytes();
     void par2_dialog_detects_real_gpu();
+    void par2_dialog_refuses_gpu_without_opencl();
+    void par2_dialog_checks_opencl_data();
+    void par2_dialog_checks_opencl();
+    void par2_dialog_rechecks_changed_opencl_tool();
+    void par2_dialog_multipar_clears_inexact_check_hint();
     void sizing_dialogs_translations_fit_data();
     void sizing_dialogs_translations_fit();
     void rar_limit_value_persists_and_zero_is_rejected();
@@ -2244,6 +2250,30 @@ void TestMainWindow::no_log_call_passes_html_markup()
 int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
+    const auto helperName = QFileInfo(app.applicationFilePath()).fileName();
+    if (helperName.startsWith("ngpost-opencl-")) {
+        QFile output;
+        if (!output.open(stdout, QIODevice::WriteOnly)) return 2;
+        if (!app.arguments().contains("--opencl-list")) {
+            output.write("ParPar test helper\n");
+            return 0;
+        }
+        if (helperName.contains("slow")) QThread::msleep(400);
+        if (helperName.contains("failed")) {
+            output.write("Error: Could not load OpenCL runtime\n");
+            return 1;
+        }
+        if (helperName.contains("invalid")) {
+            output.write("not a device listing\n");
+            return 0;
+        }
+        if (helperName.contains("none")) output.write("{\"platforms\":[]}");
+        else if (helperName.contains("offline"))
+            output.write(R"({"platforms":[{"devices":[{"name":"Offline","type":"GPU","available":false,"supported":true}]}]})");
+        else
+            output.write(R"({"platforms":[{"devices":[{"name":"Microsoft Basic Render Driver","type":"CPU","available":true,"supported":true}]}]})");
+        return 0;
+    }
     if (QFileInfo(app.applicationFilePath()).fileName().startsWith("ngpost-recording-")) {
         const auto args = app.arguments().mid(1);
         if (args.isEmpty() || args.contains("--help")) return 0;
@@ -2449,6 +2479,170 @@ void TestMainWindow::par2_dialog_detects_real_gpu()
     const auto saved = config.readAll();
     QVERIFY(saved.contains("--opencl-process=100%"));
     QVERIFY(saved.contains("--opencl-device " + deviceId.toUtf8()));
+}
+
+void TestMainWindow::par2_dialog_refuses_gpu_without_opencl()
+{
+#ifdef Q_OS_WIN
+    QSKIP("The stub tool below is a POSIX shell script.");
+#else
+    HomeSandbox sandbox;
+    QTemporaryDir stubDir;
+    QVERIFY(stubDir.isValid());
+    // ParPar on a machine without any OpenCL driver: "--opencl-list" succeeds
+    // and lists nothing, and a real run would then stop with "Unable to obtain
+    // OpenCL device info" after writing no par2 at all, aborting the post.
+    const QString stub = stubDir.filePath(QStringLiteral("parpar"));
+    QFile file(stub);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    file.write("#!/bin/sh\n"
+               "case \"$1\" in\n"
+               "--opencl-list) echo '{\"type\":\"opencl_list\",\"platforms\":[]}' ;;\n"
+               "*) echo 'ParPar v0.0.0-stub' ;;\n"
+               "esac\n");
+    file.close();
+    QVERIFY(file.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = {arg0.data(), nullptr};
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
+                                             "PAR2_PCT = 10\nPAR2_ARGS = -s1M --auto-slice-size -r10%\n").arg(stub), &error);
+    QVERIFY2(window, qPrintable(error));
+    Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+    auto *save = dialog.findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save);
+    auto *status = dialog.findChild<QLabel *>("par2Status");
+    QVERIFY(save->isEnabled());
+    dialog.findChild<QCheckBox *>("par2Gpu")->setChecked(true);
+    // The listing is asynchronous: Save has to close once the answer arrives.
+    QTRY_VERIFY_WITH_TIMEOUT(!save->isEnabled(), 10000);
+    QVERIFY(status->text().contains(QStringLiteral("OpenCL")));
+    dialog.accept();
+    QCOMPARE(dialog.result(), 0); // still open, and nothing written
+    QFile config(PathHelper::configFilePath());
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
+    QVERIFY(!config.readAll().contains("--opencl-process"));
+    // The choice is the user's to undo, and Save comes back with it.
+    dialog.findChild<QCheckBox *>("par2Gpu")->setChecked(false);
+    QVERIFY(save->isEnabled());
+    dialog.accept();
+    QCOMPARE(dialog.result(), int(QDialog::Accepted));
+#endif
+}
+
+static QString openClHelper(const QString &directory, const QString &mode)
+{
+    auto path = directory + "/ngpost-opencl-" + mode;
+#ifdef Q_OS_WIN
+    path += ".exe";
+#endif
+    return QFile::copy(QCoreApplication::applicationFilePath(), path) ? path : QString();
+}
+
+void TestMainWindow::par2_dialog_checks_opencl_data()
+{
+    QTest::addColumn<QString>("mode");
+    QTest::addColumn<bool>("usable");
+    for (const auto *mode : {"none", "failed", "invalid", "offline", "slow-cpu"})
+        QTest::newRow(mode) << QString::fromLatin1(mode) << (QString::fromLatin1(mode) == "slow-cpu");
+}
+
+void TestMainWindow::par2_dialog_checks_opencl()
+{
+    QFETCH(QString, mode);
+    QFETCH(bool, usable);
+    HomeSandbox sandbox;
+    const auto stub = openClHelper(sandbox.rootPath(), mode);
+    QVERIFY(!stub.isEmpty());
+    int argc = 1; QByteArray arg0("tst_MainWindow"); char *argv[] = {arg0.data(), nullptr};
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
+                                             "PAR2_PCT = 10\nPAR2_ARGS = -s1M --auto-slice-size -r10% --opencl-process=100%\n").arg(stub), &error);
+    QVERIFY2(window, qPrintable(error));
+    Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+    auto *save = dialog.findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save);
+    auto *devices = dialog.findChild<QComboBox *>("par2GpuDevice");
+    QVERIFY(!save->isEnabled()); // the asynchronous probe must finish first
+    dialog.accept();
+    QCOMPARE(dialog.result(), 0);
+    QTRY_VERIFY_WITH_TIMEOUT(!devices->toolTip().isEmpty(), 10000);
+    QCOMPARE(save->isEnabled(), usable);
+    if (usable) {
+        QVERIFY(devices->findData("0:0") >= 0); // CPU OpenCL is a usable choice
+        devices->setCurrentIndex(devices->findData("0:0"));
+        dialog.accept();
+        QCOMPARE(dialog.result(), int(QDialog::Accepted));
+        QFile config(PathHelper::configFilePath());
+        QVERIFY(config.open(QIODevice::ReadOnly));
+        QVERIFY(config.readAll().contains("--opencl-device 0:0"));
+    } else {
+        dialog.accept();
+        QCOMPARE(dialog.result(), 0);
+        dialog.findChild<QCheckBox *>("par2Gpu")->setChecked(false);
+        QVERIFY(save->isEnabled());
+    }
+}
+
+void TestMainWindow::par2_dialog_rechecks_changed_opencl_tool()
+{
+    HomeSandbox sandbox;
+    const auto failed = openClHelper(sandbox.rootPath(), "failed");
+    const auto cpu = openClHelper(sandbox.rootPath(), "slow-cpu");
+    QVERIFY(!failed.isEmpty() && !cpu.isEmpty());
+    int argc = 1; QByteArray arg0("tst_MainWindow"); char *argv[] = {arg0.data(), nullptr};
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
+                                             "PAR2_ARGS = -s1M --auto-slice-size --opencl-process=100%\n").arg(failed), &error);
+    QVERIFY2(window, qPrintable(error));
+    Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+    auto *path = dialog.findChild<QLineEdit *>("par2Path");
+    auto *devices = dialog.findChild<QComboBox *>("par2GpuDevice");
+    auto *save = dialog.findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save);
+    QTRY_VERIFY_WITH_TIMEOUT(!devices->toolTip().isEmpty(), 10000);
+    QVERIFY(!save->isEnabled());
+    path->setText(cpu);
+    QVERIFY(devices->toolTip().isEmpty());
+    QVERIFY(!save->isEnabled());
+    QTRY_VERIFY_WITH_TIMEOUT(save->isEnabled(), 10000);
+    QVERIFY(devices->findData("0:0") >= 0);
+    path->setText(failed);
+    QVERIFY(devices->findData("0:0") < 0); // previous executable's list was discarded
+    QVERIFY(!save->isEnabled());
+    QTRY_VERIFY_WITH_TIMEOUT(!devices->toolTip().isEmpty(), 10000);
+    QVERIFY(!save->isEnabled());
+    // An obsolete slow result must not override the new executable's failure.
+    path->setText(cpu);
+    QTest::qWait(100);
+    path->setText(failed);
+    QTRY_VERIFY_WITH_TIMEOUT(!devices->toolTip().isEmpty(), 10000);
+    QTest::qWait(500);
+    QVERIFY(!save->isEnabled());
+    QVERIFY(devices->findData("0:0") < 0);
+}
+
+void TestMainWindow::par2_dialog_multipar_clears_inexact_check_hint()
+{
+    HomeSandbox sandbox;
+    int argc = 1; QByteArray arg0("tst_MainWindow"); char *argv[] = {arg0.data(), nullptr};
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nPAR2_TOOL = multipar\nPAR2_PATH = %1\n"
+                                             "PAR2_PCT = 10\nPAR2_ARGS = c /ss1048576 /rr10\nPAR2_BLOCK_SIZE = 1048576\n")
+                                             .arg(QCoreApplication::applicationFilePath()), &error);
+    QVERIFY2(window, qPrintable(error));
+    Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+    dialog.findChild<QSpinBox *>("par2DefaultPct")->setValue(12);
+    dialog.accept();
+    QCOMPARE(dialog.result(), int(QDialog::Accepted));
+    QFile config(PathHelper::configFilePath());
+    QVERIFY(config.open(QIODevice::ReadOnly));
+    const auto saved = config.readAll();
+    QVERIFY(!QRegularExpression("(?m)^PAR2_BLOCK_SIZE\\s*=\\s*1048576").match(QString::fromUtf8(saved)).hasMatch());
+    QVERIFY(saved.contains("/ss1048576"));
 }
 
 void TestMainWindow::sizing_dialogs_translations_fit_data()

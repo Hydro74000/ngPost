@@ -844,7 +844,9 @@ void MainWindow::onToggleStartupTab(int tabIndex)
 
 bool MainWindow::hasFinishedPosts() const
 {
-    for (int idx = 2 ; idx < _ui->postTabWidget->count() - 2 ; ++idx)
+    // Post tabs live between the History tab and the trailing "New" one, so the
+    // last of them is count() - 2: onCloseAllFinishedQuickTabs() starts there.
+    for (int idx = 2 ; idx < _ui->postTabWidget->count() - 1 ; ++idx)
     {
         PostingWidget *postWidget = _getPostWidget(idx);
         if (postWidget && postWidget->isPostingFinished())

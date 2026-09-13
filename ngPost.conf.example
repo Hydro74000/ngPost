@@ -359,7 +359,7 @@ PAR2_PCT = 8
 ## you could for exemple use Multipar on Windows
 #PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q   (for parpar)
 #PAR2_ARGS = c -l -m1024 -r8 -s768000                 (for par2cmdline)
-#PAR2_ARGS = create /rr8 /lc40 /lr /rd2 /ss768000     (for Multipar)
+#PAR2_ARGS = create /rr8 /lc4 /lr /rd2 /ss768000     (for Multipar)
 
 ## par2 slice (block) size in bytes, used by --check to work out how much of a
 ## damaged post the recovery files can actually repair.

@@ -676,7 +676,7 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3175"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3177"/>
         <source>VPN: disabled</source>
         <translation>VPN: desativado</translation>
     </message>
@@ -835,7 +835,7 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
         <translation>vá por linha de comando (feche o GUI e continue no shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1230"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1232"/>
         <source>on</source>
         <translation>on</translation>
     </message>
@@ -871,20 +871,20 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1076"/>
+        <location line="+1078"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>Senha</translation>
     </message>
     <message>
-        <location line="-1141"/>
+        <location line="-1143"/>
         <location line="+405"/>
-        <location line="+1668"/>
+        <location line="+1670"/>
         <source>Default %1</source>
         <translation>Padrão %1</translation>
     </message>
     <message>
-        <location line="-2069"/>
+        <location line="-2071"/>
         <location line="+405"/>
         <source>Post history, statistics and resume center</source>
         <translation>Histórico de publicações, estatísticas e centro de retoma</translation>
@@ -981,13 +981,13 @@ Tem certeza que deseja sair?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+567"/>
+        <location line="+569"/>
         <location line="+174"/>
         <source>Files</source>
         <translation>Arquivos</translation>
     </message>
     <message>
-        <location line="-740"/>
+        <location line="-742"/>
         <source>Parameters</source>
         <translation>Parâmetros</translation>
     </message>
@@ -1013,7 +1013,7 @@ Tem certeza que deseja sair?</translation>
         <translation>Fechar todas as Abas Finalizadas</translation>
     </message>
     <message>
-        <location line="+76"/>
+        <location line="+78"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
         <translation>&lt;h3&gt;Nova versão disponível: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Atual: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;Ver versão no GitHub&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
@@ -1066,12 +1066,12 @@ The job stays in the queue.</source>
 O trabalho fica na fila.</translation>
     </message>
     <message>
-        <location line="-583"/>
+        <location line="-585"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>Não foi possível remover estas definições. Consulte o registo da VPN para mais detalhes.</translation>
     </message>
     <message>
-        <location line="+597"/>
+        <location line="+599"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>A VPN configurada no ngPost parece já estar em execução; outro ngPost poderá estar a utilizá-la. Consulte as definições da VPN.</translation>
     </message>
@@ -1822,9 +1822,9 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>Excluir entrada</translation>
     </message>
     <message>
-        <location line="-1332"/>
+        <location line="-1334"/>
         <location line="+405"/>
-        <location line="+513"/>
+        <location line="+515"/>
         <location line="+325"/>
         <source>History</source>
         <translation>Histórico</translation>
@@ -2003,13 +2003,13 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>Redefinir a largura das colunas</translation>
     </message>
     <message>
-        <location line="-1665"/>
+        <location line="-1667"/>
         <location line="+414"/>
         <source>PAR2 Settings…</source>
         <translation>Configurações PAR2…</translation>
     </message>
     <message>
-        <location line="+1605"/>
+        <location line="+1607"/>
         <source>Post all tabs</source>
         <translation>Postar todas as abas</translation>
     </message>
@@ -4952,7 +4952,7 @@ Perfil: %2</translation>
 <context>
     <name>Par2Settings</name>
     <message>
-        <location filename="../par2/Par2Settings.cpp" line="+261"/>
+        <location filename="../par2/Par2Settings.cpp" line="+281"/>
         <source>Block size must be a multiple of 4 bytes, below 2 GiB.</source>
         <translation>O tamanho do bloco deve ser múltiplo de 4 bytes e menor que 2 GiB.</translation>
     </message>
@@ -4988,8 +4988,12 @@ Perfil: %2</translation>
     </message>
     <message>
         <location line="+3"/>
+        <source>Past 2 GB, MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
+        <translation>Acima de 2 GB, o MultiPar limita um ficheiro de recuperação pelo número de blocos: defina um tamanho de bloco exato (Avançado) não superior ao tamanho pretendido.</translation>
+    </message>
+    <message>
         <source>MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
-        <translation>O MultiPar limita um ficheiro de recuperação por número de blocos: defina um tamanho de bloco exato (Avançado) não superior ao tamanho pretendido.</translation>
+        <translation type="vanished">O MultiPar limita um ficheiro de recuperação por número de blocos: defina um tamanho de bloco exato (Avançado) não superior ao tamanho pretendido.</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -5001,17 +5005,21 @@ Perfil: %2</translation>
         <source>CPU or memory setting exceeds the tool&apos;s supported range.</source>
         <translation>A configuração de CPU ou memória excede a faixa suportada pela ferramenta.</translation>
     </message>
+    <message>
+        <source>MultiPar size targets must be below 2 GB (2000000000 bytes). Use custom arguments for limits expressed in blocks.</source>
+        <translation>Os tamanhos pretendidos no MultiPar devem ser inferiores a 2 GB (2000000000 bytes). Use argumentos personalizados para limites expressos em blocos.</translation>
+    </message>
 </context>
 <context>
     <name>Par2SettingsDialog</name>
     <message>
         <location filename="../hmi/Par2SettingsDialog.cpp" line="+80"/>
-        <location line="+498"/>
+        <location line="+523"/>
         <source>indeterminate</source>
         <translation>indeterminado</translation>
     </message>
     <message>
-        <location line="-486"/>
+        <location line="-511"/>
         <source>PAR2 Settings</source>
         <translation>Configurações PAR2</translation>
     </message>
@@ -5183,29 +5191,29 @@ Perfil: %2</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+295"/>
+        <location line="+320"/>
         <source>Prepare a post to display an estimate.</source>
         <translation>Prepare um post para exibir uma estimativa.</translation>
     </message>
     <message>
-        <location line="-228"/>
+        <location line="-252"/>
         <source>Select PAR2 executable</source>
         <translation>Selecionar executável PAR2</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <location line="+218"/>
+        <location line="+11"/>
+        <location line="+239"/>
         <source>Reading source sizes…</source>
         <translation>Lendo tamanhos dos arquivos…</translation>
     </message>
     <message>
-        <location line="-115"/>
-        <location line="+17"/>
+        <location line="-136"/>
+        <location line="+22"/>
         <source>This par2cmdline build does not support thread selection.</source>
         <translation>Esta compilação do par2cmdline não permite escolher o número de threads.</translation>
     </message>
     <message>
-        <location line="-15"/>
+        <location line="-20"/>
         <source>Memory (eighths of free RAM):</source>
         <translation>Memória (oitavos da RAM livre):</translation>
     </message>
@@ -5220,7 +5228,12 @@ Perfil: %2</translation>
         <translation>O par2cmdline não suporta aceleração por GPU. Desative-a antes de mudar de ferramenta.</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+4"/>
+        <source>No OpenCL device was found: ParPar would fail and abort the post. Disable GPU acceleration or install an OpenCL driver.</source>
+        <translation>Nenhum dispositivo OpenCL encontrado: o ParPar falharia e a publicação seria abortada. Desative a aceleração por GPU ou instale um controlador OpenCL.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>The selected executable is unavailable. Select an installed tool or Automatic.</source>
         <translation>O executável selecionado não está disponível. Escolha uma ferramenta instalada ou Automático.</translation>
     </message>
@@ -5232,18 +5245,28 @@ Perfil: %2</translation>
     <message>
         <location line="+4"/>
         <location line="+6"/>
-        <location line="+17"/>
-        <location line="+7"/>
+        <location line="+21"/>
+        <location line="+9"/>
         <source>The executable could not be checked.</source>
         <translation>Não foi possível verificar o executável.</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+13"/>
+        <source>No OpenCL device is installed on this machine.</source>
+        <translation>Não há nenhum dispositivo OpenCL instalado nesta máquina.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>OpenCL is installed but reports no GPU; enter a device ID from the tooltip to use another kind of device.</source>
+        <translation>O OpenCL está instalado mas não indica nenhuma GPU; introduza um identificador de dispositivo a partir da dica para usar outro tipo de dispositivo.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
         <source>GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered.</source>
         <translation>Os detalhes da GPU estão na dica do seletor; também é possível informar um nome ou um ID plataforma:dispositivo.</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+9"/>
         <source>Estimate unavailable: some source sizes could not be read.</source>
         <translation>Estimativa indisponível: não foi possível ler alguns tamanhos de origem.</translation>
     </message>
@@ -5284,7 +5307,7 @@ Perfil: %2</translation>
         <translation>Esta prévia usa o padrão global; o post atual tem sua própria redundância.</translation>
     </message>
     <message>
-        <location line="-320"/>
+        <location line="-344"/>
         <source>Save</source>
         <translation>Guardar</translation>
     </message>
@@ -5292,6 +5315,30 @@ Perfil: %2</translation>
         <location line="+1"/>
         <source>Cancel</source>
         <translation>Cancelar</translation>
+    </message>
+    <message>
+        <source>Find OpenCL devices</source>
+        <translation>Procurar dispositivos OpenCL</translation>
+    </message>
+    <message>
+        <source>Requested block size</source>
+        <translation>Tamanho de bloco pedido</translation>
+    </message>
+    <message>
+        <source>MultiPar may adjust the requested block size to the source files and block-count limit. It is not saved as PAR2_BLOCK_SIZE.</source>
+        <translation>O MultiPar pode ajustar o tamanho pedido aos ficheiros de origem e ao limite de blocos. Este valor não é guardado como PAR2_BLOCK_SIZE.</translation>
+    </message>
+    <message>
+        <source>Checking OpenCL devices. Wait for the result or disable GPU acceleration.</source>
+        <translation>A verificar os dispositivos OpenCL. Aguarde o resultado ou desative a aceleração GPU.</translation>
+    </message>
+    <message>
+        <source>OpenCL could not be checked. Check the executable and OpenCL runtime, retry detection, or disable GPU acceleration.</source>
+        <translation>Não foi possível verificar o OpenCL. Verifique o executável e o ambiente OpenCL, repita a deteção ou desative a aceleração GPU.</translation>
+    </message>
+    <message>
+        <source>OpenCL devices are available without a physical GPU. CPU devices such as OpenCLOn12 can be selected.</source>
+        <translation>Existem dispositivos OpenCL disponíveis sem GPU física. Pode selecionar dispositivos CPU, como o OpenCLOn12.</translation>
     </message>
 </context>
 <context>
