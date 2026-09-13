@@ -343,6 +343,10 @@ RAR_SIZE = 42
 ## par2 redundancy percentage (0 by default meaning NO par2 generation)
 PAR2_PCT = 8
 
+## Optional tool type, including executables with a custom name; absence keeps historical detection.
+#PAR2_TOOL = auto
+## auto | parpar | par2cmdline | multipar
+
 ## par2 (or alternative) absolute file path
 ## this is only useful if you compile from source (as par2 is included on Windows and the AppImage)
 ## or if you wish to use an alternative to par2 (for exemple Multipar on Windows)

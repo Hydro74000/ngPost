@@ -8,6 +8,7 @@
 #include <QDirIterator>
 #include <QDoubleSpinBox>
 #include <QFileDialog>
+#include <QEvent>
 #include <QFormLayout>
 #include <QFutureWatcher>
 #include <QLabel>
@@ -17,6 +18,7 @@
 #include <QRegularExpression>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScreen>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QSpinBox>
@@ -90,11 +92,24 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     setWindowTitle(tr("PAR2 Settings"));
     setObjectName(QStringLiteral("par2SettingsDialog"));
     resize(760, 520);
-    auto *outer = new QVBoxLayout(this);
+    auto *dialogLayout = new QVBoxLayout(this);
+    // The entire form must scroll on small screens/high DPI. Scrolling only
+    // Advanced leaves the fixed controls taller than a 720p desktop at 200%.
+    auto *settingsScroll = new QScrollArea(this);
+    settingsScroll->setObjectName(QStringLiteral("par2SettingsScroll"));
+    settingsScroll->setWidgetResizable(true);
+    settingsScroll->setFrameShape(QFrame::NoFrame);
+    auto *contents = new QWidget(settingsScroll);
+    settingsScroll->setWidget(contents);
+    dialogLayout->addWidget(settingsScroll, 1);
+    auto *outer = new QVBoxLayout(contents);
+    outer->setSizeConstraint(QLayout::SetMinimumSize);
+    outer->setContentsMargins(0, 0, 0, 0);
     auto *intro = new QLabel(tr("Global settings for future posts. Each post can override the redundancy percentage; queued posts keep their settings."), this);
     intro->setWordWrap(true);
     outer->addWidget(intro);
     auto *form = new QFormLayout;
+    form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     outer->addLayout(form);
     _tool = new QComboBox(this);
     _tool->setObjectName(QStringLiteral("par2Tool"));
@@ -139,8 +154,10 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     form->addRow(tr("Recovery volumes:"), _volumes);
     _volumeMiB = new QDoubleSpinBox(this);
     _volumeMiB->setObjectName(QStringLiteral("par2VolumeMiB"));
-    _volumeMiB->setDecimals(6);
-    _volumeMiB->setRange(0.000004, 1048576);
+    // Six decimals of MiB can round an existing byte target down by one byte,
+    // which loses a whole recovery block when MultiPar converts it to /lr.
+    _volumeMiB->setDecimals(9);
+    _volumeMiB->setRange(4.0 / 1048576, 1048576);
     _volumeMiB->setSuffix(QStringLiteral(" MiB"));
     form->addRow(tr("Target size:"), sliderRow(_volumeMiB, this));
     _distribution = new QComboBox(this);
@@ -154,6 +171,24 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     auto *volumeHelp = new QLabel(tr("Sizes are targets for recovery data. PAR2 metadata can make the final files larger. par2cmdline's native limit follows the largest source file."), this);
     volumeHelp->setWordWrap(true);
     form->addRow(volumeHelp);
+    _form = form;
+
+    _gpu = new QCheckBox(tr("Enable GPU acceleration"), this);
+    _gpu->setObjectName(QStringLiteral("par2Gpu"));
+    form->addRow(_gpu);
+    _deviceRow = new QHBoxLayout;
+    _device = new QComboBox(this);
+    _device->setObjectName(QStringLiteral("par2GpuDevice"));
+    _device->setEditable(true);
+    // The tool's own wording for "let OpenCL pick": a bare ":" in the list said
+    // nothing to anyone. The value still travels in the item data.
+    _device->addItem(tr("Automatic (default device)"), QStringLiteral(":"));
+    auto *find = _findGpuButton = new QPushButton(tr("Find GPUs"), this);
+    find->setObjectName(QStringLiteral("par2FindGpus"));
+    _deviceRow->addWidget(_device, 1);
+    _deviceRow->addWidget(find);
+    form->addRow(tr("OpenCL device:"), _deviceRow);
+    connect(find, &QPushButton::clicked, this, &Par2SettingsDialog::findGpus);
 
     auto *advancedButton = new QToolButton(this);
     advancedButton->setText(tr("Advanced"));
@@ -161,16 +196,15 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     advancedButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     advancedButton->setArrowType(Qt::RightArrow);
     outer->addWidget(advancedButton);
-    auto *advancedScroll = new QScrollArea(this);
-    advancedScroll->setWidgetResizable(true);
-    advancedScroll->setMinimumHeight(240);
-    auto *advanced = new QWidget(advancedScroll);
+    auto *advanced = new QWidget(contents);
     auto *details = new QFormLayout(advanced);
-    advancedScroll->setWidget(advanced);
-    outer->addWidget(advancedScroll, 1);
-    advancedScroll->hide();
-    connect(advancedButton, &QToolButton::toggled, this, [advancedScroll, advancedButton](bool open) {
-        advancedScroll->setVisible(open);
+    details->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    details->setContentsMargins(0, 0, 0, 0);
+    outer->addWidget(advanced);
+    outer->addStretch();
+    advanced->hide();
+    connect(advancedButton, &QToolButton::toggled, this, [advanced, advancedButton](bool open) {
+        advanced->setVisible(open);
         advancedButton->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
     });
     _blocks = new QComboBox(this);
@@ -197,19 +231,6 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     _memory->setSpecialValueText(tr("Automatic"));
     _memoryLabel = new QLabel(this);
     details->addRow(_memoryLabel, _memory);
-    _gpu = new QCheckBox(tr("Enable GPU acceleration"), this);
-    _gpu->setObjectName(QStringLiteral("par2Gpu"));
-    details->addRow(_gpu);
-    auto *deviceRow = new QHBoxLayout;
-    _device = new QComboBox(this);
-    _device->setObjectName(QStringLiteral("par2GpuDevice"));
-    _device->setEditable(true);
-    _device->addItem(QStringLiteral(":"));
-    auto *find = new QPushButton(tr("Find GPUs"), this);
-    deviceRow->addWidget(_device, 1);
-    deviceRow->addWidget(find);
-    details->addRow(tr("ParPar OpenCL device:"), deviceRow);
-    connect(find, &QPushButton::clicked, this, &Par2SettingsDialog::findGpus);
     _custom = new QCheckBox(tr("Use custom arguments"), this);
     _custom->setObjectName(QStringLiteral("par2Custom"));
     details->addRow(_custom);
@@ -230,12 +251,14 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     _preview->setObjectName(QStringLiteral("par2Estimate"));
     _preview->setWordWrap(true);
     _preview->setTextFormat(Qt::PlainText);
-    outer->addWidget(_preview);
+    dialogLayout->addWidget(_preview);
     _status = new QLabel(this);
     _status->setWordWrap(true);
-    outer->addWidget(_status);
+    dialogLayout->addWidget(_status);
     _buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, this);
-    outer->addWidget(_buttons);
+    _buttons->button(QDialogButtonBox::Save)->setText(tr("Save"));
+    _buttons->button(QDialogButtonBox::Cancel)->setText(tr("Cancel"));
+    dialogLayout->addWidget(_buttons);
     connect(_buttons, &QDialogButtonBox::accepted, this, &Par2SettingsDialog::accept);
     connect(_buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
@@ -250,15 +273,22 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     _threads->setValue(_initial.threads);
     _memory->setValue(_initial.memory);
     _gpu->setChecked(_initial.gpu);
-    if (!_initial.device.isEmpty()) _device->setCurrentText(_initial.device);
+    if (!_initial.device.isEmpty()) {
+        const int known = _device->findData(_initial.device);
+        if (known >= 0)
+            _device->setCurrentIndex(known);
+        else
+            _device->setCurrentText(_initial.device);
+    }
     _custom->setChecked(_initial.custom);
     _arguments->setPlainText(ngPost->_par2Args);
     if (_initial.custom) advancedButton->setChecked(true);
     if (effectiveTool() == par2::Tool::MultiPar) {
         _threads->setMaximum(32);
         _memory->setMaximum(7);
-        _volumeMiB->setMaximum(2047.999999);
     }
+    if (effectiveTool() == par2::Tool::Par2cmdline)
+        _volumeCount->setMaximum(31);
     for (auto *combo : {_blocks, _volumes, _distribution})
         connect(combo, &QComboBox::currentIndexChanged, this, &Par2SettingsDialog::changed);
     connect(_device, &QComboBox::currentTextChanged, this, &Par2SettingsDialog::changed);
@@ -266,7 +296,11 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
         connect(spin, &QSpinBox::valueChanged, this, &Par2SettingsDialog::changed);
     for (auto *spin : {_blockBytes, _volumeMiB})
         connect(spin, &QDoubleSpinBox::valueChanged, this, &Par2SettingsDialog::changed);
-    connect(_gpu, &QCheckBox::toggled, this, &Par2SettingsDialog::changed);
+    connect(_gpu, &QCheckBox::toggled, this, [this](bool enabled) {
+        if (enabled && !_loading && effectiveTool() == par2::Tool::ParPar && _device->count() <= 1)
+            findGpus();
+        changed();
+    });
     connect(_custom, &QCheckBox::toggled, this, [this](bool custom) {
         if (custom && !_loading && _arguments->toPlainText().isEmpty())
             _arguments->setPlainText(par2::joinArguments(settings().arguments(uint(_percentage->value()))));
@@ -287,11 +321,13 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     updateControls();
     probeTool();
     if (!files.isEmpty()) {
+        _scanning = true;
         _preview->setText(tr("Reading source sizes…"));
         auto *watcher = new QFutureWatcher<ScanResult>(this);
         auto cancel = _cancelScan;
         connect(watcher, &QFutureWatcher<ScanResult>::finished, this, [this, watcher] {
             auto result = watcher->result();
+            _scanning = false;
             _sizes = result.sizes;
             _scanIncomplete = result.incomplete;
             watcher->deleteLater();
@@ -317,6 +353,21 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
             return result;
         }));
     }
+    _layoutReady = true;
+    if (screen()) resize(size().boundedTo(screen()->availableGeometry().size() * 0.9));
+}
+bool Par2SettingsDialog::event(QEvent *event)
+{
+    const bool handled = QDialog::event(event);
+    if (_layoutReady && (event->type() == QEvent::LayoutRequest || event->type() == QEvent::Resize || event->type() == QEvent::Show))
+        for (auto *label : findChildren<QLabel *>())
+            if (label->wordWrap()) {
+                const int width = qMax(1, label->contentsRect().width() - 2 * label->margin());
+                const int height = label->text().isEmpty() ? 0
+                    : label->fontMetrics().boundingRect(QRect(0, 0, width, INT_MAX), Qt::TextWordWrap, label->text()).height();
+                label->setMinimumHeight(height + 2 * label->margin());
+            }
+    return handled;
 }
 Par2SettingsDialog::~Par2SettingsDialog()
 {
@@ -344,6 +395,8 @@ par2::Settings Par2SettingsDialog::settings() const
     s.memory = _memory->value();
     s.gpu = _gpu->isChecked();
     s.device = _device->currentText();
+    if (_device->currentIndex() >= 0 && s.device == _device->itemText(_device->currentIndex())
+        && !_device->currentData().toString().isEmpty()) s.device = _device->currentData().toString();
     s.custom = _custom->isChecked();
     s.originalArguments = _arguments->toPlainText();
     return s;
@@ -377,6 +430,9 @@ void Par2SettingsDialog::updateControls()
     _memoryLabel->setText(multi ? tr("Memory (eighths of free RAM):") : tr("Memory (MiB):"));
     _gpu->setEnabled(!manual && (!cmd || _gpu->isChecked()));
     _device->setEnabled(!manual && tool == par2::Tool::ParPar && _gpu->isChecked());
+    _findGpuButton->setEnabled(_device->isEnabled());
+    _form->setRowVisible(_gpu, !cmd || _gpu->isChecked());
+    _form->setRowVisible(_deviceRow, tool == par2::Tool::ParPar);
     allow(_volumes, int(par2::Volumes::Size), !cmd);
     allow(_distribution, int(par2::Distribution::Equal), !cmd);
     allow(_distribution, int(par2::Distribution::Uniform), !multi && !(cmd && volumes == par2::Volumes::LargestInput));
@@ -408,16 +464,22 @@ void Par2SettingsDialog::selectTool()
     if (!_custom->isChecked()) _memory->setValue(0);
     _threads->setMaximum(multi ? 32 : INT_MAX);
     _memory->setMaximum(multi ? 7 : 1048576);
-    _volumeMiB->setMaximum(multi ? 2047.999999 : 1048576);
+    // par2cmdline refuses more than 31 recovery files; the spin box clamps the
+    // value it already holds rather than letting Save fail on it later.
+    _volumeCount->setMaximum(effectiveTool() == par2::Tool::Par2cmdline ? 31 : 65535);
     _loading = false;
     changed();
     probeTool();
+    if (_gpu->isChecked() && effectiveTool() == par2::Tool::ParPar && _device->count() <= 1)
+        findGpus();
 }
 void Par2SettingsDialog::probeTool()
 {
     const auto path = _path->text();
-    if (path == _probedPath && _probe) return;
+    const auto tool = effectiveTool();
+    if (path == _probedPath && tool == _probedTool && _probe) return;
     _probedPath = path;
+    _probedTool = tool;
     if (_probe) {
         _probe->disconnect(this);
         if (_probe->state() == QProcess::NotRunning) _probe->deleteLater();
@@ -431,17 +493,20 @@ void Par2SettingsDialog::probeTool()
     _threadsSupported = true;
     _toolStatus->setText(tr("Checking executable…"));
     auto *process = _probe;
-    connect(process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError) {
+    connect(process, &QProcess::errorOccurred, this, [this, path, tool](QProcess::ProcessError) {
+        if (_path->text() != path || effectiveTool() != tool) return;
         _toolStatus->setText(tr("The executable could not be checked."));
     });
-    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process] {
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process, path, tool] {
+        if (_path->text() != path || effectiveTool() != tool) return;
         const QString output = QString::fromLocal8Bit(process->readAll());
-        _toolStatus->setText(output.trimmed().isEmpty() ? tr("Executable checked.") : output.section(QLatin1Char('\n'), 0, 0).left(200));
-        if (effectiveTool() == par2::Tool::Par2cmdline) _threadsSupported = output.contains(QStringLiteral("-t"));
+        _toolStatus->setText(output.trimmed().isEmpty() || process->exitStatus() != QProcess::NormalExit
+            ? tr("The executable could not be checked.") : output.section(QLatin1Char('\n'), 0, 0).left(200));
+        if (tool == par2::Tool::Par2cmdline) _threadsSupported = output.contains(QStringLiteral("-t"));
         updateControls();
     });
     QTimer::singleShot(5000, process, [process] { if (process->state() != QProcess::NotRunning) process->kill(); });
-    process->start(path, effectiveTool() == par2::Tool::MultiPar ? QStringList{} : QStringList{QStringLiteral("--help")});
+    process->start(path, tool == par2::Tool::MultiPar ? QStringList{} : QStringList{QStringLiteral("--help")});
 }
 void Par2SettingsDialog::findGpus()
 {
@@ -449,24 +514,33 @@ void Par2SettingsDialog::findGpus()
     if (_gpuProbe) _gpuProbe->deleteLater();
     _gpuProbe = new QProcess(this);
     auto *process = _gpuProbe;
+    const auto path = _path->text();
     process->setProcessChannelMode(QProcess::MergedChannels);
-    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process] {
-        const QString text = QString::fromLocal8Bit(process->readAll());
-        _device->setToolTip(text);
-        // Keep manual IDs/names usable even for tool versions with a different listing format.
-        QRegularExpression ids(QStringLiteral("\\b\\d+:\\d+\\b"));
-        auto matches = ids.globalMatch(text);
-        while (matches.hasNext()) {
-            const auto id = matches.next().captured();
-            if (_device->findText(id) < 0) _device->addItem(id);
+    connect(process, &QProcess::errorOccurred, this, [this, path](QProcess::ProcessError) {
+        if (_path->text() == path && effectiveTool() == par2::Tool::ParPar)
+            _toolStatus->setText(tr("The executable could not be checked."));
+    });
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [this, process, path] {
+        if (_path->text() != path || effectiveTool() != par2::Tool::ParPar) return;
+        const auto output = process->readAll();
+        _device->setToolTip(QString::fromUtf8(output));
+        if (process->exitStatus() != QProcess::NormalExit || process->exitCode() != 0) {
+            _toolStatus->setText(tr("The executable could not be checked."));
+            return;
         }
+        // The text listing filters devices before numbering them. JSON keeps
+        // original platform/device indices, including CPUs and unavailable GPUs.
+        for (const auto &device : par2::openClDevices(output))
+            if (_device->findData(device.id) < 0)
+                _device->addItem(QString("%1 (%2)").arg(device.name, device.id), device.id);
         _toolStatus->setText(tr("GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered."));
     });
     QTimer::singleShot(5000, process, [process] { if (process->state() != QProcess::NotRunning) process->kill(); });
-    process->start(_path->text(), {QStringLiteral("--opencl-list")});
+    process->start(path, {QStringLiteral("--opencl-list"), QStringLiteral("--json")});
 }
 void Par2SettingsDialog::updatePreview()
 {
+    if (_scanning) { _preview->setText(tr("Reading source sizes…")); return; }
     if (_scanIncomplete) { _preview->setText(tr("Estimate unavailable: some source sizes could not be read.")); return; }
     if (_sizes.isEmpty()) { _preview->setText(tr("Prepare a post to display an estimate.")); return; }
     auto sizes = _sizes;

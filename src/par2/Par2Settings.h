@@ -16,6 +16,8 @@ bool parseTool(const QString &name, Tool &tool);
 Tool detectTool(const QString &path);
 QString findExecutable(Tool tool);
 QString joinArguments(const QStringList &args);
+struct Device { QString id; QString name; };
+QVector<Device> openClDevices(const QByteArray &output);
 
 struct Estimate {
     qint64 sourceBytes = 0;

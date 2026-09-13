@@ -30,6 +30,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QPlainTextEdit>
 #include <QAction>
 #include <QHeaderView>
 #include <QMenu>
@@ -39,6 +40,10 @@
 #include <QTabWidget>
 #include <QTabBar>
 #include <QDateTime>
+#include <QTranslator>
+#include <QScreen>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <QDirIterator>
 #include <QRegularExpression>
 #include <QTableWidget>
@@ -71,8 +76,13 @@ class TestMainWindow : public QObject
 private slots:
     void post_all_tabs_submits_only_prepared_posts();
     void par2_dialog_defaults_overrides_and_cancel();
+    void par2_dialog_preserves_exact_volume_bytes();
+    void par2_dialog_detects_real_gpu();
+    void sizing_dialogs_translations_fit_data();
+    void sizing_dialogs_translations_fit();
     void rar_limit_value_persists_and_zero_is_rejected();
     void queued_post_keeps_rar_and_par2_settings();
+    void queued_post_keeps_rar_and_par2_settings_data();
     void post_all_continues_after_overwrite_declined_and_auto_close();
     //! The log pane must not grow for the life of the process. It is fed from
     //! the posting threads, several lines per article at debug 2, and nothing
@@ -2231,7 +2241,27 @@ void TestMainWindow::no_log_call_passes_html_markup()
                                 .arg(offenders.join(QLatin1Char('\n')))));
 }
 
-QTEST_MAIN(TestMainWindow)
+int main(int argc, char **argv)
+{
+    QApplication app(argc, argv);
+    if (QFileInfo(app.applicationFilePath()).fileName().startsWith("ngpost-recording-")) {
+        const auto args = app.arguments().mid(1);
+        if (args.isEmpty() || args.contains("--help")) return 0;
+        QFile recorded(app.applicationFilePath() + ".args");
+        if (!recorded.open(QIODevice::WriteOnly)) return 1;
+        recorded.write(args.join('\n').toUtf8());
+        recorded.close();
+        for (const auto &arg : args) {
+            if (!arg.endsWith(".rar") && !arg.endsWith(".par2")) continue;
+            QFile output(arg);
+            if (!output.open(QIODevice::WriteOnly)) return 2;
+            return output.write(QByteArray(8192, 'x')) == 8192 ? 0 : 3;
+        }
+        return 4;
+    }
+    TestMainWindow test;
+    return QTest::qExec(&test, argc, argv);
+}
 #include "tst_MainWindow.moc"
 
 void TestMainWindow::post_all_tabs_submits_only_prepared_posts()
@@ -2317,10 +2347,13 @@ void TestMainWindow::par2_dialog_defaults_overrides_and_cancel()
     auto *second = window->addNewQuickTab(tabs->count() - 1);
     auto *firstPct = first->findChild<QSpinBox *>("redundancySB");
     auto *secondPct = second->findChild<QSpinBox *>("redundancySB");
+    auto *autoPct = window->findChild<AutoPostWidget *>()->findChild<QSpinBox *>("redundancySB");
+    QCOMPARE(autoPct->value(), -1);
     QCOMPARE(firstPct->value(), -1);
     firstPct->setValue(23);
     {
         Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+        QVERIFY(dialog.findChild<QLabel *>("par2Estimate")->text().contains("Prepare a post"));
         dialog.findChild<QSpinBox *>("par2DefaultPct")->setValue(49);
         dialog.reject();
     }
@@ -2339,9 +2372,10 @@ void TestMainWindow::par2_dialog_defaults_overrides_and_cancel()
     QCOMPARE(firstPct->value(), 23);
     QCOMPARE(secondPct->value(), -1);
     QVERIFY(secondPct->text().contains("15"));
+    QVERIFY(autoPct->text().contains("15"));
     QVERIFY(QMetaObject::invokeMethod(window, "onSaveConfig", Qt::DirectConnection));
     QFile config(PathHelper::configFilePath());
-    QVERIFY(config.open(QIODevice::ReadOnly));
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
     const auto saved = config.readAll(); config.close();
     QVERIFY(saved.contains("PAR2_PCT = 15\n"));
     QVERIFY(saved.contains("PAR2_TOOL = par2cmdline\n"));
@@ -2349,8 +2383,141 @@ void TestMainWindow::par2_dialog_defaults_overrides_and_cancel()
         Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
         dialog.accept(); // no change must not rewrite arguments or configuration
     }
-    QVERIFY(config.open(QIODevice::ReadOnly));
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
     QCOMPARE(config.readAll(), saved);
+    config.close();
+    autoPct->setValue(31);
+    {
+        Par2SettingsDialog dialog(&ngPost, {QFileInfo(sandbox.rootPath() + "/missing")}, false, false, window);
+        QTRY_VERIFY(dialog.findChild<QLabel *>("par2Estimate")->text().contains("could not be read"));
+        dialog.findChild<QSpinBox *>("par2DefaultPct")->setValue(19);
+        dialog.accept();
+    }
+    QCOMPARE(autoPct->value(), 31);
+    QCOMPARE(firstPct->value(), 23);
+    QVERIFY(secondPct->text().contains("19"));
+}
+
+void TestMainWindow::par2_dialog_preserves_exact_volume_bytes()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = {arg0.data(), nullptr};
+    NgPost ngPost(argc, argv);
+    QString error;
+    const auto conf = QString("GROUPS = alt.binaries.test\nPAR2_PCT = 8\nPAR2_TOOL = parpar\n"
+                              "PAR2_PATH = %1\nPAR2_ARGS = -r8% -s32B --max-input-slices=32B -p<32B\n")
+                          .arg(QCoreApplication::applicationFilePath());
+    auto *window = bootWindow(ngPost, conf, &error);
+    QVERIFY2(window, qPrintable(error));
+    Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+    dialog.findChild<QSpinBox *>("par2DefaultPct")->setValue(12);
+    dialog.accept();
+    QCOMPARE(dialog.result(), int(QDialog::Accepted));
+    QFile config(PathHelper::configFilePath());
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
+    QVERIFY(config.readAll().contains("PAR2_ARGS = -r12% -s32B --max-input-slices=32B -p<32B\n"));
+}
+
+void TestMainWindow::par2_dialog_detects_real_gpu()
+{
+    const auto deviceId = qEnvironmentVariable("NGPOST_TEST_OPENCL_DEVICE");
+    if (deviceId.isEmpty()) QSKIP("Set NGPOST_TEST_OPENCL_DEVICE to test a real OpenCL GPU.");
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = {arg0.data(), nullptr};
+    NgPost ngPost(argc, argv);
+    const auto executable = par2::findExecutable(par2::Tool::ParPar);
+    QVERIFY(!executable.isEmpty());
+    QString error;
+    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
+                                             "PAR2_PCT = 10\nPAR2_ARGS = -s1M --auto-slice-size -r10%\n").arg(executable), &error);
+    QVERIFY2(window, qPrintable(error));
+    Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+    dialog.findChild<QCheckBox *>("par2Gpu")->setChecked(true);
+    auto *devices = dialog.findChild<QComboBox *>("par2GpuDevice");
+    dialog.findChild<QPushButton *>("par2FindGpus")->click();
+    QTRY_VERIFY_WITH_TIMEOUT(devices->findData(deviceId) >= 0, 10000);
+    devices->setCurrentIndex(devices->findData(deviceId));
+    QVERIFY(!devices->currentText().isEmpty());
+    dialog.accept();
+    QCOMPARE(dialog.result(), int(QDialog::Accepted));
+    QFile config(PathHelper::configFilePath());
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
+    const auto saved = config.readAll();
+    QVERIFY(saved.contains("--opencl-process=100%"));
+    QVERIFY(saved.contains("--opencl-device " + deviceId.toUtf8()));
+}
+
+void TestMainWindow::sizing_dialogs_translations_fit_data()
+{
+    QTest::addColumn<QString>("language");
+    for (const auto *language : {"en", "fr", "de", "es", "nl", "pt", "zh"})
+        QTest::newRow(language) << QString::fromLatin1(language);
+}
+
+void TestMainWindow::sizing_dialogs_translations_fit()
+{
+    QFETCH(QString, language);
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = {arg0.data(), nullptr};
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nRAR_SIZE = 250\nRAR_MAX = 99\n"
+                                             "PAR2_TOOL = par2cmdline\nPAR2_PATH = %1\nPAR2_PCT = 10\n")
+                                         .arg(QCoreApplication::applicationFilePath()), &error);
+    QVERIFY2(window, qPrintable(error));
+    QTranslator translator;
+    QVERIFY(translator.load(":/lang/ngPost_" + language + ".qm"));
+    qApp->installTranslator(&translator);
+    auto inspect = [&](QDialog &dialog, const QString &name) {
+        dialog.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+        if (name.startsWith("par2")) {
+            const auto available = dialog.screen()->availableGeometry().size();
+            QTRY_VERIFY(dialog.frameGeometry().height() <= available.height());
+            QTRY_VERIFY(dialog.frameGeometry().width() <= available.width());
+            for (auto *field : dialog.findChildren<QWidget *>()) {
+                if (!field->isVisible()) continue;
+                // Embedded editors use their parent's frame and deliberately
+                // have less height than a standalone QLineEdit's size hint.
+                if (qobject_cast<QAbstractSpinBox *>(field->parentWidget())
+                    || qobject_cast<QComboBox *>(field->parentWidget())) continue;
+                if (qobject_cast<QComboBox *>(field) || qobject_cast<QAbstractSpinBox *>(field)
+                    || qobject_cast<QLineEdit *>(field) || qobject_cast<QPlainTextEdit *>(field))
+                    QTRY_VERIFY2(field->height() >= field->minimumSizeHint().height(), qPrintable(field->objectName()));
+            }
+        }
+        for (auto *label : dialog.findChildren<QLabel *>()) {
+            if (!label->wordWrap() || !label->isVisible()) continue;
+            QTRY_VERIFY2(label->height() >= label->heightForWidth(label->width()), qPrintable(label->text()));
+        }
+        for (auto *box : dialog.findChildren<QDialogButtonBox *>())
+            for (auto *button : box->buttons()) {
+                QVERIFY(button->isVisible());
+                QVERIFY(dialog.rect().contains(QRect(button->mapTo(&dialog, QPoint()), button->size())));
+            }
+        const auto directory = qEnvironmentVariable("NGPOST_TEST_SCREENSHOT_DIR");
+        if (!directory.isEmpty()) {
+            QVERIFY(QDir().mkpath(directory));
+            QVERIFY(dialog.grab().save(directory + '/' + name + '-' + language + ".png"));
+        }
+    };
+    CompressionSettingsDialog rarDialog(&ngPost, window);
+    inspect(rarDialog, "rar");
+    rarDialog.reject();
+    Par2SettingsDialog parDialog(&ngPost, {}, false, false, window);
+    inspect(parDialog, "par2");
+    parDialog.findChild<QToolButton *>()->setChecked(true);
+    inspect(parDialog, "par2-advanced");
+    auto *scroll = parDialog.findChild<QScrollArea *>("par2SettingsScroll");
+    scroll->verticalScrollBar()->setValue(scroll->verticalScrollBar()->maximum());
+    inspect(parDialog, "par2-advanced-bottom");
+    parDialog.reject();
 }
 
 void TestMainWindow::rar_limit_value_persists_and_zero_is_rejected()
@@ -2371,6 +2538,9 @@ void TestMainWindow::rar_limit_value_persists_and_zero_is_rejected()
         QCOMPARE(maximum->minimum(), 1);
         maximum->setValue(42);
         QVERIFY(dialog.findChild<QLabel *>("volumeHelpLabel")->text().contains("priority"));
+        dialog.show();
+        auto *help = dialog.findChild<QLabel *>("volumeHelpLabel");
+        QTRY_VERIFY(help->height() >= help->heightForWidth(help->width()));
         dialog.accept();
         CompressionSettingsDialog again(&ngPost, window);
         QCOMPARE(again.findChild<QSpinBox *>("rarMaxSB")->value(), 42);
@@ -2378,8 +2548,15 @@ void TestMainWindow::rar_limit_value_persists_and_zero_is_rejected()
         QVERIFY(!again.findChild<QSpinBox *>("rarMaxSB")->isEnabled());
         again.accept();
         QFile file(PathHelper::configFilePath());
-        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
         QVERIFY(file.readAll().contains("#RAR_MAX = 42\n"));
+    }
+    {
+        NgPost restarted(argc, argv);
+        QVERIFY(restarted.parseDefaultConfig().isEmpty());
+        CompressionSettingsDialog dialog(&restarted);
+        QCOMPARE(dialog.findChild<QSpinBox *>("rarMaxSB")->value(), 42);
+        QVERIFY(!dialog.findChild<QCheckBox *>("rarMaxCB")->isChecked());
     }
     QFile file(PathHelper::configFilePath());
     QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
@@ -2388,24 +2565,41 @@ void TestMainWindow::rar_limit_value_persists_and_zero_is_rejected()
     QVERIFY(invalid.parseDefaultConfig().contains("RAR_MAX"));
 }
 
+void TestMainWindow::queued_post_keeps_rar_and_par2_settings_data()
+{
+    QTest::addColumn<int>("requestedSize");
+    QTest::addColumn<bool>("limited");
+    QTest::addColumn<int>("maximum");
+    QTest::addColumn<qint64>("sourceSize");
+    QTest::addColumn<QString>("volumeArgument");
+    QTest::addColumn<int>("increasedSize");
+    QTest::newRow("fixed250") << 250 << false << 99 << 12LL * 1048576 << QString("-v250m") << 0;
+    QTest::newRow("under-limit") << 250 << true << 99 << 12LL * 1048576 << QString("-v250m") << 0;
+    QTest::newRow("increased") << 1 << true << 2 << 12LL * 1048576 << QString("-v7m") << 7;
+    QTest::newRow("unsplit") << 0 << false << 2 << 12LL * 1048576 << QString() << 0;
+    QTest::newRow("automatic") << 0 << true << 2 << 12LL * 1048576 << QString("-v7m") << 7;
+    QTest::newRow("rounding-below") << 1 << true << 2 << 3LL * 1048576 - 1 << QString("-v1m") << 0;
+    QTest::newRow("rounding-above") << 1 << true << 2 << 3LL * 1048576 << QString("-v2m") << 2;
+}
+
 void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
 {
-#ifdef Q_OS_WIN
-    QSKIP("The recording executables use a POSIX Python shebang.");
-#else
+    QFETCH(int, requestedSize);
+    QFETCH(bool, limited);
+    QFETCH(int, maximum);
+    QFETCH(qint64, sourceSize);
+    QFETCH(QString, volumeArgument);
+    QFETCH(int, increasedSize);
     HomeSandbox sandbox;
     const auto root = sandbox.rootPath();
     auto helper = [&](const QString &name) {
-        const auto path = root + '/' + name;
-        QFile script(path);
-        if (!script.open(QIODevice::WriteOnly)) return QString();
-        script.write("#!/usr/bin/env python3\nimport sys, pathlib\n"
-                     "if '--help' in sys.argv: print('test tool -t'); sys.exit(0)\n"
-                     "pathlib.Path(__file__ + '.args').write_text('\\n'.join(sys.argv[1:]))\n"
-                     "output = next(a for a in sys.argv[1:] if a.endswith(('.rar', '.par2')))\n"
-                     "pathlib.Path(output).write_bytes(b'x' * 8192)\n");
-        script.close();
-        if (!script.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner)) return QString();
+        auto path = root + "/ngpost-recording-" + name;
+#ifdef Q_OS_WIN
+        path += ".exe";
+#endif
+        // A native executable exercises QProcess quoting and Unicode paths on
+        // Windows as well as Unix. Its small recording mode lives in main().
+        if (!QFile::copy(QCoreApplication::applicationFilePath(), path)) return QString();
         return path;
     };
     const auto rar = helper(QString::fromUtf8("archive helper é"));
@@ -2417,9 +2611,9 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
     NgPost ngPost(argc, argv);
     QString err;
     const auto conf = QString("GROUPS = alt.binaries.test\nthread = 1\nTMP_DIR = %1\nnzbPath = %1\n"
-                              "RAR_PATH = %2\nRAR_SIZE = 1\nRAR_MAX = 2\nPAR2_PATH = %3\nPAR2_TOOL = par2cmdline\n"
+                              "RAR_PATH = %2\nRAR_SIZE = %5\n%6RAR_MAX = %7\nPAR2_PATH = %3\nPAR2_TOOL = par2cmdline\n"
                               "PAR2_PCT = 8\nPAR2_ARGS = c -r8 -s4096\n[server]\nhost = 127.0.0.1\nport = %4\nssl = false\nconnection = 1\n")
-                          .arg(root, rar, par).arg(mock.port());
+                          .arg(root, rar, par).arg(mock.port()).arg(requestedSize).arg(limited ? "" : "#").arg(maximum);
     auto *window = bootWindow(ngPost, conf, &err);
     QVERIFY2(window, qPrintable(err));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
@@ -2427,7 +2621,7 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
     auto *second = window->addNewQuickTab(tabs->count() - 1);
     QFile firstFile(root + "/first.bin"), secondFile(root + "/second.bin");
     QVERIFY(firstFile.open(QIODevice::WriteOnly)); firstFile.write(QByteArray(500000, 'a')); firstFile.close();
-    QVERIFY(secondFile.open(QIODevice::WriteOnly)); QVERIFY(secondFile.resize(12 * 1048576)); secondFile.close();
+    QVERIFY(secondFile.open(QIODevice::WriteOnly)); QVERIFY(secondFile.resize(sourceSize)); secondFile.close();
     first->addPath(firstFile.fileName(), 0);
     second->addPath(secondFile.fileName(), 0);
     second->findChild<QCheckBox *>("compressCB")->setChecked(true);
@@ -2443,7 +2637,7 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
         Par2SettingsDialog parDialog(&ngPost, {}, false, false, window);
         auto *tool = parDialog.findChild<QComboBox *>("par2Tool");
         tool->setCurrentIndex(tool->findData(int(par2::Tool::ParPar)));
-        parDialog.findChild<QLineEdit *>("par2Path")->setText("/bin/false");
+        parDialog.findChild<QLineEdit *>("par2Path")->setText(QCoreApplication::applicationFilePath());
         parDialog.findChild<QSpinBox *>("par2DefaultPct")->setValue(50);
         parDialog.accept();
         QCOMPARE(parDialog.result(), int(QDialog::Accepted));
@@ -2451,7 +2645,8 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
     QTRY_VERIFY_WITH_TIMEOUT(first->isPostingFinished() && second->isPostingFinished(), 20000);
     QFile rarArgs(rar + ".args"), parArgs(par + ".args");
     QVERIFY(rarArgs.open(QIODevice::ReadOnly));
-    QVERIFY(rarArgs.readAll().split('\n').contains("-v7m"));
+    const auto recordedRar = QString::fromUtf8(rarArgs.readAll()).split('\n').filter(QRegularExpression("^-v"));
+    QCOMPARE(recordedRar, volumeArgument.isEmpty() ? QStringList{} : QStringList{volumeArgument});
     QVERIFY(parArgs.open(QIODevice::ReadOnly));
     const auto recorded = parArgs.readAll().split('\n');
     QVERIFY(recorded.contains("-r17"));
@@ -2460,9 +2655,8 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
     QCOMPARE(mock.receivedArticles().size(), 3);
     bool adjustmentLogged = false;
     for (auto *log : window->findChildren<QTextBrowser *>())
-        adjustmentLogged |= log->toPlainText().contains("increased from 1 MiB to 7 MiB");
-    QVERIFY(adjustmentLogged);
-#endif
+        adjustmentLogged |= log->toPlainText().contains(QString("increased from %1 MiB to %2 MiB").arg(requestedSize).arg(increasedSize));
+    QCOMPARE(adjustmentLogged, increasedSize > 0);
 }
 
 void TestMainWindow::post_all_continues_after_overwrite_declined_and_auto_close()

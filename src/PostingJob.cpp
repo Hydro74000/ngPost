@@ -2606,7 +2606,18 @@ bool PostingJob::_canGenPar2() const
     //2.: check _ is executable
     QFileInfo fi(_par2Path);
     if (!fi.exists() || !fi.isFile() || !fi.isExecutable()) {
-        _error(tr("ERROR: par2 is not available..."));
+        // This aborts the whole post (see the callers), so it has to say which
+        // tool was expected and where to fix it, rather than "not available".
+        if (_par2Path.isEmpty())
+            _error(tr("ERROR: no PAR2 tool is available for %1, so this post is stopped before the "
+                      "transfer.\nInstall it, or set PAR2_PATH / PAR2_TOOL in the configuration "
+                      "(PAR2 Settings in the GUI).")
+                       .arg(par2::toolName(_par2Tool)));
+        else
+            _error(tr("ERROR: the PAR2 tool for %1 is not an executable file, so this post is stopped "
+                      "before the transfer:\n    %2\nFix PAR2_PATH in the configuration (PAR2 Settings "
+                      "in the GUI).")
+                       .arg(par2::toolName(_par2Tool), _par2Path));
         return false;
     }
 

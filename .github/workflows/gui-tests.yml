@@ -93,6 +93,78 @@ jobs:
             tests/gui/**/Testing/**/*.xml
           if-no-files-found: ignore
 
+  gui-macos:
+    name: macOS GUI tests
+    # Qt 6.8.2/qmake links AGL; the macOS 26 SDK no longer ships it.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: '6.8.2'
+          arch: 'clang_64'
+          modules: 'qtcharts'
+          cache: true
+
+      - name: Build QtKeychain from source
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
+                -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
+                -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build /tmp/qtkeychain/build -j"$(sysctl -n hw.ncpu)"
+          cmake --install /tmp/qtkeychain/build
+
+      - name: Compile translations (.ts -> .qm)
+        run: |
+          cd src
+          mkdir -p resources/lang
+          for ts in lang/ngPost_*.ts; do
+            lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
+          done
+
+      - name: Build ngPost (needed by tests' RESOURCES + locateNgPostBinary fallback)
+        run: |
+          cd src
+          qmake ngPost.pro CONFIG+=release
+          make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Build GUI tests
+        run: |
+          cd tests/gui
+          qmake gui.pro CONFIG+=release
+          make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Bundle the pinned PAR2 tools
+        run: |
+          # The dialogs under test probe a PAR2 tool, and the macOS path is the
+          # one with its own hazards: a universal par2, an ad-hoc signature
+          # without which arm64 refuses to execute at all. Exercise it here
+          # rather than at release time only.
+          ./.github/scripts/fetch-par2-tools.sh "$RUNNER_TEMP/par2-tools"
+          echo "$RUNNER_TEMP/par2-tools" >> "$GITHUB_PATH"
+
+      - name: Run GUI tests under offscreen QPA
+        env:
+          QT_QPA_PLATFORM: offscreen
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost.app/Contents/MacOS/ngPost
+        run: |
+          bash .github/scripts/run-qt-tests.sh tests/gui "GUI"
+
+      - name: Upload Test Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gui-test-logs-macos
+          path: |
+            tests/gui/**/*.log
+            tests/gui/**/*.stdout.log
+            tests/gui/**/Testing/**/*.xml
+          if-no-files-found: ignore
+
   gui-windows:
     name: Windows MSVC GUI tests
     runs-on: windows-latest

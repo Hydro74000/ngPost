@@ -7,11 +7,29 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QSet>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <cmath>
 #include <climits>
 #include <limits>
 
 namespace par2 {
+QVector<Device> openClDevices(const QByteArray &output)
+{
+    QVector<Device> result;
+    const auto platforms = QJsonDocument::fromJson(output).object().value("platforms").toArray();
+    for (int p = 0; p < platforms.size(); ++p) {
+        const auto devices = platforms[p].toObject().value("devices").toArray();
+        for (int d = 0; d < devices.size(); ++d) {
+            const auto device = devices[d].toObject();
+            if (device.value("available").toBool() && device.value("supported").toBool()
+                && device.value("type").toString().compare("gpu", Qt::CaseInsensitive) == 0)
+                result << Device{QString("%1:%2").arg(p).arg(d), device.value("name").toString()};
+        }
+    }
+    return result;
+}
 QString toolName(Tool tool)
 {
     switch (tool) {
@@ -104,7 +122,8 @@ Settings Settings::read(Tool kind, const QString &arguments)
         return s;
     }
     const auto args = QProcess::splitCommand(arguments);
-    bool autoScale = false, multiSize = false;
+    bool autoScale = false;
+    int multiParPerFile = -1; //!< /lr<n>: blocks per recovery file, resolved below; -1 = absent
     QString parparMaximum;
     QSet<QString> seen;
     auto once = [&](const QString &category) {
@@ -149,9 +168,11 @@ Settings Settings::read(Tool kind, const QString &arguments)
                 else if (v == "2") s.distribution = Distribution::PowersOfTwo;
                 else if (v == "3") s.distribution = Distribution::Decimal;
                 else s.custom = true;
-            } else if (a == "/ls2") { once("size-limit"); multiSize = true; }
-            else if (a == "/lr" || a == "/lr0") { once("volumes"); s.volumes = Volumes::LargestInput; }
-            else if (a.startsWith("/lr")) { once("volumes"); s.volumes = Volumes::Size; s.volumeBytes = byteSize(a.mid(3)); }
+            } else if (a == "/lr" || a == "/lr0") { once("volumes"); s.volumes = Volumes::LargestInput; }
+            else if (a.startsWith("/lr")) {
+                once("volumes"); multiParPerFile = number(a.mid(3));
+                if (multiParPerFile < 1) s.custom = true;
+            }
             else if (a.startsWith("/rf")) { once("volumes"); s.volumes = Volumes::Count; s.volumeCount = number(a.mid(3)); }
             else if (a.startsWith("/lc")) {
                 once("threads");
@@ -162,7 +183,13 @@ Settings Settings::read(Tool kind, const QString &arguments)
             else s.custom = true;
         } else if (kind == Tool::ParPar) {
             if (a == "--auto-slice-size" || a == "-S") { once("auto-size"); autoScale = true; continue; }
-            if (a == "--opencl-process") { s.gpu = true; continue; }
+            if (take(QString(), "--opencl-process")) {
+                once("gpu");
+                s.gpu = true;
+                // Partial CPU/GPU allocations remain a custom policy.
+                if (value != "100%") s.custom = true;
+                continue;
+            }
             if (take(QString(), "--max-input-slices")) { once("max-size"); parparMaximum = value; continue; }
             if (take("-s", "--input-slices")) {
                 once("blocks");
@@ -203,8 +230,16 @@ Settings Settings::read(Tool kind, const QString &arguments)
             else s.custom = true;
         }
     }
-    if (kind == Tool::MultiPar && s.volumes == Volumes::Size && !multiSize) s.custom = true;
-    if (multiSize && s.volumes != Volumes::Size) s.custom = true;
+    // "/lr<n>" is a number of blocks per recovery file, so it only maps back to
+    // a target size when "/ss" fixed the block size in the same command line.
+    if (multiParPerFile >= 0) {
+        if (multiParPerFile > 0 && s.blocks == Blocks::Size && s.blockBytes >= 4
+            && s.blockBytes <= std::numeric_limits<qint64>::max() / multiParPerFile) {
+            s.volumes = Volumes::Size;
+            s.volumeBytes = s.blockBytes * multiParPerFile;
+        } else
+            s.custom = true; // nothing to convert: keep the line as it was written
+    }
     if (autoScale) {
         if (s.blocks == Blocks::Size && s.blockBytes == 1048576) s.blocks = Blocks::Automatic;
         else s.custom = true; // preserve adaptive custom slice policies verbatim
@@ -226,15 +261,24 @@ QString Settings::validate() const
         return QCoreApplication::translate("Par2Settings", "Block size must be a multiple of 4 bytes, below 2 GiB.");
     if (blocks == Blocks::Count && (blockCount < 1 || blockCount > 32768))
         return QCoreApplication::translate("Par2Settings", "The source block count must be between 1 and 32768.");
-    if (volumes == Volumes::Size && (volumeBytes < 4 || (tool == Tool::MultiPar && volumeBytes >= 2147483648LL)))
+    if (volumes == Volumes::Size && (volumeBytes < 4
+        || (tool == Tool::MultiPar && blocks == Blocks::Size && volumeBytes / blockBytes > INT_MAX)))
         return QCoreApplication::translate("Par2Settings", "Choose a positive volume size below the tool's limit.");
     if (volumes == Volumes::Count && (volumeCount < 1 || volumeCount > 65535))
         return QCoreApplication::translate("Par2Settings", "The recovery volume count must be between 1 and 65535.");
+    // par2cmdline 1.x enforces this ("the maximum allowed recovery file count
+    // is 31"); 0.8.x had no cap, but 1.4.0 is what every package now ships.
+    if (tool == Tool::Par2cmdline && volumes == Volumes::Count && volumeCount > 31)
+        return QCoreApplication::translate("Par2Settings", "par2cmdline creates at most 31 recovery volumes.");
     if (tool == Tool::Par2cmdline && (volumes == Volumes::Size || distribution == Distribution::Equal
         || distribution == Distribution::Decimal || (volumes == Volumes::LargestInput && distribution == Distribution::Uniform)))
         return QCoreApplication::translate("Par2Settings", "This combination is not supported by par2cmdline.");
     if (tool == Tool::ParPar && distribution == Distribution::Decimal)
         return QCoreApplication::translate("Par2Settings", "Decimal distribution requires MultiPar.");
+    if (tool == Tool::MultiPar && volumes == Volumes::Size
+        && (blocks != Blocks::Size || volumeBytes < blockBytes))
+        return QCoreApplication::translate("Par2Settings", "MultiPar limits a recovery file by block count: "
+                                                           "set an exact block size (Advanced) no larger than the target size.");
     if (tool == Tool::MultiPar && (distribution == Distribution::Uniform
         || (volumes == Volumes::Count && distribution != Distribution::Equal && distribution != Distribution::Automatic)))
         return QCoreApplication::translate("Par2Settings", "MultiPar supports a volume count only with equal distribution.");
@@ -253,7 +297,15 @@ QStringList Settings::arguments(uint redundancy) const
         else if (distribution == Distribution::PowersOfTwo) args << "/rd2";
         else if (distribution == Distribution::Decimal) args << "/rd3";
         if (volumes == Volumes::LargestInput) args << "/lr";
-        else if (volumes == Volumes::Size) args << "/ls2" << QString("/lr%1").arg(volumeBytes);
+        else if (volumes == Volumes::Size) {
+            // par2j: "/lr<n> ... This is the max number of blocks in a file, not
+            // max size of file itself". Converting needs the block size, which
+            // validate() demands for this combination. Keep /ls out of guided
+            // arguments: generic /ls splits sources; the special /ls2 + /lr
+            // byte-limit mode remains available through custom arguments.
+            const qint64 perFile = blockBytes > 0 ? volumeBytes / blockBytes : 0;
+            args << QString("/lr%1").arg(qMax<qint64>(1, perFile));
+        }
         else if (volumes == Volumes::Count) args << QString("/rf%1").arg(volumeCount);
         if (threads || gpu) args << QString("/lc%1").arg(threads + (gpu ? 256 : 0));
         if (memory) args << QString("/m%1").arg(memory);
@@ -272,7 +324,8 @@ QStringList Settings::arguments(uint redundancy) const
         if (memory) args << QString("-m%1M").arg(memory);
         if (threads) args << QString("-t%1").arg(threads);
         if (gpu) {
-            args << "--opencl-process";
+            // The CLI requires a value even though its help calls it optional.
+            args << "--opencl-process=100%";
             if (!device.isEmpty()) args << "--opencl-device" << device;
         }
     } else {
@@ -302,6 +355,9 @@ Estimate Settings::estimate(const QVector<qint64> &sizes, uint redundancy) const
         largest = qMax(largest, size);
     }
     if (!e.sourceBytes) return e;
+    // No supported block policy can describe more than this. Reject before
+    // converting an arbitrary source total through floating point to qint64.
+    if (e.sourceBytes > 32768LL * 2147483644LL) return e;
     auto align = [](qint64 n) { return ((n + 3) / 4) * 4; };
     e.blockBytes = blockBytes;
     if (blocks == Blocks::Count) e.blockBytes = align(qMax<qint64>(4, qint64(std::ceil(double(e.sourceBytes) / blockCount))));
@@ -313,7 +369,12 @@ Estimate Settings::estimate(const QVector<qint64> &sizes, uint redundancy) const
     }
     for (auto size : sizes) e.sourceBlocks += size / e.blockBytes + (size % e.blockBytes != 0);
     if (e.sourceBlocks > 32768) return e;
-    e.recoveryBlocks = qint64(std::ceil(e.sourceBlocks * redundancy / 100.0));
+    const double recovery = e.sourceBlocks * redundancy / 100.0;
+    // Creation tools use different rounding rules, including on tiny posts.
+    if (tool == Tool::MultiPar) e.recoveryBlocks = qint64(std::floor(recovery));
+    else if (tool == Tool::Par2cmdline) e.recoveryBlocks = qint64(std::floor(recovery + 0.5));
+    else e.recoveryBlocks = qint64(std::ceil(recovery));
+    if (redundancy > 0) e.recoveryBlocks = qMax<qint64>(1, e.recoveryBlocks);
     if (e.recoveryBlocks > 65535 || e.blockBytes >= 2147483648LL) return e;
     e.recoveryBytes = e.recoveryBlocks * e.blockBytes;
     e.valid = true;

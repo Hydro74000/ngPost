@@ -617,4 +617,6 @@ void AutoPostWidget::onEditPostInfo()
 void AutoPostWidget::refreshPar2Default()
 {
     _ui->redundancySB->setSpecialValueText(tr("Global (%1 %)").arg(_ngPost->par2DefaultPercentage()));
+    _ui->redundancySB->setMaximumWidth(QWIDGETSIZE_MAX);
+    _ui->redundancySB->setMinimumWidth(_ui->redundancySB->sizeHint().width());
 }

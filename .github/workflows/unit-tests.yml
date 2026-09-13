@@ -110,6 +110,15 @@ jobs:
           qmake unit.pro CONFIG+=release
           make -j"$(nproc)"
 
+      - name: Bundle the pinned PAR2 tools
+        run: |
+          # tst_Par2Settings creates par2 files with the real tools, damages a
+          # block and repairs it. Those rows QSKIP when no tool is on PATH,
+          # which is how they went unexecuted on every runner: give them the
+          # exact builds the packages ship, from the shared pin list.
+          ./.github/scripts/fetch-par2-tools.sh "$RUNNER_TEMP/par2-tools"
+          echo "$RUNNER_TEMP/par2-tools" >> "$GITHUB_PATH"
+
       - name: Run unit tests
         env:
           NGPOST_BIN: ${{ github.workspace }}/src/ngPost
@@ -168,6 +177,15 @@ jobs:
           cd tests/unit
           qmake unit.pro CONFIG+=release
           make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Bundle the pinned PAR2 tools
+        run: |
+          # tst_Par2Settings creates par2 files with the real tools, damages a
+          # block and repairs it. Those rows QSKIP when no tool is on PATH,
+          # which is how they went unexecuted on every runner: give them the
+          # exact builds the packages ship, from the shared pin list.
+          ./.github/scripts/fetch-par2-tools.sh "$RUNNER_TEMP/par2-tools"
+          echo "$RUNNER_TEMP/par2-tools" >> "$GITHUB_PATH"
 
       - name: Run unit tests
         env:

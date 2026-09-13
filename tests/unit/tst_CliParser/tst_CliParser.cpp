@@ -302,6 +302,7 @@ private slots:
     //! Zero or negative article sizes cannot form valid byte ranges and are
     //! rejected equally from CLI and configuration.
     void article_size_must_be_positive();
+    void rar_limit_must_be_positive();
 
     //! Only ftp, http and https can receive an nzb.
     void nzb_upload_url_rejects_an_unsupported_scheme();
@@ -325,6 +326,28 @@ void TestCliParser::version_flag_succeeds()
     QCOMPARE(r.exitCode, 0);
     QVERIFY2(r.stdoutText.contains(QLatin1String(APP_VERSION)),
              qPrintable(QStringLiteral("stdout did not mention version: %1").arg(r.stdoutText)));
+}
+
+void TestCliParser::rar_limit_must_be_positive()
+{
+    HomeSandbox sandbox;
+    const auto inputPath = sandbox.rootPath() + "/input.bin";
+    QFile input(inputPath);
+    QVERIFY(input.open(QIODevice::WriteOnly)); input.write("test"); input.close();
+    for (const auto &value : {QStringLiteral("0"), QStringLiteral("-1"), QStringLiteral("2147483648"), QStringLiteral("invalid")}) {
+        const auto result = run(_bin, {"-i", inputPath, "--rar_max", value}, sandbox.rootPath());
+        QVERIFY(!result.timedOut);
+        QVERIFY(result.exitCode != 0);
+        QVERIFY2((result.stdoutText + result.stderrText).contains("RAR_MAX must be a positive integer"),
+                 qPrintable(value + ": " + result.stdoutText + result.stderrText));
+        QFile config(sandbox.rootPath() + "/invalid.conf");
+        QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        config.write(("RAR_MAX = " + value + '\n').toUtf8()); config.close();
+        const auto loaded = run(_bin, {"-c", config.fileName(), "-i", inputPath}, sandbox.rootPath());
+        QVERIFY(!loaded.timedOut && !loaded.crashed);
+        QVERIFY(loaded.exitCode != 0);
+        QVERIFY2((loaded.stdoutText + loaded.stderrText).contains("RAR_MAX"), qPrintable(loaded.stdoutText + loaded.stderrText));
+    }
 }
 
 void TestCliParser::help_lists_major_flags()

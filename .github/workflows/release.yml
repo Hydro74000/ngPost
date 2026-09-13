@@ -25,6 +25,16 @@ on:
 permissions:
   contents: read
 
+# PAR2 tools bundled with the packages. One list for every OS: the same ParPar
+# and par2cmdline builds end up in the Windows installer, the Linux archive, the
+# AppImage and the macOS bundle, so a post behaves the same everywhere and a bug
+# report names one version. MultiPar is Windows-only (par2j is a Windows
+# executable), so it has no counterpart on the other platforms.
+#
+# Every download is pinned by SHA-256. The upstream tag alone is not enough: a
+# re-tagged or replaced asset would be picked up silently, and these binaries
+# run on the user's machine with the files they are about to post.
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -191,6 +201,9 @@ jobs:
           mkdir -p "dist/${PKG}"
           cp src/ngPost "dist/${PKG}/"
           touch "dist/${PKG}/.ngpost-installation"
+          # Same pinned ParPar + par2cmdline as the Windows, AppImage and macOS
+          # packages. ngPost picks them up because they sit next to its binary.
+          ./.github/scripts/fetch-par2-tools.sh "dist/${PKG}"
           cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
           cp -R templates "dist/${PKG}/"
           test -f "dist/${PKG}/templates/post_info_default.txt"
@@ -272,6 +285,14 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path src/release/sqldrivers | Out-Null
           Copy-Item $sqlitePlugin src/release/sqldrivers/ -Force
+      - name: Load the pinned PAR2 tool versions
+        shell: pwsh
+        run: |
+          # Same file the Unix jobs source through fetch-par2-tools.sh, so the
+          # installer and the other packages ship identical tools.
+          Get-Content .github/scripts/par2-tools.env |
+            Where-Object { $_ -match '^[A-Z0-9_]+=' } |
+            Add-Content -Path $env:GITHUB_ENV -Encoding utf8
       - name: Fetch ParPar for optional bundling
         shell: pwsh
         run: |
@@ -289,13 +310,17 @@ jobs:
           # is copied unconditionally by both the ZIP package and the Inno
           # Setup main [Files] entry. parpar.exe is wired into Inno Setup as
           # a task-gated extra source instead.
-          $parparVersion = "0.4.5"
+          $parparVersion = $env:PARPAR_VERSION
           $asset         = "parpar-v$parparVersion-win64.7z"
           $url           = "https://github.com/animetosho/ParPar/releases/download/v$parparVersion/$asset"
           $stage         = Join-Path (Get-Location) "dist\parpar"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           $archive = Join-Path $env:RUNNER_TEMP $asset
           Invoke-WebRequest -Uri $url -OutFile $archive
+          $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:PARPAR_SHA256_WIN64) {
+            throw "$asset SHA-256 mismatch: got $hash, expected $env:PARPAR_SHA256_WIN64"
+          }
           # 7-Zip ships preinstalled on windows-latest runners. PowerShell's
           # Expand-Archive does not support .7z, so we shell out to 7z.exe.
           $sevenZip = "C:\Program Files\7-Zip\7z.exe"
@@ -327,23 +352,52 @@ jobs:
           # passes under QProcess's shell-less CreateProcess (verified).
           $release = "src/release"
 
-          # par2cmdline 0.8.0 - vendored in-repo (release/libs), self-globs.
-          $par2Zip = "release/libs/par2cmdline-0.8.0-win-x64.zip"
-          if (-not (Test-Path $par2Zip)) { throw "Missing vendored $par2Zip" }
+          # par2cmdline - official upstream release, same version as the Linux,
+          # AppImage and macOS packages. It expands the archive.7z* / archive*rar
+          # wildcards ngPost passes itself (par2cmdline does its own globbing, so
+          # this does not depend on the CRT: verified on 1.4.0 with execve and no
+          # shell), which is what QProcess's shell-less start requires.
+          $par2Version = $env:PAR2CMDLINE_VERSION
+          $par2Asset   = "par2cmdline-$par2Version-win-x64.zip"
+          $par2Url     = "https://github.com/Parchive/par2cmdline/releases/download/v$par2Version/$par2Asset"
+          $par2Archive = Join-Path $env:RUNNER_TEMP $par2Asset
+          Invoke-WebRequest -Uri $par2Url -OutFile $par2Archive
+          $hash = (Get-FileHash $par2Archive -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:PAR2CMDLINE_SHA256_WIN_X64) {
+            throw "$par2Asset SHA-256 mismatch: got $hash, expected $env:PAR2CMDLINE_SHA256_WIN_X64"
+          }
           $tmpPar2 = Join-Path $env:RUNNER_TEMP "par2cmdline"
           Remove-Item -Recurse -Force $tmpPar2 -ErrorAction SilentlyContinue
-          Expand-Archive -Path $par2Zip -DestinationPath $tmpPar2 -Force
+          Expand-Archive -Path $par2Archive -DestinationPath $tmpPar2 -Force
           $par2 = Get-ChildItem $tmpPar2 -Recurse -File -Filter 'par2.exe' |
             Select-Object -First 1
-          if (-not $par2) { throw "par2.exe not found in $par2Zip" }
+          if (-not $par2) { throw "par2.exe not found in $par2Asset" }
           Copy-Item $par2.FullName (Join-Path $release 'par2.exe') -Force
 
+          # The official Windows build is MSVC + OpenMP, so par2.exe imports
+          # VCOMP140.DLL. windeployqt --compiler-runtime does not deploy the
+          # OpenMP runtime, and a machine without the VC++ redistributable would
+          # fail to start par2.exe at the par2 step of a post. Ship it next to
+          # the binary that needs it; it is redistributable.
+          $vcomp = Get-ChildItem "$env:VCToolsRedistDir" -Recurse -File -Filter 'vcomp140.dll' -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
+          if (-not $vcomp) {
+            $vcomp = Get-ChildItem "$env:SystemRoot\System32" -File -Filter 'vcomp140.dll' -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+          }
+          if (-not $vcomp) { throw "vcomp140.dll not found: par2.exe (MSVC/OpenMP build) would not start" }
+          Copy-Item $vcomp.FullName (Join-Path $release 'vcomp140.dll') -Force
+
           # MultiPar (par2j64.exe) - GPL, official GitHub release.
-          $mpVersion = "1.3.3.6"
-          $mpAsset   = "MultiPar1336.zip"
+          $mpVersion = $env:MULTIPAR_VERSION
+          $mpAsset   = $env:MULTIPAR_ASSET
           $mpUrl     = "https://github.com/Yutaka-Sawada/MultiPar/releases/download/v$mpVersion/$mpAsset"
           $mpArchive = Join-Path $env:RUNNER_TEMP $mpAsset
           Invoke-WebRequest -Uri $mpUrl -OutFile $mpArchive
+          $hash = (Get-FileHash $mpArchive -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:MULTIPAR_SHA256) {
+            throw "$mpAsset SHA-256 mismatch: got $hash, expected $env:MULTIPAR_SHA256"
+          }
           $tmpMp = Join-Path $env:RUNNER_TEMP "multipar"
           Remove-Item -Recurse -Force $tmpMp -ErrorAction SilentlyContinue
           Expand-Archive -Path $mpArchive -DestinationPath $tmpMp -Force
@@ -392,11 +446,44 @@ jobs:
             throw "Missing staged parpar.exe (dist/parpar/parpar.exe)"
           }
           # par2cmdline + MultiPar are the always-installed PAR2 fallbacks.
-          foreach ($fallback in @("par2.exe", "par2j64.exe")) {
+          foreach ($fallback in @("par2.exe", "par2j64.exe", "vcomp140.dll")) {
             if (-not (Test-Path (Join-Path $root $fallback))) {
               throw "Missing bundled PAR2 fallback: $fallback"
             }
           }
+
+          # Being on disk is not enough: par2.exe is an MSVC/OpenMP build and
+          # dies at load time without vcomp140.dll next to it. Run each tool the
+          # way ngPost does -- no shell, from its own directory -- so a missing
+          # runtime fails the build instead of the user's first post.
+          $toolChecks = @(
+            @{ Exe = "par2.exe";     Args = @("-V");    Match = "par2cmdline version $env:PAR2CMDLINE_VERSION" },
+            @{ Exe = "par2j64.exe";  Args = @();        Match = "" },
+            @{ Exe = "../../dist/parpar/parpar.exe"; Args = @("--version"); Match = "$env:PARPAR_VERSION" }
+          )
+          # GitHub wraps pwsh steps with $ErrorActionPreference='Stop' and exits
+          # on the trailing $LASTEXITCODE. par2j prints its banner and exits
+          # non-zero without a command, and ParPar writes --version to stderr:
+          # both would fail the step on their own, so the output is what we judge.
+          $ErrorActionPreference = 'Continue'
+          if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+          }
+          foreach ($check in $toolChecks) {
+            $exe = Join-Path $root $check.Exe
+            $out = & $exe @($check.Args) 2>&1 | Out-String
+            # par2j prints its banner and exits non-zero without a command, so
+            # the output, not the exit code, is what tells us it started.
+            if ([string]::IsNullOrWhiteSpace($out)) {
+              throw "PAR2 tool produced no output (missing runtime DLL?): $($check.Exe)"
+            }
+            if ($check.Match -and ($out -notmatch [regex]::Escape($check.Match))) {
+              throw "PAR2 tool version mismatch for $($check.Exe): expected '$($check.Match)', got: $($out.Trim())"
+            }
+            Write-Host "$($check.Exe): $(($out -split "`n")[0].Trim())"
+          }
+          $ErrorActionPreference = 'Stop'
+          $global:LASTEXITCODE = 0
 
           $expectedDlls = @(
             "Qt6Core.dll",
@@ -556,6 +643,17 @@ jobs:
 
           MultiPar's par2j64.exe is a fast PAR2 client bundled as an alternative
           PAR2 backend (selectable via PAR2_PATH).
+
+          ------------------------------------------------------------------------
+          6. Microsoft Visual C++ OpenMP runtime (vcomp140.dll)
+          ------------------------------------------------------------------------
+          Licence  : Microsoft Visual C++ redistributable terms (Distributable Code)
+          Copyright: (c) Microsoft Corporation
+
+          par2.exe is an MSVC/OpenMP build and does not start without this runtime.
+          It is shipped next to it because windeployqt does not deploy the OpenMP
+          runtime and a machine without the VC++ redistributable would fail at the
+          par2 step of a post.
           Full GPL text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
 
           ------------------------------------------------------------------------
@@ -753,6 +851,12 @@ jobs:
           echo "$out"
           echo "$out" | grep -q "SSL support: yes" \
             || { echo "FAIL: no working SSL in the built binary"; exit 1; }
+      - name: Bundle PAR2 tools
+        run: |
+          # After macdeployqt, and into Contents/MacOS: that is what
+          # QCoreApplication::applicationDirPath() returns inside a bundle, so
+          # ngPost's own detection finds them with no configuration.
+          ./.github/scripts/fetch-par2-tools.sh src/ngPost.app/Contents/MacOS
       - name: Package
         run: |
           VERSION="${{ needs.release-metadata.outputs.package_version }}"
@@ -765,6 +869,30 @@ jobs:
           unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_baselien.txt'
           unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_json.txt'
           ls -la dist/
+      - name: Verify the packaged macOS bundle
+        run: |
+          # The Windows job verifies its deployment; macOS shipped no such check
+          # and no PAR2 tool at all. Both are unpacked and run here, from the
+          # archive the user downloads: a zip round-trip is exactly where an
+          # executable bit or an ad-hoc signature gets lost, and arm64 kills an
+          # unsigned Mach-O outright rather than warning about it.
+          VERSION="${{ needs.release-metadata.outputs.package_version }}"
+          PKG="ngPost-${VERSION}-macos"
+          work="$RUNNER_TEMP/verify-macos"
+          rm -rf "$work" && mkdir -p "$work"
+          ditto -x -k "dist/${PKG}.zip" "$work"
+          app="$work/ngPost.app/Contents/MacOS"
+          for tool in ngPost parpar par2; do
+            test -x "$app/$tool" \
+              || { echo "ERROR: $tool missing or not executable in the packaged bundle" >&2; exit 1; }
+          done
+          "$app/parpar" --version 2>&1 | grep -qx "$PARPAR_VERSION" \
+            || { echo "ERROR: packaged ParPar does not report $PARPAR_VERSION" >&2; exit 1; }
+          "$app/par2" -V | grep -q "par2cmdline version $PAR2CMDLINE_VERSION" \
+            || { echo "ERROR: packaged par2cmdline does not report $PAR2CMDLINE_VERSION" >&2; exit 1; }
+          out=$("$app/ngPost" --version 2>&1)
+          echo "$out" | grep -q "SSL support: yes" \
+            || { echo "FAIL: the packaged binary lost SSL"; echo "$out"; exit 1; }
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -783,7 +911,6 @@ jobs:
           sudo apt install -y \
             build-essential cmake libfuse2t64 wget file patchelf desktop-file-utils \
             libssl3t64 openssl \
-            par2 \
             openvpn wireguard-tools wireguard-go \
             libsecret-1-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
@@ -878,7 +1005,6 @@ jobs:
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           cp src/ngPost AppDir/usr/bin/
-          install_bin par2 AppDir/usr/bin/par2 par2 par2create par2repair
           if [ -x tools/rar ]; then
             cp tools/rar AppDir/usr/bin/rar
           fi
@@ -960,16 +1086,20 @@ jobs:
           ./linuxdeploy \
             --appdir AppDir \
             --plugin qt \
-            --output appimage \
             --library "${{ steps.openssl.outputs.ssl }}" \
             --library "${{ steps.openssl.outputs.crypto }}" \
             --library "${{ steps.qtkeychain.outputs.kc }}" \
-            --executable AppDir/usr/bin/par2 \
             --executable AppDir/usr/bin/vpn/openvpn \
             --executable AppDir/usr/bin/vpn/wireguard-go \
             --executable AppDir/usr/bin/vpn/wg \
             --desktop-file AppDir/usr/share/applications/ngPost.desktop \
             --icon-file AppDir/ngPost.png
+          # Add these after linuxdeploy: it patches every ELF in usr/bin,
+          # including files not supplied with --executable. Patching ParPar
+          # breaks its embedded integrity check; static par2 cannot be patched.
+          ./.github/scripts/fetch-par2-tools.sh AppDir/usr/bin
+          ./linuxdeploy --appimage-extract > /dev/null
+          ./squashfs-root/usr/bin/linuxdeploy-plugin-appimage --appdir AppDir
           mkdir -p dist
           mv *.AppImage *.AppImage.zsync dist/
           ls -la dist/
@@ -994,6 +1124,8 @@ jobs:
           cd dist
           APPIMAGE=$(ls *.AppImage)
           ./"$APPIMAGE" --appimage-extract >/dev/null
+          squashfs-root/usr/bin/parpar --version 2>&1 | grep -Fx "$PARPAR_VERSION"
+          squashfs-root/usr/bin/par2 -V | grep -F "par2cmdline version $PAR2CMDLINE_VERSION"
           export LD_LIBRARY_PATH="$PWD/squashfs-root/usr/lib:$PWD/squashfs-root/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
           while IFS= read -r -d '' elf; do
             if file "$elf" | grep -q 'ELF'; then

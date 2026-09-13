@@ -46,9 +46,11 @@ the GNU GPL v2 in all respects.
 
 ## par2cmdline (`par2` / `par2.exe`)
 
-- **How used**: bundled inside the Linux AppImage (from the Debian/Ubuntu
-  `par2` package) and shipped on Windows as `par2.exe` (par2cmdline 0.8.0), the
-  always-installed PAR2 fallback used when ParPar is not present.
+- **How used**: bundled in every package — Windows (`par2.exe`), the Linux
+  archive, the AppImage and the macOS bundle — from the same pinned upstream
+  release (par2cmdline 1.4.0), as the always-installed PAR2 fallback used when
+  ParPar is not present. The Windows build is MSVC/OpenMP, so Microsoft's
+  redistributable `vcomp140.dll` is shipped next to it (see below).
 - **Licence**: GNU General Public Licence, version 2 or later
 - **Copyright**: © 2003 Peter Brian Clements; © 2019–2024 par2cmdline contributors
 - **Source code**: <https://github.com/Parchive/par2cmdline>
@@ -58,15 +60,29 @@ the GNU GPL v2 in all respects.
 
 ## ParPar (`parpar.exe`)
 
-- **How used**: shipped in the Windows ZIP and offered as an optional installer
-  task on Windows. ngPost prefers ParPar over par2cmdline on Windows because
-  QProcess invokes CreateProcess directly (no shell), so file-list wildcards
-  must be expanded by the par2 binary itself — ParPar's `-R <folder>` flow
-  avoids the issue entirely.
+- **How used**: bundled in every package (ParPar 0.4.6) — in the Windows ZIP and
+  offered as an optional installer task on Windows, and shipped next to the
+  binary in the Linux archive, the AppImage and the macOS bundle. ngPost prefers
+  ParPar because QProcess invokes the tool directly (no shell), so file-list
+  wildcards must be expanded by the par2 binary itself — ParPar's `-R <folder>`
+  flow avoids the question entirely.
 - **Licence**: Public Domain / CC0 1.0 Universal
 - **Copyright**: released into the public domain by Anime Tosho
 - **Source code**: <https://github.com/animetosho/ParPar>
 - **Full licence text**: <https://creativecommons.org/publicdomain/zero/1.0/legalcode>
+
+---
+
+## Microsoft Visual C++ OpenMP runtime (`vcomp140.dll`)
+
+- **How used**: shipped in the Windows package next to `par2.exe`, which is an
+  MSVC/OpenMP build of par2cmdline and does not start without it. It is not
+  deployed by `windeployqt --compiler-runtime`, and a machine without the VC++
+  redistributable would otherwise fail at the par2 step of a post.
+- **Licence**: Microsoft Visual C++ redistributable terms (Distributable Code)
+- **Copyright**: © Microsoft Corporation
+- **Source of the binary**: the Visual Studio redistributable directory on the
+  build machine (`vcomp140.dll`, x64)
 
 ---
 

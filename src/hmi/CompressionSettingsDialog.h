@@ -47,6 +47,8 @@ private slots:
     void updateVolumeHelp();
 
 private:
+    bool event(QEvent *event) override;
+    bool _layoutReady = false;
     Ui::CompressionSettingsDialog *_ui;
     NgPost                        *_ngPost;
 };

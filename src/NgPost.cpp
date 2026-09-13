@@ -458,7 +458,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     // Fallback order: ParPar (preferred — no shell globbing needed via -R),
     // then par2cmdline (par2.exe), then MultiPar (par2j64/par2j). All three are
     // bundled by the Windows installer so par2 generation keeps working even if
-    // the user opts out of ParPar. par2cmdline 0.8.0 and par2j self-expand the
+    // the user opts out of ParPar. par2cmdline and par2j self-expand the
     // archive.7z* / archive*rar wildcards ngPost passes (verified), so they are
     // safe under QProcess's shell-less CreateProcess.
     par2Candidates << QString("%1/parpar.exe").arg(appDir)
@@ -3531,6 +3531,7 @@ QString NgPost::_parseConfig(const QString &configPath)
     QString           legacyVpnConfigPath;
     QString           legacyVpnBackend;
     bool              parsedPack = false;
+    bool              par2PathUnusable = false;
     bool              legacyAutoCompress = false;
 
     QFile file(fileInfo.absoluteFilePath());
@@ -3572,6 +3573,16 @@ QString NgPost::_parseConfig(const QString &configPath)
         while (!stream.atEnd())
         {
             QString line = stream.readLine().trimmed();
+            // saveConfig keeps the inactive GUI limit as #RAR_MAX = N. Read
+            // that preference without enabling it; an active key always wins.
+            if (!_useRarMax && line.startsWith(QStringLiteral("#RAR_MAX"), Qt::CaseInsensitive)) {
+                const int equal = line.indexOf('=');
+                if (equal > 0 && line.left(equal).trimmed().compare(QStringLiteral("#RAR_MAX"), Qt::CaseInsensitive) == 0) {
+                    bool ok = false;
+                    const uint maximum = line.mid(equal + 1).trimmed().toUInt(&ok);
+                    if (ok && maximum > 0 && maximum <= uint(INT_MAX)) _rarMax = maximum;
+                }
+            }
             if (line.isEmpty() || line.startsWith('#') || line.startsWith('/'))
                 continue;
             else if (line == "[server]")
@@ -4135,9 +4146,19 @@ QString NgPost::_parseConfig(const QString &configPath)
                     }
                     else if (opt == sOptionNames[Opt::PAR2_PATH])
                     {
-                        if (!val.isEmpty()) {
-                            _par2Path = val;
+                        if (!val.isEmpty())
+                        {
+                            // The line is kept verbatim so saveConfig() does not
+                            // silently drop what the user wrote, but an unusable
+                            // path is not adopted: _canGenPar2() would fail and
+                            // abort the whole post at the par2 step. Reported
+                            // here, and resolved after the parse.
                             _par2PathConfig = val;
+                            QFileInfo fi(val);
+                            if (fi.exists() && fi.isFile() && fi.isExecutable())
+                                _par2Path = val;
+                            else
+                                par2PathUnusable = true;
                         }
                     }
                     else if (opt == sOptionNames[Opt::PAR2_ARGS])
@@ -4235,8 +4256,58 @@ QString NgPost::_parseConfig(const QString &configPath)
         file.close();
     }
 
-    if (_par2Tool != par2::Tool::Auto && _par2PathConfig.isEmpty())
-        _par2Path = par2::findExecutable(_par2Tool);
+    // PAR2_PATH used to have the last word, and a path that no longer existed
+    // was dropped in silence -- the problem only surfaced when the par2 step
+    // aborted the post. It is reported above; what runs instead is settled here.
+    QString par2Warning;
+    if (par2PathUnusable)
+        par2Warning = tr("PAR2_PATH is not an executable file: %1").arg(_par2PathConfig);
+
+    if (_par2Tool != par2::Tool::Auto && (_par2PathConfig.isEmpty() || par2PathUnusable))
+    {
+        QString const found = par2::findExecutable(_par2Tool);
+        // Keeping the tool detected at startup would feed one tool's switches to
+        // another binary, so a tool that is nowhere to be found stays missing and
+        // the par2 step says why, rather than failing on a syntax error.
+        _par2Path = found;
+        if (found.isEmpty())
+        {
+            if (!par2Warning.isEmpty())
+                par2Warning += QLatin1Char('\n');
+            par2Warning += tr("PAR2_TOOL = %1: no %1 executable was found, neither next to ngPost nor in "
+                              "the PATH. Every post that generates par2 will stop at that step.\n"
+                              "Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, "
+                              "parpar, par2cmdline or multipar.")
+                                 .arg(par2::toolName(_par2Tool));
+        }
+        else if (par2PathUnusable)
+            par2Warning += QLatin1Char('\n')
+                         + tr("PAR2_TOOL = %1 is used instead, with %2.")
+                               .arg(par2::toolName(_par2Tool), found);
+    }
+    else if (par2PathUnusable)
+    {
+        // PAR2_TOOL is auto: whatever ngPost detected next to itself still works.
+        par2Warning += QLatin1Char('\n')
+                     + (_par2Path.isEmpty()
+                            ? tr("No par2 tool was found next to ngPost either: every post that generates "
+                                 "par2 will stop at that step. Fix PAR2_PATH, or install par2 or ParPar.")
+                            : tr("ngPost uses the par2 tool it found instead: %1.").arg(_par2Path));
+    }
+
+    // Only worth saying when this configuration can produce par2 at all: an
+    // install that never generates any would otherwise be nagged at every
+    // start about a tool it does not use. A post that asks for par2 later (the
+    // GUI box, --gen_par2) still gets the explicit message from _canGenPar2().
+    bool const par2Requested = _par2Pct > 0 || _doPar2
+                            || _packAutoKeywords.contains(sOptionNames[Opt::GEN_PAR2], Qt::CaseInsensitive)
+                            || (legacyAutoCompress && !parsedPack);
+
+    // Not appended to err: err stops ngPost with ERR_CONF_FILE, and a
+    // configuration that refuses to start is precisely where the user cannot
+    // reach the PAR2 settings to fix it. Loud, but not fatal.
+    if (par2Requested && !par2Warning.isEmpty())
+        _error(tr("Configuration: %1").arg(par2Warning));
 
     if (legacyAutoCompress && !parsedPack)
     {
@@ -5092,7 +5163,7 @@ void NgPost::saveConfig()
                << "#RAR_EXTRA = -mx0 -mhe=on   (for 7-zip)\n"
                << (_rarArgs.isEmpty() ? "" : QString("RAR_EXTRA = %1\n").arg(_rarArgs) )
                << "\n"
-               << tr("## size in MB of the RAR volumes (0 by default meaning NO split)") << "\n"
+               << tr("## RAR volume size in MiB (1 MiB = 1048576 bytes; 0 means no split without RAR_MAX)") << "\n"
                << tr("## feel free to change the value or to comment the next line if you don't want to split the archive") << "\n"
                << "RAR_SIZE = " << _rarSize << "\n"
                << "\n"

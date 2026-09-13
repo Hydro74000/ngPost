@@ -1,4 +1,3 @@
-#include <climits>
 //========================================================================
 //
 // Copyright (C) 2026 Hydro74000 <acymap@gmail.com>
@@ -17,6 +16,10 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QIntValidator>
+#include <climits>
+#include <QMessageBox>
+#include <QEvent>
+#include <QTimer>
 
 CompressionSettingsDialog::CompressionSettingsDialog(NgPost *ngPost, QWidget *parent)
     : QDialog(parent)
@@ -51,9 +54,29 @@ CompressionSettingsDialog::CompressionSettingsDialog(NgPost *ngPost, QWidget *pa
     connect(_ui->rarPassCB,          &QAbstractButton::toggled, this, &CompressionSettingsDialog::onPassToggled);
     connect(_ui->buttonBox,          &QDialogButtonBox::accepted, this, &CompressionSettingsDialog::accept);
     connect(_ui->buttonBox,          &QDialogButtonBox::rejected, this, &QDialog::reject);
+    _ui->buttonBox->button(QDialogButtonBox::Save)->setText(tr("Save"));
+    _ui->buttonBox->button(QDialogButtonBox::Cancel)->setText(tr("Cancel"));
+    _layoutReady = true;
+    // The form gives spanning labels their real width during its first layout.
+    // Fit once after that pass, before an old narrow size hint leaves a gap.
+    QTimer::singleShot(0, this, &QWidget::adjustSize);
 }
 
 CompressionSettingsDialog::~CompressionSettingsDialog() { delete _ui; }
+
+bool CompressionSettingsDialog::event(QEvent *event)
+{
+    const bool handled = QDialog::event(event);
+    if (_layoutReady && (event->type() == QEvent::LayoutRequest || event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
+        auto *label = _ui->volumeHelpLabel;
+        // heightForWidth also includes the previous minimum, so it cannot
+        // shrink a minimum measured before the form reached its actual width.
+        const int width = qMax(1, label->contentsRect().width() - 2 * label->margin());
+        const int height = label->fontMetrics().boundingRect(QRect(0, 0, width, INT_MAX), Qt::TextWordWrap, label->text()).height();
+        label->setMinimumHeight(height + 2 * label->margin());
+    }
+    return handled;
+}
 
 QString CompressionSettingsDialog::fixedPassword() const
 {
@@ -64,7 +87,14 @@ void CompressionSettingsDialog::accept()
 {
     if (!_ui->rarSizeEdit->hasAcceptableInput())
     {
+        QMessageBox::warning(this,
+                             tr("Volume size"),
+                             tr("\"%1\" is not a valid volume size, so nothing was saved.\n\n"
+                                "Enter a whole number of MiB between 0 and 1000000 "
+                                "(0 disables splitting only when the volume limit is off).")
+                                     .arg(_ui->rarSizeEdit->text()));
         _ui->rarSizeEdit->setFocus();
+        _ui->rarSizeEdit->selectAll();
         return;
     }
     _ngPost->_tmpPath = _ui->compressPathEdit->text();
@@ -114,6 +144,7 @@ void CompressionSettingsDialog::updateVolumeHelp()
     _ui->volumeHelpLabel->setText(text);
     _ui->rarMaxCB->setToolTip(text);
     _ui->rarMaxSB->setToolTip(text);
+    _ui->rarSizeEdit->setToolTip(text);
 }
 
 void CompressionSettingsDialog::onCompressPathClicked()

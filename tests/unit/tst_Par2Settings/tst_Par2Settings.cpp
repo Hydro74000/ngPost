@@ -2,12 +2,43 @@
 #include <QProcess>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+#include <limits>
 #include "par2/Par2Settings.h"
 using namespace par2;
 
 class TestPar2Settings : public QObject {
     Q_OBJECT
 private slots:
+    void recovery_rounding_matches_the_tool()
+    {
+        Settings settings;
+        settings.blocks = Blocks::Size;
+        settings.blockBytes = 4096;
+        settings.tool = Tool::ParPar;
+        QCOMPARE(settings.estimate({35 * 4096}, 10).recoveryBlocks, 4);
+        settings.tool = Tool::Par2cmdline;
+        QCOMPARE(settings.estimate({35 * 4096}, 10).recoveryBlocks, 4);
+        settings.tool = Tool::MultiPar;
+        QCOMPARE(settings.estimate({35 * 4096}, 10).recoveryBlocks, 3);
+        for (auto kind : {Tool::ParPar, Tool::Par2cmdline, Tool::MultiPar}) {
+            settings.tool = kind;
+            QCOMPARE(settings.estimate({4096}, 10).recoveryBlocks, 1);
+            QCOMPARE(settings.estimate({4096}, 0).recoveryBlocks, 0);
+        }
+    }
+    void gpu_device_ids_keep_native_indices()
+    {
+        const auto devices = openClDevices(R"({"type":"opencl_list","platforms":[
+            {"devices":[{"type":"CPU","name":"CPU","available":true,"supported":true},
+                        {"type":"GPU","name":"Card A","available":true,"supported":true},
+                        {"type":"GPU","name":"Offline","available":false,"supported":true}]},
+            {"devices":[{"type":"GPU","name":"Card B","available":true,"supported":true}]}]})");
+        QCOMPARE(devices.size(), 2);
+        QCOMPARE(devices[0].id, QString("0:1"));
+        QCOMPARE(devices[0].name, QString("Card A"));
+        QCOMPARE(devices[1].id, QString("1:0"));
+        QVERIFY(openClDevices("No OpenCL platforms found").isEmpty());
+    }
     void guided_arguments_roundtrip_data()
     {
         QTest::addColumn<int>("tool");
@@ -39,7 +70,12 @@ private slots:
                           qMakePair(Tool::MultiPar, QString("create /rr8 /rd5 /lc40 /ss250000")),
                           qMakePair(Tool::ParPar, QString("-s1M -r8%")),
                           qMakePair(Tool::ParPar, QString("-s2000 -s4000 -twrong")),
+                          qMakePair(Tool::ParPar, QString("-s2000 --opencl-process=50%")),
+                          qMakePair(Tool::ParPar, QString("-s2000 --opencl-process")),
                           qMakePair(Tool::MultiPar, QString("c /ls2 /mwrong")),
+                          qMakePair(Tool::MultiPar, QString("c /rr8 /lr2000")),
+                          qMakePair(Tool::MultiPar, QString("c /rr8 /sn3000 /lr2000")),
+                          qMakePair(Tool::MultiPar, QString("c /ss9223372036854775804 /lr2")),
                           qMakePair(Tool::Par2cmdline, QString("c -l -n10")),
                           qMakePair(Tool::Par2cmdline, QString("c -s65536 -b2000 -mwrong")),
                           qMakePair(Tool::Par2cmdline, QString("c -r8 -s768000 -q"))}) {
@@ -72,6 +108,15 @@ private slots:
         settings.blockBytes = 1024;
         settings.tool = Tool::Par2cmdline;
         QVERIFY(!settings.validate().isEmpty()); // arbitrary size limit is unsupported
+        // par2cmdline 1.x: "the maximum allowed recovery file count is 31".
+        settings.volumes = Volumes::Count;
+        settings.distribution = Distribution::Uniform;
+        settings.volumeCount = 31;
+        QVERIFY(settings.validate().isEmpty());
+        QVERIFY(settings.arguments(10).contains("-n31"));
+        settings.volumeCount = 32;
+        QVERIFY(!settings.validate().isEmpty());
+        settings.volumeCount = 5;
         settings.tool = Tool::MultiPar;
         settings.volumes = Volumes::Count;
         settings.distribution = Distribution::Decimal;
@@ -79,47 +124,90 @@ private slots:
         settings.volumes = Volumes::Size;
         QVERIFY(settings.validate().isEmpty());
         QVERIFY(settings.arguments(10).contains("/rd3"));
-        QVERIFY(settings.arguments(10).contains("/ls2"));
+        // par2j counts blocks per recovery file, and never splits the sources.
+        QVERIFY(settings.arguments(10).contains("/lr2"));
+        QVERIFY(!settings.arguments(10).join(' ').contains("/ls"));
+        const auto multiPar = Settings::read(Tool::MultiPar, joinArguments(settings.arguments(10)));
+        QVERIFY(!multiPar.custom);
+        QCOMPARE(multiPar.volumeBytes, 2048);
+        QCOMPARE(multiPar.arguments(10), settings.arguments(10));
+        // The 2 GiB PAR2 limit applies to a block, not an entire recovery file.
+        auto largeVolume = settings;
+        largeVolume.blockBytes = 1048576;
+        largeVolume.volumeBytes = 5LL * 1024 * 1048576;
+        QVERIFY(largeVolume.validate().isEmpty());
+        QVERIFY(largeVolume.arguments(10).contains("/lr5120"));
+        QCOMPARE(Settings::read(Tool::MultiPar, joinArguments(largeVolume.arguments(10))).volumeBytes,
+                 largeVolume.volumeBytes);
+        settings.blocks = Blocks::Automatic; // no block size: no block count to derive
+        QVERIFY(!settings.validate().isEmpty());
+        settings.blocks = Blocks::Size;
+        settings.volumeBytes = 512; // below one block
+        QVERIFY(!settings.validate().isEmpty());
+        settings.volumeBytes = 2048;
+        for (auto mode : {Blocks::Automatic, Blocks::Count}) {
+            settings.blocks = mode;
+            settings.volumes = Volumes::Automatic;
+            QVERIFY(!settings.estimate({std::numeric_limits<qint64>::max()}, 10).valid);
+        }
     }
     void real_tools_generate_repairable_files_data()
     {
         QTest::addColumn<int>("tool");
-        QTest::newRow("parpar") << int(Tool::ParPar);
-        QTest::newRow("par2cmdline") << int(Tool::Par2cmdline);
+        QTest::addColumn<bool>("gpu");
+        QTest::newRow("parpar") << int(Tool::ParPar) << false;
+        QTest::newRow("par2cmdline") << int(Tool::Par2cmdline) << false;
 #ifdef Q_OS_WIN
-        QTest::newRow("multipar") << int(Tool::MultiPar);
+        QTest::newRow("multipar") << int(Tool::MultiPar) << false;
 #endif
+        if (!qEnvironmentVariableIsEmpty("NGPOST_TEST_OPENCL_DEVICE"))
+            QTest::newRow("parpar-opencl") << int(Tool::ParPar) << true;
     }
     void real_tools_generate_repairable_files()
     {
         QFETCH(int, tool);
+        QFETCH(bool, gpu);
         const auto kind = Tool(tool);
         const auto executable = findExecutable(kind);
         if (executable.isEmpty()) QSKIP("Tool is not installed.");
         QTemporaryDir directory;
         QVERIFY(directory.isValid());
-        const auto input = directory.filePath("sample.bin");
+        const auto input = directory.filePath(QString::fromUtf8("sample é.bin"));
+        const QByteArray original(gpu ? 64 * 1024 * 1024 : 128 * 1024, 'x');
         QFile file(input);
         QVERIFY(file.open(QIODevice::WriteOnly));
-        file.write(QByteArray(1024 * 128, 'x'));
+        QCOMPARE(file.write(original), original.size());
         file.close();
         Settings settings;
         settings.tool = kind;
         settings.blocks = Blocks::Size;
-        settings.blockBytes = 4096;
+        settings.blockBytes = gpu ? 1048576 : 4096;
+        settings.gpu = gpu;
+        if (gpu) settings.device = qEnvironmentVariable("NGPOST_TEST_OPENCL_DEVICE");
         settings.volumes = Volumes::Count;
         settings.volumeCount = 2;
         settings.distribution = kind == Tool::Par2cmdline ? Distribution::Uniform : Distribution::Equal;
-        const auto output = directory.filePath("sample.par2");
+        const auto output = directory.filePath(QString::fromUtf8("recovery é.par2"));
         auto args = settings.arguments(10);
         if (kind == Tool::ParPar) args << "-o";
         args << output << input;
         QProcess process;
         process.setProcessChannelMode(QProcess::MergedChannels);
+        QString gpuName;
+        if (gpu) {
+            process.start(executable, {"--opencl-list", "--json"});
+            QVERIFY(process.waitForFinished(30000));
+            const auto listing = process.readAll();
+            for (const auto &device : openClDevices(listing))
+                if (device.id == settings.device) gpuName = device.name;
+            QVERIFY2(!gpuName.isEmpty(), listing.constData());
+        }
         process.start(executable, args);
         QVERIFY(process.waitForFinished(30000));
         QCOMPARE(process.exitStatus(), QProcess::NormalExit);
-        QVERIFY2(process.exitCode() == 0, process.readAll().constData());
+        const auto generationLog = process.readAll();
+        QVERIFY2(process.exitCode() == 0, generationLog.constData());
+        if (gpu) QVERIFY2(generationLog.contains(gpuName.toUtf8()), generationLog.constData());
         QVERIFY(QFileInfo::exists(output));
         QCOMPARE(QDir(directory.path()).entryList({"*.vol*.par2"}, QDir::Files).size(), 2);
         // Damage one source block and verify a real repair, not only argument spelling.
@@ -132,7 +220,7 @@ private slots:
         QVERIFY(process.waitForFinished(30000));
         QVERIFY2(process.exitCode() == 0, process.readAll().constData());
         QVERIFY(file.open(QIODevice::ReadOnly));
-        QCOMPARE(file.readAll(), QByteArray(1024 * 128, 'x'));
+        QCOMPARE(file.readAll(), original);
     }
 };
 QTEST_GUILESS_MAIN(TestPar2Settings)

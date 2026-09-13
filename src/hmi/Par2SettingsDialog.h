@@ -17,7 +17,10 @@ class QCheckBox;
 class QPlainTextEdit;
 class QLabel;
 class QDialogButtonBox;
+class QFormLayout;
+class QHBoxLayout;
 class QProcess;
+class QPushButton;
 
 class Par2SettingsDialog : public QDialog
 {
@@ -29,6 +32,8 @@ public:
     ~Par2SettingsDialog() override;
     void accept() override;
 private:
+    bool event(QEvent *event) override;
+    bool _layoutReady = false;
     NgPost *_ngPost;
     par2::Settings _initial;
     QComboBox *_tool, *_blocks, *_volumes, *_distribution, *_device;
@@ -39,14 +44,18 @@ private:
     QPlainTextEdit *_arguments;
     QLabel *_preview, *_status, *_memoryLabel, *_toolStatus, *_argumentsPreview;
     QDialogButtonBox *_buttons;
+    QPushButton *_findGpuButton;
+    QFormLayout *_form = nullptr;      //!< the basic section, whose GPU rows come and go with the tool
+    QHBoxLayout *_deviceRow = nullptr;
     QProcess *_probe = nullptr;
     QProcess *_gpuProbe = nullptr;
     QVector<qint64> _sizes;
     std::shared_ptr<std::atomic_bool> _cancelScan;
     bool _beforeCompression, _percentageOverride;
-    bool _dirty = false, _pathDirty = false, _loading = true, _scanIncomplete = false;
+    bool _dirty = false, _pathDirty = false, _loading = true, _scanIncomplete = false, _scanning = false;
     bool _threadsSupported = true;
     QString _probedPath;
+    par2::Tool _probedTool = par2::Tool::Auto;
     par2::Tool selectedTool() const;
     par2::Tool effectiveTool() const;
     par2::Settings settings() const;
