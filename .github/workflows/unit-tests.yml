@@ -253,6 +253,16 @@ jobs:
           qmake unit.pro -spec win32-msvc CONFIG+=release
           nmake
 
+      - name: Bundle the pinned PAR2 tools
+        shell: pwsh
+        run: |
+          # par2j is Windows-only, so the MultiPar row of tst_Par2Settings is
+          # compiled here and nowhere else -- and it QSKIPped on every runner
+          # for want of a binary, leaving that backend with no execution
+          # coverage at all. Same pin list as the packages.
+          .\.github\scripts\fetch-par2-tools.ps1 -Destination "$env:RUNNER_TEMP\par2-tools"
+          "$env:RUNNER_TEMP\par2-tools" | Add-Content -Path $env:GITHUB_PATH -Encoding utf8
+
       - name: Run unit tests
         env:
           NGPOST_BIN: ${{ github.workspace }}\src\release\ngPost.exe

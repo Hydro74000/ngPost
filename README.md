@@ -15,7 +15,7 @@
 This application is a high-speed command line and GUI Usenet poster for binaries, designed for secure and efficient data posting. Developed with C++17 and [Qt 6.8.2](https://www.qt.io/blog/qt-6.8.2-released), it features file compression, par2 file generation, and a posting queue for managing multiple uploads. The tool automates tasks by scanning folders and posting files, with options for executing commands post-upload and shutting down the computer upon completion.
 
 
-![ngPost_v5.3.0](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.3.0.png?raw=true)
+![ngPost_v5.6](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.6.png?raw=true)
 
 # Getting Started
 
@@ -37,6 +37,29 @@ All the features are [highlighted here](https://github.com/Hydro74000/ngPost/wik
 [Releases are available](https://github.com/Hydro74000/ngPost/releases) for Linux 64 Bit, Windows 64 Bit and macOS. Raspbian packages are not currently produced.
 
 For building the project yourself, please refer to [the wiki](https://github.com/Hydro74000/ngPost/wiki/Build)
+
+## PAR2 tools and GPU support
+
+Packages include ParPar 0.4.6 and par2cmdline 1.4.0; Windows also includes
+MultiPar 1.3.3.6. ParPar is optional in the Windows installer. The command-line
+component shipped with MultiPar 1.3.3.6 reports version 1.3.3.5.
+
+| Package | GPU generation | Required runtime |
+| --- | --- | --- |
+| Linux x86_64 archive / AppImage | ParPar via OpenCL | System OpenCL ICD loader and compatible GPU driver |
+| Windows x64 | ParPar or MultiPar via OpenCL | Compatible 64-bit OpenCL driver/runtime (`OpenCL.dll`) |
+| macOS ARM64 / x86_64 | Unavailable in the bundled ParPar 0.4.6 builds | CPU generation remains available |
+
+par2cmdline uses the CPU on all platforms. A GPU checkbox or a successful CPU
+test does not prove GPU availability: use **Find GPUs** with ParPar to check the
+selected executable and installed runtime. These tools use OpenCL, not CUDA.
+See [runtime details and upstream references](THIRD_PARTY_LICENSES.md#gpu-runtime-dependencies).
+
+Everything above is set in **PAR2 Settings...**, next to **Compression Settings**
+in the main window:
+
+![PAR2 Settings](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.6_par2.png?raw=true)
+![Compression Settings](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.6_compression.png?raw=true)
 
 ## VPN Tunnel Support
 

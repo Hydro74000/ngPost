@@ -2488,8 +2488,13 @@ void TestMainWindow::sizing_dialogs_translations_fit()
                 if (qobject_cast<QAbstractSpinBox *>(field->parentWidget())
                     || qobject_cast<QComboBox *>(field->parentWidget())) continue;
                 if (qobject_cast<QComboBox *>(field) || qobject_cast<QAbstractSpinBox *>(field)
-                    || qobject_cast<QLineEdit *>(field) || qobject_cast<QPlainTextEdit *>(field))
+                    || qobject_cast<QLineEdit *>(field) || qobject_cast<QPlainTextEdit *>(field)) {
                     QTRY_VERIFY2(field->height() >= field->minimumSizeHint().height(), qPrintable(field->objectName()));
+                    auto *scroll = dialog.findChild<QScrollArea *>("par2SettingsScroll");
+                    if (scroll && scroll->widget()->isAncestorOf(field))
+                        QTRY_VERIFY2(field->mapTo(scroll->widget(), QPoint()).x() + field->width()
+                                     <= scroll->widget()->width(), qPrintable(field->objectName()));
+                }
             }
         }
         for (auto *label : dialog.findChildren<QLabel *>()) {
@@ -2517,6 +2522,17 @@ void TestMainWindow::sizing_dialogs_translations_fit()
     auto *scroll = parDialog.findChild<QScrollArea *>("par2SettingsScroll");
     scroll->verticalScrollBar()->setValue(scroll->verticalScrollBar()->maximum());
     inspect(parDialog, "par2-advanced-bottom");
+    // Exercise the GPU rows too: par2cmdline hides them. They must fit in the
+    // basic form, including the editable device selector in every translation.
+    parDialog.findChild<QToolButton *>()->setChecked(false);
+    auto *tool = parDialog.findChild<QComboBox *>("par2Tool");
+    tool->setCurrentIndex(tool->findData(int(par2::Tool::ParPar)));
+    parDialog.findChild<QCheckBox *>("par2Gpu")->setChecked(true);
+    scroll->ensureWidgetVisible(parDialog.findChild<QPushButton *>("par2FindGpus"));
+    inspect(parDialog, "par2-parpar-gpu");
+    tool->setCurrentIndex(tool->findData(int(par2::Tool::MultiPar)));
+    scroll->ensureWidgetVisible(parDialog.findChild<QCheckBox *>("par2Gpu"));
+    inspect(parDialog, "par2-multipar-gpu");
     parDialog.reject();
 }
 

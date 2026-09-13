@@ -20,7 +20,7 @@ Voici la liste des principales fonctionnalités et atouts de ngPost:
   - multi-langues (Français, Allemand, Anglais, Chinois, Espagnol, Néerlandais, Portugais)
   - ...
 
-![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3.png)
+![ngPost_v5.6](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_fr.png)
 
 
 [Les versions pour chacun des OS sont disponibles ici](https://github.com/Hydro74000/ngPost/releases), pour Linux 64 bits, Windows 64 bits et macOS. Aucun paquet Raspbian récent n'est actuellement produit.
@@ -234,7 +234,7 @@ Puis il suffit de cliquer sur **Poster Fichiers**
 
 #### le mode auto:
 
-![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3_auto_fr.png)
+![ngPost_v5.6](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_auto_fr.png)
 
 - choisissez le **Dossier auto** (par défaut, c'est le inputDir du fichier de configuration)
 - cliquez sur **Scanner**
@@ -250,7 +250,7 @@ L'interface graphique sautera sur le Post Rapide courant.<br/>
 
 #### le mode surveillance:
 
-![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3_monitor_fr.png)
+![ngPost_v5.6](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_auto_fr.png)
 
 - choisissez le **Dossier auto** (par défaut, c'est le inputDir du fichier de configuration)
 - choisissez le **filtre sur les extensions** (ex: mp4,mkv,avi sans espaces) et si vous voulez poster les dossiers

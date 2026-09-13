@@ -58,7 +58,7 @@ the GNU GPL v2 in all respects.
 
 ---
 
-## ParPar (`parpar.exe`)
+## ParPar (`parpar` / `parpar.exe`)
 
 - **How used**: bundled in every package (ParPar 0.4.6) — in the Windows ZIP and
   offered as an optional installer task on Windows, and shipped next to the
@@ -70,6 +70,31 @@ the GNU GPL v2 in all respects.
 - **Copyright**: released into the public domain by Anime Tosho
 - **Source code**: <https://github.com/animetosho/ParPar>
 - **Full licence text**: <https://creativecommons.org/publicdomain/zero/1.0/legalcode>
+
+### GPU runtime dependencies
+
+ParPar and MultiPar include their OpenCL processing code in the executable;
+the upstream archives contain no separate GPU plugin to copy. These packages
+do not include vendor GPU drivers or CUDA modules. par2cmdline uses CPU/OpenMP
+and has no GPU backend.
+
+- **Linux x86_64**: ParPar's glibc build loads the system OpenCL ICD loader
+  (`libOpenCL.so`, `libOpenCL.so.1` or `libOpenCL.so.1.0.0`). The host needs both
+  that loader and an OpenCL implementation for its GPU. The AppImage uses the
+  host driver as well.
+- **Windows x64**: ParPar and MultiPar load `OpenCL.dll` from the installed
+  OpenCL runtime. A compatible 64-bit GPU driver/runtime is required.
+  `vcomp140.dll` below is a CPU threading dependency, not a GPU module.
+- **macOS ARM64 and x86_64**: the pinned upstream ParPar 0.4.6 executables
+  have their dynamic OpenCL loader compiled out. They support CPU generation;
+  installing an OpenCL runtime alone will not enable GPU processing in those
+  binaries. A different build with a working macOS OpenCL loader would need
+  native validation before being shipped. MultiPar is Windows-only.
+
+Upstream references: [ParPar OpenCL requirements](https://github.com/animetosho/ParPar/blob/v0.4.6/README.md#opencl-support),
+[ParPar executable build](https://github.com/animetosho/ParPar/blob/v0.4.6/nexe/build.js),
+[ParPar loader](https://github.com/animetosho/ParPar/blob/v0.4.6/gf16/opencl-include/cl.c),
+[MultiPar loader](https://github.com/Yutaka-Sawada/MultiPar/blob/v1.3.3.6/source/par2j/lib_opencl.c).
 
 ---
 

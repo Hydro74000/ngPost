@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Fetch the ParPar and par2cmdline builds pinned in the release workflow's env
-# block into a destination directory, verifying every download against its
+# Fetch the ParPar and par2cmdline builds pinned in par2-tools.env
+# into a destination directory, verifying every download against its
 # SHA-256.
 #
 # One script for the Linux archive, the AppImage and the macOS bundle: the three
 # used to disagree (Windows shipped a vendored par2cmdline, the AppImage took
 # whatever apt had, macOS shipped nothing at all), so a post behaved differently
 # depending on the package it came from. Windows fetches the same pinned
-# versions from the workflow itself -- PowerShell, and MultiPar on top.
+# versions through fetch-par2-tools.ps1, with MultiPar on top.
 #
 # ngPost finds these by name next to its own binary (see par2Candidates in
 # NgPost::NgPost), which is why they are written as plain "parpar" and "par2".
@@ -66,6 +66,10 @@ case "$(uname -s)" in
     par2_sha=${PAR2CMDLINE_SHA256_MACOS_UNIVERSAL:?missing PAR2CMDLINE_SHA256_MACOS_UNIVERSAL}
     ;;
   Linux)
+    [ "$(uname -m)" = "x86_64" ] || {
+      echo "ERROR: pinned Linux PAR2 builds require x86_64, got $(uname -m)" >&2
+      exit 1
+    }
     # ParPar's fully static build cannot load OpenCL, even with working GPU
     # drivers. The glibc 2.31 build supports runtime loading of the host's ICD.
     # par2cmdline remains static; do not pass it to linuxdeploy/patchelf.
@@ -100,10 +104,12 @@ unzip -o -q -j "$tmp/$par2_asset" par2 -d "$dest"
 chmod 755 "$dest/parpar" "$dest/par2"
 
 if [ "$(uname -s)" = "Darwin" ]; then
-  # arm64 macOS refuses to execute an unsigned Mach-O, and these come straight
-  # out of a release archive. Ad-hoc signing is what lets them run at all.
-  codesign --force --sign - "$dest/parpar"
+  # Preserve ParPar byte for byte: it verifies an appended MD5 over its entire
+  # executable, including its signature. Re-signing breaks every invocation.
+  # The upstream arm64 build already has an ad-hoc signature; x64 can run
+  # unsigned. par2cmdline has no such self-check and can be signed normally.
   codesign --force --sign - "$dest/par2"
+  echo "NOTE: upstream ParPar ${PARPAR_VERSION} macOS builds support CPU only; their OpenCL loader is disabled."
 fi
 
 # Being on disk proves nothing: run both the way ngPost will and check what they
