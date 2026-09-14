@@ -46,6 +46,18 @@ private slots:
     //! single byte, which is where the old 4x over-allocation was hiding.
     void worst_case_bound_is_never_exceeded();
     void worst_case_bound_is_never_exceeded_data();
+
+    //! Three bytes escape depending on WHERE in the line they land, which is
+    //! the half of the escape rules the cases above cannot reach:
+    //!   - SPACE and TAB at either end of a line, because anything that trims
+    //!     trailing whitespace in transit drops the byte and the decoded file
+    //!     is a byte short with a failing CRC32;
+    //!   - '.' at column 0 only, which is NNTP dot-stuffing.
+    //! The end-of-line half of the whitespace rule was dead code
+    //! (`column - 1 == maxwidth`, needing an unreachable column == 129), so
+    //! ~44 raw line-final blanks went out per 700 KB article.
+    void column_sensitive_bytes_are_escaped();
+    void column_sensitive_bytes_are_escaped_data();
 };
 
 void TestYenc::encode_empty_input()
@@ -198,6 +210,58 @@ void TestYenc::worst_case_bound_is_never_exceeded()
     QCOMPARE(dst[static_cast<size_t>(written) - 1], uchar(0)); // trailing NUL
     for (size_t i = bound; i < dst.size(); ++i)
         QCOMPARE(dst[i], uchar(0xAB)); // nothing written past the bound
+}
+
+void TestYenc::column_sensitive_bytes_are_escaped_data()
+{
+    QTest::addColumn<uchar>("rawInput");   //!< byte handed to the encoder
+    QTest::addColumn<int>("index");        //!< where it sits in the input
+    QTest::addColumn<bool>("mustEscape");
+
+    // After + 42: 0xF6 → ' ' (0x20), 0xDF → '\t' (0x09), 0x04 → '.' (0x2E).
+    // maxwidth is 128, so the last column of a line is index 127.
+    QTest::newRow("space at column 0")       << uchar(0xF6) << 0   << true;
+    QTest::newRow("space mid line")          << uchar(0xF6) << 60  << false;
+    QTest::newRow("space at last column")    << uchar(0xF6) << 127 << true;
+    QTest::newRow("tab at column 0")         << uchar(0xDF) << 0   << true;
+    QTest::newRow("tab mid line")            << uchar(0xDF) << 60  << false;
+    QTest::newRow("tab at last column")      << uchar(0xDF) << 127 << true;
+    // Dot-stuffing guards the start of a line only: a '.' anywhere else is
+    // ordinary data and escaping it would be a needless byte on every line.
+    QTest::newRow("dot at column 0")         << uchar(0x04) << 0   << true;
+    QTest::newRow("dot mid line")            << uchar(0x04) << 60  << false;
+    QTest::newRow("dot at last column")      << uchar(0x04) << 127 << false;
+}
+
+void TestYenc::column_sensitive_bytes_are_escaped()
+{
+    QFETCH(uchar, rawInput);
+    QFETCH(int, index);
+    QFETCH(bool, mustEscape);
+
+    // 0x17 + 42 == 'A', a filler that never escapes. That is what keeps input
+    // index and output column equal for every byte ahead of `index`, so the
+    // assertions below can address the output directly.
+    constexpr qint64  N = 160;
+    std::vector<char> src(static_cast<size_t>(N), char(0x17));
+    src[static_cast<size_t>(index)] = static_cast<char>(rawInput);
+
+    std::vector<uchar> dst(NntpArticle::yEncWorstCaseSize(N) + 16, 0xAA);
+    quint32            crc = 0;
+
+    Yenc::encode(src.data(), N, dst.data(), crc);
+
+    const size_t at      = static_cast<size_t>(index);
+    const uchar  encoded = static_cast<uchar>((rawInput + 42) & 0xFF);
+
+    if (mustEscape) {
+        QCOMPARE(dst[at],     uchar('='));
+        QCOMPARE(dst[at + 1], uchar(encoded + 64));
+    } else {
+        QCOMPARE(dst[at], encoded);
+        if (at > 0)
+            QVERIFY2(dst[at - 1] != uchar('='), "escaped a byte that needs no escape");
+    }
 }
 
 QTEST_APPLESS_MAIN(TestYenc)

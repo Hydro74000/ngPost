@@ -108,6 +108,53 @@ private slots:
         QCOMPARE(transactions.size(), 1);
         QVERIFY(!QFileInfo::exists(path + "/" + transactions.first() + "/cancelled"));
     }
+    //! The marker is how a cancellation reaches the detached installer, which
+    //! polls for it (install_update.py). Dropping it is the whole job of
+    //! cancelDownload(); nothing is reported because nothing went wrong.
+    void cancel_writes_the_marker_the_detached_installer_polls_for() {
+        UpdateChecker checker(nullptr, nullptr);
+        checker._work.reset(new QTemporaryDir);
+        QVERIFY(checker._work->isValid());
+        QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
+
+        checker.cancelDownload();
+
+        QVERIFY(QFileInfo::exists(checker._work->filePath("cancelled")));
+        QCOMPARE(errors.size(), 0);
+    }
+
+    //! open() used to be called for its side effect alone, so a marker that
+    //! could not be written left the user believing the update was called off
+    //! while the detached installer went on to replace the installation.
+    //! Removing the work folder is what makes the write fail on every
+    //! platform, and as any user -- a chmod would not stop root.
+    void unwritable_marker_is_reported_once_the_installer_is_detached() {
+        UpdateChecker checker(nullptr, nullptr);
+        checker._work.reset(new QTemporaryDir);
+        QVERIFY(checker._work->isValid());
+        QVERIFY(QDir().rmdir(checker._work->path()));
+        checker._detached = true;
+        QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
+
+        checker.cancelDownload();
+
+        QVERIFY(!QFileInfo::exists(checker._work->filePath("cancelled")));
+        QCOMPARE(errors.size(), 1);
+    }
+
+    //! Before startDetached() there is no process to call off, so the same
+    //! failed write is not worth a word: the download was aborted in-process.
+    void unwritable_marker_is_silent_while_nothing_is_detached() {
+        UpdateChecker checker(nullptr, nullptr);
+        checker._work.reset(new QTemporaryDir);
+        QVERIFY(QDir().rmdir(checker._work->path()));
+        QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
+
+        checker.cancelDownload();
+
+        QCOMPARE(errors.size(), 0);
+    }
+
     void trusted_urls() {
         QVERIFY(UpdateChecker::isTrustedDownloadUrl(QUrl("https://github.com/a")));
         QVERIFY(UpdateChecker::isTrustedDownloadUrl(QUrl("https://release-assets.githubusercontent.com/a")));

@@ -310,18 +310,43 @@ bool UpdateChecker::isTrustedDownloadUrl(const QUrl &url)
 
 UpdateChecker::~UpdateChecker()
 {
+    // No signal may leave the object from here on: a slot reacting to one
+    // would run against a half-destroyed UpdateChecker.
+    _destructing = true;
     // The detached installer must survive application teardown after handoff.
     if (!_handoff) cancelDownload();
+}
+
+bool UpdateChecker::_markCancelledForInstaller()
+{
+    // The detached installer polls for this file and aborts when it appears
+    // (install_update.py, "cancelled"). It is the ONLY channel we have once
+    // startDetached() has returned, so a silent failure here means a cancelled
+    // update installs itself anyway -- after ngPost has already exited.
+    if (!_work)
+        return true; // nothing staged, nothing to call off
+
+    QString const path = _work->filePath(QStringLiteral("cancelled"));
+    QFile         cancelled(path);
+    if (cancelled.open(QIODevice::WriteOnly)) {
+        cancelled.close();
+        return true;
+    }
+
+    // qWarning, not qDebug: release builds define QT_NO_DEBUG_OUTPUT, and this
+    // is the one trace left when the GUI is already gone.
+    qWarning().noquote() << QStringLiteral(
+                                "[UpdateChecker] could not write '%1' (%2); a detached update "
+                                "installer cannot be called off")
+                                .arg(path, cancelled.errorString());
+    return false;
 }
 
 void UpdateChecker::cancelDownload()
 {
     ++_generation;
     _cancelled = true;
-    if (_work) {
-        QFile cancelled(_work->filePath(QStringLiteral("cancelled")));
-        cancelled.open(QIODevice::WriteOnly);
-    }
+    bool const calledOff = _markCancelledForInstaller();
     if (_downloadReply) {
         auto reply = _downloadReply.data();
         _downloadReply = nullptr;
@@ -339,19 +364,34 @@ void UpdateChecker::cancelDownload()
         process->deleteLater();
     }
     _busy = false;
+
+    // Killing our own child says nothing about the detached installer: once
+    // _detached is set, that process owns the install directory and only the
+    // marker stops it. Telling the user the cancellation did not take is the
+    // whole point -- silently returning would leave them believing it did.
+    if (!calledOff && _detached && !_destructing)
+        emit downloadFailed(tr("Could not cancel the update: ngPost failed to signal the installer "
+                               "already running, and it may replace this installation. Check the "
+                               "version after the next start."));
 }
 
 void UpdateChecker::failDownload(const QString &message)
 {
     // Invalidate detached-readiness timers before a retry can create new work.
     ++_generation;
-    if (_work) {
-        QFile cancelled(_work->filePath(QStringLiteral("cancelled")));
-        cancelled.open(QIODevice::WriteOnly);
-    }
+    bool const calledOff = _markCancelledForInstaller();
     _busy = false;
     _downloadFile.reset();
-    if (!_cancelled) emit downloadFailed(message);
+    if (_cancelled)
+        return;
+
+    QString reported = message;
+    if (!calledOff && _detached) {
+        reported += QLatin1Char(' ')
+                  + tr("The installer already running could not be stopped either, and it may "
+                       "replace this installation.");
+    }
+    emit downloadFailed(reported);
 }
 
 void UpdateChecker::startDownloadAndInstall()
@@ -495,6 +535,9 @@ void UpdateChecker::prepareInstall()
             failDownload(tr("Cannot start update transaction."));
             return;
         }
+        // From here the installer is out of our process tree: the "cancelled"
+        // marker is the only way left to stop it.
+        _detached = true;
         // Keep files alive until the detached installer acknowledges readiness.
         _work->setAutoRemove(false);
         auto *timer = new QTimer(this);

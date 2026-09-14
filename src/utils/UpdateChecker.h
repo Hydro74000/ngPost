@@ -76,6 +76,12 @@ private:
     void prepareInstall();
     void failDownload(const QString &message);
 
+    //! Drops the "cancelled" marker the detached installer polls for. False
+    //! when it could not be written, which is the only case where a cancelled
+    //! update can still install itself; a warning names the path either way.
+    //! True when nothing is staged -- there is then nothing to call off.
+    bool _markCancelledForInstaller();
+
     static const QString sReleaseApiUrl;
     static const QString sReleaseListApiUrl;
     static const QString sRepoOwner;
@@ -93,6 +99,12 @@ private:
     bool _busy = false;
     bool _cancelled = false;
     bool _handoff = false;
+    //! A detached installer has been started and is polling the work folder.
+    //! Until then a failed "cancelled" marker costs nothing; after it, that
+    //! marker is the only thing standing between a cancellation and an install.
+    bool _detached = false;
+    //! Set by the destructor so nothing emits from a half-destroyed object.
+    bool _destructing = false;
     quint64 _generation = 0;
 
     QString _latestTag;
