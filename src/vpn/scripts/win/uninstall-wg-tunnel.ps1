@@ -89,5 +89,22 @@ if (-not $removed) {
     exit 1
 }
 
+# The staged copy install-wg-tunnel.ps1 validated and installed from. Removed
+# only now, with the service confirmed gone, so a failed uninstall never leaves
+# a registered tunnel whose staged profile has been deleted under it.
+#
+# Absence is normal and not an error: a tunnel registered by an ngPost older
+# than the staging step has no copy here. Failing to delete one is not worth
+# failing the uninstall either -- the service is gone, which is what was asked.
+$staging = Join-Path (Join-Path $env:ProgramData 'ngPost') 'wg'
+if (Test-Path -LiteralPath $staging -PathType Container) {
+    Get-ChildItem -LiteralPath $staging -File -ErrorAction SilentlyContinue |
+        Where-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Name) -eq $tunnelName } |
+        ForEach-Object {
+            try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop }
+            catch { Write-Host "Could not remove the staged profile $($_.Name): $($_.Exception.Message)" }
+        }
+}
+
 Write-Output "UNINSTALLED $ServiceName"
 exit 0

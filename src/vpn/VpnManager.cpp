@@ -13,6 +13,7 @@
 #include "VpnBackend.h"
 #include "VpnProfile.h"
 #include "WireGuardBackend.h"
+#include "WireGuardConfigPolicy.h"
 #ifdef Q_OS_WIN
 #include "WindowsBindHelper.h"
 #include "WindowsSecurity.h"
@@ -1710,9 +1711,25 @@ QString findWinScript(QString const &name)
 
 // Run a PowerShell script elevated (UAC) via Start-Process -Verb RunAs.
 // Blocks until the elevated PS exits. Returns the inner exit code, or
-// negative on failure to even launch.
-int runElevatedPowerShell(QString const &script, QStringList const &args)
+// negative on failure to even launch; -2 means the script was refused before
+// any prompt, with the reason in \a refusal.
+int runElevatedPowerShell(QString const &script, QStringList const &args, QString *refusal)
 {
+    // Refuse before the UAC prompt, not after. `-Verb RunAs` on a script an
+    // ordinary account can rewrite is a way to become administrator: the prompt
+    // names powershell.exe, signed by Microsoft, so nothing looks wrong. The
+    // installer lands in Program Files and is safe; the portable zip ships the
+    // same scripts wherever the user unpacked it.
+    //
+    // This is the check the Linux helper already performs on --bin-dir before
+    // running a bundled binary as root.
+    QString detail;
+    if (!WindowsSecurity::onlyPrivilegedPrincipalsCanWrite(script, &detail)) {
+        if (refusal)
+            *refusal = detail;
+        return -2;
+    }
+
     QString const powershell = WindowsSecurity::systemPowerShell();
     if (powershell.isEmpty()) return -1;
     QStringList psArgs;
@@ -1753,9 +1770,32 @@ bool VpnManager::registerWindowsWireGuardTunnel(QString const &confAbsPath)
         emit logLine(tr("Could not determine the caller SID; refusing tunnel installation."));
         return false;
     }
+
+    // The profile is about to be handed to wireguard.exe running elevated, and
+    // it lives in a folder any process running as this user can write. The
+    // Linux helper has sanitised it since revision 4; do the same here, before
+    // the prompt, so the user is told which line to remove.
+    WireGuardConfigPolicy::Verdict const verdict =
+        WireGuardConfigPolicy::inspectFile(confAbsPath);
+    if (!verdict.isAccepted()) {
+        emit logLine(verdict.lineNumber > 0
+                         ? tr("WireGuard profile refused (line %1): %2")
+                               .arg(verdict.lineNumber)
+                               .arg(verdict.reason)
+                         : tr("WireGuard profile refused: %1").arg(verdict.reason));
+        return false;
+    }
+
+    QString refusal;
     int code = runElevatedPowerShell(script,
         { QStringLiteral("-ConfPath"), confAbsPath,
-          QStringLiteral("-InvokerSid"), sid });
+          QStringLiteral("-InvokerSid"), sid }, &refusal);
+    if (code == -2) {
+        emit logLine(tr("Refusing to run the tunnel installer as administrator: %1. "
+                        "Install ngPost with its setup, or move it somewhere only an "
+                        "administrator can write.").arg(refusal));
+        return false;
+    }
     if (code != 0) {
         emit logLine(tr("WireGuard tunnel install failed (exit %1)").arg(code));
         return false;
@@ -1775,8 +1815,15 @@ bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
         emit logLine(tr("uninstall-wg-tunnel.ps1 not found in app bundle"));
         return false;
     }
+    QString refusal;
     int code = runElevatedPowerShell(script,
-        { QStringLiteral("-ServiceName"), serviceName });
+        { QStringLiteral("-ServiceName"), serviceName }, &refusal);
+    if (code == -2) {
+        emit logLine(tr("Refusing to run the tunnel uninstaller as administrator: %1. "
+                        "Install ngPost with its setup, or move it somewhere only an "
+                        "administrator can write.").arg(refusal));
+        return false;
+    }
     if (code != 0) {
         emit logLine(tr("WireGuard tunnel uninstall failed (exit %1)").arg(code));
         return false;

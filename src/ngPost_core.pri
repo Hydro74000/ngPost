@@ -128,6 +128,7 @@ SOURCES += \
         $$PWD/vpn/WindowsSecurity.cpp \
         $$PWD/vpn/WindowsServiceControl.cpp \
         $$PWD/vpn/WindowsBindHelper.cpp \
+        $$PWD/vpn/WireGuardConfigPolicy.cpp \
         $$PWD/vpn/WireGuardBackend.cpp
 
 HEADERS += \
@@ -172,6 +173,7 @@ HEADERS += \
     $$PWD/vpn/WindowsSecurity.h \
     $$PWD/vpn/WindowsServiceControl.h \
     $$PWD/vpn/WindowsBindHelper.h \
+    $$PWD/vpn/WireGuardConfigPolicy.h \
     $$PWD/vpn/WireGuardBackend.h
 
 # HMI sources are pulled in only when the consumer set `CONFIG += use_hmi`

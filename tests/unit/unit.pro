@@ -15,6 +15,7 @@ SUBDIRS = \
     tst_PostInfoTemplate \
     tst_VpnProfile \
     tst_OpenVpnConfigPolicy \
+    tst_WireGuardConfigPolicy \
     tst_CliParser \
     tst_FoldersMonitor \
     tst_UpdateChecker \

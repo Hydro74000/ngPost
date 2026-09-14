@@ -10,7 +10,40 @@ test_root="$1"
 suite_name="$2"
 fail=0
 found=0
+unpinned=0
 host_platform="$(uname -s)"
+
+# Normalised for expected-counts.txt: Git Bash and MSYS report MINGW64_NT-...,
+# MSYS_NT-... or CYGWIN_NT-..., none of which a human would write in a table.
+case "$host_platform" in
+  Linux)                      host_key=Linux ;;
+  Darwin)                     host_key=Darwin ;;
+  MINGW*|MSYS*|CYGWIN*|Windows_NT) host_key=Windows ;;
+  *)                          host_key="$host_platform" ;;
+esac
+
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+counts_file="$script_dir/../../tests/expected-counts.txt"
+
+# The floor a binary must clear, "" when this platform pins none. A line naming
+# this platform beats the platform-agnostic one, so a suite that legitimately
+# runs fewer tests here can say so instead of being given a figure measured
+# elsewhere.
+expected_minimum() {
+  local name=$1 bin min platform default="" specific=""
+  [ -r "$counts_file" ] || return 0
+  while read -r bin min platform _rest; do
+    case "$bin" in ''|\#*) continue ;; esac
+    [ "$bin" = "$name" ] || continue
+    case "$min" in ''|*[!0-9]*) continue ;; esac
+    if [ -n "${platform:-}" ]; then
+      [ "$platform" = "$host_key" ] && specific=$min
+    else
+      default=$min
+    fi
+  done < "$counts_file"
+  printf '%s' "${specific:-$default}"
+}
 
 # Only these two complete suites are intentionally unavailable off Windows.
 # Other Windows-related suites contain portable tests and must execute them.
@@ -68,6 +101,26 @@ while IFS= read -r test_bin; do
     code=1
   fi
 
+  # Floor check. Runs on the summary the block above just validated, so a
+  # missing or malformed summary is already a failure by this point.
+  minimum="$(expected_minimum "${test_name%.exe}")"
+  if [ -z "$minimum" ]; then
+    unpinned=$((unpinned + 1))
+    echo "::notice::${test_name} runs no pinned minimum on ${host_key}; see tests/expected-counts.txt"
+  elif [ -s "$text_log" ]; then
+    passed="$(sed -n 's/^Totals: \([0-9][0-9]*\) passed,.*/\1/p' "$text_log" | head -n 1)"
+    if [ -z "$passed" ]; then
+      echo "::error file=${text_log}::${test_name}: cannot read the passed count from its summary"
+      code=1
+    elif [ "$passed" -lt "$minimum" ]; then
+      echo "::error file=${text_log},title=${test_name} lost tests::${test_name} ran ${passed} tests," \
+           "below the ${minimum} pinned for ${host_key}. Either a test stopped running -- a stale" \
+           "in-tree .moc does this silently -- or it was removed on purpose, in which case lower the" \
+           "figure in tests/expected-counts.txt in the same commit."
+      code=1
+    fi
+  fi
+
   if [ "$code" -ne 0 ]; then
     echo "::error file=${text_log},title=${test_name} failed::${test_name} exited with code ${code}"
     fail=$((fail + 1))
@@ -78,6 +131,10 @@ done < <(find "$test_root" -type f \( -name 'tst_*' -o -name 'tst_*.exe' \) | so
 if [ "$found" -eq 0 ]; then
   echo "::error::No ${suite_name} test binaries found"
   exit 1
+fi
+
+if [ "$unpinned" -ne 0 ]; then
+  echo "::notice::${unpinned} ${suite_name} binary/binaries have no pinned minimum on ${host_key}"
 fi
 
 if [ "$fail" -ne 0 ]; then

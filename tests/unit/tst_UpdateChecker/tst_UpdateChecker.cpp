@@ -155,6 +155,28 @@ private slots:
         QCOMPARE(errors.size(), 0);
     }
 
+    //! _detached says "a detached installer is running and only the marker can
+    //! stop it". A previous attempt that reached startDetached() and then failed
+    //! its readiness wait leaves it set; carrying that into a retry made a
+    //! failed marker write warn about an installer that is not running, which
+    //! is how a warning the user must trust becomes one they learn to ignore.
+    void a_retry_does_not_inherit_the_previous_detached_state() {
+        UpdateChecker checker(nullptr, nullptr);
+        checker._work.reset(new QTemporaryDir);
+        QVERIFY(checker._work->isValid());
+        QVERIFY(QDir().rmdir(checker._work->path())); // the marker write will fail
+        checker._detached = true;                     // as a failed handoff would leave it
+        QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
+
+        // No trusted asset, so this fails immediately through failDownload().
+        checker.startDownloadAndInstall();
+
+        QVERIFY(!checker._detached);
+        QCOMPARE(errors.size(), 1);
+        QString const message = errors.first().first().toString();
+        QVERIFY2(!message.contains(QStringLiteral("already running")), qPrintable(message));
+    }
+
     void trusted_urls() {
         QVERIFY(UpdateChecker::isTrustedDownloadUrl(QUrl("https://github.com/a")));
         QVERIFY(UpdateChecker::isTrustedDownloadUrl(QUrl("https://release-assets.githubusercontent.com/a")));

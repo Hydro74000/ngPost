@@ -399,6 +399,11 @@ void UpdateChecker::startDownloadAndInstall()
     if (_busy || isAppImage()) return;
     ++_generation;
     _cancelled = false;
+    // A previous attempt that reached startDetached() and then failed its
+    // readiness wait leaves _detached set. Carrying that into a retry makes a
+    // failed marker write claim an installer is running when none is, which
+    // turns a warning the user must trust into one they learn to ignore.
+    _detached = false;
     if (!isTrustedDownloadUrl(_assetUrl) || _assetSize <= 0 || _assetSize > 1024LL * 1024 * 1024) {
         failDownload(tr("No bounded, trusted update asset is available."));
         return;

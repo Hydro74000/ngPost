@@ -1,0 +1,75 @@
+# tests/expected-counts.txt — floor on the number of tests each binary must run.
+#
+# Why this file exists
+# -------------------
+# run-qt-tests.sh already refuses a binary that produces no successful test body
+# at all. That catches a suite reduced to nothing; it does not catch a suite
+# reduced from 62 tests to 1, which stays green.
+#
+# That is not hypothetical. A stale in-tree `.moc` — left by an earlier in-tree
+# build, and picked up in preference to the freshly generated one because the
+# compiler resolves `#include "tst_X.moc"` from the source directory first — was
+# found to hide a newly added test: the binary embedded an out-of-date
+# metaobject, reported one test fewer, and the suite passed. Two tests were
+# masked that way, in tst_CliParser and tst_UpdateChecker.
+#
+# Format
+# ------
+#   <binary-name> <minimum-passed> [platform]
+#
+# `platform` is the value of `uname -s`, normalised: Linux, Darwin, Windows.
+# A line without a platform applies everywhere. The most specific match wins.
+# `minimum-passed` counts the `N passed` of the QtTest summary, data-driven rows
+# included — a test that turns into a skip lowers it too, which is the point.
+#
+# It is a FLOOR, not an exact count: adding tests never requires touching this
+# file. Only removing them does, which is precisely the decision worth making
+# explicit.
+#
+# A binary with no applicable line is reported as unpinned and does NOT fail the
+# run. That is deliberate: every number below was measured on Linux, and
+# inventing a figure for a platform nobody measured would fail CI on a legitimate
+# platform-specific skip. Extending the file to Windows and macOS means running
+# the suite there once and adding the lines — see "Windows and macOS" below.
+#
+# Measured 2026-09-14, Linux / Qt 6.11.1, with NGPOST_BIN set.
+
+tst_CliParser                 63  Linux
+tst_FoldersMonitor            10  Linux
+tst_GoldenNzb                  4  Linux
+tst_MainWindow                72  Linux
+tst_MockNntp                   8  Linux
+tst_NntpFile                  29  Linux
+tst_OpenVpnConfigPolicy       74  Linux
+tst_Par2Settings              10  Linux
+tst_PathHelper                45  Linux
+tst_PostFlow                  16  Linux
+tst_PostHistory               48  Linux
+tst_PostInfoTemplate          36  Linux
+tst_RandomToken                3  Linux
+tst_UpdateChecker             17  Linux
+tst_VpnDnsResolver             8  Linux
+tst_VpnProfile                43  Linux
+tst_VpnSocketBinder            8  Linux
+tst_WindowsCommandLine         3  Linux
+tst_WindowsSecurity            5  Linux
+tst_WindowsServiceControl      5  Linux
+tst_WireGuardBackend          13  Linux
+tst_WireGuardConfigPolicy     20  Linux
+tst_Yenc                      26  Linux
+
+# Windows and macOS
+# -----------------
+# Deliberately absent. These suites run MORE tests on Windows than on Linux, so
+# the Linux figures above cannot be reused as a floor for them — and asserting a
+# number measured nowhere is how a check like this breaks a green build:
+#
+#   tst_WindowsBindHelper    7 slots, all QSKIP'd off Windows
+#   tst_WindowsSecurity      7 slots, 4 of them behind #ifdef Q_OS_WIN
+#   tst_WindowsCommandLine   5 slots, 2 of them behind #ifdef Q_OS_WIN
+#   tst_VpnE2E_WireGuard     needs root, iproute2 and the privileged helper
+#
+# To pin them: run the suite on that platform, read the `N passed` of each
+# summary, and add `<binary> <N> Windows` (or `Darwin`) lines here. Until then
+# those binaries are reported as unpinned on every platform, which is honest
+# about what is actually guarded.

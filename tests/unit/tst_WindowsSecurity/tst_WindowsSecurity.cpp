@@ -23,12 +23,14 @@
 
 #include <QtTest>
 
+// Not inside the guard below: isPrivilegedTrusteeSid() is portable, and the
+// tests that pin it run on every platform.
+#include "vpn/WindowsSecurity.h"
+
 #ifdef Q_OS_WIN
 #include <QDir>
 #include <QFile>
 #include <QTemporaryDir>
-
-#include "vpn/WindowsSecurity.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -46,6 +48,16 @@ class TestWindowsSecurity : public QObject
 
 private slots:
     void initTestCase();
+
+    //! Which principals may hold write access to a script ngPost is about to
+    //! launch through `Start-Process -Verb RunAs`. The enforcement needs a
+    //! DACL and therefore Windows, but the policy itself is a decision about
+    //! SIDs, so it is settled here on every platform -- the rule is the part
+    //! worth pinning, and the portable zip makes getting it wrong an
+    //! administrator shell.
+    void privileged_trustees_are_the_three_administrative_sids();
+    void ordinary_and_nearly_privileged_sids_are_not_trusted();
+    void privileged_sid_matching_ignores_case_and_padding();
 
 #ifdef Q_OS_WIN
     //! A file it can reach comes back secured, and the ACL actually says so.
@@ -68,11 +80,58 @@ private slots:
 
 void TestWindowsSecurity::initTestCase()
 {
-#ifndef Q_OS_WIN
-    QSKIP("WindowsSecurity is Windows-only (SDDL / SetNamedSecurityInfoW). "
-          "On Linux/macOS the same role is filled by 0600 file modes, "
-          "exercised by tst_VpnProfile and tst_PostHistory.");
-#endif
+    // No QSKIP here any more. The DACL tests below are #ifdef'd out off
+    // Windows, but isPrivilegedTrusteeSid() is portable, and skipping the whole
+    // suite would have left that policy unexercised on two CI platforms out of
+    // three.
+}
+
+void TestWindowsSecurity::privileged_trustees_are_the_three_administrative_sids()
+{
+    // LocalSystem, BUILTIN\Administrators, and the TrustedInstaller service SID
+    // that owns the Program Files tree. Write access held by any of these
+    // grants nothing an administrator could not already take.
+    QVERIFY(WindowsSecurity::isPrivilegedTrusteeSid(QStringLiteral("S-1-5-18")));
+    QVERIFY(WindowsSecurity::isPrivilegedTrusteeSid(QStringLiteral("S-1-5-32-544")));
+    QVERIFY(WindowsSecurity::isPrivilegedTrusteeSid(QStringLiteral(
+        "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464")));
+}
+
+void TestWindowsSecurity::ordinary_and_nearly_privileged_sids_are_not_trusted()
+{
+    // A normal user account: the case the portable zip creates, and the whole
+    // reason the check exists.
+    QVERIFY(!WindowsSecurity::isPrivilegedTrusteeSid(
+        QStringLiteral("S-1-5-21-1004336348-1177238915-682003330-1001")));
+
+    // Everyone, Authenticated Users, Users, INTERACTIVE.
+    for (QString const &sid : { QStringLiteral("S-1-1-0"), QStringLiteral("S-1-5-11"),
+                                QStringLiteral("S-1-5-32-545"), QStringLiteral("S-1-5-4") })
+        QVERIFY2(!WindowsSecurity::isPrivilegedTrusteeSid(sid), qPrintable(sid));
+
+    // Administrative in practice, but not the default owner of an install
+    // directory: finding one of them with write access is worth reporting, not
+    // waving through. Backup, Print and Server Operators.
+    for (QString const &sid : { QStringLiteral("S-1-5-32-551"), QStringLiteral("S-1-5-32-550"),
+                                QStringLiteral("S-1-5-32-549") })
+        QVERIFY2(!WindowsSecurity::isPrivilegedTrusteeSid(sid), qPrintable(sid));
+
+    // CREATOR OWNER appears in the default Program Files DACL, but as an
+    // inherit-only entry: it describes what children get, never this object.
+    QVERIFY(!WindowsSecurity::isPrivilegedTrusteeSid(QStringLiteral("S-1-3-0")));
+
+    // A prefix of a trusted SID is a different account.
+    QVERIFY(!WindowsSecurity::isPrivilegedTrusteeSid(QStringLiteral("S-1-5-32-5440")));
+    QVERIFY(!WindowsSecurity::isPrivilegedTrusteeSid(QStringLiteral("S-1-5-1")));
+    QVERIFY(!WindowsSecurity::isPrivilegedTrusteeSid(QString()));
+}
+
+void TestWindowsSecurity::privileged_sid_matching_ignores_case_and_padding()
+{
+    // ConvertSidToStringSidW yields upper case, but nothing guarantees the
+    // spelling of a SID that reached us another way.
+    QVERIFY(WindowsSecurity::isPrivilegedTrusteeSid(QStringLiteral("s-1-5-32-544")));
+    QVERIFY(WindowsSecurity::isPrivilegedTrusteeSid(QStringLiteral("  S-1-5-18  ")));
 }
 
 #ifdef Q_OS_WIN
