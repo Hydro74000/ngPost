@@ -23,6 +23,7 @@
 #include "vpn/VpnManager.h"
 #include "vpn/VpnProfile.h"
 #include "vpn/VpnProtocol.h"
+#include "vpn/WireGuardConfigPolicy.h"
 
 using ngpost::tests::HomeSandbox;
 
@@ -145,6 +146,7 @@ class TestVpnProfile : public QObject
     Q_OBJECT
 
 private slots:
+    void windows_wireguard_uninstall_result();
     void windows_wireguard_install_result_data();
     void windows_wireguard_install_result();
     void windows_wireguard_install_translations_data();
@@ -1125,9 +1127,26 @@ const InstallDiagnostic installDiagnostics[] = {
         { 2, "WireGuard for Windows was not found. Install it, then retry tunnel registration." },
         { 3, "The WireGuard profile could not be read or validated. Re-import a valid profile and retry." },
         { 4, "The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry." },
+        { 5, "WireGuard rejected the profile. Check its key values and endpoint, or re-import a valid profile, then retry." },
+        { 1223, "WireGuard operation cancelled: administrator permission was not granted." },
         { 6, "The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry." },
         { 10, "The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry." },
 };
+}
+
+void TestVpnProfile::windows_wireguard_uninstall_result()
+{
+    HomeSandbox sandbox;
+    VpnManager manager;
+    QSignalSpy logs(&manager, &VpnManager::logLine);
+    QVERIFY(!manager.reportWindowsWireGuardUninstallResultForTest(1223));
+    QCOMPARE(logs.takeFirst().at(0).toString(),
+             QStringLiteral("WireGuard operation cancelled: administrator permission was not granted."));
+    QVERIFY(!manager.reportWindowsWireGuardUninstallResultForTest(1));
+    QCOMPARE(logs.takeFirst().at(0).toString(), QStringLiteral("WireGuard tunnel uninstall failed (exit 1)"));
+    QVERIFY(manager.reportWindowsWireGuardUninstallResultForTest(0));
+    QCOMPARE(logs.takeFirst().at(0).toString(), QStringLiteral("WireGuard tunnel service removed."));
+    QVERIFY(logs.isEmpty());
 }
 
 void TestVpnProfile::windows_wireguard_install_result_data()
@@ -1182,6 +1201,26 @@ void TestVpnProfile::windows_wireguard_install_translations()
         QVERIFY(!manager.reportWindowsWireGuardInstallResultForTest(diagnostic.code));
         QCOMPARE(logs.count(), 1);
         QCOMPARE(logs.takeFirst().at(0).toString(), translated);
+        if (diagnostic.code == 1223) {
+            QVERIFY(!manager.reportWindowsWireGuardUninstallResultForTest(diagnostic.code));
+            QCOMPARE(logs.count(), 1);
+            QCOMPARE(logs.takeFirst().at(0).toString(), translated);
+        }
+    }
+    // A refusal combines a translated wrapper with a translated policy reason.
+    // Check the actual policy result, including substitution of the key name.
+    const auto verdict = WireGuardConfigPolicy::inspect("[Interface]\nPostUp = whoami\n");
+    QVERIFY(!verdict.isAccepted());
+    const char *reasonSource = "'%1' runs a command when the tunnel goes up or down, which ngPost never needs. Remove that line from the profile.";
+    const QString reason = translator.translate("WireGuardConfigPolicy", reasonSource);
+    QVERIFY(!reason.isEmpty());
+    QCOMPARE(verdict.reason, reason.arg(QStringLiteral("postup")));
+    const char *wrapperSource = "WireGuard profile refused (line %1): %2";
+    const QString wrapper = translator.translate("VpnManager", wrapperSource);
+    QVERIFY(!wrapper.isEmpty());
+    if (language != QStringLiteral("en")) {
+        QVERIFY(reason != QString::fromLatin1(reasonSource));
+        QVERIFY(wrapper != QString::fromLatin1(wrapperSource));
     }
 }
 

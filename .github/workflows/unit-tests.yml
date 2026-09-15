@@ -84,6 +84,9 @@ jobs:
           modules: 'qtcharts'
           cache: true
 
+      - name: Check translation extraction
+        run: python3 .github/scripts/check-translations.py
+
       - name: Build QtKeychain
         run: |
           git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain

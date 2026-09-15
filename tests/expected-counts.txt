@@ -49,7 +49,7 @@ tst_PostInfoTemplate          36  Linux
 tst_RandomToken                3  Linux
 tst_UpdateChecker             17  Linux
 tst_VpnDnsResolver             8  Linux
-tst_VpnProfile                59  Linux
+tst_VpnProfile                62  Linux
 tst_VpnSocketBinder            8  Linux
 tst_WindowsCommandLine         3  Linux
 tst_WindowsSecurity            5  Linux
@@ -59,8 +59,10 @@ tst_WireGuardConfigPolicy     21  Linux
 tst_Yenc                      26  Linux
 
 # Native Windows checks measured on Windows 11 / Qt 6.8.2 (MSVC).
-# VpnProfile measured 2026-09-15, including all seven compiled translations.
-tst_VpnProfile                59  Windows
+# VpnProfile and WindowsCommandLine measured 2026-09-15.
+# Includes all seven compiled translations and native PowerShell exit handling.
+tst_WindowsCommandLine        11  Windows
+tst_VpnProfile                62  Windows
 tst_WindowsSecurity           19  Windows
 tst_WireGuardConfigPolicy     21  Windows
 
@@ -71,7 +73,6 @@ tst_WireGuardConfigPolicy     21  Windows
 # number measured nowhere is how a check like this breaks a green build:
 #
 #   tst_WindowsBindHelper    7 slots, all QSKIP'd off Windows
-#   tst_WindowsCommandLine   5 slots, 2 of them behind #ifdef Q_OS_WIN
 #   tst_VpnE2E_WireGuard     needs root, iproute2 and the privileged helper
 #
 # To pin them: run the suite on that platform, read the `N passed` of each

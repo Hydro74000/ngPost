@@ -20,7 +20,8 @@
 #
 # Exit-code protocol consumed by VpnManager (RunAs cannot redirect stderr):
 # 0 success; 2 WireGuard missing; 3 profile unreadable/invalid;
-# 4 service installation/state failed; 6 service ACL failed;
+# 4 service installation/state failed; 5 profile rejected by wireguard.exe;
+# 6 service ACL failed;
 # 10 staging path unsafe/inaccessible; 1 other failure.
 
 param(
@@ -291,7 +292,10 @@ try {
 # service is insufficient while wireguard.exe is still about to start it.
 try {
     $installer = Start-Process -FilePath $wg -ArgumentList ('/installtunnelservice "' + $stagedConf + '"') -Wait -PassThru
-    if ($installer.ExitCode -ne 0) { throw "WireGuard installation failed: $($installer.ExitCode)" }
+    if ($installer.ExitCode -ne 0) {
+        Write-Error "WireGuard rejected the profile (exit $($installer.ExitCode)). Check its key values and endpoint." -ErrorAction Continue
+        exit 5
+    }
 
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($stagedConf)
     $svc = "WireGuardTunnel`$$baseName"

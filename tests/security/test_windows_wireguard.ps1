@@ -70,9 +70,9 @@ function Test-Case([string] $Name, [scriptblock] $Action) {
 # under ErrorActionPreference=Stop. Fixtures inherit the private test directory's
 # ACL; stdout/stderr are captured by the test process, with no result file.
 function Get-EntryStatement([string] $Pattern) {
-    $matches = @($ast.EndBlock.Statements | Where-Object { $_.Extent.Text -match $Pattern })
-    if ($matches.Count -ne 1) { throw "Expected one entry statement for $Pattern" }
-    return $matches[0].Extent.Text
+    $entryStatements = @($ast.EndBlock.Statements | Where-Object { $_.Extent.Text -match $Pattern })
+    if ($entryStatements.Count -ne 1) { throw "Expected one entry statement for $Pattern" }
+    return $entryStatements[0].Extent.Text
 }
 function Assert-EntryExit([int] $Expected, [string] $Body) {
     $fixture = Join-Path $base 'exit-probe.ps1'
@@ -184,6 +184,10 @@ try {
     }
     Test-Case 'service installer launch failure returns exit 4' {
         Assert-EntryExit 4 ('$wg = Join-Path $base "absent.exe"' + "`n" +
+            (Get-EntryStatement '^try\s*\{\s*\$installer ='))
+    }
+    Test-Case 'profile rejection by wireguard.exe returns exit 5 rather than service error 4' {
+        Assert-EntryExit 5 ('function Start-Process { [pscustomobject]@{ ExitCode = 1 } }' + "`n" +
             (Get-EntryStatement '^try\s*\{\s*\$installer ='))
     }
     Test-Case 'service ACL read failure returns exit 6 regardless of native exit code' {

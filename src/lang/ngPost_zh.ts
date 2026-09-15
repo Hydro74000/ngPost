@@ -6941,6 +6941,14 @@ Some Usenet indexes ask for one.</source>
         <source>Update installer did not become ready. Previous installation retained.</source>
         <translation>更新安装程序未就绪。已保留先前的安装。</translation>
     </message>
+    <message>
+        <source>Could not cancel the update: ngPost failed to signal the installer already running, and it may replace this installation. Check the version after the next start.</source>
+        <translation>无法取消更新：ngPost 未能向正在运行的安装程序发送取消信号，该程序可能会替换当前安装。请在下次启动后检查版本。</translation>
+    </message>
+    <message>
+        <source>The installer already running could not be stopped either, and it may replace this installation.</source>
+        <translation>也无法停止正在运行的安装程序，该程序可能会替换当前安装。</translation>
+    </message>
 </context>
 <context>
     <name>VpnManager</name>
@@ -7435,6 +7443,30 @@ Edit the server configuration and clear its Use VPN setting to post to it withou
         <location filename="../vpn/VpnManager.cpp" line="1854"/>
         <source>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</source>
         <translation>WireGuard 暂存文件夹不安全或无法访问。请管理员检查 Windows ProgramData 中的 ngPost 文件夹；如不可信，请将其移至别处，然后重试。</translation>
+    </message>
+    <message>
+        <source>Refusing to run the tunnel installer as administrator: %1. Install ngPost with its setup, or move it somewhere only an administrator can write.</source>
+        <translation>拒绝以管理员身份运行隧道安装程序：%1。请使用安装程序安装 ngPost，或将其移至仅管理员可写入的位置。</translation>
+    </message>
+    <message>
+        <source>Refusing to run the tunnel uninstaller as administrator: %1. Install ngPost with its setup, or move it somewhere only an administrator can write.</source>
+        <translation>拒绝以管理员身份运行隧道卸载程序：%1。请使用安装程序安装 ngPost，或将其移至仅管理员可写入的位置。</translation>
+    </message>
+    <message>
+        <source>WireGuard profile refused (line %1): %2</source>
+        <translation>WireGuard 配置被拒绝（第 %1 行）：%2</translation>
+    </message>
+    <message>
+        <source>WireGuard profile refused: %1</source>
+        <translation>WireGuard 配置被拒绝：%1</translation>
+    </message>
+    <message>
+        <source>WireGuard rejected the profile. Check its key values and endpoint, or re-import a valid profile, then retry.</source>
+        <translation>WireGuard 拒绝了该配置。请检查密钥值和端点，或重新导入有效配置，然后重试。</translation>
+    </message>
+    <message>
+        <source>WireGuard operation cancelled: administrator permission was not granted.</source>
+        <translation>WireGuard 操作已取消：未授予管理员权限。</translation>
     </message>
 </context>
 <context>
@@ -7935,6 +7967,49 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
         <location line="+12"/>
         <source>Could not parse local IP from WireGuard config</source>
         <translation>无法从 WireGuard 配置中解析本地 IP</translation>
+    </message>
+</context>
+<context>
+    <name>WireGuardConfigPolicy</name>
+    <message>
+        <source>'%1' does not belong to this section</source>
+        <translation>“%1”不属于此节</translation>
+    </message>
+    <message>
+        <source>'%1' runs a command when the tunnel goes up or down, which ngPost never needs. Remove that line from the profile.</source>
+        <translation>“%1”会在隧道启动或停止时运行命令，ngPost 从不需要此功能。请从配置中删除该行。</translation>
+    </message>
+    <message>
+        <source>a key appears before any [Interface] or [Peer] section</source>
+        <translation>键出现在任何 [Interface] 或 [Peer] 节之前</translation>
+    </message>
+    <message>
+        <source>expected a Key = Value line</source>
+        <translation>应为“键 = 值”格式的行</translation>
+    </message>
+    <message>
+        <source>malformed section header</source>
+        <translation>节标题格式错误</translation>
+    </message>
+    <message>
+        <source>only [Interface] and [Peer] sections are allowed</source>
+        <translation>仅允许 [Interface] 和 [Peer] 节</translation>
+    </message>
+    <message>
+        <source>the WireGuard profile cannot be read</source>
+        <translation>无法读取 WireGuard 配置</translation>
+    </message>
+    <message>
+        <source>the WireGuard profile contains binary data</source>
+        <translation>WireGuard 配置包含二进制数据</translation>
+    </message>
+    <message>
+        <source>the WireGuard profile is larger than a profile ever is</source>
+        <translation>WireGuard 配置的大小异常，超出了正常配置的范围</translation>
+    </message>
+    <message>
+        <source>this profile carries a key ngPost has not reviewed</source>
+        <translation>此配置包含 ngPost 尚未审核的键</translation>
     </message>
 </context>
 </TS>

@@ -6940,6 +6940,14 @@ Alguns índices Usenet pedem um.</translation>
         <source>Update installer did not become ready. Previous installation retained.</source>
         <translation>O instalador da atualização não ficou pronto. A instalação anterior foi mantida.</translation>
     </message>
+    <message>
+        <source>Could not cancel the update: ngPost failed to signal the installer already running, and it may replace this installation. Check the version after the next start.</source>
+        <translation>Não foi possível cancelar a atualização: o ngPost não conseguiu enviar o sinal de cancelamento ao instalador que já está em execução, e este poderá substituir esta instalação. Verifique a versão após o próximo arranque.</translation>
+    </message>
+    <message>
+        <source>The installer already running could not be stopped either, and it may replace this installation.</source>
+        <translation>Também não foi possível parar o instalador que já está em execução, e este poderá substituir esta instalação.</translation>
+    </message>
 </context>
 <context>
     <name>VpnManager</name>
@@ -7434,6 +7442,30 @@ Edite a configuração do servidor e desative «Utilizar VPN» para publicar nel
         <location filename="../vpn/VpnManager.cpp" line="1854"/>
         <source>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</source>
         <translation>A pasta de preparação do WireGuard não é segura ou está inacessível. Peça a um administrador para verificar a pasta ngPost no ProgramData do Windows e movê-la se não for de confiança; depois, tente novamente.</translation>
+    </message>
+    <message>
+        <source>Refusing to run the tunnel installer as administrator: %1. Install ngPost with its setup, or move it somewhere only an administrator can write.</source>
+        <translation>Execução do instalador do túnel como administrador recusada: %1. Instale o ngPost com o seu programa de instalação ou mova-o para um local onde apenas os administradores possam escrever.</translation>
+    </message>
+    <message>
+        <source>Refusing to run the tunnel uninstaller as administrator: %1. Install ngPost with its setup, or move it somewhere only an administrator can write.</source>
+        <translation>Execução do desinstalador do túnel como administrador recusada: %1. Instale o ngPost com o seu programa de instalação ou mova-o para um local onde apenas os administradores possam escrever.</translation>
+    </message>
+    <message>
+        <source>WireGuard profile refused (line %1): %2</source>
+        <translation>Perfil WireGuard recusado (linha %1): %2</translation>
+    </message>
+    <message>
+        <source>WireGuard profile refused: %1</source>
+        <translation>Perfil WireGuard recusado: %1</translation>
+    </message>
+    <message>
+        <source>WireGuard rejected the profile. Check its key values and endpoint, or re-import a valid profile, then retry.</source>
+        <translation>O WireGuard recusou o perfil. Verifique os valores das chaves e o endpoint ou importe novamente um perfil válido e tente outra vez.</translation>
+    </message>
+    <message>
+        <source>WireGuard operation cancelled: administrator permission was not granted.</source>
+        <translation>Operação WireGuard cancelada: não foi concedida autorização de administrador.</translation>
     </message>
 </context>
 <context>
@@ -7934,6 +7966,49 @@ O seu ficheiro de configuração em &lt;configDir&gt;/vpn/ e as suas credenciais
         <location line="+12"/>
         <source>Could not parse local IP from WireGuard config</source>
         <translation>Não foi possível ler o IP local da configuração WireGuard</translation>
+    </message>
+</context>
+<context>
+    <name>WireGuardConfigPolicy</name>
+    <message>
+        <source>'%1' does not belong to this section</source>
+        <translation>«%1» não pertence a esta secção</translation>
+    </message>
+    <message>
+        <source>'%1' runs a command when the tunnel goes up or down, which ngPost never needs. Remove that line from the profile.</source>
+        <translation>«%1» executa um comando ao ativar ou desativar o túnel, algo de que o ngPost nunca precisa. Remova essa linha do perfil.</translation>
+    </message>
+    <message>
+        <source>a key appears before any [Interface] or [Peer] section</source>
+        <translation>existe uma chave antes de qualquer secção [Interface] ou [Peer]</translation>
+    </message>
+    <message>
+        <source>expected a Key = Value line</source>
+        <translation>era esperada uma linha no formato Chave = Valor</translation>
+    </message>
+    <message>
+        <source>malformed section header</source>
+        <translation>cabeçalho de secção mal formado</translation>
+    </message>
+    <message>
+        <source>only [Interface] and [Peer] sections are allowed</source>
+        <translation>apenas são permitidas as secções [Interface] e [Peer]</translation>
+    </message>
+    <message>
+        <source>the WireGuard profile cannot be read</source>
+        <translation>não é possível ler o perfil WireGuard</translation>
+    </message>
+    <message>
+        <source>the WireGuard profile contains binary data</source>
+        <translation>o perfil WireGuard contém dados binários</translation>
+    </message>
+    <message>
+        <source>the WireGuard profile is larger than a profile ever is</source>
+        <translation>o perfil WireGuard tem um tamanho anormalmente grande</translation>
+    </message>
+    <message>
+        <source>this profile carries a key ngPost has not reviewed</source>
+        <translation>este perfil contém uma chave que o ngPost não analisou</translation>
     </message>
 </context>
 </TS>

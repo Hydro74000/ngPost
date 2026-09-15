@@ -222,6 +222,9 @@ public:
     using WireGuardServiceHook = std::function<bool(QString const &)>;
     void setWireGuardServiceHooksForTest(WireGuardServiceHook registerHook,
                                          WireGuardServiceHook unregisterHook);
+    bool reportWindowsWireGuardUninstallResultForTest(int code) {
+        return _reportWindowsWireGuardUninstallResult(code);
+    }
     bool reportWindowsWireGuardInstallResultForTest(int code) {
         return _reportWindowsWireGuardInstallResult(code);
     }
@@ -326,6 +329,7 @@ private slots:
 private:
 #if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
     bool _reportWindowsWireGuardInstallResult(int code);
+    bool _reportWindowsWireGuardUninstallResult(int code);
 #endif
     void _setState(State s);
     void _instantiateBackend();

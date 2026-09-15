@@ -1738,11 +1738,7 @@ int runElevatedPowerShell(QString const &script, QStringList const &args, QStrin
     psArgs.append(args);
     // Start-Process joins ArgumentList without preserving PS quoting. Supply
     // ONE string already serialized for the child's Win32 argument parser.
-    QString innerArgList = WindowsCommandLine::powershellLiteral(
-        WindowsCommandLine::serialize(psArgs));
-    QString outerScript =
-        QStringLiteral("$ErrorActionPreference='Stop'; $p = Start-Process -FilePath %1 -Verb RunAs -Wait -PassThru -ArgumentList %2; exit $p.ExitCode")
-            .arg(WindowsCommandLine::powershellLiteral(powershell), innerArgList);
+    QString const outerScript = WindowsCommandLine::elevatedPowerShellCommand(powershell, psArgs);
 
     QProcess p;
     p.start(powershell,
@@ -1819,6 +1815,17 @@ bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
                         "administrator can write.").arg(refusal));
         return false;
     }
+    return _reportWindowsWireGuardUninstallResult(code);
+}
+#endif // Q_OS_WIN
+
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
+bool VpnManager::_reportWindowsWireGuardUninstallResult(int code)
+{
+    if (code == 1223) {
+        emit logLine(tr("WireGuard operation cancelled: administrator permission was not granted."));
+        return false;
+    }
     if (code != 0) {
         emit logLine(tr("WireGuard tunnel uninstall failed (exit %1)").arg(code));
         return false;
@@ -1826,9 +1833,7 @@ bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
     emit logLine(tr("WireGuard tunnel service removed."));
     return true;
 }
-#endif // Q_OS_WIN
 
-#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
 bool VpnManager::_reportWindowsWireGuardInstallResult(int code)
 {
     // RunAs returns only an exit code: the elevated console is not a channel
@@ -1846,6 +1851,12 @@ bool VpnManager::_reportWindowsWireGuardInstallResult(int code)
         break;
     case 4:
         message = tr("The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.");
+        break;
+    case 5:
+        message = tr("WireGuard rejected the profile. Check its key values and endpoint, or re-import a valid profile, then retry.");
+        break;
+    case 1223:
+        message = tr("WireGuard operation cancelled: administrator permission was not granted.");
         break;
     case 6:
         message = tr("The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.");
