@@ -7415,6 +7415,31 @@ Bewerk de serverconfiguratie en schakel &apos;VPN gebruiken&apos; uit om er zond
         <source>failed</source>
         <translation>mislukt</translation>
     </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1842"/>
+        <source>WireGuard for Windows was not found. Install it, then retry tunnel registration.</source>
+        <translation>WireGuard voor Windows is niet gevonden. Installeer het en probeer de tunnel opnieuw te registreren.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1845"/>
+        <source>The WireGuard profile could not be read or validated. Re-import a valid profile and retry.</source>
+        <translation>Het WireGuard-profiel kon niet worden gelezen of gevalideerd. Importeer opnieuw een geldig profiel en probeer het nogmaals.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1848"/>
+        <source>The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.</source>
+        <translation>De WireGuard-tunnelservice kon niet worden geregistreerd of gestopt. Controleer de WireGuard-installatie en probeer het opnieuw.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1851"/>
+        <source>The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.</source>
+        <translation>De machtigingen van de WireGuard-tunnelservice konden niet worden ingesteld. Vraag een beheerder de servicemachtigingen te controleren en probeer het opnieuw.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1854"/>
+        <source>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</source>
+        <translation>De map voor de WireGuard-configuratie is onveilig of ontoegankelijk. Vraag een beheerder de ngPost-map in Windows ProgramData te controleren en deze te verplaatsen als de map niet vertrouwd is. Probeer het daarna opnieuw.</translation>
+    </message>
 </context>
 <context>
     <name>VpnProfileEditDialog</name>

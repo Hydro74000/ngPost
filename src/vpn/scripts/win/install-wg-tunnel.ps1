@@ -18,7 +18,10 @@
 #      subsequent runtime connect/disconnect from ngPost (unprivileged) does
 #      NOT require UAC.
 #
-# Exit codes : 0 = success, non-zero = failure (message written to stderr).
+# Exit-code protocol consumed by VpnManager (RunAs cannot redirect stderr):
+# 0 success; 2 WireGuard missing; 3 profile unreadable/invalid;
+# 4 service installation/state failed; 6 service ACL failed;
+# 10 staging path unsafe/inaccessible; 1 other failure.
 
 param(
     [Parameter(Mandatory=$true)]
@@ -63,12 +66,12 @@ function Find-Wireguard {
 
 $wg = Find-Wireguard
 if (-not $wg) {
-    Write-Error "wireguard.exe not found. Install WireGuard for Windows first."
+    Write-Error "wireguard.exe not found. Install WireGuard for Windows first." -ErrorAction Continue
     exit 2
 }
 
 if (-not (Test-Path -LiteralPath $ConfPath -PathType Leaf)) {
-    Write-Error "Config file not found: $ConfPath"
+    Write-Error "Config file not found: $ConfPath" -ErrorAction Continue
     exit 3
 }
 
@@ -100,7 +103,7 @@ function Assert-WireGuardProfile {
     $lineNo  = 0
     foreach ($raw in [System.IO.File]::ReadAllLines($Path)) {
         $lineNo++
-        $line = $raw.Trim()
+        $line = ($raw -split '#', 2)[0].Trim()
         if ($line -eq '' -or $line.StartsWith('#') -or $line.StartsWith(';')) { continue }
 
         if ($line.StartsWith('[')) {
@@ -135,103 +138,197 @@ function Assert-WireGuardProfile {
     }
 }
 
-# --- Step 0: stage the profile where only administrators can write it ---------
+# --- Step 0: create and verify an administrator-owned staging tree ------------
+# A DACL alone is insufficient: an ordinary owner can grant itself access
+# again, and a writable parent can replace a protected child. Refuse hostile
+# existing paths instead of attempting to repair them in place.
+function Assert-TrustedStagingPath {
+    param([string] $Path, [switch] $Private)
+
+    try {
+        $item = Get-Item -LiteralPath $Path -Force
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            # Read the tag with the system utility; no runtime compilation or
+            # managed reflection into PowerShell internals. The tag is the first
+            # hexadecimal value in fsutil's query output, independent of locale.
+            $fsutil = Join-Path ([Environment]::SystemDirectory) 'fsutil.exe'
+            $query = & $fsutil reparsepoint query $Path 2>&1
+            $tagMatch = [regex]::Match(($query -join "`n"), '0x([0-9a-fA-F]{8})')
+            if ($LASTEXITCODE -ne 0 -or -not $tagMatch.Success) {
+                throw "cannot read the staging reparse point tag: $Path"
+            }
+            $tag = [Convert]::ToUInt32($tagMatch.Groups[1].Value, 16)
+            if ($tag -band 0x20000000) {
+                throw "staging path is a name-surrogate reparse point: $Path"
+            }
+        }
+        $acl = Get-Acl -LiteralPath $Path
+        $raw = [System.Security.AccessControl.RawSecurityDescriptor]::new(
+            $acl.GetSecurityDescriptorBinaryForm(), 0)
+        $trusted = @('S-1-5-18', 'S-1-5-32-544',
+            'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
+        if (-not $raw.Owner -or $trusted -notcontains $raw.Owner.Value) {
+            throw ("staging path has an untrusted owner: $Path. Ask an administrator to inspect " +
+                "this path and move aside the pre-created ngPost staging folder if it is not trusted, " +
+                "then retry tunnel registration. Do not remove Windows system folders.")
+        }
+        if ($null -eq $raw.DiscretionaryAcl) { throw "staging path has no DACL: $Path" }
+        # DELETE_CHILD, DELETE, WRITE_DAC, WRITE_OWNER, GENERIC_ALL. Creation of
+        # siblings (FILE_ADD_FILE / FILE_ADD_SUBDIRECTORY) cannot replace this tree.
+        $replacementRights = 0x100D0040
+        foreach ($ace in $raw.DiscretionaryAcl) {
+            if ([int]$ace.AceFlags -band [int][System.Security.AccessControl.AceFlags]::InheritOnly) { continue }
+            if ($ace.AceType -eq [System.Security.AccessControl.AceType]::AccessDenied) { continue }
+            if ($ace.AceType -ne [System.Security.AccessControl.AceType]::AccessAllowed) {
+                throw "staging path has an unsupported access rule: $Path"
+            }
+            if ($trusted -contains $ace.SecurityIdentifier.Value) { continue }
+            if ($Private -or ($ace.AccessMask -band $replacementRights)) {
+                throw "staging path grants access to an untrusted account: $Path"
+            }
+        }
+    } catch {
+        # Preserve diagnostics for manual use, but expose a typed failure to
+        # the entry point so it returns the stable staging code to ngPost.
+        throw [System.Security.SecurityException]::new($_.Exception.Message, $_.Exception)
+    }
+}
+
+function New-PrivateStagingDirectory {
+    param([string] $Path, [switch] $Ancestor)
+
+    # Windows PowerShell 5.1 uses .NET Framework: this overload supplies the
+    # descriptor to CreateDirectoryW at creation, and leaves existing paths
+    # untouched. Do not compile a helper with Add-Type in user-writable TEMP.
+    $security = New-Object System.Security.AccessControl.DirectorySecurity
+    $security.SetSecurityDescriptorSddlForm('O:BAG:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)')
+    [void][IO.Directory]::CreateDirectory($Path, $security)
+    if (-not (Get-Item -LiteralPath $Path -Force).PSIsContainer) {
+        throw "staging path is not a directory: $Path"
+    }
+    Assert-TrustedStagingPath -Path $Path -Private:(-not $Ancestor)
+}
+
 function New-ProtectedStagingDir {
-    $root = Join-Path $env:ProgramData 'ngPost'
-    $dir  = Join-Path $root 'wg'
-    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    param([string] $BasePath = [Environment]::GetFolderPath(
+        [Environment+SpecialFolder]::CommonApplicationData))
 
-    $system = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-18')
-    $admins = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-544')
-    $acl = Get-Acl -LiteralPath $dir
-    $acl.SetAccessRuleProtection($true, $false)   # protected: drop every inherited ACE
-    # Best-effort, deliberately: RemoveAccessRule throws on an entry .NET
-    # considers inherited, and with $ErrorActionPreference='Stop' that would
-    # abort a legitimate installation. The read-back below is the guarantee, not
-    # this loop -- so a failure to remove is only worth continuing past.
-    foreach ($rule in @($acl.Access)) {
-        try { [void]$acl.RemoveAccessRule($rule) } catch { }
+    # Use the Windows known folder rather than the caller's ProgramData
+    # environment variable. Check existing ancestors before creating anything.
+    $ancestors = @()
+    $cursor = [IO.DirectoryInfo]::new($BasePath)
+    while ($null -ne $cursor) {
+        $ancestors = @($cursor.FullName) + $ancestors
+        $cursor = $cursor.Parent
     }
-    foreach ($sid in @($system, $admins)) {
-        $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
-            $sid, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')))
-    }
-    Set-Acl -LiteralPath $dir -AclObject $acl
-
-    # Read it back. A Set-Acl that reports success while an ACE survives would
-    # leave the staged copy as rewritable as the original, which is the one
-    # thing this folder exists to prevent.
-    $trusted = @($system.Value, $admins.Value)
-    foreach ($ace in (Get-Acl -LiteralPath $dir).Access) {
-        if ($ace.AccessControlType -ne 'Allow') { continue }
-        if (($ace.FileSystemRights -band ([System.Security.AccessControl.FileSystemRights]::Write -bor
-                                          [System.Security.AccessControl.FileSystemRights]::Modify -bor
-                                          [System.Security.AccessControl.FileSystemRights]::FullControl -bor
-                                          [System.Security.AccessControl.FileSystemRights]::Delete)) -eq 0) { continue }
-        $sid = $null
-        try {
-            $sid = $ace.IdentityReference.Translate(
-                [System.Security.Principal.SecurityIdentifier]).Value
-        } catch { }
-        # An identity we cannot resolve is not evidence of safety. Fail closed
-        # with a message that says which folder, rather than letting an opaque
-        # .NET exception surface as an unexplained exit code.
-        if (-not $sid) {
-            throw "the staging folder $dir grants write access to an unresolvable account"
-        }
-        if ($trusted -notcontains $sid) {
-            throw "the staging folder $dir still grants write access to $sid"
-        }
-    }
+    foreach ($path in $ancestors) { Assert-TrustedStagingPath -Path $path }
+    $root = Join-Path $BasePath 'ngPost'
+    $dir = Join-Path $root 'wg'
+    New-PrivateStagingDirectory -Path $root -Ancestor
+    New-PrivateStagingDirectory -Path $dir
     return $dir
 }
 
-$staging = New-ProtectedStagingDir
-# Same basename: wireguard.exe derives the service name from it, and ngPost
-# computes the same name on its side from the original path.
-$stagedConf = Join-Path $staging ([System.IO.Path]::GetFileName($ConfPath))
-Copy-Item -LiteralPath $ConfPath -Destination $stagedConf -Force
-Assert-WireGuardProfile -Path $stagedConf
+function New-StagedWireGuardProfile {
+    param([string] $ConfPath, [string] $Staging)
+
+    Assert-TrustedStagingPath -Path $Staging -Private
+    $destination = Join-Path $Staging ([IO.Path]::GetFileName($ConfPath))
+    $temporary = Join-Path $Staging ([IO.Path]::GetRandomFileName())
+    $created = $false
+    try {
+        # CreateNew refuses an existing file, including a preplanted link. A
+        # bounded copy avoids allocating/copying an arbitrarily large source.
+        $destinationStream = [IO.File]::Open($temporary, [IO.FileMode]::CreateNew,
+            [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $created = $true
+        try {
+            $sourceStream = [IO.File]::Open($ConfPath, [IO.FileMode]::Open,
+                [IO.FileAccess]::Read, [IO.FileShare]::Read)
+            try {
+                $buffer = New-Object byte[] 65536
+                $total = 0
+                while (($count = $sourceStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                    $total += $count
+                    if ($total -gt 1048576) { throw 'the WireGuard profile is too large' }
+                    $destinationStream.Write($buffer, 0, $count)
+                }
+            } finally { $sourceStream.Dispose() }
+        } finally { $destinationStream.Dispose() }
+        Assert-TrustedStagingPath -Path $temporary -Private
+        Assert-WireGuardProfile -Path $temporary
+        if (Test-Path -LiteralPath $destination) {
+            Assert-TrustedStagingPath -Path $destination -Private
+            # Only remove a verified file, never follow a destination link.
+            [IO.File]::Delete($destination)
+        }
+        [IO.File]::Move($temporary, $destination)
+        return $destination
+    } finally {
+        if ($created -and (Test-Path -LiteralPath $temporary)) { [IO.File]::Delete($temporary) }
+    }
+}
+
+try {
+    $staging = New-ProtectedStagingDir
+} catch {
+    Write-Error $_ -ErrorAction Continue
+    exit 10
+}
+# Preserve the basename: it determines the Windows tunnel service name.
+try {
+    $stagedConf = New-StagedWireGuardProfile -ConfPath $ConfPath -Staging $staging
+} catch [System.Security.SecurityException] {
+    Write-Error $_ -ErrorAction Continue
+    exit 10
+} catch {
+    Write-Error $_ -ErrorAction Continue
+    exit 3
+}
 
 # Step 1: register the tunnel as a Windows service.
 # Wait for the installer process itself: observing a freshly created STOPPED
 # service is insufficient while wireguard.exe is still about to start it.
-$installer = Start-Process -FilePath $wg -ArgumentList ('/installtunnelservice "' + $stagedConf + '"') -Wait -PassThru
-if ($installer.ExitCode -ne 0) { throw "WireGuard installation failed: $($installer.ExitCode)" }
-
-$baseName = [System.IO.Path]::GetFileNameWithoutExtension($stagedConf)
-$svc = "WireGuardTunnel`$$baseName"
-
-$found = $false
-for ($i = 0; $i -lt 40; $i++) {
-    sc.exe query $svc 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { $found = $true; break }
-    Start-Sleep -Milliseconds 250
-}
-if (-not $found) {
-    Write-Error "Service $svc did not appear after wireguard.exe /installtunnelservice. The .conf may be invalid."
-    exit 4
-}
-
-# Import must leave a manual, stopped service, including when later ACL work
-# fails. A successful sc stop is merely an accepted request, not completion.
 try {
-    sc.exe config $svc start= demand | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Cannot configure $svc as start=demand" }
-    $startType = (Get-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$svc" -Name Start).Start
-    if ($startType -ne 3) { throw "Service $svc is not start=demand" }
-} finally {
-    $service = [System.ServiceProcess.ServiceController]::new($svc)
+    $installer = Start-Process -FilePath $wg -ArgumentList ('/installtunnelservice "' + $stagedConf + '"') -Wait -PassThru
+    if ($installer.ExitCode -ne 0) { throw "WireGuard installation failed: $($installer.ExitCode)" }
+
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($stagedConf)
+    $svc = "WireGuardTunnel`$$baseName"
+
+    $found = $false
+    for ($i = 0; $i -lt 40; $i++) {
+        sc.exe query $svc 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { $found = $true; break }
+        Start-Sleep -Milliseconds 250
+    }
+    if (-not $found) {
+        throw "Service $svc did not appear after wireguard.exe /installtunnelservice. The .conf may be invalid."
+    }
+
+    # Import must leave a manual, stopped service, including when later ACL work
+    # fails. A successful sc stop is merely an accepted request, not completion.
     try {
-        $deadline = [DateTime]::UtcNow.AddSeconds(30)
-        do {
-            $service.Refresh()
-            if ($service.Status -eq 'Stopped') { break }
-            if ([DateTime]::UtcNow -ge $deadline) { throw "Service $svc did not reach STOPPED" }
-            if ($service.Status -ne 'StopPending' -and $service.Status -ne 'StartPending') { $service.Stop() }
-            Start-Sleep -Milliseconds 200
-        } while ($true)
-    } finally { $service.Dispose() }
+        sc.exe config $svc start= demand | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Cannot configure $svc as start=demand" }
+        $startType = (Get-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$svc" -Name Start).Start
+        if ($startType -ne 3) { throw "Service $svc is not start=demand" }
+    } finally {
+        $service = [System.ServiceProcess.ServiceController]::new($svc)
+        try {
+            $deadline = [DateTime]::UtcNow.AddSeconds(30)
+            do {
+                $service.Refresh()
+                if ($service.Status -eq 'Stopped') { break }
+                if ([DateTime]::UtcNow -ge $deadline) { throw "Service $svc did not reach STOPPED" }
+                if ($service.Status -ne 'StopPending' -and $service.Status -ne 'StartPending') { $service.Stop() }
+                Start-Sleep -Milliseconds 200
+            } while ($true)
+        } finally { $service.Dispose() }
+    }
+} catch {
+    Write-Error $_ -ErrorAction Continue
+    exit 4
 }
 
 # Step 2: extend the service ACL for the validated caller SID.
@@ -241,32 +338,35 @@ try {
 # and split D: from S: at the ")S:" boundary (a literal `S:` inside an ACE
 # flag mnemonic like CCLCSW does NOT end the DACL, but the closing paren
 # of the last DACL ACE does).
-$raw = ((sc.exe sdshow $svc) -join '') -replace '\s', ''
-if ($LASTEXITCODE -ne 0) { throw "Cannot read service ACL for $svc" }
-if (-not $raw.StartsWith('D:')) {
-    Write-Error "Unexpected SDDL (missing DACL): $raw"
+try {
+    $raw = ((sc.exe sdshow $svc) -join '') -replace '\s', ''
+    if ($LASTEXITCODE -ne 0) { throw "Cannot read service ACL for $svc" }
+    if (-not $raw.StartsWith('D:')) {
+        throw "Unexpected SDDL (missing DACL): $raw"
+    }
+    $sBoundary = $raw.IndexOf(')S:')
+    if ($sBoundary -ge 0) {
+        $dPart = $raw.Substring(0, $sBoundary + 1)
+        $sPart = $raw.Substring($sBoundary + 1)
+    } else {
+        $dPart = $raw
+        $sPart = ''
+    }
+
+    # Idempotency: don't append the ACE twice if the script is re-run.
+    $newAce = "(A;;CCLCRPWP;;;$sid)" # query config/status, start, stop
+    if ($dPart -notlike "*$newAce*") {
+        $dPart = $dPart + $newAce
+    }
+    $newSddl = $dPart + $sPart
+
+    sc.exe sdset $svc $newSddl
+    if ($LASTEXITCODE -ne 0) {
+        throw "sc.exe sdset failed (exit $LASTEXITCODE) for SDDL: $newSddl"
+    }
+} catch {
+    Write-Error $_ -ErrorAction Continue
     exit 6
-}
-$sBoundary = $raw.IndexOf(')S:')
-if ($sBoundary -ge 0) {
-    $dPart = $raw.Substring(0, $sBoundary + 1)
-    $sPart = $raw.Substring($sBoundary + 1)
-} else {
-    $dPart = $raw
-    $sPart = ''
-}
-
-# Idempotency: don't append the ACE twice if the script is re-run.
-$newAce = "(A;;CCLCRPWP;;;$sid)" # query config/status, start, stop
-if ($dPart -notlike "*$newAce*") {
-    $dPart = $dPart + $newAce
-}
-$newSddl = $dPart + $sPart
-
-sc.exe sdset $svc $newSddl
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "sc.exe sdset failed (exit $LASTEXITCODE) for SDDL: $newSddl"
-    exit $LASTEXITCODE
 }
 
 Write-Output "INSTALLED $svc for $InvokerSid"

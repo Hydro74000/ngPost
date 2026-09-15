@@ -45,11 +45,10 @@ expected_minimum() {
   printf '%s' "${specific:-$default}"
 }
 
-# Only these two complete suites are intentionally unavailable off Windows.
+# Only this complete suite is intentionally unavailable off Windows.
 # Other Windows-related suites contain portable tests and must execute them.
 allows_empty_suite() {
   case "$host_platform:$1" in
-    Linux:tst_WindowsSecurity|Darwin:tst_WindowsSecurity|\
     Linux:tst_WindowsBindHelper|Darwin:tst_WindowsBindHelper) return 0 ;;
     *) return 1 ;;
   esac
@@ -114,9 +113,9 @@ while IFS= read -r test_bin; do
       code=1
     elif [ "$passed" -lt "$minimum" ]; then
       echo "::error file=${text_log},title=${test_name} lost tests::${test_name} ran ${passed} tests," \
-           "below the ${minimum} pinned for ${host_key}. Either a test stopped running -- a stale" \
-           "in-tree .moc does this silently -- or it was removed on purpose, in which case lower the" \
-           "figure in tests/expected-counts.txt in the same commit."
+           "below the ${minimum} pinned for ${host_key}. Check SKIP reasons and prerequisites" \
+           "first (Windows ACL tests require an elevated process), then stale in-tree .moc files." \
+           "Change tests/expected-counts.txt only when tests were deliberately removed."
       code=1
     fi
   fi

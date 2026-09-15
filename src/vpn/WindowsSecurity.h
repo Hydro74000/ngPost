@@ -49,8 +49,10 @@ bool protectOwnerAndSystem(QString const &path);
 bool protectCurrentUserOnly(QString const &path, bool inheritable);
 
 //! True when nothing short of an administrator can modify \a path -- the file
-//! itself, and the directory holding it, since replacing a file only needs
-//! write access to its parent.
+//! itself, and all ancestors. Creation of siblings is allowed; rights to
+//! delete/replace existing children or rewrite their permissions are not.
+//! Name-surrogate reparse points (including junctions) are refused; compression
+//! and other reparse tags that do not redirect names remain subject to ACL checks.
 //!
 //! This is what the Linux side already demands of `--bin-dir` before the helper
 //! will run a bundled binary as root. It is asked here for the same reason: the

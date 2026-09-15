@@ -27,12 +27,12 @@
 # explicit.
 #
 # A binary with no applicable line is reported as unpinned and does NOT fail the
-# run. That is deliberate: every number below was measured on Linux, and
-# inventing a figure for a platform nobody measured would fail CI on a legitimate
-# platform-specific skip. Extending the file to Windows and macOS means running
-# the suite there once and adding the lines — see "Windows and macOS" below.
+# run. Each floor is measured on its named platform; unmeasured combinations
+# remain unpinned. Extending coverage means running the suite there once and
+# adding the observed count. Windows ACL floors require an elevated process.
 #
 # Measured 2026-09-14, Linux / Qt 6.11.1, with NGPOST_BIN set.
+# VpnProfile updated 2026-09-15 after adding Windows install diagnostics.
 
 tst_CliParser                 63  Linux
 tst_FoldersMonitor            10  Linux
@@ -49,23 +49,28 @@ tst_PostInfoTemplate          36  Linux
 tst_RandomToken                3  Linux
 tst_UpdateChecker             17  Linux
 tst_VpnDnsResolver             8  Linux
-tst_VpnProfile                43  Linux
+tst_VpnProfile                59  Linux
 tst_VpnSocketBinder            8  Linux
 tst_WindowsCommandLine         3  Linux
 tst_WindowsSecurity            5  Linux
 tst_WindowsServiceControl      5  Linux
 tst_WireGuardBackend          13  Linux
-tst_WireGuardConfigPolicy     20  Linux
+tst_WireGuardConfigPolicy     21  Linux
 tst_Yenc                      26  Linux
 
-# Windows and macOS
-# -----------------
-# Deliberately absent. These suites run MORE tests on Windows than on Linux, so
+# Native Windows checks measured on Windows 11 / Qt 6.8.2 (MSVC).
+# VpnProfile measured 2026-09-15, including all seven compiled translations.
+tst_VpnProfile                59  Windows
+tst_WindowsSecurity           19  Windows
+tst_WireGuardConfigPolicy     21  Windows
+
+# Other Windows suites and macOS
+# ------------------------------
+# Not yet measured. These suites run MORE tests on Windows than on Linux, so
 # the Linux figures above cannot be reused as a floor for them — and asserting a
 # number measured nowhere is how a check like this breaks a green build:
 #
 #   tst_WindowsBindHelper    7 slots, all QSKIP'd off Windows
-#   tst_WindowsSecurity      7 slots, 4 of them behind #ifdef Q_OS_WIN
 #   tst_WindowsCommandLine   5 slots, 2 of them behind #ifdef Q_OS_WIN
 #   tst_VpnE2E_WireGuard     needs root, iproute2 and the privileged helper
 #

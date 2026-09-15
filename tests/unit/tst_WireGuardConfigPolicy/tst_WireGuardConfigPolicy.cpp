@@ -143,6 +143,7 @@ private slots:
     //! Case is irrelevant in WireGuard profiles, so it must be here too --
     //! otherwise "postup" would be refused and "PostUp" would not.
     void key_matching_is_case_insensitive();
+    void inline_comments_are_removed_before_parsing();
 
     //! The profile may be any file the caller named. A token that is not one of
     //! ours must never come back verbatim, or the refusal becomes a way to read
@@ -268,6 +269,19 @@ void TestWireGuardConfigPolicy::comments_blank_lines_and_crlf_are_tolerated()
 
     auto const verdict = WireGuardConfigPolicy::inspect(config);
     QVERIFY2(verdict.isAccepted(), qPrintable(verdict.reason));
+}
+
+void TestWireGuardConfigPolicy::inline_comments_are_removed_before_parsing()
+{
+    auto lines = baseline();
+    lines[0] += QStringLiteral(" # interface = ignored");
+    lines[5] += QStringLiteral(" # peer");
+    lines[1] += QStringLiteral(" # PostUp = ignored comment");
+    QVERIFY(WireGuardConfigPolicy::inspect(profile(lines)).isAccepted());
+    lines.insert(4, QStringLiteral("PostUp = whoami # still dangerous"));
+    const auto verdict = WireGuardConfigPolicy::inspect(profile(lines));
+    QCOMPARE(verdict.outcome, WireGuardConfigPolicy::Outcome::DangerousKey);
+    QCOMPARE(verdict.lineNumber, 5);
 }
 
 void TestWireGuardConfigPolicy::key_matching_is_case_insensitive()

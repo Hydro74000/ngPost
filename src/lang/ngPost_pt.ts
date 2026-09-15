@@ -7410,6 +7410,31 @@ Edite a configuração do servidor e desative «Utilizar VPN» para publicar nel
         <source>failed</source>
         <translation>falhou</translation>
     </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1842"/>
+        <source>WireGuard for Windows was not found. Install it, then retry tunnel registration.</source>
+        <translation>O WireGuard para Windows não foi encontrado. Instale-o e tente novamente registar o túnel.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1845"/>
+        <source>The WireGuard profile could not be read or validated. Re-import a valid profile and retry.</source>
+        <translation>Não foi possível ler ou validar o perfil WireGuard. Importe novamente um perfil válido e tente de novo.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1848"/>
+        <source>The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.</source>
+        <translation>Não foi possível registar ou parar o serviço do túnel WireGuard. Verifique a instalação do WireGuard e tente novamente.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1851"/>
+        <source>The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.</source>
+        <translation>Não foi possível configurar as permissões do serviço do túnel WireGuard. Peça a um administrador para verificar as permissões do serviço e tente novamente.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1854"/>
+        <source>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</source>
+        <translation>A pasta de preparação do WireGuard não é segura ou está inacessível. Peça a um administrador para verificar a pasta ngPost no ProgramData do Windows e movê-la se não for de confiança; depois, tente novamente.</translation>
+    </message>
 </context>
 <context>
     <name>VpnProfileEditDialog</name>

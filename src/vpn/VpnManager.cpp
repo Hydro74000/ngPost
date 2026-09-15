@@ -1796,12 +1796,7 @@ bool VpnManager::registerWindowsWireGuardTunnel(QString const &confAbsPath)
                         "administrator can write.").arg(refusal));
         return false;
     }
-    if (code != 0) {
-        emit logLine(tr("WireGuard tunnel install failed (exit %1)").arg(code));
-        return false;
-    }
-    emit logLine(tr("WireGuard tunnel service registered."));
-    return true;
+    return _reportWindowsWireGuardInstallResult(code);
 }
 
 bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
@@ -1832,6 +1827,40 @@ bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
     return true;
 }
 #endif // Q_OS_WIN
+
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
+bool VpnManager::_reportWindowsWireGuardInstallResult(int code)
+{
+    // RunAs returns only an exit code: the elevated console is not a channel
+    // for user-visible diagnostics. Keep this protocol in sync with the script.
+    QString message;
+    switch (code) {
+    case 0:
+        emit logLine(tr("WireGuard tunnel service registered."));
+        return true;
+    case 2:
+        message = tr("WireGuard for Windows was not found. Install it, then retry tunnel registration.");
+        break;
+    case 3:
+        message = tr("The WireGuard profile could not be read or validated. Re-import a valid profile and retry.");
+        break;
+    case 4:
+        message = tr("The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.");
+        break;
+    case 6:
+        message = tr("The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.");
+        break;
+    case 10:
+        message = tr("The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.");
+        break;
+    default:
+        message = tr("WireGuard tunnel install failed (exit %1)").arg(code);
+        break;
+    }
+    emit logLine(message);
+    return false;
+}
+#endif
 
 #if defined(NGPOST_TESTING) && !defined(Q_OS_WIN)
 bool VpnManager::registerWindowsWireGuardTunnel(QString const &confAbsPath)

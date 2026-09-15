@@ -15,9 +15,7 @@
 // as it was while the function reports success. So the assertions read the ACL
 // back rather than trusting the return value.
 //
-// On non-Windows the source is entirely #ifdef'd out, so the suite is a single
-// QSKIP. It stays enrolled everywhere, like tst_WindowsBindHelper, so an
-// accidental Linux/macOS break still surfaces.
+// SID policy tests run on every platform; NTFS enforcement tests run on Windows.
 //
 //========================================================================
 
@@ -40,6 +38,7 @@
 #endif
 #include <windows.h>
 #include <aclapi.h>
+#include <sddl.h>
 #endif
 
 class TestWindowsSecurity : public QObject
@@ -75,6 +74,10 @@ private slots:
     //! A path that does not exist must be reported as a failure rather than
     //! silently treated as secured.
     void protect_reports_failure_on_a_missing_path();
+    void elevated_script_path_policy_data();
+    void elevated_script_path_policy();
+    void elevated_script_rejects_junction_ancestors();
+    void elevated_script_accepts_wof_compression();
 #endif
 };
 
@@ -243,6 +246,122 @@ void TestWindowsSecurity::protect_reports_failure_on_a_missing_path()
 
     QVERIFY2(!WindowsSecurity::protectOwnerAndSystem(missing),
              "a path that cannot be secured must not be reported as secured");
+}
+
+namespace {
+bool setTestSecurity(QString const &path, QString const &sddl)
+{
+    PSECURITY_DESCRIPTOR descriptor = nullptr;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            reinterpret_cast<LPCWSTR>(sddl.utf16()), SDDL_REVISION_1, &descriptor, nullptr))
+        return false;
+    const QString native = QDir::toNativeSeparators(path);
+    const bool ok = SetFileSecurityW(reinterpret_cast<LPCWSTR>(native.utf16()),
+        OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION
+            | PROTECTED_DACL_SECURITY_INFORMATION, descriptor);
+    LocalFree(descriptor);
+    return ok;
+}
+}
+
+void TestWindowsSecurity::elevated_script_path_policy_data()
+{
+    QTest::addColumn<QString>("target");
+    QTest::addColumn<QString>("security");
+    QTest::addColumn<bool>("accepted");
+    const QString admin = QStringLiteral("O:BAD:P(A;OICI;FA;;;BA)(A;OICI;FA;;;SY)");
+    QTest::newRow("protected-tree") << QStringLiteral("parent") << admin << true;
+    QTest::newRow("create-siblings-only") << QStringLiteral("parent")
+        << admin + "(A;;0x6;;;AU)" << true;
+    QTest::newRow("delete-children") << QStringLiteral("parent")
+        << admin + "(A;;0x40;;;AU)" << false;
+    QTest::newRow("change-parent-dacl") << QStringLiteral("parent")
+        << admin + "(A;;WD;;;AU)" << false;
+    QTest::newRow("writable-script") << QStringLiteral("script")
+        << admin + "(A;;FW;;;AU)" << false;
+    QTest::newRow("append-script") << QStringLiteral("script")
+        << admin + "(A;;0x4;;;AU)" << false;
+    QTest::newRow("ordinary-owner") << QStringLiteral("parent")
+        << QStringLiteral("O:%1D:P(A;OICI;FA;;;BA)(A;OICI;FA;;;SY)")
+               .arg(WindowsSecurity::currentUserSid()) << false;
+    QTest::newRow("null-dacl") << QStringLiteral("script") << QStringLiteral("O:BAD:NO_ACCESS_CONTROL") << false;
+}
+
+void TestWindowsSecurity::elevated_script_path_policy()
+{
+    QFETCH(QString, target);
+    QFETCH(QString, security);
+    QFETCH(bool, accepted);
+    // A fresh tree directly under the volume root avoids user-owned TEMP
+    // ancestors. No existing machine directory has its permissions changed.
+    QTemporaryDir root(QDir::rootPath() + QStringLiteral("ngpost-acl-test-XXXXXX"));
+    QVERIFY(root.isValid());
+    const QString admin = QStringLiteral("O:BAD:P(A;OICI;FA;;;BA)(A;OICI;FA;;;SY)");
+    if (!setTestSecurity(root.path(), admin))
+        QSKIP("NTFS ownership fixtures require an elevated Windows test process");
+    QVERIFY(QDir().mkdir(root.filePath("parent")));
+    QVERIFY(QDir().mkdir(root.filePath("parent/child")));
+    const QString script = makeFile(root, QStringLiteral("parent/child/install.ps1"));
+    QVERIFY(!script.isEmpty());
+    QVERIFY(setTestSecurity(script, admin));
+    QVERIFY(setTestSecurity(root.filePath("parent"), admin));
+    QVERIFY(setTestSecurity(root.filePath("parent/child"), admin));
+    const QString changed = target == "parent" ? root.filePath("parent") : script;
+    QVERIFY(setTestSecurity(changed, security));
+    QString detail;
+    const bool actual = WindowsSecurity::onlyPrivilegedPrincipalsCanWrite(script, &detail);
+    QCOMPARE(actual, accepted);
+    if (!accepted) QVERIFY(!detail.isEmpty());
+}
+
+void TestWindowsSecurity::elevated_script_rejects_junction_ancestors()
+{
+    QTemporaryDir root(QDir::rootPath() + QStringLiteral("ngpost-junction-test-XXXXXX"));
+    QVERIFY(root.isValid());
+    if (!setTestSecurity(root.path(), QStringLiteral("O:BAD:P(A;OICI;FA;;;BA)(A;OICI;FA;;;SY)")))
+        QSKIP("NTFS ownership fixtures require an elevated Windows test process");
+    QVERIFY(QDir().mkdir(root.filePath("target")));
+    QVERIFY(!makeFile(root, QStringLiteral("target/install.ps1")).isEmpty());
+    QProcess cmd;
+    cmd.start(QStringLiteral("cmd.exe"), {QStringLiteral("/c"), QStringLiteral("mklink"),
+        QStringLiteral("/J"), QDir::toNativeSeparators(root.filePath("link")),
+        QDir::toNativeSeparators(root.filePath("target"))});
+    QVERIFY(cmd.waitForFinished());
+    QCOMPARE(cmd.exitCode(), 0);
+    QString detail;
+    QVERIFY(!WindowsSecurity::onlyPrivilegedPrincipalsCanWrite(root.filePath("link/install.ps1"), &detail));
+    QVERIFY(detail.contains(QStringLiteral("reparse")));
+    QVERIFY(QDir().rmdir(root.filePath("link")));
+}
+
+void TestWindowsSecurity::elevated_script_accepts_wof_compression()
+{
+    QTemporaryDir root(QDir::rootPath() + QStringLiteral("ngpost-wof-test-XXXXXX"));
+    QVERIFY(root.isValid());
+    const QString admin = QStringLiteral("O:BAD:P(A;OICI;FA;;;BA)(A;OICI;FA;;;SY)");
+    if (!setTestSecurity(root.path(), admin))
+        QSKIP("NTFS ownership fixtures require an elevated Windows test process");
+    const QString path = root.filePath(QStringLiteral("install.ps1"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write(QByteArray(131072, '#')), qint64(131072));
+    file.close();
+    QProcess compact;
+    compact.start(QStringLiteral("compact.exe"), {QStringLiteral("/C"),
+        QStringLiteral("/EXE:XPRESS4K"), QStringLiteral("/F"), QDir::toNativeSeparators(path)});
+    QVERIFY(compact.waitForFinished());
+    QCOMPARE(compact.exitCode(), 0);
+    const QString native = QDir::toNativeSeparators(path);
+    // WOF can hide its tag/attribute through its file-system filter. Confirm
+    // actual compression rather than assuming the tag is visible to callers.
+    DWORD high = 0;
+    DWORD const stored = GetCompressedFileSizeW(reinterpret_cast<LPCWSTR>(native.utf16()), &high);
+    QVERIFY(high == 0 && stored > 0 && stored < 131072);
+    QString detail;
+    QVERIFY2(WindowsSecurity::onlyPrivilegedPrincipalsCanWrite(path, &detail), qPrintable(detail));
+    // Compression is no exemption from checking the file's actual permissions.
+    QVERIFY(setTestSecurity(path, admin + QStringLiteral("(A;;FW;;;AU)")));
+    QVERIFY(!WindowsSecurity::onlyPrivilegedPrincipalsCanWrite(path, &detail));
 }
 
 #endif // Q_OS_WIN

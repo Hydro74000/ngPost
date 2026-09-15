@@ -12,6 +12,7 @@
 #include <QFileInfo>
 #include <QPointer>
 #include <QTimer>
+#include <QTranslator>
 
 #include "nntp/NntpServerParams.h"
 #include "PostingJob.h"
@@ -144,6 +145,11 @@ class TestVpnProfile : public QObject
     Q_OBJECT
 
 private slots:
+    void windows_wireguard_install_result_data();
+    void windows_wireguard_install_result();
+    void windows_wireguard_install_translations_data();
+    void windows_wireguard_install_translations();
+
     //! Default-constructed profile is invalid (name + configFileName empty).
     void default_profile_is_invalid();
 
@@ -1111,6 +1117,72 @@ void TestVpnProfile::wireguard_update_service_transaction_rolls_back()
              QStringList({ QStringLiteral("register:") + moved.absoluteConfigPath(),
                            QStringLiteral("unregister:WireGuardTunnel$old"),
                            QStringLiteral("unregister:WireGuardTunnel$new") }));
+}
+
+namespace {
+struct InstallDiagnostic { int code; const char *message; };
+const InstallDiagnostic installDiagnostics[] = {
+        { 2, "WireGuard for Windows was not found. Install it, then retry tunnel registration." },
+        { 3, "The WireGuard profile could not be read or validated. Re-import a valid profile and retry." },
+        { 4, "The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry." },
+        { 6, "The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry." },
+        { 10, "The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry." },
+};
+}
+
+void TestVpnProfile::windows_wireguard_install_result_data()
+{
+    QTest::addColumn<int>("code");
+    QTest::addColumn<QString>("message");
+    QTest::newRow("success") << 0 << QStringLiteral("WireGuard tunnel service registered.");
+    for (const auto &diagnostic : installDiagnostics)
+        QTest::newRow(qPrintable(QString::number(diagnostic.code)))
+            << diagnostic.code << QString::fromLatin1(diagnostic.message);
+    for (int code : { -1, 1, 99 })
+        QTest::newRow(qPrintable(QStringLiteral("unknown-%1").arg(code)))
+            << code << QStringLiteral("WireGuard tunnel install failed (exit %1)").arg(code);
+}
+
+void TestVpnProfile::windows_wireguard_install_result()
+{
+    QFETCH(int, code);
+    QFETCH(QString, message);
+    HomeSandbox sandbox;
+    VpnManager manager;
+    QSignalSpy logs(&manager, &VpnManager::logLine);
+    QCOMPARE(manager.reportWindowsWireGuardInstallResultForTest(code), code == 0);
+    QCOMPARE(logs.count(), 1);
+    QCOMPARE(logs.takeFirst().at(0).toString(), message);
+}
+
+void TestVpnProfile::windows_wireguard_install_translations_data()
+{
+    QTest::addColumn<QString>("language");
+    for (const char *language : { "en", "fr", "de", "es", "nl", "pt", "zh" })
+        QTest::newRow(language) << QString::fromLatin1(language);
+}
+
+void TestVpnProfile::windows_wireguard_install_translations()
+{
+    QFETCH(QString, language);
+    // Exercise the compiled catalogs shipped with the app and the actual log
+    // signal. QTranslator unregisters itself on destruction, even on failure.
+    QTranslator translator;
+    QVERIFY(translator.load(QString::fromLatin1(NGPOST_SOURCE_ROOT)
+                            + QStringLiteral("/src/resources/lang/ngPost_%1.qm").arg(language)));
+    QVERIFY(QCoreApplication::installTranslator(&translator));
+    HomeSandbox sandbox;
+    VpnManager manager;
+    QSignalSpy logs(&manager, &VpnManager::logLine);
+    for (const auto &diagnostic : installDiagnostics) {
+        const QString translated = translator.translate("VpnManager", diagnostic.message);
+        QVERIFY2(!translated.isEmpty(), diagnostic.message);
+        if (language != QStringLiteral("en"))
+            QVERIFY(translated != QString::fromLatin1(diagnostic.message));
+        QVERIFY(!manager.reportWindowsWireGuardInstallResultForTest(diagnostic.code));
+        QCOMPARE(logs.count(), 1);
+        QCOMPARE(logs.takeFirst().at(0).toString(), translated);
+    }
 }
 
 QTEST_GUILESS_MAIN(TestVpnProfile)

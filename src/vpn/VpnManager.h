@@ -222,6 +222,9 @@ public:
     using WireGuardServiceHook = std::function<bool(QString const &)>;
     void setWireGuardServiceHooksForTest(WireGuardServiceHook registerHook,
                                          WireGuardServiceHook unregisterHook);
+    bool reportWindowsWireGuardInstallResultForTest(int code) {
+        return _reportWindowsWireGuardInstallResult(code);
+    }
     //! Install a fake backend and the state needed to exercise terminal-signal
     //! cleanup without launching a helper or a Windows service.
     void setBackendForTest(VpnBackend *backend, State state = State::Starting);
@@ -321,6 +324,9 @@ private slots:
     void _pollTunIpAvailability();
 
 private:
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
+    bool _reportWindowsWireGuardInstallResult(int code);
+#endif
     void _setState(State s);
     void _instantiateBackend();
     bool _finishBackendStart(bool started);

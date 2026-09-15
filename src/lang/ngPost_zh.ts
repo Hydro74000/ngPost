@@ -7411,6 +7411,31 @@ Edit the server configuration and clear its Use VPN setting to post to it withou
         <source>failed</source>
         <translation>失败</translation>
     </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1842"/>
+        <source>WireGuard for Windows was not found. Install it, then retry tunnel registration.</source>
+        <translation>未找到 Windows 版 WireGuard。请先安装，再重试注册隧道。</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1845"/>
+        <source>The WireGuard profile could not be read or validated. Re-import a valid profile and retry.</source>
+        <translation>无法读取或验证 WireGuard 配置文件。请重新导入有效的配置文件后重试。</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1848"/>
+        <source>The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.</source>
+        <translation>无法注册或停止 WireGuard 隧道服务。请检查 WireGuard 的安装情况后重试。</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1851"/>
+        <source>The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.</source>
+        <translation>无法配置 WireGuard 隧道服务的权限。请管理员检查服务权限后重试。</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1854"/>
+        <source>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</source>
+        <translation>WireGuard 暂存文件夹不安全或无法访问。请管理员检查 Windows ProgramData 中的 ngPost 文件夹；如不可信，请将其移至别处，然后重试。</translation>
+    </message>
 </context>
 <context>
     <name>VpnProfileEditDialog</name>

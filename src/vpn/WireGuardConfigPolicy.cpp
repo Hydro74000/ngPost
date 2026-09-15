@@ -126,6 +126,10 @@ Verdict inspect(QByteArray const &config)
         QString     line       = QString::fromUtf8(lines.at(index));
         if (line.endsWith(QLatin1Char('\r')))
             line.chop(1);
+        // WireGuard removes inline comments before parsing sections or keys.
+        int const comment = line.indexOf(QLatin1Char('#'));
+        if (comment >= 0)
+            line.truncate(comment);
         line = line.trimmed();
 
         if (line.isEmpty() || line.startsWith(QLatin1Char('#'))

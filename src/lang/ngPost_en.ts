@@ -7368,6 +7368,31 @@ Edit the server configuration and clear its Use VPN setting to post to it withou
         <source>failed</source>
         <translation>failed</translation>
     </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1842"/>
+        <source>WireGuard for Windows was not found. Install it, then retry tunnel registration.</source>
+        <translation>WireGuard for Windows was not found. Install it, then retry tunnel registration.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1845"/>
+        <source>The WireGuard profile could not be read or validated. Re-import a valid profile and retry.</source>
+        <translation>The WireGuard profile could not be read or validated. Re-import a valid profile and retry.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1848"/>
+        <source>The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.</source>
+        <translation>The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1851"/>
+        <source>The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.</source>
+        <translation>The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1854"/>
+        <source>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</source>
+        <translation>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</translation>
+    </message>
 </context>
 <context>
     <name>VpnProfileEditDialog</name>

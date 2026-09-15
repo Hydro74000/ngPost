@@ -96,14 +96,85 @@ if (-not $removed) {
 # Absence is normal and not an error: a tunnel registered by an ngPost older
 # than the staging step has no copy here. Failing to delete one is not worth
 # failing the uninstall either -- the service is gone, which is what was asked.
-$staging = Join-Path (Join-Path $env:ProgramData 'ngPost') 'wg'
-if (Test-Path -LiteralPath $staging -PathType Container) {
-    Get-ChildItem -LiteralPath $staging -File -ErrorAction SilentlyContinue |
-        Where-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Name) -eq $tunnelName } |
-        ForEach-Object {
-            try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop }
-            catch { Write-Host "Could not remove the staged profile $($_.Name): $($_.Exception.Message)" }
+# Kept identical to the installer and checked by test_windows_wireguard.ps1.
+function Assert-TrustedStagingPath {
+    param([string] $Path, [switch] $Private)
+
+    try {
+        $item = Get-Item -LiteralPath $Path -Force
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            # Read the tag with the system utility; no runtime compilation or
+            # managed reflection into PowerShell internals. The tag is the first
+            # hexadecimal value in fsutil's query output, independent of locale.
+            $fsutil = Join-Path ([Environment]::SystemDirectory) 'fsutil.exe'
+            $query = & $fsutil reparsepoint query $Path 2>&1
+            $tagMatch = [regex]::Match(($query -join "`n"), '0x([0-9a-fA-F]{8})')
+            if ($LASTEXITCODE -ne 0 -or -not $tagMatch.Success) {
+                throw "cannot read the staging reparse point tag: $Path"
+            }
+            $tag = [Convert]::ToUInt32($tagMatch.Groups[1].Value, 16)
+            if ($tag -band 0x20000000) {
+                throw "staging path is a name-surrogate reparse point: $Path"
+            }
         }
+        $acl = Get-Acl -LiteralPath $Path
+        $raw = [System.Security.AccessControl.RawSecurityDescriptor]::new(
+            $acl.GetSecurityDescriptorBinaryForm(), 0)
+        $trusted = @('S-1-5-18', 'S-1-5-32-544',
+            'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
+        if (-not $raw.Owner -or $trusted -notcontains $raw.Owner.Value) {
+            throw ("staging path has an untrusted owner: $Path. Ask an administrator to inspect " +
+                "this path and move aside the pre-created ngPost staging folder if it is not trusted, " +
+                "then retry tunnel registration. Do not remove Windows system folders.")
+        }
+        if ($null -eq $raw.DiscretionaryAcl) { throw "staging path has no DACL: $Path" }
+        # DELETE_CHILD, DELETE, WRITE_DAC, WRITE_OWNER, GENERIC_ALL. Creation of
+        # siblings (FILE_ADD_FILE / FILE_ADD_SUBDIRECTORY) cannot replace this tree.
+        $replacementRights = 0x100D0040
+        foreach ($ace in $raw.DiscretionaryAcl) {
+            if ([int]$ace.AceFlags -band [int][System.Security.AccessControl.AceFlags]::InheritOnly) { continue }
+            if ($ace.AceType -eq [System.Security.AccessControl.AceType]::AccessDenied) { continue }
+            if ($ace.AceType -ne [System.Security.AccessControl.AceType]::AccessAllowed) {
+                throw "staging path has an unsupported access rule: $Path"
+            }
+            if ($trusted -contains $ace.SecurityIdentifier.Value) { continue }
+            if ($Private -or ($ace.AccessMask -band $replacementRights)) {
+                throw "staging path grants access to an untrusted account: $Path"
+            }
+        }
+    } catch {
+        # Preserve diagnostics for manual use, but expose a typed failure to
+        # the entry point so it returns the stable staging code to ngPost.
+        throw [System.Security.SecurityException]::new($_.Exception.Message, $_.Exception)
+    }
+}
+
+function Remove-StagedWireGuardProfile {
+    param([string] $TunnelName, [string] $BasePath = [Environment]::GetFolderPath(
+        [Environment+SpecialFolder]::CommonApplicationData))
+
+    $staging = Join-Path (Join-Path $BasePath 'ngPost') 'wg'
+    if (Test-Path -LiteralPath $staging) {
+        $ancestors = @()
+        $cursor = [IO.DirectoryInfo]::new($staging)
+        while ($null -ne $cursor) {
+            $ancestors = @($cursor.FullName) + $ancestors
+            $cursor = $cursor.Parent
+        }
+        foreach ($path in $ancestors) { Assert-TrustedStagingPath -Path $path }
+        Assert-TrustedStagingPath -Path $staging -Private
+        Get-ChildItem -LiteralPath $staging -File -Force |
+            Where-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) -eq $TunnelName } |
+            ForEach-Object {
+                Assert-TrustedStagingPath -Path $_.FullName -Private
+                [IO.File]::Delete($_.FullName)
+            }
+    }
+}
+try {
+    Remove-StagedWireGuardProfile -TunnelName $tunnelName
+} catch {
+    Write-Host "Could not safely remove the staged profile: $($_.Exception.Message)"
 }
 
 Write-Output "UNINSTALLED $ServiceName"

@@ -7410,6 +7410,31 @@ Bearbeiten Sie die Serverkonfiguration und deaktivieren Sie „VPN verwenden“,
         <source>failed</source>
         <translation>fehlgeschlagen</translation>
     </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1842"/>
+        <source>WireGuard for Windows was not found. Install it, then retry tunnel registration.</source>
+        <translation>WireGuard für Windows wurde nicht gefunden. Installieren Sie es und versuchen Sie anschließend erneut, den Tunnel zu registrieren.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1845"/>
+        <source>The WireGuard profile could not be read or validated. Re-import a valid profile and retry.</source>
+        <translation>Das WireGuard-Profil konnte nicht gelesen oder geprüft werden. Importieren Sie ein gültiges Profil erneut und versuchen Sie es noch einmal.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1848"/>
+        <source>The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.</source>
+        <translation>Der WireGuard-Tunneldienst konnte nicht registriert oder beendet werden. Prüfen Sie die WireGuard-Installation und versuchen Sie es erneut.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1851"/>
+        <source>The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.</source>
+        <translation>Die Berechtigungen des WireGuard-Tunneldienstes konnten nicht eingerichtet werden. Bitten Sie einen Administrator, die Dienstberechtigungen zu prüfen, und versuchen Sie es erneut.</translation>
+    </message>
+    <message>
+        <location filename="../vpn/VpnManager.cpp" line="1854"/>
+        <source>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</source>
+        <translation>Der Ordner für die WireGuard-Konfiguration ist unsicher oder nicht zugänglich. Bitten Sie einen Administrator, den ngPost-Ordner in Windows ProgramData zu prüfen und ihn zu verschieben, falls er nicht vertrauenswürdig ist. Versuchen Sie es anschließend erneut.</translation>
+    </message>
 </context>
 <context>
     <name>VpnProfileEditDialog</name>

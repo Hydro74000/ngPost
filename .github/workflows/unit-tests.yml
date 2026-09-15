@@ -281,6 +281,10 @@ jobs:
             if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
           }
 
+      - name: Test Windows WireGuard staging and profile policy
+        shell: powershell
+        run: ./tests/security/test_windows_wireguard.ps1
+
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

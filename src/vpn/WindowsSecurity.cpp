@@ -130,13 +130,13 @@ bool protectOwnerAndSystem(QString const &path)
 
 namespace
 {
-//! Rights that let a trustee replace, truncate or re-permission the object --
-//! everything needed to substitute the script we are about to run elevated.
-//! FILE_DELETE_CHILD matters on the directory: deleting the script and writing
-//! a new one in its place never touches the old file's own DACL.
-constexpr DWORD kWriteLikeRights = FILE_WRITE_DATA | FILE_APPEND_DATA | FILE_DELETE_CHILD
-                                 | DELETE | WRITE_DAC | WRITE_OWNER
-                                 | GENERIC_WRITE | GENERIC_ALL;
+// Creating a sibling does not replace an existing, protected child. In
+// particular FILE_APPEND_DATA means FILE_ADD_SUBDIRECTORY on a directory,
+// and Windows grants that right to Authenticated Users on C:\ by default.
+constexpr DWORD kDirectoryReplacementRights = FILE_DELETE_CHILD | DELETE
+                                             | WRITE_DAC | WRITE_OWNER | GENERIC_ALL;
+constexpr DWORD kFileWriteRights = FILE_WRITE_DATA | FILE_APPEND_DATA | DELETE
+                                  | WRITE_DAC | WRITE_OWNER | GENERIC_WRITE | GENERIC_ALL;
 
 //! False as soon as one ALLOW entry hands write-like rights to a trustee that
 //! is not already administrative -- or as soon as the OWNER is not one, because
@@ -145,11 +145,39 @@ constexpr DWORD kWriteLikeRights = FILE_WRITE_DATA | FILE_APPEND_DATA | FILE_DEL
 //! answers "who may write now", never "who may decide that".
 bool pathIsAdminOnly(QString const &path, QString *detail)
 {
+    QString const nativePath = QDir::toNativeSeparators(path);
+    DWORD const attributes = GetFileAttributesW(
+        reinterpret_cast<LPCWSTR>(nativePath.utf16()));
+    if (attributes == INVALID_FILE_ATTRIBUTES) {
+        if (detail)
+            *detail = QStringLiteral("cannot read the attributes of '%1'").arg(path);
+        return false;
+    }
+    // WOF compression, deduplication and cloud placeholders also carry this
+    // attribute. Only name-surrogate tags redirect into an unchecked tree.
+    if (attributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+        WIN32_FIND_DATAW data{};
+        HANDLE const search = FindFirstFileW(
+            reinterpret_cast<LPCWSTR>(nativePath.utf16()), &data);
+        if (search == INVALID_HANDLE_VALUE) {
+            if (detail)
+                *detail = QStringLiteral("cannot read the reparse tag of '%1'").arg(path);
+            return false;
+        }
+        FindClose(search);
+        if (IsReparseTagNameSurrogate(data.dwReserved0)) {
+            if (detail)
+                *detail = QStringLiteral("'%1' is a name-surrogate reparse point").arg(path);
+            return false;
+        }
+    }
+    DWORD const writeRights = (attributes & FILE_ATTRIBUTE_DIRECTORY)
+        ? kDirectoryReplacementRights : kFileWriteRights;
     PSECURITY_DESCRIPTOR descriptor = nullptr;
     PACL                 dacl       = nullptr;
     PSID                 owner      = nullptr;
     DWORD const          status     = GetNamedSecurityInfoW(
-        reinterpret_cast<wchar_t const *>(path.utf16()),
+        reinterpret_cast<wchar_t const *>(nativePath.utf16()),
         SE_FILE_OBJECT,
         OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
         &owner, nullptr, &dacl, nullptr, &descriptor);
@@ -192,18 +220,28 @@ bool pathIsAdminOnly(QString const &path, QString *detail)
     bool adminOnly = true;
     for (WORD i = 0; adminOnly && i < dacl->AceCount; ++i) {
         void *entry = nullptr;
-        if (!GetAce(dacl, i, &entry))
-            continue;
+        if (!GetAce(dacl, i, &entry)) {
+            adminOnly = false;
+            if (detail)
+                *detail = QStringLiteral("cannot read an access rule of '%1'").arg(path);
+            break;
+        }
 
         auto const *header = static_cast<ACE_HEADER const *>(entry);
-        if (header->AceType != ACCESS_ALLOWED_ACE_TYPE)
-            continue; // see the header: DENY precedence is deliberately not modelled
         // An inherit-only entry describes what children get, not this object.
         if (header->AceFlags & INHERIT_ONLY_ACE)
             continue;
+        if (header->AceType == ACCESS_DENIED_ACE_TYPE)
+            continue; // DENY precedence is deliberately not modelled
+        if (header->AceType != ACCESS_ALLOWED_ACE_TYPE) {
+            adminOnly = false;
+            if (detail)
+                *detail = QStringLiteral("'%1' has an unsupported access rule").arg(path);
+            break;
+        }
 
         auto const *allowed = static_cast<ACCESS_ALLOWED_ACE const *>(entry);
-        if ((allowed->Mask & kWriteLikeRights) == 0)
+        if ((allowed->Mask & writeRights) == 0)
             continue;
 
         QString trustee;
@@ -242,10 +280,10 @@ bool onlyPrivilegedPrincipalsCanWrite(QString const &path, QString *detail)
     if (!pathIsAdminOnly(info.absoluteFilePath(), detail))
         return false;
 
-    // Every directory up to the root, not just the immediate parent. Write
-    // access anywhere on the chain is enough: renaming an ancestor and putting
-    // another tree in its place substitutes the script without any entry on the
-    // chain below ever changing. A protected leaf inside a writable ancestor is
+    // Check replacement rights on every directory up to the root.
+    // Renaming an ancestor and putting another tree in its place substitutes
+    // the script without any entry on the chain below ever changing.
+    // A protected leaf inside a writable ancestor is
     // exactly the layout an attacker would build, and checking only the parent
     // would have accepted it.
     QDir directory = info.absoluteDir();

@@ -1031,6 +1031,9 @@ sanitize_wireguard_profile() {
         {
             line = $0
             sub(/\r$/, "", line)
+            # Match WireGuard and the Windows validators: comments may also
+            # follow a section header or a value.
+            sub(/#.*/, "", line)
             gsub(/^[ \t]+|[ \t]+$/, "", line)
             if (line == "" || line ~ /^#/ || line ~ /^;/) next
 
