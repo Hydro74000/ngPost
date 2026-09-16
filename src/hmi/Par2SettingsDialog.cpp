@@ -1,5 +1,6 @@
 // Copyright (C) 2026 Hydro74000. GPL-3.0-or-later.
 #include "Par2SettingsDialog.h"
+#include "ExternalToolPathWidget.h"
 #include "NgPost.h"
 #include <QBoxLayout>
 #include <QCheckBox>
@@ -122,13 +123,13 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
 #endif
     select(_tool, ngPost->_par2Tool);
     form->addRow(tr("Tool:"), _tool);
-    auto *pathRow = new QHBoxLayout;
-    _path = new QLineEdit(ngPost->_par2Path, this);
-    _path->setObjectName(QStringLiteral("par2Path"));
-    auto *browse = new QPushButton(tr("Browse…"), this);
-    pathRow->addWidget(_path, 1);
-    pathRow->addWidget(browse);
-    form->addRow(tr("Executable:"), pathRow);
+    _toolPath = new ExternalToolPathWidget(par2::toolName(ngPost->_par2Tool),
+                                           ngPost->_par2PathMode,
+                                           ngPost->_par2PathConfig,
+                                           QStringLiteral("par2"),
+                                           this);
+    _path = _toolPath->editor();
+    form->addRow(tr("Path:"), _toolPath);
     _toolStatus = new QLabel(this);
     _toolStatus->setWordWrap(true);
     form->addRow(_toolStatus);
@@ -311,21 +312,33 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     });
     connect(_arguments, &QPlainTextEdit::textChanged, this, &Par2SettingsDialog::changed);
     connect(_tool, &QComboBox::currentIndexChanged, this, &Par2SettingsDialog::selectTool);
-    connect(_path, &QLineEdit::textChanged, this, [this] {
-        if (_loading) return;
-        _pathDirty = true;
-        resetGpuScan();
-        changed();
-        // Coalesce edits in the same event turn and inspect the current path.
+    const auto inspectPath = [this] {
+        probeTool();
         QTimer::singleShot(0, this, [this] {
             if (_gpu->isChecked() && !_custom->isChecked() && _gpuScan == GpuScan::Unknown)
                 findGpus();
         });
+    };
+    connect(_toolPath, &ExternalToolPathWidget::selectionChanged, this, [this, inspectPath] {
+        if (_loading)
+            return;
+        resetGpuScan();
+        changed();
+        // Both checks run the executable, and any prefix of a path being typed
+        // may be another one: typing waits for editingFinished. Browse, the
+        // mode and the engine set the whole path at once (setText() clears
+        // isModified()), so they are checked at once.
+        if (!_path->isModified()) {
+            inspectPath();
+            return;
+        }
+        _probedPath.clear();
+        _toolStatus->clear();
     });
-    connect(_path, &QLineEdit::editingFinished, this, &Par2SettingsDialog::probeTool);
-    connect(browse, &QPushButton::clicked, this, [this] {
-        const auto path = QFileDialog::getOpenFileName(this, tr("Select PAR2 executable"), _path->text());
-        if (!path.isEmpty()) { _path->setText(path); probeTool(); }
+    connect(_path, &QLineEdit::editingFinished, this, [this, inspectPath] {
+        // Checked now: a later mode change that keeps this text is not typing.
+        _path->setModified(false);
+        inspectPath();
     });
     _loading = false;
     updateControls();
@@ -472,7 +485,7 @@ void Par2SettingsDialog::updateControls()
     if (!manual && !_threadsSupported && _threads->value() != 0)
         error = tr("This par2cmdline build does not support thread selection.");
     QFileInfo executable(_path->text());
-    if ((selectedTool() != par2::Tool::Auto || !_path->text().isEmpty())
+    if (_toolPath->mode() == externaltool::PathMode::Custom
         && (!executable.isFile() || !executable.isExecutable()))
         error = tr("The selected executable is unavailable. Select an installed tool or Automatic.");
     _status->setText(error);
@@ -484,9 +497,8 @@ void Par2SettingsDialog::selectTool()
     if (_loading) return;
     resetGpuScan();
     _loading = true;
-    _pathDirty = true;
     const auto next = selectedTool();
-    _path->setText(par2::findExecutable(next));
+    _toolPath->selectTool(par2::toolName(next));
     const bool multi = effectiveTool() == par2::Tool::MultiPar;
     // A unit switch is explicit; start at the new tool's native automatic
     // setting instead of treating MiB as eighths of available RAM.
@@ -520,6 +532,10 @@ void Par2SettingsDialog::probeTool()
     _probe = new QProcess(this);
     _probe->setProcessChannelMode(QProcess::MergedChannels);
     _threadsSupported = true;
+    if (!externaltool::executable(path)) {
+        _toolStatus->clear();
+        return;
+    }
     _toolStatus->setText(tr("Checking executable…"));
     auto *process = _probe;
     connect(process, &QProcess::errorOccurred, this, [this, path, tool](QProcess::ProcessError) {
@@ -655,9 +671,13 @@ void Par2SettingsDialog::accept()
     if (!_buttons->button(QDialogButtonBox::Save)->isEnabled()) return;
     if (_dirty) {
         const auto s = settings();
-        _ngPost->_par2Tool = selectedTool();
+        // Persist the engine whose arguments were generated, even when the
+        // user initially selected automatic engine discovery.
+        _ngPost->_par2Tool = externaltool::executable(_path->text()) ? effectiveTool()
+                                                                     : selectedTool();
         _ngPost->_par2Path = _path->text();
-        if (_pathDirty) _ngPost->_par2PathConfig = _path->text();
+        _ngPost->_par2PathMode = _toolPath->mode();
+        _ngPost->_par2PathConfig = _toolPath->customPath();
         _ngPost->_par2PctDefault = uint(_percentage->value());
         _ngPost->_par2Args = s.custom ? _arguments->toPlainText()
                                     : par2::joinArguments(s.arguments(_ngPost->_par2PctDefault));

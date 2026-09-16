@@ -10,8 +10,10 @@
 #include "CompressionSettingsDialog.h"
 #include "ui_CompressionSettingsDialog.h"
 
+#include "ExternalToolPathWidget.h"
 #include "NgPost.h"
 
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -29,7 +31,45 @@ CompressionSettingsDialog::CompressionSettingsDialog(NgPost *ngPost, QWidget *pa
     _ui->setupUi(this);
 
     _ui->compressPathEdit->setText(_ngPost->_tmpPath);
-    _ui->rarEdit->setText(_ngPost->_rarPath);
+    // The tool rows are built here: ExternalToolPathWidget needs constructor
+    // arguments, which a widget promoted in the .ui cannot receive.
+    _tool = new QComboBox(this);
+    _tool->setObjectName(QStringLiteral("rarTool"));
+    _tool->addItem(QStringLiteral("RAR"), QStringLiteral("rar"));
+    _tool->addItem(QStringLiteral("7-Zip"), QStringLiteral("7zip"));
+    _tool->setCurrentIndex(_tool->findData(_ngPost->_rarTool));
+    _ui->toolsForm->insertRow(1, tr("Tool:"), _tool);
+    _toolPath = new ExternalToolPathWidget(_ngPost->_rarTool,
+                                           _ngPost->_rarPathMode,
+                                           _ngPost->_rarPathConfig,
+                                           QStringLiteral("rar"),
+                                           this);
+    _ui->toolsForm->insertRow(2, tr("Path:"), _toolPath);
+    _chosenTool = _ngPost->_rarTool;
+    connect(_tool, &QComboBox::currentIndexChanged, this, [this] {
+        _chosenTool = _tool->currentData().toString();
+        _toolPath->selectTool(_chosenTool);
+    });
+    const auto updateSave = [this] {
+        _ui->buttonBox->button(QDialogButtonBox::Save)
+            ->setEnabled(_toolPath->mode() == externaltool::PathMode::Automatic
+                         || externaltool::executable(_toolPath->customPath()));
+    };
+    connect(_toolPath, &ExternalToolPathWidget::selectionChanged, this, [this, updateSave] {
+        // A custom executable named after an archiver decides the engine: the
+        // other archiver's switches would make every compression fail. A name
+        // that says neither gives the engine back to the one chosen, so a
+        // prefix met while typing ("/opt/7z" of "/opt/7z-tools/winrar-cli") leaves
+        // nothing behind.
+        const QString archiver = externaltool::archiverForFile(_toolPath->customPath());
+        const int named = _tool->findData(archiver.isEmpty() ? _chosenTool : archiver);
+        if (named >= 0 && named != _tool->currentIndex()) {
+            const QSignalBlocker blocker(_tool);
+            _tool->setCurrentIndex(named);
+            _toolPath->setTool(_tool->currentData().toString());
+        }
+        updateSave();
+    });
 
     _ui->rarSizeEdit->setValidator(new QIntValidator(0, 1000000, _ui->rarSizeEdit));
     _ui->rarSizeEdit->setText(QString::number(_ngPost->_rarSize));
@@ -48,13 +88,16 @@ CompressionSettingsDialog::CompressionSettingsDialog(NgPost *ngPost, QWidget *pa
     _ui->rarPassCB->setChecked(!_ngPost->_rarPassFixed.isEmpty());
     onPassToggled(_ui->rarPassCB->isChecked());
 
-    connect(_ui->compressPathButton, &QAbstractButton::clicked, this, &CompressionSettingsDialog::onCompressPathClicked);
-    connect(_ui->rarPathButton,      &QAbstractButton::clicked, this, &CompressionSettingsDialog::onRarPathClicked);
+    connect(_ui->compressPathButton,
+            &QAbstractButton::clicked,
+            this,
+            &CompressionSettingsDialog::onCompressPathClicked);
     connect(_ui->genPass,            &QAbstractButton::clicked, this, &CompressionSettingsDialog::onGenPass);
     connect(_ui->rarPassCB,          &QAbstractButton::toggled, this, &CompressionSettingsDialog::onPassToggled);
     connect(_ui->buttonBox,          &QDialogButtonBox::accepted, this, &CompressionSettingsDialog::accept);
     connect(_ui->buttonBox,          &QDialogButtonBox::rejected, this, &QDialog::reject);
     _ui->buttonBox->button(QDialogButtonBox::Save)->setText(tr("Save"));
+    updateSave();
     _ui->buttonBox->button(QDialogButtonBox::Cancel)->setText(tr("Cancel"));
     _layoutReady = true;
     // The form gives spanning labels their real width during its first layout.
@@ -97,8 +140,18 @@ void CompressionSettingsDialog::accept()
         _ui->rarSizeEdit->selectAll();
         return;
     }
+    if (_toolPath->mode() == externaltool::PathMode::Custom
+        && !externaltool::executable(_toolPath->customPath()))
+        return;
     _ngPost->_tmpPath = _ui->compressPathEdit->text();
-    _ngPost->_rarPath = _ui->rarEdit->text();
+    const QString nextTool = _tool->currentData().toString();
+    // Engine-specific switches cannot be transferred to another archiver.
+    if (_ngPost->_rarTool != nextTool)
+        _ngPost->_rarArgs.clear();
+    _ngPost->_rarTool = nextTool;
+    _ngPost->_rarPathMode = _toolPath->mode();
+    _ngPost->_rarPathConfig = _toolPath->customPath();
+    _ngPost->_rarPath = _toolPath->editor()->text();
 
     _ngPost->_rarSize = 0;
     if (!_ui->rarSizeEdit->text().isEmpty())
@@ -159,23 +212,6 @@ void CompressionSettingsDialog::onCompressPathClicked()
         _ui->compressPathEdit->setText(path);
 }
 
-void CompressionSettingsDialog::onRarPathClicked()
-{
-    QString path = QFileDialog::getOpenFileName(
-                this,
-                tr("Select rar executable"),
-                QFileInfo(_ngPost->_rarPath).absolutePath()
-                );
-
-    if (!path.isEmpty())
-    {
-        QFileInfo fi(path);
-        if (fi.isFile() && fi.isExecutable())
-            _ui->rarEdit->setText(path);
-        else
-            _ngPost->error(tr("the selected file is not executable..."));
-    }
-}
 
 void CompressionSettingsDialog::onGenPass()
 {

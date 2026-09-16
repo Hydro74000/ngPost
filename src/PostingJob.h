@@ -29,6 +29,7 @@
 #include <QFileInfoList>
 #include <QMap>
 #include <QMutex>
+#include <QProcess>
 #include <QQueue>
 #include <QSet>
 #include <QStringList>
@@ -37,7 +38,6 @@
 #include <QTime>
 #include <QTimer>
 #include <QVector>
-class QProcess;
 class NgPost;
 class NntpConnection;
 class NntpFile;
@@ -361,6 +361,7 @@ private slots:
 
     void onExtProcReadyReadStandardOutput();
     void onExtProcReadyReadStandardError();
+    void onExtProcError(QProcess::ProcessError error);
 
     void onCompressionFinished(int exitCode);
     void onGenPar2Finished(int exitCode);
@@ -433,8 +434,8 @@ private:
                             uint volSize = 0);
     bool startGenPar2(const QString &tmpFolder, const QString &archiveName, uint redundancy = 0);
 
-    bool _canCompress() const;
-    bool _canGenPar2() const;
+    bool _canCompress(bool checkTemporaryPath = true) const;
+    bool _canGenPar2(bool checkTemporaryPath = true) const;
 
     void _cleanExtProc();
     void _cleanCompressDir();

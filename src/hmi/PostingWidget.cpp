@@ -716,41 +716,43 @@ void PostingWidget::onEditPostInfo()
 //! writes into the NgPost globals: previewing a layout must change nothing.
 PostInfoData PostingWidget::_postInfoPreview() const
 {
-    PostInfoData data;
-    data.appVersion = QString(APP_VERSION);
+    PostInfoData postData;
+    postData.appVersion = QString(APP_VERSION);
 
     if (!_ui->nzbFileEdit->text().isEmpty())
     {
         QFileInfo const nzb(_ui->nzbFileEdit->text());
-        data.nzbPath     = nzb.absoluteFilePath();
-        data.nzbDir      = nzb.absolutePath();
-        data.nzbName     = nzb.completeBaseName();
-        data.nzbFileName = nzb.fileName();
+        postData.nzbPath = nzb.absoluteFilePath();
+        postData.nzbDir = nzb.absolutePath();
+        postData.nzbName = nzb.completeBaseName();
+        postData.nzbFileName = nzb.fileName();
     }
 
-    data.rarName = _ui->compressNameEdit->text();
+    postData.rarName = _ui->compressNameEdit->text();
     if (_ui->nzbPassCB->isChecked())
-        data.rarPass = _ui->nzbPassEdit->text();
+        postData.rarPass = _ui->nzbPassEdit->text();
 
-    data.groups = _ngPost->groups();
+    postData.groups = _ngPost->groups();
     // Left empty when ngPost draws a poster at random: showing one sample
     // would name an address the post is not going to use.
     if (!_ngPost->_genFrom && !_ngPost->_from.empty())
-        data.nzbPoster = QString::fromStdString(_ngPost->_from);
+        postData.nzbPoster = QString::fromStdString(_ngPost->_from);
 
-    data.par2Pct = _ui->par2CB->isChecked()
-        ? (_ui->redundancySB->value() < 0 ? int(_ngPost->_par2PctDefault) : _ui->redundancySB->value()) : -1;
+    postData.par2Pct = _ui->par2CB->isChecked()
+        ? (_ui->redundancySB->value() < 0 ? int(_ngPost->_par2PctDefault)
+                                          : _ui->redundancySB->value())
+        : -1;
 
     QFileInfoList files;
     bool          hasFolder = false;
     const_cast<PostingWidget *>(this)->_buildFilesList(files, hasFolder);
     if (!files.isEmpty())
     {
-        data.sourcePath   = files.first().absoluteFilePath();
-        data.originalName = files.first().fileName();
-        data.originalPath = files.first().absolutePath();
+        postData.sourcePath = files.first().absoluteFilePath();
+        postData.originalName = files.first().fileName();
+        postData.originalPath = files.first().absolutePath();
     }
-    return data;
+    return postData;
 }
 
 void PostingWidget::setPostInfo(bool enabled,

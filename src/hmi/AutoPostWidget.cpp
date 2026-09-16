@@ -554,13 +554,13 @@ void AutoPostWidget::retranslatePostInfoTexts()
 //! run can be shown.
 PostInfoData AutoPostWidget::_postInfoPreview() const
 {
-    PostInfoData data;
-    data.appVersion = QString(APP_VERSION);
-    data.groups     = _ngPost->groups();
+    PostInfoData postData;
+    postData.appVersion = QString(APP_VERSION);
+    postData.groups = _ngPost->groups();
     if (!_ngPost->_genFrom && !_ngPost->_from.empty())
-        data.nzbPoster = QString::fromStdString(_ngPost->_from);
-    data.par2Pct = _ngPost->_doPar2 ? static_cast<int>(_ngPost->_par2Pct) : -1;
-    return data;
+        postData.nzbPoster = QString::fromStdString(_ngPost->_from);
+    postData.par2Pct = _ngPost->_doPar2 ? static_cast<int>(_ngPost->_par2Pct) : -1;
+    return postData;
 }
 
 void AutoPostWidget::onPostInfoToggled(bool checked) { _postInfoButton->setEnabled(checked); }

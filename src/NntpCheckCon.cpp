@@ -29,7 +29,7 @@
 NntpCheckCon::NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &srvParams)
     : QObject()
     , _nzbCheck(nzbCheck)
-    , _id(id)
+    , _conId(id)
     , _srvParams(srvParams)
     , _socket(nullptr)
     , _isConnected(false)
@@ -200,7 +200,7 @@ void NntpCheckCon::onConnected()
         emit sslSock->startClientEncryption();
     } else {
         if (_nzbCheck->debugMode())
-            _nzbCheck->log(tr("[Con #%1] Connected").arg(_id));
+            _nzbCheck->log(tr("[Con #%1] Connected").arg(_conId));
 
         _postingState = PostingState::CONNECTED;
         // We should receive the Hello Message
@@ -210,7 +210,7 @@ void NntpCheckCon::onConnected()
 void NntpCheckCon::onEncrypted()
 {
     if (_nzbCheck->debugMode())
-        _nzbCheck->log(tr("[Con #%1] Connected").arg(_id));
+        _nzbCheck->log(tr("[Con #%1] Connected").arg(_conId));
 
     _postingState = PostingState::CONNECTED;
     // We should receive the Hello Message
@@ -230,10 +230,10 @@ void NntpCheckCon::onDisconnected()
 void NntpCheckCon::onWatchdogTimeout()
 {
     _nzbCheck->error(tr("[Con #%1] %2:%3 stopped answering after %4 s, dropping the connection")
-                             .arg(_id)
-                             .arg(_srvParams.host)
-                             .arg(_srvParams.port)
-                             .arg(_nzbCheck->socketTimeOut() / 1000));
+                         .arg(_conId)
+                         .arg(_srvParams.host)
+                         .arg(_srvParams.port)
+                         .arg(_nzbCheck->socketTimeOut() / 1000));
     if (!_socket) {
         _finishOrRetry();
         return;
@@ -264,9 +264,9 @@ void NntpCheckCon::_finishOrRetry()
     if (_nzbCheck->hasArticlesLeft() && _nbRetries < _nzbCheck->maxRetries()) {
         ++_nbRetries;
         _nzbCheck->error(tr("[Con #%1] reconnecting (attempt %2 of %3)")
-                                 .arg(_id)
-                                 .arg(_nbRetries)
-                                 .arg(_nzbCheck->maxRetries()));
+                             .arg(_conId)
+                             .arg(_nbRetries)
+                             .arg(_nzbCheck->maxRetries()));
         _postingState = PostingState::NOT_CONNECTED;
         emit startConnection();
         return;
@@ -298,7 +298,7 @@ void NntpCheckCon::onReadyRead()
             // Check welcome message
             if (strncmp(line.constData(), Nntp::getResponse(200), 3) != 0) {
                 emit errorConnecting(tr("[Connection #%1] Error connecting to server %2:%3")
-                                         .arg(_id)
+                                         .arg(_conId)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port));
                 _closeConnection();
@@ -313,11 +313,11 @@ void NntpCheckCon::onReadyRead()
                     QByteArray const cmd = Nntp::authInfoUser(_srvParams.user);
                     if (cmd.isEmpty()) {
                         emit errorConnecting(
-                                tr("[Connection #%1] The configured user for %2:%3 contains a "
-                                   "line break and cannot be sent")
-                                        .arg(_id)
-                                        .arg(_srvParams.host)
-                                        .arg(_srvParams.port));
+                            tr("[Connection #%1] The configured user for %2:%3 contains a "
+                               "line break and cannot be sent")
+                                .arg(_conId)
+                                .arg(_srvParams.host)
+                                .arg(_srvParams.port));
                         _closeConnection();
                         return;
                     }
@@ -328,7 +328,7 @@ void NntpCheckCon::onReadyRead()
             // validate the reply
             if (strncmp(line.constData(), Nntp::getResponse(381), 2) != 0) {
                 emit errorConnecting(tr("[Connection #%1] Error sending user '%4' to server %2:%3")
-                                         .arg(_id)
+                                         .arg(_conId)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
                                          .arg(_srvParams.user.c_str()));
@@ -340,11 +340,11 @@ void NntpCheckCon::onReadyRead()
                 QByteArray const cmd = Nntp::authInfoPass(_srvParams.pass);
                 if (cmd.isEmpty()) {
                     emit errorConnecting(
-                            tr("[Connection #%1] The configured password for %2:%3 contains a "
-                               "line break and cannot be sent")
-                                    .arg(_id)
-                                    .arg(_srvParams.host)
-                                    .arg(_srvParams.port));
+                        tr("[Connection #%1] The configured password for %2:%3 contains a "
+                           "line break and cannot be sent")
+                            .arg(_conId)
+                            .arg(_srvParams.host)
+                            .arg(_srvParams.port));
                     _closeConnection();
                     return;
                 }
@@ -354,7 +354,7 @@ void NntpCheckCon::onReadyRead()
             if (strncmp(line.constData(), Nntp::getResponse(281), 2) != 0) {
                 emit errorConnecting(tr("[Connection #%1] Error authentication to server %2:%3 "
                                         "with user '%4'")
-                                         .arg(_id)
+                                         .arg(_conId)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
                                          .arg(_srvParams.user.c_str()));
@@ -411,7 +411,7 @@ void NntpCheckCon::_checkNextArticle()
         if (!command.isEmpty())
             break;
 
-        _nzbCheck->log(tr("[Con #%1] Refusing to send a malformed article id").arg(_id));
+        _nzbCheck->log(tr("[Con #%1] Refusing to send a malformed article id").arg(_conId));
         // Counted the way a server-side loss is counted, so the PAR2 phase
         // still closes and the run cannot wait for an answer never asked for.
         _nzbCheck->missingArticle(_currentArticle);
@@ -421,7 +421,7 @@ void NntpCheckCon::_checkNextArticle()
 
     if (!_currentArticle.isNull()) {
         if (_nzbCheck->debugMode())
-            _nzbCheck->log(tr("[Con #%1] Checking article %2").arg(_id).arg(_currentArticle));
+            _nzbCheck->log(tr("[Con #%1] Checking article %2").arg(_conId).arg(_currentArticle));
 
         _postingState = PostingState::CHECKING_ARTICLE;
         _nbPar2Waits  = 0;
@@ -438,7 +438,7 @@ void NntpCheckCon::_checkNextArticle()
     } else {
         _watchdog.stop();
         if (_nzbCheck->debugMode())
-            _nzbCheck->log(tr("[Con #%1] No more Article").arg(_id));
+            _nzbCheck->log(tr("[Con #%1] No more Article").arg(_conId));
 
         _postingState = PostingState::IDLE;
         _closeConnection();

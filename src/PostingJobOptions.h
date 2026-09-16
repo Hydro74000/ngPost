@@ -79,6 +79,7 @@ struct PostingJobOptions
     // packing
     QString tmpPath;
     QString rarPath;
+    QString rarTool;
     QString rarArgs;
     uint    rarSize   = 0;
     bool    useRarMax = false;

@@ -19,19 +19,25 @@
 
 ushort NntpArticle::sNbMaxTrySending = 5;
 
-NntpArticle::NntpArticle(NntpFile *file, uint part, qint64 pos, qint64 bytes,
-                         const std::string *from, bool obfuscateArticles):
-    _nntpFile(file), _part(part),
-    _id(QUuid::createUuid()),
-    _from(from),
-    _subject(nullptr),
-    _body(nullptr),
-    _filePos(pos), _fileBytes(bytes),
-    _bodySize(0),
-    _bodyWireSize(0),
-    _nbTrySending(0),
-    _msgId(),
-    _obfuscateArticles(obfuscateArticles)
+NntpArticle::NntpArticle(NntpFile *file,
+                         uint part,
+                         qint64 pos,
+                         qint64 bytes,
+                         const std::string *from,
+                         bool obfuscateArticles)
+    : _nntpFile(file)
+    , _part(part)
+    , _uuid(QUuid::createUuid())
+    , _from(from)
+    , _subject(nullptr)
+    , _body(nullptr)
+    , _filePos(pos)
+    , _fileBytes(bytes)
+    , _bodySize(0)
+    , _bodyWireSize(0)
+    , _nbTrySending(0)
+    , _msgId()
+    , _obfuscateArticles(obfuscateArticles)
 {
     file->addArticle(this);
     connect(this, &NntpArticle::posted, _nntpFile, &NntpFile::onArticlePosted, Qt::QueuedConnection);
@@ -213,9 +219,9 @@ QString NntpArticle::str() const
 {
     if (_msgId.isEmpty())
 #if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
-        _msgId = _id.toString(sMsgIdFormat);
+        _msgId = _uuid.toString(sMsgIdFormat);
 #else
-        _msgId = _id.toString();
+        _msgId = _uuid.toString();
 #endif
     return QString("%5 - Article #%1/%2 <id: %3, nbTrySend: %4>").arg(
                 _part).arg(_nntpFile->nbArticles()).arg(_msgId).arg(
@@ -226,7 +232,7 @@ bool NntpArticle::tryResend()
 {
     if (_nbTrySending < sNbMaxTrySending)
     {
-        _id = QUuid::createUuid();
+        _uuid = QUuid::createUuid();
         return true;
     }
     else
@@ -245,9 +251,9 @@ void NntpArticle::write(NntpConnection *con, const std::string &idSignature)
 std::string NntpArticle::header(const std::string &idSignature) const
 {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 11, 0)
-    QByteArray msgId = _id.toByteArray(sMsgIdFormat);
+    QByteArray msgId = _uuid.toByteArray(sMsgIdFormat);
 #else
-    QByteArray msgId = _id.toByteArray();
+    QByteArray msgId = _uuid.toByteArray();
 #endif
     // Sanitised at the point of emission, not at the point of configuration:
     // a From or a Newsgroups comes from ngPost.conf and a Subject from a file

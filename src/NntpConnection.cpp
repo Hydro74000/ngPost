@@ -42,11 +42,11 @@
 
 NntpConnection::NntpConnection(NgPost *ngPost, int id, const NntpServerParams &srvParams)
     : QObject()
-    , _id(id)
+    , _conId(id)
     , _srvParams(srvParams)
     , _socket(nullptr)
     , _isConnected(false)
-    , _logPrefix(QString("NntpCon #%1").arg(_id))
+    , _logPrefix(QString("NntpCon #%1").arg(_conId))
     , _postingState(PostingState::NOT_CONNECTED)
     , _currentArticle(nullptr)
     , _currentArticlePreserved(false)
@@ -117,6 +117,7 @@ void NntpConnection::onStartConnection()
     if (_poster && _poster->isPaused())
         return;
 
+    _lastTransportError.clear();
     if (_srvParams.useSSL)
         _socket = new QSslSocket();
     else
@@ -219,7 +220,7 @@ connect_done:
 void NntpConnection::onKillConnection()
 {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
-    qDebug() << "[killConnection] #" << _id;
+    qDebug() << "[killConnection] #" << _conId;
 #endif
 #ifdef __USE_CONNECTION_TIMEOUT__
     if (_timeout)
@@ -276,7 +277,7 @@ void NntpConnection::_preserveCurrentArticleAfterTransportLoss(QString const &re
     // _finishPosting() closes every transport before the counters are read.
 }
 
-void NntpConnection::_closeConnection()
+void NntpConnection::_closeConnection(bool dropTransport)
 {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
     _log("closeConnection");
@@ -299,8 +300,18 @@ void NntpConnection::_closeConnection()
                        this,
                        SLOT(onSslErrors(QList<QSslError>)));
 
-        _socket->disconnectFromHost(); // we will end up in NntpConnect::onDisconnected
-    } else                             // wrong host info or network down
+        if (dropTransport) {
+            // A stalled or failed transport never flushes its write buffer:
+            // disconnectFromHost() would wait for it until TCP gives up.
+            _socket->abort();
+            // From a connected state abort() emits disconnected(), and
+            // onDisconnected() has already released the socket.
+            if (_socket)
+                onDisconnected();
+        } else {
+            _socket->disconnectFromHost(); // we will end up in NntpConnect::onDisconnected
+        }
+    } else // wrong host info or network down
     {
         _isConnected = false;
         if (_socket)
@@ -330,13 +341,24 @@ void NntpConnection::onDisconnected()
         && _postingState != PostingState::NO_MORE_FILES
         && _nbDisconnected++ < NntpArticle::nbMaxTrySending()) {
         // Let's try to reconnect
-        _error(
-            tr("Connection lost, trying to reconnect! (nb disconnected: %1)").arg(_nbDisconnected));
+        const QString server = QString("%1:%2").arg(_srvParams.host).arg(_srvParams.port);
+        emit retryingConnection(
+            server,
+            QString("[%1] %2: %3 (%4)")
+                .arg(_logPrefix,
+                     server,
+                     tr("Connection lost, trying to reconnect! (nb disconnected: %1)")
+                         .arg(_nbDisconnected),
+                     _lastTransportError.isEmpty() ? tr("Remote connection closed")
+                                                   : _lastTransportError));
         _preserveCurrentArticleAfterTransportLoss(
             tr("connection lost before server confirmation"));
 
         emit startConnection();
     } else {
+        if (!_lastTransportError.isEmpty() && !_poster->isPaused()
+            && _postingState != PostingState::NO_MORE_FILES)
+            _error(_lastTransportError);
         _preserveCurrentArticleAfterTransportLoss(
             tr("connection lost before server confirmation"));
         emit disconnected(this);
@@ -390,15 +412,23 @@ void NntpConnection::onSslErrors(const QList<QSslError> &errors)
 
 void NntpConnection::onErrors(QAbstractSocket::SocketError)
 {
-    _error(QString("Error Socket: %1").arg(_socket->errorString()));
-    _closeConnection();
+    if (!_socket)
+        return;
+    _lastTransportError = QString("Error Socket: %1").arg(_socket->errorString());
+    // Established transports get a bounded retry in onDisconnected(). A
+    // recovered interruption is a diagnostic, not a permanently failed post.
+    if (!_isConnected)
+        _error(_lastTransportError);
+    _closeConnection(true);
 }
 
 #ifdef __USE_CONNECTION_TIMEOUT__
 void NntpConnection::onTimeout()
 {
-    _error(QString("Socket Timeout (%1 ms)").arg(_ngPost->getSocketTimeout()));
-    _closeConnection();
+    _lastTransportError = QString("Socket Timeout (%1 ms)").arg(_ngPost->getSocketTimeout());
+    if (!_isConnected)
+        _error(_lastTransportError);
+    _closeConnection(true);
 }
 #endif
 
@@ -524,7 +554,7 @@ void NntpConnection::onReadyRead()
                 //                _error(err);
                 //#endif
                 emit errorConnecting(tr("[Connection #%1] Error connecting to server %2:%3")
-                                         .arg(_id)
+                                         .arg(_conId)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port));
                 _closeConnection();
@@ -543,11 +573,11 @@ void NntpConnection::onReadyRead()
                     QByteArray const cmd = Nntp::authInfoUser(_srvParams.user);
                     if (cmd.isEmpty()) {
                         emit errorConnecting(
-                                tr("[Connection #%1] The configured user for %2:%3 contains a "
-                                   "line break and cannot be sent")
-                                        .arg(_id)
-                                        .arg(_srvParams.host)
-                                        .arg(_srvParams.port));
+                            tr("[Connection #%1] The configured user for %2:%3 contains a "
+                               "line break and cannot be sent")
+                                .arg(_conId)
+                                .arg(_srvParams.host)
+                                .arg(_srvParams.port));
                         _closeConnection();
                         return;
                     }
@@ -567,7 +597,7 @@ void NntpConnection::onReadyRead()
                 //                _error(err);
                 //#endif
                 emit errorConnecting(tr("[Connection #%1] Error sending user '%4' to server %2:%3")
-                                         .arg(_id)
+                                         .arg(_conId)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
                                          .arg(_srvParams.user.c_str()));
@@ -583,11 +613,11 @@ void NntpConnection::onReadyRead()
                 QByteArray const cmd = Nntp::authInfoPass(_srvParams.pass);
                 if (cmd.isEmpty()) {
                     emit errorConnecting(
-                            tr("[Connection #%1] The configured password for %2:%3 contains a "
-                               "line break and cannot be sent")
-                                    .arg(_id)
-                                    .arg(_srvParams.host)
-                                    .arg(_srvParams.port));
+                        tr("[Connection #%1] The configured password for %2:%3 contains a "
+                           "line break and cannot be sent")
+                            .arg(_conId)
+                            .arg(_srvParams.host)
+                            .arg(_srvParams.port));
                     _closeConnection();
                     return;
                 }
@@ -606,7 +636,7 @@ void NntpConnection::onReadyRead()
                 //#endif
                 emit errorConnecting(tr("[Connection #%1] Error authentication to server %2:%3 "
                                         "with user '%4'")
-                                         .arg(_id)
+                                         .arg(_conId)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
                                          .arg(_srvParams.user.c_str()));

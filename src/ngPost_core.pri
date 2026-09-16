@@ -54,6 +54,11 @@ CONFIG += c++17
 
 macx: QMAKE_CXXFLAGS += -Wno-error=implicit-function-declaration
 
+# A local hiding a member or an outer local compiles silently and reads the
+# wrong variable. MSVC has no -Wshadow (its C4456-C4459 need /W4), so the flag
+# stays on the GCC and clang toolchains.
+!msvc: QMAKE_CXXFLAGS += -Wshadow
+
 DEFINES += __USE_CONNECTION_TIMEOUT__
 DEFINES += __COMPUTE_IMMEDIATE_SPEED__
 
@@ -109,6 +114,7 @@ SOURCES += \
         $$PWD/Poster.cpp \
         $$PWD/PostingJob.cpp \
         $$PWD/par2/Par2Settings.cpp \
+        $$PWD/tools/ExternalToolResolver.cpp \
         $$PWD/nntp/Nntp.cpp \
         $$PWD/nntp/NntpArticle.cpp \
         $$PWD/nntp/NntpFile.cpp \
@@ -140,6 +146,7 @@ HEADERS += \
     $$PWD/history/PostHistoryStore.h \
     $$PWD/history/ResumePlanner.h \
     $$PWD/NgPost.h \
+    $$PWD/tools/ExternalToolResolver.h \
     $$PWD/NntpCheckCon.h \
     $$PWD/NntpConnection.h \
     $$PWD/NzbCheck.h \
@@ -154,6 +161,7 @@ HEADERS += \
     $$PWD/postinfo/PostInfoTemplate.h \
     $$PWD/utils/CmdOrGuiApp.h \
     $$PWD/utils/Macros.h \
+    $$PWD/utils/LogTimestamp.h \
     $$PWD/utils/PathHelper.h \
     $$PWD/utils/RandomToken.h \
     $$PWD/utils/PureStaticClass.h \
@@ -192,6 +200,7 @@ SOURCES += \
     $$PWD/hmi/AutoPostWidget.cpp \
     $$PWD/hmi/CheckBoxCenterWidget.cpp \
     $$PWD/hmi/CompressionSettingsDialog.cpp \
+    $$PWD/hmi/ExternalToolPathWidget.cpp \
     $$PWD/hmi/Par2SettingsDialog.cpp \
     $$PWD/hmi/PostInfoDialog.cpp \
     $$PWD/hmi/PostingWidget.cpp \
@@ -205,6 +214,7 @@ HEADERS += \
     $$PWD/hmi/AutoPostWidget.h \
     $$PWD/hmi/CheckBoxCenterWidget.h \
     $$PWD/hmi/CompressionSettingsDialog.h \
+    $$PWD/hmi/ExternalToolPathWidget.h \
     $$PWD/hmi/Par2SettingsDialog.h \
     $$PWD/hmi/DependentControl.h \
     $$PWD/hmi/PostInfoDialog.h \

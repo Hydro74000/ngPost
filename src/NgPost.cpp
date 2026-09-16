@@ -52,6 +52,7 @@
 #include <QDir>
 #include <QNetworkProxy>
 #include <QStandardPaths>
+#include <optional>
 
 #include "nntp/NntpFile.h"
 #ifdef __USE_TMP_RAM__
@@ -76,6 +77,7 @@ const QStringList NgPost::sDefaultGroups  = {"alt.binaries.test", "alt.binaries.
 qint64        NgPost::sArticleSize = sDefaultArticleSize;
 const QString NgPost::sSpace       = sDefaultSpace;
 
+// clang-format off
 const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 {
     {Opt::PROXY_SOCKS5,   "proxy_socks5"},
@@ -151,6 +153,8 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 
     {Opt::TMP_DIR,      "tmp_dir"},
     {Opt::RAR_PATH,     "rar_path"},
+    {Opt::RAR_TOOL,     "rar_tool"},
+    {Opt::RAR_SOURCE,   "rar_source"},
     {Opt::RAR_EXTRA,    "rar_extra"},
     {Opt::RAR_SIZE,     "rar_size"},
     {Opt::RAR_MAX,      "rar_max"},
@@ -162,6 +166,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 
     {Opt::PAR2_PCT,     "par2_pct"},
     {Opt::PAR2_PATH,    "par2_path"},
+    {Opt::PAR2_SOURCE,  "par2_source"},
     {Opt::PAR2_TOOL,    "par2_tool"},
     {Opt::PAR2_ARGS,    "par2_args"},
     {Opt::PAR2_BLOCK_SIZE, "par2_block_size"},
@@ -222,6 +227,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::YES,                     "yes"},
     {Opt::JSON,                    "json"},
 };
+// clang-format on
 
 const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::HELP],                tr("Help: display syntax")},
@@ -447,78 +453,8 @@ NgPost::NgPost(int &argc, char *argv[]):
         _hmi->setWindowTitle(QString("%1_v%2").arg(sAppName).arg(sVersion));
 #endif
 
-    // check if an embedded par2 implementation sits next to the binary
-    // (Windows installer / AppImage). We prefer parpar when present because
-    // it does not rely on shell wildcard expansion (see useParPar handling
-    // in PostingJob::startGenPar2) — a hard requirement on Windows where
-    // QProcess invokes CreateProcess directly without a shell.
-    const QString appDir = QCoreApplication::applicationDirPath();
-    QStringList par2Candidates;
-#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
-    // Fallback order: ParPar (preferred — no shell globbing needed via -R),
-    // then par2cmdline (par2.exe), then MultiPar (par2j64/par2j). All three are
-    // bundled by the Windows installer so par2 generation keeps working even if
-    // the user opts out of ParPar. par2cmdline and par2j self-expand the
-    // archive.7z* / archive*rar wildcards ngPost passes (verified), so they are
-    // safe under QProcess's shell-less CreateProcess.
-    par2Candidates << QString("%1/parpar.exe").arg(appDir)
-                   << QString("%1/par2.exe").arg(appDir)
-                   << QString("%1/par2j64.exe").arg(appDir)
-                   << QString("%1/par2j.exe").arg(appDir);
-#else
-    par2Candidates << QString("%1/parpar").arg(appDir)
-                   << QString("%1/par2").arg(appDir);
-#endif
-    for (const QString &candidate : par2Candidates) {
-        QFileInfo fi(candidate);
-        if (fi.exists() && fi.isFile() && fi.isExecutable()) {
-            _par2Path = candidate;
-            break;
-        }
-    }
-
-#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
-    // Fall back to system-wide installations when no bundled binary was found.
-    // Search order: PATH (parpar first, then par2), then QuickPar typical paths.
-    if (_par2Path.isEmpty()) {
-        for (const QString &name : {QStringLiteral("parpar.exe"), QStringLiteral("par2.exe")}) {
-            const QString found = QStandardPaths::findExecutable(name);
-            if (!found.isEmpty()) {
-                _par2Path = found;
-                break;
-            }
-        }
-    }
-    if (_par2Path.isEmpty()) {
-        for (const char *envVar : {"PROGRAMFILES", "PROGRAMFILES(X86)"}) {
-            const QString pf = QString::fromLocal8Bit(qgetenv(envVar));
-            if (pf.isEmpty())
-                continue;
-            // Some QuickPar installs ship the par2cmdline-compatible par2.exe in
-            // their folder; use it when present. We deliberately do NOT fall back
-            // to QuickPar.exe itself: it is a GUI-only tool (no headless creation
-            // mode — verified empirically), so launching it would just pop a
-            // window and hang the posting job forever.
-            const QString candidate = QString("%1/QuickPar/par2.exe").arg(pf);
-            QFileInfo fi(candidate);
-            if (fi.exists() && fi.isFile() && fi.isExecutable()) {
-                _par2Path = candidate;
-                break;
-            }
-        }
-    }
-#endif
-
-    // check if an embedded rar is available (windows or appImage)
-    QString rarEmbedded;
-#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
-    rarEmbedded = QString("%1/rar.exe").arg(QCoreApplication::applicationDirPath());
-#else
-    rarEmbedded = QString("%1/rar").arg(QCoreApplication::applicationDirPath());
-#endif
-    QFileInfo rarFi(rarEmbedded);
-    if (rarFi.exists() && rarFi.isFile() && rarFi.isExecutable())
-        _rarPath = rarEmbedded;
+    _par2Path = externaltool::resolve(QStringLiteral("auto")).path;
+    _rarPath = externaltool::resolve(_rarTool).path;
 
     connect(this, &NgPost::log,   this, &NgPost::onLog,   Qt::QueuedConnection);
     connect(this, &NgPost::error, this, &NgPost::onError, Qt::QueuedConnection);
@@ -1512,6 +1448,28 @@ void NgPost::onLog(QString msg, bool newline)
     _log(msg, newline);
 }
 
+void NgPost::onConnectionRetry(QString server, QString detail)
+{
+    if (debugMode()) {
+        _log(detail);
+        return;
+    }
+    if (_connectionRetries.isEmpty())
+        QTimer::singleShot(1000, this, &NgPost::flushConnectionRetries);
+    ++_connectionRetries[server];
+}
+
+void NgPost::flushConnectionRetries()
+{
+    const auto retries = _connectionRetries;
+    _connectionRetries.clear();
+    for (auto it = retries.cbegin(); it != retries.cend(); ++it)
+        _log(tr("%1: %2 connection interruption(s); automatic reconnection attempted. See Debug "
+                "for details.")
+                 .arg(it.key())
+                 .arg(it.value()));
+}
+
 void NgPost::onError(QString msg)
 {
     // Worker diagnostics are intentionally generic.  They may arrive after a
@@ -2088,6 +2046,9 @@ PostingJobOptions NgPost::_baseJobOptions() const
     opt.meta              = _meta;
     opt.declaredPassword  = _declaredPassword;
     opt.writePostInfoFile = !_noPostInfo;
+
+    // Which archiver rarPath runs: the switches of one fail on the other.
+    opt.rarTool = _rarTool;
     return opt;
 }
 
@@ -2447,35 +2408,42 @@ void NgPost::onNetworkAccessibleChanged(QNetworkAccessManager::NetworkAccessibil
 
 void NgPost::_log(const QString &aMsg, bool newline) const
 {
+    const QString text = _logTimestamp.format(aMsg, newline || _logEntryComplete);
+    const QString separator = newline && _logFragmentOpen ? QStringLiteral("\n") : QString();
 #ifdef __USE_HMI__
-    if (_hmi)
-    {
-        _hmi->log(aMsg, newline);
-        if (_logStream && newline)
-            *_logStream << aMsg << "\n" << MB_FLUSH; // force flush in case of crash
-    }
-    else
+    if (_hmi) {
+        _hmi->log(text, newline);
+        // Include debug process output and progress fragments in the file too.
+        if (_logStream)
+            *_logStream << separator << text << (newline ? "\n" : "") << MB_FLUSH;
+    } else
 #endif
-    {
-        _cout << aMsg;
-        if (newline)
-            _cout << "\n";
-        _cout << MB_FLUSH;
-    }
+        _cout << separator << text << (newline ? "\n" : "") << MB_FLUSH;
+    if (newline || !text.isEmpty())
+        _logFragmentOpen = !newline && !text.endsWith(QLatin1Char('\n'));
+    if (newline || !aMsg.isEmpty())
+        _logEntryComplete = newline;
 }
 
 void NgPost::_error(const QString &error) const
 {
+    const QString text = _logTimestamp.format(error, true);
 #ifdef __USE_HMI__
-    if (_hmi)
-    {
-        _hmi->logError(error);
+    if (_hmi) {
+        _hmi->logError(text);
         if (_logStream)
-            *_logStream << "ERR: " << error << "\n" << MB_FLUSH; // force flush in case of crash
-    }
-    else
+            *_logStream << (_logFragmentOpen ? "\n" : "")
+                        << _logTimestamp.format(QStringLiteral("ERR: ") + error, true) << "\n"
+                        << MB_FLUSH;
+    } else
 #endif
-        _cerr << error << "\n" << MB_FLUSH;
+    {
+        if (_logFragmentOpen)
+            _cout << "\n" << MB_FLUSH;
+        _cerr << text << "\n" << MB_FLUSH;
+    }
+    _logFragmentOpen = false;
+    _logEntryComplete = true;
 }
 
 void NgPost::_error(const QString &error, NgPost::ERROR_CODE code)
@@ -2709,12 +2677,12 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (parser.isSet(sOptionNames[Opt::DEBUG]))
     {
         _debug = 1;
-        _cout << tr("Extra logs are ON\n") << MB_FLUSH;
+        _log(tr("Extra logs are ON\n").trimmed());
     }
     if (parser.isSet(sOptionNames[Opt::DEBUG_FULL]))
     {
         _debug = 2;
-        _cout << tr("Full debug logs are ON\n") << MB_FLUSH;
+        _log(tr("Full debug logs are ON\n").trimmed());
     }
 
     if (parser.isSet(sOptionNames[Opt::DISP_PROGRESS]))
@@ -3156,8 +3124,13 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     // compression section
     if (parser.isSet(sOptionNames[Opt::TMP_DIR]))
         _tmpPath = parser.value(sOptionNames[Opt::TMP_DIR]);
-    if (parser.isSet(sOptionNames[Opt::RAR_PATH]))
+    if (parser.isSet(sOptionNames[Opt::RAR_PATH])) {
         _rarPath = parser.value(sOptionNames[Opt::RAR_PATH]);
+        // The executable's name tells its engine; a name that says neither keeps RAR_TOOL.
+        const QString archiver = externaltool::archiverForFile(_rarPath);
+        if (!archiver.isEmpty())
+            _rarTool = archiver;
+    }
     if (parser.isSet(sOptionNames[Opt::RAR_SIZE]))
     {
         bool ok;
@@ -3192,12 +3165,23 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (parser.isSet(sOptionNames[Opt::PAR2_PATH]))
     {
         QString val = parser.value(sOptionNames[Opt::PAR2_PATH]);
-        if (!val.isEmpty())
-        {
-            QFileInfo fi(val);
-            if (fi.exists() && fi.isFile() && fi.isExecutable())
-                _par2Path = val;
+        // An explicit CLI path must fail clearly if missing, never execute an
+        // unrelated auto-detected binary. A recognizable executable also
+        // overrides the configured engine; unnamed wrappers keep PAR2_TOOL.
+        par2::Tool tool;
+        if (par2::parseTool(externaltool::toolForFile(val), tool)) {
+            const auto previous = _par2Tool == par2::Tool::Auto ? par2::detectTool(_par2Path)
+                                                                : _par2Tool;
+            if (tool != previous && !_par2Args.isEmpty()) {
+                _error(tr("--par2_path selects %1 instead of %2; PAR2_ARGS is ignored and default "
+                          "arguments are used.")
+                           .arg(par2::toolName(tool), par2::toolName(previous)));
+                _par2Args.clear();
+                _par2BlockSize = 0;
+            }
+            _par2Tool = tool;
         }
+        _par2Path = val;
     }
 
     if (_doPar2 && _par2Pct == 0 && _par2Args.isEmpty())
@@ -3526,13 +3510,22 @@ QString NgPost::_parseConfig(const QString &configPath)
         vpnSignalsWereBlocked = _vpnManager->blockSignals(true);
 
     // Phase 4 — collected during parse, applied to VpnManager at end.
+    // clang-format off
     QList<VpnProfile> parsedVpnProfiles;
     QString           parsedActiveVpnProfile;
     QString           legacyVpnConfigPath;
     QString           legacyVpnBackend;
     bool              parsedPack = false;
-    bool              par2PathUnusable = false;
     bool              legacyAutoCompress = false;
+    // clang-format on
+
+    // The tool lines are settled once the whole file is read: see readPath below.
+    std::optional<QString> rarToolLine, rarSourceLine, par2ToolLine, par2SourceLine;
+    _par2PathConfig.clear();
+    _rarPathConfig.clear();
+    _rarTool = QStringLiteral("rar");
+    _par2Tool = par2::Tool::Auto;
+    _par2PathMode = _rarPathMode = externaltool::PathMode::Automatic;
 
     QFile file(fileInfo.absoluteFilePath());
     if (file.open(QIODevice::ReadOnly))
@@ -3774,9 +3767,9 @@ QString NgPost::_parseConfig(const QString &configPath)
                     }
                     else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_BACKEND])
                     {
-                        bool ok = false;
-                        VpnManager::Backend b = VpnManager::backendFromString(val, &ok);
-                        if (ok)
+                        bool backendOk = false;
+                        VpnManager::Backend b = VpnManager::backendFromString(val, &backendOk);
+                        if (backendOk)
                             currentVpn.backend = b;
                     }
                     else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_CONFIG_FILE])
@@ -3812,11 +3805,12 @@ QString NgPost::_parseConfig(const QString &configPath)
                         val = val.toLower();
                         if (val == "true" || val == "on" || val == "1")
                         {
-#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
-                            QString logFilePath = sDefaultLogFile;
-#else
-                            QString logFilePath = QString("%1/%2").arg(getenv("HOME")).arg(sDefaultLogFile);
-#endif
+                            // The configuration folder, on every platform. $HOME may be
+                            // unset (a service, a container), which put the log at /ngPost.log,
+                            // and the working directory of a GUI started from a shortcut
+                            // is wherever the shortcut says.
+                            QString const logFilePath = PathHelper::configDir() + QLatin1Char('/')
+                                + sDefaultLogFile;
 
                             _logFile = new QFile(logFilePath);
                             if (_logFile->open(QIODevice::WriteOnly|QIODevice::Text))
@@ -3828,7 +3822,8 @@ QString NgPost::_parseConfig(const QString &configPath)
                             {
                                 delete _logFile;
                                 _logFile = nullptr;
-                                _error(tr("Error opening log file: '%1'").arg(logFilePath));
+                                _error(tr("Error opening log file: '%1'")
+                                           .arg(QDir::toNativeSeparators(logFilePath)));
                             }
                         }
                     }
@@ -3978,9 +3973,9 @@ QString NgPost::_parseConfig(const QString &configPath)
                         _postInfoOnlySuccess = (val.toLower() == "true");
                     else if (opt == sOptionNames[Opt::POST_CMD_TIMEOUT])
                     {
-                        bool ok = false;
-                        int nb = val.toInt(&ok);
-                        if (ok && nb >= 0)
+                        bool timeoutOk = false;
+                        int nb = val.toInt(&timeoutOk);
+                        if (timeoutOk && nb >= 0)
                             _postCmdTimeoutSec = nb;
                         else
                             err += tr("POST_CMD_TIMEOUT must be a number of seconds (0 = no limit)\n");
@@ -3991,9 +3986,9 @@ QString NgPost::_parseConfig(const QString &configPath)
                         _postCmdExposePassword = (val.toLower() == "true");
                     else if (opt == sOptionNames[Opt::NZB_UPLOAD_TIMEOUT])
                     {
-                        bool ok = false;
-                        int nb = val.toInt(&ok);
-                        if (ok && nb >= 0)
+                        bool timeoutOk = false;
+                        int nb = val.toInt(&timeoutOk);
+                        if (timeoutOk && nb >= 0)
                             _nzbUploadTimeoutSec = nb;
                         else
                             err += tr("NZB_UPLOAD_TIMEOUT must be a number of seconds (0 = no limit)\n");
@@ -4052,7 +4047,11 @@ QString NgPost::_parseConfig(const QString &configPath)
                     else if (opt == sOptionNames[Opt::TMP_DIR])
                         _tmpPath = val;
                     else if (opt == sOptionNames[Opt::RAR_PATH])
-                        _rarPath = val;
+                        _rarPathConfig = val;
+                    else if (opt == sOptionNames[Opt::RAR_TOOL])
+                        rarToolLine = val;
+                    else if (opt == sOptionNames[Opt::RAR_SOURCE])
+                        rarSourceLine = val;
                     else if (opt == sOptionNames[Opt::RAR_PASS])
                     {
                         _rarPassFixed = val;
@@ -4140,27 +4139,11 @@ QString NgPost::_parseConfig(const QString &configPath)
                         }
                     }
                     else if (opt == sOptionNames[Opt::PAR2_TOOL])
-                    {
-                        if (!par2::parseTool(val, _par2Tool))
-                            err += tr("PAR2_TOOL must be auto, parpar, par2cmdline or multipar.") + QLatin1Char('\n');
-                    }
+                        par2ToolLine = val;
                     else if (opt == sOptionNames[Opt::PAR2_PATH])
-                    {
-                        if (!val.isEmpty())
-                        {
-                            // The line is kept verbatim so saveConfig() does not
-                            // silently drop what the user wrote, but an unusable
-                            // path is not adopted: _canGenPar2() would fail and
-                            // abort the whole post at the par2 step. Reported
-                            // here, and resolved after the parse.
-                            _par2PathConfig = val;
-                            QFileInfo fi(val);
-                            if (fi.exists() && fi.isFile() && fi.isExecutable())
-                                _par2Path = val;
-                            else
-                                par2PathUnusable = true;
-                        }
-                    }
+                        _par2PathConfig = val;
+                    else if (opt == sOptionNames[Opt::PAR2_SOURCE])
+                        par2SourceLine = val;
                     else if (opt == sOptionNames[Opt::PAR2_ARGS])
                         _par2Args = val;
                     else if (opt == sOptionNames[Opt::PAR2_BLOCK_SIZE])
@@ -4256,58 +4239,150 @@ QString NgPost::_parseConfig(const QString &configPath)
         file.close();
     }
 
-    // PAR2_PATH used to have the last word, and a path that no longer existed
-    // was dropped in silence -- the problem only surfaced when the par2 step
-    // aborted the post. It is reported above; what runs instead is settled here.
-    QString par2Warning;
-    if (par2PathUnusable)
-        par2Warning = tr("PAR2_PATH is not an executable file: %1").arg(_par2PathConfig);
-
-    if (_par2Tool != par2::Tool::Auto && (_par2PathConfig.isEmpty() || par2PathUnusable))
-    {
-        QString const found = par2::findExecutable(_par2Tool);
-        // Keeping the tool detected at startup would feed one tool's switches to
-        // another binary, so a tool that is nowhere to be found stays missing and
-        // the par2 step says why, rather than failing on a syntax error.
-        _par2Path = found;
-        if (found.isEmpty())
-        {
-            if (!par2Warning.isEmpty())
-                par2Warning += QLatin1Char('\n');
-            par2Warning += tr("PAR2_TOOL = %1: no %1 executable was found, neither next to ngPost nor in "
-                              "the PATH. Every post that generates par2 will stop at that step.\n"
-                              "Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, "
-                              "parpar, par2cmdline or multipar.")
-                                 .arg(par2::toolName(_par2Tool));
+    // Checked once the whole file is read, like the paths they qualify: as for
+    // every key, the last line wins. A value that means nothing is reported and
+    // read as if the line were absent, but not in err (see readPath below).
+    if (rarToolLine) {
+        const QString rarTool = rarToolLine->trimmed().toLower();
+        if (rarTool == QLatin1String("rar") || rarTool == QLatin1String("7zip"))
+            _rarTool = rarTool;
+        else {
+            _error(tr("RAR_TOOL must be rar or 7zip."));
+            rarToolLine.reset();
         }
-        else if (par2PathUnusable)
-            par2Warning += QLatin1Char('\n')
-                         + tr("PAR2_TOOL = %1 is used instead, with %2.")
-                               .arg(par2::toolName(_par2Tool), found);
     }
-    else if (par2PathUnusable)
-    {
-        // PAR2_TOOL is auto: whatever ngPost detected next to itself still works.
-        par2Warning += QLatin1Char('\n')
-                     + (_par2Path.isEmpty()
-                            ? tr("No par2 tool was found next to ngPost either: every post that generates "
-                                 "par2 will stop at that step. Fix PAR2_PATH, or install par2 or ParPar.")
-                            : tr("ngPost uses the par2 tool it found instead: %1.").arg(_par2Path));
+    if (par2ToolLine && !par2::parseTool(*par2ToolLine, _par2Tool))
+        _error(tr("PAR2_TOOL must be auto, parpar, par2cmdline or multipar."));
+    if (rarSourceLine && !externaltool::parseMode(*rarSourceLine, _rarPathMode)) {
+        _error(tr("RAR_SOURCE must be auto or custom."));
+        rarSourceLine.reset();
+    }
+    if (par2SourceLine && !externaltool::parseMode(*par2SourceLine, _par2PathMode)) {
+        _error(tr("PAR2_SOURCE must be auto or custom."));
+        par2SourceLine.reset();
     }
 
-    // Only worth saying when this configuration can produce par2 at all: an
-    // install that never generates any would otherwise be nagged at every
-    // start about a tool it does not use. A post that asks for par2 later (the
-    // GUI box, --gen_par2) still gets the explicit message from _canGenPar2().
-    bool const par2Requested = _par2Pct > 0 || _doPar2
-                            || _packAutoKeywords.contains(sOptionNames[Opt::GEN_PAR2], Qt::CaseInsensitive)
-                            || (legacyAutoCompress && !parsedPack);
+    // A missing tool is only worth saying when this configuration can use it:
+    // an install that never compresses or generates par2 would otherwise be
+    // told at every start about a tool it does not use. A post that asks for
+    // it later (the GUI boxes, --compress, --gen_par2) still gets the explicit
+    // message from PostingJob::_canCompress() and _canGenPar2().
+    bool const legacyPacking = legacyAutoCompress && !parsedPack;
+    bool const par2Requested = _par2Pct > 0 || _doPar2 || legacyPacking
+        || _packAutoKeywords.contains(sOptionNames[Opt::GEN_PAR2]);
+    bool const compressRequested = _doCompress || legacyPacking
+        || _packAutoKeywords.contains(sOptionNames[Opt::COMPRESS]);
 
-    // Not appended to err: err stops ngPost with ERR_CONF_FILE, and a
-    // configuration that refuses to start is precisely where the user cannot
-    // reach the PAR2 settings to fix it. Loud, but not fatal.
-    if (par2Requested && !par2Warning.isEmpty())
-        _error(tr("Configuration: %1").arg(par2Warning));
+    // How a *_PATH line is read. With an explicit *_SOURCE, as written: a custom
+    // path never falls back to another executable. Without one, the configuration
+    // predates *_SOURCE: a bundled path (even of an old AppImage mount) becomes
+    // automatic discovery of that tool, an executable path stays custom, and a
+    // path that no longer exists falls back to automatic discovery, as PAR2_PATH
+    // always did. A line that does not do what it says is reported, but not in
+    // err: that stops ngPost, the very place where the settings get fixed.
+    auto readPath = [this](const QString &key,
+                           const QString &sourceKey,
+                           const QStringList &kinds,
+                           QString &tool,
+                           externaltool::PathMode &mode,
+                           QString &path,
+                           bool explicitMode,
+                           const QString &toolArgs,
+                           bool requested) {
+        if (path.isEmpty())
+            return;
+        if (explicitMode) {
+            if (mode == externaltool::PathMode::Automatic) {
+                _error(tr("Configuration: %1 is ignored because %2 = auto. Set %2 = custom to use "
+                          "this path.")
+                           .arg(key, sourceKey));
+                path.clear();
+            } else if (requested && !externaltool::executable(path))
+                _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
+                          "tool will stop before the transfer.")
+                           .arg(key, path));
+            return;
+        }
+        // The file name says which engine the line meant. It only matters when
+        // that engine can run the configured arguments: adopt it when they were
+        // written for it, or when it is installed. Otherwise auto detection
+        // stays, and builds the arguments for whichever engine it finds -- the
+        // bundle may well have lost that engine (ParPar is optional on Windows).
+        const auto adoptNamedEngine = [&](const QString &named) {
+            if (tool == QLatin1String("auto") && kinds.contains(named)
+                && (!toolArgs.isEmpty() || externaltool::resolve(named).available()))
+                tool = named;
+        };
+        const QString bundled = externaltool::bundledTool(path);
+        if (kinds.contains(bundled) && (tool == QLatin1String("auto") || tool == bundled)) {
+            adoptNamedEngine(bundled);
+            mode = externaltool::PathMode::Automatic;
+            path.clear();
+            return;
+        }
+        if (externaltool::executable(path)) {
+            mode = externaltool::PathMode::Custom;
+            return;
+        }
+        adoptNamedEngine(externaltool::toolForFile(path));
+        mode = externaltool::PathMode::Automatic;
+        if (requested) {
+            const QString found = externaltool::resolve(tool).path;
+            if (found.isEmpty())
+                _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
+                          "tool will stop before the transfer.")
+                           .arg(key, path));
+            else
+                _error(tr("Configuration: %1 = %2 is not an executable file; ngPost uses %3, found "
+                          "automatically, instead.")
+                           .arg(key, path, found));
+        }
+        // Keep legacy user paths, even when unavailable. Save them without a
+        // *_SOURCE line so a reload retains this fallback and can use the
+        // original executable again if it becomes available.
+    };
+    QString par2Tool = par2::toolName(_par2Tool);
+    readPath(QStringLiteral("PAR2_PATH"),
+             QStringLiteral("PAR2_SOURCE"),
+             { QStringLiteral("parpar"),
+               QStringLiteral("par2cmdline"),
+               QStringLiteral("multipar") },
+             par2Tool,
+             _par2PathMode,
+             _par2PathConfig,
+             par2SourceLine.has_value(),
+             _par2Args,
+             par2Requested);
+    par2::parseTool(par2Tool, _par2Tool);
+    const QString rarNamed = externaltool::archiverForFile(_rarPathConfig);
+    if (!rarToolLine && !rarNamed.isEmpty()
+        && (!rarSourceLine || _rarPathMode == externaltool::PathMode::Custom))
+        _rarTool = rarNamed;
+    readPath(QStringLiteral("RAR_PATH"),
+             QStringLiteral("RAR_SOURCE"),
+             { QStringLiteral("rar"), QStringLiteral("7zip") },
+             _rarTool,
+             _rarPathMode,
+             _rarPathConfig,
+             rarSourceLine.has_value(),
+             _rarArgs,
+             compressRequested);
+    // The example configuration sets RAR_TOOL = rar next to a commented
+    // RAR_PATH = /usr/bin/7z: rar's switches would make 7-Zip fail every time.
+    if (_rarPathMode == externaltool::PathMode::Custom && !rarNamed.isEmpty()
+        && rarNamed != _rarTool) {
+        _error(tr("Configuration: RAR_TOOL = %1 does not match RAR_PATH = %2; %3 is used.")
+                   .arg(_rarTool, _rarPathConfig, rarNamed));
+        _rarTool = rarNamed;
+    }
+    _par2Path = externaltool::resolve(par2Tool, _par2PathMode, _par2PathConfig).path;
+    _rarPath = externaltool::resolve(_rarTool, _rarPathMode, _rarPathConfig).path;
+    if (par2Requested && _par2Tool != par2::Tool::Auto
+        && _par2PathMode == externaltool::PathMode::Automatic && _par2Path.isEmpty())
+        _error(tr("Configuration: PAR2_TOOL = %1: no executable was found. Install %1, select "
+                  "another PAR2_TOOL, or set PAR2_SOURCE = custom and PAR2_PATH to its executable "
+                  "(PAR2 Settings in the GUI).")
+                   .arg(par2Tool));
 
     if (legacyAutoCompress && !parsedPack)
     {
@@ -4881,6 +4956,8 @@ void NgPost::saveConfig()
     if (file.open(QIODevice::WriteOnly|QIODevice::Text))
     {
         QTextStream stream(&file);
+        // clang-format off
+        // One stream line per line of the file: the layout mirrors what is written.
         stream << tr("# ngPost configuration file") << "\n"
                << "#\n"
                << "#\n"
@@ -5094,7 +5171,7 @@ void NgPost::saveConfig()
                << (_preparePacking ? "" : "#") << "PREPARE_PACKING = true" << "\n"
                << "\n"
                << tr("## For GUI ONLY, save the logs in a file (to debug potential crashes)") << "\n"
-               << tr("## ~/ngPost.log on Linux and MacOS, in the executable folder for Windows") << "\n"
+               << tr("## ngPost.log is written in the ngPost configuration folder") << "\n"
                << tr("## The log is overwritten each time ngPost is launched") << "\n"
                << tr("## => after a crash, please SAVE the log before relaunching ngPost") << "\n"
                << (_logStream != nullptr ? "" : "#") << "LOG_IN_FILE = true" << "\n"
@@ -5150,10 +5227,11 @@ void NgPost::saveConfig()
                << "TMP_RAM_RATIO = " << _ramRatio << "\n"
                << "\n";
 #endif
-        stream << tr("## RAR or 7zip absolute file path (external application)") << "\n"
-               << tr("## /!\\ The file MUST EXIST and BE EXECUTABLE /!\\") << "\n"
-               << tr("## this is set for Linux environment, Windows users MUST change it") << "\n"
-               << "RAR_PATH = " << _rarPath << "\n"
+        stream << "RAR_TOOL = " << _rarTool << "\n"
+               << (_rarPathMode == externaltool::PathMode::Automatic && !_rarPathConfig.isEmpty()
+                       ? QString() : QString("RAR_SOURCE = %1\n").arg(externaltool::modeName(_rarPathMode)))
+               << tr("## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.") << "\n"
+               << (!_rarPathConfig.isEmpty() ? QString("RAR_PATH = %1\n").arg(_rarPathConfig) : QString())
                << "\n"
                << tr("## RAR EXTRA options (the first 'a' and '-idp' will be added automatically)") << "\n"
                << tr("## -hp will be added if you use a password with --gen_pass, --rar_pass or using the HMI") << "\n"
@@ -5181,11 +5259,10 @@ void NgPost::saveConfig()
                << tr("## par2 redundancy percentage (0 by default meaning NO par2 generation)") << "\n"
                << "PAR2_PCT = " << _par2PctDefault << "\n"
                << "PAR2_TOOL = " << par2::toolName(_par2Tool) << "\n"
+               << (_par2PathMode == externaltool::PathMode::Automatic && !_par2PathConfig.isEmpty()
+                       ? QString() : QString("PAR2_SOURCE = %1\n").arg(externaltool::modeName(_par2PathMode)))
                << "\n"
-               << tr("## par2 (or alternative) absolute file path") << "\n"
-               << tr("## this is only useful if you compile from source (as par2 is included on Windows and the AppImage)") << "\n"
-               << tr("## or if you wish to use an alternative to par2 (for exemple Multipar on Windows)") << "\n"
-               << tr("## (in that case, you may need to set also PAR2_ARGS)") << "\n";
+               << tr("## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.") << "\n";
         if (!_par2PathConfig.isEmpty())
             stream << "PAR2_PATH = " << _par2PathConfig << "\n";
 #if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
@@ -5266,6 +5343,7 @@ void NgPost::saveConfig()
             }
         }
 
+        // clang-format on
         stream.flush();
         if (stream.status() != QTextStream::Ok) {
             file.cancelWriting();

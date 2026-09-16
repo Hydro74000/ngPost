@@ -387,27 +387,11 @@ It will be irreversible...</source>
     </message>
     <message>
         <location line="+3"/>
-        <location line="+34"/>
         <source>...</source>
         <translation>...</translation>
     </message>
     <message>
-        <location line="-25"/>
-        <source>RAR Path: </source>
-        <translation>RAR路径：</translation>
-    </message>
-    <message>
-        <location line="+9"/>
-        <source>full path of the rar executable</source>
-        <translation>rar可执行文件的完整路径</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select rar executable</source>
-        <translation>选择rar可执行文件</translation>
-    </message>
-    <message>
-        <location line="+27"/>
+        <location line="+24"/>
         <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
         <translation>将rar文件分卷压缩（0为不分卷压缩）</translation>
     </message>
@@ -461,19 +445,9 @@ This is the default every new post starts with; each post can still decide other
         <translation>生成随机密码</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+154"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+207"/>
         <source>Select a Folder</source>
         <translation>选择一个文件夹</translation>
-    </message>
-    <message>
-        <location line="+12"/>
-        <source>Select rar executable</source>
-        <translation>选择rar可执行文件</translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>the selected file is not executable...</source>
-        <translation>选中的文件不是可执行文件类型...</translation>
     </message>
     <message>
         <location filename="../hmi/CompressionSettingsDialog.ui" line="-117"/>
@@ -486,7 +460,7 @@ This is the default every new post starts with; each post can still decide other
         <translation>将分卷数量限制为</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-85"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-73"/>
         <source>Volume size</source>
         <translation>分卷大小</translation>
     </message>
@@ -500,7 +474,7 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
 请输入 0 到 1000000 之间的整数（MiB；只有关闭分卷数量限制时，0 才表示不分卷）。</translation>
     </message>
     <message>
-        <location line="+46"/>
+        <location line="+56"/>
         <source>The volume size is calculated automatically from the source size and the volume limit.</source>
         <translation>根据源文件大小和分卷数量限制自动计算分卷大小。</translation>
     </message>
@@ -525,14 +499,77 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
         <translation>1 MiB = 1,048,576 字节。根据源文件大小计算并取整。</translation>
     </message>
     <message>
-        <location line="-86"/>
+        <location line="-97"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-58"/>
+        <source>Tool:</source>
+        <translation>工具：</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Path:</source>
+        <translation>路径：</translation>
+    </message>
+    <message>
+        <location line="+54"/>
         <source>Cancel</source>
         <translation>取消</translation>
+    </message>
+</context>
+<context>
+    <name>ExternalToolPathWidget</name>
+    <message>
+        <location filename="../hmi/ExternalToolPathWidget.cpp" line="+25"/>
+        <source>Automatic (recommended)</source>
+        <translation>自动（推荐）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Custom…</source>
+        <translation>自定义…</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Browse…</source>
+        <translation>浏览…</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Show path</source>
+        <translation>显示路径</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Select executable</source>
+        <translation>选择可执行文件</translation>
+    </message>
+    <message>
+        <location line="+49"/>
+        <source>Executable unavailable. Choose an executable file or use Automatic.</source>
+        <translation>可执行文件不可用。请选择可执行文件或使用自动模式。</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>This tool is not included or installed. Install it, choose another tool, or set a custom path. Posts requiring it cannot start.</source>
+        <translation>此工具未随 ngPost 提供，也未安装。请安装它、选择其他工具或设置自定义路径。需要此工具的发布任务无法启动。</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Included with ngPost · ready</source>
+        <translation>随 ngPost 提供 · 就绪</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Found on this computer · ready</source>
+        <translation>在此计算机上找到 · 就绪</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Custom executable · ready</source>
+        <translation>自定义可执行文件 · 就绪</translation>
     </message>
 </context>
 <context>
@@ -676,7 +713,7 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3177"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3181"/>
         <source>VPN: disabled</source>
         <translation>VPN：已禁用</translation>
     </message>
@@ -835,7 +872,7 @@ Unlike the per post box, this choice is saved.</source>
         <translation>转到命令行（关闭图形化界面并在命令行环境中继续）</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1232"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1236"/>
         <source>on</source>
         <translation>启用</translation>
     </message>
@@ -871,32 +908,32 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1078"/>
+        <location line="+1082"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>密码</translation>
     </message>
     <message>
-        <location line="-1143"/>
-        <location line="+405"/>
+        <location line="-1147"/>
+        <location line="+409"/>
         <location line="+1670"/>
         <source>Default %1</source>
         <translation>默认 %1</translation>
     </message>
     <message>
-        <location line="-2071"/>
-        <location line="+405"/>
+        <location line="-2075"/>
+        <location line="+409"/>
         <source>Post history, statistics and resume center</source>
         <translation>发贴历史、统计与续传中心</translation>
     </message>
     <message>
-        <location line="-404"/>
-        <location line="+408"/>
+        <location line="-408"/>
+        <location line="+412"/>
         <source>New</source>
         <translation>新建</translation>
     </message>
     <message>
-        <location line="-346"/>
+        <location line="-350"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>平均速度</translation>
@@ -953,7 +990,7 @@ Close that other ngPost to use the VPN here. If none is running, you can remove 
         <translation>VPN</translation>
     </message>
     <message>
-        <location line="+219"/>
+        <location line="+223"/>
         <source>close while still posting?</source>
         <translation>仍在发布，确认关闭?</translation>
     </message>
@@ -1066,12 +1103,12 @@ The job stays in the queue.</source>
 任务保留在队列中。</translation>
     </message>
     <message>
-        <location line="-585"/>
+        <location line="-589"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>无法移除这些设置。详情请查看 VPN 日志。</translation>
     </message>
     <message>
-        <location line="+599"/>
+        <location line="+603"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>ngPost 中配置的 VPN 似乎已在运行；可能有另一个 ngPost 正在使用它。请查看 VPN 设置。</translation>
     </message>
@@ -1823,8 +1860,8 @@ This also removes all associated file and article records.</source>
         <translation>删除条目</translation>
     </message>
     <message>
-        <location line="-1334"/>
-        <location line="+405"/>
+        <location line="-1338"/>
+        <location line="+409"/>
         <location line="+515"/>
         <location line="+325"/>
         <source>History</source>
@@ -2004,8 +2041,8 @@ This also removes all associated file and article records.</source>
         <translation>重置列宽</translation>
     </message>
     <message>
-        <location line="-1667"/>
-        <location line="+414"/>
+        <location line="-1671"/>
+        <location line="+418"/>
         <source>PAR2 Settings…</source>
         <translation>PAR2 设置…</translation>
     </message>
@@ -2023,7 +2060,7 @@ This also removes all associated file and article records.</source>
 <context>
     <name>NgPost</name>
     <message>
-        <location filename="../NgPost.cpp" line="+68"/>
+        <location filename="../NgPost.cpp" line="+69"/>
         <source>Auto Posting</source>
         <translation>自动发布</translation>
     </message>
@@ -2033,7 +2070,7 @@ This also removes all associated file and article records.</source>
         <translation>快速发布</translation>
     </message>
     <message>
-        <location line="+158"/>
+        <location line="+163"/>
         <source>Help: display syntax</source>
         <translation>帮助：显示语法</translation>
     </message>
@@ -2204,12 +2241,12 @@ This also removes all associated file and article records.</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4865"/>
+        <location line="+4937"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>使用RAR压缩文件夹时删除根（父）文件夹</translation>
     </message>
     <message>
-        <location line="-4862"/>
+        <location line="-4934"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP服务器遵循的格式 (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2244,7 +2281,7 @@ This also removes all associated file and article records.</source>
         <translation>NNTP连接数</translation>
     </message>
     <message>
-        <location line="+1271"/>
+        <location line="+1223"/>
         <source>MONITOR_IGNORE_DIR ON =&gt; Ignoring new incoming folder %1</source>
         <translation>设置MONITOR_IGNORE_DIR为ON意味着忽略新导入的文件夹%1</translation>
     </message>
@@ -2274,7 +2311,7 @@ This also removes all associated file and article records.</source>
         <translation> =&gt;关闭程序</translation>
     </message>
     <message>
-        <location line="+535"/>
+        <location line="+538"/>
         <source>packing job finished unexpectedly...</source>
         <translation>完成打包任务时发生意外...</translation>
     </message>
@@ -2284,7 +2321,7 @@ This also removes all associated file and article records.</source>
         <translation>网络访问已更改: %1</translation>
     </message>
     <message>
-        <location line="+88"/>
+        <location line="+95"/>
         <source>Cancelling monitoring job: %1</source>
         <translation>正在取消监视任务: %1</translation>
     </message>
@@ -2337,17 +2374,17 @@ To list the available options use: %2 --help
 </translation>
     </message>
     <message>
-        <location line="-2409"/>
+        <location line="-2371"/>
         <source>Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</source>
         <translation>您可以配置PACK命令定义的子命令(COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)来打包发帖</translation>
     </message>
     <message>
-        <location line="+1394"/>
+        <location line="+1346"/>
         <source>SSL issue on your system...</source>
         <translation>您的系统出现SSL问题...</translation>
     </message>
     <message>
-        <location line="+495"/>
+        <location line="+498"/>
         <source>no packing needed for next pending job %1</source>
         <translation>待处理任务无需打包 %1</translation>
     </message>
@@ -2362,12 +2399,12 @@ To list the available options use: %2 --help
         <translation>取消待处理的任务?</translation>
     </message>
     <message>
-        <location line="-1014"/>
+        <location line="-1039"/>
         <source>Posting canceled by user.</source>
         <translation>用户已取消发布。</translation>
     </message>
     <message>
-        <location line="+3386"/>
+        <location line="+3525"/>
         <source>VPN warning</source>
         <translation>VPN 警告</translation>
     </message>
@@ -2400,14 +2437,14 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>取消</translation>
     </message>
     <message>
-        <location line="-1988"/>
+        <location line="-2095"/>
         <source>Full debug logs are ON
 </source>
         <translation>已打开完整调试日志
 </translation>
     </message>
     <message>
-        <location line="-2488"/>
+        <location line="-2450"/>
         <source>use configuration file (default: the per-user ngPost configuration folder)</source>
         <translation>使用配置文件（默认：每位用户的 ngPost 配置文件夹）</translation>
     </message>
@@ -2602,7 +2639,7 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>按名称选择生效的 VPN 配置（该配置必须已存在于配置文件中）</translation>
     </message>
     <message>
-        <location line="+269"/>
+        <location line="+199"/>
         <source>VPN required but unavailable: %1</source>
         <translation>需要 VPN 但不可用：%1</translation>
     </message>
@@ -2697,12 +2734,12 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <location line="+4"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+3267"/>
+        <location line="+3406"/>
         <source>Warning: %1</source>
         <translation>警告：%1</translation>
     </message>
     <message>
-        <location line="-3482"/>
+        <location line="-3621"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>需要确认。请加 --yes 重新运行以继续发贴。</translation>
     </message>
@@ -2757,7 +2794,12 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>信息文件已写入：%1</translation>
     </message>
     <message>
-        <location line="+218"/>
+        <location line="+125"/>
+        <source>%1: %2 connection interruption(s); automatic reconnection attempted. See Debug for details.</source>
+        <translation>%1：连接中断 %2 次；已尝试自动重连。详情请查看调试模式。</translation>
+    </message>
+    <message>
+        <location line="+115"/>
         <location line="+257"/>
         <source>AUTO_INCLUDE_NFO ON =&gt; %1 will be bundled with its sibling, not posted alone</source>
         <translation>AUTO_INCLUDE_NFO ON =&gt; %1 将与同名文件打包，不单独发布</translation>
@@ -2788,13 +2830,13 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>错误：元数据“%1”同时以公开（--meta）和私有（--post_meta）方式给出；请选择其一。</translation>
     </message>
     <message>
-        <location line="+255"/>
+        <location line="+258"/>
         <source>Recovering: starting next job that wasn&apos;t pre-packed</source>
         <translation>恢复中：正在启动下一个未预打包的任务</translation>
     </message>
     <message>
-        <location line="-826"/>
-        <location line="+1183"/>
+        <location line="-851"/>
+        <location line="+1215"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>配置文件夹迁移失败；ngPost 已在使用新文件夹前停止，以便下次安全重试。</translation>
     </message>
@@ -2851,17 +2893,17 @@ That&apos;s not the case for &apos;%1&apos; which contains folders: %2</source>
     </message>
     <message>
         <location line="+69"/>
-        <location line="+811"/>
+        <location line="+838"/>
         <source>Generate new random poster for each post</source>
         <translation>为每个帖子生成新的随机发布者</translation>
     </message>
     <message>
-        <location line="-780"/>
+        <location line="-807"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>您应为发布文章的重试次数提供一个无符号整数（参数-r）</translation>
     </message>
     <message>
-        <location line="+57"/>
+        <location line="+73"/>
         <source>Error: can&apos;t generate par2 if the redundancy percentage is null or PAR2_ARGS is not provided...
 Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>错误: 如果冗余数值为空或者没有提供参数PAR2_ARGS将无法生成par2文件...
@@ -2929,14 +2971,29 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>无法读取配置文件“%1”...</translation>
     </message>
     <message>
-        <location line="+144"/>
+        <location line="+153"/>
         <source>the nzbPath &apos;%1&apos; is not writable...
 </source>
         <translation>无法写入nzb保存路径“%1”...
 </translation>
     </message>
     <message>
-        <location line="+804"/>
+        <location line="+600"/>
+        <source>RAR_TOOL must be rar or 7zip.</source>
+        <translation>RAR_TOOL 必须为 rar 或 7zip。</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>RAR_SOURCE must be auto or custom.</source>
+        <translation>RAR_SOURCE 必须为 auto 或 custom。</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>PAR2_SOURCE must be auto or custom.</source>
+        <translation>PAR2_SOURCE 必须为 auto 或 custom。</translation>
+    </message>
+    <message>
+        <location line="+275"/>
         <source>ngPost used to keep your settings in a folder named after the program file, so renaming or updating the application (an AppImage is renamed on install and on every update) silently started ngPost with an empty configuration and an empty post history.
 
 The folder is now always called &quot;ngPost&quot;, and your settings have been brought over to it:
@@ -3047,7 +3104,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>历史记录：无法移除已取消的发贴 %1：%2</translation>
     </message>
     <message>
-        <location line="+119"/>
+        <location line="+121"/>
         <source>## here is the list of the available variables</source>
         <translation>## 以下是可用变量的列表</translation>
     </message>
@@ -3137,14 +3194,14 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>## 传给贴后命令；参数中的 __rarPass__ 仍然有效</translation>
     </message>
     <message>
-        <location line="-3013"/>
+        <location line="-3132"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>NZB_UPLOAD_URL (%1)使用了不支持的协议。 您只可以使用%2
 </translation>
     </message>
     <message>
-        <location line="+1867"/>
+        <location line="+1903"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost 开始记录: %1</translation>
     </message>
@@ -3154,7 +3211,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>打开记录文件时发生错误: &apos;%1&apos;</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+41"/>
         <source>Group Policy: one group per Post</source>
         <translation>新闻组策略：每个帖子一个新闻组</translation>
     </message>
@@ -3169,7 +3226,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>解析Proxy Socks5参数时出错. 语法应为: %1</translation>
     </message>
     <message>
-        <location line="-1985"/>
+        <location line="-2022"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>发布历史“%1”不可设置为目录...
@@ -3184,7 +3241,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
 </translation>
     </message>
     <message>
-        <location line="+2045"/>
+        <location line="+2082"/>
         <source>should be a directory!...</source>
         <translation>应该是一个目录!...</translation>
     </message>
@@ -3204,7 +3261,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>应该是一个比率介于 %1 与 %2 之间</translation>
     </message>
     <message>
-        <location line="+48"/>
+        <location line="+52"/>
         <source>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it.</source>
         <translation>废弃的关键词 AUTO_COMPRESS, 您应当使用 PACK 命令, 请点击保存来更新您的配置文件, 更新后请再查看.</translation>
     </message>
@@ -3219,17 +3276,17 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>使用 PACK 命令时使用了错误的关键词: %1. 关键词请使用下面中的 (%2)</translation>
     </message>
     <message>
-        <location line="-2121"/>
+        <location line="-2162"/>
         <source>date</source>
         <translation>日期</translation>
     </message>
     <message>
-        <location line="-1722"/>
+        <location line="-1674"/>
         <source>where to write the post info file (non-secret variables allowed)</source>
         <translation>发贴信息文件的写入位置（允许使用非机密变量）</translation>
     </message>
     <message>
-        <location line="+1723"/>
+        <location line="+1675"/>
         <source>nzb name</source>
         <translation>nzb文件名</translation>
     </message>
@@ -3264,7 +3321,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>从</translation>
     </message>
     <message>
-        <location line="+385"/>
+        <location line="+388"/>
         <source>Shutdown process failed (exit code %1).</source>
         <translation>关机进程失败（退出代码 %1）。</translation>
     </message>
@@ -3274,8 +3331,8 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
         <translation>关机进程出错：%1</translation>
     </message>
     <message>
-        <location line="+725"/>
-        <location line="+770"/>
+        <location line="+732"/>
+        <location line="+797"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE 必须是正整数</translation>
     </message>
@@ -3301,7 +3358,7 @@ No existing source file was modified or deleted. Safe, non-conflicting files may
 </translation>
     </message>
     <message>
-        <location line="+347"/>
+        <location line="+427"/>
         <source>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</source>
         <translation>VPN：旧的 VPN_CONFIG_PATH 已迁移到配置“Default”</translation>
     </message>
@@ -3449,7 +3506,7 @@ Your active configuration file is:
         <translation>使用默认配置文件: %1</translation>
     </message>
     <message>
-        <location line="+213"/>
+        <location line="+215"/>
         <source>## Lang for the app. Currently supported: EN, FR, ES, DE, NL, PT, ZH</source>
         <translation>## 程序界面语言. 当前支持: 英语, 法语, 西班牙语, 德语, 荷兰语, 葡萄牙语以及简体中文</translation>
     </message>
@@ -3495,8 +3552,8 @@ Your active configuration file is:
     </message>
     <message>
         <location line="+1"/>
-        <source>## ~/ngPost.log on Linux and MacOS, in the executable folder for Windows</source>
-        <translation>## ~/ngPost.log 在 Linux 和 MacOS 平台上, 在Windows平台中保存在可执行文件夹</translation>
+        <source>## ngPost.log is written in the ngPost configuration folder</source>
+        <translation>## ngPost.log 保存在 ngPost 的配置文件夹中</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -3534,12 +3591,12 @@ Your active configuration file is:
         <translation></translation>
     </message>
     <message>
-        <location line="-734"/>
+        <location line="-736"/>
         <source>for compression and par2 support</source>
         <translation>为压缩和par2文件提供支持</translation>
     </message>
     <message>
-        <location line="-4144"/>
+        <location line="-4213"/>
         <source>check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, see the report for whether they can be repaired, 2 = missing beyond any repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)</source>
         <translation>检查 nzb 文件（文章在 Usenet 上是否可用）。退出码：0 = 所有文章齐全，1 = 有文章缺失，是否可修复请见报告，2 = 缺失且无法修复，3 = 无结论（nzb 不可读、未启用任何检查服务器，或连接失败）</translation>
     </message>
@@ -3564,12 +3621,12 @@ Your active configuration file is:
         <translation>重新核查后移除无归属的 ngPost VPN 资源（需要 --yes）</translation>
     </message>
     <message>
-        <location line="+297"/>
+        <location line="+227"/>
         <source>VPN recovery exhausted; the post was preserved for resume.</source>
         <translation>VPN 恢复次数已用尽；发布已保留以便续传。</translation>
     </message>
     <message>
-        <location line="+1075"/>
+        <location line="+1097"/>
         <source>SSL support is unavailable</source>
         <translation>SSL 支持不可用</translation>
     </message>
@@ -3584,7 +3641,7 @@ Your active configuration file is:
         <translation>在 VPN 恢复完成之前，发布将保持暂停。</translation>
     </message>
     <message>
-        <location line="+865"/>
+        <location line="+875"/>
         <source>Error: --vpn-cleanup-unattributed requires --yes because it can interrupt another ngPost tunnel.</source>
         <translation>错误：--vpn-cleanup-unattributed 需要配合 --yes，因为它可能中断另一个 ngPost 的隧道。</translation>
     </message>
@@ -3624,7 +3681,12 @@ Your active configuration file is:
         <translation>已启用 nzb 检查的服务器连接数不为正</translation>
     </message>
     <message>
-        <location line="+937"/>
+        <location line="+398"/>
+        <source>--par2_path selects %1 instead of %2; PAR2_ARGS is ignored and default arguments are used.</source>
+        <translation>--par2_path 选择 %1 而非 %2；将忽略 PAR2_ARGS 并使用默认参数。</translation>
+    </message>
+    <message>
+        <location line="+564"/>
         <source>Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5.</source>
         <translation>警告：VPN_LEASE_WAIT_MINUTES 必须在 0..1440 之间；将使用 5。</translation>
     </message>
@@ -3634,44 +3696,38 @@ Your active configuration file is:
         <translation>警告：VPN_RECOVERY_MAX_ATTEMPTS 必须在 0..1000 之间；将使用 0（无限制）。</translation>
     </message>
     <message>
-        <location line="+415"/>
+        <location line="+405"/>
         <source>should be a positive number of bytes!...</source>
         <translation>应为正的字节数！…</translation>
     </message>
     <message>
-        <location line="+92"/>
-        <source>PAR2_PATH is not an executable file: %1</source>
-        <translation>PAR2_PATH 不是可执行文件：%1</translation>
+        <location line="+141"/>
+        <source>Configuration: %1 is ignored because %2 = auto. Set %2 = custom to use this path.</source>
+        <translation>配置：由于 %2 = auto，%1 被忽略。请设置 %2 = custom 以使用此路径。</translation>
     </message>
     <message>
-        <location line="+13"/>
-        <source>PAR2_TOOL = %1: no %1 executable was found, neither next to ngPost nor in the PATH. Every post that generates par2 will stop at that step.
-Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, par2cmdline or multipar.</source>
-        <translation>PAR2_TOOL = %1：在 ngPost 旁边和 PATH 中都找不到 %1 可执行文件。任何生成 par2 的发布都会在该步骤停止。
-请安装 %1、将 PAR2_PATH 指向其可执行文件，或将 PAR2_TOOL 设为 auto、parpar、par2cmdline 或 multipar。</translation>
+        <location line="+5"/>
+        <location line="+31"/>
+        <source>Configuration: %1 = %2 is not an executable file. Posts that need this tool will stop before the transfer.</source>
+        <translation>配置：%1 = %2 不是可执行文件。需要此工具的发布将在传输前停止。</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Configuration: %1 = %2 is not an executable file; ngPost uses %3, found automatically, instead.</source>
+        <translation>配置：%1 = %2 不是可执行文件；ngPost 改用自动找到的 %3。</translation>
+    </message>
+    <message>
+        <location line="+38"/>
+        <source>Configuration: RAR_TOOL = %1 does not match RAR_PATH = %2; %3 is used.</source>
+        <translation>配置：RAR_TOOL = %1 与 RAR_PATH = %2 不匹配；将使用 %3。</translation>
     </message>
     <message>
         <location line="+8"/>
-        <source>PAR2_TOOL = %1 is used instead, with %2.</source>
-        <translation>改用 PAR2_TOOL = %1，可执行文件为 %2。</translation>
+        <source>Configuration: PAR2_TOOL = %1: no executable was found. Install %1, select another PAR2_TOOL, or set PAR2_SOURCE = custom and PAR2_PATH to its executable (PAR2 Settings in the GUI).</source>
+        <translation>配置：PAR2_TOOL = %1：未找到可执行文件。请安装 %1、选择其他 PAR2_TOOL，或设置 PAR2_SOURCE = custom 并将 PAR2_PATH 指向其可执行文件（图形界面中的 PAR2 设置）。</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <source>No par2 tool was found next to ngPost either: every post that generates par2 will stop at that step. Fix PAR2_PATH, or install par2 or ParPar.</source>
-        <translation>在 ngPost 旁边也未找到任何 par2 工具：任何生成 par2 的发布都会在该步骤停止。请修正 PAR2_PATH，或安装 par2 或 ParPar。</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>ngPost uses the par2 tool it found instead: %1.</source>
-        <translation>ngPost 改用它找到的 par2 工具：%1。</translation>
-    </message>
-    <message>
-        <location line="+15"/>
-        <source>Configuration: %1</source>
-        <translation>配置：%1</translation>
-    </message>
-    <message>
-        <location line="+71"/>
+        <location line="+74"/>
         <source>automated posting (scanning and/or monitoring)</source>
         <translation>自动发布（扫描和/或者监视）</translation>
     </message>
@@ -3731,7 +3787,7 @@ Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, p
         <translation>已将“%1”限制为仅您的账户可访问：它保存着您的凭据，而本机其他用户原本可以读取</translation>
     </message>
     <message>
-        <location line="+220"/>
+        <location line="+222"/>
         <source># ngPost configuration file</source>
         <translation># ngPost配置文件</translation>
     </message>
@@ -4032,12 +4088,11 @@ Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, p
     </message>
     <message>
         <location line="+1"/>
-        <location line="+17"/>
         <source>## this is set for Linux environment, Windows users MUST change it</source>
         <translation>##这是为Linux运行环境设置的，Windows用户必须修改它</translation>
     </message>
     <message>
-        <location line="-13"/>
+        <location line="+4"/>
         <source>## temporary folder with size constraint, typically a tmpfs partition</source>
         <translation>## 有大小限制的临时文件夹，通常是tmpfs分区</translation>
     </message>
@@ -4067,17 +4122,7 @@ Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, p
         <translation>## 确保最小值为10％（1.1），最大值为2.0</translation>
     </message>
     <message>
-        <location line="+4"/>
-        <source>## RAR or 7zip absolute file path (external application)</source>
-        <translation>##RAR或7zip绝对路径（外部程序）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## /!\ The file MUST EXIST and BE EXECUTABLE /!\</source>
-        <translation>## /!\此文件必须存在且可执行/!\</translation>
-    </message>
-    <message>
-        <location line="+4"/>
+        <location line="+10"/>
         <source>## RAR EXTRA options (the first &apos;a&apos; and &apos;-idp&apos; will be added automatically)</source>
         <translation>##RAR额外选项（参数“a”以及“-idp”将会被自动添加）</translation>
     </message>
@@ -4117,27 +4162,7 @@ Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, p
         <translation>##par2冗余百分比（默认为0表示不生成par2文件）</translation>
     </message>
     <message>
-        <location line="+4"/>
-        <source>## par2 (or alternative) absolute file path</source>
-        <translation>##par2（或替代文件）绝对文件路径</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## this is only useful if you compile from source (as par2 is included on Windows and the AppImage)</source>
-        <translation>##仅当从源代码编译时才有用（因为par2包含在Windows和AppImage中）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## or if you wish to use an alternative to par2 (for exemple Multipar on Windows)</source>
-        <translation>##或者如果您希望使用另一种方式替代par2（例如Windows上的Multipar）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## (in that case, you may need to set also PAR2_ARGS)</source>
-        <translation>##（在此情况下，您可能还需要设置PAR2_ARGS）</translation>
-    </message>
-    <message>
-        <location line="+11"/>
+        <location line="+17"/>
         <source>## fixed parameters for the par2 (or alternative) command</source>
         <translation>##par2（或替代文件）命令的固定参数</translation>
     </message>
@@ -4177,7 +4202,7 @@ Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, p
         <translation>##如果您有多个新闻组服务器可以通过“服务器”部分添加</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+42"/>
         <source>Warning: &apos;%1&apos; holds your credentials but could not be restricted to you; anyone with an account on this machine may be able to read it</source>
         <translation>警告：“%1”保存着您的凭据，但无法限制为仅您可访问；本机上任何拥有账户的人都可能读取它</translation>
     </message>
@@ -4194,7 +4219,7 @@ Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, p
         <translation>错误: 无法写入默认配置文件: %1</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1152"/>
+        <location filename="../NgPost.h" line="+1167"/>
         <source>PACKing auto using: %1</source>
         <translation>打包功能自动使用: %1</translation>
     </message>
@@ -4254,19 +4279,19 @@ Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, p
         <translation>如果您愿意将ngPost翻译成您使用的语言，这很简单，请通过以下方式与我联系:  Matthieu.Bruel@gmail.com</translation>
     </message>
     <message>
-        <location filename="../NgPost.cpp" line="-5021"/>
+        <location filename="../NgPost.cpp" line="-5093"/>
         <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
         <translation>压缩前用随机名称重命名输入文件，使压缩包不携带原始文件名（与 --compress 一起使用）</translation>
     </message>
     <message>
-        <location line="+2696"/>
+        <location line="+2658"/>
         <source>Do file name obfuscation (the input files are renamed before compression)
 </source>
         <translation>文件名混淆（输入文件在压缩前被重命名）
 </translation>
     </message>
     <message>
-        <location line="+2079"/>
+        <location line="+2188"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation>## &apos;filename&apos; 在压缩前用随机名称重命名输入文件，</translation>
     </message>
@@ -4276,18 +4301,24 @@ Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, p
         <translation>## 使压缩包不携带任何原始文件名。两者可同时启用。</translation>
     </message>
     <message>
-        <location line="-1870"/>
-        <location line="+898"/>
+        <location line="-1974"/>
+        <location line="+924"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX 必须是大于零且不超过 2147483647 的整数。</translation>
     </message>
     <message>
-        <location line="+72"/>
+        <location line="+183"/>
         <source>PAR2_TOOL must be auto, parpar, par2cmdline or multipar.</source>
         <translation>PAR2_TOOL 必须为 auto、parpar、par2cmdline 或 multipar。</translation>
     </message>
     <message>
-        <location line="+1025"/>
+        <location line="+978"/>
+        <location line="+32"/>
+        <source>## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.</source>
+        <translation>## 自动路径使用当前软件包或系统中的所选工具。自定义路径必须指向可执行文件。</translation>
+    </message>
+    <message>
+        <location line="-17"/>
         <source>## Optional maximum number of archive volumes; commented means no limit.</source>
         <translation>## 可选的归档分卷数量上限；注释此行表示不限制。</translation>
     </message>
@@ -4384,7 +4415,7 @@ Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, p
 <context>
     <name>NntpConnection</name>
     <message>
-        <location filename="../NntpConnection.cpp" line="+139"/>
+        <location filename="../NntpConnection.cpp" line="+140"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>服务器“%1”必须走 VPN，但隧道尚未连接</translation>
     </message>
@@ -4409,23 +4440,28 @@ Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, p
         <translation>在服务器确认之前连接已被终止</translation>
     </message>
     <message>
-        <location line="+55"/>
+        <location line="+65"/>
         <source>connection closed before server confirmation</source>
         <translation>在服务器确认之前连接已关闭</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+29"/>
         <source>Connection lost, trying to reconnect! (nb disconnected: %1)</source>
         <translation>连接断开，正在尝试重新连接！（nb断开：%1）</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+5"/>
+        <source>Remote connection closed</source>
+        <translation>远程连接已关闭</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+8"/>
         <source>connection lost before server confirmation</source>
         <translation>在服务器确认之前连接已丢失</translation>
     </message>
     <message>
-        <location line="+100"/>
+        <location line="+108"/>
         <source>Closing Connection due to ERROR on post command: &apos;%2&apos; (%1 skipped)
 </source>
         <translation>发布命令错误导致连接关闭：‘%2’（%1跳过）
@@ -4953,7 +4989,7 @@ Profile: %2</source>
 <context>
     <name>Par2Settings</name>
     <message>
-        <location filename="../par2/Par2Settings.cpp" line="+281"/>
+        <location filename="../par2/Par2Settings.cpp" line="+251"/>
         <source>Block size must be a multiple of 4 bytes, below 2 GiB.</source>
         <translation>块大小必须是 4 字节的倍数，且小于 2 GiB。</translation>
     </message>
@@ -4988,16 +5024,7 @@ Profile: %2</source>
         <translation>十进制权重分配需要 MultiPar。</translation>
     </message>
     <message>
-        <location line="+3"/>
-        <source>Past 2 GB, MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
-        <translation>超过 2 GB 时，MultiPar 只能按块数限制恢复文件：请在“高级”中设置不大于目标大小的精确块大小。</translation>
-    </message>
-    <message>
-        <source>MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
-        <translation type="vanished">MultiPar 按块数限制恢复文件：请在“高级”中设置不超过目标大小的精确块大小。</translation>
-    </message>
-    <message>
-        <location line="+4"/>
+        <location line="+6"/>
         <source>MultiPar supports a volume count only with equal distribution.</source>
         <translation>MultiPar 仅在等量分配时支持指定分卷数量。</translation>
     </message>
@@ -5007,6 +5034,7 @@ Profile: %2</source>
         <translation>CPU 或内存设置超出工具支持的范围。</translation>
     </message>
     <message>
+        <location line="-6"/>
         <source>MultiPar size targets must be below 2 GB (2000000000 bytes). Use custom arguments for limits expressed in blocks.</source>
         <translation>MultiPar 的目标大小必须小于 2 GB（2000000000 字节）。以块数表示的限制请使用自定义参数。</translation>
     </message>
@@ -5014,13 +5042,13 @@ Profile: %2</source>
 <context>
     <name>Par2SettingsDialog</name>
     <message>
-        <location filename="../hmi/Par2SettingsDialog.cpp" line="+80"/>
-        <location line="+523"/>
+        <location filename="../hmi/Par2SettingsDialog.cpp" line="+81"/>
+        <location line="+583"/>
         <source>indeterminate</source>
         <translation>无法确定</translation>
     </message>
     <message>
-        <location line="-511"/>
+        <location line="-571"/>
         <source>PAR2 Settings</source>
         <translation>PAR2 设置</translation>
     </message>
@@ -5045,17 +5073,7 @@ Profile: %2</source>
         <translation>工具：</translation>
     </message>
     <message>
-        <location line="+4"/>
-        <source>Browse…</source>
-        <translation>浏览…</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Executable:</source>
-        <translation>可执行文件：</translation>
-    </message>
-    <message>
-        <location line="+16"/>
+        <location line="+23"/>
         <source>Default redundancy:</source>
         <translation>默认冗余：</translation>
     </message>
@@ -5132,11 +5150,12 @@ Profile: %2</source>
     </message>
     <message>
         <location line="+19"/>
+        <location line="+231"/>
         <source>Exact block size</source>
         <translation>精确块大小</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-230"/>
         <source>Target source block count</source>
         <translation>目标源块数量</translation>
     </message>
@@ -5171,12 +5190,7 @@ Profile: %2</source>
         <translation>启用 GPU 加速</translation>
     </message>
     <message>
-        <location line="+10"/>
-        <source>Find GPUs</source>
-        <translation>查找 GPU</translation>
-    </message>
-    <message>
-        <location line="+48"/>
+        <location line="+58"/>
         <source>Use custom arguments</source>
         <translation>使用自定义参数</translation>
     </message>
@@ -5192,29 +5206,24 @@ Profile: %2</source>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+320"/>
+        <location line="+380"/>
         <source>Prepare a post to display an estimate.</source>
         <translation>准备一个发布任务以显示估算。</translation>
     </message>
     <message>
-        <location line="-252"/>
-        <source>Select PAR2 executable</source>
-        <translation>选择 PAR2 可执行文件</translation>
-    </message>
-    <message>
-        <location line="+11"/>
-        <location line="+239"/>
+        <location line="-280"/>
+        <location line="+278"/>
         <source>Reading source sizes…</source>
         <translation>正在读取源文件大小…</translation>
     </message>
     <message>
-        <location line="-136"/>
-        <location line="+22"/>
+        <location line="-171"/>
+        <location line="+28"/>
         <source>This par2cmdline build does not support thread selection.</source>
         <translation>此 par2cmdline 构建不支持选择线程数。</translation>
     </message>
     <message>
-        <location line="-20"/>
+        <location line="-26"/>
         <source>Memory (eighths of free RAM):</source>
         <translation>内存（可用 RAM 的八分之几）：</translation>
     </message>
@@ -5229,40 +5238,36 @@ Profile: %2</source>
         <translation>par2cmdline 不支持 GPU 加速。请在切换工具前禁用它。</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+9"/>
         <source>No OpenCL device was found: ParPar would fail and abort the post. Disable GPU acceleration or install an OpenCL driver.</source>
         <translation>未找到 OpenCL 设备：ParPar 将失败并中止发布。请关闭 GPU 加速或安装 OpenCL 驱动。</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>The selected executable is unavailable. Select an installed tool or Automatic.</source>
         <translation>所选可执行文件不可用。请选择已安装的工具或“自动”。</translation>
     </message>
     <message>
-        <location line="+45"/>
+        <location line="+49"/>
         <source>Checking executable…</source>
         <translation>正在检查可执行文件…</translation>
     </message>
     <message>
         <location line="+4"/>
         <location line="+6"/>
-        <location line="+21"/>
+        <location line="+39"/>
         <location line="+9"/>
+        <location line="+18"/>
         <source>The executable could not be checked.</source>
         <translation>无法检查可执行文件。</translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+2"/>
         <source>No OpenCL device is installed on this machine.</source>
         <translation>本机未安装 OpenCL 设备。</translation>
     </message>
     <message>
-        <location line="+2"/>
-        <source>OpenCL is installed but reports no GPU; enter a device ID from the tooltip to use another kind of device.</source>
-        <translation>已安装 OpenCL，但未报告 GPU；可从提示中输入设备 ID 以使用其他类型的设备。</translation>
-    </message>
-    <message>
-        <location line="+2"/>
+        <location line="+4"/>
         <source>GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered.</source>
         <translation>设备选择框的提示中提供 GPU 详情；也可输入设备名称或“平台:设备”编号。</translation>
     </message>
@@ -5283,7 +5288,12 @@ Profile: %2</source>
         <translation>无法根据这些参数或块限制确定估算结果。</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="-524"/>
+        <source>Path:</source>
+        <translation>路径：</translation>
+    </message>
+    <message>
+        <location line="+527"/>
         <source>Estimate before compression (source sizes and rounding):</source>
         <translation>压缩前估算（源文件大小及取整）：</translation>
     </message>
@@ -5308,7 +5318,7 @@ Profile: %2</source>
         <translation>此预览使用全局默认值；当前发布任务设有独立的冗余值。</translation>
     </message>
     <message>
-        <location line="-344"/>
+        <location line="-404"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
@@ -5318,26 +5328,32 @@ Profile: %2</source>
         <translation>取消</translation>
     </message>
     <message>
+        <location line="-75"/>
         <source>Find OpenCL devices</source>
         <translation>查找 OpenCL 设备</translation>
     </message>
     <message>
+        <location line="+258"/>
         <source>Requested block size</source>
         <translation>请求的块大小</translation>
     </message>
     <message>
+        <location line="+1"/>
         <source>MultiPar may adjust the requested block size to the source files and block-count limit. It is not saved as PAR2_BLOCK_SIZE.</source>
         <translation>MultiPar 可能根据源文件和块数量上限调整请求的块大小。该值不会保存为 PAR2_BLOCK_SIZE。</translation>
     </message>
     <message>
+        <location line="+32"/>
         <source>Checking OpenCL devices. Wait for the result or disable GPU acceleration.</source>
         <translation>正在检查 OpenCL 设备。请等待结果或禁用 GPU 加速。</translation>
     </message>
     <message>
+        <location line="+2"/>
         <source>OpenCL could not be checked. Check the executable and OpenCL runtime, retry detection, or disable GPU acceleration.</source>
         <translation>无法检查 OpenCL。请检查可执行文件和 OpenCL 运行时，重新检测或禁用 GPU 加速。</translation>
     </message>
     <message>
+        <location line="+139"/>
         <source>OpenCL devices are available without a physical GPU. CPU devices such as OpenCLOn12 can be selected.</source>
         <translation>没有物理 GPU 也有可用的 OpenCL 设备。可以选择 OpenCLOn12 等 CPU 设备。</translation>
     </message>
@@ -5402,14 +5418,14 @@ Profile: %2</source>
     <name>PostInfoDialog</name>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
-        <location line="+591"/>
+        <location line="+599"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>发贴信息</translation>
     </message>
     <message>
-        <location line="-733"/>
+        <location line="-741"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>信息文件在 nzb 旁边用一个文本文件描述此贴。
@@ -5503,12 +5519,12 @@ A line starting with # is a comment: it is never written. Changes here only reac
     </message>
     <message>
         <location line="+3"/>
-        <location line="+508"/>
+        <location line="+516"/>
         <source>Save as…</source>
         <translation>另存为…</translation>
     </message>
     <message>
-        <location line="-506"/>
+        <location line="-514"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>把这些行写入一个属于您自己的模板文件。</translation>
     </message>
@@ -5572,7 +5588,7 @@ On: it is written there AND published in the nzb, which circulates.</source>
         <translation>未设置目标：不会写出任何信息文件。</translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="+31"/>
         <source>Unknown variable in the destination: %1</source>
         <translation>目标中含有未知变量：%1</translation>
     </message>
@@ -5618,12 +5634,12 @@ On: it is written there AND published in the nzb, which circulates.</source>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+229"/>
+        <location line="+234"/>
         <source>Text files (*.txt *.tpl);;All files (*)</source>
         <translation>文本文件 (*.txt *.tpl);;所有文件 (*)</translation>
     </message>
     <message>
-        <location line="-206"/>
+        <location line="-211"/>
         <source>No model: nothing will be written for this post.</source>
         <translation>没有模板：此贴不会写出任何内容。</translation>
     </message>
@@ -5634,12 +5650,12 @@ On: it is written there AND published in the nzb, which circulates.</source>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+214"/>
+        <location line="+219"/>
         <source>Model in use: %1</source>
         <translation>当前模板：%1</translation>
     </message>
     <message>
-        <location line="-190"/>
+        <location line="-195"/>
         <source>name of the line</source>
         <translation>该行的名称</translation>
     </message>
@@ -5679,7 +5695,7 @@ On: it is written there AND published in the nzb, which circulates.</source>
         <translation>（不写出）</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+16"/>
         <source>filled in after the post</source>
         <translation>发贴后填写</translation>
     </message>
@@ -6014,7 +6030,7 @@ Save the model now?</source>
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+734"/>
+        <location filename="../PostingJob.cpp" line="+735"/>
         <source>Try to resume posting</source>
         <translation>尝试恢复发布</translation>
     </message>
@@ -6029,7 +6045,7 @@ Save the model now?</source>
         <translation>开始发布</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+25"/>
         <source>Using TMP_RAM path as temporary folder. Post size: %1</source>
         <translation>使用TMP_RAM路径作为临时文件夹。 帖子大小为 : %1</translation>
     </message>
@@ -6050,13 +6066,13 @@ Save the model now?</source>
     </message>
     <message>
         <location line="+56"/>
-        <location line="+394"/>
+        <location line="+399"/>
         <location line="+8"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
         <translation>无法将nfo %1复制到%2</translation>
     </message>
     <message>
-        <location line="-349"/>
+        <location line="-354"/>
         <source>Error: there are no NntpConnection...</source>
         <translation>错误: 没有Nntp连接...</translation>
     </message>
@@ -6119,17 +6135,7 @@ Save the model now?</source>
         <translation>警告：%1</translation>
     </message>
     <message>
-        <location line="+39"/>
-        <source>Number of available Nntp Connections: %1</source>
-        <translation>可用Nntp连接数: %1</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>Number of available Nntp Connections</source>
-        <translation>可用Nntp连接数</translation>
-    </message>
-    <message>
-        <location line="+53"/>
+        <location line="+101"/>
         <source>Copied nfo file %1 next to the nzb: %2</source>
         <translation>nfo文件%1已复制到nzb旁边：%2</translation>
     </message>
@@ -6234,7 +6240,7 @@ Save the model now?</source>
         <translation>历史：无法记录贴 %1 的大小：%2</translation>
     </message>
     <message>
-        <location line="+487"/>
+        <location line="+488"/>
         <source>posted: %1
 failed: %2
 unknown: %3
@@ -6250,23 +6256,38 @@ unknown: %3
         <translation>，压缩文件密码：***</translation>
     </message>
     <message>
-        <location line="+494"/>
-        <source>ERROR: no PAR2 tool is available for %1, so this post is stopped before the transfer.
-Install it, or set PAR2_PATH / PAR2_TOOL in the configuration (PAR2 Settings in the GUI).</source>
-        <translation>错误：没有可用于 %1 的 PAR2 工具，因此本次发布在传输前停止。
-请安装它，或在配置中设置 PAR2_PATH / PAR2_TOOL（界面中的“PAR2 设置”）。</translation>
+        <location line="+427"/>
+        <source>Could not start external tool %1: %2</source>
+        <translation>无法启动外部工具 %1：%2</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+3"/>
+        <source>Some source files are still under their obfuscated name; ngPost will try again when the job ends.</source>
+        <translation>部分源文件仍使用混淆名称；ngPost 将在任务结束时重试。</translation>
+    </message>
+    <message>
+        <location line="+74"/>
+        <source>Compression tool unavailable: %1. Install the selected tool or choose a path in Compression Settings.</source>
+        <translation>压缩工具不可用：%1。请安装所选工具或在压缩设置中选择路径。</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>ERROR: no PAR2 tool is available for %1, so this post is stopped before the transfer.
+Install it, select another PAR2_TOOL, or set PAR2_SOURCE = custom and PAR2_PATH to its executable in the configuration (PAR2 Settings in the GUI).</source>
+        <translation>错误：没有可用于 %1 的 PAR2 工具，因此已在传输前停止此发布任务。
+请安装该工具、选择其他 PAR2_TOOL，或在配置中设置 PAR2_SOURCE = custom 并将 PAR2_PATH 指向其可执行文件（图形界面中的 PAR2 设置）。</translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>ERROR: the PAR2 tool for %1 is not an executable file, so this post is stopped before the transfer:
     %2
-Fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
-        <translation>错误：%1 的 PAR2 工具不是可执行文件，因此本次发布在传输前停止：
+Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
+        <translation>错误：%1 的 PAR2 工具不是可执行文件，因此已在传输前停止此发布任务：
     %2
-请在配置中修正 PAR2_PATH（界面中的“PAR2 设置”）。</translation>
+请在配置中设置 PAR2_SOURCE = custom 并修正 PAR2_PATH（图形界面中的 PAR2 设置）。</translation>
     </message>
     <message>
-        <location line="-851"/>
+        <location line="-885"/>
         <source>History: could not record the outcome of post %1: %2</source>
         <translation>历史：无法记录贴 %1 的结果：%2</translation>
     </message>
@@ -6348,18 +6369,18 @@ Fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
         <translation>文件: %1, rar文件名: %2</translation>
     </message>
     <message>
-        <location line="+114"/>
+        <location line="+121"/>
         <location line="+3"/>
         <source>postSize: %1 MB =&gt; volSize: %2</source>
         <translation>发布文件大小: %1 MB =&gt;分卷数: %2</translation>
     </message>
     <message>
-        <location line="-883"/>
+        <location line="-891"/>
         <source>Couldn&apos;t rename file %1</source>
         <translation>无法重命名文件%1</translation>
     </message>
     <message>
-        <location line="-843"/>
+        <location line="-855"/>
         <source>Could not stop the external process before restoring source files</source>
         <translation>在恢复源文件之前无法停止外部进程</translation>
     </message>
@@ -6369,12 +6390,22 @@ Fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
         <translation>无法保存中断文章的状态：%1</translation>
     </message>
     <message>
-        <location line="+1405"/>
+        <location line="+516"/>
+        <source>Opening %1 configured NNTP connections…</source>
+        <translation>正在打开 %1 个已配置的 NNTP 连接…</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Configured NNTP connections</source>
+        <translation>已配置的 NNTP 连接</translation>
+    </message>
+    <message>
+        <location line="+898"/>
         <source>Post interrupted with %1 ambiguous article(s); resume data was preserved.</source>
         <translation>发布中断，存在 %1 篇状态不明的文章；续传数据已保留。</translation>
     </message>
     <message>
-        <location line="+157"/>
+        <location line="+164"/>
         <location line="+4"/>
         <source>Compressing files</source>
         <translation>正在压缩文件</translation>
@@ -6407,7 +6438,7 @@ Fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
         <translation>仅 ParPar 可以为来自不同文件夹的文件生成 par2 文件... 您可以考虑使用它 ;)</translation>
     </message>
     <message>
-        <location line="+35"/>
+        <location line="+40"/>
         <location line="+4"/>
         <source>Generating par2</source>
         <translation>正在生成par2文件</translation>
@@ -6445,7 +6476,7 @@ Fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
         <translation>无法创建临时文件夹: &apos;%1&apos;...</translation>
     </message>
     <message>
-        <location line="+39"/>
+        <location line="+56"/>
         <source>NO_POSSIBLE_COMPRESSION: You must define the temporary directory...</source>
         <translation>NO_POSSIBLE_COMPRESSION：您必须定义临时目录...</translation>
     </message>
@@ -6455,12 +6486,7 @@ Fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
         <translation>错误: 临时目录必须可读取...</translation>
     </message>
     <message>
-        <location line="+30"/>
-        <source>ERROR: the RAR path is not executable...</source>
-        <translation>错误: RAR路径不可执行...</translation>
-    </message>
-    <message>
-        <location line="-2116"/>
+        <location line="-2128"/>
         <source>History: could not create post record: %1</source>
         <translation>历史记录：无法创建帖子记录：%1</translation>
     </message>
@@ -6480,7 +6506,7 @@ Fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
         <translation>历史记录：无法创建文件记录：%1</translation>
     </message>
     <message>
-        <location line="+1181"/>
+        <location line="+1194"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>无法从历史记录重新生成最终 NZB：%1</translation>
     </message>
@@ -6490,12 +6516,12 @@ Fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
         <translation>NZB 历史记录警告：%1</translation>
     </message>
     <message>
-        <location line="-378"/>
+        <location line="-379"/>
         <source>[%1] skipping already posted article %2 from %3</source>
         <translation>[%1] 跳过已发布的文章 %2 来自 %3</translation>
     </message>
     <message>
-        <location line="+736"/>
+        <location line="+744"/>
         <source>RAR_MAX must be greater than zero.</source>
         <translation>RAR_MAX 必须大于零。</translation>
     </message>
@@ -6658,12 +6684,12 @@ Fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+484"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+486"/>
         <source>Post Files</source>
         <translation>发布文件</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="-696"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-698"/>
         <source>There are no selected files to post...</source>
         <translation>没有选中的文件用于发布...</translation>
     </message>
@@ -6691,19 +6717,19 @@ Would you like to overwrite it ?</source>
     </message>
     <message>
         <location line="+47"/>
-        <location line="+618"/>
+        <location line="+620"/>
         <location line="+20"/>
         <source>Stop Posting</source>
         <translation>停止发布</translation>
     </message>
     <message>
-        <location line="-632"/>
-        <location line="+635"/>
+        <location line="-634"/>
+        <location line="+637"/>
         <source>Cancel Posting</source>
         <translation>取消发布</translation>
     </message>
     <message>
-        <location line="-593"/>
+        <location line="-595"/>
         <source>Select one or more files to Post</source>
         <translation>选择一个或多个文件发布</translation>
     </message>
@@ -6764,7 +6790,7 @@ Some Usenet indexes ask for one.</source>
         <translation>从配置文件中使用参数PAR2_ARGS: %1</translation>
     </message>
     <message>
-        <location line="+383"/>
+        <location line="+385"/>
         <source>You can add files or folder by:</source>
         <translation>您可以通过以下方法来添加文件或文件夹:</translation>
     </message>
@@ -6877,7 +6903,7 @@ Some Usenet indexes ask for one.</source>
 <context>
     <name>UpdateChecker</name>
     <message>
-        <location filename="../utils/UpdateChecker.cpp" line="+363"/>
+        <location filename="../utils/UpdateChecker.cpp" line="+408"/>
         <source>No bounded, trusted update asset is available.</source>
         <translation>没有可用的、大小受限的可信更新文件。</translation>
     </message>
@@ -6937,15 +6963,17 @@ Some Usenet indexes ask for one.</source>
         <translation>无法启动更新事务。</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+20"/>
         <source>Update installer did not become ready. Previous installation retained.</source>
         <translation>更新安装程序未就绪。已保留先前的安装。</translation>
     </message>
     <message>
+        <location line="-187"/>
         <source>Could not cancel the update: ngPost failed to signal the installer already running, and it may replace this installation. Check the version after the next start.</source>
         <translation>无法取消更新：ngPost 未能向正在运行的安装程序发送取消信号，该程序可能会替换当前安装。请在下次启动后检查版本。</translation>
     </message>
     <message>
+        <location line="+18"/>
         <source>The installer already running could not be stopped either, and it may replace this installation.</source>
         <translation>也无法停止正在运行的安装程序，该程序可能会替换当前安装。</translation>
     </message>
@@ -6953,7 +6981,7 @@ Some Usenet indexes ask for one.</source>
 <context>
     <name>VpnManager</name>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="+1252"/>
+        <location filename="../vpn/VpnManager.cpp" line="+1253"/>
         <source>VPN: failed — %1</source>
         <translation>VPN：失败 — %1</translation>
     </message>
@@ -6984,25 +7012,25 @@ Some Usenet indexes ask for one.</source>
         <translation>VPN 卸载：超时</translation>
     </message>
     <message>
-        <location line="+470"/>
+        <location line="+556"/>
         <source>The VPN helper is not installed. Open the VPN dialog and click Install.</source>
         <translation>VPN 辅助程序未安装。请打开 VPN 对话框并点击安装。</translation>
     </message>
     <message>
-        <location line="-1775"/>
+        <location line="-1861"/>
         <location line="+10"/>
-        <location line="+1770"/>
+        <location line="+1856"/>
         <source>No active VPN profile / configuration is selected.</source>
         <translation>未选择有效的 VPN 配置文件/配置。</translation>
     </message>
     <message>
-        <location line="-1763"/>
-        <location line="+1768"/>
+        <location line="-1849"/>
+        <location line="+1854"/>
         <source>The VPN configuration file is missing or unreadable: %1</source>
         <translation>VPN 配置文件缺失或无法读取：%1</translation>
     </message>
     <message>
-        <location line="-1684"/>
+        <location line="-1770"/>
         <source>Disconnect the active VPN before changing its WireGuard configuration.</source>
         <translation>更改 WireGuard 配置前，请先断开活动的 VPN 连接。</translation>
     </message>
@@ -7248,7 +7276,7 @@ Some Usenet indexes ask for one.</source>
         <translation>正在运行 VPN 卸载：%1 %2</translation>
     </message>
     <message>
-        <location line="+76"/>
+        <location line="+88"/>
         <source>install-wg-tunnel.ps1 not found in app bundle</source>
         <translation>应用程序包中找不到 install-wg-tunnel.ps1</translation>
     </message>
@@ -7258,22 +7286,22 @@ Some Usenet indexes ask for one.</source>
         <translation>无法确定调用方 SID；拒绝安装隧道。</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+102"/>
         <source>WireGuard tunnel install failed (exit %1)</source>
         <translation>WireGuard 隧道安装失败（退出码 %1）</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="-24"/>
         <source>WireGuard tunnel service registered.</source>
         <translation>WireGuard 隧道服务已注册。</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="-38"/>
         <source>uninstall-wg-tunnel.ps1 not found in app bundle</source>
         <translation>应用程序包中找不到 uninstall-wg-tunnel.ps1</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+24"/>
         <source>WireGuard tunnel uninstall failed (exit %1)</source>
         <translation>WireGuard 隧道卸载失败（退出码 %1）</translation>
     </message>
@@ -7283,7 +7311,7 @@ Some Usenet indexes ask for one.</source>
         <translation>WireGuard 隧道服务已移除。</translation>
     </message>
     <message>
-        <location line="+134"/>
+        <location line="+172"/>
         <source>VPN startup preflight could not read %1; no cleanup attempted</source>
         <translation>VPN 启动预检无法读取 %1；未尝试清理</translation>
     </message>
@@ -7420,51 +7448,58 @@ Edit the server configuration and clear its Use VPN setting to post to it withou
         <translation>失败</translation>
     </message>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="1842"/>
+        <location line="-533"/>
         <source>WireGuard for Windows was not found. Install it, then retry tunnel registration.</source>
         <translation>未找到 Windows 版 WireGuard。请先安装，再重试注册隧道。</translation>
     </message>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="1845"/>
+        <location line="+3"/>
         <source>The WireGuard profile could not be read or validated. Re-import a valid profile and retry.</source>
         <translation>无法读取或验证 WireGuard 配置文件。请重新导入有效的配置文件后重试。</translation>
     </message>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="1848"/>
+        <location line="+3"/>
         <source>The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.</source>
         <translation>无法注册或停止 WireGuard 隧道服务。请检查 WireGuard 的安装情况后重试。</translation>
     </message>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="1851"/>
+        <location line="+9"/>
         <source>The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.</source>
         <translation>无法配置 WireGuard 隧道服务的权限。请管理员检查服务权限后重试。</translation>
     </message>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="1854"/>
+        <location line="+3"/>
         <source>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</source>
         <translation>WireGuard 暂存文件夹不安全或无法访问。请管理员检查 Windows ProgramData 中的 ngPost 文件夹；如不可信，请将其移至别处，然后重试。</translation>
     </message>
     <message>
+        <location line="-75"/>
         <source>Refusing to run the tunnel installer as administrator: %1. Install ngPost with its setup, or move it somewhere only an administrator can write.</source>
         <translation>拒绝以管理员身份运行隧道安装程序：%1。请使用安装程序安装 ngPost，或将其移至仅管理员可写入的位置。</translation>
     </message>
     <message>
+        <location line="+23"/>
         <source>Refusing to run the tunnel uninstaller as administrator: %1. Install ngPost with its setup, or move it somewhere only an administrator can write.</source>
         <translation>拒绝以管理员身份运行隧道卸载程序：%1。请使用安装程序安装 ngPost，或将其移至仅管理员可写入的位置。</translation>
     </message>
     <message>
+        <location line="-35"/>
         <source>WireGuard profile refused (line %1): %2</source>
         <translation>WireGuard 配置被拒绝（第 %1 行）：%2</translation>
     </message>
     <message>
+        <location line="+3"/>
         <source>WireGuard profile refused: %1</source>
         <translation>WireGuard 配置被拒绝：%1</translation>
     </message>
     <message>
+        <location line="+75"/>
         <source>WireGuard rejected the profile. Check its key values and endpoint, or re-import a valid profile, then retry.</source>
         <translation>WireGuard 拒绝了该配置。请检查密钥值和端点，或重新导入有效配置，然后重试。</translation>
     </message>
     <message>
+        <location line="-30"/>
+        <location line="+33"/>
         <source>WireGuard operation cancelled: administrator permission was not granted.</source>
         <translation>WireGuard 操作已取消：未授予管理员权限。</translation>
     </message>
@@ -7972,42 +8007,55 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
 <context>
     <name>WireGuardConfigPolicy</name>
     <message>
-        <source>'%1' does not belong to this section</source>
+        <location filename="../vpn/WireGuardConfigPolicy.cpp" line="+195"/>
+        <source>&apos;%1&apos; does not belong to this section</source>
         <translation>“%1”不属于此节</translation>
     </message>
     <message>
-        <source>'%1' runs a command when the tunnel goes up or down, which ngPost never needs. Remove that line from the profile.</source>
+        <location line="-9"/>
+        <source>&apos;%1&apos; runs a command when the tunnel goes up or down, which ngPost never needs. Remove that line from the profile.</source>
         <translation>“%1”会在隧道启动或停止时运行命令，ngPost 从不需要此功能。请从配置中删除该行。</translation>
     </message>
     <message>
+        <location line="-8"/>
         <source>a key appears before any [Interface] or [Peer] section</source>
         <translation>键出现在任何 [Interface] 或 [Peer] 节之前</translation>
     </message>
     <message>
+        <location line="-17"/>
+        <location line="+6"/>
         <source>expected a Key = Value line</source>
         <translation>应为“键 = 值”格式的行</translation>
     </message>
     <message>
+        <location line="-25"/>
         <source>malformed section header</source>
         <translation>节标题格式错误</translation>
     </message>
     <message>
+        <location line="+9"/>
         <source>only [Interface] and [Peer] sections are allowed</source>
         <translation>仅允许 [Interface] 和 [Peer] 节</translation>
     </message>
     <message>
+        <location line="+61"/>
+        <location line="+11"/>
         <source>the WireGuard profile cannot be read</source>
         <translation>无法读取 WireGuard 配置</translation>
     </message>
     <message>
+        <location line="-107"/>
         <source>the WireGuard profile contains binary data</source>
         <translation>WireGuard 配置包含二进制数据</translation>
     </message>
     <message>
+        <location line="-8"/>
+        <location line="+108"/>
         <source>the WireGuard profile is larger than a profile ever is</source>
         <translation>WireGuard 配置的大小异常，超出了正常配置的范围</translation>
     </message>
     <message>
+        <location line="-17"/>
         <source>this profile carries a key ngPost has not reviewed</source>
         <translation>此配置包含 ngPost 尚未审核的键</translation>
     </message>

@@ -554,7 +554,10 @@ void MainWindow::_trimLogPane() const
 
 void MainWindow::log(const QString &aMsg, bool newline) const
 {
-    _insertBoundedLogText(aMsg, newline);
+    const bool newBlock = newline || _logEntryComplete;
+    _insertBoundedLogText(_logTimestamp.format(aMsg, newBlock), newBlock);
+    if (!aMsg.isEmpty() || newline)
+        _logEntryComplete = newline;
     _trimLogPane();
 }
 
@@ -565,7 +568,8 @@ void MainWindow::logError(const QString &error) const
     // list is exactly the unbroken run the per-block cap has to split.
     QTextCharFormat red;
     red.setForeground(QBrush(QColor(Qt::red)));
-    _insertBoundedLogText(error, true, red);
+    _insertBoundedLogText(_logTimestamp.format(error, true), true, red);
+    _logEntryComplete = true;
     _trimLogPane();
 }
 

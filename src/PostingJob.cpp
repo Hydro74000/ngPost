@@ -27,6 +27,7 @@
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
 #include "postinfo/PostInfoTemplate.h"
+#include "tools/ExternalToolResolver.h"
 #include "utils/SecretMasker.h"
 #ifdef __USE_HMI__
 #include "hmi/PostingWidget.h"
@@ -784,6 +785,13 @@ void PostingJob::onStartPosting(bool isActiveJob)
     if (_ngPost->_copyNfoWithNzb && !_nzbFilePath.isEmpty())
         _resolveNfoSource();
 
+    // Validate all required executables before doing potentially long packing.
+    // The selected tool and path are already frozen in this job's options.
+    if ((_doCompress && !_canCompress(false)) || (_doPar2 && !_canGenPar2(false))) {
+        _abortBeforeTransfer();
+        return;
+    }
+
     if (_doCompress) {
 #ifdef __USE_TMP_RAM__
         if (_ngPost->useTmpRam()) {
@@ -1204,6 +1212,11 @@ int PostingJob::_createNntpConnections()
                 NntpConnection *nntpCon = new NntpConnection(_ngPost, ++conIdx, *srvParams);
                 connect(nntpCon, &NntpConnection::log, _ngPost, &NgPost::onLog, Qt::QueuedConnection);
                 connect(nntpCon,
+                        &NntpConnection::retryingConnection,
+                        _ngPost,
+                        &NgPost::onConnectionRetry,
+                        Qt::QueuedConnection);
+                connect(nntpCon,
                         &NntpConnection::error,
                         _ngPost,
                         &NgPost::onError,
@@ -1224,11 +1237,11 @@ int PostingJob::_createNntpConnections()
     }
 
     if (_ngPost->useHMI())
-        _log(tr("Number of available Nntp Connections: %1").arg(_nbConnections));
+        _log(tr("Opening %1 configured NNTP connections…").arg(_nbConnections));
     else
         _log(QString("[%1] %2: %3")
                  .arg(timestamp())
-                 .arg(tr("Number of available Nntp Connections"))
+                 .arg(tr("Configured NNTP connections"))
                  .arg(_nbConnections));
 
     return _nbConnections;
@@ -1687,6 +1700,7 @@ void PostingJob::_abortBeforeTransfer(bool keepResumeResumable)
 
 void PostingJob::_finishPosting()
 {
+    _ngPost->flushConnectionRetries();
 #ifdef __DEBUG__
     qDebug() << "[MB_TRACE][PostingJob::_finishPosting]";
 #endif
@@ -2160,6 +2174,11 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
 
     _extProc = new QProcess(this);
     connect(_extProc,
+            &QProcess::errorOccurred,
+            this,
+            &PostingJob::onExtProcError,
+            Qt::QueuedConnection);
+    connect(_extProc,
             &QProcess::readyReadStandardOutput,
             this,
             &PostingJob::onExtProcReadyReadStandardOutput,
@@ -2176,7 +2195,9 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
             Qt::QueuedConnection);
 
     _use7z = false;
-    if (_rarPath.contains("7z")) {
+    if (_options.rarTool == QLatin1String("7zip")
+        || (_options.rarTool.isEmpty()
+            && externaltool::archiverForFile(_rarPath) == QLatin1String("7zip"))) {
         _use7z = true;
         if (_rarArgs.isEmpty())
             _rarArgs = _ngPost->sDefault7zOptions;
@@ -2424,11 +2445,16 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
             args << path;
         }
 
-        QString archiveTmpFolder = _createArchiveFolder(tmpFolder, archiveName);
-        if (archiveTmpFolder.isEmpty())
+        QString const createdFolder = _createArchiveFolder(tmpFolder, archiveName);
+        if (createdFolder.isEmpty())
             return false;
 
         _extProc = new QProcess(this);
+        connect(_extProc,
+                &QProcess::errorOccurred,
+                this,
+                &PostingJob::onExtProcError,
+                Qt::QueuedConnection);
         connect(_extProc,
                 &QProcess::readyReadStandardOutput,
                 this,
@@ -2524,6 +2550,23 @@ QString PostingJob::_createArchiveFolder(const QString &tmpFolder, const QString
     return archiveTmpFolder;
 }
 
+void PostingJob::onExtProcError(QProcess::ProcessError error)
+{
+    // FailedToStart does not emit finished(): a missing interpreter or shared
+    // library must terminate this job, rather than leaving it packing forever.
+    if (error != QProcess::FailedToStart || !_extProc)
+        return;
+    _error(tr("Could not start external tool %1: %2")
+               .arg(_extProc->program(), _extProc->errorString()));
+    if (!_restoreObfuscatedFileNames())
+        _error(tr("Some source files are still under their obfuscated name; ngPost will try "
+                  "again when the job ends."));
+    _cleanExtProc();
+    if (_compressDir)
+        _cleanCompressDir();
+    _abortBeforeTransfer();
+}
+
 void PostingJob::onExtProcReadyReadStandardOutput()
 {
     if (_ngPost->debugMode())
@@ -2581,26 +2624,28 @@ qint64 PostingJob::_dirSize(const QString &path)
     return size;
 }
 
-bool PostingJob::_canCompress() const
+bool PostingJob::_canCompress(bool checkTemporaryPath) const
 {
     //1.: the _tmp_folder must be writable
-    if (!_checkTmpFolder())
+    if (checkTemporaryPath && !_checkTmpFolder())
         return false;
 
     //2.: check _rarPath is executable
     QFileInfo fi(_rarPath);
     if (!fi.exists() || !fi.isFile() || !fi.isExecutable()) {
-        _error(tr("ERROR: the RAR path is not executable..."));
+        _error(tr("Compression tool unavailable: %1. Install the selected tool or choose a path in "
+                  "Compression Settings.")
+                   .arg(_rarPath.isEmpty() ? _options.rarTool : _rarPath));
         return false;
     }
 
     return true;
 }
 
-bool PostingJob::_canGenPar2() const
+bool PostingJob::_canGenPar2(bool checkTemporaryPath) const
 {
     //1.: the _tmp_folder must be writable
-    if (!_checkTmpFolder())
+    if (checkTemporaryPath && !_checkTmpFolder())
         return false;
 
     //2.: check _ is executable
@@ -2609,15 +2654,19 @@ bool PostingJob::_canGenPar2() const
         // This aborts the whole post (see the callers), so it has to say which
         // tool was expected and where to fix it, rather than "not available".
         if (_par2Path.isEmpty())
-            _error(tr("ERROR: no PAR2 tool is available for %1, so this post is stopped before the "
-                      "transfer.\nInstall it, or set PAR2_PATH / PAR2_TOOL in the configuration "
-                      "(PAR2 Settings in the GUI).")
-                       .arg(par2::toolName(_par2Tool)));
+            _error(
+                tr("ERROR: no PAR2 tool is available for %1, so this post is stopped before the "
+                   "transfer.\nInstall it, select another PAR2_TOOL, or set PAR2_SOURCE = custom "
+                   "and PAR2_PATH to its executable in the configuration "
+                   "(PAR2 Settings in the GUI).")
+                    .arg(par2::toolName(_par2Tool)));
         else
-            _error(tr("ERROR: the PAR2 tool for %1 is not an executable file, so this post is stopped "
-                      "before the transfer:\n    %2\nFix PAR2_PATH in the configuration (PAR2 Settings "
-                      "in the GUI).")
-                       .arg(par2::toolName(_par2Tool), _par2Path));
+            _error(
+                tr("ERROR: the PAR2 tool for %1 is not an executable file, so this post is stopped "
+                   "before the transfer:\n    %2\nSet PAR2_SOURCE = custom and fix PAR2_PATH in "
+                   "the configuration (PAR2 Settings "
+                   "in the GUI).")
+                    .arg(par2::toolName(_par2Tool), _par2Path));
         return false;
     }
 

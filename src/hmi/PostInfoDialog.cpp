@@ -290,23 +290,26 @@ void PostInfoDialog::onOutputEdited()
         return;
     }
 
-    PostInfoData data = _preview;
-    data.meta         = meta();
-    if (!data.finishedAt.isValid())
-        data.finishedAt = QDateTime::currentDateTime();
-    if (!data.startedAt.isValid())
-        data.startedAt = data.finishedAt;
+    PostInfoData postData = _preview;
+    postData.meta = meta();
+    if (!postData.finishedAt.isValid())
+        postData.finishedAt = QDateTime::currentDateTime();
+    if (!postData.startedAt.isValid())
+        postData.startedAt = postData.finishedAt;
 
     QStringList unknown;
-    const QString resolved = PostInfoTemplate::render(
-        pattern, data, true, PostInfoTemplate::OnUnknown::Fail, &unknown);
+    const QString resolved = PostInfoTemplate::render(pattern,
+                                                      postData,
+                                                      true,
+                                                      PostInfoTemplate::OnUnknown::Fail,
+                                                      &unknown);
 
     // On a tab that has not named its nzb yet, __nzbName__ and __nzbDir__ are
     // still empty, so the default pattern resolves to something like
     // "\\.info.txt". That is not where the sheet goes, it is a path we cannot
     // know yet -- say so, the way the model table says "filled in after the
     // post" for the values it does not have either.
-    const QMap<QString, QString> known = PostInfoTemplate::values(data, true);
+    const QMap<QString, QString> known = PostInfoTemplate::values(postData, true);
     QStringList                  pending;
     for (PostInfoTemplate::Token const &token : PostInfoTemplate::tokensIn(pattern)) {
         if (!token.isMeta() && known.value(token.name).isEmpty())
@@ -347,8 +350,8 @@ bool PostInfoDialog::setAsDefault() const
 
 QString PostInfoDialog::_effectiveTemplatePath() const
 {
-    QString const data = _templateList->currentData().toString();
-    return data == QLatin1String("__browse__") ? QString() : data;
+    QString const choice = _templateList->currentData().toString();
+    return choice == QLatin1String("__browse__") ? QString() : choice;
 }
 
 //! The configured model first, marked as such, then the ones opened earlier in
@@ -591,8 +594,8 @@ void PostInfoDialog::onAddModelLine()
 //! literally what the sheet will hold.
 void PostInfoDialog::_refreshPreviews()
 {
-    PostInfoData data = _preview;
-    data.meta         = meta(); // what is typed right now, duplicates ignored here
+    PostInfoData postData = _preview;
+    postData.meta = meta(); // what is typed right now, duplicates ignored here
 
     // Re-read from the lines as they stand: typing "#!json" into the model, or
     // deleting it, changes what the file will hold, and this column claims to
@@ -603,10 +606,10 @@ void PostInfoDialog::_refreshPreviews()
 
     // A date is knowable while the post is being prepared: previewing today
     // shows the shape of the line, which is what the format is chosen for.
-    if (!data.finishedAt.isValid())
-        data.finishedAt = QDateTime::currentDateTime();
-    if (!data.startedAt.isValid())
-        data.startedAt = data.finishedAt;
+    if (!postData.finishedAt.isValid())
+        postData.finishedAt = QDateTime::currentDateTime();
+    if (!postData.startedAt.isValid())
+        postData.startedAt = postData.finishedAt;
 
     for (int row = 0; row < _model->rowCount() && row < _lines.size(); ++row) {
         auto *preview = qobject_cast<QLineEdit *>(_model->cellWidget(row, ColPreview));
@@ -622,8 +625,13 @@ void PostInfoDialog::_refreshPreviews()
 
         QString const source =
             line.kind == PostInfoTemplate::SheetLine::Kind::Field ? line.expression : line.raw;
-        QString const rendered = PostInfoTemplate::render(
-            source, data, false, PostInfoTemplate::OnUnknown::KeepVerbatim, nullptr, false, _escape);
+        QString const rendered = PostInfoTemplate::render(source,
+                                                          postData,
+                                                          false,
+                                                          PostInfoTemplate::OnUnknown::KeepVerbatim,
+                                                          nullptr,
+                                                          false,
+                                                          _escape);
 
         preview->setText(rendered);
         preview->setCursorPosition(0);

@@ -55,15 +55,19 @@
 #include "hmi/AutoPostWidget.h"
 #include "hmi/CheckBoxCenterWidget.h"
 #include "hmi/CompressionSettingsDialog.h"
+#include "hmi/ExternalToolPathWidget.h"
 #include "hmi/Par2SettingsDialog.h"
 #include "MockNntpServer.h"
 #include <QDoubleSpinBox>
 #include <QDialogButtonBox>
 #include <QTemporaryDir>
+#include <QScopeGuard>
 #include <QMessageBox>
 #include <QPointer>
 #include "utils/PathHelper.h"
 #include "NgPost.h"
+#include "PostingJob.h"
+#include "PostingJobOptions.h"
 #include "TestEnv.h"
 
 #include <QBoxLayout>
@@ -75,6 +79,35 @@ class TestMainWindow : public QObject
     Q_OBJECT
 
 private slots:
+    void legacy_bundle_paths_become_automatic();
+    void tool_paths_keep_custom_choices_and_report_missing_tools();
+    //! A PAR2_PATH or RAR_PATH written before *_SOURCE existed, and gone since,
+    //! used to abort every post: it falls back to automatic discovery, loudly.
+    void legacy_missing_tool_paths_fall_back_with_a_warning_data();
+    void legacy_missing_tool_paths_fall_back_with_a_warning();
+    void explicit_missing_parity_engine_is_reported();
+    void automatic_archiver_ignores_the_legacy_path();
+    void failed_compressor_reports_unrestored_sources();
+    //! Without PAR2_ARGS, the engine an old PAR2_PATH names -- vanished, or next
+    //! to ngPost in a bundle that no longer ships it -- is only adopted when it is
+    //! installed: auto detection builds arguments for whichever engine it finds.
+    void legacy_parity_path_adopts_its_engine_only_when_usable_data();
+    void legacy_parity_path_adopts_its_engine_only_when_usable();
+    //! "Show path" disappears with the detected tool; the path it showed must too.
+    void tool_path_details_hide_with_an_unavailable_tool();
+    //! A path next to *_SOURCE = auto, and RAR_TOOL = rar next to a 7-Zip
+    //! executable, cannot do what the file says: reported, and the engine follows
+    //! the executable.
+    void explicit_tool_lines_that_cannot_apply_are_reported();
+    //! RAR_TOOL is read whatever its case, a tool line that means nothing
+    //! (*_TOOL, *_SOURCE) is reported without refusing the configuration, and
+    //! a missing executable is only reported when the configuration uses it.
+    void tool_lines_are_lenient_and_missing_tools_reported_only_when_used();
+    //! Typing in a custom path keeps the cursor and the undo history, and a
+    //! 7-Zip executable selects the 7-Zip engine without losing the path.
+    void custom_archiver_path_keeps_the_cursor_and_selects_the_engine();
+    void log_timestamps_cover_debug_errors_and_fragments();
+    void log_file_keeps_timestamped_debug_fragments();
     void post_all_tabs_submits_only_prepared_posts();
     void par2_dialog_defaults_overrides_and_cancel();
     void par2_dialog_preserves_exact_volume_bytes();
@@ -83,6 +116,9 @@ private slots:
     void par2_dialog_checks_opencl_data();
     void par2_dialog_checks_opencl();
     void par2_dialog_rechecks_changed_opencl_tool();
+    //! Every prefix of a path being typed may be another executable: none is
+    //! run until the edit is finished.
+    void par2_dialog_runs_a_typed_path_only_once_typing_ends();
     void par2_dialog_multipar_clears_inexact_check_hint();
     void sizing_dialogs_translations_fit_data();
     void sizing_dialogs_translations_fit();
@@ -174,6 +210,10 @@ private slots:
     //! If the atomic replacement cannot be staged, Save Config must leave the
     //! existing file intact instead of truncating it in place.
     void save_config_preserves_existing_file_when_atomic_open_fails();
+
+    //! LOG_IN_FILE wrote to $HOME/ngPost.log -- /ngPost.log with HOME unset --
+    //! and, on Windows, to whatever the working directory was.
+    void log_in_file_is_written_in_the_config_folder();
 
     //! A posting tab carries one discreet checkbox; the button that opens the
     //! editor follows it.
@@ -483,6 +523,38 @@ void TestMainWindow::save_config_round_trips_post_info_keys()
         // save, and --check then quietly went back to inferring a slice size.
         QCOMPARE(ngPost.par2BlockSizeForTest(), Q_INT64_C(5242880));
     }
+}
+
+void TestMainWindow::log_in_file_is_written_in_the_config_folder()
+{
+    HomeSandbox sandbox;
+    {
+        QFile conf(PathHelper::configFilePath());
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream(&conf) << "LOG_IN_FILE = true\n"
+                           << "[server]\n"
+                           << "host = news.example.invalid\n"
+                           << "port = 563\n"
+                           << "ssl = true\n"
+                           << "connection = 1\n"
+                           << "enabled = true\n";
+    }
+    const QString logPath = PathHelper::configDir() + QStringLiteral("/ngPost.log");
+    const QString homeLog = QDir(sandbox.rootPath()).filePath(QStringLiteral("ngPost.log"));
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    {
+        NgPost ngPost(argc, argv);
+        const QString parseErr = ngPost.parseDefaultConfig();
+        QVERIFY2(QFile::exists(logPath),
+                 qPrintable(
+                     QStringLiteral("no log at %1 (config errors: %2)").arg(logPath, parseErr)));
+    }
+    QVERIFY2(!QFile::exists(homeLog), qPrintable(homeLog));
+    // closed and flushed with ngPost: the start line must have reached the file
+    QVERIFY(QFileInfo(logPath).size() > 0);
 }
 
 void TestMainWindow::save_config_preserves_existing_file_when_atomic_open_fails()
@@ -2091,6 +2163,7 @@ void TestMainWindow::log_pane_bounds_fragments_without_newlines()
     QCOMPARE(longestLogBlock(browser->document()), blockCharacterCap);
 
     QString kept = browser->toPlainText();
+    kept.remove(QRegularExpression("\\[\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\] "));
     kept.remove(QLatin1Char('\n')); // only the deliberate safety boundaries
     QCOMPARE(kept,
              QStringLiteral("old-marker") + QString(200000, QLatin1Char('*'))
@@ -2109,6 +2182,7 @@ void TestMainWindow::log_pane_bounds_one_large_fragment_without_newline()
     QCOMPARE(longestLogBlock(browser->document()), win.logMaxBlockCharactersForTest());
 
     QString kept = browser->toPlainText();
+    kept.remove(QRegularExpression("\\[\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\] "));
     kept.remove(QLatin1Char('\n'));
     QCOMPARE(kept, payload);
 }
@@ -2142,6 +2216,7 @@ void TestMainWindow::log_pane_fragment_splitting_preserves_text_boundaries()
     expected.remove(QLatin1Char('\n'));
     expected.remove(QChar(0x2028));
     expected.remove(QChar(0x2029));
+    flattened.remove(QRegularExpression("\\[\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\] "));
     QCOMPARE(flattened, expected);
 }
 
@@ -2624,6 +2699,52 @@ void TestMainWindow::par2_dialog_rechecks_changed_opencl_tool()
     QVERIFY(devices->findData("0:0") < 0);
 }
 
+void TestMainWindow::par2_dialog_runs_a_typed_path_only_once_typing_ends()
+{
+#ifdef Q_OS_WIN
+    QSKIP("The stub tool below is a POSIX shell script.");
+#else
+    HomeSandbox sandbox;
+    const QString calls = sandbox.rootPath() + "/calls.log";
+    const QString prefix = sandbox.rootPath() + "/par2";
+    const QString typed = prefix + "-stub";
+    for (const QString &stub : { prefix, typed }) {
+        QFile file(stub);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+        file.write(QString("#!/bin/sh\necho \"$0\" >> '%1'\necho 'par2cmdline stub'\n")
+                       .arg(calls)
+                       .toUtf8());
+        file.close();
+        QVERIFY(file.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+    }
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              QStringLiteral(
+                                  "GROUPS = alt.binaries.test\nPAR2_TOOL = par2cmdline\n"),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+    auto *path = dialog.findChild<QLineEdit *>("par2Path");
+    dialog.findChild<QComboBox *>("par2PathMode")->setCurrentIndex(1);
+    QVERIFY(path->text().isEmpty());
+    for (const QChar c : typed)
+        path->insert(QString(c));
+    QCOMPARE(path->text(), typed);
+    QTest::qWait(500);
+    QVERIFY2(!QFile::exists(calls), "a path was run while it was still being typed");
+
+    emit path->editingFinished();
+    QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(calls), 5000);
+    QFile log(calls);
+    QVERIFY(log.open(QIODevice::ReadOnly | QIODevice::Text));
+    QCOMPARE(QString::fromUtf8(log.readAll()), typed + "\n");
+#endif
+}
+
 void TestMainWindow::par2_dialog_multipar_clears_inexact_check_hint()
 {
     HomeSandbox sandbox;
@@ -2911,4 +3032,584 @@ void TestMainWindow::post_all_continues_after_overwrite_declined_and_auto_close(
     QCOMPARE(mock.receivedArticles().size(), 1);
     QVERIFY(existing.open(QIODevice::ReadOnly)); QCOMPARE(existing.readAll(), QByteArray("original nzb"));
     QVERIFY(!window->findChild<QPushButton *>("postAllTabsButton")->isEnabled());
+}
+
+void TestMainWindow::legacy_bundle_paths_become_automatic()
+{
+#ifndef Q_OS_LINUX
+    QSKIP("AppImage migration is Linux-specific");
+#else
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              QStringLiteral(
+                                  "GROUPS = alt.binaries.test\nPAR2_TOOL = auto\nPAR2_PCT = 10\n"
+                                  "PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -q\n"
+                                  "PAR2_PATH = /tmp/.mount_ngpostOLD/usr/bin/parpar\n"
+                                  "RAR_PATH = /tmp/.mount_ngpostOLD/usr/bin/rar\n"),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    Par2SettingsDialog parity(&ngPost, {}, false, false, window);
+    QCOMPARE(parity.findChild<QComboBox *>("par2PathMode")->currentData().toInt(), 0);
+    QCOMPARE(parity.findChild<QComboBox *>("par2Tool")->currentData().toInt(),
+             int(par2::Tool::ParPar));
+    CompressionSettingsDialog compression(&ngPost, window);
+    QCOMPARE(compression.findChild<QComboBox *>("rarPathMode")->currentData().toInt(), 0);
+    ngPost.saveConfig();
+    QFile config(PathHelper::configFilePath());
+    QVERIFY(config.open(QIODevice::ReadOnly));
+    const auto saved = config.readAll();
+    QVERIFY(saved.contains("PAR2_SOURCE = auto\n"));
+    QVERIFY(saved.contains("PAR2_TOOL = parpar\n"));
+    QVERIFY(saved.contains("RAR_SOURCE = auto\n"));
+    QVERIFY(!saved.contains(".mount_ngpostOLD"));
+    QVERIFY(
+        !QRegularExpression("(?m)^(PAR2|RAR)_PATH =").match(QString::fromUtf8(saved)).hasMatch());
+    const auto log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY(!log.contains("not an executable"));
+    QVERIFY(ngPost.parseDefaultConfig().isEmpty());
+    Par2SettingsDialog reloaded(&ngPost, {}, false, false, window);
+    QCOMPARE(reloaded.findChild<QComboBox *>("par2PathMode")->currentData().toInt(), 0);
+#endif
+}
+
+void TestMainWindow::tool_paths_keep_custom_choices_and_report_missing_tools()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    const QString custom = QCoreApplication::applicationFilePath();
+    auto *window = bootWindow(ngPost,
+                              QString("GROUPS = alt.binaries.test\nPAR2_TOOL = "
+                                      "par2cmdline\nPAR2_PCT = 8\nPAR2_PATH = %1\nRAR_PATH = %1\n")
+                                  .arg(custom),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    {
+        Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+        auto *mode = dialog.findChild<QComboBox *>("par2PathMode");
+        QCOMPARE(mode->currentData().toInt(), 1);
+        QCOMPARE(dialog.findChild<QLineEdit *>("par2Path")->text(), custom);
+        dialog.findChild<QSpinBox *>("par2DefaultPct")->setValue(9);
+        dialog.accept();
+        QCOMPARE(dialog.result(), int(QDialog::Accepted));
+    }
+    QFile config(PathHelper::configFilePath());
+    QVERIFY(config.open(QIODevice::ReadOnly));
+    auto saved = config.readAll();
+    config.close();
+    QVERIFY(saved.contains("PAR2_SOURCE = custom\n"));
+    QVERIFY(saved.contains(("PAR2_PATH = " + custom + "\n").toUtf8()));
+    {
+        Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+        dialog.findChild<QLineEdit *>("par2Path")->setText(sandbox.rootPath() + "/missing-parpar");
+        QVERIFY(
+            !dialog.findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save)->isEnabled());
+        QVERIFY(dialog.findChild<QLabel *>("par2PathStatus")->text().contains("unavailable"));
+        // An explicit engine choice must not persist an automatically resolved path.
+        auto *tool = dialog.findChild<QComboBox *>("par2Tool");
+        tool->setCurrentIndex(tool->findData(int(par2::Tool::ParPar)));
+        QCOMPARE(dialog.findChild<QComboBox *>("par2PathMode")->currentData().toInt(), 0);
+        dialog.accept();
+        QCOMPARE(dialog.result(), int(QDialog::Accepted));
+    }
+    QVERIFY(config.open(QIODevice::ReadOnly));
+    saved = config.readAll();
+    config.close();
+    QVERIFY(saved.contains("PAR2_SOURCE = auto\n"));
+    QVERIFY(!QRegularExpression("(?m)^PAR2_PATH =").match(QString::fromUtf8(saved)).hasMatch());
+    {
+        CompressionSettingsDialog dialog(&ngPost, window);
+        QCOMPARE(dialog.findChild<QComboBox *>("rarPathMode")->currentData().toInt(), 1);
+        dialog.findChild<QLineEdit *>("rarEdit")->setText(sandbox.rootPath() + "/missing-rar");
+        QVERIFY(
+            !dialog.findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save)->isEnabled());
+        dialog.findChild<QComboBox *>("rarPathMode")->setCurrentIndex(0);
+        QVERIFY(
+            dialog.findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save)->isEnabled());
+        dialog.accept();
+        QCOMPARE(dialog.result(), int(QDialog::Accepted));
+    }
+    QVERIFY(config.open(QIODevice::ReadOnly));
+    saved = config.readAll();
+    QVERIFY(saved.contains("RAR_SOURCE = auto\n"));
+    QVERIFY(!QRegularExpression("(?m)^RAR_PATH =").match(QString::fromUtf8(saved)).hasMatch());
+}
+
+void TestMainWindow::log_timestamps_cover_debug_errors_and_fragments()
+{
+    MainWindow window;
+    window.log("Normal entry");
+    window.log("[Poster #1] debug details\nsecond debug line");
+    window.log("process fragment", false);
+    window.log(" completed\r", false);
+    window.log("\nnext process line", false);
+    window.logError("failure\nreason");
+    window.log("[12:34:56.789] existing timestamp");
+    const QString text = window.findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    const auto lines = text.split('\n', Qt::SkipEmptyParts);
+    QCOMPARE(lines.size(), 8);
+    const QRegularExpression stamp("^\\[\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\] ");
+    for (const auto &line : lines)
+        QVERIFY2(stamp.match(line).hasMatch(), qPrintable(line));
+    QVERIFY(text.contains("process fragment completed\n"));
+    QVERIFY(text.contains("[12:34:56.789] existing timestamp"));
+    QVERIFY(!text.contains("] [12:34:56.789]"));
+}
+
+void TestMainWindow::log_file_keeps_timestamped_debug_fragments()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              QStringLiteral("GROUPS = alt.binaries.test\nLOG_IN_FILE = true\n"),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    emit ngPost.log("first debug fragment", false);
+    emit ngPost.log(" completed\r", false);
+    emit ngPost.log("\nsecond debug line", false);
+    emit ngPost.log("\n3%\r4%\r", false);
+    emit ngPost.log("normal entry", true);
+    emit ngPost.error("test error");
+    QCoreApplication::sendPostedEvents(&ngPost, QEvent::MetaCall);
+    QFile log(PathHelper::configDir() + "/ngPost.log");
+    QVERIFY(log.open(QIODevice::ReadOnly));
+    const QString text = QString::fromUtf8(log.readAll());
+    const QRegularExpression stamp("^\\[\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\] ");
+    QVERIFY2(text.contains("first debug fragment completed\n["), qPrintable(text));
+    QVERIFY2(text.contains("second debug line\n["), qPrintable(text));
+    // Progress rewrites its line in the file, as on a terminal.
+    QVERIFY2(text.contains("3%\r[") && text.contains("4%\n["), qPrintable(text));
+    QVERIFY(text.contains("ERR: test error"));
+    for (const auto &line : text.split('\n', Qt::SkipEmptyParts))
+        QVERIFY2(stamp.match(line).hasMatch(), qPrintable(line));
+    const QString pane = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY2(pane.contains("first debug fragment completed\n["), qPrintable(pane));
+    QVERIFY(!QRegularExpression("\\[\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\] \\[\\d{2}:")
+                 .match(pane)
+                 .hasMatch());
+}
+
+namespace
+{
+//! An empty file Qt reports as executable, named as given (.exe added on Windows).
+QString makeFakeExecutable(const QString &dir, const QString &name)
+{
+    QDir().mkpath(dir);
+    QString path = QDir(dir).filePath(name);
+#ifdef Q_OS_WIN
+    path += QStringLiteral(".exe");
+#endif
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly))
+        return {};
+    file.close();
+    file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+    return path;
+}
+} // namespace
+
+void TestMainWindow::legacy_missing_tool_paths_fall_back_with_a_warning_data()
+{
+    QTest::addColumn<bool>("used");
+    QTest::newRow("unused") << false;
+    QTest::newRow("used") << true;
+}
+
+void TestMainWindow::legacy_missing_tool_paths_fall_back_with_a_warning()
+{
+    QFETCH(bool, used);
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString par2Path = sandbox.rootPath() + "/uninstalled/parpar";
+    const QString rarPath = sandbox.rootPath() + "/uninstalled/7z";
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              QString("GROUPS = alt.binaries.test\nPAR2_PATH = %1\n"
+                                      "PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -q\n"
+                                      "RAR_PATH = %2\n%3")
+                                  .arg(par2Path,
+                                       rarPath,
+                                       used ? "PACK = COMPRESS, GEN_PAR2\n" : ""),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY2(log.contains("PAR2_PATH = " + par2Path + " is not an executable file") == used,
+             qPrintable(log));
+    QVERIFY2(log.contains("RAR_PATH = " + rarPath + " is not an executable file") == used,
+             qPrintable(log));
+
+    // The file name still tells which engine PAR2_ARGS and the archive switches were written
+    // for: those arguments keep ParPar even on a machine where it is not installed.
+    Par2SettingsDialog parity(&ngPost, {}, false, false, window);
+    QCOMPARE(parity.findChild<QComboBox *>("par2PathMode")->currentData().toInt(), 0);
+    QCOMPARE(parity.findChild<QComboBox *>("par2Tool")->currentData().toInt(),
+             int(par2::Tool::ParPar));
+    CompressionSettingsDialog compression(&ngPost, window);
+    QCOMPARE(compression.findChild<QComboBox *>("rarPathMode")->currentData().toInt(), 0);
+    QCOMPARE(compression.findChild<QComboBox *>("rarTool")->currentData().toString(),
+             QString("7zip"));
+
+    ngPost.saveConfig();
+    QFile config(PathHelper::configFilePath());
+    QVERIFY(config.open(QIODevice::ReadOnly));
+    const QString saved = QString::fromUtf8(config.readAll());
+    QVERIFY(saved.contains("PAR2_TOOL = parpar\n"));
+    QVERIFY(saved.contains("RAR_TOOL = 7zip\n"));
+    QVERIFY(saved.contains("PAR2_PATH = " + par2Path + "\n"));
+    QVERIFY(saved.contains("RAR_PATH = " + rarPath + "\n"));
+    QVERIFY(!QRegularExpression("(?m)^(PAR2|RAR)_SOURCE =").match(saved).hasMatch());
+    config.close();
+    QVERIFY(ngPost.parseDefaultConfig().isEmpty());
+    ngPost.saveConfig();
+    QVERIFY(config.open(QIODevice::ReadOnly));
+    const auto reloaded = config.readAll();
+    QVERIFY(reloaded.contains(("PAR2_PATH = " + par2Path + "\n").toUtf8()));
+    QVERIFY(reloaded.contains(("RAR_PATH = " + rarPath + "\n").toUtf8()));
+}
+
+void TestMainWindow::legacy_parity_path_adopts_its_engine_only_when_usable_data()
+{
+    QTest::addColumn<bool>("bundled");
+    QTest::addColumn<bool>("installed");
+    QTest::newRow("vanished path, ParPar installed") << false << true;
+    QTest::newRow("vanished path, ParPar missing") << false << false;
+    QTest::newRow("bundled path, ParPar installed") << true << true;
+    QTest::newRow("bundled path, ParPar missing") << true << false;
+}
+
+void TestMainWindow::legacy_parity_path_adopts_its_engine_only_when_usable()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("On Windows, automatic discovery also searches Program Files, beyond the test's PATH");
+#else
+    QFETCH(bool, bundled);
+    QFETCH(bool, installed);
+    HomeSandbox sandbox;
+    const QString bin = sandbox.rootPath() + "/bin";
+    QVERIFY(QDir().mkpath(bin));
+    if (installed)
+        QVERIFY(!makeFakeExecutable(bin, "parpar").isEmpty());
+    // Only this folder is searched, whatever the machine running the test has installed.
+    const QByteArray savedPath = qgetenv("PATH");
+    qputenv("PATH", bin.toLocal8Bit());
+    const auto restorePath = qScopeGuard([&savedPath] { qputenv("PATH", savedPath); });
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    // A bundled path names the test binary's folder, which holds no ParPar: the
+    // bundle a Windows installation without its optional ParPar leaves behind.
+    const QString par2Path = bundled ? QCoreApplication::applicationDirPath() + "/parpar"
+                                     : sandbox.rootPath() + "/uninstalled/parpar";
+    QVERIFY(!QFile::exists(par2Path));
+    QString error;
+    auto *window = bootWindow(
+        ngPost,
+        QString("GROUPS = alt.binaries.test\nPAR2_PCT = 10\nPAR2_PATH = %1\n").arg(par2Path),
+        &error);
+    QVERIFY2(window, qPrintable(error));
+    const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    const QString unusable = "PAR2_PATH = " + par2Path + " is not an executable file";
+    if (bundled) {
+        // A bundle path is a migration, not a mistake of the user's: said nowhere.
+        QVERIFY2(!log.contains(unusable), qPrintable(log));
+    } else {
+        const QString outcome = installed ? "; ngPost uses " + bin + "/parpar"
+                                          : QString(". Posts that need this tool will stop");
+        QVERIFY2(log.contains(unusable + outcome), qPrintable(log));
+    }
+
+    ngPost.saveConfig();
+    QFile config(PathHelper::configFilePath());
+    QVERIFY(config.open(QIODevice::ReadOnly));
+    const QString saved = QString::fromUtf8(config.readAll());
+    QVERIFY2(saved.contains(installed ? "PAR2_TOOL = parpar\n" : "PAR2_TOOL = auto\n"),
+             qPrintable(saved));
+    QCOMPARE(saved.contains("PAR2_SOURCE = auto\n"), bundled);
+    QCOMPARE(QRegularExpression("(?m)^PAR2_PATH =").match(saved).hasMatch(), !bundled);
+#endif
+}
+
+void TestMainWindow::tool_path_details_hide_with_an_unavailable_tool()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("On Windows, automatic discovery also searches Program Files, beyond the test's PATH");
+#else
+    HomeSandbox sandbox;
+    const QString bin = sandbox.rootPath() + "/bin";
+    QVERIFY(!makeFakeExecutable(bin, "parpar").isEmpty());
+    const QByteArray savedPath = qgetenv("PATH");
+    qputenv("PATH", bin.toLocal8Bit());
+    const auto restorePath = qScopeGuard([&savedPath] { qputenv("PATH", savedPath); });
+
+    ExternalToolPathWidget widget(QStringLiteral("parpar"),
+                                  externaltool::PathMode::Automatic,
+                                  {},
+                                  QStringLiteral("par2"),
+                                  nullptr);
+    auto *details = widget.findChild<QToolButton *>("par2PathDetails");
+    auto *path = widget.findChild<QLineEdit *>("par2Path");
+    QVERIFY(details && path);
+    QVERIFY(!details->isHidden());
+    QVERIFY(path->isHidden());
+    details->setChecked(true);
+    QVERIFY(!path->isHidden());
+
+    // No par2 in PATH: nothing detected, nothing to show, and no button left to hide it with.
+    widget.selectTool(QStringLiteral("par2cmdline"));
+    QVERIFY(details->isHidden());
+    QVERIFY(path->isHidden());
+
+    widget.selectTool(QStringLiteral("parpar"));
+    QVERIFY(!details->isHidden());
+    QVERIFY(!path->isHidden());
+#endif
+}
+
+void TestMainWindow::explicit_tool_lines_that_cannot_apply_are_reported()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString sevenZip = makeFakeExecutable(sandbox.rootPath() + "/bin", "7z");
+    QVERIFY(!sevenZip.isEmpty());
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              QString("GROUPS = alt.binaries.test\nPAR2_SOURCE = auto\n"
+                                      "PAR2_PATH = %1/par2\nRAR_TOOL = rar\nRAR_SOURCE = custom\n"
+                                      "RAR_PATH = %2\n")
+                                  .arg(sandbox.rootPath(), sevenZip),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY2(log.contains("PAR2_PATH is ignored because PAR2_SOURCE = auto"), qPrintable(log));
+    QVERIFY2(log.contains("RAR_TOOL = rar does not match RAR_PATH = " + sevenZip), qPrintable(log));
+
+    CompressionSettingsDialog compression(&ngPost, window);
+    QCOMPARE(compression.findChild<QComboBox *>("rarPathMode")->currentData().toInt(), 1);
+    QCOMPARE(compression.findChild<QComboBox *>("rarTool")->currentData().toString(),
+             QString("7zip"));
+    QCOMPARE(compression.findChild<QLineEdit *>("rarEdit")->text(), sevenZip);
+
+    ngPost.saveConfig();
+    QFile config(PathHelper::configFilePath());
+    QVERIFY(config.open(QIODevice::ReadOnly));
+    const QString saved = QString::fromUtf8(config.readAll());
+    QVERIFY(saved.contains("RAR_TOOL = 7zip\n"));
+    QVERIFY(saved.contains("RAR_SOURCE = custom\n"));
+    QVERIFY(saved.contains("RAR_PATH = " + sevenZip + "\n"));
+    QVERIFY(!QRegularExpression("(?m)^PAR2_PATH =").match(saved).hasMatch());
+}
+
+void TestMainWindow::tool_lines_are_lenient_and_missing_tools_reported_only_when_used()
+{
+    for (const bool used : { false, true }) {
+        HomeSandbox sandbox;
+        int argc = 1;
+        QByteArray arg0("tst_MainWindow");
+        char *argv[] = { arg0.data(), nullptr };
+        NgPost ngPost(argc, argv);
+        const QString missing = sandbox.rootPath() + "/missing";
+        QString error;
+        auto *window = bootWindow(ngPost,
+                                  QString("GROUPS = alt.binaries.test\nRAR_TOOL = 7Zip\n"
+                                          "RAR_SOURCE = Custom\nRAR_PATH = %1/7z\n"
+                                          "PAR2_TOOL = par3\nPAR2_SOURCE = sometimes\n"
+                                          "PAR2_PATH = %1/par2\n%2")
+                                      .arg(missing, used ? "PACK = COMPRESS, GEN_PAR2\n" : ""),
+                                  &error);
+        QVERIFY2(window, qPrintable(error));
+        const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+        QVERIFY2(!log.contains("RAR_TOOL must be"), qPrintable(log));
+        QVERIFY2(log.contains("PAR2_SOURCE must be auto or custom."), qPrintable(log));
+        QVERIFY2(log.contains("PAR2_TOOL must be auto, parpar, par2cmdline or multipar."),
+                 qPrintable(log));
+        QVERIFY2(log.contains("RAR_PATH = " + missing + "/7z is not an executable file") == used,
+                 qPrintable(log));
+        QVERIFY2(log.contains("PAR2_PATH = " + missing + "/par2 is not an executable file") == used,
+                 qPrintable(log));
+
+        CompressionSettingsDialog compression(&ngPost, window);
+        QCOMPARE(compression.findChild<QComboBox *>("rarTool")->currentData().toString(),
+                 QString("7zip"));
+    }
+}
+
+void TestMainWindow::custom_archiver_path_keeps_the_cursor_and_selects_the_engine()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &error);
+    QVERIFY2(window, qPrintable(error));
+    CompressionSettingsDialog dialog(&ngPost, window);
+    auto *path = dialog.findChild<QLineEdit *>("rarEdit");
+    auto *mode = dialog.findChild<QComboBox *>("rarPathMode");
+    auto *tool = dialog.findChild<QComboBox *>("rarTool");
+    tool->setCurrentIndex(tool->findData(QString("rar")));
+
+    path->setText(sandbox.rootPath() + "/archiver");
+    QCOMPARE(mode->currentData().toInt(), 1);
+    const int middle = sandbox.rootPath().size() + 1;
+    path->setCursorPosition(middle);
+    path->insert(QStringLiteral("x"));
+    QCOMPARE(path->text(), sandbox.rootPath() + "/xarchiver");
+    QCOMPARE(path->cursorPosition(), middle + 1);
+    QVERIFY(path->isUndoAvailable());
+    QCOMPARE(tool->currentData().toString(), QString("rar"));
+
+    const QString sevenZip = sandbox.rootPath() + "/bin/7zz";
+    path->setText(sevenZip);
+    QCOMPARE(tool->currentData().toString(), QString("7zip"));
+    QCOMPARE(mode->currentData().toInt(), 1);
+    QCOMPARE(path->text(), sevenZip);
+
+    // An engine picked by hand still starts over with automatic discovery.
+    tool->setCurrentIndex(tool->findData(QString("rar")));
+    QCOMPARE(mode->currentData().toInt(), 0);
+
+    // Typing goes through prefixes: "/7z" of "/7z-tools/winrar-cli" must not
+    // leave 7-Zip selected once the whole name says neither archiver.
+    mode->setCurrentIndex(1);
+    QVERIFY(path->text().isEmpty());
+    const QString typed = sandbox.rootPath() + "/7z-tools/winrar-cli";
+    bool sevenZipOnTheWay = false;
+    for (const QChar c : typed) {
+        path->insert(QString(c));
+        sevenZipOnTheWay |= tool->currentData().toString() == QLatin1String("7zip");
+    }
+    QVERIFY(sevenZipOnTheWay);
+    QCOMPARE(path->text(), typed);
+    QCOMPARE(tool->currentData().toString(), QString("rar"));
+}
+
+void TestMainWindow::explicit_missing_parity_engine_is_reported()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("The test isolates automatic discovery using PATH");
+#else
+    HomeSandbox sandbox;
+    const QByteArray savedPath = qgetenv("PATH");
+    qputenv("PATH", sandbox.rootPath().toLocal8Bit());
+    const auto restorePath = qScopeGuard([&] { qputenv("PATH", savedPath); });
+    QVERIFY(!QFile::exists(QCoreApplication::applicationDirPath() + "/parpar"));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              "GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PCT = 10\n",
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    const auto log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY2(log.contains("PAR2_TOOL = parpar: no executable was found"), qPrintable(log));
+    QVERIFY(log.contains("PAR2_SOURCE = custom"));
+#endif
+}
+
+void TestMainWindow::automatic_archiver_ignores_the_legacy_path()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(
+        ngPost,
+        "GROUPS = alt.binaries.test\nRAR_SOURCE = auto\nRAR_PATH = /ignored/7z\n",
+        &error);
+    QVERIFY2(window, qPrintable(error));
+    CompressionSettingsDialog dialog(&ngPost, window);
+    QCOMPARE(dialog.findChild<QComboBox *>("rarTool")->currentData().toString(), QString("rar"));
+    QVERIFY(window->findChild<QTextBrowser *>("logBrowser")
+                ->toPlainText()
+                .contains("RAR_PATH is ignored because RAR_SOURCE = auto"));
+}
+
+void TestMainWindow::failed_compressor_reports_unrestored_sources()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("Uses an executable script with a missing interpreter");
+#else
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    const QString source = sandbox.rootPath() + "/original.bin";
+    QFile input(source);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("original contents");
+    input.close();
+    const auto compressor = makeFakeExecutable(sandbox.rootPath(), "rar");
+    QFile script(compressor);
+    QVERIFY(script.open(QIODevice::WriteOnly));
+    script.write("#!/ngpost-test/missing-interpreter\n");
+    script.close();
+    PostingJobOptions options;
+    options.files = { QFileInfo(source) };
+    options.inputPaths = { source };
+    options.nzbFilePath = sandbox.rootPath() + "/test.nzb";
+    options.tmpPath = sandbox.rootPath();
+    options.rarPath = compressor;
+    options.rarName = "archive";
+    options.doCompress = true;
+    options.obfuscateFileName = true;
+    QSignalSpy errors(&ngPost, &NgPost::error);
+    {
+        PostingJob job(&ngPost, options);
+        // This job belongs to the test, not to NgPost's managed queue.
+        disconnect(&job, &PostingJob::postingFinished, &ngPost, nullptr);
+        QSignalSpy finished(&job, &PostingJob::postingFinished);
+        QVERIFY(QMetaObject::invokeMethod(&job,
+                                          "onStartPosting",
+                                          Qt::DirectConnection,
+                                          Q_ARG(bool, false)));
+        QVERIFY(!QFile::exists(source));
+        // Occupy the original name before the queued FailedToStart handler runs.
+        QVERIFY(input.open(QIODevice::WriteOnly));
+        input.write("replacement");
+        input.close();
+        QTRY_COMPARE(finished.count(), 1);
+        QString messages;
+        for (const auto &row : errors)
+            messages += row.first().toString() + '\n';
+        QVERIFY2(messages.contains("Couldn't restore") && messages.contains(source),
+                 qPrintable(messages));
+        QVERIFY2(messages.contains("Some source files are still under their obfuscated name"),
+                 qPrintable(messages));
+        QVERIFY(input.open(QIODevice::ReadOnly));
+        QCOMPARE(input.readAll(), QByteArray("replacement"));
+        input.close();
+        QVERIFY(input.remove()); // destructor can now retry the restoration
+    }
+    QVERIFY(input.open(QIODevice::ReadOnly));
+    QCOMPARE(input.readAll(), QByteArray("original contents"));
+#endif
 }

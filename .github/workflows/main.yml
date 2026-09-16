@@ -16,6 +16,31 @@ permissions:
   contents: read
 
 jobs:
+  format:
+    name: C++ format (changed lines)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # the base of the pushed range must be in the clone to diff against
+          fetch-depth: 0
+
+      # Pinned by version and hash: clang-format output changes between major
+      # versions, and this is the one .clang-format was calibrated with.
+      - name: Install clang-format 18
+        run: |
+          python3 -m venv "$RUNNER_TEMP/clang-format"
+          echo "clang-format==18.1.8 --hash=sha256:2de122b8aa78ba49e326f974131caab2c79f4ae877c227cd4e3e5d82a98d21e5" \
+            > "$RUNNER_TEMP/clang-format-requirements.txt"
+          "$RUNNER_TEMP/clang-format/bin/pip" install --require-hashes --only-binary=:all: \
+            -r "$RUNNER_TEMP/clang-format-requirements.txt"
+          echo "$RUNNER_TEMP/clang-format/bin" >> "$GITHUB_PATH"
+
+      - name: Check changed lines
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bash .github/scripts/check-format.sh "$BASE_SHA"
+
   linux:
     name: Linux app
     runs-on: ubuntu-latest

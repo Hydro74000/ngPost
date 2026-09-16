@@ -268,7 +268,7 @@ SOCK_TIMEOUT = 30
 PREPARE_PACKING = true
 
 ## For GUI ONLY, save the logs in a file (to debug potential crashes)
-## ~/ngPost.log on Linux and MacOS, in the executable folder for Windows
+## ngPost.log is written in the ngPost configuration folder
 ## The log is overwritten each time ngPost is launched
 ## => after a crash, please SAVE the log before relaunching ngPost
 LOG_IN_FILE = true
@@ -306,10 +306,11 @@ TMP_DIR = /tmp
 TMP_RAM_RATIO = 1.1
 
 
-## RAR absolute file path (external application)
-## /!\ The file MUST EXIST and BE EXECUTABLE /!\
-## this is set for Linux environment, Windows users MUST change it
-RAR_PATH = /usr/bin/rar
+## Automatic path: selected tool in the current bundle, then system installations.
+## For a custom path, set RAR_SOURCE = custom and provide RAR_PATH.
+RAR_TOOL = rar
+RAR_SOURCE = auto
+#RAR_PATH = /usr/bin/rar
 #RAR_PATH = C:\Program Files\WinRAR\Rar.exe
 #RAR_PATH = /usr/bin/7z
 #RAR_PATH = C:\Program Files\7-Zip\7z.exe
@@ -344,11 +345,13 @@ RAR_SIZE = 42
 PAR2_PCT = 8
 
 ## Optional tool type, including executables with a custom name; absence keeps historical detection.
-#PAR2_TOOL = auto
+PAR2_TOOL = auto
+PAR2_SOURCE = auto
 ## auto | parpar | par2cmdline | multipar
 
 ## par2 (or alternative) absolute file path
-## this is only useful if you compile from source (as par2 is included on Windows and the AppImage)
+## Optional: set PAR2_SOURCE = custom to use this path.
+## Automatic paths search the current bundle and PATH for the selected engine.
 ## or if you wish to use an alternative to par2 (for exemple Multipar on Windows)
 ## (in that case, you may need to set also PAR2_ARGS)
 #PAR2_PATH = /usr/local/bin/parpar

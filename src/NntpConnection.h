@@ -56,7 +56,7 @@ private:
         NO_MORE_FILES
     };
 
-    const int _id;                      //!< connection id
+    const int _conId;                   //!< connection id
     const NntpServerParams &_srvParams; //!< server parameters
 
     QTcpSocket *_socket; //!< Real TCP socket
@@ -68,6 +68,7 @@ private:
     NntpArticle *_currentArticle;
     bool _currentArticlePreserved;
     ushort _nbDisconnected;
+    QString _lastTransportError;
 
     NgPost *_ngPost;
     Poster *_poster;
@@ -117,6 +118,7 @@ signals:
     void socketError(QString aError); //!< Error during socket creation (ssl or not)
     void errorConnecting(QString aError);
     void disconnected(NntpConnection *con);
+    void retryingConnection(QString server, QString detail);
     void log(QString msg, bool newline = true) const;
     void error(QString msg) const;
 
@@ -146,7 +148,7 @@ private:
     inline void _error(const std::string &aMsg) const; //!< log function for std::string
 
     void _sendNextArticle();
-    void _closeConnection();
+    void _closeConnection(bool dropTransport = false);
     //! A transport close while an article is awaiting a definitive NNTP
     //! response is ambiguous: the server may already have accepted it. Keep
     //! the article resumable independently of VPN state and NO_RESUME_AUTO.
@@ -157,7 +159,7 @@ private:
 
 int NntpConnection::getId() const
 {
-    return _id;
+    return _conId;
 }
 
 void NntpConnection::write(const QByteArray &aBuffer)

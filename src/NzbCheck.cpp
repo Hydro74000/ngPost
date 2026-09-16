@@ -337,8 +337,8 @@ int NzbCheck::parseNzb()
                 }
 
                 while (!xmlReader.atEnd()) {
-                    QXmlStreamReader::TokenType type = xmlReader.readNext();
-                    if (type == QXmlStreamReader::TokenType::EndElement
+                    QXmlStreamReader::TokenType token = xmlReader.readNext();
+                    if (token == QXmlStreamReader::TokenType::EndElement
                         && xmlReader.name().compare(QLatin1String("file")) == 0) {
                         if (isPar2) {
                             _par2Volumes[volumeIdx].nbListedArticles = nbArticles;
@@ -387,7 +387,7 @@ int NzbCheck::parseNzb()
                         }
 
                         break;
-                    } else if (type == QXmlStreamReader::TokenType::StartElement
+                    } else if (token == QXmlStreamReader::TokenType::StartElement
                                && xmlReader.name().compare(QLatin1String("segment")) == 0) {
                         bool bytesOk = false;
                         qint64 const encodedBytes

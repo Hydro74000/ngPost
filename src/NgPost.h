@@ -1,4 +1,3 @@
-#include "par2/Par2Settings.h"
 /*
  * Copyright (c) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
  * Copyright (c) 2024-2026 Hydro74000 <acymap@gmail.com>
@@ -10,6 +9,9 @@
 #define NGPOST_H
 #include "PostingJobOptions.h"
 #include "history/PostHistoryStore.h"
+#include "par2/Par2Settings.h"
+#include "tools/ExternalToolResolver.h"
+#include "utils/LogTimestamp.h"
 #include "utils/PathHelper.h"
 #include "utils/CmdOrGuiApp.h"
 #include "utils/Macros.h"
@@ -143,6 +145,8 @@ public:
         DEL_AUTO,
         TMP_DIR,
         RAR_PATH,
+        RAR_TOOL,
+        RAR_SOURCE,
         RAR_EXTRA,
         RAR_SIZE,
         RAR_MAX,
@@ -153,6 +157,7 @@ public:
 #endif
         PAR2_PCT,
         PAR2_PATH,
+        PAR2_SOURCE,
         PAR2_TOOL,
         PAR2_ARGS,
         PAR2_BLOCK_SIZE,
@@ -304,6 +309,9 @@ private:
 #endif
     QString _tmpPath;
     QString _rarPath;
+    QString _rarPathConfig;
+    QString _rarTool = QStringLiteral("rar");
+    externaltool::PathMode _rarPathMode = externaltool::PathMode::Automatic;
     QString _rarArgs;
     uint _rarSize;
     uint _rarMax;
@@ -315,6 +323,7 @@ private:
     QString _par2Args;
     qint64  _par2BlockSize; //!< PAR2 slice size for --check's recovery analysis; 0 = unknown
     QString _par2PathConfig;
+    externaltool::PathMode _par2PathMode = externaltool::PathMode::Automatic;
 
     bool _doCompress;
     bool _doPar2;
@@ -435,6 +444,10 @@ private:
 
     QFile *_logFile;
     QTextStream *_logStream;
+    mutable LogTimestamp _logTimestamp{ LogTimestamp::CarriageReturn::RewritesLine };
+    mutable bool _logFragmentOpen = false;
+    mutable bool _logEntryComplete = true;
+    QMap<QString, int> _connectionRetries;
 
     static constexpr const char *sDefaultShutdownCmdLinux = "sudo -n /sbin/poweroff";
     static constexpr const char *sDefaultShutdownCmdWindows = "shutdown /s /f /t 0";
@@ -731,6 +744,8 @@ public slots:
 
 private slots:
     void onLog(QString msg, bool newline);
+    void onConnectionRetry(QString server, QString detail);
+    void flushConnectionRetries();
     void onError(QString msg);
     void onErrorConnecting(QString err);
     void onRefreshprogressbarBar();
@@ -1044,7 +1059,7 @@ QString NgPost::randomFrom(ushort length) const
 
 std::string NgPost::randomStdFrom(ushort length)
 {
-    const std::string sRandomAlphabet = "abcdefghijklmnopqrstuvwxyz";
+    const std::string lowercaseAlphabet = "abcdefghijklmnopqrstuvwxyz";
     const std::vector<std::string> tlds = {
         ".com", ".net", ".org", ".io", ".us", ".uk", ".de", ".jp", ".fr", ".au",
         ".ca", ".cn", ".es", ".it", ".nl", ".ru", ".ch", ".se", ".no", ".in",
@@ -1053,7 +1068,7 @@ std::string NgPost::randomStdFrom(ushort length)
         ".ro", ".hu", ".ie", ".il", ".th", ".sa", ".ae", ".is", ".pk", ".vn"
     };
 
-    size_t nbLetters = sRandomAlphabet.length();
+    size_t nbLetters = lowercaseAlphabet.length();
 
     std::random_device rd;
     std::mt19937 engine(rd());
@@ -1064,12 +1079,12 @@ std::string NgPost::randomStdFrom(ushort length)
     std::string signature;
 
     for (size_t i = 0; i < length; ++i)
-        randomFrom.push_back(sRandomAlphabet[distAlphabet(engine)]);
+        randomFrom.push_back(lowercaseAlphabet[distAlphabet(engine)]);
 
     randomFrom.push_back('@');
 
     for (size_t i = 0; i < length; ++i)
-        signature.push_back(sRandomAlphabet[distAlphabet(engine)]);
+        signature.push_back(lowercaseAlphabet[distAlphabet(engine)]);
 
     randomFrom.append(signature);
 

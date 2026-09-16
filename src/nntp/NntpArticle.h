@@ -32,7 +32,7 @@ class NntpArticle : public QObject
 private:
     NntpFile  *_nntpFile; //!< original file
     const uint _part;     //!< part of the original file
-    QUuid      _id;       //!< to generate a unique Message-ID for the Header
+    QUuid _uuid;          //!< to generate a unique Message-ID for the Header
 
     const std::string *_from;    //!< NNTP header From (owned by PostingJob)
     char *_subject;              //!< NNTP header Subject (if defined it won't be obfuscated)
@@ -130,7 +130,7 @@ quint64 NntpArticle::size() const { return static_cast<quint64>(_fileBytes); }
 qint64 NntpArticle::nzbBytes() const { return _bodySize > 0 ? _bodySize : _fileBytes; }
 void NntpArticle::genNewId()
 {
-    _id = QUuid::createUuid();
+    _uuid = QUuid::createUuid();
     // id() exposes the fully materialised wire Message-ID. It must not keep
     // reporting the value from an ambiguous attempt after the UUID changes.
     _msgId.clear();

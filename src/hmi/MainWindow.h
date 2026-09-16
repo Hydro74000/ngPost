@@ -23,6 +23,7 @@
 
 #include "vpn/VpnManager.h"
 #include "history/PostHistoryStore.h"
+#include "utils/LogTimestamp.h"
 
 #include <QTextCharFormat>
 #include <QMainWindow>
@@ -92,6 +93,8 @@ private:
     //! Lines the log pane currently keeps. Derived from a memory budget that
     //! grows with the debug level; see _applyLogCapacity().
     int             _logBlockCap;
+    mutable LogTimestamp _logTimestamp;
+    mutable bool _logEntryComplete = true;
     //! Characters the pane may keep. Bounds the case the block count cannot:
     //! a pane whose blocks all reached kLogMaxBlockCharacters.
     int             _logCharacterCap;

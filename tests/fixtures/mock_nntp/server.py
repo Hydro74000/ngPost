@@ -107,6 +107,14 @@ class Session:
             chunks.append(stripped + b"\r\n")
         return b"".join(chunks)
 
+    def drop_post_reply(self) -> bool:
+        if self.opts.drop_before_post_reply:
+            return True
+        if self.opts.drop_before_post_reply_count > 0:
+            self.opts.drop_before_post_reply_count -= 1
+            return True
+        return False
+
     async def serve(self) -> None:
         self.log(f"connect (require_auth={self.opts.require_auth})")
 
@@ -177,7 +185,7 @@ class Session:
                     await self.write_line(b"335 send the article")
                     body = await self.read_until_dot()
                     self._dump_article(msgid, body)
-                    if self.opts.drop_before_post_reply:
+                    if self.drop_post_reply():
                         self.log("closing before final IHAVE reply (test injection)")
                         self.writer.transport.abort()
                         return
@@ -186,10 +194,16 @@ class Session:
 
                 if upper == "POST":
                     await self.write_line(b"340 send the article; end with <CR-LF>.<CR-LF>")
+                    if self.opts.stall_article:
+                        # Stop reading: a large article stays queued in the
+                        # client's write buffer, as with a dead route.
+                        self.log("not reading the article (test injection)")
+                        while True:
+                            await asyncio.sleep(3600)
                     body = await self.read_until_dot()
                     msgid = self._extract_msgid(body)
                     self._dump_article(msgid, body)
-                    if self.opts.drop_before_post_reply:
+                    if self.drop_post_reply():
                         self.log("closing before final POST reply (test injection)")
                         self.writer.transport.abort()
                         return
@@ -338,6 +352,10 @@ def main(argv: list[str]) -> int:
                    help="Close the connection after N bytes have been received (0 = never)")
     p.add_argument("--drop-before-post-reply", action="store_true",
                    help="Accept and dump an article, then close without its final 235/240 reply")
+    p.add_argument("--drop-before-post-reply-count", type=int, default=0,
+                   help="Drop the first N final replies, then allow successful retries")
+    p.add_argument("--stall-article", action="store_true",
+                   help="Accept POST, then never read the article nor reply")
     p.add_argument("--slow-mode-ms", type=int, default=0,
                    help="Sleep N ms before each server reply (default 0)")
     p.add_argument("--stat-missing", action="store_true",

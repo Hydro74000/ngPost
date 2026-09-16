@@ -197,6 +197,14 @@ private slots:
     //! The mock drops the connection after N bytes; ngPost must not crash or
     //! hang regardless of whether retry eventually succeeds.
     void retry_on_dropped_connection();
+    void recovered_connection_is_successful_and_timestamped();
+    //! A server that stops reading mid-article leaves bytes queued: the socket
+    //! timeout must drop the transport at once, not wait for a graceful close.
+    void stalled_upload_times_out_promptly();
+    void missing_parity_tool_stops_before_compression();
+    void cli_parity_path_overrides_configured_engine();
+    void unavailable_compressor_stops_and_preserves_input_data();
+    void unavailable_compressor_stops_and_preserves_input();
     //! A transport loss after the article body but before 240 is ambiguous,
     //! even when automatic resume is disabled: preserve it as unknown.
     void no_resume_transport_loss_is_unknown_and_nonzero();
@@ -1157,3 +1165,239 @@ void TestPostFlow::archive_password_never_reaches_the_output()
 
 QTEST_MAIN(TestPostFlow)
 #include "tst_PostFlow.moc"
+
+void TestPostFlow::recovered_connection_is_successful_and_timestamped()
+{
+    HomeSandbox sandbox;
+    const QString source = sandbox.rootPath() + "/retry.bin";
+    QFile input(source);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write(QByteArray(160000, 'r'));
+    input.close();
+    for (const bool debug : { false, true }) {
+        // A fresh server gives each log mode its own recoverable interruption.
+        MockNntpServer mock;
+        QVERIFY(mock.start({ "--drop-before-post-reply-count", "1" }));
+        const QString nzb = sandbox.rootPath() + (debug ? "/debug.nzb" : "/normal.nzb");
+        QStringList args{ "-S",
+                          QString("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port()),
+                          "-i",
+                          source,
+                          "-o",
+                          nzb,
+                          "-g",
+                          "alt.binaries.test",
+                          "-r",
+                          "3",
+                          "--disp_progress",
+                          "none" };
+        if (debug)
+            args << "-d";
+        QString out;
+        const int code = runNgPost(_bin, args, sandbox.rootPath(), out);
+        QVERIFY2(code == 0, qPrintable(QString("exit=%1\n%2").arg(code).arg(out)));
+        QFile result(nzb);
+        QVERIFY(result.open(QIODevice::ReadOnly));
+        QCOMPARE(countSegmentsInNzb(result.readAll()), 1);
+        QVERIFY2(out.contains(debug ? "Connection lost, trying to reconnect"
+                                    : "automatic reconnection attempted"),
+                 qPrintable(out));
+        const QRegularExpression timestamp("^\\[\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\] ");
+        for (const auto &line : out.split('\n'))
+            if (line.contains("reconnect") || line.contains("Error Socket"))
+                QVERIFY2(timestamp.match(line).hasMatch(), qPrintable(line));
+    }
+}
+
+void TestPostFlow::stalled_upload_times_out_promptly()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--stall-article" }));
+
+    // Larger than the loopback socket buffers on both ends, so most of the
+    // article is still in Qt's write buffer when the timeout fires.
+    const int articleSize = 16 * 1024 * 1024;
+    const QString source = sandbox.rootPath() + "/stall.bin";
+    QFile input(source);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write(QByteArray(articleSize, 's'));
+    input.close();
+
+    const QString config = sandbox.rootPath() + "/stall.conf";
+    QFile conf(config);
+    QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+    conf.write("NO_RESUME_AUTO = true\nSOCK_TIMEOUT = 6\n");
+    conf.close();
+
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config,
+                                 "-S",
+                                 QString("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port()),
+                                 "-i",
+                                 source,
+                                 "-o",
+                                 sandbox.rootPath() + "/stall.nzb",
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "-a",
+                                 QString::number(articleSize),
+                                 "-r",
+                                 "0",
+                                 "--disp_progress",
+                                 "none" },
+                               sandbox.rootPath(),
+                               out,
+                               25000);
+    QVERIFY2(code != -2, qPrintable("ngPost hung on the stalled connection:\n" + out));
+    QVERIFY2(code > 0, qPrintable(QString("exit=%1\n%2").arg(code).arg(out)));
+    QVERIFY2(out.contains("Socket Timeout (6000 ms)"), qPrintable(out));
+}
+
+void TestPostFlow::missing_parity_tool_stops_before_compression()
+{
+    HomeSandbox sandbox;
+    const QString source = sandbox.rootPath() + "/source.bin";
+    QFile input(source);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("test");
+    input.close();
+    const QString config = sandbox.rootPath() + "/missing.conf";
+    QFile file(config);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(QString("GROUPS = alt.binaries.test\nTMP_DIR = %1\nRAR_PATH = %2\n"
+                       "PAR2_SOURCE = custom\nPAR2_TOOL = parpar\nPAR2_PATH = "
+                       "%1/missing-parpar\nPAR2_PCT = 10\n")
+                   .arg(sandbox.rootPath(), _bin)
+                   .toUtf8());
+    file.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config,
+                                 "-S",
+                                 "u:p@@@127.0.0.1:1:1:nossl",
+                                 "-i",
+                                 source,
+                                 "-o",
+                                 sandbox.rootPath() + "/missing.nzb",
+                                 "--compress",
+                                 "--gen_par2" },
+                               sandbox.rootPath(),
+                               out);
+    QVERIFY2(code > 0, qPrintable(out));
+    QVERIFY2(out.contains("PAR2 tool") && out.contains("missing-parpar"), qPrintable(out));
+    QVERIFY(!out.contains("Compressing files"));
+    QVERIFY(!out.contains("Configured NNTP"));
+}
+
+void TestPostFlow::unavailable_compressor_stops_and_preserves_input_data()
+{
+    QTest::addColumn<bool>("brokenInterpreter");
+    QTest::newRow("missing executable") << false;
+#ifdef Q_OS_UNIX
+    QTest::newRow("missing interpreter") << true;
+#endif
+}
+
+void TestPostFlow::unavailable_compressor_stops_and_preserves_input()
+{
+    QFETCH(bool, brokenInterpreter);
+    HomeSandbox sandbox;
+    const QString source = sandbox.rootPath() + "/original.bin";
+    QFile input(source);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("original contents");
+    input.close();
+    const QString compressor = sandbox.rootPath() + "/fakerar";
+    if (brokenInterpreter) {
+        QFile script(compressor);
+        QVERIFY(script.open(QIODevice::WriteOnly));
+        script.write("#!/ngpost-test/missing-interpreter\n");
+        script.close();
+        QVERIFY(script.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                      | QFileDevice::ExeOwner));
+    }
+    const QString config = sandbox.rootPath() + "/compression.conf";
+    QFile file(config);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(QString("TMP_DIR = %1\nRAR_SOURCE = custom\nRAR_TOOL = rar\nRAR_PATH = %2\n")
+                   .arg(sandbox.rootPath(), compressor)
+                   .toUtf8());
+    file.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config,
+                                 "-S",
+                                 "u:p@@@127.0.0.1:1:1:nossl",
+                                 "-i",
+                                 source,
+                                 "-o",
+                                 sandbox.rootPath() + "/unavailable.nzb",
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "--compress",
+                                 "--obfuscate-filename",
+                                 "--debug" },
+                               sandbox.rootPath(),
+                               out);
+    QVERIFY2(code > 0, qPrintable(out));
+    QVERIFY2(out.contains(brokenInterpreter ? "Could not start external tool"
+                                            : "Compression tool unavailable"),
+             qPrintable(out));
+    QVERIFY(!out.contains("Configured NNTP"));
+    QVERIFY(input.open(QIODevice::ReadOnly));
+    QCOMPARE(input.readAll(), QByteArray("original contents"));
+}
+
+void TestPostFlow::cli_parity_path_overrides_configured_engine()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("Uses a shell script to capture tool arguments");
+#else
+    HomeSandbox sandbox;
+    const auto root = sandbox.rootPath();
+    const auto captured = root + "/arguments";
+    QVERIFY(writeFakeTool(root + "/par2",
+                          "#!/bin/sh\nprintf '%s\\n' \"$@\" > '" + captured + "'\nexit 9\n"));
+    QFile input(root + "/source.bin");
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("payload");
+    input.close();
+    QFile config(root + "/tools.conf");
+    QVERIFY(config.open(QIODevice::WriteOnly));
+    config.write(("TMP_DIR = " + root
+                  + "\nPAR2_TOOL = parpar\nPAR2_SOURCE = auto\n"
+                    "PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -q\nPAR2_PCT = 10\n")
+                     .toUtf8());
+    config.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config.fileName(),
+                                 "-S",
+                                 "u:p@@@127.0.0.1:1:1:nossl",
+                                 "-i",
+                                 input.fileName(),
+                                 "-o",
+                                 root + "/test.nzb",
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "--gen_par2",
+                                 "--par2_path",
+                                 root + "/par2" },
+                               root,
+                               out);
+    QVERIFY2(code > 0, qPrintable(out));
+    QVERIFY2(out.contains("PAR2_ARGS is ignored"), qPrintable(out));
+    QFile args(captured);
+    QVERIFY2(args.open(QIODevice::ReadOnly), qPrintable(out));
+    const auto text = args.readAll();
+    QVERIFY2(text.startsWith("c\n"), text.constData());
+    QVERIFY(!text.contains("--auto-slice-size"));
+    QVERIFY(text.contains("-r10\n"));
+#endif
+}

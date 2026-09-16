@@ -9,6 +9,7 @@
 #include "par2/Par2Settings.h"
 
 class NgPost;
+class ExternalToolPathWidget;
 class QComboBox;
 class QLineEdit;
 class QSpinBox;
@@ -38,6 +39,7 @@ private:
     par2::Settings _initial;
     QComboBox *_tool, *_blocks, *_volumes, *_distribution, *_device;
     QLineEdit *_path;
+    ExternalToolPathWidget *_toolPath;
     QSpinBox *_percentage, *_blockCount, *_volumeCount, *_threads, *_memory;
     QDoubleSpinBox *_blockBytes, *_volumeMiB;
     QCheckBox *_gpu, *_custom;
@@ -52,7 +54,7 @@ private:
     QVector<qint64> _sizes;
     std::shared_ptr<std::atomic_bool> _cancelScan;
     bool _beforeCompression, _percentageOverride;
-    bool _dirty = false, _pathDirty = false, _loading = true, _scanIncomplete = false, _scanning = false;
+    bool _dirty = false, _loading = true, _scanIncomplete = false, _scanning = false;
     bool _threadsSupported = true;
     QString _probedPath;
     par2::Tool _probedTool = par2::Tool::Auto;

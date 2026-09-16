@@ -318,19 +318,27 @@ void TestWindowsSecurity::elevated_script_rejects_junction_ancestors()
 {
     QTemporaryDir root(QDir::rootPath() + QStringLiteral("ngpost-junction-test-XXXXXX"));
     QVERIFY(root.isValid());
-    if (!setTestSecurity(root.path(), QStringLiteral("O:BAD:P(A;OICI;FA;;;BA)(A;OICI;FA;;;SY)")))
+    const QString admin = QStringLiteral("O:BAD:P(A;OICI;FA;;;BA)(A;OICI;FA;;;SY)");
+    if (!setTestSecurity(root.path(), admin))
         QSKIP("NTFS ownership fixtures require an elevated Windows test process");
     QVERIFY(QDir().mkdir(root.filePath("target")));
-    QVERIFY(!makeFile(root, QStringLiteral("target/install.ps1")).isEmpty());
+    const QString script = makeFile(root, QStringLiteral("target/install.ps1"));
+    QVERIFY(!script.isEmpty());
+    // DACL inheritance does not inherit ownership. CI may create children
+    // owned by the individual account even when the parent is owned by BA.
+    QVERIFY(setTestSecurity(root.filePath("target"), admin));
+    QVERIFY(setTestSecurity(script, admin));
+    QString detail;
+    QVERIFY2(WindowsSecurity::onlyPrivilegedPrincipalsCanWrite(script, &detail),
+             qPrintable(detail));
     QProcess cmd;
     cmd.start(QStringLiteral("cmd.exe"), {QStringLiteral("/c"), QStringLiteral("mklink"),
         QStringLiteral("/J"), QDir::toNativeSeparators(root.filePath("link")),
         QDir::toNativeSeparators(root.filePath("target"))});
     QVERIFY(cmd.waitForFinished());
     QCOMPARE(cmd.exitCode(), 0);
-    QString detail;
     QVERIFY(!WindowsSecurity::onlyPrivilegedPrincipalsCanWrite(root.filePath("link/install.ps1"), &detail));
-    QVERIFY(detail.contains(QStringLiteral("reparse")));
+    QVERIFY2(detail.contains(QStringLiteral("reparse")), qPrintable(detail));
     QVERIFY(QDir().rmdir(root.filePath("link")));
 }
 
@@ -346,6 +354,11 @@ void TestWindowsSecurity::elevated_script_accepts_wof_compression()
     QVERIFY(file.open(QIODevice::WriteOnly));
     QCOMPARE(file.write(QByteArray(131072, '#')), qint64(131072));
     file.close();
+    // Set the leaf's owner explicitly, independently of the process token's
+    // default owner. Compression must be the only changing condition.
+    QVERIFY(setTestSecurity(path, admin));
+    QString detail;
+    QVERIFY2(WindowsSecurity::onlyPrivilegedPrincipalsCanWrite(path, &detail), qPrintable(detail));
     QProcess compact;
     compact.start(QStringLiteral("compact.exe"), {QStringLiteral("/C"),
         QStringLiteral("/EXE:XPRESS4K"), QStringLiteral("/F"), QDir::toNativeSeparators(path)});
@@ -357,7 +370,6 @@ void TestWindowsSecurity::elevated_script_accepts_wof_compression()
     DWORD high = 0;
     DWORD const stored = GetCompressedFileSizeW(reinterpret_cast<LPCWSTR>(native.utf16()), &high);
     QVERIFY(high == 0 && stored > 0 && stored < 131072);
-    QString detail;
     QVERIFY2(WindowsSecurity::onlyPrivilegedPrincipalsCanWrite(path, &detail), qPrintable(detail));
     // Compression is no exemption from checking the file's actual permissions.
     QVERIFY(setTestSecurity(path, admin + QStringLiteral("(A;;FW;;;AU)")));

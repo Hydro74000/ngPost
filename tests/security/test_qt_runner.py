@@ -12,7 +12,7 @@ SKIP = 'SKIP   : Test::initTestCase() Windows-only\nTotals: 0 passed, 0 failed, 
 
 
 class QtRunnerTests(unittest.TestCase):
-    def run_fixture(self, log, name='tst_RunnerFixture', platform='Linux', code=0):
+    def run_fixture(self, log, name='tst_RunnerFixture', platform='Linux', code=0, counts_crlf=False):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             tests = root / 'tests with spaces'
@@ -27,7 +27,14 @@ class QtRunnerTests(unittest.TestCase):
             uname = root / 'uname'
             uname.write_text('#!/bin/bash\nprintf "%s\\n" ' + shlex.quote(platform) + '\n')
             uname.chmod(0o755)
-            return subprocess.run(['bash', str(RUNNER), str(tests), 'fixture'],
+            runner = root / '.github/scripts/run-qt-tests.sh'
+            runner.parent.mkdir(parents=True)
+            runner.write_bytes(RUNNER.read_bytes())
+            counts = root / 'tests/expected-counts.txt'
+            counts.parent.mkdir()
+            table = (RUNNER.parents[2] / 'tests/expected-counts.txt').read_text()
+            counts.write_bytes(table.replace('\n', '\r\n' if counts_crlf else '\n').encode())
+            return subprocess.run(['bash', str(runner), str(tests), 'fixture'],
                                   env=dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH']),
                                   capture_output=True, text=True)
 
@@ -84,6 +91,19 @@ class QtRunnerTests(unittest.TestCase):
                     result = self.run_fixture(PASS.replace('3 passed', f'{passed} passed'),
                                               'tst_WindowsSecurity.exe', platform)
                     self.assertEqual(result.returncode == 0, passed >= minimum, result.stdout)
+
+    def test_crlf_checkout_does_not_disable_windows_floors(self):
+        counts = RUNNER.parents[2] / 'tests/expected-counts.txt'
+        minimum = next(int(parts[1]) for line in counts.read_text().splitlines()
+                       if (parts := line.split()) and parts[0] == 'tst_WindowsSecurity'
+                       and parts[2:] == ['Windows'])
+        for passed in (minimum - 1, minimum):
+            with self.subTest(passed=passed):
+                result = self.run_fixture(PASS.replace('3 passed', f'{passed} passed'),
+                                          'tst_WindowsSecurity.exe', 'MINGW64_NT-10.0',
+                                          counts_crlf=True)
+                self.assertEqual(result.returncode == 0, passed >= minimum, result.stdout)
+                self.assertNotIn('no pinned minimum', result.stdout)
 
     def test_windows_acl_skip_reports_the_elevation_prerequisite(self):
         log = PASS.replace('Totals:', 'SKIP   : Test::acl_case() NTFS ownership fixtures require an elevated Windows test process\nTotals:').replace('0 skipped', '1 skipped')

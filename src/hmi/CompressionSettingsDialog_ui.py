@@ -53,31 +53,10 @@ class Ui_CompressionSettingsDialog(object):
 
         self.toolsForm.setLayout(0, QFormLayout.ItemRole.FieldRole, self.compressPathLayout)
 
-        self.rarLbl = QLabel(self.toolsBox)
-        self.rarLbl.setObjectName(u"rarLbl")
-
-        self.toolsForm.setWidget(1, QFormLayout.ItemRole.LabelRole, self.rarLbl)
-
-        self.rarPathLayout = QHBoxLayout()
-        self.rarPathLayout.setObjectName(u"rarPathLayout")
-        self.rarEdit = QLineEdit(self.toolsBox)
-        self.rarEdit.setObjectName(u"rarEdit")
-
-        self.rarPathLayout.addWidget(self.rarEdit)
-
-        self.rarPathButton = QPushButton(self.toolsBox)
-        self.rarPathButton.setObjectName(u"rarPathButton")
-        self.rarPathButton.setMaximumSize(QSize(30, 16777215))
-
-        self.rarPathLayout.addWidget(self.rarPathButton)
-
-
-        self.toolsForm.setLayout(1, QFormLayout.ItemRole.FieldRole, self.rarPathLayout)
-
         self.rarSizeLbl = QLabel(self.toolsBox)
         self.rarSizeLbl.setObjectName(u"rarSizeLbl")
 
-        self.toolsForm.setWidget(2, QFormLayout.ItemRole.LabelRole, self.rarSizeLbl)
+        self.toolsForm.setWidget(1, QFormLayout.ItemRole.LabelRole, self.rarSizeLbl)
 
         self.rarSizeLayout = QHBoxLayout()
         self.rarSizeLayout.setObjectName(u"rarSizeLayout")
@@ -105,18 +84,18 @@ class Ui_CompressionSettingsDialog(object):
         self.rarSizeLayout.addItem(self.rarSizeSpacer)
 
 
-        self.toolsForm.setLayout(2, QFormLayout.ItemRole.FieldRole, self.rarSizeLayout)
+        self.toolsForm.setLayout(1, QFormLayout.ItemRole.FieldRole, self.rarSizeLayout)
 
         self.keepRarDefaultCB = QCheckBox(self.toolsBox)
         self.keepRarDefaultCB.setObjectName(u"keepRarDefaultCB")
 
-        self.toolsForm.setWidget(4, QFormLayout.ItemRole.FieldRole, self.keepRarDefaultCB)
+        self.toolsForm.setWidget(3, QFormLayout.ItemRole.FieldRole, self.keepRarDefaultCB)
 
         self.volumeHelpLabel = QLabel(self.toolsBox)
         self.volumeHelpLabel.setObjectName(u"volumeHelpLabel")
         self.volumeHelpLabel.setWordWrap(True)
 
-        self.toolsForm.setWidget(3, QFormLayout.ItemRole.SpanningRole, self.volumeHelpLabel)
+        self.toolsForm.setWidget(2, QFormLayout.ItemRole.SpanningRole, self.volumeHelpLabel)
 
 
         self.rootLayout.addWidget(self.toolsBox)
@@ -180,14 +159,6 @@ class Ui_CompressionSettingsDialog(object):
         self.compressPathButton.setToolTip(QCoreApplication.translate("CompressionSettingsDialog", u"select the temporary folder where the archives and par2 will be created (it will be cleaned once the post is done)", None))
 #endif // QT_CONFIG(tooltip)
         self.compressPathButton.setText(QCoreApplication.translate("CompressionSettingsDialog", u"...", None))
-        self.rarLbl.setText(QCoreApplication.translate("CompressionSettingsDialog", u"RAR Path: ", None))
-#if QT_CONFIG(tooltip)
-        self.rarEdit.setToolTip(QCoreApplication.translate("CompressionSettingsDialog", u"full path of the rar executable", None))
-#endif // QT_CONFIG(tooltip)
-#if QT_CONFIG(tooltip)
-        self.rarPathButton.setToolTip(QCoreApplication.translate("CompressionSettingsDialog", u"select rar executable", None))
-#endif // QT_CONFIG(tooltip)
-        self.rarPathButton.setText(QCoreApplication.translate("CompressionSettingsDialog", u"...", None))
         self.rarSizeLbl.setText(QCoreApplication.translate("CompressionSettingsDialog", u"Volume size (MiB):", None))
 #if QT_CONFIG(tooltip)
         self.rarSizeEdit.setToolTip(QCoreApplication.translate("CompressionSettingsDialog", u"to split the rar archive in several volumes (0 to don't split)", None))

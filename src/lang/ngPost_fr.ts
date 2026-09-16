@@ -380,27 +380,11 @@ It will be irreversible...</source>
     </message>
     <message>
         <location line="+3"/>
-        <location line="+34"/>
         <source>...</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-25"/>
-        <source>RAR Path: </source>
-        <translation>Chemin de RAR : </translation>
-    </message>
-    <message>
-        <location line="+9"/>
-        <source>full path of the rar executable</source>
-        <translation>chemin d&apos;accès complet de l&apos;exécutable RAR</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select rar executable</source>
-        <translation>sélectionner l&apos;exécutable RAR</translation>
-    </message>
-    <message>
-        <location line="+27"/>
+        <location line="+24"/>
         <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
         <translation>pour découper l&apos;archive en plusieurs volumes de même tailles (0 pour ne faire qu&apos;un seul fichier)</translation>
     </message>
@@ -454,19 +438,9 @@ C&apos;est le défaut avec lequel démarre chaque nouveau post ; chaque post peu
         <translation>générer mot de passe</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+154"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+207"/>
         <source>Select a Folder</source>
         <translation>Sélectionner un dossier</translation>
-    </message>
-    <message>
-        <location line="+12"/>
-        <source>Select rar executable</source>
-        <translation>Sélectionner l&apos;exécutable RAR</translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>the selected file is not executable...</source>
-        <translation>le fichier sélectionné n&apos;est pas exécutable...</translation>
     </message>
     <message>
         <location filename="../hmi/CompressionSettingsDialog.ui" line="-117"/>
@@ -479,7 +453,7 @@ C&apos;est le défaut avec lequel démarre chaque nouveau post ; chaque post peu
         <translation>Limiter le nombre de volumes à</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-85"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-73"/>
         <source>Volume size</source>
         <translation>Taille des volumes</translation>
     </message>
@@ -493,7 +467,7 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
 Indiquez un nombre entier de Mio entre 0 et 1000000 (0 désactive le découpage uniquement lorsque la limite de volumes est désactivée).</translation>
     </message>
     <message>
-        <location line="+46"/>
+        <location line="+56"/>
         <source>The volume size is calculated automatically from the source size and the volume limit.</source>
         <translation>La taille des volumes est calculée automatiquement d’après la taille des sources et le nombre maximal de volumes.</translation>
     </message>
@@ -518,14 +492,77 @@ Indiquez un nombre entier de Mio entre 0 et 1000000 (0 désactive le découpage 
         <translation>1 Mio = 1 048 576 octets. Le calcul utilise la taille des sources, avec arrondi.</translation>
     </message>
     <message>
-        <location line="-86"/>
+        <location line="-97"/>
         <source>Save</source>
         <translation>Enregistrer</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-58"/>
+        <source>Tool:</source>
+        <translation>Outil :</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Path:</source>
+        <translation>Chemin :</translation>
+    </message>
+    <message>
+        <location line="+54"/>
         <source>Cancel</source>
         <translation>Annuler</translation>
+    </message>
+</context>
+<context>
+    <name>ExternalToolPathWidget</name>
+    <message>
+        <location filename="../hmi/ExternalToolPathWidget.cpp" line="+25"/>
+        <source>Automatic (recommended)</source>
+        <translation>Automatique (recommandé)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Custom…</source>
+        <translation>Personnalisé…</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Browse…</source>
+        <translation>Parcourir…</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Show path</source>
+        <translation>Afficher le chemin</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Select executable</source>
+        <translation>Choisir un exécutable</translation>
+    </message>
+    <message>
+        <location line="+49"/>
+        <source>Executable unavailable. Choose an executable file or use Automatic.</source>
+        <translation>Exécutable indisponible. Choisissez un fichier exécutable ou le mode Automatique.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>This tool is not included or installed. Install it, choose another tool, or set a custom path. Posts requiring it cannot start.</source>
+        <translation>Cet outil n’est ni inclus ni installé. Installez-le, choisissez un autre outil ou indiquez un chemin personnalisé. Les posts qui en ont besoin ne peuvent pas démarrer.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Included with ngPost · ready</source>
+        <translation>Inclus avec ngPost · prêt</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Found on this computer · ready</source>
+        <translation>Trouvé sur cet ordinateur · prêt</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Custom executable · ready</source>
+        <translation>Exécutable personnalisé · prêt</translation>
     </message>
 </context>
 <context>
@@ -679,7 +716,7 @@ Contrairement à la case du post, ce choix est sauvegardé.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3177"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3181"/>
         <source>VPN: disabled</source>
         <translation>VPN : désactivé</translation>
     </message>
@@ -828,7 +865,7 @@ Contrairement à la case du post, ce choix est sauvegardé.</translation>
         <translation>allez en mode Terminal (fermeture de l&apos;IHM et passage en ligne de commande)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1231"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1235"/>
         <source>Host (name or IP)</source>
         <translation>Serveur (DNS ou IP)</translation>
     </message>
@@ -859,32 +896,32 @@ Contrairement à la case du post, ce choix est sauvegardé.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1078"/>
+        <location line="+1082"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>Mot de Passe</translation>
     </message>
     <message>
-        <location line="-1143"/>
-        <location line="+405"/>
+        <location line="-1147"/>
+        <location line="+409"/>
         <location line="+1670"/>
         <source>Default %1</source>
         <translation>Défaut %1</translation>
     </message>
     <message>
-        <location line="-2071"/>
-        <location line="+405"/>
+        <location line="-2075"/>
+        <location line="+409"/>
         <source>Post history, statistics and resume center</source>
         <translation>Historique des posts, statistiques et centre de reprise</translation>
     </message>
     <message>
-        <location line="-404"/>
-        <location line="+408"/>
+        <location line="-408"/>
+        <location line="+412"/>
         <source>New</source>
         <translation>Nouveau</translation>
     </message>
     <message>
-        <location line="-346"/>
+        <location line="-350"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>débit moyen</translation>
@@ -941,7 +978,7 @@ Fermez cet autre ngPost pour utiliser le VPN ici. Si aucun ne tourne, vous pouve
         <translation>VPN</translation>
     </message>
     <message>
-        <location line="+279"/>
+        <location line="+283"/>
         <source>Immediate speed (avg on %1 sec) - (nb Articles uploaded / total number of Articles) - avg speed</source>
         <translation>Vitesse réelle (moyenne sur les dernières %1 sec) - (nb articles postés / nb total d&apos;articles) - vitesse moyenne</translation>
     </message>
@@ -1026,12 +1063,12 @@ The job stays in the queue.</source>
 Le job reste dans la file d&apos;attente.</translation>
     </message>
     <message>
-        <location line="-585"/>
+        <location line="-589"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>Ces réglages n&apos;ont pas pu être supprimés. Voir le journal VPN pour le détail.</translation>
     </message>
     <message>
-        <location line="+599"/>
+        <location line="+603"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>Le VPN configuré dans ngPost semble déjà actif ; un autre ngPost l&apos;utilise peut-être. Voir les réglages VPN.</translation>
     </message>
@@ -1639,12 +1676,12 @@ Cela supprime aussi tous les enregistrements de fichiers et d&apos;articles asso
         <translation>Quitter en cours de Post?</translation>
     </message>
     <message>
-        <location line="-450"/>
+        <location line="-454"/>
         <source>on</source>
         <translation>on</translation>
     </message>
     <message>
-        <location line="+451"/>
+        <location line="+455"/>
         <source>ngPost is currently posting.
 Are you sure you want to quit?</source>
         <translation>ngPost est encore en train de poster.\nSouhaitez vous vraiment quitter?</translation>
@@ -1813,8 +1850,8 @@ Are you sure you want to quit?</source>
         <translation>Supprimer l&apos;entrée</translation>
     </message>
     <message>
-        <location line="-1334"/>
-        <location line="+405"/>
+        <location line="-1338"/>
+        <location line="+409"/>
         <location line="+515"/>
         <location line="+325"/>
         <source>History</source>
@@ -1994,8 +2031,8 @@ Are you sure you want to quit?</source>
         <translation>Réinitialiser la largeur des colonnes</translation>
     </message>
     <message>
-        <location line="-1667"/>
-        <location line="+414"/>
+        <location line="-1671"/>
+        <location line="+418"/>
         <source>PAR2 Settings…</source>
         <translation>Réglages PAR2…</translation>
     </message>
@@ -2013,7 +2050,7 @@ Are you sure you want to quit?</source>
 <context>
     <name>NgPost</name>
     <message>
-        <location filename="../NgPost.cpp" line="+227"/>
+        <location filename="../NgPost.cpp" line="+233"/>
         <source>Help: display syntax</source>
         <translation>Aide: afficher la syntaxe</translation>
     </message>
@@ -2179,12 +2216,12 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4865"/>
+        <location line="+4937"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Supprimer le dossier racine (parent) lors des compressions de dossiers avec RAR</translation>
     </message>
     <message>
-        <location line="-4862"/>
+        <location line="-4934"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP serveur suivant le format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2224,7 +2261,7 @@ Are you sure you want to quit?</source>
         <translation>supprimer les ressources VPN ngPost sans propriétaire après nouvelle vérification (nécessite --yes)</translation>
     </message>
     <message>
-        <location line="+1259"/>
+        <location line="+1211"/>
         <source>MONITOR_IGNORE_DIR ON =&gt; Ignoring new incoming folder %1</source>
         <translation>MONITOR_IGNORE_DIR ON =&gt; ignore nouveau dossier %1</translation>
     </message>
@@ -2239,7 +2276,7 @@ Are you sure you want to quit?</source>
         <translation>Traitement du nouveau fichier: %1</translation>
     </message>
     <message>
-        <location line="-1402"/>
+        <location line="-1354"/>
         <source>display extra information</source>
         <translation>affiche extra infos</translation>
     </message>
@@ -2259,7 +2296,7 @@ Are you sure you want to quit?</source>
         <translation>compressions des fichiers avec RAR ou 7z</translation>
     </message>
     <message>
-        <location line="+1349"/>
+        <location line="+1301"/>
         <source>error loading translator %1</source>
         <translation>Erreur lors du chargement du traducteur: %1</translation>
     </message>
@@ -2274,12 +2311,12 @@ Are you sure you want to quit?</source>
         <translation> =&gt; fermeture de l&apos;application</translation>
     </message>
     <message>
-        <location line="+645"/>
+        <location line="+648"/>
         <source>Network access changed: %1</source>
         <translation>Changement de la connection réseau: %1</translation>
     </message>
     <message>
-        <location line="+88"/>
+        <location line="+95"/>
         <source>Cancelling monitoring job: %1</source>
         <translation>Annulation du post de surveillance: %1</translation>
     </message>
@@ -2332,7 +2369,7 @@ Pour obtenir la liste des options disponibles : %2 --help
 </translation>
     </message>
     <message>
-        <location line="-2473"/>
+        <location line="-2435"/>
         <source>quiet mode (no output on stdout)</source>
         <translation>mode silencieux (aucune sortie sur stdout)</translation>
     </message>
@@ -2532,7 +2569,7 @@ Pour obtenir la liste des options disponibles : %2 --help
         <translation>choisir le profil VPN actif par son nom (il doit déjà exister dans la configuration)</translation>
     </message>
     <message>
-        <location line="+269"/>
+        <location line="+199"/>
         <source>VPN required but unavailable: %1</source>
         <translation>VPN requis mais indisponible : %1</translation>
     </message>
@@ -2625,12 +2662,17 @@ Pour obtenir la liste des options disponibles : %2 --help
     </message>
     <message>
         <location line="+355"/>
-        <location line="+1183"/>
+        <location line="+1215"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>L’adoption du dossier de configuration a échoué ; ngPost s’est arrêté avant d’utiliser le nouveau dossier afin de pouvoir réessayer en toute sécurité au prochain démarrage.</translation>
     </message>
     <message>
-        <location line="-945"/>
+        <location line="-1153"/>
+        <source>%1: %2 connection interruption(s); automatic reconnection attempted. See Debug for details.</source>
+        <translation>%1 : %2 interruption(s) de connexion ; tentative de reconnexion automatique. Détails en mode Debug.</translation>
+    </message>
+    <message>
+        <location line="+198"/>
         <source>SSL support is unavailable</source>
         <translation>Le support SSL n&apos;est pas disponible</translation>
     </message>
@@ -2645,7 +2687,7 @@ Pour obtenir la liste des options disponibles : %2 --help
         <translation>Le post reste en pause jusqu&apos;à la fin de la reprise du VPN.</translation>
     </message>
     <message>
-        <location line="+555"/>
+        <location line="+558"/>
         <source>Shutdown process failed (exit code %1).</source>
         <translation>Le processus d&apos;arrêt a échoué (code de sortie %1).</translation>
     </message>
@@ -2655,7 +2697,7 @@ Pour obtenir la liste des options disponibles : %2 --help
         <translation>Erreur du processus d&apos;arrêt : %1</translation>
     </message>
     <message>
-        <location line="+289"/>
+        <location line="+296"/>
         <source>Error: --vpn-cleanup-unattributed requires --yes because it can interrupt another ngPost tunnel.</source>
         <translation>Erreur : --vpn-cleanup-unattributed exige --yes car cela peut interrompre le tunnel d&apos;un autre ngPost.</translation>
     </message>
@@ -2696,12 +2738,17 @@ Pour obtenir la liste des options disponibles : %2 --help
     </message>
     <message>
         <location line="+324"/>
-        <location line="+770"/>
+        <location line="+797"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE doit être un entier positif</translation>
     </message>
     <message>
-        <location line="-157"/>
+        <location line="-723"/>
+        <source>--par2_path selects %1 instead of %2; PAR2_ARGS is ignored and default arguments are used.</source>
+        <translation>--par2_path sélectionne %1 au lieu de %2 ; PAR2_ARGS est ignoré et les arguments par défaut sont utilisés.</translation>
+    </message>
+    <message>
+        <location line="+564"/>
         <source>Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5.</source>
         <translation>Avertissement : VPN_LEASE_WAIT_MINUTES doit être compris entre 0 et 1440 ; utilisation de 5.</translation>
     </message>
@@ -2711,44 +2758,48 @@ Pour obtenir la liste des options disponibles : %2 --help
         <translation>Avertissement : VPN_RECOVERY_MAX_ATTEMPTS doit être compris entre 0 et 1000 ; utilisation de 0 (illimité).</translation>
     </message>
     <message>
-        <location line="+415"/>
+        <location line="+500"/>
+        <source>RAR_TOOL must be rar or 7zip.</source>
+        <translation>RAR_TOOL doit être rar ou 7zip.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>RAR_SOURCE must be auto or custom.</source>
+        <translation>RAR_SOURCE doit être auto ou custom.</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>PAR2_SOURCE must be auto or custom.</source>
+        <translation>PAR2_SOURCE doit être auto ou custom.</translation>
+    </message>
+    <message>
+        <location line="-106"/>
         <source>should be a positive number of bytes!...</source>
         <translation>doit être un nombre d&apos;octets positif !...</translation>
     </message>
     <message>
-        <location line="+92"/>
-        <source>PAR2_PATH is not an executable file: %1</source>
-        <translation>PAR2_PATH n&apos;est pas un fichier exécutable : %1</translation>
+        <location line="+141"/>
+        <source>Configuration: %1 is ignored because %2 = auto. Set %2 = custom to use this path.</source>
+        <translation>Configuration : %1 est ignoré car %2 = auto. Indiquez %2 = custom pour utiliser ce chemin.</translation>
     </message>
     <message>
-        <location line="+13"/>
-        <source>PAR2_TOOL = %1: no %1 executable was found, neither next to ngPost nor in the PATH. Every post that generates par2 will stop at that step.
-Install %1, set PAR2_PATH to its executable, or set PAR2_TOOL to auto, parpar, par2cmdline or multipar.</source>
-        <translation>PAR2_TOOL = %1 : aucun exécutable %1 n&apos;a été trouvé, ni à côté de ngPost ni dans le PATH. Tout post générant des par2 s&apos;arrêtera à cette étape.
-Installez %1, indiquez son exécutable dans PAR2_PATH, ou mettez PAR2_TOOL à auto, parpar, par2cmdline ou multipar.</translation>
+        <location line="+5"/>
+        <location line="+31"/>
+        <source>Configuration: %1 = %2 is not an executable file. Posts that need this tool will stop before the transfer.</source>
+        <translation>Configuration : %1 = %2 n&apos;est pas un fichier exécutable. Les posts qui ont besoin de cet outil s&apos;arrêteront avant le transfert.</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <source>PAR2_TOOL = %1 is used instead, with %2.</source>
-        <translation>PAR2_TOOL = %1 est utilisé à la place, avec %2.</translation>
+        <location line="+4"/>
+        <source>Configuration: %1 = %2 is not an executable file; ngPost uses %3, found automatically, instead.</source>
+        <translation>Configuration : %1 = %2 n&apos;est pas un fichier exécutable ; ngPost utilise à la place %3, trouvé automatiquement.</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <source>No par2 tool was found next to ngPost either: every post that generates par2 will stop at that step. Fix PAR2_PATH, or install par2 or ParPar.</source>
-        <translation>Aucun outil par2 n&apos;a été trouvé à côté de ngPost non plus : tout post générant des par2 s&apos;arrêtera à cette étape. Corrigez PAR2_PATH, ou installez par2 ou ParPar.</translation>
+        <location line="+38"/>
+        <source>Configuration: RAR_TOOL = %1 does not match RAR_PATH = %2; %3 is used.</source>
+        <translation>Configuration : RAR_TOOL = %1 ne correspond pas à RAR_PATH = %2 ; %3 est utilisé.</translation>
     </message>
     <message>
-        <location line="+2"/>
-        <source>ngPost uses the par2 tool it found instead: %1.</source>
-        <translation>ngPost utilise à la place l&apos;outil par2 qu&apos;il a trouvé : %1.</translation>
-    </message>
-    <message>
-        <location line="+15"/>
-        <source>Configuration: %1</source>
-        <translation>Configuration : %1</translation>
-    </message>
-    <message>
-        <location line="+125"/>
+        <location line="+136"/>
         <source>Warning: this configuration file is the one ngPost adopted when it moved your settings to &quot;%1&quot;.
 It has no POST_DB line, so this run records its posts in
     %2
@@ -2879,7 +2930,7 @@ Aucun fichier source existant n’a été modifié ou supprimé. Des fichiers s�
         <translation>Historique : impossible de supprimer le post annulé %1 : %2</translation>
     </message>
     <message>
-        <location line="+119"/>
+        <location line="+121"/>
         <source>## here is the list of the available variables</source>
         <translation>## voici la liste des variables disponibles</translation>
     </message>
@@ -2969,7 +3020,7 @@ Aucun fichier source existant n’a été modifié ou supprimé. Des fichiers s�
         <translation>## donné à une post-commande ; __rarPass__ dans les arguments fonctionne toujours</translation>
     </message>
     <message>
-        <location line="-3860"/>
+        <location line="-4001"/>
         <source>NZB written: %1</source>
         <translation>NZB écrit : %1</translation>
     </message>
@@ -2977,12 +3028,12 @@ Aucun fichier source existant n’a été modifié ou supprimé. Des fichiers s�
         <location line="+7"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+3267"/>
+        <location line="+3406"/>
         <source>Warning: %1</source>
         <translation>Avertissement : %1</translation>
     </message>
     <message>
-        <location line="-3482"/>
+        <location line="-3621"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>Confirmation requise. Relancez avec --yes pour reprendre le post.</translation>
     </message>
@@ -3022,12 +3073,12 @@ Aucun fichier source existant n’a été modifié ou supprimé. Des fichiers s�
         <translation>aucun fichier source ne reste disponible pour la reprise</translation>
     </message>
     <message>
-        <location line="+408"/>
+        <location line="+430"/>
         <source>SSL issue on your system...</source>
         <translation>Problème SSL sur votre système...</translation>
     </message>
     <message>
-        <location line="+495"/>
+        <location line="+498"/>
         <source>no packing needed for next pending job %1</source>
         <translation>pas de packaging pour le prochain post en attente %1</translation>
     </message>
@@ -3047,12 +3098,12 @@ Aucun fichier source existant n’a été modifié ou supprimé. Des fichiers s�
         <translation>le post en attente a été annulé?</translation>
     </message>
     <message>
-        <location line="-1014"/>
+        <location line="-1039"/>
         <source>Posting canceled by user.</source>
         <translation>Post annulé par l&apos;utilisateur.</translation>
     </message>
     <message>
-        <location line="+3386"/>
+        <location line="+3525"/>
         <source>VPN warning</source>
         <translation>Alerte VPN</translation>
     </message>
@@ -3085,19 +3136,19 @@ Réglage : Bouton &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Rout
         <translation>Annuler</translation>
     </message>
     <message>
-        <location line="-1988"/>
+        <location line="-2095"/>
         <source>Full debug logs are ON
 </source>
         <translation>Logs de Debug ON
 </translation>
     </message>
     <message>
-        <location line="-2488"/>
+        <location line="-2450"/>
         <source>use configuration file (default: the per-user ngPost configuration folder)</source>
         <translation>utiliser le fichier de configuration (par défaut : le dossier de configuration ngPost de l’utilisateur)</translation>
     </message>
     <message>
-        <location line="+1131"/>
+        <location line="+1061"/>
         <source>Could not load post %1: %2</source>
         <translation>Impossible de charger le post %1 : %2</translation>
     </message>
@@ -3112,7 +3163,7 @@ Réglage : Bouton &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Rout
         <translation>Fiche de post écrite : %1</translation>
     </message>
     <message>
-        <location line="+218"/>
+        <location line="+240"/>
         <location line="+257"/>
         <source>AUTO_INCLUDE_NFO ON =&gt; %1 will be bundled with its sibling, not posted alone</source>
         <translation>AUTO_INCLUDE_NFO ON =&gt; %1 sera joint à son voisin, pas posté seul</translation>
@@ -3143,12 +3194,12 @@ Réglage : Bouton &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Rout
         <translation>Erreur : la métadonnée « %1 » est donnée à la fois en public (--meta) et en privé (--post_meta) ; choisissez l&apos;un des deux.</translation>
     </message>
     <message>
-        <location line="+255"/>
+        <location line="+258"/>
         <source>Recovering: starting next job that wasn&apos;t pre-packed</source>
         <translation>Récupération : démarrage du prochain travail non pré-préparé</translation>
     </message>
     <message>
-        <location line="+536"/>
+        <location line="+543"/>
         <source>Error syntax: --rm_posted option is only available with --auto or --monitor</source>
         <translation>Erreur de syntaxe : l&apos;option --rm_posted n&apos;est disponible qu&apos;avec --auto ou --monitor</translation>
     </message>
@@ -3200,17 +3251,17 @@ That&apos;s not the case for &apos;%1&apos; which contains folders: %2</source>
     </message>
     <message>
         <location line="+69"/>
-        <location line="+811"/>
+        <location line="+838"/>
         <source>Generate new random poster for each post</source>
         <translation>Générer un nouvel email aléatoire pour le posteur à chaque Post</translation>
     </message>
     <message>
-        <location line="-780"/>
+        <location line="-807"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>Vous devez fournir un entier positif pour le nombre de tentative de rePost d&apos;un Article (option -r)</translation>
     </message>
     <message>
-        <location line="+57"/>
+        <location line="+73"/>
         <source>Error: can&apos;t generate par2 if the redundancy percentage is null or PAR2_ARGS is not provided...
 Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Erreur: impossible de générer les par2 si le poucentage de redondance est nul ou si PAR2_ARGS n&apos;est pas fourni...
@@ -3278,21 +3329,21 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>Le fichier de configuration &apos;%1&apos; n&apos;est pas lisible...</translation>
     </message>
     <message>
-        <location line="+144"/>
+        <location line="+153"/>
         <source>the nzbPath &apos;%1&apos; is not writable...
 </source>
         <translation>the chemin d&apos;accès des fichiers nzb &apos;%1&apos; n&apos;a pas les droits en écriture...
 </translation>
     </message>
     <message>
-        <location line="-1699"/>
+        <location line="-1734"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Protocole non supporté pour NZB_UPLOAD_URL (%1). Vous ne pouvez utiliser que: %2
 </translation>
     </message>
     <message>
-        <location line="+1867"/>
+        <location line="+1903"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost commencer à logger: %1</translation>
     </message>
@@ -3302,7 +3353,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>Erreur d&apos;ouverture du fichier log: &apos;%1&apos;</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+41"/>
         <source>Group Policy: one group per Post</source>
         <translation>Gestion des groupes: un groupe par post</translation>
     </message>
@@ -3317,7 +3368,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>Erreur lors de l&apos;analyse des paramètres du proxy Socks5. La syntaxe est la suivante: %1</translation>
     </message>
     <message>
-        <location line="-1985"/>
+        <location line="-2022"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>le fichier d&apos;historique des posts &apos;%1&apos; ne peut pas être un dossier...
@@ -3332,7 +3383,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
 </translation>
     </message>
     <message>
-        <location line="+2045"/>
+        <location line="+2082"/>
         <source>should be a directory!...</source>
         <translation>doit être un dossier!...</translation>
     </message>
@@ -3352,7 +3403,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>doit être un ratio entre %1 et %2</translation>
     </message>
     <message>
-        <location line="+48"/>
+        <location line="+52"/>
         <source>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it.</source>
         <translation>le mot clef AUTO_COMPRESS est obsolète, il est remplacé par PACK, clickez sur le bouton de sauvegarde dans le GUI pour mettre à jour le fichier de configuration.</translation>
     </message>
@@ -3367,17 +3418,17 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>Mauvais mot clef pour PACK: %1. Ce doit être un sous ensemble de (%2)</translation>
     </message>
     <message>
-        <location line="-2121"/>
+        <location line="-2162"/>
         <source>date</source>
         <translation>date</translation>
     </message>
     <message>
-        <location line="-1722"/>
+        <location line="-1674"/>
         <source>where to write the post info file (non-secret variables allowed)</source>
         <translation>où écrire la fiche de post (variables non secrètes autorisées)</translation>
     </message>
     <message>
-        <location line="+1723"/>
+        <location line="+1675"/>
         <source>nzb name</source>
         <translation>nom du nzb</translation>
     </message>
@@ -3412,7 +3463,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>posteur (from)</translation>
     </message>
     <message>
-        <location line="+1968"/>
+        <location line="+2005"/>
         <source>POST_INFO_OUTPUT can&apos;t be empty
 </source>
         <translation>POST_INFO_OUTPUT ne peut pas être vide
@@ -3433,7 +3484,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
 </translation>
     </message>
     <message>
-        <location line="+347"/>
+        <location line="+427"/>
         <source>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</source>
         <translation>VPN : ancien VPN_CONFIG_PATH migré dans le profil « Default »</translation>
     </message>
@@ -3556,7 +3607,7 @@ Votre fichier de configuration actif est :
         <translation>Échec de la migration : impossible de copier l&apos;ancienne configuration « %1 » vers « %2 ».</translation>
     </message>
     <message>
-        <location line="+239"/>
+        <location line="+241"/>
         <source>## Lang for the app. Currently supported: EN, FR, ES, DE, NL, PT, ZH</source>
         <translation>## Language de l&apos;application. Sont supportés: EN, FR, ES. DE. NL, PT, ZH</translation>
     </message>
@@ -3607,8 +3658,8 @@ Votre fichier de configuration actif est :
     </message>
     <message>
         <location line="+1"/>
-        <source>## ~/ngPost.log on Linux and MacOS, in the executable folder for Windows</source>
-        <translation>## ~/ngPost.log sur Linux et MacOS, dans le dossier d&apos;installation pour Windows</translation>
+        <source>## ngPost.log is written in the ngPost configuration folder</source>
+        <translation>## ngPost.log est écrit dans le dossier de configuration de ngPost</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -3646,7 +3697,7 @@ Votre fichier de configuration actif est :
         <translation></translation>
     </message>
     <message>
-        <location line="-734"/>
+        <location line="-736"/>
         <source>for compression and par2 support</source>
         <translation>pour la compression et le support des fichiers par2</translation>
     </message>
@@ -3706,7 +3757,7 @@ Votre fichier de configuration actif est :
         <translation>donc pour le second exemple ci-dessus, le nom du nzb serait: /tmp/file1.nzb</translation>
     </message>
     <message>
-        <location line="+475"/>
+        <location line="+477"/>
         <source># ngPost configuration file</source>
         <translation># fichier de configuration de ngPost</translation>
     </message>
@@ -3846,17 +3897,22 @@ Votre fichier de configuration actif est :
         <translation>## temps d&apos;attente (en secondes) avant d&apos;essayer de recommencer le post automatiquement lors d&apos;une perte de réseau (min: %1)</translation>
     </message>
     <message>
-        <location line="-703"/>
+        <location line="-705"/>
         <source>you can provide servers in one string using -S and/or split the parameters for ONE SINGLE server (this will overwrite the configuration file)</source>
         <translation>il est possible de fournir plusieurs serveurs via l&apos;option -S et/ou un UNIQUE serveur avec les paramètres séparés (ils écraseront ceux présents dans le fichier de configuration)</translation>
     </message>
     <message>
-        <location line="+298"/>
+        <location line="-70"/>
+        <source>Configuration: PAR2_TOOL = %1: no executable was found. Install %1, select another PAR2_TOOL, or set PAR2_SOURCE = custom and PAR2_PATH to its executable (PAR2 Settings in the GUI).</source>
+        <translation>Configuration : PAR2_TOOL = %1 : aucun exécutable trouvé. Installez %1, choisissez un autre PAR2_TOOL ou définissez PAR2_SOURCE = custom et PAR2_PATH vers son exécutable (Paramètres PAR2 dans l’interface).</translation>
+    </message>
+    <message>
+        <location line="+368"/>
         <source>Using default config file: %1</source>
         <translation>Utilisation de la configuration par défaut: %1</translation>
     </message>
     <message>
-        <location line="+216"/>
+        <location line="+218"/>
         <source>## use Proxy (only Socks5 type!)</source>
         <translation>## Utilisation d&apos;un Proxy (uniquement de type Socks5!)</translation>
     </message>
@@ -4012,12 +4068,11 @@ Votre fichier de configuration actif est :
     </message>
     <message>
         <location line="+1"/>
-        <location line="+17"/>
         <source>## this is set for Linux environment, Windows users MUST change it</source>
         <translation>## à changer selon votre système d&apos;exploitation</translation>
     </message>
     <message>
-        <location line="-13"/>
+        <location line="+4"/>
         <source>## temporary folder with size constraint, typically a tmpfs partition</source>
         <translation>## dossier temporaire avec une taille limitée, typiquement une partition tmpfs</translation>
     </message>
@@ -4047,17 +4102,7 @@ Votre fichier de configuration actif est :
         <translation>## le minimum est 10% pour raison de sécurité (donc 1.1), le maximum est 2.0</translation>
     </message>
     <message>
-        <location line="+4"/>
-        <source>## RAR or 7zip absolute file path (external application)</source>
-        <translation>## chemin d&apos;accès complet de l&apos;éxécutable RAR ou 7zip</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## /!\ The file MUST EXIST and BE EXECUTABLE /!\</source>
-        <translation>## /!\ le fichier DOIT EXISTER et ÊTRE ÉXÉCUTABLE /!\</translation>
-    </message>
-    <message>
-        <location line="+4"/>
+        <location line="+10"/>
         <source>## RAR EXTRA options (the first &apos;a&apos; and &apos;-idp&apos; will be added automatically)</source>
         <translation>## RAR EXTRA options (le premier &apos;a&apos; et &apos;-idp&apos; sont ajoutés automatiquement)</translation>
     </message>
@@ -4097,27 +4142,7 @@ Votre fichier de configuration actif est :
         <translation>## pourcentage de redondance par2 (0 signifiant aucune génération)</translation>
     </message>
     <message>
-        <location line="+4"/>
-        <source>## par2 (or alternative) absolute file path</source>
-        <translation>## chemin d&apos;accès complet de l&apos;exécutable par2 (ou alternative)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## this is only useful if you compile from source (as par2 is included on Windows and the AppImage)</source>
-        <translation>## cette option est nécessaire si vous compilez l&apos;application (par2cmdline étant inclus dans les packages portables)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## or if you wish to use an alternative to par2 (for exemple Multipar on Windows)</source>
-        <translation>## ou si vous souhaitez utiliser une autre application comme ParPar ou MultiPar</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## (in that case, you may need to set also PAR2_ARGS)</source>
-        <translation>## (dans ce cas, il vous faudra aussi fournir les paramètres avec PAR2_ARGS ci dessous)</translation>
-    </message>
-    <message>
-        <location line="+11"/>
+        <location line="+17"/>
         <source>## fixed parameters for the par2 (or alternative) command</source>
         <translation>## Paramètres fixes pour la commande par2 (ou alternative comme ParPar)</translation>
     </message>
@@ -4157,7 +4182,7 @@ Votre fichier de configuration actif est :
         <translation>## Vous pouvez utiliser autant de serveurs que vous voulez en ajoutant une autre section &quot;server&quot;</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+42"/>
         <source>Warning: &apos;%1&apos; holds your credentials but could not be restricted to you; anyone with an account on this machine may be able to read it</source>
         <translation>Attention : « %1 » contient vos identifiants mais n&apos;a pas pu être restreint à votre compte ; toute personne disposant d&apos;un compte sur cette machine peut probablement le lire</translation>
     </message>
@@ -4174,7 +4199,7 @@ Votre fichier de configuration actif est :
         <translation>Erreur: impossible d&apos;écrire le fichier de configuration par défaut: %1</translation>
     </message>
     <message>
-        <location line="-5222"/>
+        <location line="-5299"/>
         <source>Auto Posting</source>
         <translation>Post Auto</translation>
     </message>
@@ -4184,7 +4209,7 @@ Votre fichier de configuration actif est :
         <translation>Post Rapide</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1152"/>
+        <location filename="../NgPost.h" line="+1167"/>
         <source>PACKing auto using: %1</source>
         <translation>Packing auto avec: %1</translation>
     </message>
@@ -4244,19 +4269,19 @@ Votre fichier de configuration actif est :
         <translation>Si vous souhaitez traduire ngPost dans votre langue, contactez moi sur Matthieu.Bruel@gmail.com, la procédure est simple</translation>
     </message>
     <message>
-        <location filename="../NgPost.cpp" line="+200"/>
+        <location filename="../NgPost.cpp" line="+205"/>
         <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
         <translation>renomme les fichiers source avec un nom aléatoire avant de les compresser, ainsi l&apos;archive ne porte pas le nom d&apos;origine (à utiliser avec --compress)</translation>
     </message>
     <message>
-        <location line="+2696"/>
+        <location line="+2658"/>
         <source>Do file name obfuscation (the input files are renamed before compression)
 </source>
         <translation>Obfuscation du nom de fichier (les fichiers source sont renommés avant compression)
 </translation>
     </message>
     <message>
-        <location line="+2079"/>
+        <location line="+2188"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation>## &apos;filename&apos; renomme les fichiers source avec un nom aléatoire avant de les</translation>
     </message>
@@ -4266,18 +4291,24 @@ Votre fichier de configuration actif est :
         <translation>## compresser, ainsi l&apos;archive ne porte aucun nom d&apos;origine. Les deux à la fois.</translation>
     </message>
     <message>
-        <location line="-1870"/>
-        <location line="+898"/>
+        <location line="-1974"/>
+        <location line="+924"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX doit être un entier strictement positif inférieur ou égal à 2147483647.</translation>
     </message>
     <message>
-        <location line="+72"/>
+        <location line="+183"/>
         <source>PAR2_TOOL must be auto, parpar, par2cmdline or multipar.</source>
         <translation>PAR2_TOOL doit être auto, parpar, par2cmdline ou multipar.</translation>
     </message>
     <message>
-        <location line="+1025"/>
+        <location line="+978"/>
+        <location line="+32"/>
+        <source>## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.</source>
+        <translation>## En mode automatique, l’outil choisi est recherché dans ngPost puis sur le système. Un chemin personnalisé doit désigner un exécutable.</translation>
+    </message>
+    <message>
+        <location line="-17"/>
         <source>## Optional maximum number of archive volumes; commented means no limit.</source>
         <translation>## Nombre maximal facultatif de volumes ; ligne commentée = aucune limite.</translation>
     </message>
@@ -4374,7 +4405,7 @@ Votre fichier de configuration actif est :
 <context>
     <name>NntpConnection</name>
     <message>
-        <location filename="../NntpConnection.cpp" line="+139"/>
+        <location filename="../NntpConnection.cpp" line="+140"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>Le serveur « %1 » doit passer par le VPN mais le tunnel n&apos;est pas connecté</translation>
     </message>
@@ -4399,23 +4430,28 @@ Votre fichier de configuration actif est :
         <translation>connexion tuée avant la confirmation du serveur</translation>
     </message>
     <message>
-        <location line="+55"/>
+        <location line="+65"/>
         <source>connection closed before server confirmation</source>
         <translation>connexion fermée avant la confirmation du serveur</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+29"/>
         <source>Connection lost, trying to reconnect! (nb disconnected: %1)</source>
         <translation>Perte de Connexion. Tentative de reconnexion! (nombre de déconnexions : %1)</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+5"/>
+        <source>Remote connection closed</source>
+        <translation>Connexion distante fermée</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+8"/>
         <source>connection lost before server confirmation</source>
         <translation>connexion perdue avant la confirmation du serveur</translation>
     </message>
     <message>
-        <location line="+100"/>
+        <location line="+108"/>
         <source>Closing Connection due to ERROR on post command: &apos;%2&apos; (%1 skipped)
 </source>
         <translation>Fermeture de la connexion à cause d&apos;une erreur sur la commande POST : &apos;%2&apos; (%1 ignoré)
@@ -4943,7 +4979,7 @@ Profil : %2</translation>
 <context>
     <name>Par2Settings</name>
     <message>
-        <location filename="../par2/Par2Settings.cpp" line="+281"/>
+        <location filename="../par2/Par2Settings.cpp" line="+251"/>
         <source>Block size must be a multiple of 4 bytes, below 2 GiB.</source>
         <translation>La taille des blocs doit être un multiple de 4 octets, inférieur à 2 Gio.</translation>
     </message>
@@ -4978,16 +5014,7 @@ Profil : %2</translation>
         <translation>La répartition décimale nécessite MultiPar.</translation>
     </message>
     <message>
-        <location line="+3"/>
-        <source>Past 2 GB, MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
-        <translation>Au-delà de 2 Go, MultiPar limite un fichier de récupération en nombre de blocs : indiquez une taille de bloc exacte (Avancé), au plus égale à la taille visée.</translation>
-    </message>
-    <message>
-        <source>MultiPar limits a recovery file by block count: set an exact block size (Advanced) no larger than the target size.</source>
-        <translation type="vanished">MultiPar limite un fichier de récupération en nombre de blocs : indiquez une taille de bloc exacte (Avancé) qui ne dépasse pas la taille cible.</translation>
-    </message>
-    <message>
-        <location line="+4"/>
+        <location line="+6"/>
         <source>MultiPar supports a volume count only with equal distribution.</source>
         <translation>MultiPar ne permet de choisir le nombre de volumes qu’avec une répartition égale.</translation>
     </message>
@@ -4997,6 +5024,7 @@ Profil : %2</translation>
         <translation>Le réglage CPU ou mémoire dépasse la plage prise en charge par l’outil.</translation>
     </message>
     <message>
+        <location line="-6"/>
         <source>MultiPar size targets must be below 2 GB (2000000000 bytes). Use custom arguments for limits expressed in blocks.</source>
         <translation>Les tailles visées avec MultiPar doivent être inférieures à 2 Go (2000000000 octets). Utilisez des arguments personnalisés pour les limites exprimées en blocs.</translation>
     </message>
@@ -5004,13 +5032,13 @@ Profil : %2</translation>
 <context>
     <name>Par2SettingsDialog</name>
     <message>
-        <location filename="../hmi/Par2SettingsDialog.cpp" line="+80"/>
-        <location line="+523"/>
+        <location filename="../hmi/Par2SettingsDialog.cpp" line="+81"/>
+        <location line="+583"/>
         <source>indeterminate</source>
         <translation>indéterminé</translation>
     </message>
     <message>
-        <location line="-511"/>
+        <location line="-571"/>
         <source>PAR2 Settings</source>
         <translation>Réglages PAR2</translation>
     </message>
@@ -5035,17 +5063,7 @@ Profil : %2</translation>
         <translation>Outil :</translation>
     </message>
     <message>
-        <location line="+4"/>
-        <source>Browse…</source>
-        <translation>Parcourir…</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Executable:</source>
-        <translation>Exécutable :</translation>
-    </message>
-    <message>
-        <location line="+16"/>
+        <location line="+23"/>
         <source>Default redundancy:</source>
         <translation>Redondance par défaut :</translation>
     </message>
@@ -5122,11 +5140,12 @@ Profil : %2</translation>
     </message>
     <message>
         <location line="+19"/>
+        <location line="+231"/>
         <source>Exact block size</source>
         <translation>Taille exacte des blocs</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-230"/>
         <source>Target source block count</source>
         <translation>Nombre cible de blocs source</translation>
     </message>
@@ -5161,12 +5180,7 @@ Profil : %2</translation>
         <translation>Activer l’accélération GPU</translation>
     </message>
     <message>
-        <location line="+10"/>
-        <source>Find GPUs</source>
-        <translation>Rechercher les GPU</translation>
-    </message>
-    <message>
-        <location line="+48"/>
+        <location line="+58"/>
         <source>Use custom arguments</source>
         <translation>Utiliser des arguments personnalisés</translation>
     </message>
@@ -5182,29 +5196,24 @@ Profil : %2</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+320"/>
+        <location line="+380"/>
         <source>Prepare a post to display an estimate.</source>
         <translation>Préparez un post pour afficher une estimation.</translation>
     </message>
     <message>
-        <location line="-252"/>
-        <source>Select PAR2 executable</source>
-        <translation>Sélectionner l’exécutable PAR2</translation>
-    </message>
-    <message>
-        <location line="+11"/>
-        <location line="+239"/>
+        <location line="-280"/>
+        <location line="+278"/>
         <source>Reading source sizes…</source>
         <translation>Lecture des tailles des sources…</translation>
     </message>
     <message>
-        <location line="-136"/>
-        <location line="+22"/>
+        <location line="-171"/>
+        <location line="+28"/>
         <source>This par2cmdline build does not support thread selection.</source>
         <translation>Cette version de par2cmdline ne permet pas de choisir le nombre de threads.</translation>
     </message>
     <message>
-        <location line="-20"/>
+        <location line="-26"/>
         <source>Memory (eighths of free RAM):</source>
         <translation>Mémoire (huitièmes de RAM libre) :</translation>
     </message>
@@ -5219,40 +5228,36 @@ Profil : %2</translation>
         <translation>par2cmdline ne prend pas en charge le GPU. Désactivez-le avant de changer d’outil.</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+9"/>
         <source>No OpenCL device was found: ParPar would fail and abort the post. Disable GPU acceleration or install an OpenCL driver.</source>
-        <translation>Aucun périphérique OpenCL détecté : ParPar échouerait et le post serait abandonné. Désactivez l'accélération GPU ou installez un pilote OpenCL.</translation>
+        <translation>Aucun périphérique OpenCL détecté : ParPar échouerait et le post serait abandonné. Désactivez l&apos;accélération GPU ou installez un pilote OpenCL.</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>The selected executable is unavailable. Select an installed tool or Automatic.</source>
         <translation>L’exécutable sélectionné est indisponible. Choisissez un outil installé ou Automatique.</translation>
     </message>
     <message>
-        <location line="+45"/>
+        <location line="+49"/>
         <source>Checking executable…</source>
         <translation>Vérification de l’exécutable…</translation>
     </message>
     <message>
         <location line="+4"/>
         <location line="+6"/>
-        <location line="+21"/>
+        <location line="+39"/>
         <location line="+9"/>
+        <location line="+18"/>
         <source>The executable could not be checked.</source>
         <translation>L’exécutable n’a pas pu être vérifié.</translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+2"/>
         <source>No OpenCL device is installed on this machine.</source>
-        <translation>Aucun périphérique OpenCL n'est installé sur cette machine.</translation>
+        <translation>Aucun périphérique OpenCL n&apos;est installé sur cette machine.</translation>
     </message>
     <message>
-        <location line="+2"/>
-        <source>OpenCL is installed but reports no GPU; enter a device ID from the tooltip to use another kind of device.</source>
-        <translation>OpenCL est installé mais ne signale aucun GPU ; saisissez un identifiant de périphérique depuis l'infobulle pour utiliser un autre type de périphérique.</translation>
-    </message>
-    <message>
-        <location line="+2"/>
+        <location line="+4"/>
         <source>GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered.</source>
         <translation>Les détails GPU figurent dans l’infobulle du sélecteur ; vous pouvez aussi saisir un nom de périphérique ou un identifiant plateforme:périphérique.</translation>
     </message>
@@ -5273,7 +5278,12 @@ Profil : %2</translation>
         <translation>Estimation indéterminée pour ces arguments ou limites de blocs.</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="-524"/>
+        <source>Path:</source>
+        <translation>Chemin :</translation>
+    </message>
+    <message>
+        <location line="+527"/>
         <source>Estimate before compression (source sizes and rounding):</source>
         <translation>Estimation avant compression (tailles des sources et arrondis) :</translation>
     </message>
@@ -5298,7 +5308,7 @@ Profil : %2</translation>
         <translation>Cet aperçu utilise le défaut global ; le post courant possède sa propre redondance.</translation>
     </message>
     <message>
-        <location line="-344"/>
+        <location line="-404"/>
         <source>Save</source>
         <translation>Enregistrer</translation>
     </message>
@@ -5308,26 +5318,32 @@ Profil : %2</translation>
         <translation>Annuler</translation>
     </message>
     <message>
+        <location line="-75"/>
         <source>Find OpenCL devices</source>
         <translation>Rechercher les périphériques OpenCL</translation>
     </message>
     <message>
+        <location line="+258"/>
         <source>Requested block size</source>
         <translation>Taille de bloc demandée</translation>
     </message>
     <message>
+        <location line="+1"/>
         <source>MultiPar may adjust the requested block size to the source files and block-count limit. It is not saved as PAR2_BLOCK_SIZE.</source>
         <translation>MultiPar peut ajuster la taille demandée aux fichiers source et à la limite du nombre de blocs. Elle n’est pas enregistrée dans PAR2_BLOCK_SIZE.</translation>
     </message>
     <message>
+        <location line="+32"/>
         <source>Checking OpenCL devices. Wait for the result or disable GPU acceleration.</source>
         <translation>Vérification des périphériques OpenCL. Attendez le résultat ou désactivez l’accélération GPU.</translation>
     </message>
     <message>
+        <location line="+2"/>
         <source>OpenCL could not be checked. Check the executable and OpenCL runtime, retry detection, or disable GPU acceleration.</source>
         <translation>Impossible de vérifier OpenCL. Vérifiez l’exécutable et l’environnement OpenCL, relancez la détection ou désactivez l’accélération GPU.</translation>
     </message>
     <message>
+        <location line="+139"/>
         <source>OpenCL devices are available without a physical GPU. CPU devices such as OpenCLOn12 can be selected.</source>
         <translation>Des périphériques OpenCL sont disponibles sans GPU physique. Les périphériques de type CPU, comme OpenCLOn12, peuvent être sélectionnés.</translation>
     </message>
@@ -5392,14 +5408,14 @@ Profil : %2</translation>
     <name>PostInfoDialog</name>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
-        <location line="+591"/>
+        <location line="+599"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>Informations du post</translation>
     </message>
     <message>
-        <location line="-733"/>
+        <location line="-741"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>Une fiche de post décrit ce post dans un fichier texte écrit à côté du nzb.
@@ -5493,12 +5509,12 @@ Une ligne commençant par # est un commentaire : elle n&apos;est jamais écrite.
     </message>
     <message>
         <location line="+3"/>
-        <location line="+508"/>
+        <location line="+516"/>
         <source>Save as…</source>
         <translation>Enregistrer sous…</translation>
     </message>
     <message>
-        <location line="-506"/>
+        <location line="-514"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>Écrit ces lignes dans un fichier modèle à vous.</translation>
     </message>
@@ -5562,7 +5578,7 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
         <translation>Aucune destination : aucune fiche ne sera écrite.</translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="+31"/>
         <source>Unknown variable in the destination: %1</source>
         <translation>Variable inconnue dans la destination : %1</translation>
     </message>
@@ -5608,12 +5624,12 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+229"/>
+        <location line="+234"/>
         <source>Text files (*.txt *.tpl);;All files (*)</source>
         <translation>Fichiers texte (*.txt *.tpl);;Tous les fichiers (*)</translation>
     </message>
     <message>
-        <location line="-206"/>
+        <location line="-211"/>
         <source>No model: nothing will be written for this post.</source>
         <translation>Aucun modèle : rien ne sera écrit pour ce post.</translation>
     </message>
@@ -5624,12 +5640,12 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+214"/>
+        <location line="+219"/>
         <source>Model in use: %1</source>
         <translation>Modèle utilisé : %1</translation>
     </message>
     <message>
-        <location line="-190"/>
+        <location line="-195"/>
         <source>name of the line</source>
         <translation>nom de la ligne</translation>
     </message>
@@ -5669,7 +5685,7 @@ Coché : il y est écrit ET publié dans le nzb, qui circule.</translation>
         <translation>(non écrit)</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+16"/>
         <source>filled in after the post</source>
         <translation>rempli après le post</translation>
     </message>
@@ -6004,12 +6020,12 @@ Enregistrer le modèle maintenant ?</translation>
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+777"/>
+        <location filename="../PostingJob.cpp" line="+778"/>
         <source>Start Post #%1: %2</source>
         <translation>Début du Post #%1: %2</translation>
     </message>
     <message>
-        <location line="+160"/>
+        <location line="+167"/>
         <source>Error: there are no NntpConnection...</source>
         <translation>Erreur: il ny a pas de connexion Nntp...</translation>
     </message>
@@ -6036,7 +6052,7 @@ Enregistrer le modèle maintenant ?</translation>
         <translation>Toutes les connexions sont perdues...</translation>
     </message>
     <message>
-        <location line="-600"/>
+        <location line="-607"/>
         <source>History: could not create post record: %1</source>
         <translation>Historique : impossible de créer l&apos;entrée du post : %1</translation>
     </message>
@@ -6076,7 +6092,7 @@ Enregistrer le modèle maintenant ?</translation>
         <translation>Début du post</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+25"/>
         <source>Using TMP_RAM path as temporary folder. Post size: %1</source>
         <translation>Utilisation de TMP_RAM pour les dossiers temporaires. Taille du post: %1</translation>
     </message>
@@ -6097,13 +6113,13 @@ Enregistrer le modèle maintenant ?</translation>
     </message>
     <message>
         <location line="+56"/>
-        <location line="+394"/>
+        <location line="+399"/>
         <location line="+8"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
         <translation>Impossible de copier le nfo %1 vers %2</translation>
     </message>
     <message>
-        <location line="-298"/>
+        <location line="-303"/>
         <source>History: could not mark post %1 as resuming: %2</source>
         <translation>Historique : impossible de marquer le post %1 comme en reprise : %2</translation>
     </message>
@@ -6139,17 +6155,7 @@ Enregistrer le modèle maintenant ?</translation>
         <translation>Avertissement : %1</translation>
     </message>
     <message>
-        <location line="+39"/>
-        <source>Number of available Nntp Connections: %1</source>
-        <translation>Nombre de connexions disponibles : %1</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>Number of available Nntp Connections</source>
-        <translation>Nombre de connexions disponibles</translation>
-    </message>
-    <message>
-        <location line="+53"/>
+        <location line="+101"/>
         <source>Copied nfo file %1 next to the nzb: %2</source>
         <translation>Fichier nfo %1 copié à côté du nzb : %2</translation>
     </message>
@@ -6259,7 +6265,7 @@ Enregistrer le modèle maintenant ?</translation>
         <translation>Historique : impossible d&apos;enregistrer la taille du post %1 : %2</translation>
     </message>
     <message>
-        <location line="+156"/>
+        <location line="+157"/>
         <source>History: could not record the outcome of post %1: %2</source>
         <translation>Historique : impossible d&apos;enregistrer le résultat du post %1 : %2</translation>
     </message>
@@ -6343,7 +6349,7 @@ indéterminés : %3
         <translation>Post interrompu avec %1 article(s) au statut indéterminé ; les données de reprise ont été conservées.</translation>
     </message>
     <message>
-        <location line="+157"/>
+        <location line="+164"/>
         <location line="+4"/>
         <source>Compressing files</source>
         <translation>Compression des fichiers</translation>
@@ -6364,29 +6370,44 @@ indéterminés : %3
         <translation>seul ParPar permet de générer de par2 pour des fichiers de différents dossiers... vous devriez penser à l&apos;utiliser ;)</translation>
     </message>
     <message>
-        <location line="+35"/>
+        <location line="+40"/>
         <location line="+4"/>
         <source>Generating par2</source>
         <translation>Génération des fichiers par2</translation>
     </message>
     <message>
-        <location line="+155"/>
-        <source>ERROR: no PAR2 tool is available for %1, so this post is stopped before the transfer.
-Install it, or set PAR2_PATH / PAR2_TOOL in the configuration (PAR2 Settings in the GUI).</source>
-        <translation>ERREUR : aucun outil PAR2 n&apos;est disponible pour %1, ce post est donc arrêté avant le transfert.
-Installez-le, ou renseignez PAR2_PATH / PAR2_TOOL dans la configuration (Réglages PAR2 dans l&apos;interface).</translation>
+        <location line="+76"/>
+        <source>Could not start external tool %1: %2</source>
+        <translation>Impossible de démarrer l’outil externe %1 : %2</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+3"/>
+        <source>Some source files are still under their obfuscated name; ngPost will try again when the job ends.</source>
+        <translation>Certains fichiers sources portent encore leur nom obfusqué ; ngPost réessaiera à la fin du job.</translation>
+    </message>
+    <message>
+        <location line="+74"/>
+        <source>Compression tool unavailable: %1. Install the selected tool or choose a path in Compression Settings.</source>
+        <translation>Outil de compression indisponible : %1. Installez l’outil choisi ou indiquez un chemin dans les paramètres de compression.</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>ERROR: no PAR2 tool is available for %1, so this post is stopped before the transfer.
+Install it, select another PAR2_TOOL, or set PAR2_SOURCE = custom and PAR2_PATH to its executable in the configuration (PAR2 Settings in the GUI).</source>
+        <translation>ERREUR : aucun outil PAR2 disponible pour %1, ce post est donc arrêté avant le transfert.
+Installez-le, choisissez un autre PAR2_TOOL ou définissez PAR2_SOURCE = custom et PAR2_PATH vers son exécutable dans la configuration (Paramètres PAR2 dans l’interface).</translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>ERROR: the PAR2 tool for %1 is not an executable file, so this post is stopped before the transfer:
     %2
-Fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
-        <translation>ERREUR : l&apos;outil PAR2 pour %1 n&apos;est pas un fichier exécutable, ce post est donc arrêté avant le transfert :
+Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
+        <translation>ERREUR : l’outil PAR2 pour %1 n’est pas un fichier exécutable, ce post est donc arrêté avant le transfert :
     %2
-Corrigez PAR2_PATH dans la configuration (Réglages PAR2 dans l&apos;interface).</translation>
+Définissez PAR2_SOURCE = custom et corrigez PAR2_PATH dans la configuration (Paramètres PAR2 dans l’interface).</translation>
     </message>
     <message>
-        <location line="-513"/>
+        <location line="-547"/>
         <source>%1 / %2 articles FAILED to be uploaded (even with %3 retries)...
 </source>
         <translation>%1 / %2 articles ont échoué (même après %3 tentatives)...
@@ -6415,18 +6436,28 @@ Corrigez PAR2_PATH dans la configuration (Réglages PAR2 dans l&apos;interface).
         <translation>nom du fichier: %1, nom de l&apos;archive: %2</translation>
     </message>
     <message>
-        <location line="+114"/>
+        <location line="+121"/>
         <location line="+3"/>
         <source>postSize: %1 MB =&gt; volSize: %2</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-883"/>
+        <location line="-891"/>
         <source>Couldn&apos;t rename file %1</source>
         <translation>Impossible de renommer le fichier %1</translation>
     </message>
     <message>
-        <location line="+954"/>
+        <location line="-123"/>
+        <source>Opening %1 configured NNTP connections…</source>
+        <translation>Ouverture des %1 connexions NNTP configurées…</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Configured NNTP connections</source>
+        <translation>Connexions NNTP configurées</translation>
+    </message>
+    <message>
+        <location line="+1081"/>
         <source>=&gt; rar exit code: %1
 </source>
         <translation>=&gt; rar exit code: %1
@@ -6438,7 +6469,7 @@ Corrigez PAR2_PATH dans la configuration (Réglages PAR2 dans l&apos;interface).
         <translation>Erreur lors de la compression: %1</translation>
     </message>
     <message>
-        <location line="+143"/>
+        <location line="+148"/>
         <source>=&gt; par2 exit code: %1
 </source>
         <translation>=&gt; par2 exit code: %1
@@ -6470,7 +6501,7 @@ Corrigez PAR2_PATH dans la configuration (Réglages PAR2 dans l&apos;interface).
         <translation>Impossible de créer le dossier temporaire: &apos;%1&apos;...</translation>
     </message>
     <message>
-        <location line="+39"/>
+        <location line="+56"/>
         <source>NO_POSSIBLE_COMPRESSION: You must define the temporary directory...</source>
         <translation>NO_POSSIBLE_COMPRESSION: Vous devez définir le dossier temporaire pour les archives...</translation>
     </message>
@@ -6480,12 +6511,7 @@ Corrigez PAR2_PATH dans la configuration (Réglages PAR2 dans l&apos;interface).
         <translation>Erreur: le dossier temporaire doit avoir les droits en écriture...</translation>
     </message>
     <message>
-        <location line="+30"/>
-        <source>ERROR: the RAR path is not executable...</source>
-        <translation>Erreur: RAR n&apos;est pas exécutable...</translation>
-    </message>
-    <message>
-        <location line="-385"/>
+        <location line="-377"/>
         <source>RAR_MAX must be greater than zero.</source>
         <translation>RAR_MAX doit être strictement supérieur à zéro.</translation>
     </message>
@@ -6648,7 +6674,7 @@ Corrigez PAR2_PATH dans la configuration (Réglages PAR2 dans l&apos;interface).
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+484"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+486"/>
         <source>Post Files</source>
         <translation>Poster Fichiers</translation>
     </message>
@@ -6678,7 +6704,7 @@ Corrigez PAR2_PATH dans la configuration (Réglages PAR2 dans l&apos;interface).
         <translation>Vous pouvez sélectionner dans la liste et appuyer sur SUPPR pour enlever fichiers/dossiers</translation>
     </message>
     <message>
-        <location line="-621"/>
+        <location line="-623"/>
         <source>There are no selected files to post...</source>
         <translation>Il n&apos;y a aucun fichier séléctionné à poster...</translation>
     </message>
@@ -6705,19 +6731,19 @@ Would you like to overwrite it ?</source>
     </message>
     <message>
         <location line="+47"/>
-        <location line="+618"/>
+        <location line="+620"/>
         <location line="+20"/>
         <source>Stop Posting</source>
         <translation>Stop Post</translation>
     </message>
     <message>
-        <location line="-632"/>
-        <location line="+635"/>
+        <location line="-634"/>
+        <location line="+637"/>
         <source>Cancel Posting</source>
         <translation>Annuler Post</translation>
     </message>
     <message>
-        <location line="-593"/>
+        <location line="-595"/>
         <source>Select one or more files to Post</source>
         <translation>Sélectionner un ou plusieurs fichiers à poster</translation>
     </message>
@@ -6778,7 +6804,7 @@ Certains index Usenet en demandent un.</translation>
         <translation>utilisation de fichier de configuration pour PAR2_ARGS: %1</translation>
     </message>
     <message>
-        <location line="+500"/>
+        <location line="+502"/>
         <source>Global (%1 %)</source>
         <translation>Global (%1 %)</translation>
     </message>
@@ -6866,7 +6892,7 @@ Certains index Usenet en demandent un.</translation>
 <context>
     <name>UpdateChecker</name>
     <message>
-        <location filename="../utils/UpdateChecker.cpp" line="+363"/>
+        <location filename="../utils/UpdateChecker.cpp" line="+408"/>
         <source>No bounded, trusted update asset is available.</source>
         <translation>Aucun fichier de mise à jour fiable et de taille bornée n&apos;est disponible.</translation>
     </message>
@@ -6926,15 +6952,17 @@ Certains index Usenet en demandent un.</translation>
         <translation>Impossible de démarrer la transaction de mise à jour.</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+20"/>
         <source>Update installer did not become ready. Previous installation retained.</source>
         <translation>L&apos;installeur de mise à jour n&apos;est pas devenu prêt. L&apos;installation précédente est conservée.</translation>
     </message>
     <message>
+        <location line="-187"/>
         <source>Could not cancel the update: ngPost failed to signal the installer already running, and it may replace this installation. Check the version after the next start.</source>
         <translation>Impossible d’annuler la mise à jour : ngPost n’a pas pu envoyer le signal d’annulation à l’installeur déjà en cours d’exécution, qui risque de remplacer cette installation. Vérifiez la version au prochain démarrage.</translation>
     </message>
     <message>
+        <location line="+18"/>
         <source>The installer already running could not be stopped either, and it may replace this installation.</source>
         <translation>L’installeur déjà en cours d’exécution n’a pas pu être arrêté non plus et risque de remplacer cette installation.</translation>
     </message>
@@ -6942,7 +6970,7 @@ Certains index Usenet en demandent un.</translation>
 <context>
     <name>VpnManager</name>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="+1252"/>
+        <location filename="../vpn/VpnManager.cpp" line="+1253"/>
         <source>VPN: failed — %1</source>
         <translation>VPN : échec — %1</translation>
     </message>
@@ -6973,25 +7001,25 @@ Certains index Usenet en demandent un.</translation>
         <translation>Désinstall VPN : timeout</translation>
     </message>
     <message>
-        <location line="+470"/>
+        <location line="+556"/>
         <source>The VPN helper is not installed. Open the VPN dialog and click Install.</source>
         <translation>Le helper VPN n&apos;est pas installé. Ouvrez la boîte de dialogue VPN et cliquez sur Installer.</translation>
     </message>
     <message>
-        <location line="-1775"/>
+        <location line="-1861"/>
         <location line="+10"/>
-        <location line="+1770"/>
+        <location line="+1856"/>
         <source>No active VPN profile / configuration is selected.</source>
         <translation>Aucun profil VPN actif / aucune configuration VPN sélectionné(e).</translation>
     </message>
     <message>
-        <location line="-1763"/>
-        <location line="+1768"/>
+        <location line="-1849"/>
+        <location line="+1854"/>
         <source>The VPN configuration file is missing or unreadable: %1</source>
         <translation>Le fichier de configuration VPN est manquant ou illisible : %1</translation>
     </message>
     <message>
-        <location line="-1684"/>
+        <location line="-1770"/>
         <source>Disconnect the active VPN before changing its WireGuard configuration.</source>
         <translation>Déconnectez le VPN actif avant de modifier sa configuration WireGuard.</translation>
     </message>
@@ -7237,7 +7265,7 @@ Certains index Usenet en demandent un.</translation>
         <translation>Désinstallation du VPN en cours : %1 %2</translation>
     </message>
     <message>
-        <location line="+76"/>
+        <location line="+88"/>
         <source>install-wg-tunnel.ps1 not found in app bundle</source>
         <translation>install-wg-tunnel.ps1 introuvable dans le paquet de l&apos;application</translation>
     </message>
@@ -7247,22 +7275,22 @@ Certains index Usenet en demandent un.</translation>
         <translation>Impossible de déterminer le SID de l&apos;appelant ; installation du tunnel refusée.</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+102"/>
         <source>WireGuard tunnel install failed (exit %1)</source>
         <translation>Échec de l&apos;installation du tunnel WireGuard (sortie %1)</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="-24"/>
         <source>WireGuard tunnel service registered.</source>
         <translation>Service de tunnel WireGuard enregistré.</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="-38"/>
         <source>uninstall-wg-tunnel.ps1 not found in app bundle</source>
         <translation>uninstall-wg-tunnel.ps1 introuvable dans le paquet de l&apos;application</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+24"/>
         <source>WireGuard tunnel uninstall failed (exit %1)</source>
         <translation>Échec de la désinstallation du tunnel WireGuard (sortie %1)</translation>
     </message>
@@ -7272,7 +7300,7 @@ Certains index Usenet en demandent un.</translation>
         <translation>Service de tunnel WireGuard supprimé.</translation>
     </message>
     <message>
-        <location line="+134"/>
+        <location line="+172"/>
         <source>VPN startup preflight could not read %1; no cleanup attempted</source>
         <translation>La vérification VPN au démarrage n&apos;a pas pu lire %1 ; aucun nettoyage tenté</translation>
     </message>
@@ -7409,51 +7437,58 @@ Modifiez la configuration du serveur et désactivez son option « Utiliser le VP
         <translation>échec</translation>
     </message>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="1842"/>
+        <location line="-533"/>
         <source>WireGuard for Windows was not found. Install it, then retry tunnel registration.</source>
         <translation>WireGuard pour Windows est introuvable. Installez-le, puis réessayez d’enregistrer le tunnel.</translation>
     </message>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="1845"/>
+        <location line="+3"/>
         <source>The WireGuard profile could not be read or validated. Re-import a valid profile and retry.</source>
         <translation>Le profil WireGuard n’a pas pu être lu ou validé. Réimportez un profil valide, puis réessayez.</translation>
     </message>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="1848"/>
+        <location line="+3"/>
         <source>The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.</source>
         <translation>Le service du tunnel WireGuard n’a pas pu être enregistré ou arrêté. Vérifiez l’installation de WireGuard, puis réessayez.</translation>
     </message>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="1851"/>
+        <location line="+9"/>
         <source>The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.</source>
         <translation>Les autorisations du service du tunnel WireGuard n’ont pas pu être configurées. Demandez à un administrateur de vérifier les autorisations du service, puis réessayez.</translation>
     </message>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="1854"/>
+        <location line="+3"/>
         <source>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</source>
         <translation>Le dossier de préparation WireGuard n’est pas sûr ou est inaccessible. Demandez à un administrateur de vérifier le dossier ngPost dans ProgramData de Windows et de le déplacer s’il n’est pas fiable, puis réessayez.</translation>
     </message>
     <message>
+        <location line="-75"/>
         <source>Refusing to run the tunnel installer as administrator: %1. Install ngPost with its setup, or move it somewhere only an administrator can write.</source>
         <translation>Exécution de l’installeur du tunnel en tant qu’administrateur refusée : %1. Installez ngPost avec son programme d’installation ou déplacez-le dans un dossier où seuls les administrateurs peuvent écrire.</translation>
     </message>
     <message>
+        <location line="+23"/>
         <source>Refusing to run the tunnel uninstaller as administrator: %1. Install ngPost with its setup, or move it somewhere only an administrator can write.</source>
         <translation>Exécution du désinstalleur du tunnel en tant qu’administrateur refusée : %1. Installez ngPost avec son programme d’installation ou déplacez-le dans un dossier où seuls les administrateurs peuvent écrire.</translation>
     </message>
     <message>
+        <location line="-35"/>
         <source>WireGuard profile refused (line %1): %2</source>
         <translation>Profil WireGuard refusé (ligne %1) : %2</translation>
     </message>
     <message>
+        <location line="+3"/>
         <source>WireGuard profile refused: %1</source>
         <translation>Profil WireGuard refusé : %1</translation>
     </message>
     <message>
+        <location line="+75"/>
         <source>WireGuard rejected the profile. Check its key values and endpoint, or re-import a valid profile, then retry.</source>
         <translation>WireGuard a refusé le profil. Vérifiez les valeurs des clés et le point de terminaison, ou réimportez un profil valide, puis réessayez.</translation>
     </message>
     <message>
+        <location line="-30"/>
+        <location line="+33"/>
         <source>WireGuard operation cancelled: administrator permission was not granted.</source>
         <translation>Opération WireGuard annulée : l’autorisation administrateur n’a pas été accordée.</translation>
     </message>
@@ -7961,42 +7996,55 @@ Son fichier de configuration sous &lt;configDir&gt;/vpn/ et ses identifiants dan
 <context>
     <name>WireGuardConfigPolicy</name>
     <message>
-        <source>'%1' does not belong to this section</source>
+        <location filename="../vpn/WireGuardConfigPolicy.cpp" line="+195"/>
+        <source>&apos;%1&apos; does not belong to this section</source>
         <translation>« %1 » n’appartient pas à cette section</translation>
     </message>
     <message>
-        <source>'%1' runs a command when the tunnel goes up or down, which ngPost never needs. Remove that line from the profile.</source>
+        <location line="-9"/>
+        <source>&apos;%1&apos; runs a command when the tunnel goes up or down, which ngPost never needs. Remove that line from the profile.</source>
         <translation>« %1 » exécute une commande à l’activation ou à l’arrêt du tunnel, ce dont ngPost n’a jamais besoin. Supprimez cette ligne du profil.</translation>
     </message>
     <message>
+        <location line="-8"/>
         <source>a key appears before any [Interface] or [Peer] section</source>
         <translation>une clé apparaît avant toute section [Interface] ou [Peer]</translation>
     </message>
     <message>
+        <location line="-17"/>
+        <location line="+6"/>
         <source>expected a Key = Value line</source>
         <translation>une ligne au format Clé = Valeur est attendue</translation>
     </message>
     <message>
+        <location line="-25"/>
         <source>malformed section header</source>
         <translation>en-tête de section mal formé</translation>
     </message>
     <message>
+        <location line="+9"/>
         <source>only [Interface] and [Peer] sections are allowed</source>
         <translation>seules les sections [Interface] et [Peer] sont autorisées</translation>
     </message>
     <message>
+        <location line="+61"/>
+        <location line="+11"/>
         <source>the WireGuard profile cannot be read</source>
         <translation>le profil WireGuard est illisible</translation>
     </message>
     <message>
+        <location line="-107"/>
         <source>the WireGuard profile contains binary data</source>
         <translation>le profil WireGuard contient des données binaires</translation>
     </message>
     <message>
+        <location line="-8"/>
+        <location line="+108"/>
         <source>the WireGuard profile is larger than a profile ever is</source>
         <translation>la taille du profil WireGuard est anormalement élevée</translation>
     </message>
     <message>
+        <location line="-17"/>
         <source>this profile carries a key ngPost has not reviewed</source>
         <translation>ce profil contient une clé que ngPost n’a pas validée</translation>
     </message>

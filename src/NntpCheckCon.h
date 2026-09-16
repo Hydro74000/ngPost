@@ -57,7 +57,7 @@ private:
     };
 
     NzbCheck *const _nzbCheck;
-    const int _id;                      //!< connection id
+    const int _conId;                   //!< connection id
     const NntpServerParams &_srvParams; //!< server parameters
 
     QTcpSocket *_socket; //!< Real TCP socket

@@ -1,11 +1,10 @@
 // Copyright (C) 2026 Hydro74000. GPL-3.0-or-later.
 #include "Par2Settings.h"
+#include "tools/ExternalToolResolver.h"
 #include <QCoreApplication>
-#include <QDir>
 #include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
-#include <QStandardPaths>
 #include <QSet>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -61,39 +60,15 @@ bool parseTool(const QString &name, Tool &tool)
 }
 Tool detectTool(const QString &path)
 {
-    if (path.contains(QStringLiteral("parpar"), Qt::CaseInsensitive)) return Tool::ParPar;
-    if (path.contains(QStringLiteral("par2j"), Qt::CaseInsensitive)) return Tool::MultiPar;
+    if (QFileInfo(path).fileName().contains(QStringLiteral("parpar"), Qt::CaseInsensitive))
+        return Tool::ParPar;
+    if (QFileInfo(path).fileName().contains(QStringLiteral("par2j"), Qt::CaseInsensitive))
+        return Tool::MultiPar;
     return Tool::Par2cmdline;
 }
 QString findExecutable(Tool tool)
 {
-    if (tool == Tool::Auto) {
-        for (auto kind : {Tool::ParPar, Tool::Par2cmdline, Tool::MultiPar}) {
-            const auto path = findExecutable(kind);
-            if (!path.isEmpty()) return path;
-        }
-        return {};
-    }
-    QStringList names;
-    if (tool == Tool::ParPar) names << QStringLiteral("parpar");
-    else if (tool == Tool::Par2cmdline) names << QStringLiteral("par2");
-    else {
-#ifdef Q_OS_WIN
-        names << QStringLiteral("par2j64") << QStringLiteral("par2j");
-#else
-        return {};
-#endif
-    }
-    for (QString name : names) {
-#ifdef Q_OS_WIN
-        name += QStringLiteral(".exe");
-#endif
-        const QString bundled = QDir(QCoreApplication::applicationDirPath()).filePath(name);
-        if (QFileInfo(bundled).isFile() && QFileInfo(bundled).isExecutable()) return bundled;
-        const auto path = QStandardPaths::findExecutable(name);
-        if (!path.isEmpty()) return path;
-    }
-    return {};
+    return externaltool::resolve(toolName(tool)).path;
 }
 QString joinArguments(const QStringList &args)
 {

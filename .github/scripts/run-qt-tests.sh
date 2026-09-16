@@ -32,7 +32,8 @@ counts_file="$script_dir/../../tests/expected-counts.txt"
 expected_minimum() {
   local name=$1 bin min platform default="" specific=""
   [ -r "$counts_file" ] || return 0
-  while read -r bin min platform _rest; do
+  # Git for Windows may check out the table with CRLF line endings.
+  while IFS=$' \t\r' read -r bin min platform _rest; do
     case "$bin" in ''|\#*) continue ;; esac
     [ "$bin" = "$name" ] || continue
     case "$min" in ''|*[!0-9]*) continue ;; esac

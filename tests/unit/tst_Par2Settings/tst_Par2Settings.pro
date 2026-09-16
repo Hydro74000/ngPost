@@ -5,4 +5,5 @@ TEMPLATE = app
 TARGET = tst_Par2Settings
 INCLUDEPATH += ../../../src
 SOURCES += tst_Par2Settings.cpp ../../../src/par2/Par2Settings.cpp
+SOURCES += ../../../src/tools/ExternalToolResolver.cpp
 HEADERS += ../../../src/par2/Par2Settings.h
