@@ -187,6 +187,8 @@ public:
 
 #ifdef NGPOST_TESTING
     QWidget *buildHistoryTabForTest();
+    bool resumePostForTest(qint64 id) { return _startResumePost(id, true); }
+    QTableWidget *resumeTableForTest() const { return _resumeTable; }
     void     fitHistoryColumnsForTest(bool toContents) { _fitHistoryColumns(toContents); }
     int      startupTabForTest() const { return _startupTab; }
     int      logBlockCapForTest() const { return _logBlockCap; }
@@ -225,6 +227,8 @@ public:
 
 
     bool hasFinishedPosts() const;
+    //! Prepared posts that have not yet entered NgPost's queue.
+    bool hasUnsubmittedPosts() const;
 
     inline AutoPostWidget *autoWidget() const;
     void closeTab(PostingWidget *postWidget);

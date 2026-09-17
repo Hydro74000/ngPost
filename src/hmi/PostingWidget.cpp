@@ -298,6 +298,7 @@ void PostingWidget::onGenNzbPassword()
 
 void PostingWidget::onSelectFilesClicked()
 {
+    const auto shutdownHold = _ngPost->holdShutdown();
     QStringList files = QFileDialog::getOpenFileNames(
                 this,
                 tr("Select one or more files to Post"),
@@ -310,6 +311,7 @@ void PostingWidget::onSelectFilesClicked()
 
 void PostingWidget::onSelectFolderClicked()
 {
+    const auto shutdownHold = _ngPost->holdShutdown();
     QString folder = QFileDialog::getExistingDirectory(
                 this,
                 tr("Select a Folder"),

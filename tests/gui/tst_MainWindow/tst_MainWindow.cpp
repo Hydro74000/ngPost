@@ -27,6 +27,7 @@
 
 #include <QComboBox>
 #include <QFile>
+#include <QFileDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -68,6 +69,7 @@
 #include "NgPost.h"
 #include "PostingJob.h"
 #include "PostingJobOptions.h"
+#include "vpn/VpnManager.h"
 #include "TestEnv.h"
 
 #include <QBoxLayout>
@@ -109,6 +111,23 @@ private slots:
     void log_timestamps_cover_debug_errors_and_fragments();
     void log_file_keeps_timestamped_debug_fragments();
     void post_all_tabs_submits_only_prepared_posts();
+    void shutdown_waits_for_every_post_data();
+    void shutdown_waits_for_every_post();
+    void shutdown_requires_new_completed_post_data();
+    void shutdown_requires_new_completed_post();
+    void shutdown_waits_during_vpn_confirmation_data();
+    void shutdown_waits_during_vpn_confirmation();
+    void shutdown_waits_for_posts_added_after_completion();
+    void shutdown_requires_an_actual_transfer();
+    void shutdown_waits_during_input_dialogs_data();
+    void shutdown_waits_during_input_dialogs();
+    void shutdown_test_command_must_match();
+    void shutdown_ignores_requested_cancellation_data();
+    void shutdown_ignores_requested_cancellation();
+    void shutdown_handles_terminal_connection_loss_data();
+    void shutdown_handles_terminal_connection_loss();
+    void shutdown_ignores_completion_queued_before_arming_data();
+    void shutdown_ignores_completion_queued_before_arming();
     void par2_dialog_defaults_overrides_and_cancel();
     void par2_dialog_preserves_exact_volume_bytes();
     void par2_dialog_detects_real_gpu();
@@ -1340,6 +1359,20 @@ MainWindow *bootWindow(NgPost &ngPost, const QString &confBody, QString *error)
     if (!error->isEmpty())
         return nullptr;
 
+    // Compare the parsed command with the fixture before any test can arm it.
+    // The test build also refuses execution unless this check succeeded.
+    for (const QString &line : confBody.split('\n')) {
+        if (line.startsWith("SHUTDOWN_CMD = ")) {
+            const QString expected = line.mid(QString("SHUTDOWN_CMD = ").size());
+            const QString helper = QString("\"%1\" --ngpost-test-shutdown ")
+                                       .arg(QCoreApplication::applicationFilePath());
+            if (!expected.startsWith(helper) || !ngPost.allowShutdownCommandForTest(expected)) {
+                *error = "The harmless test shutdown command was not applied";
+                return nullptr;
+            }
+        }
+    }
+
     MainWindow *window = ngPost.mainWindowForTest();
     if (!window)
     {
@@ -2324,7 +2357,17 @@ void TestMainWindow::no_log_call_passes_html_markup()
 
 int main(int argc, char **argv)
 {
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     QApplication app(argc, argv);
+    if (app.arguments().size() == 3 && app.arguments().at(1) == "--ngpost-test-shutdown") {
+        QFile marker(app.arguments().at(2));
+        if (!marker.open(QIODevice::WriteOnly | QIODevice::Append))
+            return 1;
+        // Leave an observable empty file before writing: existence is not completion.
+        QThread::msleep(100);
+        marker.write("shutdown\n");
+        return 0;
+    }
     const auto helperName = QFileInfo(app.applicationFilePath()).fileName();
     if (helperName.startsWith("ngpost-opencl-")) {
         QFile output;
@@ -3612,4 +3655,844 @@ void TestMainWindow::failed_compressor_reports_unrestored_sources()
     QVERIFY(input.open(QIODevice::ReadOnly));
     QCOMPARE(input.readAll(), QByteArray("original contents"));
 #endif
+}
+
+void TestMainWindow::shutdown_waits_for_every_post_data()
+{
+    QTest::addColumn<bool>("submitAll");
+    QTest::addColumn<bool>("autoClose");
+    QTest::addColumn<bool>("startDefault");
+    QTest::addColumn<QString>("resolveBlockers");
+    // These two rows protect the existing backend queue barrier.
+    QTest::newRow("five queued posts") << true << false << true << QString("post");
+    QTest::newRow("five queued posts, auto close") << true << true << true << QString("post");
+    // Every row below requires the prepared-tab barrier and its deferred recheck.
+    for (const bool autoClose : { false, true }) {
+        const QByteArray suffix = autoClose ? ", auto close" : "";
+        QTest::newRow("submit unstarted posts" + suffix)
+            << false << autoClose << true << QString("post");
+        QTest::newRow("submit default tab" + suffix)
+            << false << autoClose << false << QString("post");
+        QTest::newRow("clear unstarted posts" + suffix)
+            << false << autoClose << true << QString("clear");
+        QTest::newRow("clear default tab" + suffix)
+            << false << autoClose << false << QString("clear");
+        QTest::newRow("close unstarted posts" + suffix)
+            << false << autoClose << true << QString("close");
+    }
+}
+
+void TestMainWindow::shutdown_waits_for_every_post()
+{
+    QFETCH(bool, submitAll);
+    QFETCH(bool, autoClose);
+    QFETCH(bool, startDefault);
+    QFETCH(QString, resolveBlockers);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "40" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    const auto markerPath = root + "/shutdown-marker";
+    QString error;
+    auto *window = bootWindow(
+        ngPost,
+        QString("GROUPS = alt.binaries.test\nthread = 1\nnzbPath = %1\n"
+                "AUTO_CLOSE_TABS = %2\nSHUTDOWN_CMD = \"%3\" --ngpost-test-shutdown \"%4\"\n"
+                "[server]\nhost = 127.0.0.1\nport = %5\nssl = false\nconnection = 1\n")
+            .arg(root,
+                 autoClose ? "true" : "false",
+                 QCoreApplication::applicationFilePath(),
+                 markerPath)
+            .arg(mock.port()),
+        &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    QList<QPointer<PostingWidget>> posts{ first };
+    for (int i = 1; i < 5; ++i)
+        posts << window->addNewQuickTab(tabs->count() - 1);
+    for (int i = 0; i < posts.size(); ++i) {
+        QFile file(root + QString("/source-%1.bin").arg(i));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(QByteArray(64000, 'a' + i));
+        file.close();
+        posts[i]->addPath(file.fileName(), 0);
+    }
+    QPointer<PostingWidget> started = posts[startDefault ? 0 : 4];
+    // Empty tabs must not prevent shutdown once the five real posts finish.
+    window->addNewQuickTab(tabs->count() - 1);
+    bool confirmed = false;
+    QTimer confirm;
+    connect(&confirm, &QTimer::timeout, window, [&] {
+        for (auto *widget : QApplication::topLevelWidgets())
+            if (auto *question = qobject_cast<QMessageBox *>(widget)) {
+                confirmed = true;
+                question->done(QMessageBox::Yes);
+            }
+    });
+    confirm.start(5);
+    window->findChild<QCheckBox *>("shutdownCB")->setChecked(true);
+    confirm.stop();
+    QVERIFY(confirmed);
+
+    if (submitAll)
+        window->findChild<QPushButton *>("postAllTabsButton")->click();
+    else
+        started->postFiles(true);
+
+    QTRY_VERIFY_WITH_TIMEOUT(!started
+                                 || (autoClose ? started->previewFiles().isEmpty()
+                                               : started->isPostingFinished()),
+                             15000);
+    QVERIFY2(!QFile::exists(markerPath), "Shutdown ran while posts remained queued or unstarted");
+    if (!submitAll) {
+        const QString blockedMessage =
+            "Shutdown postponed: some posting tabs have not been submitted.";
+        auto *log = window->findChild<QTextBrowser *>("logBrowser");
+        QTRY_COMPARE(log->toPlainText().count(blockedMessage), 1);
+        QList<QPointer<PostingWidget>> blockers;
+        for (const auto &post : posts)
+            if (post && post != started) {
+                QVERIFY(post->canSubmit());
+                blockers << post;
+                emit post->submissionEligibilityChanged();
+            }
+        QTest::qWait(150);
+        QVERIFY2(!QFile::exists(markerPath), "Shutdown ignored prepared tabs");
+        QCOMPARE(log->toPlainText().count(blockedMessage), 1);
+        if (resolveBlockers == "post") {
+            window->findChild<QPushButton *>("postAllTabsButton")->click();
+        } else {
+            for (int i = 0; i < blockers.size(); ++i) {
+                auto &post = blockers[i];
+                const bool last = i == blockers.size() - 1;
+                if (resolveBlockers == "close") {
+                    emit tabs->tabBar()->tabCloseRequested(tabs->indexOf(post));
+                    QVERIFY(post.isNull());
+                } else {
+                    auto *clear = post->findChild<QPushButton *>("clearFilesButton");
+                    QVERIFY(clear);
+                    if (last) {
+                        // A transiently empty list must not trigger shutdown inside
+                        // its mutation: re-add before the deferred check runs.
+                        const auto source = post->previewFiles().first().filePath();
+                        clear->click();
+                        post->addPath(source, 0);
+                        QTest::qWait(150);
+                        QVERIFY(!QFile::exists(markerPath));
+                        QCOMPARE(log->toPlainText().count(blockedMessage), 1);
+                    }
+                    clear->click();
+                    QVERIFY(post->previewFiles().isEmpty());
+                }
+                if (!last) {
+                    QTest::qWait(50);
+                    QVERIFY(!QFile::exists(markerPath));
+                    QCOMPARE(log->toPlainText().count(blockedMessage), 1);
+                }
+            }
+        }
+    }
+    const auto readMarker = [&] {
+        QFile marker(markerPath);
+        return marker.open(QIODevice::ReadOnly) ? marker.readAll() : QByteArray();
+    };
+    // Wait for the content, not for the child to have merely opened the file.
+    // No explicit maybeFinishApplication() here: UI changes must wake it up.
+    QTRY_COMPARE_WITH_TIMEOUT(readMarker(), QByteArray("shutdown\n"), 20000);
+    QCOMPARE(mock.receivedArticles().size(), resolveBlockers == "post" ? 5 : 1);
+    for (const auto &post : posts)
+        QVERIFY(!post || post->isPostingFinished() || post->previewFiles().isEmpty());
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 1);
+    // Count launches directly after the first process has exited. A second
+    // launch is observable even before the child starts or writes anything.
+    for (int i = 0; i < 3; ++i) {
+        ngPost.maybeFinishApplication();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+        QCOMPARE(ngPost.shutdownStartCountForTest(), 1);
+    }
+    QCOMPARE(readMarker(), QByteArray("shutdown\n"));
+}
+
+namespace
+{
+bool armTestShutdown(MainWindow *window)
+{
+    bool confirmed = false;
+    QTimer confirm;
+    QObject::connect(&confirm, &QTimer::timeout, window, [&] {
+        for (auto *widget : QApplication::topLevelWidgets())
+            if (auto *question = qobject_cast<QMessageBox *>(widget)) {
+                confirmed = true;
+                question->done(QMessageBox::Yes);
+            }
+    });
+    confirm.start(5);
+    window->findChild<QCheckBox *>("shutdownCB")->setChecked(true);
+    return confirmed;
+}
+
+QString shutdownTestConfig(const QString &root, quint16 port)
+{
+    return QString("GROUPS = alt.binaries.test\nthread = 1\nnzbPath = %1\n"
+                   "SHUTDOWN_CMD = \"%2\" --ngpost-test-shutdown \"%1/shutdown-marker\"\n"
+                   "[server]\nhost = 127.0.0.1\nport = %3\nssl = false\nconnection = 1\n")
+        .arg(root, QCoreApplication::applicationFilePath())
+        .arg(port);
+}
+
+bool addShutdownTestFile(PostingWidget *post, const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly))
+        return false;
+    file.write(QByteArray(64000, 'a'));
+    file.close();
+    post->addPath(path, 0);
+    return true;
+}
+}
+
+void TestMainWindow::shutdown_requires_new_completed_post_data()
+{
+    QTest::addColumn<bool>("withHistory");
+    QTest::addColumn<bool>("startDefault");
+    QTest::addColumn<bool>("rearm");
+    QTest::newRow("nothing ever posted") << false << true << false;
+    QTest::newRow("clear finished default tab") << true << true << false;
+    QTest::newRow("close old finished tab") << true << false << false;
+    QTest::newRow("rearm after deferred completion") << true << true << true;
+}
+
+void TestMainWindow::shutdown_requires_new_completed_post()
+{
+    QFETCH(bool, withHistory);
+    QFETCH(bool, startDefault);
+    QFETCH(bool, rearm);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "40" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *defaultPost = qobject_cast<PostingWidget *>(tabs->widget(0));
+    QPointer<PostingWidget> other = window->addNewQuickTab(tabs->count() - 1);
+    auto *completed = startDefault ? defaultPost : other.data();
+    auto *blocker = startDefault ? other.data() : defaultPost;
+    if (withHistory) {
+        QVERIFY(addShutdownTestFile(completed, root + "/old.bin"));
+        if (rearm) {
+            QVERIFY(addShutdownTestFile(blocker, root + "/blocker.bin"));
+            QVERIFY(armTestShutdown(window));
+        }
+        completed->postFiles(true);
+        QTRY_VERIFY_WITH_TIMEOUT(completed->isPostingFinished(), 15000);
+        QCOMPARE(mock.receivedArticles().size(), 1);
+        if (rearm) {
+            QTRY_VERIFY(window->findChild<QTextBrowser *>("logBrowser")
+                            ->toPlainText()
+                            .contains("Shutdown postponed:"));
+            window->findChild<QCheckBox *>("shutdownCB")->setChecked(false);
+        }
+    }
+    QVERIFY(armTestShutdown(window));
+    // Finish-check signals from old tabs must never grant shutdown eligibility.
+    defaultPost->findChild<QPushButton *>("clearFilesButton")->click();
+    emit tabs->tabBar()->tabCloseRequested(tabs->indexOf(other));
+    QVERIFY(other.isNull());
+    QVERIFY(addShutdownTestFile(defaultPost, root + "/temporary.bin"));
+    defaultPost->findChild<QPushButton *>("clearFilesButton")->click();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+    ngPost.maybeFinishApplication();
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+    QVERIFY(!QFile::exists(root + "/shutdown-marker"));
+
+    // The same armed request becomes eligible after a genuinely new transfer.
+    QVERIFY(addShutdownTestFile(defaultPost, root + "/new.bin"));
+    defaultPost->postFiles(true);
+    QTRY_COMPARE_WITH_TIMEOUT(ngPost.shutdownStartCountForTest(), 1, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
+    QCOMPARE(mock.receivedArticles().size(), withHistory ? 2 : 1);
+}
+
+void TestMainWindow::shutdown_waits_during_vpn_confirmation_data()
+{
+    QTest::addColumn<bool>("proceed");
+    QTest::newRow("continue") << true;
+    QTest::newRow("cancel") << false;
+}
+
+void TestMainWindow::shutdown_waits_during_vpn_confirmation()
+{
+    QFETCH(bool, proceed);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "40" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *last = window->addNewQuickTab(tabs->count() - 1);
+    QVERIFY(addShutdownTestFile(first, root + "/first.bin"));
+    QVERIFY(addShutdownTestFile(last, root + "/last.bin"));
+    QVERIFY(armTestShutdown(window));
+    first->postFiles(true);
+    QTRY_VERIFY_WITH_TIMEOUT(first->isPostingFinished(), 15000);
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+    // Fake only detection of installed prerequisites; no helper is executed.
+    auto *vpn = ngPost.vpnManager();
+    vpn->setHelperInstalledForTest(true);
+    vpn->setAutoConnect(true);
+    QVERIFY(vpn->shouldConfirmMasterSwitchWithoutProfile());
+    bool sawDialog = false;
+    bool blocked = false;
+    QTimer respond;
+    connect(&respond, &QTimer::timeout, window, [&] {
+        for (auto *widget : QApplication::topLevelWidgets()) {
+            auto *question = qobject_cast<QMessageBox *>(widget);
+            if (!question || question->windowTitle() != "VPN warning")
+                continue;
+            respond.stop();
+            sawDialog = true;
+            // Run the real queued checks while the confirmation is open.
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+            ngPost.maybeFinishApplication();
+            blocked = ngPost.shutdownStartCountForTest() == 0;
+            for (auto *button : question->buttons())
+                if (question->buttonRole(button)
+                    == (proceed ? QMessageBox::AcceptRole : QMessageBox::RejectRole)) {
+                    button->click();
+                    return;
+                }
+        }
+    });
+    respond.start(5);
+    last->postFiles(true);
+    respond.stop();
+    QVERIFY(sawDialog);
+    QVERIFY2(blocked, "Shutdown started inside the VPN confirmation");
+    if (!proceed) {
+        QVERIFY(last->canSubmit());
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+        ngPost.maybeFinishApplication();
+        QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+        last->findChild<QPushButton *>("clearFilesButton")->click();
+    }
+    QTRY_COMPARE_WITH_TIMEOUT(ngPost.shutdownStartCountForTest(), 1, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
+    QCOMPARE(mock.receivedArticles().size(), proceed ? 2 : 1);
+}
+
+void TestMainWindow::shutdown_waits_for_posts_added_after_completion()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "40" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *second = window->addNewQuickTab(tabs->count() - 1);
+    QVERIFY(addShutdownTestFile(first, root + "/first.bin"));
+    QVERIFY(addShutdownTestFile(second, root + "/second.bin"));
+    QVERIFY(armTestShutdown(window));
+    first->postFiles(true);
+    QTRY_VERIFY_WITH_TIMEOUT(first->isPostingFinished(), 15000);
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+    // Completion is latched, but the queue is never snapshotted at arming.
+    auto *late = window->addNewQuickTab(tabs->count() - 1);
+    QVERIFY(addShutdownTestFile(late, root + "/late.bin"));
+    second->postFiles(true);
+    QTRY_VERIFY_WITH_TIMEOUT(second->isPostingFinished(), 15000);
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+    QVERIFY(late->canSubmit());
+    // A further job is submitted while this last transfer is still active.
+    late->postFiles(true);
+    auto *queued = window->addNewQuickTab(tabs->count() - 1);
+    QVERIFY(addShutdownTestFile(queued, root + "/queued.bin"));
+    queued->postFiles(true);
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+    QTRY_COMPARE_WITH_TIMEOUT(ngPost.shutdownStartCountForTest(), 1, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
+    QVERIFY(late->isPostingFinished());
+    QVERIFY(queued->isPostingFinished());
+    QCOMPARE(mock.receivedArticles().size(), 4);
+}
+
+void TestMainWindow::shutdown_requires_an_actual_transfer()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(
+        ngPost,
+        QString("TMP_DIR = %1\nRAR_SOURCE = custom\nRAR_PATH = %1/missing-rar\n").arg(root)
+            + shutdownTestConfig(root, mock.port()),
+        &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *post = qobject_cast<PostingWidget *>(
+        window->findChild<QTabWidget *>("postTabWidget")->widget(0));
+    QVERIFY(addShutdownTestFile(post, root + "/failed.bin"));
+    QVERIFY(armTestShutdown(window));
+    post->findChild<QCheckBox *>("compressCB")->setChecked(true);
+    post->postFiles(true);
+    QTRY_VERIFY_WITH_TIMEOUT(post->isPostingFinished(), 15000);
+    QCOMPARE(mock.receivedArticles().size(), 0);
+    post->findChild<QPushButton *>("clearFilesButton")->click();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+    ngPost.maybeFinishApplication();
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+    const QString waiting = "Shutdown postponed: waiting for a completed post";
+    auto *log = window->findChild<QTextBrowser *>("logBrowser");
+    QTRY_COMPARE(log->toPlainText().count(waiting), 1);
+    ngPost.maybeFinishApplication();
+    QCOMPARE(log->toPlainText().count(waiting), 1);
+    // A failure does not disarm the request: a later real post can satisfy it.
+    post->findChild<QCheckBox *>("compressCB")->setChecked(false);
+    QVERIFY(addShutdownTestFile(post, root + "/posted.bin"));
+    post->postFiles(true);
+    QTRY_COMPARE_WITH_TIMEOUT(ngPost.shutdownStartCountForTest(), 1, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
+    QCOMPARE(mock.receivedArticles().size(), 1);
+}
+
+void TestMainWindow::shutdown_handles_terminal_connection_loss_data()
+{
+    QTest::addColumn<bool>("autoResume");
+    QTest::addColumn<bool>("preparedPost");
+    QTest::newRow("lost connections, queue empty") << false << false;
+    QTest::newRow("lost connections, another post prepared") << false << true;
+    QTest::newRow("automatic reconnection still pending") << true << false;
+}
+
+void TestMainWindow::shutdown_handles_terminal_connection_loss()
+{
+    QFETCH(bool, autoResume);
+    QFETCH(bool, preparedPost);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "30" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              QString("NO_RESUME_AUTO = %1\n").arg(autoResume ? "false" : "true")
+                                  + shutdownTestConfig(root, mock.port()),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *prepared = qobject_cast<PostingWidget *>(tabs->widget(0));
+    if (preparedPost)
+        QVERIFY(addShutdownTestFile(prepared, root + "/later.bin"));
+    QFile file(root + "/large.bin");
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QVERIFY(file.resize(8 * 1024 * 1024));
+    file.close();
+    PostingJobOptions options;
+    options.files = { QFileInfo(file) };
+    options.inputPaths = { file.fileName() };
+    options.nzbFilePath = root + "/large.nzb";
+    options.grpList = { "alt.binaries.test" };
+    options.from = "poster@example.invalid";
+    options.articleSizeBytes = 4096;
+    QPointer<PostingJob> job = new PostingJob(&ngPost, options);
+    QSignalSpy lostConnections(job, &PostingJob::noMoreConnection);
+    bool incomplete = false;
+    bool transferred = false;
+    connect(job, &PostingJob::noMoreConnection, window, [&] {
+        incomplete = !job->hasPostFinished();
+        transferred = job->nbArticlesUploaded() > job->nbArticlesFailed();
+    }, Qt::DirectConnection);
+    QVERIFY(armTestShutdown(window));
+    QVERIFY(ngPost.startPostingJob(job));
+    QTRY_VERIFY_WITH_TIMEOUT(job && job->nbArticlesUploaded() > job->nbArticlesFailed(), 15000);
+    QVERIFY(!job->hasPostFinished());
+    mock.stop(); // cut the actual transport after at least one confirmed article
+    if (autoResume) {
+        QTRY_VERIFY_WITH_TIMEOUT(job && job->isPaused(), 15000);
+        QCOMPARE(job->pauseReason(), PostingJob::PauseReason::ConnectionBackoff);
+        QCOMPARE(lostConnections.count(), 0);
+        ngPost.maybeFinishApplication();
+        QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+        // Stopping the paused job preserves it for resume; it does not authorize shutdown.
+        job->onStopPosting();
+        QTRY_VERIFY_WITH_TIMEOUT(job.isNull(), 15000);
+        ngPost.maybeFinishApplication();
+        QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+        return;
+    } else {
+        QTRY_COMPARE_WITH_TIMEOUT(lostConnections.count(), 1, 15000);
+        QVERIFY(incomplete);
+        QVERIFY(transferred);
+    }
+    if (preparedPost) {
+        QTRY_VERIFY_WITH_TIMEOUT(job.isNull(), 15000);
+        ngPost.maybeFinishApplication();
+        QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+        QVERIFY(prepared->canSubmit());
+        prepared->findChild<QPushButton *>("clearFilesButton")->click();
+    }
+    QTRY_COMPARE_WITH_TIMEOUT(ngPost.shutdownStartCountForTest(), 1, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
+    QVERIFY(!mock.receivedArticles().isEmpty());
+}
+
+void TestMainWindow::shutdown_ignores_completion_queued_before_arming_data()
+{
+    QTest::addColumn<bool>("previouslyArmed");
+    QTest::newRow("arm after actual finish, before queued notification") << false;
+    QTest::newRow("rearm after actual finish, before queued notification") << true;
+}
+
+void TestMainWindow::shutdown_ignores_completion_queued_before_arming()
+{
+    QFETCH(bool, previouslyArmed);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    QFile file(root + "/source.bin");
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("payload");
+    file.close();
+    PostingJobOptions options;
+    options.files = { QFileInfo(file) };
+    options.inputPaths = { file.fileName() };
+    options.nzbFilePath = root + "/old.nzb";
+    options.grpList = { "alt.binaries.test" };
+    options.from = "poster@example.invalid";
+    QPointer<PostingJob> old = new PostingJob(&ngPost, options);
+    bool armedAfterFinish = false;
+    connect(old, &PostingJob::postingFinished, window, [&] {
+        // Direct delivery runs after _finishPosting but before NgPost's queued
+        // completion handler. No timestamps or artificial delays are involved.
+        ngPost.setShutdownWhenDone(false);
+        ngPost.setShutdownWhenDone(true);
+        armedAfterFinish = true;
+    }, Qt::DirectConnection);
+    if (previouslyArmed)
+        QVERIFY(armTestShutdown(window));
+    QVERIFY(ngPost.startPostingJob(old));
+    QTRY_VERIFY_WITH_TIMEOUT(old.isNull(), 15000);
+    QVERIFY(armedAfterFinish);
+    ngPost.maybeFinishApplication();
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+    options.nzbFilePath = root + "/new.nzb";
+    QVERIFY(ngPost.startPostingJob(new PostingJob(&ngPost, options)));
+    QTRY_COMPARE_WITH_TIMEOUT(ngPost.shutdownStartCountForTest(), 1, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
+    QCOMPARE(mock.receivedArticles().size(), 2);
+}
+
+void TestMainWindow::shutdown_ignores_requested_cancellation_data()
+{
+    QTest::addColumn<QString>("stopAction");
+    QTest::addColumn<bool>("previousCompletion");
+    for (const auto &action :
+         { "button", "monitoring", "vpn", "all", "completion", "close", "close_completion" }) {
+        QTest::newRow(action) << QString(action) << false;
+        QTest::newRow(qPrintable(QString("previous completion, %1").arg(action)))
+            << QString(action) << true;
+    }
+}
+
+void TestMainWindow::shutdown_ignores_requested_cancellation()
+{
+    QFETCH(QString, stopAction);
+    QFETCH(bool, previousCompletion);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "20" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *post = qobject_cast<PostingWidget *>(tabs->widget(0));
+    QFile source(root + "/source.bin");
+    QVERIFY(source.open(QIODevice::WriteOnly));
+    QVERIFY(source.resize(stopAction.endsWith("completion") ? 4096 : 8 * 1024 * 1024));
+    source.close();
+    PostingJobOptions options;
+    options.files = { QFileInfo(source) };
+    options.inputPaths = { source.fileName() };
+    options.nzbFilePath = root + "/stopped.nzb";
+    options.grpList = { "alt.binaries.test" };
+    options.from = "poster@example.invalid";
+    options.articleSizeBytes = 4096;
+    const bool monitoring = stopAction == "monitoring";
+    QVERIFY(armTestShutdown(window));
+    if (previousCompletion) {
+        // A finishes while B is still prepared, granting shutdown eligibility.
+        post->addPath(source.fileName(), 0);
+        auto *first = window->addNewQuickTab(tabs->count() - 1);
+        QVERIFY(addShutdownTestFile(first, root + "/first.bin"));
+        first->postFiles(true);
+        QTRY_VERIFY_WITH_TIMEOUT(first->isPostingFinished(), 15000);
+        QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+        post->findChild<QPushButton *>("clearFilesButton")->click();
+    }
+    QPointer<PostingJob> job = new PostingJob(&ngPost, options, monitoring ? nullptr : post);
+    if (!monitoring)
+        post->attachResumeJob(job, options.files, true);
+    bool canceledOnCompletion = false;
+    if (stopAction == "completion") {
+        connect(job, &PostingJob::filePosted, window, [&] {
+            // onNntpFilePosted will finish naturally as soon as this returns,
+            // before the queued stop handler can run. Record intent at click time.
+            post->findChild<QPushButton *>("postButton")->click();
+            canceledOnCompletion = true;
+        }, Qt::DirectConnection);
+    }
+    QVERIFY(ngPost.startPostingJob(job));
+    if (stopAction != "completion") {
+        if (stopAction != "close_completion") {
+            QTRY_VERIFY_WITH_TIMEOUT(job && job->nbArticlesUploaded() > job->nbArticlesFailed(),
+                                     15000);
+            QVERIFY(!job->hasPostFinished());
+        }
+        if (stopAction == "button") {
+            post->findChild<QPushButton *>("postButton")->click();
+        } else if (monitoring) {
+            // Called by the confirmed Stop Monitoring action.
+            ngPost.closeAllMonitoringJobs();
+        } else if (stopAction.startsWith("close")) {
+            bool confirmed = false;
+            bool blocked = false;
+            QElapsedTimer deadline;
+            deadline.start();
+            QTimer confirm;
+            connect(&confirm, &QTimer::timeout, window, [&] {
+                for (auto *widget : QApplication::topLevelWidgets()) {
+                    auto *box = qobject_cast<QMessageBox *>(widget);
+                    if (box && box->windowTitle() == "close while still posting?") {
+                        if (stopAction == "close_completion" && job && deadline.elapsed() < 15000)
+                            continue;
+                        ngPost.maybeFinishApplication();
+                        blocked = ngPost.shutdownStartCountForTest() == 0;
+                        confirmed = true;
+                        box->done(QMessageBox::Yes);
+                    }
+                }
+            });
+            confirm.start(5);
+            window->close();
+            QVERIFY(confirmed);
+            QVERIFY(blocked);
+            if (stopAction == "close_completion")
+                QVERIFY(job.isNull());
+        } else if (stopAction == "all") {
+            ngPost.closeAllPostingJobs();
+        } else {
+            job->pause(PostingJob::PauseReason::VpnRecovery);
+            bool chosePreserve = false;
+            QTimer choose;
+            connect(&choose, &QTimer::timeout, window, [&] {
+                for (auto *widget : QApplication::topLevelWidgets()) {
+                    auto *box = qobject_cast<QMessageBox *>(widget);
+                    if (!box || box->windowTitle() != "VPN recovery exhausted")
+                        continue;
+                    for (auto *button : box->buttons())
+                        if (box->buttonRole(button) == QMessageBox::RejectRole) {
+                            chosePreserve = true;
+                            button->click();
+                            return;
+                        }
+                }
+            });
+            choose.start(5);
+            emit ngPost.vpnManager()->recoveryExhausted(VpnManager::FailureKind::TunnelLost);
+            choose.stop();
+            QVERIFY(chosePreserve);
+        }
+    }
+    QTRY_VERIFY_WITH_TIMEOUT(job.isNull(), 15000);
+    QCOMPARE(canceledOnCompletion, stopAction == "completion");
+    ngPost.maybeFinishApplication();
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+    QVERIFY(!mock.receivedArticles().isEmpty());
+    // Cleaning the canceled tab must not accidentally turn its earlier data
+    // transfer into an authorization to shut down.
+    post->findChild<QPushButton *>("clearFilesButton")->click();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+    ngPost.maybeFinishApplication();
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+    QVERIFY(!QFile::exists(root + "/shutdown-marker"));
+    // A later, normally completed post can still fulfill the armed request.
+    QVERIFY(addShutdownTestFile(post, root + "/next.bin"));
+    post->postFiles(true);
+    QTRY_COMPARE_WITH_TIMEOUT(ngPost.shutdownStartCountForTest(), 1, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
+}
+
+void TestMainWindow::shutdown_test_command_must_match()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    const QString expected = QString("\"%1\" --ngpost-test-shutdown \"%2/shutdown-marker\"")
+                                 .arg(QCoreApplication::applicationFilePath(), sandbox.rootPath());
+    QVERIFY(!ngPost.allowShutdownCommandForTest(expected));
+    QVERIFY(!ngPost.allowShutdownCommandForTest(QString()));
+}
+
+void TestMainWindow::shutdown_waits_during_input_dialogs_data()
+{
+    QTest::addColumn<QString>("dialogKind");
+    QTest::addColumn<bool>("selectInput");
+    QTest::newRow("history resume, cancel") << QString("history") << false;
+    QTest::newRow("resume center, cancel") << QString("resume") << false;
+    QTest::newRow("select files, cancel") << QString("files") << false;
+    QTest::newRow("select files, accept") << QString("files") << true;
+    QTest::newRow("select folder, cancel") << QString("folder") << false;
+    QTest::newRow("select folder, accept") << QString("folder") << true;
+}
+
+void TestMainWindow::shutdown_waits_during_input_dialogs()
+{
+    QFETCH(QString, dialogKind);
+    QFETCH(bool, selectInput);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "40" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *empty = window->addNewQuickTab(tabs->count() - 1);
+    QVERIFY(addShutdownTestFile(first, root + "/first.bin"));
+    QVERIFY(QDir().mkpath(root + "/input"));
+    QFile input(root + "/input/next.bin");
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    QCOMPARE(input.write(QByteArray(64000, 'b')), qint64(64000));
+    input.close();
+    QVERIFY(armTestShutdown(window));
+    bool sawDialog = false;
+    bool blocked = false;
+    QTimer answer;
+    connect(&answer, &QTimer::timeout, window, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog || !first->isPostingFinished())
+            return;
+        answer.stop();
+        sawDialog = true;
+        // A real post finished in the nested event loop. Neither a queued
+        // recheck nor a direct check may start shutdown before the answer.
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+        ngPost.maybeFinishApplication();
+        blocked = ngPost.shutdownStartCountForTest() == 0;
+        if (auto *files = qobject_cast<QFileDialog *>(dialog)) {
+            if (selectInput) {
+                // selectFile() does not update the line edit of an already
+                // visible dialog on every Qt platform. Enter the path as a user would.
+                auto *name = files->findChild<QLineEdit *>("fileNameEdit");
+                if (name) {
+                    name->setText(dialogKind == "folder" ? root + "/input" : input.fileName());
+                    QMetaObject::invokeMethod(files, "accept", Qt::DirectConnection);
+                } else
+                    files->reject();
+            } else
+                files->reject();
+        } else
+            dialog->done(QMessageBox::No);
+    });
+    // Bound failures: a missed completion must fail instead of hanging CI.
+    QTimer timeout;
+    timeout.setSingleShot(true);
+    connect(&timeout, &QTimer::timeout, window, [] {
+        if (auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget()))
+            dialog->reject();
+    });
+    answer.start(5);
+    timeout.start(15000);
+    first->postFiles(true);
+    if (dialogKind == "history")
+        QVERIFY(!window->resumePostForTest(1));
+    else if (dialogKind == "resume") {
+        auto *table = window->resumeTableForTest();
+        const QSignalBlocker selectionSignals(table);
+        table->setRowCount(1);
+        auto *item = new QTableWidgetItem("test resume");
+        item->setData(Qt::UserRole, 1);
+        table->setItem(0, 0, item);
+        table->selectRow(0);
+        QVERIFY(QMetaObject::invokeMethod(window, "_onResumePost", Qt::DirectConnection));
+    } else
+        QVERIFY(QMetaObject::invokeMethod(empty,
+                                          dialogKind == "files" ? "onSelectFilesClicked"
+                                                                : "onSelectFolderClicked",
+                                          Qt::DirectConnection));
+    answer.stop();
+    timeout.stop();
+    QVERIFY(sawDialog);
+    QVERIFY2(blocked, "Shutdown started while waiting for user input");
+    if (selectInput) {
+        QVERIFY(empty->canSubmit());
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+        ngPost.maybeFinishApplication();
+        QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+        if (dialogKind == "folder")
+            // A folder requires compression. Clearing it resolves the blocker
+            // without relying on an installed archiver in this dialog test.
+            empty->findChild<QPushButton *>("clearFilesButton")->click();
+        else
+            empty->postFiles(true);
+    }
+    QTRY_COMPARE_WITH_TIMEOUT(ngPost.shutdownStartCountForTest(), 1, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
+    QCOMPARE(mock.receivedArticles().size(), selectInput && dialogKind == "files" ? 2 : 1);
 }

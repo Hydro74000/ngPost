@@ -44,6 +44,7 @@
 #include <QDateTime>
 #include <QFile>
 #include <QSaveFile>
+#include <QScopeGuard>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -1699,8 +1700,33 @@ void NgPost::_requestExit(ERROR_CODE code, bool waitForActiveJob)
     QTimer::singleShot(0, this, [this]() { maybeFinishApplication(); });
 }
 
+void NgPost::setShutdownWhenDone(bool enabled)
+{
+    _doShutdownWhenDone = enabled;
+    _resetShutdownCompletion();
+}
+
+void NgPost::_resetShutdownCompletion()
+{
+    _transferEndedSinceShutdownArmed = false;
+    _waitingForUnsubmittedPosts = false;
+    _waitingForTransfer = false;
+}
+
+void NgPost::_releaseShutdownHold()
+{
+    --_shutdownHolds;
+    if (_doShutdownWhenDone)
+        QTimer::singleShot(0, this, &NgPost::maybeFinishApplication);
+}
+
 void NgPost::maybeFinishApplication()
 {
+#ifdef __USE_HMI__
+    const bool unsubmittedPosts = _hmi && _hmi->hasUnsubmittedPosts();
+    if (!_doShutdownWhenDone || !unsubmittedPosts)
+        _waitingForUnsubmittedPosts = false;
+#endif
     if (_pendingExitCode >= 0) {
         if (_pendingExitWaitsForActiveJob && _activeJob)
             return;
@@ -1715,7 +1741,7 @@ void NgPost::maybeFinishApplication()
         return;
     }
 
-    if (_activeJob || !_pendingJobs.isEmpty())
+    if (_shutdownHolds || _activeJob || !_pendingJobs.isEmpty())
         return;
     if (_postCmdRunner && !_postCmdRunner->isIdle()) {
         if (!_waitingForPostCmds) {
@@ -1727,6 +1753,29 @@ void NgPost::maybeFinishApplication()
     _waitingForPostCmds = false;
 
     if (_doShutdownWhenDone && !_shutdownCmd.isEmpty()) {
+        // UI changes only re-evaluate an already eligible shutdown. Arming
+        // while idle must not turn clearing old tabs into a power-off action.
+        if (!_transferEndedSinceShutdownArmed) {
+            if (!_waitingForTransfer) {
+                _waitingForTransfer = true;
+                _log(tr("Shutdown postponed: waiting for a completed post with at least one "
+                        "successfully sent article (manual cancellations do not count)."));
+            }
+            return;
+        }
+        _waitingForTransfer = false;
+#ifdef __USE_HMI__
+        // Prepared tabs do not enter _pendingJobs until Post Files is clicked.
+        // They must also finish (or be removed) before the computer can stop.
+        if (unsubmittedPosts) {
+            if (!_waitingForUnsubmittedPosts) {
+                _waitingForUnsubmittedPosts = true;
+                _log(tr("Shutdown postponed: some posting tabs have not been submitted. "
+                        "Post them, clear them or close them to allow shutdown."));
+            }
+            return;
+        }
+#endif
         _startShutdown();
         return;
     }
@@ -2294,10 +2343,19 @@ void NgPost::_startShutdown()
     if (_shutdownProc)
         return;
 
+#ifdef NGPOST_TESTING
+    // Fail closed even if a test forgets to check its config, or parsing regresses.
+    if (_allowedShutdownCmdForTest.isEmpty() || _shutdownCmd != _allowedShutdownCmdForTest)
+        qFatal("Refusing an unverified shutdown command in a test build");
+#endif
+
     // This is a one-shot action. If the configured command merely notifies
     // another service, or fails to power the machine off, completing it must
     // release the normal CLI exit path instead of starting it over forever.
-    _doShutdownWhenDone = false;
+    setShutdownWhenDone(false);
+#ifdef NGPOST_TESTING
+    ++_shutdownStartCount;
+#endif
 
     //cf https://forum.qt.io/topic/111602/qprocess-signals-not-received-in-slots-except-in-debug-with-breakpoints/
 //    int exitCode = QProcess::execute("echo \\\"toto\\\" | /usr/bin/sudo -S /bin/ls -al");
@@ -2460,13 +2518,16 @@ QString NgPost::randomPass(uint length) const
 
 void NgPost::closeAllPostingJobs()
 {
+    _resetShutdownCompletion();
     qDeleteAll(_pendingJobs);
+    _pendingJobs.clear();
     if (_activeJob)
         _activeJob->onStopPosting();
 }
 
 void NgPost::stopActivePostingForResume()
 {
+    _resetShutdownCompletion();
     if (_activeJob)
         emit _activeJob->stopPosting();
 }
@@ -2479,6 +2540,7 @@ void NgPost::closeAllMonitoringJobs()
         PostingJob *job = *it;
         if (!job->widget())
         {
+            _resetShutdownCompletion();
             it = _pendingJobs.erase(it);
             if (_debug)
                 _error(tr("Cancelling monitoring job: %1").arg(job->getFirstOriginalFile()));
@@ -4789,6 +4851,9 @@ bool NgPost::_confirmMasterSwitchWithoutVpnProfileIfNeeded()
 
 bool NgPost::startPostingJob(PostingJob *job)
 {
+    // Admission may open a VPN dialog before this job enters _pendingJobs or
+    // _activeJob. Its nested event loop must not allow shutdown in that gap.
+    const auto admission = holdShutdown();
     _lastPostingStartCanceled = false;
 
 #ifdef __DEBUG__

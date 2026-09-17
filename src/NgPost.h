@@ -25,6 +25,7 @@
 #include <QNetworkProxy>
 #include <QProcess>
 #include <QQueue>
+#include <QScopeGuard>
 #include <QSet>
 #include <QSettings>
 #include <QTextStream>
@@ -376,6 +377,16 @@ private:
     QString _urlNzbUploadStr;
 
     bool _doShutdownWhenDone;
+    bool _transferEndedSinceShutdownArmed = false;
+    int _shutdownHolds = 0;
+    bool _waitingForTransfer = false;
+    void _resetShutdownCompletion();
+    void _releaseShutdownHold();
+#ifdef NGPOST_TESTING
+    int _shutdownStartCount = 0;
+    QString _allowedShutdownCmdForTest;
+#endif
+    bool _waitingForUnsubmittedPosts = false;
     QProcess *_shutdownProc;
     QString _shutdownCmd;
 
@@ -547,6 +558,15 @@ public:
     inline MainWindow *mainWindowForTest() const;
 #endif
 #ifdef NGPOST_TESTING
+    bool allowShutdownCommandForTest(const QString &expected)
+    {
+        if (expected.isEmpty() || _shutdownCmd != expected)
+            return false;
+        _allowedShutdownCmdForTest = expected;
+        return true;
+    }
+    int shutdownStartCountForTest() const { return _shutdownStartCount; }
+    bool shutdownInProgressForTest() const { return _shutdownProc != nullptr; }
     //! Read back what the configuration parsing produced, so a test can check
     //! that saveConfig() writes something that parses back to the same thing.
     QString postInfoOutputForTest() const { return _postInfoOutput; }
@@ -623,6 +643,13 @@ public:
     //! The only place allowed to quit or to power the machine off. Waits for
     //! the posts, the post commands and the nzb uploads.
     void maybeFinishApplication();
+    void setShutdownWhenDone(bool enabled);
+    //! Keep shutdown deferred through a dialog and the resulting queue changes.
+    auto holdShutdown()
+    {
+        ++_shutdownHolds;
+        return qScopeGuard([this] { _releaseShutdownHold(); });
+    }
 
     //! True when something will actually read the description of a post: a
     //! post info file, a post command, or an upload. Consolidating it costs a

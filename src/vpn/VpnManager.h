@@ -20,6 +20,7 @@
 #include <QString>
 
 #include <functional>
+#include <optional>
 
 class QTimer;
 struct NntpServerParams;
@@ -217,6 +218,7 @@ public:
 #endif
 
 #ifdef NGPOST_TESTING
+    void setHelperInstalledForTest(bool installed) { _testHelperInstalled = installed; }
     //! Narrow dependency injection used by the portable profile-transaction
     //! tests. On Windows it also guarantees that tests never trigger UAC.
     using WireGuardServiceHook = std::function<bool(QString const &)>;
@@ -409,6 +411,7 @@ private:
 #endif
 
 #ifdef NGPOST_TESTING
+    std::optional<bool> _testHelperInstalled;
     WireGuardServiceHook _testRegisterWireGuardService;
     WireGuardServiceHook _testUnregisterWireGuardService;
 #endif

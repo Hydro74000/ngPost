@@ -713,7 +713,7 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3181"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3215"/>
         <source>VPN: disabled</source>
         <translation>VPN: desativado</translation>
     </message>
@@ -856,7 +856,7 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="-1914"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1929"/>
         <location line="+159"/>
         <source>Clear</source>
         <translation>Limpar</translation>
@@ -872,7 +872,7 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
         <translation>vá por linha de comando (feche o GUI e continue no shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1236"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1255"/>
         <source>on</source>
         <translation>on</translation>
     </message>
@@ -908,32 +908,32 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1082"/>
+        <location line="+1101"/>
         <location line="+174"/>
         <source>Password</source>
         <translation>Senha</translation>
     </message>
     <message>
-        <location line="-1147"/>
-        <location line="+409"/>
-        <location line="+1670"/>
+        <location line="-1161"/>
+        <location line="+410"/>
+        <location line="+1697"/>
         <source>Default %1</source>
         <translation>Padrão %1</translation>
     </message>
     <message>
-        <location line="-2075"/>
-        <location line="+409"/>
+        <location line="-2103"/>
+        <location line="+410"/>
         <source>Post history, statistics and resume center</source>
         <translation>Histórico de publicações, estatísticas e centro de retoma</translation>
     </message>
     <message>
-        <location line="-408"/>
-        <location line="+412"/>
+        <location line="-409"/>
+        <location line="+413"/>
         <source>New</source>
         <translation>Novo</translation>
     </message>
     <message>
-        <location line="-350"/>
+        <location line="-351"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>velocidade média</translation>
@@ -990,7 +990,7 @@ Feche esse outro ngPost para utilizar a VPN aqui. Se não houver nenhum em execu
         <translation>VPN</translation>
     </message>
     <message>
-        <location line="+223"/>
+        <location line="+224"/>
         <source>close while still posting?</source>
         <translation>fechar enquanto ainda está postando?</translation>
     </message>
@@ -1018,13 +1018,13 @@ Tem certeza que deseja sair?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+569"/>
+        <location line="+582"/>
         <location line="+174"/>
         <source>Files</source>
         <translation>Arquivos</translation>
     </message>
     <message>
-        <location line="-742"/>
+        <location line="-755"/>
         <source>Parameters</source>
         <translation>Parâmetros</translation>
     </message>
@@ -1050,7 +1050,7 @@ Tem certeza que deseja sair?</translation>
         <translation>Fechar todas as Abas Finalizadas</translation>
     </message>
     <message>
-        <location line="+78"/>
+        <location line="+91"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
         <translation>&lt;h3&gt;Nova versão disponível: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Atual: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;Ver versão no GitHub&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
@@ -1103,12 +1103,12 @@ The job stays in the queue.</source>
 O trabalho fica na fila.</translation>
     </message>
     <message>
-        <location line="-589"/>
+        <location line="-603"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>Não foi possível remover estas definições. Consulte o registo da VPN para mais detalhes.</translation>
     </message>
     <message>
-        <location line="+603"/>
+        <location line="+617"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>A VPN configurada no ngPost parece já estar em execução; outro ngPost poderá estar a utilizá-la. Consulte as definições da VPN.</translation>
     </message>
@@ -1185,32 +1185,32 @@ O trabalho fica na fila.</translation>
         <location line="+128"/>
         <location line="+159"/>
         <location line="+23"/>
-        <location line="+930"/>
+        <location line="+944"/>
         <source>Name</source>
         <translation>Nome</translation>
     </message>
     <message>
-        <location line="-1286"/>
+        <location line="-1300"/>
         <location line="+39"/>
         <location line="+7"/>
         <location line="+128"/>
         <location line="+159"/>
         <location line="+23"/>
-        <location line="+930"/>
+        <location line="+944"/>
         <source>Status</source>
         <translation>Estado</translation>
     </message>
     <message>
-        <location line="-1286"/>
+        <location line="-1300"/>
         <location line="+39"/>
         <location line="+135"/>
         <location line="+159"/>
-        <location line="+953"/>
+        <location line="+967"/>
         <source>Size</source>
         <translation>Tamanho</translation>
     </message>
     <message>
-        <location line="-1285"/>
+        <location line="-1299"/>
         <location line="+174"/>
         <source>Articles</source>
         <translation>Artigos</translation>
@@ -1218,12 +1218,12 @@ O trabalho fica na fila.</translation>
     <message>
         <location line="-174"/>
         <location line="+174"/>
-        <location line="+1412"/>
+        <location line="+1426"/>
         <source>Failed</source>
         <translation>Falhada</translation>
     </message>
     <message>
-        <location line="-1586"/>
+        <location line="-1600"/>
         <location line="+38"/>
         <location line="+136"/>
         <location line="+158"/>
@@ -1239,12 +1239,12 @@ O trabalho fica na fila.</translation>
     <message>
         <location line="-237"/>
         <location line="+238"/>
-        <location line="+1605"/>
+        <location line="+1620"/>
         <source>Export info file…</source>
         <translation>Exportar a ficha…</translation>
     </message>
     <message>
-        <location line="-1836"/>
+        <location line="-1851"/>
         <location line="+282"/>
         <source>Period:</source>
         <translation>Período:</translation>
@@ -1265,7 +1265,7 @@ O trabalho fica na fila.</translation>
         <translation>Entradas %1-%2</translation>
     </message>
     <message>
-        <location line="+174"/>
+        <location line="+187"/>
         <source>Resume post</source>
         <translation>Retomar a publicação</translation>
     </message>
@@ -1278,12 +1278,12 @@ Só os artigos em falta ou falhados serão reenviados.</translation>
     </message>
     <message>
         <location line="+15"/>
-        <location line="+998"/>
+        <location line="+1000"/>
         <source>Resume failed</source>
         <translation>A retoma falhou</translation>
     </message>
     <message>
-        <location line="-996"/>
+        <location line="-998"/>
         <source>This post could not be resumed.</source>
         <translation>Esta publicação não pôde ser retomada.</translation>
     </message>
@@ -1295,7 +1295,7 @@ Só os artigos em falta ou falhados serão reenviados.</translation>
 %1</translation>
     </message>
     <message>
-        <location line="+349"/>
+        <location line="+350"/>
         <source>Quick Post is working..</source>
         <translation>Postagem Rápida em curso..</translation>
     </message>
@@ -1557,12 +1557,12 @@ Esta publicação foi feita antes de o ngPost registar estes dados, por isso a p
     </message>
     <message>
         <location line="+17"/>
-        <location line="+440"/>
+        <location line="+441"/>
         <source>Password copied to clipboard.</source>
         <translation>Palavra-passe copiada para a área de transferência.</translation>
     </message>
     <message>
-        <location line="-432"/>
+        <location line="-433"/>
         <source>Remove the stored password for this post?
 The history entry is kept; only the password value is erased.</source>
         <translation>Remover a palavra-passe guardada desta publicação?
@@ -1581,12 +1581,12 @@ A entrada do histórico é mantida; só o valor da palavra-passe é apagado.</tr
     </message>
     <message>
         <location line="+21"/>
-        <location line="+320"/>
+        <location line="+321"/>
         <source>Delete history entries</source>
         <translation>Apagar entradas do histórico</translation>
     </message>
     <message>
-        <location line="-319"/>
+        <location line="-320"/>
         <source>Permanently delete %1 selected post(s) from the history?
 This also removes all associated file and article records.</source>
         <translation>Apagar definitivamente %1 publicação(ões) seleccionada(s) do histórico?
@@ -1638,7 +1638,7 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>&lt;span style=&apos;color:darkred&apos;&gt;Não retomável&lt;/span&gt;</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+19"/>
         <source>Resume post(s)</source>
         <translation>Retomar publicação(ões)</translation>
     </message>
@@ -1728,7 +1728,7 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>VPN: falhou</translation>
     </message>
     <message>
-        <location line="-1935"/>
+        <location line="-1950"/>
         <location line="+128"/>
         <source>All statuses</source>
         <translation>Todos os estados</translation>
@@ -1758,12 +1758,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
     <message>
         <location line="-146"/>
         <location line="+149"/>
-        <location line="+1140"/>
+        <location line="+1154"/>
         <source>Status:</source>
         <translation>Estado:</translation>
     </message>
     <message>
-        <location line="-1264"/>
+        <location line="-1278"/>
         <location line="+1"/>
         <location line="+136"/>
         <location line="+7"/>
@@ -1826,26 +1826,26 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <location line="-170"/>
         <location line="+227"/>
         <location line="+351"/>
-        <location line="+630"/>
+        <location line="+644"/>
         <source>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</source>
         <translation>&lt;i&gt;Selecione um post para ver os detalhes.&lt;/i&gt;</translation>
     </message>
     <message>
-        <location line="-1205"/>
+        <location line="-1219"/>
         <location line="+238"/>
-        <location line="+1612"/>
+        <location line="+1627"/>
         <source>Copy password</source>
         <translation>Copiar senha</translation>
     </message>
     <message>
-        <location line="-1849"/>
+        <location line="-1864"/>
         <location line="+238"/>
-        <location line="+1201"/>
+        <location line="+1215"/>
         <source>Purge password</source>
         <translation>Excluir senha</translation>
     </message>
     <message>
-        <location line="-1438"/>
+        <location line="-1452"/>
         <location line="+238"/>
         <source>Open NZB location</source>
         <translation>Abrir localização NZB</translation>
@@ -1859,9 +1859,9 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>Excluir entrada</translation>
     </message>
     <message>
-        <location line="-1338"/>
-        <location line="+409"/>
-        <location line="+515"/>
+        <location line="-1352"/>
+        <location line="+410"/>
+        <location line="+528"/>
         <location line="+325"/>
         <source>History</source>
         <translation>Histórico</translation>
@@ -1899,12 +1899,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
     <message>
         <location line="-264"/>
         <location line="+267"/>
-        <location line="+1276"/>
+        <location line="+1290"/>
         <source>All groups</source>
         <translation>Todos os grupos</translation>
     </message>
     <message>
-        <location line="-1535"/>
+        <location line="-1549"/>
         <location line="+281"/>
         <source>Volume and failures per day</source>
         <translation>Volume e falhas por dia</translation>
@@ -1943,12 +1943,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <location line="-298"/>
         <location line="+305"/>
         <location line="+237"/>
-        <location line="+1093"/>
+        <location line="+1107"/>
         <source>&lt;i&gt;Select a post to see resume details.&lt;/i&gt;</source>
         <translation>&lt;i&gt;Selecione um post para ver os detalhes de retomada.&lt;/i&gt;</translation>
     </message>
     <message>
-        <location line="-1632"/>
+        <location line="-1646"/>
         <location line="+310"/>
         <source>Posted</source>
         <translation>Enviado</translation>
@@ -1980,12 +1980,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
     <message>
         <location line="-310"/>
         <location line="+311"/>
-        <location line="+1397"/>
+        <location line="+1412"/>
         <source>Purge resume data</source>
         <translation>Purgar dados de retomada</translation>
     </message>
     <message>
-        <location line="-1704"/>
+        <location line="-1719"/>
         <location line="+308"/>
         <source>Ignore (session)</source>
         <translation>Ignorar (sessão)</translation>
@@ -1995,12 +1995,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <location line="+91"/>
         <location line="+317"/>
         <location line="+24"/>
-        <location line="+1457"/>
+        <location line="+1472"/>
         <source>Resume</source>
         <translation>Retomadas</translation>
     </message>
     <message>
-        <location line="-1797"/>
+        <location line="-1812"/>
         <location line="+322"/>
         <source>Resume posting the selected post(s) from where they stopped</source>
         <translation>Retomar o envio do(s) post(s) selecionado(s) de onde parou</translation>
@@ -2040,13 +2040,13 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>Redefinir a largura das colunas</translation>
     </message>
     <message>
-        <location line="-1671"/>
-        <location line="+418"/>
+        <location line="-1690"/>
+        <location line="+424"/>
         <source>PAR2 Settings…</source>
         <translation>Configurações PAR2…</translation>
     </message>
     <message>
-        <location line="+1607"/>
+        <location line="+1633"/>
         <source>Post all tabs</source>
         <translation>Postar todas as abas</translation>
     </message>
@@ -2059,7 +2059,7 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
 <context>
     <name>NgPost</name>
     <message>
-        <location filename="../NgPost.cpp" line="+69"/>
+        <location filename="../NgPost.cpp" line="+70"/>
         <source>Auto Posting</source>
         <translation>Postadem Automática</translation>
     </message>
@@ -2240,12 +2240,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4937"/>
+        <location line="+5001"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Remova a pasta raiz (pai) ao compactar pastas usando o RAR</translation>
     </message>
     <message>
-        <location line="-4934"/>
+        <location line="-4998"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>O servidor NNTP segue o formato (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2305,7 +2305,7 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>ERRO: não foi possível encontrar tradução para o idioma %1</translation>
     </message>
     <message>
-        <location line="+117"/>
+        <location line="+165"/>
         <source> =&gt; closing application</source>
         <translation> =&gt; fechando a aplicação</translation>
     </message>
@@ -2315,12 +2315,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>tarefa de empacotamento parou inesperadamente...</translation>
     </message>
     <message>
-        <location line="+110"/>
+        <location line="+119"/>
         <source>Network access changed: %1</source>
         <translation>Acesso à rede alterado: %1</translation>
     </message>
     <message>
-        <location line="+95"/>
+        <location line="+99"/>
         <source>Cancelling monitoring job: %1</source>
         <translation>Cancelando tarefa de monitoramento: %1</translation>
     </message>
@@ -2373,7 +2373,7 @@ Para listar as opções disponíveis use: %2 --help
 </translation>
     </message>
     <message>
-        <location line="-2371"/>
+        <location line="-2432"/>
         <source>Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</source>
         <translation>Compacte postagens usando a definição de configuração PACK com um subconjunto (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</translation>
     </message>
@@ -2383,7 +2383,7 @@ Para listar as opções disponíveis use: %2 --help
         <translation>Problema SSL no seu sistema...</translation>
     </message>
     <message>
-        <location line="+498"/>
+        <location line="+546"/>
         <source>no packing needed for next pending job %1</source>
         <translation>sem compactação necessária para a próxima tarefa pendente %1</translation>
     </message>
@@ -2398,12 +2398,12 @@ Para listar as opções disponíveis use: %2 --help
         <translation>Tarefa pendente cancelada?</translation>
     </message>
     <message>
-        <location line="-1039"/>
+        <location line="-1087"/>
         <source>Posting canceled by user.</source>
         <translation>Postagem cancelada pelo usuário.</translation>
     </message>
     <message>
-        <location line="+3525"/>
+        <location line="+3586"/>
         <source>VPN warning</source>
         <translation>Aviso de VPN</translation>
     </message>
@@ -2443,7 +2443,7 @@ Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos
 </translation>
     </message>
     <message>
-        <location line="-2450"/>
+        <location line="-2511"/>
         <source>use configuration file (default: the per-user ngPost configuration folder)</source>
         <translation>usar o ficheiro de configuração (predefinição: a pasta de configuração ngPost do utilizador)</translation>
     </message>
@@ -2733,12 +2733,12 @@ Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos
         <location line="+4"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+3406"/>
+        <location line="+3467"/>
         <source>Warning: %1</source>
         <translation>Aviso: %1</translation>
     </message>
     <message>
-        <location line="-3621"/>
+        <location line="-3682"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>É necessária confirmação. Volte a executar com --yes para retomar a publicação.</translation>
     </message>
@@ -2799,12 +2799,12 @@ Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos
     </message>
     <message>
         <location line="+115"/>
-        <location line="+257"/>
+        <location line="+305"/>
         <source>AUTO_INCLUDE_NFO ON =&gt; %1 will be bundled with its sibling, not posted alone</source>
         <translation>AUTO_INCLUDE_NFO ON =&gt; %1 será agrupado com o seu vizinho, não publicado sozinho</translation>
     </message>
     <message>
-        <location line="-129"/>
+        <location line="-152"/>
         <source>Waiting for the post commands to finish before exiting...</source>
         <translation>À espera que os comandos pós-publicação terminem antes de sair...</translation>
     </message>
@@ -2814,7 +2814,7 @@ Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos
         <translation>À espera que os comandos pós-publicação terminem...</translation>
     </message>
     <message>
-        <location line="+151"/>
+        <location line="+174"/>
         <source>AUTO_INCLUDE_NFO ON =&gt; bundling %1 in the post of %2</source>
         <translation>AUTO_INCLUDE_NFO ON =&gt; %1 é agrupado na publicação de %2</translation>
     </message>
@@ -2834,8 +2834,8 @@ Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos
         <translation>Recuperação: a iniciar a próxima tarefa que não estava pré-empacotada</translation>
     </message>
     <message>
-        <location line="-851"/>
-        <location line="+1215"/>
+        <location line="-899"/>
+        <location line="+1276"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>A adoção da pasta de configuração falhou; o ngPost foi interrompido antes de utilizar a nova pasta, para poder tentar novamente em segurança da próxima vez.</translation>
     </message>
@@ -3098,7 +3098,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>Pasta de configuração</translation>
     </message>
     <message>
-        <location line="+250"/>
+        <location line="+253"/>
         <source>History: could not remove the canceled post %1: %2</source>
         <translation>Histórico: não foi possível remover a postagem cancelada %1: %2</translation>
     </message>
@@ -3193,14 +3193,14 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>## dado a um comando pós-publicação; __rarPass__ nos argumentos continua a funcionar</translation>
     </message>
     <message>
-        <location line="-3132"/>
+        <location line="-3148"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Protocolo não suportado para NZB_UPLOAD_URL (%1). Você pode usar apenas: %2
 </translation>
     </message>
     <message>
-        <location line="+1903"/>
+        <location line="+1916"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost inicia gravação de logs: %1</translation>
     </message>
@@ -3225,7 +3225,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>erro analizando parâmetros de Proxy Socks5. A sintaxe deveria ser: %1</translation>
     </message>
     <message>
-        <location line="-2022"/>
+        <location line="-2035"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>o histórico de postagem &apos;%1&apos; não pode ser um diretório...
@@ -3240,7 +3240,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
 </translation>
     </message>
     <message>
-        <location line="+2082"/>
+        <location line="+2095"/>
         <source>should be a directory!...</source>
         <translation>deve ser um diretório!...</translation>
     </message>
@@ -3275,17 +3275,17 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>Palavra-chave errada para PACK: %1. Deve ser um subconjunto de (%2)</translation>
     </message>
     <message>
-        <location line="-2162"/>
+        <location line="-2175"/>
         <source>date</source>
         <translation>data</translation>
     </message>
     <message>
-        <location line="-1674"/>
+        <location line="-1722"/>
         <source>where to write the post info file (non-secret variables allowed)</source>
         <translation>onde gravar o arquivo de informações da postagem (variáveis não secretas permitidas)</translation>
     </message>
     <message>
-        <location line="+1675"/>
+        <location line="+1723"/>
         <source>nzb name</source>
         <translation>nome do nzb</translation>
     </message>
@@ -3320,7 +3320,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>a partir de</translation>
     </message>
     <message>
-        <location line="+388"/>
+        <location line="+397"/>
         <source>Shutdown process failed (exit code %1).</source>
         <translation>O processo de desligamento falhou (código de saída %1).</translation>
     </message>
@@ -3330,7 +3330,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>Erro no processo de desligamento: %1</translation>
     </message>
     <message>
-        <location line="+732"/>
+        <location line="+736"/>
         <location line="+797"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE deve ser um número inteiro positivo</translation>
@@ -3505,7 +3505,7 @@ O seu ficheiro de configuração activo é:
         <translation>Utilizando arquivo de configuração padrão: %1</translation>
     </message>
     <message>
-        <location line="+215"/>
+        <location line="+218"/>
         <source>## Lang for the app. Currently supported: EN, FR, ES, DE, NL, PT, ZH</source>
         <translation>## Idioma do programa. Atualmente suportado: EN, FR, ES. DE. NL, PT, ZH</translation>
     </message>
@@ -3590,12 +3590,12 @@ O seu ficheiro de configuração activo é:
         <translation></translation>
     </message>
     <message>
-        <location line="-736"/>
+        <location line="-739"/>
         <source>for compression and par2 support</source>
         <translation>para compressão e suporte par2</translation>
     </message>
     <message>
-        <location line="-4213"/>
+        <location line="-4274"/>
         <source>check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, see the report for whether they can be repaired, 2 = missing beyond any repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)</source>
         <translation>verificar o ficheiro nzb (se os artigos estão disponíveis na Usenet). Código de saída: 0 = todos os artigos presentes, 1 = faltam artigos, consulte o relatório para saber se são reparáveis, 2 = perda irreparável, 3 = sem veredicto (nzb ilegível, nenhum servidor ativado para verificação, ou ligações falhadas)</translation>
     </message>
@@ -3630,7 +3630,17 @@ O seu ficheiro de configuração activo é:
         <translation>O suporte de SSL não está disponível</translation>
     </message>
     <message>
-        <location line="+110"/>
+        <location line="+95"/>
+        <source>Shutdown postponed: waiting for a completed post with at least one successfully sent article (manual cancellations do not count).</source>
+        <translation>Encerramento adiado: a aguardar uma publicação concluída com pelo menos um artigo enviado com sucesso (os cancelamentos manuais não contam).</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Shutdown postponed: some posting tabs have not been submitted. Post them, clear them or close them to allow shutdown.</source>
+        <translation>Desligamento adiado: algumas abas de postagem ainda não foram enviadas. Envie-as, esvazie-as ou feche-as para permitir o desligamento.</translation>
+    </message>
+    <message>
+        <location line="+51"/>
         <source>The post remains paused until the requested VPN stop completes.</source>
         <translation>A publicação permanece em pausa até que a paragem solicitada da VPN termine.</translation>
     </message>
@@ -3640,7 +3650,7 @@ O seu ficheiro de configuração activo é:
         <translation>A publicação permanece em pausa até que a recuperação da VPN termine.</translation>
     </message>
     <message>
-        <location line="+875"/>
+        <location line="+888"/>
         <source>Error: --vpn-cleanup-unattributed requires --yes because it can interrupt another ngPost tunnel.</source>
         <translation>Erro: --vpn-cleanup-unattributed requer --yes porque pode interromper o túnel de outro ngPost.</translation>
     </message>
@@ -3786,7 +3796,7 @@ O seu ficheiro de configuração activo é:
         <translation>&apos;%1&apos; foi restringido à sua conta: contém as suas credenciais e era legível por outros utilizadores desta máquina</translation>
     </message>
     <message>
-        <location line="+222"/>
+        <location line="+225"/>
         <source># ngPost configuration file</source>
         <translation># arquivo de configuração ngPost</translation>
     </message>
@@ -4218,7 +4228,7 @@ O seu ficheiro de configuração activo é:
         <translation>Erro: não foi possível gravar o arquivo de configuração padrão: %1</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1167"/>
+        <location filename="../NgPost.h" line="+1194"/>
         <source>PACKing auto using: %1</source>
         <translation>Comptatação automática usando: %1</translation>
     </message>
@@ -4278,19 +4288,19 @@ O seu ficheiro de configuração activo é:
         <translation>Se você gostaria de traduzir ngPost em seu idioma, é fácil, por favor, entre em contato comigo em Matthieu.Bruel@gmail.com</translation>
     </message>
     <message>
-        <location filename="../NgPost.cpp" line="-5093"/>
+        <location filename="../NgPost.cpp" line="-5157"/>
         <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
         <translation>renomeia os ficheiros de entrada com um nome aleatório antes de os comprimir, para que o arquivo não contenha o nome original (a usar com --compress)</translation>
     </message>
     <message>
-        <location line="+2658"/>
+        <location line="+2719"/>
         <source>Do file name obfuscation (the input files are renamed before compression)
 </source>
         <translation>Ofuscação do nome do ficheiro (os ficheiros de entrada são renomeados antes da compressão)
 </translation>
     </message>
     <message>
-        <location line="+2188"/>
+        <location line="+2191"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation>## &apos;filename&apos; renomeia os ficheiros de entrada com um nome aleatório antes de os</translation>
     </message>
@@ -4300,7 +4310,7 @@ O seu ficheiro de configuração activo é:
         <translation>## comprimir, para que o arquivo não contenha nome original. Ambos ao mesmo tempo.</translation>
     </message>
     <message>
-        <location line="-1974"/>
+        <location line="-1977"/>
         <location line="+924"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX deve ser um inteiro positivo de até 2147483647.</translation>
@@ -4311,7 +4321,7 @@ O seu ficheiro de configuração activo é:
         <translation>PAR2_TOOL deve ser auto, parpar, par2cmdline ou multipar.</translation>
     </message>
     <message>
-        <location line="+978"/>
+        <location line="+981"/>
         <location line="+32"/>
         <source>## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.</source>
         <translation>## Caminhos automáticos usam a ferramenta selecionada do pacote atual ou do sistema. Caminhos personalizados devem apontar para um executável.</translation>
@@ -6029,7 +6039,7 @@ Guardar o modelo agora?</translation>
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+735"/>
+        <location filename="../PostingJob.cpp" line="+741"/>
         <source>Try to resume posting</source>
         <translation>Tentar resumir a postagem</translation>
     </message>
@@ -6065,13 +6075,13 @@ Guardar o modelo agora?</translation>
     </message>
     <message>
         <location line="+56"/>
-        <location line="+399"/>
+        <location line="+402"/>
         <location line="+8"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
         <translation>Não foi possível copiar nfo %1 para %2</translation>
     </message>
     <message>
-        <location line="-354"/>
+        <location line="-357"/>
         <source>Error: there are no NntpConnection...</source>
         <translation>Erro: não há ConexãoNntp...</translation>
     </message>
@@ -6091,7 +6101,7 @@ Guardar o modelo agora?</translation>
         <translation>Histórico: não foi possível registrar o início da postagem %1: %2</translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+54"/>
         <source>killing external process...</source>
         <translation>matando processo externo...</translation>
     </message>
@@ -6239,7 +6249,7 @@ Guardar o modelo agora?</translation>
         <translation>Histórico: não foi possível registar o tamanho da publicação %1: %2</translation>
     </message>
     <message>
-        <location line="+488"/>
+        <location line="+499"/>
         <source>posted: %1
 failed: %2
 unknown: %3
@@ -6286,7 +6296,7 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
 Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configurações PAR2 na interface).</translation>
     </message>
     <message>
-        <location line="-885"/>
+        <location line="-896"/>
         <source>History: could not record the outcome of post %1: %2</source>
         <translation>Histórico: não foi possível registar o resultado da publicação %1: %2</translation>
     </message>
@@ -6301,7 +6311,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>você pode tentar reenviar somente esses e juntar o nzb com o atual</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+28"/>
         <source>Could not consolidate the resumed NZB because its history is incomplete; the previous NZB was left untouched.</source>
         <translation>Não foi possível consolidar o NZB retomado porque seu histórico está incompleto; o NZB anterior permaneceu intacto.</translation>
     </message>
@@ -6374,12 +6384,12 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>Tamanhopost: %1 MB =&gt; Tamanhovol: %2</translation>
     </message>
     <message>
-        <location line="-891"/>
+        <location line="-902"/>
         <source>Couldn&apos;t rename file %1</source>
         <translation>Não foi possível renomear o arquivo %1</translation>
     </message>
     <message>
-        <location line="-855"/>
+        <location line="-858"/>
         <source>Could not stop the external process before restoring source files</source>
         <translation>Não foi possível parar o processo externo antes de restaurar os ficheiros de origem</translation>
     </message>
@@ -6389,7 +6399,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>Não foi possível guardar o estado do artigo interrompido: %1</translation>
     </message>
     <message>
-        <location line="+516"/>
+        <location line="+519"/>
         <source>Opening %1 configured NNTP connections…</source>
         <translation>Abrindo %1 conexões NNTP configuradas…</translation>
     </message>
@@ -6399,7 +6409,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>Conexões NNTP configuradas</translation>
     </message>
     <message>
-        <location line="+898"/>
+        <location line="+909"/>
         <source>Post interrupted with %1 ambiguous article(s); resume data was preserved.</source>
         <translation>Publicação interrompida com %1 artigo(s) ambíguo(s); os dados de retoma foram preservados.</translation>
     </message>
@@ -6485,7 +6495,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>ERRO: o diretório temporário precisa ser um diretório GRAVÁVEL...</translation>
     </message>
     <message>
-        <location line="-2128"/>
+        <location line="-2142"/>
         <source>History: could not create post record: %1</source>
         <translation>Histórico: não foi possível criar o registo do post: %1</translation>
     </message>
@@ -6505,7 +6515,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>Histórico: não foi possível criar o registo do ficheiro: %1</translation>
     </message>
     <message>
-        <location line="+1194"/>
+        <location line="+1208"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>Não foi possível regenerar o NZB final do histórico: %1</translation>
     </message>
@@ -6515,12 +6525,12 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>Aviso de histórico NZB: %1</translation>
     </message>
     <message>
-        <location line="-379"/>
+        <location line="-390"/>
         <source>[%1] skipping already posted article %2 from %3</source>
         <translation>[%1] a ignorar artigo já publicado %2 de %3</translation>
     </message>
     <message>
-        <location line="+744"/>
+        <location line="+755"/>
         <source>RAR_MAX must be greater than zero.</source>
         <translation>RAR_MAX deve ser maior que zero.</translation>
     </message>
@@ -6584,13 +6594,13 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
     </message>
     <message>
         <location line="+115"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+376"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+378"/>
         <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
         <translation>comprimento do nome de arquivo que o botão do dado gera (config LENGTH_NAME)</translation>
     </message>
     <message>
         <location line="+63"/>
-        <location filename="../hmi/PostingWidget.cpp" line="-86"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-88"/>
         <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
         <translation>comprimento da palavra-passe que o botão do dado gera (config LENGTH_PASS)</translation>
     </message>
@@ -6621,13 +6631,13 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
     </message>
     <message>
         <location line="+57"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+94"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+96"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation>Essa deve ser a senha do arquivo que você está postando</translation>
     </message>
     <message>
         <location line="+13"/>
-        <location filename="../hmi/PostingWidget.cpp" line="-97"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-99"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>senha usada no seu arquivo que também seria adicionada no cabeçalho do arquivo nzb</translation>
     </message>
@@ -6644,7 +6654,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
     </message>
     <message>
         <location line="+10"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+83"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+85"/>
         <source>archive name (file name obfuscation)</source>
         <translation>nome do arquivo (nome do arquivo ofuscado)</translation>
     </message>
@@ -6713,7 +6723,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>Lembre-se de que você pode selecionar itens na lista e pressionar DEL para removê-los</translation>
     </message>
     <message>
-        <location line="-623"/>
+        <location line="-625"/>
         <source>There are no selected files to post...</source>
         <translation>Não existem arquivos selecionados para postar...</translation>
     </message>
@@ -6741,31 +6751,31 @@ Deseja substituí-lo?</translation>
     </message>
     <message>
         <location line="+47"/>
-        <location line="+620"/>
+        <location line="+622"/>
         <location line="+20"/>
         <source>Stop Posting</source>
         <translation>Para a Postagem</translation>
     </message>
     <message>
-        <location line="-634"/>
-        <location line="+637"/>
+        <location line="-636"/>
+        <location line="+639"/>
         <source>Cancel Posting</source>
         <translation>Cancele a Postagem</translation>
     </message>
     <message>
-        <location line="-595"/>
+        <location line="-596"/>
         <source>Select one or more files to Post</source>
         <translation>Selecione um ou mais arquivo para Postar</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+13"/>
         <source>Select a Folder</source>
         <translation>Selecione uma Pasta</translation>
     </message>
     <message>
-        <location line="-32"/>
+        <location line="-34"/>
         <location line="+1"/>
-        <location line="+87"/>
+        <location line="+89"/>
         <location line="+28"/>
         <location line="+1"/>
         <source>requires: %1</source>
@@ -6996,7 +7006,7 @@ Alguns índices Usenet pedem um.</translation>
         <translation>VPN: backend ainda não suportado nesta plataforma</translation>
     </message>
     <message>
-        <location line="+305"/>
+        <location line="+309"/>
         <source>VPN install: timed out</source>
         <translation>Instalação VPN: tempo esgotado</translation>
     </message>
@@ -7016,20 +7026,20 @@ Alguns índices Usenet pedem um.</translation>
         <translation>O auxiliar VPN não está instalado. Abra o diálogo VPN e clique em Instalar.</translation>
     </message>
     <message>
-        <location line="-1861"/>
+        <location line="-1865"/>
         <location line="+10"/>
-        <location line="+1856"/>
+        <location line="+1860"/>
         <source>No active VPN profile / configuration is selected.</source>
         <translation>Nenhum perfil VPN ativo / configuração VPN selecionado.</translation>
     </message>
     <message>
-        <location line="-1849"/>
-        <location line="+1854"/>
+        <location line="-1853"/>
+        <location line="+1858"/>
         <source>The VPN configuration file is missing or unreadable: %1</source>
         <translation>O ficheiro de configuração VPN está em falta ou ilegível: %1</translation>
     </message>
     <message>
-        <location line="-1770"/>
+        <location line="-1774"/>
         <source>Disconnect the active VPN before changing its WireGuard configuration.</source>
         <translation>Desconecte a VPN ativa antes de alterar sua configuração do WireGuard.</translation>
     </message>
@@ -7119,7 +7129,7 @@ Alguns índices Usenet pedem um.</translation>
         <translation>VPN: ligado em %1 (%2) — nenhum DNS captado, usa-se o resolvedor do sistema</translation>
     </message>
     <message>
-        <location line="+568"/>
+        <location line="+572"/>
         <source>required VPN resource is missing or unreadable: %1</source>
         <translation>falta um recurso VPN necessário ou não é legível: %1</translation>
     </message>
@@ -7149,13 +7159,13 @@ Alguns índices Usenet pedem um.</translation>
         <translation>VPN: não foi possível criar uma pasta de instalação temporária</translation>
     </message>
     <message>
-        <location line="-451"/>
-        <location line="+457"/>
+        <location line="-455"/>
+        <location line="+461"/>
         <source>VPN: %1</source>
         <translation>VPN: %1</translation>
     </message>
     <message>
-        <location line="-1371"/>
+        <location line="-1375"/>
         <source>The machine-wide VPN lease security descriptor could not be created (Windows error %1).</source>
         <translation>Não foi possível criar o descritor de segurança da reserva da VPN a nível da máquina (erro do Windows %1).</translation>
     </message>
@@ -7250,7 +7260,7 @@ Alguns índices Usenet pedem um.</translation>
         <translation>VPN: à espera da confirmação da paragem do serviço…</translation>
     </message>
     <message>
-        <location line="+376"/>
+        <location line="+380"/>
         <source>could not stage bundled VPN executable: %1</source>
         <translation>não foi possível preparar o executável da VPN incluído: %1</translation>
     </message>

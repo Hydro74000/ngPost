@@ -159,6 +159,8 @@ private:
     uint _nbArticlesTotal;    //!< number of Articles of all the files to post
 
     AtomicBool _stopPosting;
+    // User/requested cancellation, distinct from normal worker shutdown.
+    bool _cancelRequested = false;
     AtomicBool _noMoreFiles;
 
     bool _postStarted;

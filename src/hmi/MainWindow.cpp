@@ -289,6 +289,11 @@ void MainWindow::init(NgPost *ngPost)
 
     _quickJobTab = new PostingWidget(ngPost, this, 1);
     connect(_quickJobTab, &PostingWidget::submissionEligibilityChanged, this, &MainWindow::updatePostAllButton);
+    connect(_quickJobTab,
+            &PostingWidget::submissionEligibilityChanged,
+            _ngPost,
+            &NgPost::maybeFinishApplication,
+            Qt::QueuedConnection);
     _autoPostTab = new AutoPostWidget(ngPost, this);
 
     _ui->debugBox->setChecked(_ngPost->debugMode());
@@ -625,6 +630,7 @@ void MainWindow::dropEvent(QDropEvent *e)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    const auto shutdownHold = _ngPost->holdShutdown();
     // Persist the current window geometry so the next run reopens at the
     // same size/position (saveGeometry also captures the maximized state).
     QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
@@ -846,6 +852,19 @@ void MainWindow::onToggleStartupTab(int tabIndex)
     _startupTabBar()->setStartupTab(_startupTab);
 }
 
+bool MainWindow::hasUnsubmittedPosts() const
+{
+    // Bulk submission can open an overwrite dialog and run a nested event
+    // loop while a previous post finishes. Keep shutdown blocked throughout.
+    if (_submittingAll)
+        return true;
+    for (int i = 0; i < _ui->postTabWidget->count(); ++i)
+        if (auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->widget(i)))
+            if (post->canSubmit())
+                return true;
+    return false;
+}
+
 bool MainWindow::hasFinishedPosts() const
 {
     // Post tabs live between the History tab and the trailing "New" one, so the
@@ -1027,8 +1046,8 @@ void MainWindow::_initPostingBox()
                 15000);
         });
 
-        connect(vpn, &VpnManager::recoveryExhausted,
-                this, [this, vpn](VpnManager::FailureKind) {
+        connect(vpn, &VpnManager::recoveryExhausted, this, [this, vpn](VpnManager::FailureKind) {
+            const auto shutdownHold = _ngPost->holdShutdown();
             QMessageBox box(QMessageBox::Critical, tr("VPN recovery exhausted"),
                 tr("The posting job is paused and preserved for a later resume."),
                 QMessageBox::NoButton, this);
@@ -1965,6 +1984,18 @@ PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &f
     newPostingWidget->init();
     connect(newPostingWidget, &PostingWidget::submissionEligibilityChanged, this, &MainWindow::updatePostAllButton);
     connect(newPostingWidget, &QObject::destroyed, this, &MainWindow::updatePostAllButton);
+    // Recheck after the tab/list mutation is complete, including the default
+    // tab being emptied and tabs removed by either close path.
+    connect(newPostingWidget,
+            &PostingWidget::submissionEligibilityChanged,
+            _ngPost,
+            &NgPost::maybeFinishApplication,
+            Qt::QueuedConnection);
+    connect(newPostingWidget,
+            &QObject::destroyed,
+            _ngPost,
+            &NgPost::maybeFinishApplication,
+            Qt::QueuedConnection);
     // Tab layout: 0=quick (#1), 1=folder, 2=history, 3="+" — so a tab inserted
     // at lastTabIdx becomes the (lastTabIdx-1)-th quick post for display.
     QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(lastTabIdx - 1);
@@ -1986,6 +2017,7 @@ bool MainWindow::_startResumePost(qint64 postId, bool askConfirmation)
     if (!postId || !_ngPost)
         return false;
 
+    const auto shutdownHold = _ngPost->holdShutdown();
     if (askConfirmation) {
         const int res = QMessageBox::question(
             this,
@@ -2329,6 +2361,7 @@ void MainWindow::onPostAllTabs()
                 post->postFiles(false);
     }
     updatePostAllButton();
+    QTimer::singleShot(0, _ngPost, &NgPost::maybeFinishApplication);
 }
 
 void MainWindow::onSaveConfig()
@@ -2435,12 +2468,12 @@ void MainWindow::onShutdownToggled(bool checked)
                                         QMessageBox::Yes,
                                         QMessageBox::No);
         if (res == QMessageBox::Yes)
-            _ngPost->_doShutdownWhenDone = checked;
+            _ngPost->setShutdownWhenDone(checked);
         else
             _ui->shutdownCB->setChecked(false);
     }
     else
-        _ngPost->_doShutdownWhenDone = false;
+        _ngPost->setShutdownWhenDone(false);
 }
 
 void MainWindow::setPauseIcon(bool pause)
@@ -2988,6 +3021,7 @@ void MainWindow::_onResumeSelectionChanged()
 void MainWindow::_onResumePost()
 {
     if (!_resumeTable || !_ngPost) return;
+    const auto shutdownHold = _ngPost->holdShutdown();
     const QModelIndexList selected = _resumeTable->selectionModel()->selectedRows();
     if (selected.isEmpty()) return;
     const int res = QMessageBox::question(

@@ -368,6 +368,12 @@ PostingJob::PostingJob(NgPost *ngPost,
     qDebug() << "[PostingJob] >>>> Construct " << this;
 #endif
     connect(this, &PostingJob::startPosting, this, &PostingJob::onStartPosting, Qt::QueuedConnection);
+    // Mark the request immediately: a natural completion may already be
+    // queued ahead of onStopPosting, but must not authorize shutdown now.
+    connect(this, &PostingJob::stopPosting, this, [this] {
+        _cancelRequested = true;
+        _ngPost->_resetShutdownCompletion();
+    }, Qt::DirectConnection);
     connect(this, &PostingJob::stopPosting, this, &PostingJob::onStopPosting, Qt::QueuedConnection);
     connect(this,
             &PostingJob::postingStarted,
@@ -1049,6 +1055,9 @@ void PostingJob::_postFiles()
 
 void PostingJob::onStopPosting()
 {
+    if (!_cancelRequested)
+        _ngPost->_resetShutdownCompletion();
+    _cancelRequested = true; // also cover direct callers (closing all jobs)
     if (_extProc) {
         _log(tr("killing external process..."));
         _extProc->terminate();
@@ -1827,6 +1836,17 @@ void PostingJob::_finishPosting()
         if (MB_LoadAtomic(_delFilesAfterPost))
             _delOriginalFiles();
     }
+
+    // Record the actual end synchronously, before postingFinished/noMoreConnection
+    // is queued. Re-arming shutdown resets this latch, so an old notification
+    // cannot enable a new request. No wall-clock comparison is needed.
+    // A terminal connection loss counts too if some articles were confirmed;
+    // automatic reconnection only pauses the job and never reaches this point.
+    // Explicit Stop/Cancel (including preserving the job for resume) does not
+    // qualify, even when some articles have already been transferred.
+    if (!_cancelRequested && _ngPost->_doShutdownWhenDone
+        && _nbArticlesUploaded > _nbArticlesFailed)
+        _ngPost->_transferEndedSinceShutdownArmed = true;
 }
 
 void PostingJob::_closeNzb()

@@ -1466,6 +1466,10 @@ QStringList VpnManager::windowsProgramFilesRoots()
 
 bool VpnManager::isHelperInstalled() const
 {
+#ifdef NGPOST_TESTING
+    if (_testHelperInstalled.has_value())
+        return *_testHelperInstalled;
+#endif
 #ifdef Q_OS_WIN
     // There is no ngPost-owned helper to install on Windows. We rely on
     // OpenVPN Community and WireGuard for Windows; the setup installer
