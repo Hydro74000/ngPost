@@ -223,7 +223,8 @@ HEADERS += \
     $$PWD/hmi/StartupTabBar.h \
     $$PWD/hmi/MainWindow.h \
     $$PWD/hmi/VpnProfileEditDialog.h \
-    $$PWD/hmi/VpnSettingsDialog.h
+    $$PWD/hmi/VpnSettingsDialog.h \
+    $$PWD/hmi/WrappedLabels.h
 
 FORMS += \
     $$PWD/hmi/AutoPostWidget.ui \

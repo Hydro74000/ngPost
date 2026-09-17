@@ -380,10 +380,13 @@ private:
     bool _transferEndedSinceShutdownArmed = false;
     int _shutdownHolds = 0;
     bool _waitingForTransfer = false;
+    bool _shutdownRecheckQueued = false;
     void _resetShutdownCompletion();
     void _releaseShutdownHold();
+    void _onPostingJobEnded(const PostingJob *job);
 #ifdef NGPOST_TESTING
     int _shutdownStartCount = 0;
+    int _shutdownRecheckCount = 0;
     QString _allowedShutdownCmdForTest;
 #endif
     bool _waitingForUnsubmittedPosts = false;
@@ -566,6 +569,7 @@ public:
         return true;
     }
     int shutdownStartCountForTest() const { return _shutdownStartCount; }
+    int shutdownRecheckCountForTest() const { return _shutdownRecheckCount; }
     bool shutdownInProgressForTest() const { return _shutdownProc != nullptr; }
     //! Read back what the configuration parsing produced, so a test can check
     //! that saveConfig() writes something that parses back to the same thing.
@@ -644,6 +648,8 @@ public:
     //! the posts, the post commands and the nzb uploads.
     void maybeFinishApplication();
     void setShutdownWhenDone(bool enabled);
+    //! Re-evaluate an armed shutdown once, after the current UI change settles.
+    void requestShutdownRecheck();
     //! Keep shutdown deferred through a dialog and the resulting queue changes.
     auto holdShutdown()
     {

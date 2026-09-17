@@ -369,12 +369,17 @@ PostingJob::PostingJob(NgPost *ngPost,
 #endif
     connect(this, &PostingJob::startPosting, this, &PostingJob::onStartPosting, Qt::QueuedConnection);
     // Mark the request immediately: a natural completion may already be
-    // queued ahead of onStopPosting, but must not authorize shutdown now.
+    // queued ahead of onStopPosting, but must still count as cancelled.
     connect(this, &PostingJob::stopPosting, this, [this] {
         _cancelRequested = true;
-        _ngPost->_resetShutdownCompletion();
     }, Qt::DirectConnection);
     connect(this, &PostingJob::stopPosting, this, &PostingJob::onStopPosting, Qt::QueuedConnection);
+    // Synchronous, right after _finishPosting(): NgPost must see the end before
+    // shutdown can be re-armed ahead of the queued onPostingJobFinished().
+    for (auto ended : { &PostingJob::postingFinished, &PostingJob::noMoreConnection })
+        connect(this, ended, _ngPost, [this] {
+            _ngPost->_onPostingJobEnded(this);
+        }, Qt::DirectConnection);
     connect(this,
             &PostingJob::postingStarted,
             _ngPost,
@@ -1055,8 +1060,6 @@ void PostingJob::_postFiles()
 
 void PostingJob::onStopPosting()
 {
-    if (!_cancelRequested)
-        _ngPost->_resetShutdownCompletion();
     _cancelRequested = true; // also cover direct callers (closing all jobs)
     if (_extProc) {
         _log(tr("killing external process..."));
@@ -1836,17 +1839,6 @@ void PostingJob::_finishPosting()
         if (MB_LoadAtomic(_delFilesAfterPost))
             _delOriginalFiles();
     }
-
-    // Record the actual end synchronously, before postingFinished/noMoreConnection
-    // is queued. Re-arming shutdown resets this latch, so an old notification
-    // cannot enable a new request. No wall-clock comparison is needed.
-    // A terminal connection loss counts too if some articles were confirmed;
-    // automatic reconnection only pauses the job and never reaches this point.
-    // Explicit Stop/Cancel (including preserving the job for resume) does not
-    // qualify, even when some articles have already been transferred.
-    if (!_cancelRequested && _ngPost->_doShutdownWhenDone
-        && _nbArticlesUploaded > _nbArticlesFailed)
-        _ngPost->_transferEndedSinceShutdownArmed = true;
 }
 
 void PostingJob::_closeNzb()

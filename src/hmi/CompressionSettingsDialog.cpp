@@ -12,6 +12,7 @@
 
 #include "ExternalToolPathWidget.h"
 #include "NgPost.h"
+#include "WrappedLabels.h"
 
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -110,14 +111,11 @@ CompressionSettingsDialog::~CompressionSettingsDialog() { delete _ui; }
 bool CompressionSettingsDialog::event(QEvent *event)
 {
     const bool handled = QDialog::event(event);
-    if (_layoutReady && (event->type() == QEvent::LayoutRequest || event->type() == QEvent::Resize || event->type() == QEvent::Show)) {
-        auto *label = _ui->volumeHelpLabel;
-        // heightForWidth also includes the previous minimum, so it cannot
-        // shrink a minimum measured before the form reached its actual width.
-        const int width = qMax(1, label->contentsRect().width() - 2 * label->margin());
-        const int height = label->fontMetrics().boundingRect(QRect(0, 0, width, INT_MAX), Qt::TextWordWrap, label->text()).height();
-        label->setMinimumHeight(height + 2 * label->margin());
-    }
+    // The volume help and the tool status of the path row both wrap.
+    if (_layoutReady
+        && (event->type() == QEvent::LayoutRequest || event->type() == QEvent::Resize
+            || event->type() == QEvent::Show))
+        fitWrappedLabels(*this);
     return handled;
 }
 

@@ -377,6 +377,9 @@ private:
     int  _serverRow(QObject *delButton);
     PostingWidget *_getPostWidget(int tabIndex) const;
     int _getPostWidgetIndex(PostingWidget *postWidget) const;
+    //! Every posting tab, the default one included, in visual order.
+    QList<PostingWidget *> _postingWidgets() const;
+    void _connectPostingWidget(PostingWidget *post);
 
     StartupTabBar *_startupTabBar() const;
     void _fillTabContextMenu(QMenu &menu, int tabIndex);

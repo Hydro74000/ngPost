@@ -288,12 +288,7 @@ void MainWindow::init(NgPost *ngPost)
     _applyLogCapacity(_ngPost->debugFull() ? 2 : (_ngPost->debugMode() ? 1 : 0));
 
     _quickJobTab = new PostingWidget(ngPost, this, 1);
-    connect(_quickJobTab, &PostingWidget::submissionEligibilityChanged, this, &MainWindow::updatePostAllButton);
-    connect(_quickJobTab,
-            &PostingWidget::submissionEligibilityChanged,
-            _ngPost,
-            &NgPost::maybeFinishApplication,
-            Qt::QueuedConnection);
+    _connectPostingWidget(_quickJobTab);
     _autoPostTab = new AutoPostWidget(ngPost, this);
 
     _ui->debugBox->setChecked(_ngPost->debugMode());
@@ -854,15 +849,34 @@ void MainWindow::onToggleStartupTab(int tabIndex)
 
 bool MainWindow::hasUnsubmittedPosts() const
 {
-    // Bulk submission can open an overwrite dialog and run a nested event
-    // loop while a previous post finishes. Keep shutdown blocked throughout.
-    if (_submittingAll)
-        return true;
+    // Post All needs no flag here: while one of its dialogs is open, that tab
+    // and the ones after it are still submittable.
+    for (const auto *post : _postingWidgets())
+        if (post->canSubmit())
+            return true;
+    return false;
+}
+
+QList<PostingWidget *> MainWindow::_postingWidgets() const
+{
+    QList<PostingWidget *> posts;
     for (int i = 0; i < _ui->postTabWidget->count(); ++i)
         if (auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->widget(i)))
-            if (post->canSubmit())
-                return true;
-    return false;
+            posts << post;
+    return posts;
+}
+
+void MainWindow::_connectPostingWidget(PostingWidget *post)
+{
+    // Re-evaluate after the tab or list change has settled, including the
+    // default tab being emptied and tabs removed by either close path.
+    // ~MainWindow() disconnects every PostingWidget from this first.
+    const auto changed = [this] {
+        updatePostAllButton();
+        _ngPost->requestShutdownRecheck();
+    };
+    connect(post, &PostingWidget::submissionEligibilityChanged, this, changed);
+    connect(post, &QObject::destroyed, this, changed);
 }
 
 bool MainWindow::hasFinishedPosts() const
@@ -1982,20 +1996,7 @@ PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &f
         lastTabIdx = _ui->postTabWidget->count() -1;
     PostingWidget *newPostingWidget = new PostingWidget(_ngPost, this, static_cast<uint>(lastTabIdx));
     newPostingWidget->init();
-    connect(newPostingWidget, &PostingWidget::submissionEligibilityChanged, this, &MainWindow::updatePostAllButton);
-    connect(newPostingWidget, &QObject::destroyed, this, &MainWindow::updatePostAllButton);
-    // Recheck after the tab/list mutation is complete, including the default
-    // tab being emptied and tabs removed by either close path.
-    connect(newPostingWidget,
-            &PostingWidget::submissionEligibilityChanged,
-            _ngPost,
-            &NgPost::maybeFinishApplication,
-            Qt::QueuedConnection);
-    connect(newPostingWidget,
-            &QObject::destroyed,
-            _ngPost,
-            &NgPost::maybeFinishApplication,
-            Qt::QueuedConnection);
+    _connectPostingWidget(newPostingWidget);
     // Tab layout: 0=quick (#1), 1=folder, 2=history, 3="+" — so a tab inserted
     // at lastTabIdx becomes the (lastTabIdx-1)-th quick post for display.
     QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(lastTabIdx - 1);
@@ -2332,11 +2333,10 @@ void MainWindow::updatePostAllButton()
     if (!_postAllButton)
         return;
     int tabs = 0, ready = 0;
-    for (int i = 0; i < _ui->postTabWidget->count(); ++i)
-        if (auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->widget(i))) {
-            ++tabs;
-            ready += post->canSubmit();
-        }
+    for (const auto *post : _postingWidgets()) {
+        ++tabs;
+        ready += post->canSubmit();
+    }
     _postAllButton->setText(tr("Post all tabs"));
     _postAllButton->setToolTip(tr("Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.").arg(ready));
     _postAllButton->setEnabled(!_submittingAll && tabs > 1 && ready > 0);
@@ -2350,10 +2350,9 @@ void MainWindow::onPostAllTabs()
         QScopedValueRollback<bool> guard(_submittingAll, true);
         updatePostAllButton();
         QList<QPointer<PostingWidget>> posts;
-        for (int i = 0; i < _ui->postTabWidget->count(); ++i)
-            if (auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->widget(i)))
-                if (post->canSubmit())
-                    posts << post;
+        for (auto *post : _postingWidgets())
+            if (post->canSubmit())
+                posts << post;
         updateServers();
         updateParams();
         for (const auto &post : posts)
@@ -2361,7 +2360,6 @@ void MainWindow::onPostAllTabs()
                 post->postFiles(false);
     }
     updatePostAllButton();
-    QTimer::singleShot(0, _ngPost, &NgPost::maybeFinishApplication);
 }
 
 void MainWindow::onSaveConfig()

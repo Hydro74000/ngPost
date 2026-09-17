@@ -128,6 +128,12 @@ private slots:
     void shutdown_handles_terminal_connection_loss();
     void shutdown_ignores_completion_queued_before_arming_data();
     void shutdown_ignores_completion_queued_before_arming();
+    //! Post All sets no flag of its own: a post that finishes while its
+    //! overwrite question is open still finds that tab submittable.
+    void shutdown_waits_during_post_all_overwrite_data();
+    void shutdown_waits_during_post_all_overwrite();
+    //! UI changes re-evaluate only an armed shutdown, once per burst.
+    void shutdown_rechecks_are_coalesced_and_only_when_armed();
     void par2_dialog_defaults_overrides_and_cancel();
     void par2_dialog_preserves_exact_volume_bytes();
     void par2_dialog_detects_real_gpu();
@@ -3104,7 +3110,7 @@ void TestMainWindow::legacy_bundle_paths_become_automatic()
     QCOMPARE(compression.findChild<QComboBox *>("rarPathMode")->currentData().toInt(), 0);
     ngPost.saveConfig();
     QFile config(PathHelper::configFilePath());
-    QVERIFY(config.open(QIODevice::ReadOnly));
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
     const auto saved = config.readAll();
     QVERIFY(saved.contains("PAR2_SOURCE = auto\n"));
     QVERIFY(saved.contains("PAR2_TOOL = parpar\n"));
@@ -3145,7 +3151,7 @@ void TestMainWindow::tool_paths_keep_custom_choices_and_report_missing_tools()
         QCOMPARE(dialog.result(), int(QDialog::Accepted));
     }
     QFile config(PathHelper::configFilePath());
-    QVERIFY(config.open(QIODevice::ReadOnly));
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
     auto saved = config.readAll();
     config.close();
     QVERIFY(saved.contains("PAR2_SOURCE = custom\n"));
@@ -3163,7 +3169,7 @@ void TestMainWindow::tool_paths_keep_custom_choices_and_report_missing_tools()
         dialog.accept();
         QCOMPARE(dialog.result(), int(QDialog::Accepted));
     }
-    QVERIFY(config.open(QIODevice::ReadOnly));
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
     saved = config.readAll();
     config.close();
     QVERIFY(saved.contains("PAR2_SOURCE = auto\n"));
@@ -3180,7 +3186,7 @@ void TestMainWindow::tool_paths_keep_custom_choices_and_report_missing_tools()
         dialog.accept();
         QCOMPARE(dialog.result(), int(QDialog::Accepted));
     }
-    QVERIFY(config.open(QIODevice::ReadOnly));
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
     saved = config.readAll();
     QVERIFY(saved.contains("RAR_SOURCE = auto\n"));
     QVERIFY(!QRegularExpression("(?m)^RAR_PATH =").match(QString::fromUtf8(saved)).hasMatch());
@@ -3228,7 +3234,9 @@ void TestMainWindow::log_file_keeps_timestamped_debug_fragments()
     QCoreApplication::sendPostedEvents(&ngPost, QEvent::MetaCall);
     QFile log(PathHelper::configDir() + "/ngPost.log");
     QVERIFY(log.open(QIODevice::ReadOnly));
-    const QString text = QString::fromUtf8(log.readAll());
+    // Written in text mode (CRLF on Windows). Not read in text mode: that would
+    // also drop the bare CR a progress update rewrites its line with.
+    const QString text = QString::fromUtf8(log.readAll()).replace("\r\n", "\n");
     const QRegularExpression stamp("^\\[\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\] ");
     QVERIFY2(text.contains("first debug fragment completed\n["), qPrintable(text));
     QVERIFY2(text.contains("second debug line\n["), qPrintable(text));
@@ -3309,7 +3317,7 @@ void TestMainWindow::legacy_missing_tool_paths_fall_back_with_a_warning()
 
     ngPost.saveConfig();
     QFile config(PathHelper::configFilePath());
-    QVERIFY(config.open(QIODevice::ReadOnly));
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString saved = QString::fromUtf8(config.readAll());
     QVERIFY(saved.contains("PAR2_TOOL = parpar\n"));
     QVERIFY(saved.contains("RAR_TOOL = 7zip\n"));
@@ -3319,7 +3327,7 @@ void TestMainWindow::legacy_missing_tool_paths_fall_back_with_a_warning()
     config.close();
     QVERIFY(ngPost.parseDefaultConfig().isEmpty());
     ngPost.saveConfig();
-    QVERIFY(config.open(QIODevice::ReadOnly));
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
     const auto reloaded = config.readAll();
     QVERIFY(reloaded.contains(("PAR2_PATH = " + par2Path + "\n").toUtf8()));
     QVERIFY(reloaded.contains(("RAR_PATH = " + rarPath + "\n").toUtf8()));
@@ -3380,7 +3388,7 @@ void TestMainWindow::legacy_parity_path_adopts_its_engine_only_when_usable()
 
     ngPost.saveConfig();
     QFile config(PathHelper::configFilePath());
-    QVERIFY(config.open(QIODevice::ReadOnly));
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString saved = QString::fromUtf8(config.readAll());
     QVERIFY2(saved.contains(installed ? "PAR2_TOOL = parpar\n" : "PAR2_TOOL = auto\n"),
              qPrintable(saved));
@@ -3454,7 +3462,7 @@ void TestMainWindow::explicit_tool_lines_that_cannot_apply_are_reported()
 
     ngPost.saveConfig();
     QFile config(PathHelper::configFilePath());
-    QVERIFY(config.open(QIODevice::ReadOnly));
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString saved = QString::fromUtf8(config.readAll());
     QVERIFY(saved.contains("RAR_TOOL = 7zip\n"));
     QVERIFY(saved.contains("RAR_SOURCE = custom\n"));
@@ -3967,7 +3975,8 @@ void TestMainWindow::shutdown_waits_during_vpn_confirmation()
     connect(&respond, &QTimer::timeout, window, [&] {
         for (auto *widget : QApplication::topLevelWidgets()) {
             auto *question = qobject_cast<QMessageBox *>(widget);
-            if (!question || question->windowTitle() != "VPN warning")
+            // macOS ignores QMessageBox titles: recognise the box by its text.
+            if (!question || !question->text().startsWith("VPN is enabled globally"))
                 continue;
             respond.stop();
             sawDialog = true;
@@ -4308,7 +4317,7 @@ void TestMainWindow::shutdown_ignores_requested_cancellation()
             connect(&confirm, &QTimer::timeout, window, [&] {
                 for (auto *widget : QApplication::topLevelWidgets()) {
                     auto *box = qobject_cast<QMessageBox *>(widget);
-                    if (box && box->windowTitle() == "close while still posting?") {
+                    if (box && box->text().startsWith("ngPost is currently posting.")) {
                         if (stopAction == "close_completion" && job && deadline.elapsed() < 15000)
                             continue;
                         ngPost.maybeFinishApplication();
@@ -4333,7 +4342,7 @@ void TestMainWindow::shutdown_ignores_requested_cancellation()
             connect(&choose, &QTimer::timeout, window, [&] {
                 for (auto *widget : QApplication::topLevelWidgets()) {
                     auto *box = qobject_cast<QMessageBox *>(widget);
-                    if (!box || box->windowTitle() != "VPN recovery exhausted")
+                    if (!box || !box->text().startsWith("The posting job is paused"))
                         continue;
                     for (auto *button : box->buttons())
                         if (box->buttonRole(button) == QMessageBox::RejectRole) {
@@ -4495,4 +4504,116 @@ void TestMainWindow::shutdown_waits_during_input_dialogs()
     QTRY_COMPARE_WITH_TIMEOUT(ngPost.shutdownStartCountForTest(), 1, 15000);
     QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
     QCOMPARE(mock.receivedArticles().size(), selectInput && dialogKind == "files" ? 2 : 1);
+}
+
+void TestMainWindow::shutdown_waits_during_post_all_overwrite_data()
+{
+    QTest::addColumn<bool>("overwrite");
+    QTest::newRow("overwrite") << true;
+    QTest::newRow("keep existing nzb") << false;
+}
+
+void TestMainWindow::shutdown_waits_during_post_all_overwrite()
+{
+    QFETCH(bool, overwrite);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "40" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *running = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *prepared = window->addNewQuickTab(tabs->count() - 1);
+    QVERIFY(addShutdownTestFile(running, root + "/running.bin"));
+    QVERIFY(addShutdownTestFile(prepared, root + "/prepared.bin"));
+    const auto nzbPath = prepared->findChild<QLineEdit *>("nzbFileEdit")->text();
+    QFile existing(nzbPath.endsWith(".nzb") ? nzbPath : nzbPath + ".nzb");
+    QVERIFY(existing.open(QIODevice::WriteOnly));
+    existing.write("original nzb");
+    existing.close();
+    QVERIFY(armTestShutdown(window));
+    running->postFiles(true);
+
+    bool askedWhileRunning = false;
+    bool blocked = false;
+    QElapsedTimer waited;
+    QTimer answer;
+    connect(&answer, &QTimer::timeout, window, [&] {
+        for (auto *widget : QApplication::topLevelWidgets()) {
+            auto *question = qobject_cast<QMessageBox *>(widget);
+            if (!question || !question->text().contains("already exists"))
+                continue;
+            if (!waited.isValid()) {
+                waited.start();
+                askedWhileRunning = !running->isPostingFinished();
+            }
+            // Let the running post end inside the question's own event loop.
+            if (!running->isPostingFinished() && waited.elapsed() < 15000)
+                return;
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+            ngPost.maybeFinishApplication();
+            blocked = running->isPostingFinished() && ngPost.shutdownStartCountForTest() == 0;
+            answer.stop();
+            question->done(overwrite ? QMessageBox::Yes : QMessageBox::No);
+            return;
+        }
+    });
+    answer.start(5);
+    window->findChild<QPushButton *>("postAllTabsButton")->click();
+    answer.stop();
+    QVERIFY(askedWhileRunning);
+    QVERIFY2(blocked, "Shutdown started while Post All was asking about an existing nzb");
+    if (!overwrite) {
+        QVERIFY(prepared->canSubmit());
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+        ngPost.maybeFinishApplication();
+        QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
+        prepared->findChild<QPushButton *>("clearFilesButton")->click();
+    }
+    QTRY_COMPARE_WITH_TIMEOUT(ngPost.shutdownStartCountForTest(), 1, 15000);
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.shutdownInProgressForTest(), 15000);
+    QCOMPARE(mock.receivedArticles().size(), overwrite ? 2 : 1);
+}
+
+void TestMainWindow::shutdown_rechecks_are_coalesced_and_only_when_armed()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *post = qobject_cast<PostingWidget *>(
+        window->findChild<QTabWidget *>("postTabWidget")->widget(0));
+    const auto addBurst = [&](const QString &prefix) {
+        for (int i = 0; i < 50; ++i)
+            if (!addShutdownTestFile(post, root + QString("/%1-%2.bin").arg(prefix).arg(i)))
+                return false;
+        return true;
+    };
+
+    QVERIFY(addBurst("idle"));
+    post->findChild<QPushButton *>("clearFilesButton")->click();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+    QCOMPARE(ngPost.shutdownRecheckCountForTest(), 0);
+
+    QVERIFY(armTestShutdown(window));
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+    const int armed = ngPost.shutdownRecheckCountForTest();
+    QVERIFY(addBurst("armed"));
+    post->findChild<QPushButton *>("clearFilesButton")->click();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+    QCOMPARE(ngPost.shutdownRecheckCountForTest(), armed + 1);
+    QCOMPARE(ngPost.shutdownStartCountForTest(), 0);
 }

@@ -287,6 +287,8 @@ public:
     inline bool hasPostStarted() const;
     inline bool hasPostFinished() const;
     inline bool hasPostFinishedSuccessfully() const;
+    //! Stop/Cancel was requested, whether or not the job had already finished.
+    inline bool cancelRequested() const;
 
     //! The success rule itself, so it can be exercised without a live post.
     inline static bool postSucceeded(bool postFinished, uint nbArticlesFailed, bool anyFileFailed);
@@ -630,6 +632,10 @@ bool PostingJob::hasPostStarted() const
 bool PostingJob::hasPostFinished() const
 {
     return _postFinished;
+}
+bool PostingJob::cancelRequested() const
+{
+    return _cancelRequested;
 }
 bool PostingJob::hasPostFinishedSuccessfully() const
 {

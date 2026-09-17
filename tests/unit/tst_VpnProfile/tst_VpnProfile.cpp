@@ -378,6 +378,9 @@ void TestVpnProfile::master_switch_ignored_without_active_vpn_profile()
     TestVpnHelperFile helper;
 
     VpnManager manager;
+    // What is under test is the neutral master switch, not the detection of
+    // installed VPN clients: a CI runner without OpenVPN/WireGuard must run it.
+    manager.setHelperInstalledForTest(true);
     manager.setAutoConnect(true);
     if (!manager.vpnFeatureAvailable())
         QSKIP("No VPN helper/prerequisite available on this platform");

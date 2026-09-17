@@ -1716,15 +1716,42 @@ void NgPost::_resetShutdownCompletion()
 void NgPost::_releaseShutdownHold()
 {
     --_shutdownHolds;
-    if (_doShutdownWhenDone)
-        QTimer::singleShot(0, this, &NgPost::maybeFinishApplication);
+    requestShutdownRecheck();
+}
+
+void NgPost::requestShutdownRecheck()
+{
+    // Only an armed shutdown needs UI changes re-evaluated, and a burst of them
+    // (a dropped folder adds one row at a time) needs a single check.
+    if (!_doShutdownWhenDone || _shutdownRecheckQueued)
+        return;
+    _shutdownRecheckQueued = true;
+    QTimer::singleShot(0, this, [this] {
+        _shutdownRecheckQueued = false;
+#ifdef NGPOST_TESTING
+        ++_shutdownRecheckCount;
+#endif
+        maybeFinishApplication();
+    });
+}
+
+void NgPost::_onPostingJobEnded(const PostingJob *job)
+{
+    // Called synchronously when the job ends, so re-arming shutdown before the
+    // queued onPostingJobFinished() cannot be satisfied by this job. A terminal
+    // connection loss counts if some articles were confirmed; an explicit
+    // Stop/Cancel (even preserved for resume) withdraws any earlier completion.
+    if (job->cancelRequested())
+        _resetShutdownCompletion();
+    else if (_doShutdownWhenDone && job->nbArticlesUploaded() > job->nbArticlesFailed())
+        _transferEndedSinceShutdownArmed = true;
 }
 
 void NgPost::maybeFinishApplication()
 {
 #ifdef __USE_HMI__
-    const bool unsubmittedPosts = _hmi && _hmi->hasUnsubmittedPosts();
-    if (!_doShutdownWhenDone || !unsubmittedPosts)
+    // Set only while shutdown is armed: scan the tabs only to end that episode.
+    if (_waitingForUnsubmittedPosts && !(_hmi && _hmi->hasUnsubmittedPosts()))
         _waitingForUnsubmittedPosts = false;
 #endif
     if (_pendingExitCode >= 0) {
@@ -1767,7 +1794,7 @@ void NgPost::maybeFinishApplication()
 #ifdef __USE_HMI__
         // Prepared tabs do not enter _pendingJobs until Post Files is clicked.
         // They must also finish (or be removed) before the computer can stop.
-        if (unsubmittedPosts) {
+        if (_hmi && _hmi->hasUnsubmittedPosts()) {
             if (!_waitingForUnsubmittedPosts) {
                 _waitingForUnsubmittedPosts = true;
                 _log(tr("Shutdown postponed: some posting tabs have not been submitted. "
@@ -2518,6 +2545,7 @@ QString NgPost::randomPass(uint length) const
 
 void NgPost::closeAllPostingJobs()
 {
+    // Deleted pending jobs never report their end; the active one does.
     _resetShutdownCompletion();
     qDeleteAll(_pendingJobs);
     _pendingJobs.clear();
@@ -2527,7 +2555,6 @@ void NgPost::closeAllPostingJobs()
 
 void NgPost::stopActivePostingForResume()
 {
-    _resetShutdownCompletion();
     if (_activeJob)
         emit _activeJob->stopPosting();
 }
@@ -2540,7 +2567,7 @@ void NgPost::closeAllMonitoringJobs()
         PostingJob *job = *it;
         if (!job->widget())
         {
-            _resetShutdownCompletion();
+            _resetShutdownCompletion(); // deleted below without reporting its end
             it = _pendingJobs.erase(it);
             if (_debug)
                 _error(tr("Cancelling monitoring job: %1").arg(job->getFirstOriginalFile()));

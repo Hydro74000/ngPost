@@ -26,6 +26,13 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libsecret-1-dev shellcheck bubblewrap
 
+      # Ubuntu 24.04 runners restrict unprivileged user namespaces through
+      # AppArmor, so bwrap fails with "setting up uid map: Permission denied".
+      # tst_CliParser needs bwrap to isolate the Qt TLS plugins, and its pinned
+      # test count rejects a silent skip.
+      - name: Allow unprivileged user namespaces for bwrap
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - name: Verify TLS plugin isolation prerequisite
         run: bwrap --ro-bind / / --dev-bind /dev /dev --proc /proc true
 

@@ -2,6 +2,7 @@
 #include "Par2SettingsDialog.h"
 #include "ExternalToolPathWidget.h"
 #include "NgPost.h"
+#include "WrappedLabels.h"
 #include <QBoxLayout>
 #include <QCheckBox>
 #include <QComboBox>
@@ -386,13 +387,7 @@ bool Par2SettingsDialog::event(QEvent *event)
 {
     const bool handled = QDialog::event(event);
     if (_layoutReady && (event->type() == QEvent::LayoutRequest || event->type() == QEvent::Resize || event->type() == QEvent::Show))
-        for (auto *label : findChildren<QLabel *>())
-            if (label->wordWrap()) {
-                const int width = qMax(1, label->contentsRect().width() - 2 * label->margin());
-                const int height = label->text().isEmpty() ? 0
-                    : label->fontMetrics().boundingRect(QRect(0, 0, width, INT_MAX), Qt::TextWordWrap, label->text()).height();
-                label->setMinimumHeight(height + 2 * label->margin());
-            }
+        fitWrappedLabels(*this);
     return handled;
 }
 Par2SettingsDialog::~Par2SettingsDialog()
