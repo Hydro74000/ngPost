@@ -285,9 +285,12 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _useRarMax(options.useRarMax)
     , _par2Pct(options.par2Pct)
     , _par2Path(options.par2Tool == par2::Tool::Auto ? ngPost->_par2Path : options.par2Path)
-    , _par2Args(options.par2Tool == par2::Tool::Auto ? ngPost->_par2Args : options.par2Arguments)
+    , _par2Args(options.par2Tool == par2::Tool::Auto ? ngPost->par2ArgsInUse()
+                                                     : options.par2Arguments)
     , _par2Tool(options.par2Tool == par2::Tool::Auto
-                    ? (ngPost->useParPar() ? par2::Tool::ParPar : ngPost->useMultiPar() ? par2::Tool::MultiPar : par2::Tool::Par2cmdline)
+                    ? (ngPost->useParPar()         ? par2::Tool::ParPar
+                           : ngPost->useMultiPar() ? par2::Tool::MultiPar
+                                                   : par2::Tool::Par2cmdline)
                     : options.par2Tool)
     , _doCompress(options.doCompress)
     , _doPar2(options.doPar2)
@@ -2510,8 +2513,18 @@ void PostingJob::onGenPar2Finished(int exitCode)
 
     _cleanExtProc();
 
-    if (exitCode != 0) {
-        _error(tr("Error during par2 generation: %1").arg(exitCode));
+    // An exit code alone is not proof: par2j handed switches it does not know
+    // -- ParPar's, say, on a PAR2_ARGS_CUSTOM line -- prints its usage and
+    // exits 0, and the files would go out without any recovery data.
+    bool const wrote = !_compressDir
+        || !_compressDir->entryList({ QStringLiteral("*.par2") }, QDir::Files).isEmpty();
+    if (exitCode != 0 || !wrote) {
+        if (exitCode != 0)
+            _error(tr("Error during par2 generation: %1").arg(exitCode));
+        else
+            _error(tr("The par2 tool ended without an error but wrote no par2 file, so nothing "
+                      "is posted. Its arguments are probably written for another tool: check "
+                      "them against PAR2_TOOL."));
         _cleanCompressDir();
         _abortBeforeTransfer();
     } else {

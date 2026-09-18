@@ -401,9 +401,11 @@ void PostingWidget::onPar2CB(bool checked)
     QString const needs = compress ? tr("requires: %1").arg(_ui->par2CB->text())
                                    : tr("requires: %1").arg(_ui->compressCB->text());
 
-    setDependentEnabled(_ui->redundancySB, checked && compress,
-                        tr("Using PAR2_ARGS from config file: %1").arg(_ngPost->_par2Args),
-                        needs);
+    setDependentEnabled(
+        _ui->redundancySB,
+        checked && compress,
+        tr("Using the PAR2 arguments of the configuration: %1").arg(_ngPost->par2ArgsInUse()),
+        needs);
 }
 
 void PostingWidget::onGenCompressName()
@@ -526,7 +528,7 @@ void PostingWidget::init()
     _ui->nameLengthSB->setRange(5, 50);
     _ui->nameLengthSB->setValue(static_cast<int>(_ngPost->_lengthName));
     _ui->passLengthSB->setRange(5, 50);
-    _ui->passLengthSB->setValue(static_cast<int>(_ngPost->_lengthPass));
+    _ui->passLengthSB->setValue(static_cast<int>(_ngPost->_lengthPassDefault));
 
     _ui->copyNfoWithNzbCB->setChecked(_ngPost->_copyNfoWithNzb);
 
@@ -907,6 +909,8 @@ void PostingWidget::refreshPar2Default()
     _ui->redundancySB->setSpecialValueText(tr("Global (%1 %)").arg(_ngPost->par2DefaultPercentage()));
     _ui->redundancySB->setMaximumWidth(QWIDGETSIZE_MAX);
     _ui->redundancySB->setMinimumWidth(_ui->redundancySB->sizeHint().width());
+    // The tooltip of the redundancy names the arguments a post runs with.
+    onPar2CB(_ui->par2CB->isChecked());
 }
 
 void PostingWidget::setPar2PercentageOverride(int percentage)

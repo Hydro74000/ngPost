@@ -1,27 +1,67 @@
-# Usage:
-# Assuming you want to share the "files" subdirectory
-# and your ngPost config is ngPost.docker.conf.
-# $ docker build -t ngpost .
-# $ docker run -it -v $PWD/files:/root/files -v $PWD/ngPost.docker.conf:/root/.ngPost ngpost ARGUMENTS
-# The integrated Linux VPN additionally requires volatile runtime state:
-# $ docker run -it --tmpfs /run:rw,nosuid,nodev,mode=755 ... ngpost ARGUMENTS
-# ngPost deliberately refuses the VPN when /run is persistent or inaccessible.
+# ngPost without a graphical interface, for a server, a NAS or a CI runner.
+#
+#   docker build -t ngpost .
+#   docker run --rm -v "$PWD/config:/config" -v "$PWD/data:/data" ngpost --version
+#
+# The configuration lives at /config/ngPost/ngPost.conf -- ngPost reads it from
+# $XDG_CONFIG_HOME, which this image points at /config. Copy ngPost.docker.conf
+# there to start from something that works, and put your files under /data.
+#
+# What this image can and cannot do:
+#   * 7-Zip and par2cmdline are installed. rar is non-free and cannot be
+#     redistributed: mount your own binary and set RAR_TOOL = rar with
+#     RAR_SOURCE = custom / RAR_PATH if you need it.
+#   * The integrated VPN is not supported here. A tunnel needs NET_ADMIN,
+#     /dev/net/tun and a volatile /run, and ngPost deliberately refuses to run
+#     one when /run is persistent. Put the container behind the VPN instead.
+#   * The build is the headless one (CONFIG+=no_hmi): Qt Core, Network, Sql,
+#     DBus and qtkeychain only, no X11, so --auto and --monitor run with no
+#     display of any kind.
 
-FROM debian:10
+ARG DEBIAN_VERSION=trixie-slim
 
-RUN sed -i 's/main$/main non-free/' /etc/apt/sources.list
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    git build-essential qt5-qmake qt5-default par2 rar ca-certificates \
+FROM debian:${DEBIAN_VERSION} AS build
+
+# One job by default: a fat -j on a small machine ends in the OOM killer, and
+# the CI runner passes its own count.
+ARG JOBS=1
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+        build-essential \
+        qt6-base-dev \
+        qtkeychain-qt6-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . /usr/src/ngPost
-WORKDIR /usr/src/ngPost/src
+COPY . /src
+WORKDIR /build
+RUN qmake6 CONFIG+=no_hmi /src/src/ngPost.pro \
+    && make -j"${JOBS}" \
+    && strip ngPost
 
-ENV QT_SELECT=qt5-x86_64-linux-gnu
-RUN git clean -fx && qmake && make -j$(nproc)
-RUN ln -s /usr/src/ngPost/src/ngPost /usr/local/bin/ngPost
+FROM debian:${DEBIAN_VERSION}
 
-WORKDIR /root
-VOLUME /root/files
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+        libqt6core6t64 \
+        libqt6network6 \
+        libqt6sql6 \
+        libqt6sql6-sqlite \
+        libqt6dbus6 \
+        libqt6keychain1 \
+        par2 \
+        7zip \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT [ "ngPost" ]
+COPY --from=build /build/ngPost /usr/local/bin/ngPost
+
+# Qt needs a UTF-8 locale and says so on every run under the bare "C" of a slim
+# image, before any output of ngPost. C.UTF-8 ships with glibc itself.
+ENV LANG=C.UTF-8
+ENV XDG_CONFIG_HOME=/config
+VOLUME ["/config", "/data"]
+WORKDIR /data
+
+ENTRYPOINT ["ngPost"]
+CMD ["--help"]

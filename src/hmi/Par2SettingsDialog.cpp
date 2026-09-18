@@ -265,7 +265,7 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
     connect(_buttons, &QDialogButtonBox::accepted, this, &Par2SettingsDialog::accept);
     connect(_buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
-    _initial = par2::Settings::read(effectiveTool(), ngPost->_par2Args);
+    _initial = par2::Settings::read(effectiveTool(), ngPost->par2ArgsConfigured());
     select(_blocks, _initial.blocks);
     _blockBytes->setValue(_initial.blockBytes);
     _blockCount->setValue(_initial.blockCount);
@@ -283,8 +283,11 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
         else
             _device->setCurrentText(_initial.device);
     }
+    // A PAR2_ARGS_CUSTOM line is the user's word: those arguments are theirs
+    // even when this dialog could express them, so nothing here rewrites them.
+    _initial.custom = _initial.custom || !ngPost->_par2ArgsCustom.isEmpty();
     _custom->setChecked(_initial.custom);
-    _arguments->setPlainText(ngPost->_par2Args);
+    _arguments->setPlainText(ngPost->par2ArgsConfigured());
     if (_initial.custom) advancedButton->setChecked(true);
     if (effectiveTool() == par2::Tool::MultiPar) {
         _threads->setMaximum(32);
@@ -646,9 +649,29 @@ void Par2SettingsDialog::updatePreview()
         if (total / volume > 32768) { _preview->setText(tr("Estimate unavailable: too many source volumes.")); return; }
         while (total > 0) { sizes << qMin(total, volume); total -= sizes.last(); }
     }
-    const auto e = settings().estimate(sizes, uint(_percentage->value()));
+    const auto configured = settings();
+    const auto e = configured.estimate(sizes, uint(_percentage->value()));
     if (!e.valid) {
-        _preview->setText(tr("Estimate indeterminate for these arguments or block limits."));
+        // par2j caps a post at 32768 source blocks: asking for smaller ones does
+        // not give more, it makes par2j pick its own size after scanning, and
+        // the PAR2 step then takes several times longer for the same result.
+        qint64 sourceBytes = 0;
+        for (qint64 size : sizes)
+            sourceBytes += size;
+        const qint64 wanted = configured.tool == par2::Tool::MultiPar
+                && configured.blocks == par2::Blocks::Size && configured.blockBytes > 0
+            ? (sourceBytes + configured.blockBytes - 1) / configured.blockBytes
+            : 0;
+        if (wanted > 32768) {
+            const qint64 least = ((sourceBytes + 32767) / 32768 + 3) / 4 * 4;
+            _preview->setText(tr("MultiPar stops at 32768 source blocks, and this post would need "
+                                 "%1: par2j enlarges the blocks itself, which makes the PAR2 step "
+                                 "several times longer. Choose a source block count, or a block "
+                                 "size of at least %2.")
+                                  .arg(wanted)
+                                  .arg(bytes(least)));
+        } else
+            _preview->setText(tr("Estimate indeterminate for these arguments or block limits."));
         return;
     }
     QString text = _beforeCompression ? tr("Estimate before compression (source sizes and rounding):")
@@ -666,6 +689,8 @@ void Par2SettingsDialog::accept()
     if (!_buttons->button(QDialogButtonBox::Save)->isEnabled()) return;
     if (_dirty) {
         const auto s = settings();
+        const auto engineBefore = _ngPost->_par2Tool;
+        const bool fellBackBefore = _ngPost->_par2ToolFallback != par2::Tool::Auto;
         // Persist the engine whose arguments were generated, even when the
         // user initially selected automatic engine discovery.
         _ngPost->_par2Tool = externaltool::executable(_path->text()) ? effectiveTool()
@@ -674,9 +699,25 @@ void Par2SettingsDialog::accept()
         _ngPost->_par2PathMode = _toolPath->mode();
         _ngPost->_par2PathConfig = _toolPath->customPath();
         _ngPost->_par2PctDefault = uint(_percentage->value());
-        _ngPost->_par2Args = s.custom ? _arguments->toPlainText()
-                                    : par2::joinArguments(s.arguments(_ngPost->_par2PctDefault));
+        // Custom arguments live on their own line, so the one this dialog
+        // maintains stays available for the day the boxes are used again.
+        if (s.custom)
+            // One configuration line: a text box can hold several, and the
+            // lines after the first would be read as other settings, or as
+            // nothing at all, and the arguments silently truncated.
+            _ngPost->_par2ArgsCustom =
+                _arguments->toPlainText().replace(QRegularExpression("\\s*\n\\s*"), " ").trimmed();
+        else {
+            _ngPost->_par2ArgsCustom.clear();
+            _ngPost->_par2Args = par2::joinArguments(s.arguments(_ngPost->_par2PctDefault));
+        }
         if (!s.custom) _ngPost->_par2BlockSize = s.exactBlockBytes();
+        // The engine saved here replaces the one this run fell back to at
+        // startup. When it is not installed either, the fallback and its path
+        // are worked out again rather than left pointing at the old choice --
+        // _par2Path above is empty for a missing engine. Said once per engine:
+        // saving again around one already reported missing stays quiet.
+        _ngPost->_applyPar2Fallback(_ngPost->_par2Tool != engineBefore || !fellBackBefore);
         emit _ngPost->par2DefaultsChanged();
         _ngPost->saveConfig();
     }

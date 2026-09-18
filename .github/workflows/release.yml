@@ -1041,6 +1041,57 @@ jobs:
             dist/*.AppImage
             dist/*.AppImage.zsync
 
+  publish-image:
+    name: Publish container image
+    runs-on: ubuntu-latest
+    # After the release, whose needs already cover every build and test suite:
+    # a version tag -- and "latest" on the stable channel -- must never point at
+    # an image whose release failed. A failed push here leaves a release without
+    # its image, which re-running this failed job publishes; the reverse would
+    # leave a public tag behind a release that does not exist.
+    needs: [release-metadata, release]
+    permissions:
+      contents: read
+      packages: write
+    # Same rule as the release job: a push to master/devel publishes, a manual
+    # run only when its "publish" input is checked.
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build the image
+        run: docker build --build-arg JOBS="$(nproc)" -t ngpost:release .
+
+      - name: It runs, and holds what it promises
+        run: |
+          docker run --rm ngpost:release --version
+          docker run --rm --entrypoint sh ngpost:release -c '
+            set -e
+            command -v par2 >/dev/null || { echo "par2cmdline missing"; exit 1; }
+            command -v 7z   >/dev/null || { echo "7-Zip missing"; exit 1; }
+            ! ldd /usr/local/bin/ngPost | grep -E "libQt6Widgets|libQt6Gui|libX11"
+          '
+
+      # No third-party action: the token this pushes with is the one GitHub
+      # hands the job, and it never leaves the runner.
+      - name: Publish to ghcr.io
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release-metadata.outputs.package_version }}
+          CHANNEL: ${{ needs.release-metadata.outputs.channel }}
+        run: |
+          image="ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag ngpost:release "$image:$VERSION"
+          docker push "$image:$VERSION"
+          # "latest" follows the stable channel only: an unstable build must
+          # never become what a bare `docker pull ngpost` gives.
+          if [ "$CHANNEL" = "stable" ]; then
+            docker tag ngpost:release "$image:latest"
+            docker push "$image:latest"
+          fi
+          docker logout ghcr.io
+
   release:
     name: Create Release
     runs-on: ubuntu-latest

@@ -25,9 +25,12 @@ nzbPath  = /tmp
 ## Shutdown command to switch off the computer when ngPost is done with all its queued posting
 ## this should mainly used with the auto posting
 ## you could use whatever script instead (like to send a mail...)
-#SHUTDOWN_CMD = shutdown /s /f /t 0  (Windows)
-#SHUTDOWN_CMD = sudo -n /sbin/poweroff  (Linux, make sure poweroff has sudo rights without any password or change the command)
-#SHUTDOWN_CMD = sudo -n shutdown -h now (MacOS, same make sure you've sudo rights)
+## the three lines below are for Windows, Linux and macOS, in that order; the
+## last two need sudo rights without a password. Uncomment one as it is:
+## anything after the = is the command, including a note in parentheses.
+#SHUTDOWN_CMD = shutdown /s /f /t 0
+#SHUTDOWN_CMD = sudo -n /sbin/poweroff
+#SHUTDOWN_CMD = sudo -n shutdown -h now
 
 ## upload the nzb to a specific URL
 ## only http, https or ftp (neither ftps or sftp are supported)
@@ -320,8 +323,9 @@ RAR_SOURCE = auto
 ## -hp will be added if you use a password with --gen_pass, --rar_pass or using the HMI
 ## -v42m will be added with --rar_size or using the HMI
 ## you could change the compression level, lock the archive, add redundancy...
+## the first line below is for rar, the second for 7-zip:
 #RAR_EXTRA = -ep1 -m0 -k -rr5p
-#RAR_EXTRA = -mx0 -mhe=on   (for 7-zip)
+#RAR_EXTRA = -mx0 -mhe=on
 
 ## RAR volume size in MiB (1 MiB = 1048576 bytes; 0 means no split without RAR_MAX)
 ## feel free to change the value or to comment the next line if you don't want to split the archive
@@ -358,11 +362,27 @@ PAR2_SOURCE = auto
 #PAR2_PATH = /usr/bin/par2
 #PAR2_PATH = C:\Program Files\MultiPar\par2j64.exe
 
-## fixed parameters for the par2 (or alternative) command
-## you could for exemple use Multipar on Windows
-#PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q   (for parpar)
-#PAR2_ARGS = c -l -m1024 -r8 -s768000                 (for par2cmdline)
-#PAR2_ARGS = create /rr8 /lc4 /lr /rd2 /ss768000     (for Multipar)
+## PAR2_ARGS holds the fixed parameters of the par2 command, and the PAR2
+## Settings window of the GUI owns that line: it rewrites it from its fields, so
+## editing it by hand does not last.
+##
+## Your own arguments go on PAR2_ARGS_CUSTOM instead. Uncomment the line written
+## for your PAR2_TOOL and ngPost runs it, without ever rewriting it; only the
+## redundancy of each post is replaced. Comment it again to go back to the
+## window's fields. Each tool rejects the switches of the others.
+##
+## The three lines below are for ParPar, par2cmdline and MultiPar, in that
+## order. Uncomment one as it is: everything after the = goes to the tool, a
+## note in parentheses included.
+#PAR2_ARGS_CUSTOM = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q
+#PAR2_ARGS_CUSTOM = c -l -m1024 -r8 -s768000
+#PAR2_ARGS_CUSTOM = c /rr8 /sn3000 /rd3 /ls2 /lr260000000
+
+## MultiPar (par2j) stops at 32768 source blocks. Asking for smaller blocks than
+## that - /ss250000 on a 20 GB post, for instance - does not give you more: par2j
+## picks its own size and the PAR2 step takes several times longer. /sn3000 asks
+## for about 3000 blocks, like MultiPar's own default, and /ls2 /lr260000000
+## keeps each recovery file under 248 MiB.
 
 ## par2 slice (block) size in bytes, used by --check to work out how much of a
 ## damaged post the recovery files can actually repair.

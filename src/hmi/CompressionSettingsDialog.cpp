@@ -82,7 +82,7 @@ CompressionSettingsDialog::CompressionSettingsDialog(NgPost *ngPost, QWidget *pa
     _ui->keepRarDefaultCB->setChecked(_ngPost->_keepRarDefault);
 
     _ui->rarLengthSB->setRange(5, 50);
-    _ui->rarLengthSB->setValue(static_cast<int>(_ngPost->_lengthPass));
+    _ui->rarLengthSB->setValue(static_cast<int>(_ngPost->_lengthPassDefault));
 
     // Issue #48: the text first, so the toggled handler has something to push.
     _ui->rarPassEdit->setText(_ngPost->_rarPassFixed);
@@ -165,7 +165,9 @@ void CompressionSettingsDialog::accept()
     // Only the default: _keepRar is what the post being prepared decided, and
     // its tab refreshes it before every job.
     _ngPost->_keepRarDefault = _ui->keepRarDefaultCB->isChecked();
-    _ngPost->_lengthPass = static_cast<uint>(_ui->rarLengthSB->value());
+    // The default, like KEEP_RAR above: saveConfig() reads the length of the
+    // tab in front into _lengthPass, and used to write that one instead.
+    _ngPost->_lengthPassDefault = static_cast<uint>(_ui->rarLengthSB->value());
 
     // A ticked box over an empty field is not a password: everything else in
     // ngPost reads an empty _rarPassFixed as "no default password", so the two

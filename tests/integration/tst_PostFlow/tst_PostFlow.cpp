@@ -203,6 +203,14 @@ private slots:
     void stalled_upload_times_out_promptly();
     void missing_parity_tool_stops_before_compression();
     void cli_parity_path_overrides_configured_engine();
+    //! PAR2_TOOL names an engine automatic discovery cannot find, so the
+    //! configuration falls back to another; --par2_path then points at the
+    //! configured engine. That path must run with the configured arguments,
+    //! not with the fallback's defaults, which the engine rejects.
+    void cli_parity_path_to_the_configured_engine_keeps_its_arguments();
+    //! par2j handed switches it does not know prints its usage and exits 0. The
+    //! post must stop there, not go out without any recovery file.
+    void parity_tool_that_writes_nothing_stops_the_post();
     void unavailable_compressor_stops_and_preserves_input_data();
     void unavailable_compressor_stops_and_preserves_input();
     //! A transport loss after the article body but before 240 is ambiguous,
@@ -1392,12 +1400,119 @@ void TestPostFlow::cli_parity_path_overrides_configured_engine()
                                root,
                                out);
     QVERIFY2(code > 0, qPrintable(out));
-    QVERIFY2(out.contains("PAR2_ARGS is ignored"), qPrintable(out));
+    QVERIFY2(out.contains("ignored for this run"), qPrintable(out));
     QFile args(captured);
     QVERIFY2(args.open(QIODevice::ReadOnly), qPrintable(out));
     const auto text = args.readAll();
     QVERIFY2(text.startsWith("c\n"), text.constData());
     QVERIFY(!text.contains("--auto-slice-size"));
     QVERIFY(text.contains("-r10\n"));
+#endif
+}
+
+void TestPostFlow::cli_parity_path_to_the_configured_engine_keeps_its_arguments()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("Uses shell scripts, and PATH, to stand in for the engines");
+#else
+    if (QFileInfo::exists(QFileInfo(_bin).absolutePath() + "/parpar"))
+        QSKIP("A ParPar bundled next to ngPost leaves nothing to fall back from");
+    HomeSandbox sandbox;
+    const auto root = sandbox.rootPath();
+    // par2cmdline is the only engine on PATH; ParPar lives where automatic
+    // discovery does not look, so PAR2_TOOL = parpar falls back to par2cmdline.
+    QVERIFY(QDir().mkpath(root + "/bin"));
+    QVERIFY(QDir().mkpath(root + "/opt"));
+    const auto captured = root + "/arguments";
+    QVERIFY(writeFakeTool(root + "/bin/par2", "#!/bin/sh\nexit 0\n"));
+    QVERIFY(writeFakeTool(root + "/opt/parpar",
+                          "#!/bin/sh\nprintf '%s\\n' \"$@\" > '" + captured + "'\nexit 9\n"));
+    const QByteArray savedPath = qgetenv("PATH");
+    qputenv("PATH", QString(root + "/bin").toLocal8Bit());
+    const auto restorePath = qScopeGuard([&] { qputenv("PATH", savedPath); });
+
+    QFile input(root + "/source.bin");
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("payload");
+    input.close();
+    QFile config(root + "/tools.conf");
+    QVERIFY(config.open(QIODevice::WriteOnly));
+    config.write(("TMP_DIR = " + root
+                  + "\nPAR2_TOOL = parpar\nPAR2_SOURCE = auto\n"
+                    "PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -q\nPAR2_PCT = 10\n")
+                     .toUtf8());
+    config.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config.fileName(),
+                                 "-S",
+                                 "u:p@@@127.0.0.1:1:1:nossl",
+                                 "-i",
+                                 input.fileName(),
+                                 "-o",
+                                 root + "/test.nzb",
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "--gen_par2",
+                                 "--par2_path",
+                                 root + "/opt/parpar" },
+                               root,
+                               out);
+    QVERIFY2(code > 0, qPrintable(out));
+    // Nothing to announce: the path names the engine the configuration chose.
+    QVERIFY2(!out.contains("is not installed here"), qPrintable(out));
+    QVERIFY2(!out.contains("ignored for this run"), qPrintable(out));
+    QFile args(captured);
+    QVERIFY2(args.open(QIODevice::ReadOnly), qPrintable(out));
+    const auto text = args.readAll();
+    QVERIFY2(!text.startsWith("c\n"), text.constData());
+    QVERIFY2(text.contains("--auto-slice-size\n"), text.constData());
+    QVERIFY2(text.contains("-r10%\n"), text.constData());
+#endif
+}
+
+void TestPostFlow::parity_tool_that_writes_nothing_stops_the_post()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("Uses a shell script to stand in for the engine");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+    const auto root = sandbox.rootPath();
+    // What par2j does with ParPar's switches: its usage on stdout, exit code 0,
+    // and not a single file written.
+    QVERIFY(writeFakeTool(root + "/par2", "#!/bin/sh\necho Usage\nexit 0\n"));
+    QFile input(root + "/source.bin");
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write(QByteArray(4096, 'x'));
+    input.close();
+    QFile config(root + "/tools.conf");
+    QVERIFY(config.open(QIODevice::WriteOnly));
+    config.write(("TMP_DIR = " + root
+                  + "\nPAR2_TOOL = par2cmdline\nPAR2_SOURCE = custom\nPAR2_PATH = " + root
+                  + "/par2\nPAR2_PCT = 10\nNO_RESUME_AUTO = true\n")
+                     .toUtf8());
+    config.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config.fileName(),
+                                 "-S",
+                                 QString("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port()),
+                                 "-i",
+                                 input.fileName(),
+                                 "-o",
+                                 root + "/test.nzb",
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "--gen_par2" },
+                               root,
+                               out);
+    QVERIFY2(code > 0, qPrintable(out));
+    QVERIFY2(out.contains("wrote no par2 file"), qPrintable(out));
+    QVERIFY2(mock.receivedArticles().isEmpty(), "nothing may be posted without its par2");
+    QVERIFY(input.exists());
 #endif
 }

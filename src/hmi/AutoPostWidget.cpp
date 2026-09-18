@@ -67,7 +67,7 @@ void AutoPostWidget::init()
     _ui->nameLengthSB->setRange(5, 50);
     _ui->nameLengthSB->setValue(static_cast<int>(_ngPost->_lengthName));
     _ui->passLengthSB->setRange(5, 50);
-    _ui->passLengthSB->setValue(static_cast<int>(_ngPost->_lengthPass));
+    _ui->passLengthSB->setValue(static_cast<int>(_ngPost->_lengthPassDefault));
 
     _ui->filesList->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
@@ -322,9 +322,11 @@ void AutoPostWidget::updatePackingDependents()
                         tr("by default archives and par2 files are deleted uppon post success but you can choose to keep them"),
                         needsCompress);
 
-    setDependentEnabled(_ui->redundancySB, _ui->par2CB->isChecked(),
-                        tr("Using PAR2_ARGS from config file: %1").arg(_ngPost->_par2Args),
-                        tr("requires: %1").arg(_ui->par2CB->text()));
+    setDependentEnabled(
+        _ui->redundancySB,
+        _ui->par2CB->isChecked(),
+        tr("Using the PAR2 arguments of the configuration: %1").arg(_ngPost->par2ArgsInUse()),
+        tr("requires: %1").arg(_ui->par2CB->text()));
 }
 
 void AutoPostWidget::onCompressToggled(bool checked)
@@ -619,4 +621,6 @@ void AutoPostWidget::refreshPar2Default()
     _ui->redundancySB->setSpecialValueText(tr("Global (%1 %)").arg(_ngPost->par2DefaultPercentage()));
     _ui->redundancySB->setMaximumWidth(QWIDGETSIZE_MAX);
     _ui->redundancySB->setMinimumWidth(_ui->redundancySB->sizeHint().width());
+    // The tooltip of the redundancy names the arguments a post runs with.
+    updatePackingDependents();
 }

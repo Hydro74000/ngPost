@@ -1,4 +1,5 @@
 #include <climits>
+#include <type_traits>
 /*
  * Copyright (c) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
  * Copyright (c) 2024-2026 Hydro74000 <acymap@gmail.com>
@@ -168,6 +169,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::PAR2_PCT,     "par2_pct"},
     {Opt::PAR2_PATH,    "par2_path"},
     {Opt::PAR2_SOURCE,  "par2_source"},
+    {Opt::PAR2_ARGS_CUSTOM, "par2_args_custom"},
     {Opt::PAR2_TOOL,    "par2_tool"},
     {Opt::PAR2_ARGS,    "par2_args"},
     {Opt::PAR2_BLOCK_SIZE, "par2_block_size"},
@@ -2110,8 +2112,10 @@ PostingJobOptions NgPost::_baseJobOptions() const
     opt.rarMax            = _rarMax;
     opt.par2Pct           = _par2Pct;
     opt.par2Path          = _par2Path;
-    opt.par2Arguments     = _par2Args;
-    opt.par2Tool          = _par2Tool == par2::Tool::Auto ? par2::detectTool(_par2Path) : _par2Tool;
+    // par2ArgsInUse() is already empty when another engine had to be picked:
+    // its switches are not the ones the configuration holds.
+    opt.par2Arguments = par2ArgsInUse();
+    opt.par2Tool = par2ToolInUse();
     opt.doCompress        = _doCompress;
     opt.doPar2            = _doPar2;
     opt.rarName           = _rarName;
@@ -2635,6 +2639,9 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
 
     if (parser.isSet(sOptionNames[Opt::QUIET]))
         _quiet = true;
+    // Known before the configuration is read: an explicit executable makes the
+    // engine fallback of PAR2_TOOL moot, and its announcement wrong.
+    _par2PathOnCommandLine = parser.isSet(sOptionNames[Opt::PAR2_PATH]);
 
     // Decided before the configuration is even read, because loading it
     // already has things to say (a migrated config, for one) and stdout is
@@ -3257,24 +3264,31 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         // An explicit CLI path must fail clearly if missing, never execute an
         // unrelated auto-detected binary. A recognizable executable also
         // overrides the configured engine; unnamed wrappers keep PAR2_TOOL.
+        // Either way it replaces the engine the configuration fell back to: the
+        // path of the configured engine, found elsewhere, runs with its own
+        // arguments again.
+        _par2ToolFallback = par2::Tool::Auto;
         par2::Tool tool;
         if (par2::parseTool(externaltool::toolForFile(val), tool)) {
             const auto previous = _par2Tool == par2::Tool::Auto ? par2::detectTool(_par2Path)
                                                                 : _par2Tool;
-            if (tool != previous && !_par2Args.isEmpty()) {
-                _error(tr("--par2_path selects %1 instead of %2; PAR2_ARGS is ignored and default "
-                          "arguments are used.")
-                           .arg(par2::toolName(tool), par2::toolName(previous)));
-                _par2Args.clear();
-                _par2BlockSize = 0;
+            if (tool != previous) {
+                // One-shot option: PAR2_TOOL, PAR2_ARGS and PAR2_BLOCK_SIZE
+                // belong to the other engine and stay as they are -- a save
+                // that follows must not write this run's choice into the file.
+                // Only the run changes engine, and its switches with it.
+                if (!par2ArgsConfigured().isEmpty())
+                    _error(tr("--par2_path selects %1 instead of %2, so the par2 arguments of your "
+                              "configuration are ignored for this run and %1 runs with its own "
+                              "defaults. The configuration is left as it is.")
+                               .arg(par2::toolName(tool), par2::toolName(previous)));
+                _par2ToolFallback = tool;
             }
-            _par2Tool = tool;
         }
         _par2Path = val;
     }
 
-    if (_doPar2 && _par2Pct == 0 && _par2Args.isEmpty())
-    {
+    if (_doPar2 && _par2Pct == 0 && par2ArgsInUse().isEmpty()) {
         _error(tr("Error: can't generate par2 if the redundancy percentage is null or PAR2_ARGS is not provided...\nEither use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file."),
                ERROR_CODE::ERR_PAR2_ARGS);
         return false;
@@ -3578,7 +3592,415 @@ QString NgPost::nzbPath(const QString &monitorFolder)
 }
 
 
-QString NgPost::_parseConfig(const QString &configPath)
+//! Before "[server]" blocks existed, a configuration put its single server's
+//! keys at the top level, and _parseConfig() still reads them that way. The
+//! merge needs the same list: writing such a key above the sections again would
+//! add a second server on the next start.
+QStringList const &NgPost::topLevelServerKeys()
+{
+    static QStringList const keys{
+        sOptionNames[Opt::HOST],      sOptionNames[Opt::PORT],
+        sOptionNames[Opt::SSL],       sOptionNames[Opt::ENABLED],
+        sOptionNames[Opt::NZBCHECK],  sOptionNames[Opt::SERVER_USE_VPN].toLower(),
+        sOptionNames[Opt::USER],      sOptionNames[Opt::PASS],
+        sOptionNames[Opt::CONNECTION]
+    };
+    return keys;
+}
+
+bool NgPost::isKnownSetting(QString const &key)
+{
+    static QSet<QString> const names(sOptionNames.cbegin(), sOptionNames.cend());
+    return names.contains(key);
+}
+
+bool NgPost::isSecretSetting(QString const &key)
+{
+    // RAR_EXTRA carries -hp<password> as well as it carries -m0: SecretMasker
+    // hides it on the archiver's command line, so the merge must not print it
+    // either. A command line, SHUTDOWN_CMD as NZB_POST_CMD, can hold any token.
+    static QStringList const secrets{
+        sOptionNames[Opt::RAR_PASS],       sOptionNames[Opt::PASS],
+        sOptionNames[Opt::USER],           sOptionNames[Opt::PROXY_SOCKS5],
+        sOptionNames[Opt::NZB_UPLOAD_URL], sOptionNames[Opt::NZB_POST_CMD],
+        sOptionNames[Opt::RAR_EXTRA],      sOptionNames[Opt::SHUTDOWN_CMD]
+    };
+    return secrets.contains(key);
+}
+
+QStringList const &NgPost::vpnProfileKeys()
+{
+    static QStringList const keys{ sOptionNames[Opt::VPN_PROFILE_NAME],
+                                   sOptionNames[Opt::VPN_PROFILE_BACKEND],
+                                   sOptionNames[Opt::VPN_PROFILE_CONFIG_FILE],
+                                   sOptionNames[Opt::VPN_PROFILE_HAS_AUTH] };
+    return keys;
+}
+
+//! Walk a configuration text the way _parseConfig() reads it, and sort each
+//! "key = value" line: a setting, or a line of the block it stands in. Blocks do
+//! not end: a [server] block owns the server keys that follow it, a
+//! [vpn_profile] block those and its own four, and any other key is a setting
+//! wherever it is -- appended at the end of the file, for one. Server keys above
+//! the first block are the legacy single server: they stay with the settings,
+//! where the merge recognises them.
+static void splitConfigText(QString const &text,
+                            QStringList const &serverKeys,
+                            QStringList const &profileKeys,
+                            QMap<QString, QString> *settings,
+                            QStringList *sections)
+{
+    enum class Area {
+        Settings,
+        Server,
+        VpnProfile
+    } area = Area::Settings;
+    for (QString const &raw : text.split(QLatin1Char('\n'))) {
+        QString const line = raw.trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#'))
+            || line.startsWith(QLatin1Char('/')))
+            continue;
+        // Only the two headers the parser knows. Any other [name] line has no
+        // '=' and is dropped below, as the parser drops it.
+        bool const server = line == QLatin1String("[server]");
+        if (server || line == QLatin1String("[vpn_profile]")) {
+            area = server ? Area::Server : Area::VpnProfile;
+            if (sections)
+                *sections << line;
+            continue;
+        }
+        int const equal = line.indexOf(QLatin1Char('='));
+        if (equal <= 0)
+            continue;
+        QString const key = line.left(equal).trimmed().toLower();
+        bool const owned = (area != Area::Settings && serverKeys.contains(key))
+            || (area == Area::VpnProfile && profileKeys.contains(key));
+        if (owned) {
+            if (sections)
+                *sections << line;
+        } else if (settings)
+            settings->insert(key, line.mid(equal + 1).trimmed());
+    }
+}
+
+//! Sections are deliberately not merged: two [server] blocks have no identity a
+//! merge could rely on. The settings among them are, like any other.
+QMap<QString, QString> NgPost::topLevelSettings(QString const &text)
+{
+    QMap<QString, QString> settings;
+    splitConfigText(text, topLevelServerKeys(), vpnProfileKeys(), &settings, nullptr);
+    return settings;
+}
+
+QString NgPost::sectionsText(QString const &text)
+{
+    QStringList sections;
+    splitConfigText(text, topLevelServerKeys(), vpnProfileKeys(), nullptr, &sections);
+    return sections.join(QLatin1Char('\n'));
+}
+
+//! Put \a value on the line of \a key, above the first section: on its own
+//! line when it has one, just under the commented example the writer leaves
+//! when the setting is empty (so the explanation above still applies), else on
+//! a line inserted before the sections, with the other settings -- wherever the
+//! user wrote it, since \a text is the file as ngPost writes it.
+static void setTopLevelValue(QString &text,
+                             QString const &key,
+                             QString const &value,
+                             QString const &insertedHeader)
+{
+    QStringList lines = text.split(QLatin1Char('\n'));
+    int sections = lines.size(), commented = -1;
+    for (int i = 0; i < lines.size(); ++i) {
+        QString const line = lines.at(i).trimmed();
+        // The commented [server] and [vpn_profile] examples end the settings
+        // area just as a real block does: a line added under them reads as
+        // belonging to whatever section the user uncomments there next.
+        if (line.startsWith(QLatin1Char('[')) || line.startsWith(QLatin1String("#["))) {
+            sections = i;
+            break;
+        }
+        int const equal = lines.at(i).indexOf(QLatin1Char('='));
+        if (equal <= 0)
+            continue;
+        QString const name = lines.at(i).left(equal).trimmed();
+        if (name.compare(key, Qt::CaseInsensitive) == 0) {
+            lines[i] = lines.at(i).left(equal + 1) + QLatin1Char(' ') + value;
+            text = lines.join(QLatin1Char('\n'));
+            return;
+        }
+        if (name.startsWith(QLatin1Char('#'))
+            && name.mid(1).trimmed().compare(key, Qt::CaseInsensitive) == 0)
+            commented = i; // the last example wins: that is where the writer puts the real line
+    }
+    QString const line = QString("%1 = %2").arg(key.toUpper(), value);
+    int header = -1;
+    for (int i = 0; i < sections && header < 0; ++i)
+        if (lines.at(i) == insertedHeader)
+            header = i;
+    if (commented >= 0)
+        lines.insert(commented + 1, line);
+    else if (header >= 0) {
+        // One header for every line kept this way, the new one at the end.
+        int end = header + 1;
+        while (end < sections && !lines.at(end).trimmed().isEmpty())
+            ++end;
+        lines.insert(end, line);
+    } else
+        for (QString const &added : QStringList{ QString(), insertedHeader, line })
+            lines.insert(sections++, added);
+    text = lines.join(QLatin1Char('\n'));
+}
+
+//! Drop the line of \a key from the settings area: a line the user commented
+//! out or deleted must not come back active on the next save.
+static void removeTopLevelLine(QString &text, QString const &key)
+{
+    QStringList lines = text.split(QLatin1Char('\n'));
+    // Every occurrence: the parser keeps the last line of a repeated key, so
+    // leaving one behind would bring the setting back on the next start.
+    for (int i = 0; i < lines.size();) {
+        QString const line = lines.at(i).trimmed();
+        if (line.startsWith(QLatin1Char('[')) || line.startsWith(QLatin1String("#[")))
+            break;
+        int const equal = lines.at(i).indexOf(QLatin1Char('='));
+        if (equal > 0 && lines.at(i).left(equal).trimmed().compare(key, Qt::CaseInsensitive) == 0)
+            lines.removeAt(i);
+        else
+            ++i;
+    }
+    text = lines.join(QLatin1Char('\n'));
+}
+
+bool NgPost::_adoptConfigValue(QString const &key, QString const &value)
+{
+    // Only the settings that are nothing but a value in memory. A path, an
+    // engine or a VPN profile is resolved once, at startup: taking one here
+    // would leave _par2Path, the engine fallback or the tunnel pointing at the
+    // previous choice, which is worse than waiting for the next start.
+    // Nor a value a window owns: saveConfig() starts by reading LENGTH_NAME back
+    // from the spin box of the posting tab in front, so taking it here would
+    // last until the next save and quietly revert the file with it. LENGTH_PASS
+    // is the dialog's default, which no tab writes: that one can be taken.
+    // Read exactly as _parseConfig() reads it, so adopting a line and restarting
+    // on it give the same state: 0 is a value (no par2, no split), and what the
+    // parser refuses -- a word, a number too large for the type -- is refused
+    // here too rather than silently truncated.
+    auto const number = [&value](auto &target) {
+        using Target = std::remove_reference_t<decltype(target)>;
+        bool ok = false;
+        if constexpr (std::is_same_v<Target, qint64>) {
+            qint64 const parsed = value.toLongLong(&ok);
+            if (!ok || parsed <= 0)
+                return false;
+            target = parsed;
+        } else {
+            uint const parsed = value.toUInt(&ok);
+            if (!ok)
+                return false;
+            target = static_cast<Target>(parsed);
+        }
+        return true;
+    };
+    if (key == sOptionNames[Opt::PAR2_ARGS_CUSTOM])
+        _par2ArgsCustom = value;
+    else if (key == sOptionNames[Opt::PAR2_ARGS])
+        _par2Args = value;
+    else if (key == sOptionNames[Opt::RAR_EXTRA])
+        _rarArgs = value;
+    else if (key == sOptionNames[Opt::TMP_DIR])
+        _tmpPath = value;
+    else if (key == sOptionNames[Opt::PAR2_BLOCK_SIZE])
+        return number(_par2BlockSize);
+    else if (key == sOptionNames[Opt::RAR_SIZE])
+        return number(_rarSize);
+    else if (key == sOptionNames[Opt::LENGTH_PASS])
+        return number(_lengthPassDefault);
+    else if (key == sOptionNames[Opt::PAR2_PCT]) {
+        uint percentage = 0;
+        if (!number(percentage))
+            return false;
+        _par2Pct = _par2PctDefault = percentage;
+    } else
+        return false;
+    return true;
+}
+
+QMap<QString, QString> NgPost::_mergeExternalConfigEdits(QString &text)
+{
+    QMap<QString, QString> const mine = topLevelSettings(text);
+    QString const conf = PathHelper::configFilePath();
+    QFile file(conf);
+    // Nothing read from this file yet (first run, or a -c configuration): there
+    // is no baseline that could tell an edit from ngPost's own state.
+    if (_configBelief.isEmpty() || !file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return mine;
+    QString const diskText = QString::fromUtf8(file.readAll());
+    file.close();
+    QMap<QString, QString> const theirs = topLevelSettings(diskText);
+
+    QString const header = tr("## Added to your configuration file, kept here");
+    QMap<QString, QString> belief = mine;
+    QStringList adopted, afterRestart, kept, cleared, refused, dropped;
+    for (auto it = theirs.cbegin(); it != theirs.cend(); ++it) {
+        QString const &key = it.key();
+        QString const &onDisk = it.value();
+        // ngPostWrites: the line is in the text just built, so ngPost has a
+        // value for it. diskChanged: the file no longer says what ngPost read.
+        bool const ngPostWrites = mine.contains(key);
+        bool const diskChanged = !_configBelief.contains(key) || onDisk != _configBelief.value(key);
+
+        // A configuration older than [server] blocks put its single server at
+        // the top level. The parser gives those keys the server they imply, and
+        // this save writes it as a [server] block: the top-level line goes, and
+        // that is worth saying once, because the file visibly changes shape.
+        if (topLevelServerKeys().contains(key)) {
+            if (!ngPostWrites)
+                dropped << key;
+            continue;
+        }
+
+        if (!diskChanged) {
+            // ngPost's own line, or a setting it has just cleared and therefore
+            // stops writing: either way the text already says what it holds.
+            if (ngPostWrites || isKnownSetting(key))
+                continue;
+            // A line ngPost does not use: put it back where it was, without
+            // saying again what was said the save it appeared.
+            setTopLevelValue(text, key, onDisk, header);
+            belief.insert(key, onDisk);
+            continue;
+        }
+
+        // Changed on both sides -- an empty mine.value() means the window
+        // cleared it -- so the window the user just validated wins.
+        if (_configBelief.contains(key) && mine.value(key) != _configBelief.value(key)
+            && mine.value(key) != onDisk) {
+            refused << (isSecretSetting(key) ? key : QString("%1 = %2").arg(key, onDisk));
+            _configKeptForRestart.remove(key);
+            continue;
+        }
+
+        setTopLevelValue(text, key, onDisk, header);
+        if (!isKnownSetting(key)) {
+            kept << key; // nothing to adopt: ngPost never reads it
+            belief.insert(key, onDisk);
+        } else if (_adoptConfigValue(key, onDisk)) {
+            adopted << key;
+            belief.insert(key, onDisk);
+            _configKeptForRestart.remove(key);
+        } else {
+            // The file keeps their value while ngPost keeps believing its own,
+            // so every save preserves the line until a start really loads it --
+            // announced the first time, then patched in silence.
+            if (_configKeptForRestart.value(key) != onDisk)
+                afterRestart << key;
+            _configKeptForRestart.insert(key, onDisk);
+        }
+    }
+    for (QString const &key : _configKeptForRestart.keys())
+        if (!theirs.contains(key))
+            _configKeptForRestart.remove(key);
+
+    // Commenting a line out is how the configuration turns a setting off, and
+    // that is an edit like any other. Only where an empty value means something
+    // on its own: _adoptConfigValue() refuses a number, whose absence would
+    // mean its default rather than what the file used to say.
+    for (auto it = _configBelief.cbegin(); it != _configBelief.cend(); ++it) {
+        QString const &key = it.key();
+        if (theirs.contains(key) || !mine.contains(key))
+            continue; // still in the file, or ngPost no longer writes it either
+        if (mine.value(key) != it.value())
+            continue; // also changed in the GUI, which wins as everywhere else
+        if (_adoptConfigValue(key, QString())) {
+            removeTopLevelLine(text, key);
+            belief.remove(key);
+            cleared << key;
+        }
+    }
+
+    // The posting tabs show the default redundancy and the arguments a post
+    // runs with: they must follow a value taken from the file, as they follow
+    // the PAR2 Settings window.
+    for (QString const &key : adopted + cleared)
+        if (key.startsWith(QLatin1String("par2_"))) {
+            emit par2DefaultsChanged();
+            break;
+        }
+
+    if (!adopted.isEmpty())
+        _log(tr("'%1' was edited while ngPost was running; taken from your file: %2.")
+                 .arg(conf, adopted.join(QStringLiteral(", "))));
+    if (!afterRestart.isEmpty())
+        _log(tr("Also edited in '%1' and kept there, but used only after a restart: %2.")
+                 .arg(conf, afterRestart.join(QStringLiteral(", "))));
+    if (!cleared.isEmpty())
+        _log(tr("Commented out or deleted in '%1' while ngPost was running, so it stops using "
+                "them: %2.")
+                 .arg(conf, cleared.join(QStringLiteral(", "))));
+    if (!kept.isEmpty())
+        _log(tr("Kept in '%1' as they are, unused by ngPost: %2.")
+                 .arg(conf, kept.join(QStringLiteral(", "))));
+    if (!refused.isEmpty())
+        _error(
+            tr("Edited both in '%1' and in ngPost, which keeps its own value and drops yours: %2.")
+                .arg(conf, refused.join(QStringLiteral(" ; "))));
+    if (!dropped.isEmpty())
+        _error(tr("Dropped by this save of '%1', because a [server] section holds them now: %2.")
+                   .arg(conf, dropped.join(QStringLiteral(", "))));
+    // The blocks themselves are not merged: two [server] sections have no
+    // identity a merge could rely on, so ngPost writes them from its own state.
+    // Saying so is the least it owes an edit it is about to discard.
+    if (sectionsText(diskText) != _configSections)
+        _error(
+            tr("The [server] and [vpn_profile] blocks of '%1' were edited by hand, and this save "
+               "writes the ones ngPost holds instead: those changes are lost. Change servers and "
+               "VPN profiles in the GUI, or with ngPost closed.")
+                .arg(conf));
+    return belief;
+}
+
+void NgPost::_applyPar2Fallback(bool announce)
+{
+    _par2ToolFallback = par2::Tool::Auto;
+    if (_par2Tool == par2::Tool::Auto || _par2PathMode != externaltool::PathMode::Automatic
+        || !_par2Path.isEmpty())
+        return;
+    // The chosen engine is not installed here. Running whatever is beats
+    // stopping every post that generates par2 -- but the fallback stays in
+    // memory: PAR2_TOOL keeps the user's choice, which a reinstall (or the
+    // optional ParPar of the Windows installer) makes valid again. An explicit
+    // PAR2_PATH is excluded on purpose: a custom path never falls back, and its
+    // own message already says so.
+    QString const par2Tool = par2::toolName(_par2Tool);
+    const auto fallback = externaltool::resolve(QStringLiteral("auto"));
+    par2::Tool fallbackTool = par2::Tool::Auto;
+    if (fallback.available() && par2::parseTool(fallback.tool, fallbackTool)) {
+        _par2ToolFallback = fallbackTool;
+        _par2Path = fallback.path;
+        if (announce) {
+            _error(tr("Configuration: PAR2_TOOL = %1 is not installed here; ngPost uses %2 for "
+                      "this run: %3. The configuration keeps PAR2_TOOL = %1.")
+                       .arg(par2Tool, par2::toolName(fallbackTool), fallback.path));
+            // Engine-specific switches: par2j rejects ParPar's, and the reverse.
+            // The line stays in the configuration for the day the chosen engine
+            // is back; this run uses the defaults instead. What the file holds,
+            // not what this run uses: the fallback is already in effect above, so
+            // par2ArgsInUse() is empty by now.
+            if (!par2ArgsConfigured().isEmpty())
+                _error(tr("The par2 arguments of your configuration are written for %1, so %2 "
+                          "runs with its default arguments this time. The line is left in the "
+                          "configuration.")
+                           .arg(par2Tool, par2::toolName(fallbackTool)));
+        }
+    } else if (announce)
+        _error(tr("Configuration: PAR2_TOOL = %1: no executable was found. Install %1, select "
+                  "another PAR2_TOOL, or set PAR2_SOURCE = custom and PAR2_PATH to its executable "
+                  "(PAR2 Settings in the GUI).")
+                   .arg(par2Tool));
+}
+
+QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
 {
     QString err;
     QFileInfo fileInfo(configPath);
@@ -3610,11 +4032,27 @@ QString NgPost::_parseConfig(const QString &configPath)
 
     // The tool lines are settled once the whole file is read: see readPath below.
     std::optional<QString> rarToolLine, rarSourceLine, par2ToolLine, par2SourceLine;
+    _par2ArgsCustom.clear();
+    _par2ToolFallback = par2::Tool::Auto;
     _par2PathConfig.clear();
     _rarPathConfig.clear();
     _rarTool = QStringLiteral("rar");
     _par2Tool = par2::Tool::Auto;
     _par2PathMode = _rarPathMode = externaltool::PathMode::Automatic;
+
+    // Only the file saveConfig() writes can be merged with it later: a -c
+    // configuration is read, never written back.
+    _configBelief.clear();
+    _configKeptForRestart.clear();
+    _configSections.clear();
+    if (isDefaultConfig) {
+        QFile snapshot(fileInfo.absoluteFilePath());
+        if (snapshot.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QString const text = QString::fromUtf8(snapshot.readAll());
+            _configBelief = topLevelSettings(text);
+            _configSections = sectionsText(text);
+        }
+    }
 
     QFile file(fileInfo.absoluteFilePath());
     if (file.open(QIODevice::ReadOnly))
@@ -3690,20 +4128,11 @@ QString NgPost::_parseConfig(const QString &configPath)
                             val = line.mid(equalIdx + 1).trimmed();
                     bool ok = false;
 
-                    // Before "[server]" blocks existed, a configuration put its
-                    // single server's keys at the top level. Those keys still
-                    // parse, but no block ever created the object they write
-                    // into -- so a file written that way used to crash here on
-                    // a null pointer. Give them the server they imply.
-                    static const QStringList sTopLevelServerKeys = {
-                        sOptionNames[Opt::HOST],     sOptionNames[Opt::PORT],
-                        sOptionNames[Opt::SSL],      sOptionNames[Opt::ENABLED],
-                        sOptionNames[Opt::NZBCHECK], sOptionNames[Opt::SERVER_USE_VPN].toLower(),
-                        sOptionNames[Opt::USER],     sOptionNames[Opt::PASS],
-                        sOptionNames[Opt::CONNECTION]
-                    };
-                    if (!serverParams && sTopLevelServerKeys.contains(opt))
-                    {
+                    // Those keys still parse, but no block ever created the
+                    // object they write into -- so a file written that way used
+                    // to crash here on a null pointer. Give them the server
+                    // they imply.
+                    if (!serverParams && topLevelServerKeys().contains(opt)) {
                         serverParams = new NntpServerParams();
                         _nntpServers << serverParams;
                     }
@@ -4233,6 +4662,8 @@ QString NgPost::_parseConfig(const QString &configPath)
                         _par2PathConfig = val;
                     else if (opt == sOptionNames[Opt::PAR2_SOURCE])
                         par2SourceLine = val;
+                    else if (opt == sOptionNames[Opt::PAR2_ARGS_CUSTOM])
+                        _par2ArgsCustom = val;
                     else if (opt == sOptionNames[Opt::PAR2_ARGS])
                         _par2Args = val;
                     else if (opt == sOptionNames[Opt::PAR2_BLOCK_SIZE])
@@ -4253,7 +4684,7 @@ QString NgPost::_parseConfig(const QString &configPath)
                     {
                         uint nb = val.toUInt(&ok);
                         if (ok)
-                            _lengthPass = nb;
+                            _lengthPass = _lengthPassDefault = nb;
                     }
 
 
@@ -4440,7 +4871,7 @@ QString NgPost::_parseConfig(const QString &configPath)
              _par2PathMode,
              _par2PathConfig,
              par2SourceLine.has_value(),
-             _par2Args,
+             par2ArgsInUse(),
              par2Requested);
     par2::parseTool(par2Tool, _par2Tool);
     const QString rarNamed = externaltool::archiverForFile(_rarPathConfig);
@@ -4466,12 +4897,26 @@ QString NgPost::_parseConfig(const QString &configPath)
     }
     _par2Path = externaltool::resolve(par2Tool, _par2PathMode, _par2PathConfig).path;
     _rarPath = externaltool::resolve(_rarTool, _rarPathMode, _rarPathConfig).path;
-    if (par2Requested && _par2Tool != par2::Tool::Auto
-        && _par2PathMode == externaltool::PathMode::Automatic && _par2Path.isEmpty())
-        _error(tr("Configuration: PAR2_TOOL = %1: no executable was found. Install %1, select "
-                  "another PAR2_TOOL, or set PAR2_SOURCE = custom and PAR2_PATH to its executable "
-                  "(PAR2 Settings in the GUI).")
-                   .arg(par2Tool));
+
+    // A custom line written for another engine cannot run: par2j reads
+    // /switches where the other two read -switches. Said here rather than at the
+    // par2 step, after the compression, with only the tool's own error to show.
+    if (par2Requested && !_par2ArgsCustom.isEmpty()) {
+        bool multiParStyle = false, otherStyle = false;
+        for (QString const &token : QProcess::splitCommand(_par2ArgsCustom)) {
+            multiParStyle = multiParStyle || token.startsWith(QLatin1Char('/'));
+            otherStyle = otherStyle || token.startsWith(QLatin1Char('-'));
+        }
+        bool const multiPar = par2ToolInUse() == par2::Tool::MultiPar;
+        if ((multiPar && otherStyle && !multiParStyle)
+            || (!multiPar && multiParStyle && !otherStyle))
+            _error(tr("Configuration: PAR2_ARGS_CUSTOM is written for another tool than %1, so the "
+                      "par2 step would fail. Comment that line out, or write it for %1.")
+                       .arg(par2::toolName(par2ToolInUse())));
+    }
+
+    // --par2_path replaces this choice for the run, and says so itself.
+    _applyPar2Fallback(par2Requested && !_par2PathOnCommandLine);
 
     if (legacyAutoCompress && !parsedPack)
     {
@@ -4837,7 +5282,7 @@ QString NgPost::parseDefaultConfig()
     {
         if (!_quiet)
             _cout << tr("Using default config file: %1").arg(conf) << "\n" << MB_FLUSH;
-        err = _parseConfig(conf);
+        err = _parseConfig(conf, true);
     }
     else
         qCritical() << "The default config file doesn't exist: " << conf;
@@ -5044,10 +5489,22 @@ void NgPost::saveConfig()
 
     QString conf = PathHelper::configFilePath();
 
+    // Opened before the text is built, as it always was: when the folder
+    // refuses a new file, the configuration is left alone and the writer --
+    // which asks the windows for more than updateConfigFromUi() above took --
+    // does not run.
     QSaveFile file(conf);
-    if (file.open(QIODevice::WriteOnly|QIODevice::Text))
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
+        return;
+    }
+
+    // Built in memory: this text is what ngPost holds, and the file may have
+    // been edited since it was read. _mergeExternalConfigEdits() folds those
+    // edits into it, so nothing needs to be copied aside.
+    QString text;
     {
-        QTextStream stream(&file);
+        QTextStream stream(&text);
         // clang-format off
         // One stream line per line of the file: the layout mirrors what is written.
         stream << tr("# ngPost configuration file") << "\n"
@@ -5068,9 +5525,15 @@ void NgPost::saveConfig()
                << tr("## Shutdown command to switch off the computer when ngPost is done with all its queued posting") << "\n"
                << tr("## this should mainly used with the auto posting") << "\n"
                << tr("## you could use whatever script instead (like to send a mail...)") << "\n"
-               << tr("#SHUTDOWN_CMD = shutdown /s /f /t 0  (Windows)") << "\n"
-               << tr("#SHUTDOWN_CMD = sudo -n /sbin/poweroff  (Linux, make sure poweroff has sudo rights without any password or change the command)") << "\n"
-               << tr("#SHUTDOWN_CMD = sudo -n shutdown -h now (MacOS, same make sure you've sudo rights)") << "\n"
+               << tr("## the three lines below are for Windows, Linux and macOS, in that order;")
+               << "\n"
+               << tr("## the last two need sudo rights without a password. Uncomment one as it is:")
+               << "\n"
+               << tr("## anything after the = is the command, including a note in parentheses.")
+               << "\n"
+               << "#SHUTDOWN_CMD = shutdown /s /f /t 0\n"
+               << "#SHUTDOWN_CMD = sudo -n /sbin/poweroff\n"
+               << "#SHUTDOWN_CMD = sudo -n shutdown -h now\n"
                << "SHUTDOWN_CMD = " << _shutdownCmd << "\n"
                << "\n"
                << tr("## upload the nzb to a specific URL") << "\n"
@@ -5329,8 +5792,9 @@ void NgPost::saveConfig()
                << tr("## -hp will be added if you use a password with --gen_pass, --rar_pass or using the HMI") << "\n"
                << tr("## -v42m will be added with --rar_size or using the HMI") << "\n"
                << tr("## you could change the compression level, lock the archive, add redundancy...") << "\n"
+               << tr("## the first line below is for rar, the second for 7-zip:") << "\n"
                << "#RAR_EXTRA = -ep1 -m0 -k -rr5p\n"
-               << "#RAR_EXTRA = -mx0 -mhe=on   (for 7-zip)\n"
+               << "#RAR_EXTRA = -mx0 -mhe=on\n"
                << (_rarArgs.isEmpty() ? "" : QString("RAR_EXTRA = %1\n").arg(_rarArgs) )
                << "\n"
                << tr("## RAR volume size in MiB (1 MiB = 1048576 bytes; 0 means no split without RAR_MAX)") << "\n"
@@ -5366,11 +5830,29 @@ void NgPost::saveConfig()
 #endif
         stream << "\n"
                << tr("## fixed parameters for the par2 (or alternative) command") << "\n"
-               << tr("## you could for exemple use Multipar on Windows") << "\n"
-               << "#PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q   (for parpar)\n"
-               << "#PAR2_ARGS = c -l -m1024 -r8 -s768000                 (for par2cmdline)\n"
-               << "#PAR2_ARGS = create /rr8 /lc4 /lr /rd2 /ss768000     (for Multipar)\n"
+               << tr("## The PAR2 Settings window of the GUI owns this line and rewrites it from its "
+                     "fields, so editing it here does not last.")
+               << "\n"
                << (_par2Args.isEmpty() ? "" : QString("PAR2_ARGS = %1\n").arg(_par2Args))
+               << "\n"
+               << tr("## Your own arguments: uncomment one line below and ngPost runs it instead of")
+               << "\n"
+               << tr("## PAR2_ARGS, without ever rewriting it. Only the redundancy of each post is")
+               << "\n"
+               << tr("## replaced. Comment it again to go back to the PAR2 Settings fields.") << "\n"
+               << tr("## Write it for the tool PAR2_TOOL selects: one rejects the switches of another.")
+               << "\n"
+               << tr("## the three lines below are for ParPar, par2cmdline and MultiPar, in that")
+               << "\n"
+               << tr("## order. Uncomment one as it is: everything after the = is passed to the")
+               << "\n"
+               << tr("## tool, a note in parentheses included.") << "\n"
+               << "#PAR2_ARGS_CUSTOM = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q\n"
+               << "#PAR2_ARGS_CUSTOM = c -l -m1024 -r8 -s768000\n"
+               << "#PAR2_ARGS_CUSTOM = c /rr8 /sn3000 /rd3 /ls2 /lr260000000\n"
+               << (_par2ArgsCustom.isEmpty()
+                       ? ""
+                       : QString("PAR2_ARGS_CUSTOM = %1\n").arg(_par2ArgsCustom))
                << "\n"
                << tr("## PAR2 slice size in bytes, used by --check to weigh a loss against the")
                << "\n"
@@ -5385,7 +5867,7 @@ void NgPost::saveConfig()
                << "LENGTH_NAME = " << _lengthName << "\n"
                << "\n"
                << tr("## length of the random archive's passsword") << "\n"
-               << "LENGTH_PASS = "<< _lengthPass << "\n"
+               << "LENGTH_PASS = "<< _lengthPassDefault << "\n"
                << "\n"
                << "\n"
                << "\n"
@@ -5438,27 +5920,37 @@ void NgPost::saveConfig()
         // clang-format on
         stream.flush();
         if (stream.status() != QTextStream::Ok) {
+            _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
+            return;
+        }
+    }
+
+    QMap<QString, QString> const belief = _mergeExternalConfigEdits(text);
+    {
+        QTextStream out(&file);
+        out << text;
+        out.flush();
+        if (out.status() != QTextStream::Ok) {
             file.cancelWriting();
             _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
             return;
         }
-        if (!file.commit()) {
-            _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
-            return;
-        }
-        // QSaveFile keeps the permissions of the file it replaced, and gives a
-        // brand new one 0666 minus the umask. Either way it is the NNTP and
-        // proxy credentials plus the fixed archive password sitting in a file
-        // every other account on this machine can read.
-        if (!PathHelper::restrictToOwner(conf))
-            _error(tr("Warning: '%1' holds your credentials but could not be restricted to "
-                      "you; anyone with an account on this machine may be able to read it")
-                           .arg(conf));
-        _log(tr("the config '%1' file has been updated").arg(conf));
     }
-    else
+    if (!file.commit()) {
         _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
-
+        return;
+    }
+    // QSaveFile keeps the permissions of the file it replaced, and gives a
+    // brand new one 0666 minus the umask. Either way it is the NNTP and
+    // proxy credentials plus the fixed archive password sitting in a file
+    // every other account on this machine can read.
+    if (!PathHelper::restrictToOwner(conf))
+        _error(tr("Warning: '%1' holds your credentials but could not be restricted to "
+                  "you; anyone with an account on this machine may be able to read it")
+                   .arg(conf));
+    _configBelief = belief;
+    _configSections = sectionsText(text);
+    _log(tr("the config '%1' file has been updated").arg(conf));
 }
 
 void NgPost::setDelFilesAfterPosted(bool delFiles)
@@ -5476,11 +5968,11 @@ void NgPost::addMonitoringFolder(const QString &dirPath)
         _folderMonitor->addFolder(dirPath);
 }
 
-const QString NgPost::sNgPostASCII = QString("\
-                   __________               __\n\
-       ____    ____\\______   \\____  _______/  |_\n\
-      /    \\  / ___\\|     ___/  _ \\/  ___/\\   __\\\n\
-     |   |  \\/ /_/  >    |  (  <_> )___ \\  |  |\n\
-     |___|  /\\___  /|____|   \\____/____  > |__|\n\
-          \\//_____/                    \\/\n\
-");
+const QString NgPost::sNgPostASCII = QString(
+    "                   __________               __\n"
+    "       ____    ____\\______   \\____  _______/  |_\n"
+    "      /    \\  / ___\\|     ___/  _ \\/  ___/\\   __\\\n"
+    "     |   |  \\/ /_/  >    |  (  <_> )___ \\  |  |\n"
+    "     |___|  /\\___  /|____|   \\____/____  > |__|\n"
+    "          \\//_____/                    \\/\n"
+    "             ---   b y   H y d r o   ---\n");

@@ -159,6 +159,7 @@ public:
         PAR2_PCT,
         PAR2_PATH,
         PAR2_SOURCE,
+        PAR2_ARGS_CUSTOM,
         PAR2_TOOL,
         PAR2_ARGS,
         PAR2_BLOCK_SIZE,
@@ -227,6 +228,33 @@ private:
     static const QMap<GROUP_POLICY, QString> sGroupPolicies;
 
     static const QMap<Opt, QString> sOptionNames;
+
+    //! The keys a configuration older than [server] blocks put at the top
+    //! level: _parseConfig() still reads them there, so the merge must not move
+    //! one back above the sections and create a second server.
+    static QStringList const &topLevelServerKeys();
+    //! The keys _parseConfig() gives to a [vpn_profile] block rather than to the
+    //! settings, when they stand inside one.
+    static QStringList const &vpnProfileKeys();
+
+    //! The "key = value" lines _parseConfig() reads as settings, wherever they
+    //! stand: above the sections, or among them when the block they sit in does
+    //! not own that key. Comments are left out; the last line wins, as in the
+    //! parser.
+    static QMap<QString, QString> topLevelSettings(QString const &text);
+    //! The lines that make the [server] and [vpn_profile] blocks: their headers
+    //! and the keys each block owns, in order. Comments, blank lines and the
+    //! settings placed among the blocks are left out, since none of them changes
+    //! a server or a profile.
+    static QString sectionsText(QString const &text);
+
+    //! Whether ngPost knows a setting name at all, to tell a line it does not
+    //! use from one it uses but reads only at startup.
+    static bool isKnownSetting(QString const &key);
+
+    //! Whether a setting's value can hold a credential. The log panel ends up in
+    //! bug reports, so a message about one of these names the key, never the value.
+    static bool isSecretSetting(QString const &key);
 
     //! The four one-shot VPN overrides (--vpn, --no_vpn, --vpn_profile,
     //! --vpn-cleanup-unattributed). Where there is no VPN integration they are
@@ -322,6 +350,19 @@ private:
     par2::Tool _par2Tool = par2::Tool::Auto;
     QString _par2Path;
     QString _par2Args;
+    //! PAR2_ARGS_CUSTOM: the user's own arguments. When this line is present in
+    //! the configuration it replaces PAR2_ARGS for every post, and ngPost never
+    //! rewrites it -- commenting it out is how you go back to PAR2_ARGS.
+    QString _par2ArgsCustom;
+    //! The engine this run uses instead of the configured one: the installed
+    //! engine when PAR2_TOOL names a missing one, or the engine --par2_path
+    //! points at. Never saved -- PAR2_TOOL and PAR2_ARGS keep the user's
+    //! choice, which a reinstall or the next run makes valid again.
+    //! Tool::Auto when the configured engine is the one running.
+    par2::Tool _par2ToolFallback = par2::Tool::Auto;
+    //! --par2_path names the executable of this run, and says so itself: the
+    //! configuration's own fallback is then neither used nor announced.
+    bool _par2PathOnCommandLine = false;
     qint64  _par2BlockSize; //!< PAR2 slice size for --check's recovery analysis; 0 = unknown
     QString _par2PathConfig;
     externaltool::PathMode _par2PathMode = externaltool::PathMode::Automatic;
@@ -332,7 +373,12 @@ private:
     bool _genPass;
 
     uint _lengthName;
-    uint _lengthPass;
+    uint _lengthPass; //!< what THIS post uses, refreshed from its tab before each job
+    //! What a new tab starts with, what the Compression settings dialog edits
+    //! and what LENGTH_PASS holds on disk. Kept apart from _lengthPass, as
+    //! _keepRarDefault is from _keepRar, so that the tab in front at save time
+    //! does not overwrite the length the dialog has just set.
+    uint _lengthPassDefault = sDefaultLengthPass;
     QString _rarName;
     QString _rarPass;
     QString _rarPassFixed;
@@ -455,6 +501,34 @@ private:
 
     VpnManager *_vpnManager; //!< app-scoped VPN (OpenVPN / WireGuard), bound to NNTP sockets only
     bool _lastPostingStartCanceled;
+
+    //! Top-level configuration keys as ngPost believes them: what it read at
+    //! startup, then what each save wrote. A value that differs from this on
+    //! disk was edited behind ngPost's back, and _mergeExternalConfigEdits()
+    //! folds it back in. Empty when the parsed file is not the one saveConfig()
+    //! writes (-c), where nothing is ever written back.
+    QMap<QString, QString> _configBelief;
+    //! Top-level keys whose edited value ngPost keeps in the file without using
+    //! it before the next start, with the value already announced for each: the
+    //! saves that follow patch the line again, but say it only once.
+    QMap<QString, QString> _configKeptForRestart;
+    //! The [server] and [vpn_profile] blocks of the file as ngPost last read or
+    //! wrote them (sectionsText()). Those blocks are rewritten from memory,
+    //! never merged, so a difference here is an edit this save is about to
+    //! discard.
+    QString _configSections;
+
+    //! Fold the edits made in the file since ngPost read it into \a text, and
+    //! into memory for the keys that can be applied while it runs. Returns what
+    //! ngPost will believe once \a text is written. Sections are left alone.
+    QMap<QString, QString> _mergeExternalConfigEdits(QString &text);
+    //! Apply one top-level key to the running state, false when this key needs a
+    //! restart (paths and engines are resolved once, at startup).
+    bool _adoptConfigValue(QString const &key, QString const &value);
+    //! Settle _par2ToolFallback and _par2Path once PAR2_TOOL, its path mode and
+    //! _par2Path are known: when the chosen engine is not installed, this run
+    //! uses the one that is. \a announce says it in the log.
+    void _applyPar2Fallback(bool announce);
 
     QFile *_logFile;
     QTextStream *_logStream;
@@ -579,6 +653,8 @@ public:
     bool obfuscateArticlesForTest() const { return _obfuscateArticles; }
     bool obfuscateFileNameForTest() const { return _obfuscateFileName; }
     qint64 par2BlockSizeForTest() const { return _par2BlockSize; }
+    //! The executable this run hands the par2 step, fallback included.
+    QString par2PathForTest() const { return _par2Path; }
     int postCmdTimeoutSecForTest() const { return _postCmdTimeoutSec; }
     bool postCmdFailIsErrorForTest() const { return _postCmdFailIsError; }
     bool postCmdExposePasswordForTest() const { return _postCmdExposePassword; }
@@ -744,6 +820,16 @@ public:
     void ignoreMonitorPath(const QString &absolutePath);
     void stopIgnoringMonitorPath(const QString &absolutePath);
 
+    //! The engine this run really uses: the configured one, or the fallback
+    //! picked when it is not installed.
+    inline par2::Tool par2ToolInUse() const;
+    //! The arguments the configuration holds: PAR2_ARGS_CUSTOM when the user
+    //! wrote one, otherwise the PAR2_ARGS line the PAR2 Settings dialog
+    //! maintains. This is what that dialog edits and what a save writes.
+    inline QString par2ArgsConfigured() const;
+    //! The arguments this run really passes to the engine: none when
+    //! --par2_path selected another engine, whose switches these are not.
+    inline QString par2ArgsInUse() const;
     inline bool useParPar() const;
     inline bool useMultiPar() const;
     uint par2DefaultPercentage() const { return _par2PctDefault; }
@@ -844,7 +930,11 @@ private:
     bool _confirmMasterSwitchWithoutVpnProfileIfNeeded();
 
     void _syntax(char *appName);
-    QString _parseConfig(const QString &configPath);
+    //! \a isDefaultConfig tells the file saveConfig() writes from a -c one:
+    //! only the former is remembered for the merge, and asking
+    //! PathHelper::configFilePath() here would create the folder a read-only
+    //! invocation must leave alone.
+    QString _parseConfig(const QString &configPath, bool isDefaultConfig = false);
     //! The value of the `obfuscate` config key for the current settings.
     QString _obfuscationKinds() const;
 
@@ -970,13 +1060,29 @@ bool NgPost::nzbCheck() const
     return _nzbCheck != nullptr;
 }
 
+inline par2::Tool NgPost::par2ToolInUse() const
+{
+    if (_par2ToolFallback != par2::Tool::Auto)
+        return _par2ToolFallback;
+    return _par2Tool == par2::Tool::Auto ? par2::detectTool(_par2Path) : _par2Tool;
+}
+inline QString NgPost::par2ArgsConfigured() const
+{
+    return _par2ArgsCustom.isEmpty() ? _par2Args : _par2ArgsCustom;
+}
+inline QString NgPost::par2ArgsInUse() const
+{
+    // An engine other than the configured one cannot be given the configured
+    // switches: par2j reads /switches where the other two read -switches.
+    return _par2ToolFallback == par2::Tool::Auto ? par2ArgsConfigured() : QString();
+}
 inline bool NgPost::useParPar() const
 {
-    return _par2Tool == par2::Tool::ParPar || (_par2Tool == par2::Tool::Auto && par2::detectTool(_par2Path) == par2::Tool::ParPar);
+    return par2ToolInUse() == par2::Tool::ParPar;
 }
 inline bool NgPost::useMultiPar() const
 {
-    return _par2Tool == par2::Tool::MultiPar || (_par2Tool == par2::Tool::Auto && par2::detectTool(_par2Path) == par2::Tool::MultiPar);
+    return par2ToolInUse() == par2::Tool::MultiPar;
 }
 
 inline bool NgPost::lastPostingStartCanceled() const

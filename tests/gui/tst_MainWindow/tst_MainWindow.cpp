@@ -88,6 +88,51 @@ private slots:
     void legacy_missing_tool_paths_fall_back_with_a_warning_data();
     void legacy_missing_tool_paths_fall_back_with_a_warning();
     void explicit_missing_parity_engine_is_reported();
+
+    //! An engine that is not installed must not stop every post that needs par2:
+    //! ngPost runs the one that is, without rewriting the configured choice.
+    void parity_engine_falls_back_to_an_installed_one();
+
+    //! Issue #15: a PAR2_ARGS_CUSTOM line is the user's, and neither a save nor
+    //! the settings dialog may replace it. Commented out, it does not apply.
+    void custom_parity_arguments_are_never_rewritten();
+
+    //! A save writes what ngPost holds in memory: an edit made in the file
+    //! meanwhile must be kept aside instead of vanishing.
+    void an_external_edit_is_merged_into_the_next_save();
+    void an_external_edit_ngPost_cannot_take_now_stays_in_the_file();
+    //! The parser reads a setting wherever it stands, below the [server] blocks
+    //! included -- where appending a line puts it. The merge must read it there too.
+    void a_setting_appended_below_the_servers_is_merged();
+    //! The tab in front writes the name length back on every save, so an edit
+    //! of it waits for a restart; the password length is the dialog's default,
+    //! which no tab writes, so an edit of it is taken. Neither may be reverted.
+    void lengths_edited_in_the_file_are_not_reverted_by_the_tabs();
+    //! A redundancy or arguments taken from the file show in the posting tabs,
+    //! as they do when the PAR2 Settings window changes them.
+    void parity_settings_taken_from_the_file_reach_the_posting_tabs();
+    //! Saving the PAR2 Settings window while this run falls back to another
+    //! engine must neither empty the path nor keep a fallback the user replaced.
+    void saving_the_parity_dialog_keeps_the_engine_fallback_right();
+
+    //! Servers and VPN profiles are written from ngPost's own state, never
+    //! merged: a block edited by hand is discarded, and that must be said.
+    void a_hand_edited_server_block_is_reported();
+
+    //! A conflict names the line it drops, and the log panel ends up in bug
+    //! reports: the value of a credential must never be one of those names.
+    void a_conflict_on_a_password_does_not_print_it();
+    //! RAR_EXTRA carries -hp<password> as easily as -m0: its conflicts are
+    //! named, never printed, like the archiver command line SecretMasker hides.
+    void a_conflict_on_archiver_switches_does_not_print_them();
+
+    //! A commented example is meant to be uncommented as it is. One ending in
+    //! "(for parpar)" hands that note to the tool, which fails on it.
+    void commented_examples_survive_being_uncommented();
+
+    //! Switches of one parity engine are refused by another: say it while the
+    //! configuration is read, not hours later at the par2 step.
+    void custom_parity_arguments_for_another_tool_are_reported();
     void automatic_archiver_ignores_the_legacy_path();
     void failed_compressor_reports_unrestored_sources();
     //! Without PAR2_ARGS, the engine an old PAR2_PATH names -- vanished, or next
@@ -315,6 +360,9 @@ private slots:
     //! "Keep the archives" is a default held by the dialog: a new tab starts
     //! with it, and the choice a single post makes must not rewrite it.
     void keep_archives_default_is_owned_by_the_dialog();
+    //! Same for the password length: the save the dialog triggers used to read
+    //! the tab in front back into ngPost and write its length instead.
+    void password_length_default_is_owned_by_the_dialog();
 
     //! The history columns belong to the user: every one of them answers to the
     //! mouse -- the name column was a Stretch section the header sized itself,
@@ -1750,6 +1798,55 @@ void TestMainWindow::keep_archives_default_is_owned_by_the_dialog()
     content = QString::fromUtf8(saved.readAll());
     QVERIFY2(content.contains(QStringLiteral("\nKEEP_RAR = true\n")), qPrintable(content));
     QVERIFY2(!content.contains(QStringLiteral("\n#KEEP_RAR = true\n")), qPrintable(content));
+}
+
+void TestMainWindow::password_length_default_is_owned_by_the_dialog()
+{
+    HomeSandbox sandbox;
+    const QString confPath = PathHelper::configFilePath();
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\nLENGTH_PASS = 15\n", &err);
+    QVERIFY2(window, qPrintable(err));
+    auto configText = [&confPath]() {
+        QFile file(confPath);
+        return file.open(QIODevice::ReadOnly | QIODevice::Text) ? QString::fromUtf8(file.readAll())
+                                                                : QString();
+    };
+
+    // The quick post tab in front still shows 15 when the dialog saves.
+    {
+        CompressionSettingsDialog dlg(&ngPost, window);
+        auto *length = dlg.findChild<QSpinBox *>(QStringLiteral("rarLengthSB"));
+        QVERIFY(length);
+        QCOMPARE(length->value(), 15);
+        length->setValue(24);
+        dlg.accept();
+    }
+    QVERIFY2(configText().contains(QStringLiteral("\nLENGTH_PASS = 24\n")),
+             qPrintable(configText()));
+
+    // A tab opened afterwards starts from that default...
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    QVERIFY(tabs);
+    PostingWidget *fresh = window->addNewQuickTab(tabs->count() - 1);
+    QVERIFY(fresh);
+    fresh->init();
+    auto *freshLength = fresh->findChild<QSpinBox *>(QStringLiteral("passLengthSB"));
+    QVERIFY(freshLength);
+    QCOMPARE(freshLength->value(), 24);
+
+    // ...and the length one post uses stays with that post.
+    freshLength->setValue(8);
+    tabs->setCurrentIndex(tabs->indexOf(fresh));
+    QVERIFY(QMetaObject::invokeMethod(window, "onSaveConfig", Qt::DirectConnection));
+    QVERIFY2(configText().contains(QStringLiteral("\nLENGTH_PASS = 24\n")),
+             qPrintable(configText()));
+    CompressionSettingsDialog again(&ngPost, window);
+    QCOMPARE(again.findChild<QSpinBox *>(QStringLiteral("rarLengthSB"))->value(), 24);
 }
 
 namespace
@@ -3554,6 +3651,701 @@ void TestMainWindow::custom_archiver_path_keeps_the_cursor_and_selects_the_engin
     QCOMPARE(path->text(), typed);
     QCOMPARE(tool->currentData().toString(), QString("rar"));
 }
+
+void TestMainWindow::parity_engine_falls_back_to_an_installed_one()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("The test isolates automatic discovery using PATH");
+#else
+    HomeSandbox sandbox;
+    const QString binDir = sandbox.rootPath() + "/bin";
+    QVERIFY(QDir().mkpath(binDir));
+    const QString installed = binDir + "/par2";
+    {
+        QFile fake(installed);
+        QVERIFY(fake.open(QIODevice::WriteOnly | QIODevice::Text));
+        QVERIFY(fake.write("#!/bin/sh\nexit 0\n") > 0);
+        fake.close();
+        QVERIFY(fake.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                    | QFileDevice::ExeOwner));
+    }
+    const QByteArray savedPath = qgetenv("PATH");
+    qputenv("PATH", binDir.toLocal8Bit());
+    const auto restorePath = qScopeGuard([&] { qputenv("PATH", savedPath); });
+    QVERIFY(!QFile::exists(QCoreApplication::applicationDirPath() + "/parpar"));
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString arguments = "-s1M --auto-slice-size -r1n*0.6 --progress stdout -q";
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              QString("GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\n"
+                                      "PAR2_PCT = 10\nPAR2_ARGS = %1\n")
+                                  .arg(arguments),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY2(log.contains("PAR2_TOOL = parpar is not installed here"), qPrintable(log));
+    QVERIFY2(log.contains(installed), qPrintable(log));
+    QVERIFY2(log.contains("default arguments"), qPrintable(log));
+
+    // This run uses the engine that exists, with its own defaults: ParPar
+    // switches would make par2 fail on every post.
+    QCOMPARE(ngPost.par2ToolInUse(), par2::Tool::Par2cmdline);
+    QVERIFY(!ngPost.useParPar());
+
+    // The configuration keeps the choice and the arguments: a reinstall of
+    // ParPar, or the Windows installer option, makes them valid again.
+    ngPost.saveConfig();
+    QFile config(PathHelper::configFilePath());
+    QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString saved = QString::fromUtf8(config.readAll());
+    QVERIFY2(saved.contains("PAR2_TOOL = parpar\n"), "the fallback must not be persisted");
+    QVERIFY(saved.contains("PAR2_ARGS = " + arguments + "\n"));
+#endif
+}
+
+void TestMainWindow::custom_parity_arguments_for_another_tool_are_reported()
+{
+    HomeSandbox sandbox;
+    const QString par2j = sandbox.rootPath() + "/par2j64";
+    {
+        QFile fake(par2j);
+        QVERIFY(fake.open(QIODevice::WriteOnly | QIODevice::Text));
+        QVERIFY(fake.write("#!/bin/sh\nexit 0\n") > 0);
+        fake.close();
+        QVERIFY(fake.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                    | QFileDevice::ExeOwner));
+    }
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    // MultiPar reads /switches; these are ParPar's.
+    auto *window = bootWindow(ngPost,
+                              QString("GROUPS = alt.binaries.test\nPAR2_PCT = 10\n"
+                                      "PAR2_TOOL = multipar\nPAR2_SOURCE = custom\nPAR2_PATH = %1\n"
+                                      "PAR2_ARGS_CUSTOM = -s1M --auto-slice-size -m1024M\n")
+                                  .arg(par2j),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY2(log.contains("PAR2_ARGS_CUSTOM is written for another tool than multipar"),
+             qPrintable(log));
+}
+
+void TestMainWindow::an_external_edit_is_merged_into_the_next_save()
+{
+    HomeSandbox sandbox;
+    // MultiPar at a path of its own: found wherever the test runs. Left to
+    // automatic discovery it is missing off Windows, and an engine installed on
+    // the machine -- the macOS runner puts ParPar on PATH -- would replace it
+    // with its default arguments, the ones this test then reads back.
+#ifdef Q_OS_WIN
+    const QString par2j = sandbox.rootPath() + "/par2j64.exe";
+#else
+    const QString par2j = sandbox.rootPath() + "/par2j64";
+#endif
+    {
+        QFile fake(par2j);
+        QVERIFY(fake.open(QIODevice::WriteOnly | QIODevice::Text));
+        QVERIFY(fake.write("#!/bin/sh\nexit 0\n") > 0);
+        fake.close();
+        QVERIFY(fake.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                    | QFileDevice::ExeOwner));
+    }
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              QString("GROUPS = alt.binaries.test\nPAR2_TOOL = multipar\n"
+                                      "PAR2_SOURCE = custom\nPAR2_PATH = %1\nPAR2_PCT = 10\n")
+                                  .arg(par2j),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    QCOMPARE(ngPost.par2ToolInUse(), par2::Tool::MultiPar);
+
+    // What issue #15 describes: the file is edited by hand while ngPost runs.
+    // The save that follows reads those lines back instead of erasing them.
+    const QString mine = "c /rr10 /sn3000 /rd3 /ls2 /lr260000000";
+    const QString conf = PathHelper::configFilePath();
+    {
+        QFile file(conf);
+        QVERIFY(file.open(QIODevice::Append | QIODevice::Text));
+        QVERIFY(
+            file.write(
+                QString("PAR2_ARGS_CUSTOM = %1\nMY_OWN_NOTE = keep-me\nMY_OTHER_NOTE = me-too\n")
+                    .arg(mine)
+                    .toUtf8())
+            > 0);
+    }
+    ngPost.saveConfig();
+
+    // Taken into memory, so this run already posts with those arguments.
+    QCOMPARE(ngPost.par2ArgsInUse(), mine);
+    const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY2(log.contains("taken from your file: par2_args_custom"), qPrintable(log));
+    QVERIFY2(log.contains("unused by ngPost: my_other_note, my_own_note"), qPrintable(log));
+
+    auto configText = [&conf]() {
+        QFile file(conf);
+        return file.open(QIODevice::ReadOnly | QIODevice::Text) ? QString::fromUtf8(file.readAll())
+                                                                : QString();
+    };
+    QString saved = configText();
+    QCOMPARE(saved.count("PAR2_ARGS_CUSTOM = " + mine + "\n"), 1);
+    QVERIFY2(saved.contains("MY_OWN_NOTE = keep-me\n"), qPrintable(saved));
+    // A line ngPost does not write joins the other settings, above the
+    // sections, where a reader of the file looks for it -- all of them under
+    // one header, however many there are.
+    QVERIFY(saved.indexOf("MY_OWN_NOTE") < saved.indexOf("[server]"));
+    QVERIFY2(saved.contains("MY_OTHER_NOTE = me-too\n"), qPrintable(saved));
+    QCOMPARE(saved.count("## Added to your configuration file, kept here"), 1);
+
+    // No copy aside, and saving again neither duplicates nor drops anything.
+    const QDir folder(QFileInfo(conf).absolutePath());
+    QVERIFY(
+        folder.entryInfoList({ QStringLiteral("ngPost.conf.edited-*") }, QDir::Files).isEmpty());
+    ngPost.saveConfig();
+    saved = configText();
+    QCOMPARE(saved.count("PAR2_ARGS_CUSTOM = " + mine + "\n"), 1);
+    QCOMPARE(saved.count("MY_OWN_NOTE = keep-me\n"), 1);
+    QCOMPARE(saved.count("MY_OTHER_NOTE = me-too\n"), 1);
+    QCOMPARE(saved.count("## Added to your configuration file, kept here"), 1);
+    // Said once, when the line appeared: the saves that follow keep it silently.
+    QCOMPARE(
+        window->findChild<QTextBrowser *>("logBrowser")->toPlainText().count("unused by ngPost"),
+        1);
+
+    // And the file still reads back to the same state.
+    QVERIFY(ngPost.parseDefaultConfig().isEmpty());
+    QCOMPARE(ngPost.par2ArgsInUse(), mine);
+
+    // Commenting the line out is how the configuration turns the setting off,
+    // and doing it under ngPost must not bring the line back active.
+    {
+        QFile file(conf);
+        QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+        QString text = QString::fromUtf8(file.readAll());
+        file.close();
+        text.replace("\nPAR2_ARGS_CUSTOM = ", "\n#PAR2_ARGS_CUSTOM = ");
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+        QVERIFY(file.write(text.toUtf8()) > 0);
+    }
+    ngPost.saveConfig();
+    QVERIFY2(ngPost.par2ArgsInUse() != mine, "a commented out line must stop being used");
+    saved = configText();
+    QVERIFY2(!saved.contains("\nPAR2_ARGS_CUSTOM = "), qPrintable(saved));
+    QVERIFY2(window->findChild<QTextBrowser *>("logBrowser")
+                 ->toPlainText()
+                 .contains("so it stops using them: par2_args_custom"),
+             "the log must say the line was turned off");
+}
+
+void TestMainWindow::an_external_edit_ngPost_cannot_take_now_stays_in_the_file()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              "GROUPS = alt.binaries.test\nPAR2_TOOL = multipar\nPAR2_PCT = 10\n"
+                              "ARTICLE_SIZE = 716800\n",
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    const QString conf = PathHelper::configFilePath();
+
+    // ARTICLE_SIZE is read once, when the posters are built, and PAR2_TOOL
+    // picks an executable at startup: taking either now would leave the running
+    // job disagreeing with itself. PAR2_PCT is edited on both sides.
+    {
+        QFile file(conf);
+        QVERIFY(file.open(QIODevice::Append | QIODevice::Text));
+        QVERIFY(file.write("PAR2_TOOL = par2\nARTICLE_SIZE = 1433600\nPAR2_PCT = 33\n"
+                           "HOST = news.example.com\n")
+                > 0);
+    }
+    Par2SettingsDialog parity(&ngPost, {}, false, false, window);
+    auto *percentage = parity.findChild<QSpinBox *>("par2DefaultPct");
+    QVERIFY(percentage);
+    percentage->setValue(12);
+    parity.accept();
+    ngPost.saveConfig();
+
+    QFile file(conf);
+    QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString saved = QString::fromUtf8(file.readAll());
+    const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+
+    // Kept in the file for the next start, while this run keeps its own values.
+    QVERIFY2(saved.contains("PAR2_TOOL = par2\n"), qPrintable(saved));
+    QVERIFY2(saved.contains("article_size = 1433600\n"), qPrintable(saved));
+    QCOMPARE(NgPost::articleSize(), Q_INT64_C(716800));
+    QVERIFY2(log.contains("used only after a restart: article_size"), qPrintable(log));
+
+    // Edited on both sides: the window the user just validated wins, and the
+    // value it drops is named so nothing disappears silently.
+    QVERIFY2(saved.contains("PAR2_PCT = 12\n"), qPrintable(saved));
+    QVERIFY2(log.contains("drops yours: par2_pct = 33"), qPrintable(log));
+
+    // A [server] key written at the top level is the one thing not merged back:
+    // it would add a second server on the next start.
+    QVERIFY2(!saved.contains("HOST = news.example.com"), qPrintable(saved));
+    QVERIFY2(log.contains("[server] section holds them now: host"), qPrintable(log));
+
+    // Every save patches the two lines again, and says so only the first time.
+    ngPost.saveConfig();
+    file.close();
+    QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString again = QString::fromUtf8(file.readAll());
+    QVERIFY2(again.contains("PAR2_TOOL = par2\n"), qPrintable(again));
+    QVERIFY2(again.contains("article_size = 1433600\n"), qPrintable(again));
+    QCOMPARE(window->findChild<QTextBrowser *>("logBrowser")
+                 ->toPlainText()
+                 .count("used only after a restart"),
+             1);
+}
+
+void TestMainWindow::a_hand_edited_server_block_is_reported()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\nPAR2_PCT = 10\n", &error);
+    QVERIFY2(window, qPrintable(error));
+
+    const QString conf = PathHelper::configFilePath();
+    {
+        QFile file(conf);
+        QVERIFY(file.open(QIODevice::Append | QIODevice::Text));
+        QVERIFY(file.write("\n[server]\nhost = news.hand.example\nport = 563\n"
+                           "connection = 10\nenabled = true\n")
+                > 0);
+    }
+    ngPost.saveConfig();
+
+    QFile file(conf);
+    QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    QVERIFY2(!QString::fromUtf8(file.readAll()).contains("news.hand.example"),
+             "a hand written block is not merged: that is the documented limit");
+    auto log = [window]() {
+        return window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    };
+    QVERIFY2(log().contains("were edited by hand"), qPrintable(log()));
+
+    // Said for the edit, not for every save that follows.
+    ngPost.saveConfig();
+    QCOMPARE(log().count("were edited by hand"), 1);
+}
+
+void TestMainWindow::a_conflict_on_a_password_does_not_print_it()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              "GROUPS = alt.binaries.test\nRAR_PASS = as-ngPost-read-it\n",
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+
+    const QString conf = PathHelper::configFilePath();
+    const QString onlyOnDisk = QStringLiteral("edited-behind-ngPost-back");
+    {
+        QFile file(conf);
+        QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+        QString text = QString::fromUtf8(file.readAll());
+        file.close();
+        text.replace("RAR_PASS = as-ngPost-read-it", "RAR_PASS = " + onlyOnDisk);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+        QVERIFY(file.write(text.toUtf8()) > 0);
+    }
+
+    // The window changes it too, which makes it a conflict: ngPost keeps its
+    // own value and says which line it dropped.
+    CompressionSettingsDialog dialog(&ngPost, window);
+    auto *box = dialog.findChild<QCheckBox *>("rarPassCB");
+    auto *edit = dialog.findChild<QLineEdit *>("rarPassEdit");
+    QVERIFY(box && edit);
+    box->setChecked(true);
+    edit->setText("typed-in-the-window");
+    dialog.accept();
+
+    const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY2(log.contains("rar_pass"), qPrintable(log));
+    QVERIFY2(!log.contains(onlyOnDisk), "a credential must never reach the log");
+}
+
+void TestMainWindow::a_conflict_on_archiver_switches_does_not_print_them()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              "GROUPS = alt.binaries.test\nRAR_TOOL = rar\nRAR_EXTRA = -m0\n",
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+
+    // A password glued to the switches in the file...
+    const QString conf = PathHelper::configFilePath();
+    const QString onlyOnDisk = QStringLiteral("edited-behind-ngPost-back");
+    {
+        QFile file(conf);
+        QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+        QString text = QString::fromUtf8(file.readAll());
+        file.close();
+        QVERIFY2(text.contains("RAR_EXTRA = -m0"), qPrintable(text));
+        text.replace("RAR_EXTRA = -m0", "RAR_EXTRA = -m0 -hp" + onlyOnDisk);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+        QVERIFY(file.write(text.toUtf8()) > 0);
+    }
+
+    // ...while the window switches archiver, which drops ngPost's own switches:
+    // changed on both sides, so ngPost keeps its value and names the line.
+    CompressionSettingsDialog dialog(&ngPost, window);
+    auto *tool = dialog.findChild<QComboBox *>("rarTool");
+    QVERIFY(tool);
+    tool->setCurrentIndex(tool->findData(QStringLiteral("7zip")));
+    dialog.accept();
+
+    const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY2(log.contains("drops yours: rar_extra"), qPrintable(log));
+    QVERIFY2(!log.contains(onlyOnDisk), "an archive password must never reach the log");
+}
+
+void TestMainWindow::commented_examples_survive_being_uncommented()
+{
+    // Everything after the = goes to the tool or the shell, so a note in
+    // parentheses at the end of an example becomes an argument.
+    const QRegularExpression example("^#([A-Za-z_0-9]+)\\s*=\\s*(.+)$");
+    const QRegularExpression note("\\([^()]*\\)\\s*$");
+    auto check = [&](QString const &text, QString const &what) {
+        for (QString const &line : text.split(QLatin1Char('\n'))) {
+            const auto m = example.match(line.trimmed());
+            if (!m.hasMatch())
+                continue;
+            // A command may legitimately hold parentheses inside its own
+            // quotes; only a note tacked on at the end is the trap.
+            if (m.captured(2).contains(QLatin1Char('"')))
+                continue;
+            QVERIFY2(!note.match(m.captured(2)).hasMatch(),
+                     qPrintable(what + ": " + line.trimmed()));
+        }
+    };
+
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    ngPost.saveConfig();
+    QFile written(PathHelper::configFilePath());
+    QVERIFY(written.open(QIODevice::ReadOnly | QIODevice::Text));
+    check(QString::fromUtf8(written.readAll()), "the configuration ngPost writes");
+
+    for (QString const &name :
+         { QStringLiteral("ngPost.conf.example"), QStringLiteral("ngPost_fr.conf") }) {
+        QFile shipped(QStringLiteral(NGPOST_SOURCE_ROOT) + QLatin1Char('/') + name);
+        QVERIFY2(shipped.open(QIODevice::ReadOnly | QIODevice::Text), qPrintable(name));
+        check(QString::fromUtf8(shipped.readAll()), name);
+    }
+}
+
+void TestMainWindow::custom_parity_arguments_are_never_rewritten()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    // The line of issue #15, next to the one the PAR2 Settings dialog maintains.
+    const QString mine = "c /rr10 /sn3000 /rd3 /ls2 /lr260000000 /lc288";
+    const QString ngPostLine = "c /rr10 /ss1048576 /rd3";
+    const QString config = QString("GROUPS = alt.binaries.test\nPAR2_TOOL = multipar\n"
+                                   "PAR2_PCT = 10\nPAR2_ARGS = %1\n%2PAR2_ARGS_CUSTOM = %3\n");
+
+    {
+        // Commented out, the custom line does not exist for ngPost.
+        NgPost ngPost(argc, argv);
+        QString error;
+        auto *window = bootWindow(ngPost, config.arg(ngPostLine, "#", mine), &error);
+        QVERIFY2(window, qPrintable(error));
+        Par2SettingsDialog parity(&ngPost, {}, false, false, window);
+        QVERIFY(!parity.findChild<QCheckBox *>("par2Custom")->isChecked());
+        QCOMPARE(parity.findChild<QPlainTextEdit *>("par2Arguments")->toPlainText(), ngPostLine);
+    }
+
+    // Uncommented, it is what runs, and nothing may rewrite it.
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, config.arg(ngPostLine, "", mine), &error);
+    QVERIFY2(window, qPrintable(error));
+
+    Par2SettingsDialog parity(&ngPost, {}, false, false, window);
+    auto *custom = parity.findChild<QCheckBox *>("par2Custom");
+    QVERIFY(custom);
+    QVERIFY2(custom->isChecked(), "an uncommented PAR2_ARGS_CUSTOM must reach the dialog");
+    QCOMPARE(parity.findChild<QPlainTextEdit *>("par2Arguments")->toPlainText(), mine);
+    // Touch another setting: the dialog now saves, and must still not touch them.
+    auto *percentage = parity.findChild<QSpinBox *>("par2DefaultPct");
+    QVERIFY(percentage);
+    percentage->setValue(percentage->value() == 10 ? 12 : 10);
+    parity.accept();
+
+    ngPost.saveConfig();
+    QFile file(PathHelper::configFilePath());
+    QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString saved = QString::fromUtf8(file.readAll());
+    QVERIFY2(saved.contains("PAR2_ARGS_CUSTOM = " + mine + "\n"), qPrintable(saved));
+
+    // Reading it back keeps it, so the save that follows cannot drift either.
+    QVERIFY(ngPost.parseDefaultConfig().isEmpty());
+    ngPost.saveConfig();
+    file.close();
+    QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    QVERIFY(QString::fromUtf8(file.readAll()).contains("PAR2_ARGS_CUSTOM = " + mine + "\n"));
+}
+
+
+void TestMainWindow::a_setting_appended_below_the_servers_is_merged()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    // No PAR2_TOOL: automatic discovery never falls back to another engine, so
+    // the arguments read back below are the file's whatever is installed here.
+    auto *window = bootWindow(ngPost,
+                              "GROUPS = alt.binaries.test\nPAR2_PCT = 10\n\n"
+                              "[server]\nhost = news.example.com\nport = 563\nssl = true\n"
+                              "user = me\npass = secret\nconnection = 5\nenabled = true\n",
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    ngPost.saveConfig(); // the file as ngPost writes it: servers below the settings
+    auto log = [window]() {
+        return window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    };
+    const QString conf = PathHelper::configFilePath();
+    auto configText = [&conf]() {
+        QFile file(conf);
+        return file.open(QIODevice::ReadOnly | QIODevice::Text) ? QString::fromUtf8(file.readAll())
+                                                                : QString();
+    };
+
+    // Appended at the very end, below the [server] block: ngPost reads both
+    // lines as settings when it starts, so the merge must as well.
+    const QString mine = "c -l -m1024 -r8";
+    {
+        QFile file(conf);
+        QVERIFY(file.open(QIODevice::Append | QIODevice::Text));
+        QVERIFY(
+            file.write(QString("PAR2_ARGS_CUSTOM = %1\nMY_OWN_NOTE = keep-me\n").arg(mine).toUtf8())
+            > 0);
+    }
+    ngPost.saveConfig();
+
+    QCOMPARE(ngPost.par2ArgsInUse(), mine);
+    QVERIFY2(log().contains("taken from your file: par2_args_custom"), qPrintable(log()));
+    QVERIFY2(!log().contains("were edited by hand"), "a setting is not a change to a block");
+    QString saved = configText();
+    QCOMPARE(saved.count("PAR2_ARGS_CUSTOM = " + mine + "\n"), 1);
+    QVERIFY2(saved.contains("MY_OWN_NOTE = keep-me\n"), qPrintable(saved));
+    QVERIFY(saved.indexOf("PAR2_ARGS_CUSTOM = " + mine) < saved.indexOf("\n[server]\n"));
+    QVERIFY2(saved.contains("host = news.example.com\n"), qPrintable(saved));
+
+    // A key the block owns is still a change to that block, and still said.
+    {
+        QFile file(conf);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+        QVERIFY(file.write(
+                    saved.replace("host = news.example.com", "host = news.other.example").toUtf8())
+                > 0);
+    }
+    ngPost.saveConfig();
+    QVERIFY2(log().contains("were edited by hand"), qPrintable(log()));
+    QVERIFY(configText().contains("host = news.example.com\n"));
+}
+
+void TestMainWindow::lengths_edited_in_the_file_are_not_reverted_by_the_tabs()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              "GROUPS = alt.binaries.test\nLENGTH_NAME = 22\nLENGTH_PASS = 15\n",
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    ngPost.saveConfig();
+    const QString conf = PathHelper::configFilePath();
+    auto configText = [&conf]() {
+        QFile file(conf);
+        return file.open(QIODevice::ReadOnly | QIODevice::Text) ? QString::fromUtf8(file.readAll())
+                                                                : QString();
+    };
+    {
+        QString text = configText();
+        QVERIFY2(text.contains("LENGTH_NAME = 22\n"), qPrintable(text));
+        QVERIFY2(text.contains("LENGTH_PASS = 15\n"), qPrintable(text));
+        text.replace("LENGTH_NAME = 22", "LENGTH_NAME = 30");
+        text.replace("LENGTH_PASS = 15", "LENGTH_PASS = 20");
+        QFile file(conf);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+        QVERIFY(file.write(text.toUtf8()) > 0);
+    }
+
+    // The second save is the one that used to write the spin box back over the
+    // file, after the first had announced the value as taken.
+    ngPost.saveConfig();
+    ngPost.saveConfig();
+    const QString saved = configText();
+    QVERIFY2(saved.contains("LENGTH_NAME = 30\n"), qPrintable(saved));
+    QVERIFY2(saved.contains("LENGTH_PASS = 20\n"), qPrintable(saved));
+    const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    QVERIFY2(log.contains("used only after a restart: length_name"), qPrintable(log));
+    QVERIFY2(!log.contains("taken from your file: length_name"), qPrintable(log));
+    QVERIFY2(log.contains("taken from your file: length_pass"), qPrintable(log));
+    // This run keeps the name length its tabs show and post with...
+    const auto boxes = window->findChildren<QSpinBox *>("nameLengthSB");
+    QVERIFY(!boxes.isEmpty());
+    for (QSpinBox *box : boxes)
+        QCOMPARE(box->value(), 22);
+    // ...and the dialog now offers the password length of the file.
+    CompressionSettingsDialog dialog(&ngPost, window);
+    auto *length = dialog.findChild<QSpinBox *>("rarLengthSB");
+    QVERIFY(length);
+    QCOMPARE(length->value(), 20);
+}
+
+void TestMainWindow::parity_settings_taken_from_the_file_reach_the_posting_tabs()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\nPAR2_PCT = 10\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    ngPost.saveConfig();
+    const QString conf = PathHelper::configFilePath();
+    const QString mine = "c -l -m1024 -r8";
+    {
+        QFile file(conf);
+        QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+        QString text = QString::fromUtf8(file.readAll());
+        file.close();
+        QVERIFY2(text.contains("PAR2_PCT = 10\n"), qPrintable(text));
+        text.replace("PAR2_PCT = 10", "PAR2_PCT = 33");
+        text += QString("PAR2_ARGS_CUSTOM = %1\n").arg(mine);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
+        QVERIFY(file.write(text.toUtf8()) > 0);
+    }
+    ngPost.saveConfig();
+    QCOMPARE(ngPost.par2DefaultPercentage(), 33u);
+
+    // Both the quick post and the auto post tab: their default redundancy and
+    // the arguments their tooltip says a post runs with.
+    const auto boxes = window->findChildren<QSpinBox *>("redundancySB");
+    QVERIFY(boxes.size() >= 2);
+    for (QSpinBox *box : boxes) {
+        QVERIFY2(box->specialValueText().contains("33"), qPrintable(box->specialValueText()));
+        QVERIFY2(box->toolTip().contains(mine), qPrintable(box->toolTip()));
+    }
+}
+
+void TestMainWindow::saving_the_parity_dialog_keeps_the_engine_fallback_right()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("The test isolates automatic discovery using PATH");
+#else
+    HomeSandbox sandbox;
+    const QString binDir = sandbox.rootPath() + "/bin";
+    QVERIFY(QDir().mkpath(binDir));
+    const QString installed = binDir + "/par2";
+    {
+        QFile fake(installed);
+        QVERIFY(fake.open(QIODevice::WriteOnly | QIODevice::Text));
+        QVERIFY(fake.write("#!/bin/sh\nexit 0\n") > 0);
+        fake.close();
+        QVERIFY(fake.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                    | QFileDevice::ExeOwner));
+    }
+    const QByteArray savedPath = qgetenv("PATH");
+    qputenv("PATH", binDir.toLocal8Bit());
+    const auto restorePath = qScopeGuard([&] { qputenv("PATH", savedPath); });
+    QVERIFY(!QFile::exists(QCoreApplication::applicationDirPath() + "/parpar"));
+
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              "GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PCT = 10\n",
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    QCOMPARE(ngPost.par2ToolInUse(), par2::Tool::Par2cmdline);
+    QCOMPARE(ngPost.par2PathForTest(), installed);
+    auto log = [window]() {
+        return window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
+    };
+
+    {
+        // Only the redundancy changes. ParPar is still missing, and this run
+        // keeps posting with the engine it fell back to -- not with an empty
+        // path, which is what the window's own path field holds for ParPar.
+        Par2SettingsDialog parity(&ngPost, {}, false, false, window);
+        auto *percentage = parity.findChild<QSpinBox *>("par2DefaultPct");
+        QVERIFY(percentage);
+        percentage->setValue(12);
+        parity.accept();
+    }
+    QCOMPARE(ngPost.par2ToolInUse(), par2::Tool::Par2cmdline);
+    QCOMPARE(ngPost.par2PathForTest(), installed);
+    // The missing engine did not change: said at startup, not again.
+    QCOMPARE(log().count("PAR2_TOOL = parpar is not installed here"), 1);
+
+    {
+        // Choosing the installed engine ends the fallback, and the arguments
+        // the window builds for it are the ones this run passes.
+        Par2SettingsDialog parity(&ngPost, {}, false, false, window);
+        auto *tool = parity.findChild<QComboBox *>("par2Tool");
+        QVERIFY(tool);
+        tool->setCurrentIndex(tool->findData(int(par2::Tool::Par2cmdline)));
+        auto *percentage = parity.findChild<QSpinBox *>("par2DefaultPct");
+        QVERIFY(percentage);
+        percentage->setValue(14);
+        parity.accept();
+    }
+    QCOMPARE(ngPost.par2ToolInUse(), par2::Tool::Par2cmdline);
+    QCOMPARE(ngPost.par2PathForTest(), installed);
+    QVERIFY(!ngPost.par2ArgsInUse().isEmpty());
+    QCOMPARE(ngPost.par2ArgsInUse(), ngPost.par2ArgsConfigured());
+#endif
+}
+
 
 void TestMainWindow::explicit_missing_parity_engine_is_reported()
 {

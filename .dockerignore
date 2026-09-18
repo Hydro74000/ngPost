@@ -1,0 +1,28 @@
+# The build only needs the sources: keep local artefacts, history and secrets
+# out of the context sent to the daemon. A bare pattern matches at the root of
+# the context only; **/ extends it to every folder, src/ included, where an
+# in-tree build leaves its objects, moc files and Makefile.
+.git
+.github
+**/*.o
+**/*.moc
+**/moc_*
+**/qrc_*
+**/ui_*
+**/Makefile
+build*/
+release/
+debug/
+**/*.user
+**/*.AppImage
+**/*.dmg
+**/*.exe
+**/ngPost
+**/ngPost.conf
+**/ngPost.log
+tests/
+doc/
+# Not needed inside the image, and editing them would invalidate the cache of
+# every layer that follows the source copy.
+Dockerfile
+.dockerignore

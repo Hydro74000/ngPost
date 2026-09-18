@@ -73,10 +73,27 @@ class QtRunnerTests(unittest.TestCase):
                 if passed < minimum:
                     self.assertIn('below the', result.stdout)
 
+    @staticmethod
+    def linux_only_binary():
+        # Read from the table rather than named here: pinning that binary on
+        # another platform later must break this test, not silently empty it.
+        platforms = {}
+        counts = RUNNER.parents[2] / 'tests/expected-counts.txt'
+        for line in counts.read_text().splitlines():
+            parts = line.split()
+            if not parts or parts[0].startswith('#'):
+                continue
+            platforms.setdefault(parts[0], set()).add(parts[2] if len(parts) > 2 else '')
+        for binary, pinned in sorted(platforms.items()):
+            if pinned == {'Linux'}:
+                return binary
+        raise AssertionError('no binary is pinned on Linux only any more')
+
     def test_linux_floor_does_not_apply_to_other_platforms(self):
+        name = self.linux_only_binary()
         for platform in ('Darwin', 'MINGW64_NT-10.0', 'MSYS_NT-10.0', 'CYGWIN_NT-10.0'):
             with self.subTest(platform=platform):
-                result = self.run_fixture(PASS, 'tst_CliParser.exe', platform)
+                result = self.run_fixture(PASS, name + '.exe', platform)
                 self.assertEqual(result.returncode, 0, result.stdout)
                 self.assertIn('no pinned minimum', result.stdout)
 

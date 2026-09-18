@@ -39,6 +39,96 @@ TODO: auto RAR size and par2 parameters depending on the inputs size?
   new article admission while recovery is in progress.
 - New settings: VPN_LEASE_WAIT_MINUTES (CLI default 5, range 0..1440) and
   VPN_RECOVERY_MAX_ATTEMPTS (default 0/unlimited, range 0..1000).
+- External tools are now resolved through a single search: the copy shipped
+  next to ngPost first, then the system. RAR_TOOL selects rar or 7zip, while
+  RAR_SOURCE and PAR2_SOURCE select automatic discovery or a custom path;
+  RAR_PATH and PAR2_PATH are still read. A configured path that no longer
+  exists falls back to automatic discovery with a warning instead of silently
+  running another tool, and an explicit --par2_path that cannot be executed now
+  fails clearly instead of being ignored.
+- GUI, log file and command line diagnostics are prefixed with [hh:mm:ss.zzz].
+  Output meant for machines is unchanged: --resume-list --json and --history
+  carry no timestamp.
+- LOG_IN_FILE writes ngPost.log in the ngPost configuration folder on every
+  platform. It used to be written to $HOME on Linux and macOS - to /ngPost.log
+  when HOME was unset - and to the current working directory on Windows.
+- Automatic shutdown now waits for a post to complete with at least one article
+  sent since the option was armed, for prepared tabs to be posted or cleared,
+  and for any open dialog to close. A cancelled post never triggers it.
+- Windows: a WireGuard profile carrying PreUp, PostUp, PreDown or PostDown is
+  refused when its tunnel service is registered. Rolling back to a profile that
+  an earlier version had accepted can therefore fail; the previous profile is
+  kept and the failure is reported.
+- PAR2_ARGS_CUSTOM is a new key for your own par2 arguments. Uncommented, it is
+  what runs, and ngPost never rewrites it; only the redundancy of each post is
+  substituted. Commented out, the PAR2_ARGS line the PAR2 Settings window
+  maintains runs instead. Arguments written for another engine than PAR2_TOOL are
+  reported when the configuration is read rather than at the par2 step.
+- Editing the configuration file while ngPost runs no longer loses the lines you
+  wrote: a save now merges them instead of overwriting the file, wherever they
+  stand -- a setting appended below the [server] blocks counts, as it does when
+  ngPost starts, and the save moves it up with the other settings. Values such
+  as PAR2_ARGS_CUSTOM, PAR2_ARGS, RAR_EXTRA, TMP_DIR, RAR_SIZE, PAR2_PCT or
+  LENGTH_PASS are taken into memory right away, and the posting tabs follow;
+  keys resolved at startup, such as PAR2_TOOL or the paths, and LENGTH_NAME,
+  which the posting tab in front writes back, stay in the file for the next
+  start; lines ngPost does not use are kept as they are. Commenting out or deleting
+  PAR2_ARGS_CUSTOM, PAR2_ARGS, RAR_EXTRA or TMP_DIR stops it right away; any
+  other line ngPost writes comes back at the next save with the value ngPost
+  holds -- change those in the GUI, or with ngPost closed. A setting changed on
+  both sides keeps ngPost's value. The log names the lines taken, kept, turned
+  off and dropped.
+  Only [server] keys written at the top level, as configurations older than
+  [server] blocks did, are dropped: putting them back would add a second
+  server. The [server] and [vpn_profile] blocks are still written from what
+  ngPost holds, since two blocks have no identity a merge could rely on, but a
+  change to a block -- a header or a key it owns -- is now reported instead of
+  being dropped in silence. A comment added among the blocks is not kept.
+- ngPost runs in a container. The image is the headless build -- Qt Core,
+  Network, Sql, DBus and qtkeychain, no graphical stack, no X11 -- with
+  par2cmdline and 7-Zip inside, and is published on ghcr.io at every release.
+  rar is non-free and is not in it: mount your own and set RAR_SOURCE = custom.
+  The integrated VPN is not supported in a container; put the container behind
+  your VPN instead. The configuration goes to /config/ngPost/ngPost.conf and
+  your files under /data. See "ngPost in Docker" in the wiki.
+- The headless build works again: `qmake6 CONFIG+=no_hmi` now really drops the
+  interface, where `CONFIG-=use_hmi` was undone by the project file itself, and
+  a dead QtGui include in the update checker no longer breaks that build. CI
+  builds it on every push, so it cannot rot unnoticed again.
+- A commented example can be uncommented as it is. The note that said which
+  tool or platform a line was for moved above it: everything after the = is
+  passed on, so uncommenting #SHUTDOWN_CMD = shutdown /s /f /t 0  (Windows) used
+  to hand "(Windows)" to the shell, and the par2 and 7-zip examples did the same
+  to their tool. This covers the configuration ngPost writes and both shipped
+  templates.
+- --par2_path changes the engine for that run only. It used to clear PAR2_ARGS
+  and PAR2_BLOCK_SIZE and to overwrite PAR2_TOOL in memory, so the next save
+  wrote a one-shot option into the configuration. A path to the engine
+  PAR2_TOOL names runs with the arguments of the configuration, even when that
+  engine is not installed where ngPost looks for it.
+- The PAR2 Settings window writes custom arguments on a single line: a text box
+  can hold several, and the lines after the first were silently lost.
+- A setting edited both in the file and in ngPost is reported by name only when
+  it can hold a credential -- a password, the proxy, the upload URL, a command
+  line or RAR_EXTRA, where -hp<password> fits as well as -m0 -- so the log panel
+  of a bug report never carries it.
+- The password length set in the Compression settings window is saved again.
+  The save it triggers read the length of the posting tab in front back into
+  ngPost and wrote that one instead. It is now a default, as KEEP_RAR is: a new
+  tab starts from it, and the length one post uses stays with that post.
+- A par2 step that ends without an error but writes no par2 file now stops the
+  post instead of sending the files without any recovery data. MultiPar does
+  exactly that when its arguments are written for another tool: par2j prints
+  its usage and exits successfully.
+- PAR2_TOOL that names an engine which is not installed no longer stops every
+  post: ngPost runs an installed engine for that run, with its default
+  arguments, and leaves PAR2_TOOL and PAR2_ARGS untouched. Saving the PAR2
+  Settings window works that fallback out again for the engine it saves.
+- The MultiPar examples of both configuration templates now ask for a source
+  block count (/sn3000) with a recovery-file size limit (/ls2 /lr260000000).
+  par2j stops at 32768 source blocks: a fixed block size below that ratio, such
+  as /ss250000 on a 20 GB post, made the PAR2 step several times longer. The
+  PAR2 Settings window now says so, with the block count the post would need.
 
 ####################################################
 ###       Release: ngPost v5.5                   ###

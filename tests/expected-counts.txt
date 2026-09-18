@@ -28,27 +28,42 @@
 #
 # A binary with no applicable line is reported as unpinned and does NOT fail the
 # run. Each floor is measured on its named platform; unmeasured combinations
-# remain unpinned. Extending coverage means running the suite there once and
-# adding the observed count. Windows ACL floors require an elevated process.
+# remain unpinned.
 #
-# Measured 2026-09-14, Linux / Qt 6.11.1, with NGPOST_BIN set.
-# VpnProfile updated 2026-09-15 after adding Windows install diagnostics.
+# Where these numbers come from
+# -----------------------------
+# Linux measured 2026-09-14 (Qt 6.11.1, NGPOST_BIN set), refreshed 2026-09-17
+# from CI run 2f55212 — the three suites that had grown well past their floor
+# (tst_MainWindow 72 -> 140, tst_PostFlow 16 -> 22, tst_Par2Settings 10 -> 17).
+# Darwin and Windows come from that same run: macos-15 and windows-latest, Qt
+# 6.8.2, where the Windows job runs elevated enough for the ACL fixtures.
+#
+# The three platforms do not run the same number of tests, and the gaps are
+# expected: no GPU on the runners, no symlink privilege on Windows, the
+# Windows-only suites that QSKIP everywhere else. Each column is what that
+# platform actually ran, so a floor never asserts a number measured elsewhere.
+#
+# These figures assume the par2 tools CI fetches before the suites
+# (.github/scripts/fetch-par2-tools.sh). Without them, the cases that run a real
+# engine skip instead: tst_Par2Settings reports 15 rather than 17 on Linux. Fetch
+# the tools before reading a local failure as a lost test.
 
 tst_CliParser                 63  Linux
 tst_FoldersMonitor            10  Linux
 tst_GoldenNzb                  4  Linux
-tst_MainWindow                72  Linux
+tst_MainWindow               140  Linux
 tst_MockNntp                   8  Linux
 tst_NntpFile                  29  Linux
 tst_OpenVpnConfigPolicy       74  Linux
-tst_Par2Settings              10  Linux
+tst_Par2Settings              17  Linux
 tst_PathHelper                45  Linux
-tst_PostFlow                  16  Linux
+tst_PostFlow                  22  Linux
 tst_PostHistory               48  Linux
 tst_PostInfoTemplate          36  Linux
 tst_RandomToken                3  Linux
 tst_UpdateChecker             17  Linux
 tst_VpnDnsResolver             8  Linux
+tst_VpnE2E_WireGuard           7  Linux
 tst_VpnProfile                62  Linux
 tst_VpnSocketBinder            8  Linux
 tst_WindowsCommandLine         3  Linux
@@ -58,24 +73,68 @@ tst_WireGuardBackend          13  Linux
 tst_WireGuardConfigPolicy     21  Linux
 tst_Yenc                      26  Linux
 
-# Native Windows checks measured on Windows 11 / Qt 6.8.2 (MSVC).
-# VpnProfile and WindowsCommandLine measured 2026-09-15.
-# Includes all seven compiled translations and native PowerShell exit handling.
-tst_WindowsCommandLine        11  Windows
-tst_VpnProfile                62  Windows
-tst_WindowsSecurity           19  Windows
-tst_WireGuardConfigPolicy     21  Windows
+# macOS, measured 2026-09-17 on macos-15 / Qt 6.8.2.
+# Lower than Linux where the platform decides: tst_CliParser skips the five
+# cases that isolate the Qt TLS plugins with bwrap, tst_MainWindow skips the
+# GPU probe and the bundled-tool case, tst_VpnProfile skips one install check.
+tst_CliParser                 58  Darwin
+tst_FoldersMonitor            10  Darwin
+tst_GoldenNzb                  4  Darwin
+tst_MainWindow               139  Darwin
+tst_MockNntp                   8  Darwin
+tst_NntpFile                  29  Darwin
+tst_OpenVpnConfigPolicy       74  Darwin
+tst_Par2Settings              17  Darwin
+tst_PathHelper                45  Darwin
+tst_PostFlow                  22  Darwin
+tst_PostHistory               48  Darwin
+tst_PostInfoTemplate          36  Darwin
+tst_RandomToken                3  Darwin
+tst_UpdateChecker             17  Darwin
+tst_VpnDnsResolver             8  Darwin
+tst_VpnProfile                61  Darwin
+tst_VpnSocketBinder            8  Darwin
+tst_WindowsCommandLine         3  Darwin
+tst_WindowsSecurity            5  Darwin
+tst_WindowsServiceControl      5  Darwin
+tst_WireGuardBackend          13  Darwin
+tst_WireGuardConfigPolicy     21  Darwin
+tst_Yenc                      26  Darwin
 
-# Other Windows suites and macOS
-# ------------------------------
-# Not yet measured. These suites run MORE tests on Windows than on Linux, so
-# the Linux figures above cannot be reused as a floor for them — and asserting a
-# number measured nowhere is how a check like this breaks a green build:
-#
-#   tst_WindowsBindHelper    7 slots, all QSKIP'd off Windows
-#   tst_VpnE2E_WireGuard     needs root, iproute2 and the privileged helper
-#
-# To pin them: run the suite on that platform, read the `N passed` of each
-# summary, and add `<binary> <N> Windows` (or `Darwin`) lines here. Until then
-# those binaries are reported as unpinned on every platform, which is honest
-# about what is actually guarded.
+# Windows, measured 2026-09-17 on windows-latest / Qt 6.8.2 (MSVC).
+# The Windows-only suites run here and only here; tst_PathHelper and
+# tst_PostInfoTemplate skip the cases that need a symlink privilege, and
+# tst_MainWindow skips the tool-path cases that need a POSIX file mode.
+tst_CliParser                 60  Windows
+tst_FoldersMonitor            10  Windows
+tst_GoldenNzb                  4  Windows
+tst_MainWindow               129  Windows
+tst_MockNntp                   8  Windows
+tst_NntpFile                  29  Windows
+tst_OpenVpnConfigPolicy       74  Windows
+tst_Par2Settings              18  Windows
+tst_PathHelper                38  Windows
+tst_PostFlow                  18  Windows
+tst_PostHistory               48  Windows
+tst_PostInfoTemplate          34  Windows
+tst_RandomToken                3  Windows
+tst_UpdateChecker             17  Windows
+tst_VpnDnsResolver             8  Windows
+tst_VpnProfile                62  Windows
+tst_VpnSocketBinder            8  Windows
+tst_WindowsBindHelper          9  Windows
+tst_WindowsCommandLine        11  Windows
+tst_WindowsSecurity           19  Windows
+tst_WindowsServiceControl      6  Windows
+tst_WireGuardBackend          13  Windows
+tst_WireGuardConfigPolicy     21  Windows
+tst_Yenc                      26  Windows
+
+# Deliberately unpinned
+# ---------------------
+#   tst_WindowsBindHelper   Off Windows, every slot QSKIPs and the binary runs
+#                           0 tests; the harness allowlists that empty suite.
+#                           Pinned on Windows, where the 9 tests really run.
+#   tst_VpnE2E_WireGuard    Built and run on Linux only (root, iproute2 and the
+#                           privileged helper), so it has a Linux floor and no
+#                           line for the other two platforms.

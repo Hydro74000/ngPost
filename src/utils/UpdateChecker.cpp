@@ -9,7 +9,6 @@
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDebug>
-#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
