@@ -921,6 +921,8 @@ private:
 
     void _prepareNextPacking();
 
+    void _initVpnManager();
+    void _connectVpnRecoverySignals();
     void _startMonitoring(const QString &folderPath);
     void _stopMonitoring();
 

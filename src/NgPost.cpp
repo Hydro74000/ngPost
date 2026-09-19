@@ -478,6 +478,46 @@ NgPost::NgPost(int &argc, char *argv[]):
             &NgPost::maybeFinishApplication,
             Qt::QueuedConnection);
 
+    _initVpnManager();
+    _connectVpnRecoverySignals();
+
+    _loadTanslators();
+    _historyService = new PostHistoryService(_postDbFile, _historyStorePasswords, this);
+    connect(_historyService, &PostHistoryService::error, this, [this](const QString &msg) {
+        _error(msg);
+    }, Qt::QueuedConnection);
+    connect(_historyService, &PostHistoryService::prepared, this, [this](bool ok) {
+        _historyCrashedArticlesChecked = ok;
+    }, Qt::QueuedConnection);
+
+#if defined(__DEBUG__) && QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+    QNetworkConfigurationManager netConfMgr;
+    for (const QNetworkConfiguration &conf : netConfMgr.allConfigurations()) {
+        qDebug() << "net conf: " << conf.name() << ", bearerType: " << conf.bearerTypeName()
+#if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
+                 << ", timeout: " << conf.connectTimeout()
+#endif
+                 << ", isValid: " << conf.isValid() << ", state: " << conf.state();
+    }
+
+    QNetworkConfiguration conf = netConfMgr.defaultConfiguration();
+    qDebug() << "DEFAULT conf: " << conf.name() << ", bearerType: " << conf.bearerTypeName()
+#if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
+             << ", timeout: " << conf.connectTimeout()
+#endif
+             << ", isValid: " << conf.isValid() << ", state: " << conf.state();
+#endif
+
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+    connect(&_netMgr,
+            &QNetworkAccessManager::networkAccessibleChanged,
+            this,
+            &NgPost::onNetworkAccessibleChanged);
+#endif
+}
+
+void NgPost::_initVpnManager()
+{
     _vpnManager    = new VpnManager(this);
     _vpnManager->setCliMode(!useHMI());
     // Best-effort sweep of any stale VPN state from a previous crashed run.
@@ -530,6 +570,10 @@ NgPost::NgPost(int &argc, char *argv[]):
             // manager count and therefore does not enter this branch.
             _activeJob->_vpnRetained = false;
     });
+}
+
+void NgPost::_connectVpnRecoverySignals()
+{
     // Blocked admission also needs CLI handling: the GUI shows a popup, but
     // there's no popup in CLI, so without this hook the binary hangs forever
     // until the parent times it out. Surface the reason and exit non-zero.
@@ -587,46 +631,6 @@ NgPost::NgPost(int &argc, char *argv[]):
             _requestExit(ERROR_CODE::ERR_VPN);
         }
     });
-
-    _loadTanslators();
-    _historyService = new PostHistoryService(_postDbFile, _historyStorePasswords, this);
-    connect(_historyService,
-            &PostHistoryService::error,
-            this,
-            [this](const QString &msg) { _error(msg); },
-            Qt::QueuedConnection);
-    connect(_historyService,
-            &PostHistoryService::prepared,
-            this,
-            [this](bool ok) { _historyCrashedArticlesChecked = ok; },
-            Qt::QueuedConnection);
-
-#if defined(__DEBUG__) && QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
-    QNetworkConfigurationManager netConfMgr;
-    for (const QNetworkConfiguration &conf : netConfMgr.allConfigurations())
-    {
-        qDebug() << "net conf: " << conf.name()
-                 << ", bearerType: " << conf.bearerTypeName()
-            #if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
-                 << ", timeout: " << conf.connectTimeout()
-            #endif
-                 << ", isValid: " << conf.isValid()
-                 << ", state: " << conf.state();
-    }
-
-    QNetworkConfiguration conf = netConfMgr.defaultConfiguration();
-    qDebug() << "DEFAULT conf: " << conf.name()
-             << ", bearerType: " << conf.bearerTypeName()
-          #if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
-             << ", timeout: " << conf.connectTimeout()
-          #endif
-             << ", isValid: " << conf.isValid()
-             << ", state: " << conf.state();
-#endif
-
-#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
-    connect(&_netMgr, &QNetworkAccessManager::networkAccessibleChanged, this, &NgPost::onNetworkAccessibleChanged);
-#endif
 }
 
 void NgPost::_startMonitoring(const QString &folderPath)
