@@ -198,6 +198,14 @@ private slots:
     //! hang regardless of whether retry eventually succeeds.
     void retry_on_dropped_connection();
     void recovered_connection_is_successful_and_timestamped();
+    //! Credentials the server refuses are not replayed at once, and three
+    //! backoff cycles refused in a row stop the post with an error instead of
+    //! retrying forever -- which is what gets a provider account blocked.
+    //! Each cycle waits RESUME_WAIT (30 s minimum), so this takes a minute.
+    void refused_credentials_stop_after_three_cycles();
+    //! A refusal that clears up -- a provider still counting the connections
+    //! of a crashed run -- must not stop the post before the third cycle.
+    void refused_credentials_recover_before_the_limit();
     //! A server that stops reading mid-article leaves bytes queued: the socket
     //! timeout must drop the transport at once, not wait for a graceful close.
     void stalled_upload_times_out_promptly();
@@ -587,6 +595,110 @@ void TestPostFlow::retry_on_dropped_connection()
     // non-zero exit. Either way we want a NON-hanging finish.
     QVERIFY2(code != -1 && code != -2,
              qPrintable(QStringLiteral("ngPost crashed or timed out (code=%1):\n%2").arg(code).arg(out)));
+}
+
+namespace
+{
+//! One "connect" line per TCP connection the mock accepted.
+int mockConnectionCount(const MockNntpServer &mock)
+{
+    QFile log(mock.logFile());
+    if (!log.open(QIODevice::ReadOnly | QIODevice::Text))
+        return -1;
+    return QString::fromUtf8(log.readAll()).count(QStringLiteral("] connect ("));
+}
+}
+
+void TestPostFlow::refused_credentials_stop_after_three_cycles()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--fail-auth" }));
+
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/refused.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write("refused");
+    }
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/refused.nzb");
+    const QString srv = QStringLiteral("u:wrong@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+
+    QString out;
+    const int code = runNgPost(_bin,
+                               {
+                                   "-S",
+                                   srv,
+                                   "-i",
+                                   inPath,
+                                   "-o",
+                                   nzbPath,
+                                   "-g",
+                                   "alt.binaries.test",
+                                   "--disp_progress",
+                                   "none",
+                               },
+                               sandbox.rootPath(),
+                               out,
+                               /*timeoutMs=*/150000);
+
+    QVERIFY2(code > 0,
+             qPrintable(QStringLiteral("refused credentials must end the run non-zero "
+                                       "(code=%1):\n%2")
+                            .arg(code)
+                            .arg(out)));
+    QVERIFY2(out.contains(QStringLiteral("refused the credentials 3 times in a row")),
+             qPrintable(out));
+    // One attempt per cycle: the old path replayed the credentials
+    // nbMaxTrySending() more times on the spot, every cycle, forever.
+    QCOMPARE(mockConnectionCount(mock), 3);
+    QVERIFY(mock.receivedArticles().isEmpty());
+}
+
+void TestPostFlow::refused_credentials_recover_before_the_limit()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--fail-auth-count", "2" }));
+
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/late.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write("accepted on the third cycle");
+    }
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/late.nzb");
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+
+    QString out;
+    const int code = runNgPost(_bin,
+                               {
+                                   "-S",
+                                   srv,
+                                   "-i",
+                                   inPath,
+                                   "-o",
+                                   nzbPath,
+                                   "-g",
+                                   "alt.binaries.test",
+                                   "--disp_progress",
+                                   "none",
+                               },
+                               sandbox.rootPath(),
+                               out,
+                               /*timeoutMs=*/150000);
+
+    // COMPLETED_WITH_ERRORS (1), not 0: NgPost::onErrorConnecting has always
+    // marked the run as soon as a connection error is reported, even when the
+    // post then completes. What this test pins is that it DOES complete.
+    QVERIFY2(code == 1,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(code).arg(out)));
+    QVERIFY2(out.contains(QStringLiteral("posted: 1")), qPrintable(out));
+    QVERIFY2(out.contains(QStringLiteral("failed: 0")), qPrintable(out));
+    QVERIFY2(!out.contains(QStringLiteral("refused the credentials")), qPrintable(out));
+    QCOMPARE(mockConnectionCount(mock), 3);
+    QCOMPARE(mock.receivedArticles().size(), 1);
+    QVERIFY(QFile::exists(nzbPath));
 }
 
 void TestPostFlow::no_resume_transport_loss_is_unknown_and_nonzero()

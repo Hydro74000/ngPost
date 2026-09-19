@@ -445,7 +445,7 @@ Es el valor por defecto con el que empieza cada nuevo post; cada post puede deci
         <translation>generar contraseña aleatoria</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+205"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+207"/>
         <source>Select a Folder</source>
         <translation>Seleccione una carpeta</translation>
     </message>
@@ -460,7 +460,7 @@ Es el valor por defecto con el que empieza cada nuevo post; cada post puede deci
         <translation>Limitar el número de volúmenes a</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-73"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-75"/>
         <source>Volume size</source>
         <translation>Tamaño de volumen</translation>
     </message>
@@ -474,7 +474,7 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
 Introduzca un número entero de MiB entre 0 y 1000000 (0 desactiva la división solo si el límite de volúmenes está desactivado).</translation>
     </message>
     <message>
-        <location line="+56"/>
+        <location line="+58"/>
         <source>The volume size is calculated automatically from the source size and the volume limit.</source>
         <translation>El tamaño se calcula automáticamente a partir del tamaño de los archivos y del límite de volúmenes.</translation>
     </message>
@@ -499,7 +499,7 @@ Introduzca un número entero de MiB entre 0 y 1000000 (0 desactiva la división 
         <translation>1 MiB = 1.048.576 bytes. El cálculo usa el tamaño de los archivos, con redondeo.</translation>
     </message>
     <message>
-        <location line="-94"/>
+        <location line="-96"/>
         <source>Save</source>
         <translation>Guardar</translation>
     </message>
@@ -2205,12 +2205,12 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+5473"/>
+        <location line="+5490"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Eliminar la carpeta raíz al comprimir con RAR</translation>
     </message>
     <message>
-        <location line="-5470"/>
+        <location line="-5487"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>El servidor NNTP sigue el formato (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2393,7 +2393,7 @@ Para listar las opciones disponibles use: %2 --help
         <translation>Publicación cancelada por el usuario.</translation>
     </message>
     <message>
-        <location line="+4039"/>
+        <location line="+4056"/>
         <source>VPN warning</source>
         <translation>Advertencia VPN</translation>
     </message>
@@ -2426,7 +2426,7 @@ Ajuste: Botón &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route a
         <translation>Cancelar</translation>
     </message>
     <message>
-        <location line="-2516"/>
+        <location line="-2533"/>
         <source>Full debug logs are ON
 </source>
         <translation>Logs completos de depuración están ON
@@ -2723,12 +2723,12 @@ Ajuste: Botón &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route a
         <location line="+4"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+3920"/>
+        <location line="+3937"/>
         <source>Warning: %1</source>
         <translation>Aviso: %1</translation>
     </message>
     <message>
-        <location line="-4135"/>
+        <location line="-4152"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>Se necesita confirmación. Vuelva a ejecutar con --yes para reanudar la publicación.</translation>
     </message>
@@ -2839,7 +2839,7 @@ Ajuste: Botón &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route a
         <translation>--par2_path elige %1 en lugar de %2: los argumentos par2 de su configuración se ignoran en esta ejecución y %1 usa sus propios valores por defecto. La configuración no se modifica.</translation>
     </message>
     <message>
-        <location line="+640"/>
+        <location line="+657"/>
         <source>Commented out or deleted in &apos;%1&apos; while ngPost was running, so it stops using them: %2.</source>
         <translation>Comentado o eliminado en «%1» mientras ngPost estaba en marcha, así que deja de usarlos: %2.</translation>
     </message>
@@ -2899,7 +2899,7 @@ Ajuste: Botón &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route a
         <translation>## publicación. Vuelva a comentarla para regresar a los campos de Ajustes PAR2.</translation>
     </message>
     <message>
-        <location line="-4417"/>
+        <location line="-4434"/>
         <location line="+1308"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>Error al adoptar la carpeta de configuración; ngPost se detuvo antes de usar la nueva carpeta para poder volver a intentarlo de forma segura la próxima vez.</translation>
@@ -3043,12 +3043,12 @@ No es el caso de &apos;%1&apos; que contiene carpetas: %2</translation>
     </message>
     <message>
         <location line="+69"/>
-        <location line="+1243"/>
+        <location line="+1260"/>
         <source>Generate new random poster for each post</source>
         <translation>Generar un nuevo publicador aleatorio para cada publicación</translation>
     </message>
     <message>
-        <location line="-1212"/>
+        <location line="-1229"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>Debería dar un número entero no registrado para el número de reintentos de publicación de un artículo (opción -r)</translation>
     </message>
@@ -3116,7 +3116,7 @@ O bien usa --par2_pct o establece PAR2_PCT o PAR2_ARGS en el fichero de configur
         <translation>Nada que hacer...</translation>
     </message>
     <message>
-        <location line="+304"/>
+        <location line="+321"/>
         <source>## Added to your configuration file, kept here</source>
         <translation>## Añadido a su archivo de configuración, conservado aquí</translation>
     </message>
@@ -3415,14 +3415,14 @@ No se modificó ni eliminó ningún archivo de origen existente. Es posible que 
         <translation>## dado a un comando posterior; __rarPass__ en los argumentos sigue funcionando</translation>
     </message>
     <message>
-        <location line="-3592"/>
+        <location line="-3609"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Protocolo no soportado para NZB_UPLOAD_URL (%1). Sólo puedes usar: %2
 </translation>
     </message>
     <message>
-        <location line="+2326"/>
+        <location line="+2343"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost empieza el registro: %1</translation>
     </message>
@@ -3447,7 +3447,7 @@ No se modificó ni eliminó ningún archivo de origen existente. Es posible que 
         <translation>Error al analizar los parámetros de Proxy Socks5. La sintaxis debería ser: %1</translation>
     </message>
     <message>
-        <location line="-2445"/>
+        <location line="-2462"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>el historial del publicación &apos;%1&apos; no puede ser un directorio...
@@ -3462,7 +3462,7 @@ No se modificó ni eliminó ningún archivo de origen existente. Es posible que 
 </translation>
     </message>
     <message>
-        <location line="+2505"/>
+        <location line="+2522"/>
         <source>should be a directory!...</source>
         <translation>debería ser un directorio!...</translation>
     </message>
@@ -3497,7 +3497,7 @@ No se modificó ni eliminó ningún archivo de origen existente. Es posible que 
         <translation>Palabras clave incorrectas para PACK: %1. Debería ser un subgrupo de (%2)</translation>
     </message>
     <message>
-        <location line="-2585"/>
+        <location line="-2602"/>
         <source>date</source>
         <translation>fecha</translation>
     </message>
@@ -3553,7 +3553,7 @@ No se modificó ni eliminó ningún archivo de origen existente. Es posible que 
     </message>
     <message>
         <location line="+739"/>
-        <location line="+1202"/>
+        <location line="+1219"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE debe ser un número entero positivo</translation>
     </message>
@@ -4315,7 +4315,7 @@ Su archivo de configuración activo es:
         <translation>Error: No se pudo escribir el fichero de configuración por defecto: %1</translation>
     </message>
     <message>
-        <location line="-5852"/>
+        <location line="-5869"/>
         <source>Auto Posting</source>
         <translation>Publicación Automática</translation>
     </message>
@@ -4325,7 +4325,7 @@ Su archivo de configuración activo es:
         <translation>Publicación Rápida</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1301"/>
+        <location filename="../NgPost.h" line="+1306"/>
         <source>PACKing auto using: %1</source>
         <translation>Empaquetado automático usando: %1</translation>
     </message>
@@ -4397,7 +4397,7 @@ Su archivo de configuración activo es:
 </translation>
     </message>
     <message>
-        <location line="+2630"/>
+        <location line="+2647"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation>## &apos;filename&apos; renombra los archivos de entrada con un nombre aleatorio antes de</translation>
     </message>
@@ -4407,8 +4407,8 @@ Su archivo de configuración activo es:
         <translation>## comprimirlos, así el archivo no conserva ningún nombre original. Ambos a la vez.</translation>
     </message>
     <message>
-        <location line="-2416"/>
-        <location line="+1329"/>
+        <location line="-2433"/>
+        <location line="+1346"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX debe ser un entero positivo no mayor que 2147483647.</translation>
     </message>
@@ -4521,7 +4521,7 @@ Su archivo de configuración activo es:
 <context>
     <name>NntpConnection</name>
     <message>
-        <location filename="../NntpConnection.cpp" line="+140"/>
+        <location filename="../NntpConnection.cpp" line="+143"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>El servidor «%1» debe pasar por el VPN pero el túnel no está conectado</translation>
     </message>
@@ -4551,7 +4551,7 @@ Su archivo de configuración activo es:
         <translation>conexión cerrada antes de la confirmación del servidor</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+28"/>
         <source>Connection lost, trying to reconnect! (nb disconnected: %1)</source>
         <translation>¡Conexión perdida, tratando de reconectar! (Núm desconectado: %1)</translation>
     </message>
@@ -4609,27 +4609,27 @@ Su archivo de configuración activo es:
         <translation>[Conexión #%1] Error de conexión al servidor %2:%3</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+21"/>
         <source>[Connection #%1] The configured user for %2:%3 contains a line break and cannot be sent</source>
         <translation>[Conexión n.º %1] El usuario configurado para %2:%3 contiene un salto de línea y no se puede enviar</translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+24"/>
         <source>[Connection #%1] Error sending user &apos;%4&apos; to server %2:%3</source>
         <translation>[Conexión #%1] Error al enviar el usuario &apos;%4&apos; al servidor %2:%3</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>[Connection #%1] The configured password for %2:%3 contains a line break and cannot be sent</source>
         <translation>[Conexión n.º %1] La contraseña configurada para %2:%3 contiene un salto de línea y no se puede enviar</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+22"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
         <translation>[Conexión n.º%1] Error de autenticación en el servidor %2:%3 con el usuario «%4»</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+39"/>
         <source>start sending article: %1</source>
         <translation>empezar a enviar el artículo: %1</translation>
     </message>
@@ -6141,7 +6141,7 @@ La publicación usa el archivo, así que estos cambios se perderían.
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+792"/>
+        <location filename="../PostingJob.cpp" line="+793"/>
         <source>Start Post #%1: %2</source>
         <translation>Comenzando Publicación #%1: %2</translation>
     </message>
@@ -6214,13 +6214,13 @@ La publicación usa el archivo, así que estos cambios se perderían.
     </message>
     <message>
         <location line="+56"/>
-        <location line="+400"/>
+        <location line="+418"/>
         <location line="+8"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
         <translation>No se pudo copiar el nfo %1 a %2</translation>
     </message>
     <message>
-        <location line="-304"/>
+        <location line="-322"/>
         <source>History: could not mark post %1 as resuming: %2</source>
         <translation>Historial: no se pudo marcar la publicación %1 como en reanudación: %2</translation>
     </message>
@@ -6230,7 +6230,12 @@ La publicación usa el archivo, así que estos cambios se perderían.
         <translation>Historial: no se pudo registrar el inicio de la publicación %1: %2</translation>
     </message>
     <message>
-        <location line="+87"/>
+        <location line="+96"/>
+        <source>The server refused the credentials %1 times in a row, with no connection accepted in between: the post is stopped. Check the user and password of the server.</source>
+        <translation>El servidor ha rechazado las credenciales %1 veces seguidas, sin aceptar ninguna conexión entretanto: la publicación se detiene. Compruebe el usuario y la contraseña del servidor.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>Sleep for %1 sec before trying to reconnect</source>
         <translation>Esperar %1 segundos antes de intentar la reconexión</translation>
     </message>
@@ -6602,7 +6607,7 @@ Establezca PAR2_SOURCE = custom y corrija PAR2_PATH en la configuración (Ajuste
         <translation>ERROR: el directorio temporal debe ser un directorio ESCRIBIBLE...</translation>
     </message>
     <message>
-        <location line="-2139"/>
+        <location line="-2157"/>
         <source>History: could not create post record: %1</source>
         <translation>Historial: no se pudo crear el registro del post: %1</translation>
     </message>
@@ -6622,7 +6627,7 @@ Establezca PAR2_SOURCE = custom y corrija PAR2_PATH en la configuración (Ajuste
         <translation>Historial: no se pudo crear el registro del archivo: %1</translation>
     </message>
     <message>
-        <location line="+1195"/>
+        <location line="+1213"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>No se pudo regenerar el NZB final desde el historial: %1</translation>
     </message>

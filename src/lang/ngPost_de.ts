@@ -446,7 +446,7 @@ Das ist der Standard, mit dem jeder neue Post startet; jeder Post kann es anders
         <translation>Zufälliges Passwort generieren</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+205"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+207"/>
         <source>Select a Folder</source>
         <translation>Ordner auswählen</translation>
     </message>
@@ -461,7 +461,7 @@ Das ist der Standard, mit dem jeder neue Post startet; jeder Post kann es anders
         <translation>Anzahl der Volumes begrenzen auf</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-73"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-75"/>
         <source>Volume size</source>
         <translation>Volumengröße</translation>
     </message>
@@ -475,7 +475,7 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
 Geben Sie eine ganze Zahl in MiB zwischen 0 und 1000000 ein (0 deaktiviert die Aufteilung nur bei ausgeschaltetem Volume-Limit).</translation>
     </message>
     <message>
-        <location line="+56"/>
+        <location line="+58"/>
         <source>The volume size is calculated automatically from the source size and the volume limit.</source>
         <translation>Die Volumegröße wird automatisch aus der Quellgröße und der Volumegrenze berechnet.</translation>
     </message>
@@ -500,7 +500,7 @@ Geben Sie eine ganze Zahl in MiB zwischen 0 und 1000000 ein (0 deaktiviert die A
         <translation>1 MiB = 1.048.576 Bytes. Berechnet wird anhand der Quellgröße, mit Rundung.</translation>
     </message>
     <message>
-        <location line="-94"/>
+        <location line="-96"/>
         <source>Save</source>
         <translation>Speichern</translation>
     </message>
@@ -2206,12 +2206,12 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+5473"/>
+        <location line="+5490"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Root Ordner entfernen beim Komprimieren von Ordnern bei Nutzung von RAR</translation>
     </message>
     <message>
-        <location line="-5470"/>
+        <location line="-5487"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP-Server-Einstellungen im Format (&lt;user&gt;:&lt;pass&gt;@@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2369,7 +2369,7 @@ Um die verfügbaren Optionen aufzulisten, verwenden Sie: %2 --help
         <translation>Posting vom Benutzer abgebrochen.</translation>
     </message>
     <message>
-        <location line="+4039"/>
+        <location line="+4056"/>
         <source>VPN warning</source>
         <translation>VPN-Warnung</translation>
     </message>
@@ -2402,7 +2402,7 @@ Einstellung: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Ro
         <translation>Abbrechen</translation>
     </message>
     <message>
-        <location line="-2516"/>
+        <location line="-2533"/>
         <source>Full debug logs are ON
 </source>
         <translation>Vollständige Debug-Protokollierung ist eingeschaltet
@@ -2699,12 +2699,12 @@ Einstellung: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Ro
         <location line="+4"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+3920"/>
+        <location line="+3937"/>
         <source>Warning: %1</source>
         <translation>Warnung: %1</translation>
     </message>
     <message>
-        <location line="-4135"/>
+        <location line="-4152"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>Bestätigung nötig. Starten Sie mit --yes erneut, um den Post fortzusetzen.</translation>
     </message>
@@ -2805,7 +2805,7 @@ Einstellung: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Ro
         <translation>--par2_path wählt %1 statt %2: Die par2-Argumente Ihrer Konfiguration werden für diesen Lauf ignoriert und %1 läuft mit seinen eigenen Standardwerten. Die Konfiguration bleibt unverändert.</translation>
     </message>
     <message>
-        <location line="+693"/>
+        <location line="+710"/>
         <source>The par2 arguments of your configuration are written for %1, so %2 runs with its default arguments this time. The line is left in the configuration.</source>
         <translation>Die par2-Argumente Ihrer Konfiguration sind für %1 geschrieben, daher läuft %2 diesmal mit seinen Standardargumenten. Die Zeile bleibt in der Konfiguration.</translation>
     </message>
@@ -2840,7 +2840,7 @@ Einstellung: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Ro
         <translation>## Ihre eigenen Argumente: Kommentieren Sie unten eine Zeile aus, dann verwendet</translation>
     </message>
     <message>
-        <location line="-4413"/>
+        <location line="-4430"/>
         <location line="+1308"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>Die Übernahme des Konfigurationsordners ist fehlgeschlagen; ngPost wurde gestoppt, bevor der neue Ordner verwendet wurde, damit die Übernahme beim nächsten Mal sicher erneut versucht werden kann.</translation>
@@ -2994,12 +2994,12 @@ Dies ist nicht der Fall für &apos;%1&apos;, das Ordner enthält: %2</translatio
     </message>
     <message>
         <location line="+69"/>
-        <location line="+1243"/>
+        <location line="+1260"/>
         <source>Generate new random poster for each post</source>
         <translation>Neue zufällige Poster für jeden Post generieren</translation>
     </message>
     <message>
-        <location line="-1212"/>
+        <location line="-1229"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>Sie sollten eine ganze Zahl für die Anzahl der Wiederholungsversuche für die Veröffentlichung eines Artikels angeben (option -r)</translation>
     </message>
@@ -3066,7 +3066,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Es gibt nichts zu tun...</translation>
     </message>
     <message>
-        <location line="+400"/>
+        <location line="+417"/>
         <source>Commented out or deleted in &apos;%1&apos; while ngPost was running, so it stops using them: %2.</source>
         <translation>In „%1“ auskommentiert oder gelöscht, während ngPost lief; ngPost verwendet sie daher nicht mehr: %2.</translation>
     </message>
@@ -3340,14 +3340,14 @@ Keine vorhandene Quelldatei wurde geändert oder gelöscht. Sichere, konfliktfre
         <translation>## an einen Post-Befehl übergeben; __rarPass__ in den Argumenten funktioniert weiterhin</translation>
     </message>
     <message>
-        <location line="-3592"/>
+        <location line="-3609"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Nicht unterstütztes Protokoll für NZB_UPLOAD_URL (%1). Sie können nur %2 verwenden
 </translation>
     </message>
     <message>
-        <location line="+2326"/>
+        <location line="+2343"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost beginnt mit der Protokollierung: %1</translation>
     </message>
@@ -3372,7 +3372,7 @@ Keine vorhandene Quelldatei wurde geändert oder gelöscht. Sichere, konfliktfre
         <translation>Fehler beim Parsen der Proxy Socks5-Parametern. Der Syntax sollte lauten: %1</translation>
     </message>
     <message>
-        <location line="-2445"/>
+        <location line="-2462"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>die Postgeschichte &apos;%1&apos; kann kein Verzeichnis sein...
@@ -3387,7 +3387,7 @@ Keine vorhandene Quelldatei wurde geändert oder gelöscht. Sichere, konfliktfre
 </translation>
     </message>
     <message>
-        <location line="+2505"/>
+        <location line="+2522"/>
         <source>should be a directory!...</source>
         <translation>muss ein Verzeichnis sein!...</translation>
     </message>
@@ -3422,7 +3422,7 @@ Keine vorhandene Quelldatei wurde geändert oder gelöscht. Sichere, konfliktfre
         <translation>Falsche Schlüsselwörter für PACK: %1. Es sollte eine Teilmenge von (%2) sein</translation>
     </message>
     <message>
-        <location line="-2585"/>
+        <location line="-2602"/>
         <source>date</source>
         <translation>Datum</translation>
     </message>
@@ -3478,7 +3478,7 @@ Keine vorhandene Quelldatei wurde geändert oder gelöscht. Sichere, konfliktfre
     </message>
     <message>
         <location line="+739"/>
-        <location line="+1202"/>
+        <location line="+1219"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE muss eine positive Ganzzahl sein</translation>
     </message>
@@ -3897,7 +3897,7 @@ Ihre aktive Konfigurationsdatei ist:
         <translation>## zur Überprüfung, neue eingehende Ordner ignorieren</translation>
     </message>
     <message>
-        <location line="-5357"/>
+        <location line="-5374"/>
         <source>display extra information</source>
         <translation>Zusätzliche Informationen anzeigen</translation>
     </message>
@@ -3922,7 +3922,7 @@ Ihre aktive Konfigurationsdatei ist:
         <translation></translation>
     </message>
     <message>
-        <location line="+2210"/>
+        <location line="+2227"/>
         <source>## Added to your configuration file, kept here</source>
         <translation>## Zu Ihrer Konfigurationsdatei hinzugefügt, hier beibehalten</translation>
     </message>
@@ -4315,7 +4315,7 @@ Ihre aktive Konfigurationsdatei ist:
         <translation>Fehler: Konnte keine Standardkonfigurationsdatei schreiben: %1</translation>
     </message>
     <message>
-        <location line="-5852"/>
+        <location line="-5869"/>
         <source>Auto Posting</source>
         <translation>Auto Posting</translation>
     </message>
@@ -4325,7 +4325,7 @@ Ihre aktive Konfigurationsdatei ist:
         <translation>Quick Post</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1301"/>
+        <location filename="../NgPost.h" line="+1306"/>
         <source>PACKing auto using: %1</source>
         <translation>PACKing automatisch mit: %1</translation>
     </message>
@@ -4397,7 +4397,7 @@ Ihre aktive Konfigurationsdatei ist:
 </translation>
     </message>
     <message>
-        <location line="+2630"/>
+        <location line="+2647"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation>## &apos;filename&apos; benennt die Eingabedateien vor dem Komprimieren zufällig um, sodass</translation>
     </message>
@@ -4407,8 +4407,8 @@ Ihre aktive Konfigurationsdatei ist:
         <translation>## das Archiv keinen Originalnamen enthält. Beides ist gleichzeitig möglich.</translation>
     </message>
     <message>
-        <location line="-2416"/>
-        <location line="+1329"/>
+        <location line="-2433"/>
+        <location line="+1346"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX muss eine positive Ganzzahl bis 2147483647 sein.</translation>
     </message>
@@ -4521,7 +4521,7 @@ Ihre aktive Konfigurationsdatei ist:
 <context>
     <name>NntpConnection</name>
     <message>
-        <location filename="../NntpConnection.cpp" line="+140"/>
+        <location filename="../NntpConnection.cpp" line="+143"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>Server „%1“ muss durch das VPN gehen, aber der Tunnel ist nicht verbunden</translation>
     </message>
@@ -4551,7 +4551,7 @@ Ihre aktive Konfigurationsdatei ist:
         <translation>Verbindung vor der Serverbestätigung geschlossen</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+28"/>
         <source>Connection lost, trying to reconnect! (nb disconnected: %1)</source>
         <translation>Verbindung verloren, versuche wiederherzustellen! (nb getrennt: %1)</translation>
     </message>
@@ -4609,27 +4609,27 @@ Ihre aktive Konfigurationsdatei ist:
         <translation>[Verbindung #%1] Fehler bei der Verbindung zum Server %2:%3</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+21"/>
         <source>[Connection #%1] The configured user for %2:%3 contains a line break and cannot be sent</source>
         <translation>[Verbindung #%1] Der konfigurierte Benutzer für %2:%3 enthält einen Zeilenumbruch und kann nicht gesendet werden</translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+24"/>
         <source>[Connection #%1] Error sending user &apos;%4&apos; to server %2:%3</source>
         <translation>[Verbindung #%1] Fehler beim Senden des Benutzers &apos;%4&apos; an den Server %2:%3</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>[Connection #%1] The configured password for %2:%3 contains a line break and cannot be sent</source>
         <translation>[Verbindung #%1] Das konfigurierte Passwort für %2:%3 enthält einen Zeilenumbruch und kann nicht gesendet werden</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+22"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
         <translation>[Verbindung #%1] Anmeldefehler beim Server %2:%3 mit Benutzer „%4“</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+39"/>
         <source>start sending article: %1</source>
         <translation>Starte mit dem Versenden der Artikel: %1</translation>
     </message>
@@ -6141,7 +6141,7 @@ Das Modell jetzt speichern?</translation>
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+792"/>
+        <location filename="../PostingJob.cpp" line="+793"/>
         <source>Start Post #%1: %2</source>
         <translation>Start-Post #%1: %2</translation>
     </message>
@@ -6214,13 +6214,13 @@ Das Modell jetzt speichern?</translation>
     </message>
     <message>
         <location line="+56"/>
-        <location line="+400"/>
+        <location line="+418"/>
         <location line="+8"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
         <translation>nfo %1 konnte nicht nach %2 kopiert werden</translation>
     </message>
     <message>
-        <location line="-304"/>
+        <location line="-322"/>
         <source>History: could not mark post %1 as resuming: %2</source>
         <translation>Verlauf: Post %1 konnte nicht als „wird fortgesetzt“ markiert werden: %2</translation>
     </message>
@@ -6230,7 +6230,12 @@ Das Modell jetzt speichern?</translation>
         <translation>Verlauf: Der Beginn von Post %1 konnte nicht aufgezeichnet werden: %2</translation>
     </message>
     <message>
-        <location line="+87"/>
+        <location line="+96"/>
+        <source>The server refused the credentials %1 times in a row, with no connection accepted in between: the post is stopped. Check the user and password of the server.</source>
+        <translation>Der Server hat die Anmeldedaten %1 Mal in Folge abgelehnt, ohne zwischendurch eine Verbindung anzunehmen: Das Posten wird abgebrochen. Prüfen Sie Benutzer und Passwort des Servers.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>Sleep for %1 sec before trying to reconnect</source>
         <translation>Wartet %1 Sekunde lang, bevor versucht wird, die Verbindung wieder herzustellen</translation>
     </message>
@@ -6602,7 +6607,7 @@ Setzen Sie PAR2_SOURCE = custom und korrigieren Sie PAR2_PATH in der Konfigurati
         <translation>FEHLER: Das temporäre Verzeichnis muss ein WRITABLE-Verzeichnis sein...</translation>
     </message>
     <message>
-        <location line="-2139"/>
+        <location line="-2157"/>
         <source>History: could not create post record: %1</source>
         <translation>Verlauf: Post-Eintrag konnte nicht erstellt werden: %1</translation>
     </message>
@@ -6622,7 +6627,7 @@ Setzen Sie PAR2_SOURCE = custom und korrigieren Sie PAR2_PATH in der Konfigurati
         <translation>Verlauf: Datei-Eintrag konnte nicht erstellt werden: %1</translation>
     </message>
     <message>
-        <location line="+1195"/>
+        <location line="+1213"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>Finales NZB konnte nicht aus dem Verlauf regeneriert werden: %1</translation>
     </message>

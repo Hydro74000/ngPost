@@ -51,6 +51,8 @@ NntpConnection::NntpConnection(NgPost *ngPost, int id, const NntpServerParams &s
     , _currentArticle(nullptr)
     , _currentArticlePreserved(false)
     , _nbDisconnected(0)
+    , _authRejected(false)
+    , _becameReady(false)
     , _ngPost(ngPost)
     , _poster(nullptr)
 #ifdef __USE_CONNECTION_TIMEOUT__
@@ -118,6 +120,7 @@ void NntpConnection::onStartConnection()
         return;
 
     _lastTransportError.clear();
+    _authRejected = false;
     if (_srvParams.useSSL)
         _socket = new QSslSocket();
     else
@@ -337,9 +340,8 @@ void NntpConnection::onDisconnected()
 
         deleteSocket();
     }
-    if (_poster->isPosting() && !_poster->isPaused()
-        && _postingState != PostingState::NO_MORE_FILES
-        && _nbDisconnected++ < NntpArticle::nbMaxTrySending()) {
+    if (_poster->isPosting() && !_poster->isPaused() && _postingState != PostingState::NO_MORE_FILES
+        && !_authRejected && _nbDisconnected++ < NntpArticle::nbMaxTrySending()) {
         // Let's try to reconnect
         const QString server = QString("%1:%2").arg(_srvParams.host).arg(_srvParams.port);
         emit retryingConnection(
@@ -566,6 +568,7 @@ void NntpConnection::onReadyRead()
                 // Start authentication : send user info
                 if (_srvParams.user.empty()) {
                     _postingState = PostingState::IDLE;
+                    _becameReady = true;
                     _sendNextArticle();
                 } else {
                     _postingState = PostingState::AUTH_USER;
@@ -578,6 +581,7 @@ void NntpConnection::onReadyRead()
                                 .arg(_conId)
                                 .arg(_srvParams.host)
                                 .arg(_srvParams.port));
+                        _authRejected = true;
                         _closeConnection();
                         return;
                     }
@@ -601,6 +605,7 @@ void NntpConnection::onReadyRead()
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
                                          .arg(_srvParams.user.c_str()));
+                _authRejected = true;
                 _closeConnection();
             } else {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
@@ -618,6 +623,7 @@ void NntpConnection::onReadyRead()
                             .arg(_conId)
                             .arg(_srvParams.host)
                             .arg(_srvParams.port));
+                    _authRejected = true;
                     _closeConnection();
                     return;
                 }
@@ -640,12 +646,14 @@ void NntpConnection::onReadyRead()
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
                                          .arg(_srvParams.user.c_str()));
+                _authRejected = true;
                 _closeConnection();
             } else {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
                 _log("> AUTHINFO_PASS succeed => ready to POST \\o/");
 #endif
                 _postingState = PostingState::IDLE;
+                _becameReady = true;
                 _sendNextArticle();
             }
         }

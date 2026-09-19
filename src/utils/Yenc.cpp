@@ -116,8 +116,11 @@ qint64 Yenc::encode(const char data[], qint64 dataSize, uchar encbuffer[], quint
             // '\t', so ~2 of every 256 line-final bytes went out raw -- about
             // 44 per 700 KB article. Escaping here costs one extra column on
             // that line, exactly as the four escapes above already do.
-            if(!column || column == maxwidth - 1)
-            {
+            //
+            // The last byte of the input ends a line too -- a short one, right
+            // before the =yend trailer -- so it gets the same treatment
+            // wherever its column falls.
+            if (!column || column == maxwidth - 1 || i == dataSize - 1) {
                 ++column;
                 ++encSize;
                 *(pointer++) = '=';

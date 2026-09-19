@@ -206,6 +206,14 @@ private:
     bool _vpnRetained;
 
     QTimer _resumeTimer;
+    //! Consecutive backoff cycles in which every connection had its
+    //! credentials refused and none reached the posting state.
+    ushort _authRejectedCycles;
+    //! A provider can refuse good credentials for a while -- connections left
+    //! over by a crashed run still count against its limit -- so one refused
+    //! cycle is not proof. Three are, and replaying bad credentials forever is
+    //! what gets an account or an address blocked.
+    static constexpr ushort kMaxAuthRejectedCycles = 3;
 
     bool _isActiveJob;
     qint64 _historyPostId;

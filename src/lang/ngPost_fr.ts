@@ -438,7 +438,7 @@ C&apos;est le défaut avec lequel démarre chaque nouveau post ; chaque post peu
         <translation>générer mot de passe</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+205"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+207"/>
         <source>Select a Folder</source>
         <translation>Sélectionner un dossier</translation>
     </message>
@@ -453,7 +453,7 @@ C&apos;est le défaut avec lequel démarre chaque nouveau post ; chaque post peu
         <translation>Limiter le nombre de volumes à</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-73"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-75"/>
         <source>Volume size</source>
         <translation>Taille des volumes</translation>
     </message>
@@ -467,7 +467,7 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
 Indiquez un nombre entier de Mio entre 0 et 1000000 (0 désactive le découpage uniquement lorsque la limite de volumes est désactivée).</translation>
     </message>
     <message>
-        <location line="+56"/>
+        <location line="+58"/>
         <source>The volume size is calculated automatically from the source size and the volume limit.</source>
         <translation>La taille des volumes est calculée automatiquement d’après la taille des sources et le nombre maximal de volumes.</translation>
     </message>
@@ -492,7 +492,7 @@ Indiquez un nombre entier de Mio entre 0 et 1000000 (0 désactive le découpage 
         <translation>1 Mio = 1 048 576 octets. Le calcul utilise la taille des sources, avec arrondi.</translation>
     </message>
     <message>
-        <location line="-94"/>
+        <location line="-96"/>
         <source>Save</source>
         <translation>Enregistrer</translation>
     </message>
@@ -2216,12 +2216,12 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+5473"/>
+        <location line="+5490"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Supprimer le dossier racine (parent) lors des compressions de dossiers avec RAR</translation>
     </message>
     <message>
-        <location line="-5470"/>
+        <location line="-5487"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP serveur suivant le format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2748,7 +2748,7 @@ Pour obtenir la liste des options disponibles : %2 --help
     </message>
     <message>
         <location line="+324"/>
-        <location line="+1202"/>
+        <location line="+1219"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE doit être un entier positif</translation>
     </message>
@@ -3095,7 +3095,7 @@ Aucun fichier source existant n’a été modifié ou supprimé. Des fichiers s�
         <translation>## donné à une post-commande ; __rarPass__ dans les arguments fonctionne toujours</translation>
     </message>
     <message>
-        <location line="-4536"/>
+        <location line="-4553"/>
         <source>NZB written: %1</source>
         <translation>NZB écrit : %1</translation>
     </message>
@@ -3103,12 +3103,12 @@ Aucun fichier source existant n’a été modifié ou supprimé. Des fichiers s�
         <location line="+7"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+3920"/>
+        <location line="+3937"/>
         <source>Warning: %1</source>
         <translation>Avertissement : %1</translation>
     </message>
     <message>
-        <location line="-4135"/>
+        <location line="-4152"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>Confirmation requise. Relancez avec --yes pour reprendre le post.</translation>
     </message>
@@ -3178,7 +3178,7 @@ Aucun fichier source existant n’a été modifié ou supprimé. Des fichiers s�
         <translation>Post annulé par l&apos;utilisateur.</translation>
     </message>
     <message>
-        <location line="+4039"/>
+        <location line="+4056"/>
         <source>VPN warning</source>
         <translation>Alerte VPN</translation>
     </message>
@@ -3211,7 +3211,7 @@ Réglage : Bouton &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Rout
         <translation>Annuler</translation>
     </message>
     <message>
-        <location line="-2516"/>
+        <location line="-2533"/>
         <source>Full debug logs are ON
 </source>
         <translation>Logs de Debug ON
@@ -3326,12 +3326,12 @@ That&apos;s not the case for &apos;%1&apos; which contains folders: %2</source>
     </message>
     <message>
         <location line="+69"/>
-        <location line="+1243"/>
+        <location line="+1260"/>
         <source>Generate new random poster for each post</source>
         <translation>Générer un nouvel email aléatoire pour le posteur à chaque Post</translation>
     </message>
     <message>
-        <location line="-1212"/>
+        <location line="-1229"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>Vous devez fournir un entier positif pour le nombre de tentative de rePost d&apos;un Article (option -r)</translation>
     </message>
@@ -3404,7 +3404,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>Rien à poster...</translation>
     </message>
     <message>
-        <location line="+470"/>
+        <location line="+487"/>
         <source>The config file &apos;%1&apos; is not readable...</source>
         <translation>Le fichier de configuration &apos;%1&apos; n&apos;est pas lisible...</translation>
     </message>
@@ -3416,14 +3416,14 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
 </translation>
     </message>
     <message>
-        <location line="-2157"/>
+        <location line="-2174"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Protocole non supporté pour NZB_UPLOAD_URL (%1). Vous ne pouvez utiliser que: %2
 </translation>
     </message>
     <message>
-        <location line="+2326"/>
+        <location line="+2343"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost commencer à logger: %1</translation>
     </message>
@@ -3448,7 +3448,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>Erreur lors de l&apos;analyse des paramètres du proxy Socks5. La syntaxe est la suivante: %1</translation>
     </message>
     <message>
-        <location line="-2445"/>
+        <location line="-2462"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>le fichier d&apos;historique des posts &apos;%1&apos; ne peut pas être un dossier...
@@ -3463,7 +3463,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
 </translation>
     </message>
     <message>
-        <location line="+2505"/>
+        <location line="+2522"/>
         <source>should be a directory!...</source>
         <translation>doit être un dossier!...</translation>
     </message>
@@ -3498,7 +3498,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>Mauvais mot clef pour PACK: %1. Ce doit être un sous ensemble de (%2)</translation>
     </message>
     <message>
-        <location line="-2585"/>
+        <location line="-2602"/>
         <source>date</source>
         <translation>date</translation>
     </message>
@@ -3543,7 +3543,7 @@ Soit utilisez --par2_pct, soit renseignez PAR2_PCT ou PAR2_ARGS dans le fichier 
         <translation>posteur (from)</translation>
     </message>
     <message>
-        <location line="+2428"/>
+        <location line="+2445"/>
         <source>POST_INFO_OUTPUT can&apos;t be empty
 </source>
         <translation>POST_INFO_OUTPUT ne peut pas être vide
@@ -4305,7 +4305,7 @@ Votre fichier de configuration actif est :
         <translation>Erreur: impossible d&apos;écrire le fichier de configuration par défaut: %1</translation>
     </message>
     <message>
-        <location line="-5852"/>
+        <location line="-5869"/>
         <source>Auto Posting</source>
         <translation>Post Auto</translation>
     </message>
@@ -4315,7 +4315,7 @@ Votre fichier de configuration actif est :
         <translation>Post Rapide</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1301"/>
+        <location filename="../NgPost.h" line="+1306"/>
         <source>PACKing auto using: %1</source>
         <translation>Packing auto avec: %1</translation>
     </message>
@@ -4387,7 +4387,7 @@ Votre fichier de configuration actif est :
 </translation>
     </message>
     <message>
-        <location line="+2630"/>
+        <location line="+2647"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation>## &apos;filename&apos; renomme les fichiers source avec un nom aléatoire avant de les</translation>
     </message>
@@ -4397,8 +4397,8 @@ Votre fichier de configuration actif est :
         <translation>## compresser, ainsi l&apos;archive ne porte aucun nom d&apos;origine. Les deux à la fois.</translation>
     </message>
     <message>
-        <location line="-2416"/>
-        <location line="+1329"/>
+        <location line="-2433"/>
+        <location line="+1346"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX doit être un entier strictement positif inférieur ou égal à 2147483647.</translation>
     </message>
@@ -4511,7 +4511,7 @@ Votre fichier de configuration actif est :
 <context>
     <name>NntpConnection</name>
     <message>
-        <location filename="../NntpConnection.cpp" line="+140"/>
+        <location filename="../NntpConnection.cpp" line="+143"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>Le serveur « %1 » doit passer par le VPN mais le tunnel n&apos;est pas connecté</translation>
     </message>
@@ -4541,7 +4541,7 @@ Votre fichier de configuration actif est :
         <translation>connexion fermée avant la confirmation du serveur</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+28"/>
         <source>Connection lost, trying to reconnect! (nb disconnected: %1)</source>
         <translation>Perte de Connexion. Tentative de reconnexion! (nombre de déconnexions : %1)</translation>
     </message>
@@ -4599,27 +4599,27 @@ Votre fichier de configuration actif est :
         <translation>[Connexion #%1] Erreur de connexion au serveur %2:%3</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+21"/>
         <source>[Connection #%1] The configured user for %2:%3 contains a line break and cannot be sent</source>
         <translation>[Connexion #%1] L&apos;utilisateur configuré pour %2:%3 contient un retour à la ligne et ne peut pas être envoyé</translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+24"/>
         <source>[Connection #%1] Error sending user &apos;%4&apos; to server %2:%3</source>
         <translation>[Connexion #%1] Erreur sur l&apos;evoi du login &apos;%4&apos; au serveur %2:%3</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>[Connection #%1] The configured password for %2:%3 contains a line break and cannot be sent</source>
         <translation>[Connexion #%1] Le mot de passe configuré pour %2:%3 contient un retour à la ligne et ne peut pas être envoyé</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+22"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
         <translation>[Connexion n°%1] Erreur d&apos;authentification au serveur %2:%3 avec l&apos;utilisateur « %4 »</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+39"/>
         <source>start sending article: %1</source>
         <translation></translation>
     </message>
@@ -6131,7 +6131,7 @@ Enregistrer le modèle maintenant ?</translation>
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+792"/>
+        <location filename="../PostingJob.cpp" line="+793"/>
         <source>Start Post #%1: %2</source>
         <translation>Début du Post #%1: %2</translation>
     </message>
@@ -6224,13 +6224,13 @@ Enregistrer le modèle maintenant ?</translation>
     </message>
     <message>
         <location line="+56"/>
-        <location line="+400"/>
+        <location line="+418"/>
         <location line="+8"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
         <translation>Impossible de copier le nfo %1 vers %2</translation>
     </message>
     <message>
-        <location line="-304"/>
+        <location line="-322"/>
         <source>History: could not mark post %1 as resuming: %2</source>
         <translation>Historique : impossible de marquer le post %1 comme en reprise : %2</translation>
     </message>
@@ -6240,7 +6240,12 @@ Enregistrer le modèle maintenant ?</translation>
         <translation>Historique : impossible d&apos;enregistrer le début du post %1 : %2</translation>
     </message>
     <message>
-        <location line="+87"/>
+        <location line="+96"/>
+        <source>The server refused the credentials %1 times in a row, with no connection accepted in between: the post is stopped. Check the user and password of the server.</source>
+        <translation>Le serveur a refusé les identifiants %1 fois de suite, sans accepter aucune connexion entre-temps : le post est arrêté. Vérifiez l&apos;utilisateur et le mot de passe du serveur.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>Sleep for %1 sec before trying to reconnect</source>
         <translation>Pause de %1 secondes avant d&apos;essayer de se reconnecter</translation>
     </message>

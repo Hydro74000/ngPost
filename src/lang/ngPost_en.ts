@@ -437,7 +437,7 @@ This is the default every new post starts with; each post can still decide other
         <translation></translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+205"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+207"/>
         <source>Select a Folder</source>
         <translation></translation>
     </message>
@@ -452,7 +452,7 @@ This is the default every new post starts with; each post can still decide other
         <translation>Limit the number of volumes to</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-73"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-75"/>
         <source>Volume size</source>
         <translation></translation>
     </message>
@@ -466,7 +466,7 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
 Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only when the volume limit is off).</translation>
     </message>
     <message>
-        <location line="+56"/>
+        <location line="+58"/>
         <source>The volume size is calculated automatically from the source size and the volume limit.</source>
         <translation>The volume size is calculated automatically from the source size and the volume limit.</translation>
     </message>
@@ -491,7 +491,7 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
         <translation>1 MiB = 1,048,576 bytes. The calculation uses the source size, with rounding.</translation>
     </message>
     <message>
-        <location line="-94"/>
+        <location line="-96"/>
         <source>Save</source>
         <translation>Save</translation>
     </message>
@@ -2238,12 +2238,12 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+5473"/>
+        <location line="+5490"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-5470"/>
+        <location line="-5487"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation></translation>
     </message>
@@ -2482,7 +2482,7 @@ To list the available options use: %2 --help
         <translation>Posting canceled by user.</translation>
     </message>
     <message>
-        <location line="+4039"/>
+        <location line="+4056"/>
         <source>VPN warning</source>
         <translation>VPN warning</translation>
     </message>
@@ -2515,7 +2515,7 @@ Setting: Button &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route 
         <translation>Cancel</translation>
     </message>
     <message>
-        <location line="-2516"/>
+        <location line="-2533"/>
         <source>Full debug logs are ON
 </source>
         <translation></translation>
@@ -2544,12 +2544,12 @@ That&apos;s not the case for &apos;%1&apos; which contains folders: %2</translat
     </message>
     <message>
         <location line="+139"/>
-        <location line="+1243"/>
+        <location line="+1260"/>
         <source>Generate new random poster for each post</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-1212"/>
+        <location line="-1229"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation></translation>
     </message>
@@ -2616,7 +2616,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+470"/>
+        <location line="+487"/>
         <source>The config file &apos;%1&apos; is not readable...</source>
         <translation></translation>
     </message>
@@ -2627,13 +2627,13 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-2157"/>
+        <location line="-2174"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation></translation>
     </message>
     <message>
-        <location line="+2326"/>
+        <location line="+2343"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost starts logging: %1</translation>
     </message>
@@ -2658,7 +2658,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="-2445"/>
+        <location line="-2462"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation></translation>
@@ -2671,7 +2671,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+2505"/>
+        <location line="+2522"/>
         <source>should be a directory!...</source>
         <translation></translation>
     </message>
@@ -2706,7 +2706,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Wrong keywords for PACK: %1. It should be a subset of (%2)</translation>
     </message>
     <message>
-        <location line="-2585"/>
+        <location line="-2602"/>
         <source>date</source>
         <translation></translation>
     </message>
@@ -2996,12 +2996,12 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <location line="+4"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+3920"/>
+        <location line="+3937"/>
         <source>Warning: %1</source>
         <translation>Warning: %1</translation>
     </message>
     <message>
-        <location line="-4135"/>
+        <location line="-4152"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>Confirmation required. Re-run with --yes to resume posting.</translation>
     </message>
@@ -3147,7 +3147,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>--par2_path selects %1 instead of %2, so the par2 arguments of your configuration are ignored for this run and %1 runs with its own defaults. The configuration is left as it is.</translation>
     </message>
     <message>
-        <location line="+640"/>
+        <location line="+657"/>
         <source>Commented out or deleted in &apos;%1&apos; while ngPost was running, so it stops using them: %2.</source>
         <translation>Commented out or deleted in &apos;%1&apos; while ngPost was running, so it stops using them: %2.</translation>
     </message>
@@ -3207,7 +3207,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>## replaced. Comment it again to go back to the PAR2 Settings fields.</translation>
     </message>
     <message>
-        <location line="-4417"/>
+        <location line="-4434"/>
         <location line="+1308"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</translation>
@@ -3244,7 +3244,7 @@ Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
     </message>
     <message>
         <location line="+86"/>
-        <location line="+1202"/>
+        <location line="+1219"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE must be a positive integer</translation>
     </message>
@@ -4293,7 +4293,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="-5852"/>
+        <location line="-5869"/>
         <source>Auto Posting</source>
         <translation></translation>
     </message>
@@ -4303,7 +4303,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1301"/>
+        <location filename="../NgPost.h" line="+1306"/>
         <source>PACKing auto using: %1</source>
         <translation>PACKing auto using: %1</translation>
     </message>
@@ -4374,7 +4374,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="+2630"/>
+        <location line="+2647"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation></translation>
     </message>
@@ -4384,8 +4384,8 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="-2416"/>
-        <location line="+1329"/>
+        <location line="-2433"/>
+        <location line="+1346"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX must be a positive integer no greater than 2147483647.</translation>
     </message>
@@ -4498,7 +4498,7 @@ One thing does change for such a script: the old configuration file has no POST_
 <context>
     <name>NntpConnection</name>
     <message>
-        <location filename="../NntpConnection.cpp" line="+140"/>
+        <location filename="../NntpConnection.cpp" line="+143"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</translation>
     </message>
@@ -4528,7 +4528,7 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation>connection closed before server confirmation</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+28"/>
         <source>Connection lost, trying to reconnect! (nb disconnected: %1)</source>
         <translation></translation>
     </message>
@@ -4585,27 +4585,27 @@ One thing does change for such a script: the old configuration file has no POST_
         <translation></translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+21"/>
         <source>[Connection #%1] The configured user for %2:%3 contains a line break and cannot be sent</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+24"/>
         <source>[Connection #%1] Error sending user &apos;%4&apos; to server %2:%3</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>[Connection #%1] The configured password for %2:%3 contains a line break and cannot be sent</source>
         <translation></translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+22"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
         <translation>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+39"/>
         <source>start sending article: %1</source>
         <translation></translation>
     </message>
@@ -6113,7 +6113,7 @@ Save the model now?</translation>
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+792"/>
+        <location filename="../PostingJob.cpp" line="+793"/>
         <source>Start Post #%1: %2</source>
         <translation></translation>
     </message>
@@ -6190,13 +6190,13 @@ Save the model now?</translation>
     </message>
     <message>
         <location line="+56"/>
-        <location line="+400"/>
+        <location line="+418"/>
         <location line="+8"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
         <translation>Couldn&apos;t copy nfo %1 to %2</translation>
     </message>
     <message>
-        <location line="-304"/>
+        <location line="-322"/>
         <source>History: could not mark post %1 as resuming: %2</source>
         <translation>History: could not mark post %1 as resuming: %2</translation>
     </message>
@@ -6206,7 +6206,12 @@ Save the model now?</translation>
         <translation>History: could not record the start of post %1: %2</translation>
     </message>
     <message>
-        <location line="+87"/>
+        <location line="+96"/>
+        <source>The server refused the credentials %1 times in a row, with no connection accepted in between: the post is stopped. Check the user and password of the server.</source>
+        <translation>The server refused the credentials %1 times in a row, with no connection accepted in between: the post is stopped. Check the user and password of the server.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>Sleep for %1 sec before trying to reconnect</source>
         <translation></translation>
     </message>
@@ -6573,7 +6578,7 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
         <translation></translation>
     </message>
     <message>
-        <location line="-2139"/>
+        <location line="-2157"/>
         <source>History: could not create post record: %1</source>
         <translation>History: could not create post record: %1</translation>
     </message>
@@ -6588,7 +6593,7 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
         <translation>History: could not create file record: %1</translation>
     </message>
     <message>
-        <location line="+1195"/>
+        <location line="+1213"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>Could not regenerate final NZB from history: %1</translation>
     </message>

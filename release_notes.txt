@@ -59,6 +59,18 @@ TODO: auto RAR size and par2 parameters depending on the inputs size?
   refused when its tunnel service is registered. Rolling back to a profile that
   an earlier version had accepted can therefore fail; the previous profile is
   kept and the failure is reported.
+- yEnc: a space or tab ending a line is now escaped as the specification
+  requires -- on the last column of a line, and on the last byte of an article.
+  Almost every article used to carry some line ending in a raw blank, about 44
+  in a 700 KB article; any server or client that trims trailing whitespace
+  would drop those bytes, and the CRC check would fail.
+- Credentials the server refuses are no longer replayed at once on every
+  connection. After three reconnection cycles in a row in which the server
+  refused them and accepted no connection, the post stops with an error instead
+  of retrying forever. A refusal that clears up within those cycles -- a
+  provider still counting the connections of a crashed run -- lets the post go
+  on. An unreachable server is still retried without limit, as RESUME_WAIT
+  describes.
 - PAR2_ARGS_CUSTOM is a new key for your own par2 arguments. Uncommented, it is
   what runs, and ngPost never rewrites it; only the redundancy of each post is
   substituted. Commented out, the PAR2_ARGS line the PAR2 Settings window

@@ -57,10 +57,11 @@ tst_NntpFile                  29  Linux
 tst_OpenVpnConfigPolicy       74  Linux
 tst_Par2Settings              17  Linux
 tst_PathHelper                45  Linux
-tst_PostFlow                  22  Linux
+tst_PostFlow                  26  Linux
 tst_PostHistory               48  Linux
 tst_PostInfoTemplate          36  Linux
 tst_RandomToken                3  Linux
+tst_SecretMasker              22  Linux
 tst_UpdateChecker             17  Linux
 tst_VpnDnsResolver             8  Linux
 tst_VpnE2E_WireGuard           7  Linux
@@ -71,7 +72,7 @@ tst_WindowsSecurity            5  Linux
 tst_WindowsServiceControl      5  Linux
 tst_WireGuardBackend          13  Linux
 tst_WireGuardConfigPolicy     21  Linux
-tst_Yenc                      26  Linux
+tst_Yenc                      30  Linux
 
 # macOS, measured 2026-09-17 on macos-15 / Qt 6.8.2.
 # Lower than Linux where the platform decides: tst_CliParser skips the five
@@ -90,6 +91,7 @@ tst_PostFlow                  22  Darwin
 tst_PostHistory               48  Darwin
 tst_PostInfoTemplate          36  Darwin
 tst_RandomToken                3  Darwin
+tst_SecretMasker              22  Darwin
 tst_UpdateChecker             17  Darwin
 tst_VpnDnsResolver             8  Darwin
 tst_VpnProfile                61  Darwin
@@ -99,7 +101,7 @@ tst_WindowsSecurity            5  Darwin
 tst_WindowsServiceControl      5  Darwin
 tst_WireGuardBackend          13  Darwin
 tst_WireGuardConfigPolicy     21  Darwin
-tst_Yenc                      26  Darwin
+tst_Yenc                      30  Darwin
 
 # Windows, measured 2026-09-17 on windows-latest / Qt 6.8.2 (MSVC).
 # The Windows-only suites run here and only here; tst_PathHelper and
@@ -118,6 +120,7 @@ tst_PostFlow                  18  Windows
 tst_PostHistory               48  Windows
 tst_PostInfoTemplate          34  Windows
 tst_RandomToken                3  Windows
+tst_SecretMasker              22  Windows
 tst_UpdateChecker             17  Windows
 tst_VpnDnsResolver             8  Windows
 tst_VpnProfile                62  Windows
@@ -128,7 +131,7 @@ tst_WindowsSecurity           19  Windows
 tst_WindowsServiceControl      6  Windows
 tst_WireGuardBackend          13  Windows
 tst_WireGuardConfigPolicy     21  Windows
-tst_Yenc                      26  Windows
+tst_Yenc                      30  Windows
 
 # Deliberately unpinned
 # ---------------------

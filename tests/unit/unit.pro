@@ -8,6 +8,7 @@ SUBDIRS = \
     tst_WindowsCommandLine \
     tst_RandomToken \
     tst_Yenc \
+    tst_SecretMasker \
     tst_NntpFile \
     tst_VpnSocketBinder \
     tst_PathHelper \

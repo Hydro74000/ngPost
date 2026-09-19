@@ -69,6 +69,13 @@ private:
     bool _currentArticlePreserved;
     ushort _nbDisconnected;
     QString _lastTransportError;
+    //! The server refused our credentials (or they cannot be sent) on the
+    //! latest attempt. Replaying them at once cannot succeed, so the immediate
+    //! reconnect is skipped and PostingJob decides from the backoff cycle.
+    bool _authRejected;
+    //! Reached the posting state since PostingJob last asked: proof that these
+    //! credentials worked, which takeBecameReady() consumes.
+    bool _becameReady;
 
     NgPost *_ngPost;
     Poster *_poster;
@@ -102,6 +109,13 @@ public:
 
     inline void resetErrorCount();
     inline bool isConnected() const;
+
+    //! Only meaningful once disconnected() was emitted: the connection is then
+    //! idle until the next startConnection.
+    inline bool authenticationRejected() const;
+    //! Whether the connection reached the posting state since the previous
+    //! call. Same idle-only contract as authenticationRejected().
+    inline bool takeBecameReady();
 
     void setPoster(Poster *poster);
 
@@ -178,6 +192,18 @@ void NntpConnection::resetErrorCount()
 bool NntpConnection::isConnected() const
 {
     return _isConnected;
+}
+
+bool NntpConnection::authenticationRejected() const
+{
+    return _authRejected;
+}
+
+bool NntpConnection::takeBecameReady()
+{
+    bool const ready = _becameReady;
+    _becameReady = false;
+    return ready;
 }
 
 bool NntpConnection::hasNoMoreFiles() const

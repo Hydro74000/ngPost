@@ -58,6 +58,13 @@ private slots:
     //! ~44 raw line-final blanks went out per 700 KB article.
     void column_sensitive_bytes_are_escaped();
     void column_sensitive_bytes_are_escaped_data();
+
+    //! The last byte of an article ends a line wherever its column falls: the
+    //! body is followed by CRLF and the =yend trailer. A SPACE or TAB there is
+    //! as exposed to trailing-whitespace trimming as one on the last column,
+    //! and it went out raw on ~2 articles in 256.
+    void last_input_byte_blank_is_escaped();
+    void last_input_byte_blank_is_escaped_data();
 };
 
 void TestYenc::encode_empty_input()
@@ -261,6 +268,51 @@ void TestYenc::column_sensitive_bytes_are_escaped()
         QCOMPARE(dst[at], encoded);
         if (at > 0)
             QVERIFY2(dst[at - 1] != uchar('='), "escaped a byte that needs no escape");
+    }
+}
+
+void TestYenc::last_input_byte_blank_is_escaped_data()
+{
+    QTest::addColumn<uchar>("rawInput"); //!< last byte handed to the encoder
+    QTest::addColumn<int>("size");       //!< input length, so its last column
+    QTest::addColumn<bool>("mustEscape");
+
+    // Same byte mapping as above. A '.' only matters at column 0, so it is the
+    // control row: ending an article is no reason to escape it.
+    QTest::newRow("space ends a short article") << uchar(0xF6) << 10 << true;
+    QTest::newRow("tab ends a short article") << uchar(0xDF) << 10 << true;
+    QTest::newRow("space ends the second line") << uchar(0xF6) << 140 << true;
+    QTest::newRow("dot ends a short article") << uchar(0x04) << 10 << false;
+}
+
+void TestYenc::last_input_byte_blank_is_escaped()
+{
+    QFETCH(uchar, rawInput);
+    QFETCH(int, size);
+    QFETCH(bool, mustEscape);
+
+    // 0x17 fills with 'A', which never escapes, so the encoded body is the
+    // input shifted by one CRLF per full line.
+    const qint64 N = size;
+    std::vector<char> src(static_cast<size_t>(N), char(0x17));
+    src.back() = static_cast<char>(rawInput);
+
+    std::vector<uchar> dst(NntpArticle::yEncWorstCaseSize(N) + 16, 0xAA);
+    quint32 crc = 0;
+
+    // The returned size counts the trailing NUL.
+    const qint64 n = Yenc::encode(src.data(), N, dst.data(), crc);
+    QVERIFY(n >= 3);
+    const size_t end = static_cast<size_t>(n - 1);
+    const uchar encoded = static_cast<uchar>((rawInput + 42) & 0xFF);
+
+    QCOMPARE(dst[end], uchar(0));
+    if (mustEscape) {
+        QCOMPARE(dst[end - 2], uchar('='));
+        QCOMPARE(dst[end - 1], uchar(encoded + 64));
+    } else {
+        QCOMPARE(dst[end - 1], encoded);
+        QVERIFY2(dst[end - 2] != uchar('='), "escaped a byte that needs no escape");
     }
 }
 

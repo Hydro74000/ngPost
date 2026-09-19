@@ -356,6 +356,7 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _vpnRequired(false)
     , _vpnRetained(false)
     , _resumeTimer()
+    , _authRejectedCycles(0)
     , _isActiveJob(false)
     , _historyPostId(options.resumeHistoryPostId)
     , _resumeFromHistory(options.resumeHistoryPostId != 0)
@@ -1098,7 +1099,25 @@ void PostingJob::onDisconnectedConnection(NntpConnection *con)
                 }
             } else {
                 _error(tr("we lost all the connections..."));
-                if (_ngPost->_tryResumePostWhenConnectionLost) {
+                // Every connection is idle now: read what its last attempt did.
+                bool anyReady = false, allRejected = true;
+                for (NntpConnection *closed : _closedConnections) {
+                    if (closed->takeBecameReady())
+                        anyReady = true;
+                    if (!closed->authenticationRejected())
+                        allRejected = false;
+                }
+                _authRejectedCycles = (!anyReady && allRejected) ? _authRejectedCycles + 1 : 0;
+
+                if (_authRejectedCycles >= kMaxAuthRejectedCycles) {
+                    _error(tr("The server refused the credentials %1 times in a row, with no "
+                              "connection accepted in between: the post is stopped. Check the "
+                              "user and password of the server.")
+                               .arg(_authRejectedCycles));
+                    _finishPosting();
+                    if (!_postFinished)
+                        emit noMoreConnection();
+                } else if (_ngPost->_tryResumePostWhenConnectionLost) {
                     int sleepDurationInSec = _ngPost->waitDurationBeforeAutoResume();
                     _log(tr("Sleep for %1 sec before trying to reconnect").arg(sleepDurationInSec));
                     pause(PauseReason::ConnectionBackoff);

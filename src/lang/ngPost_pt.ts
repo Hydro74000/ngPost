@@ -445,7 +445,7 @@ Marcada, ficam na pasta do caminho de compressão.
         <translation>gere uma senha aleatória</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+205"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+207"/>
         <source>Select a Folder</source>
         <translation>Selecione uma Pasta</translation>
     </message>
@@ -460,7 +460,7 @@ Marcada, ficam na pasta do caminho de compressão.
         <translation>Limitar o número de volumes a</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-73"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-75"/>
         <source>Volume size</source>
         <translation>Tamanho do volume</translation>
     </message>
@@ -474,7 +474,7 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
 Introduza um número inteiro de MiB entre 0 e 1000000 (0 desativa a divisão apenas quando o limite de volumes está desativado).</translation>
     </message>
     <message>
-        <location line="+56"/>
+        <location line="+58"/>
         <source>The volume size is calculated automatically from the source size and the volume limit.</source>
         <translation>O tamanho é calculado automaticamente a partir do tamanho dos arquivos e do limite de volumes.</translation>
     </message>
@@ -499,7 +499,7 @@ Introduza um número inteiro de MiB entre 0 e 1000000 (0 desativa a divisão ape
         <translation>1 MiB = 1.048.576 bytes. O cálculo usa o tamanho dos arquivos, com arredondamento.</translation>
     </message>
     <message>
-        <location line="-94"/>
+        <location line="-96"/>
         <source>Save</source>
         <translation>Guardar</translation>
     </message>
@@ -2240,12 +2240,12 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
     </message>
     <message>
         <location line="+1"/>
-        <location line="+5473"/>
+        <location line="+5490"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Remova a pasta raiz (pai) ao compactar pastas usando o RAR</translation>
     </message>
     <message>
-        <location line="-5470"/>
+        <location line="-5487"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>O servidor NNTP segue o formato (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2403,7 +2403,7 @@ Para listar as opções disponíveis use: %2 --help
         <translation>Postagem cancelada pelo usuário.</translation>
     </message>
     <message>
-        <location line="+4039"/>
+        <location line="+4056"/>
         <source>VPN warning</source>
         <translation>Aviso de VPN</translation>
     </message>
@@ -2436,7 +2436,7 @@ Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos
         <translation>Cancelar</translation>
     </message>
     <message>
-        <location line="-2516"/>
+        <location line="-2533"/>
         <source>Full debug logs are ON
 </source>
         <translation>Logs de depuração completos estão LIGADOS
@@ -2733,12 +2733,12 @@ Configuração: Botão &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos
         <location line="+4"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+3920"/>
+        <location line="+3937"/>
         <source>Warning: %1</source>
         <translation>Aviso: %1</translation>
     </message>
     <message>
-        <location line="-4135"/>
+        <location line="-4152"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>É necessária confirmação. Volte a executar com --yes para retomar a publicação.</translation>
     </message>
@@ -2892,12 +2892,12 @@ That&apos;s not the case for &apos;%1&apos; which contains folders: %2</source>
     </message>
     <message>
         <location line="+69"/>
-        <location line="+1243"/>
+        <location line="+1260"/>
         <source>Generate new random poster for each post</source>
         <translation>Gear um postador aleatório para cada postagem</translation>
     </message>
     <message>
-        <location line="-1212"/>
+        <location line="-1229"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>Você deve fornecer um número inteiro não assinado para o número de novas tentativas para postar um Artigo (option -r)</translation>
     </message>
@@ -2970,7 +2970,7 @@ OU use --par2_pct ou coloque PAR2_PCT ou PAR2_ARGS na configuração de arquivo.
         <translation>Nada para fazer...</translation>
     </message>
     <message>
-        <location line="+304"/>
+        <location line="+321"/>
         <source>## Added to your configuration file, kept here</source>
         <translation>## Adicionado ao seu ficheiro de configuração, mantido aqui</translation>
     </message>
@@ -3248,14 +3248,14 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>## dado a um comando pós-publicação; __rarPass__ nos argumentos continua a funcionar</translation>
     </message>
     <message>
-        <location line="-3592"/>
+        <location line="-3609"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Protocolo não suportado para NZB_UPLOAD_URL (%1). Você pode usar apenas: %2
 </translation>
     </message>
     <message>
-        <location line="+2326"/>
+        <location line="+2343"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost inicia gravação de logs: %1</translation>
     </message>
@@ -3280,7 +3280,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>erro analizando parâmetros de Proxy Socks5. A sintaxe deveria ser: %1</translation>
     </message>
     <message>
-        <location line="-2445"/>
+        <location line="-2462"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>o histórico de postagem &apos;%1&apos; não pode ser um diretório...
@@ -3295,7 +3295,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
 </translation>
     </message>
     <message>
-        <location line="+2505"/>
+        <location line="+2522"/>
         <source>should be a directory!...</source>
         <translation>deve ser um diretório!...</translation>
     </message>
@@ -3330,7 +3330,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
         <translation>Palavra-chave errada para PACK: %1. Deve ser um subconjunto de (%2)</translation>
     </message>
     <message>
-        <location line="-2585"/>
+        <location line="-2602"/>
         <source>date</source>
         <translation>data</translation>
     </message>
@@ -3386,7 +3386,7 @@ Nenhum ficheiro de origem existente foi alterado ou eliminado. Alguns ficheiros 
     </message>
     <message>
         <location line="+739"/>
-        <location line="+1202"/>
+        <location line="+1219"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE deve ser um número inteiro positivo</translation>
     </message>
@@ -3650,7 +3650,7 @@ O seu ficheiro de configuração activo é:
         <translation>para compressão e suporte par2</translation>
     </message>
     <message>
-        <location line="-4727"/>
+        <location line="-4744"/>
         <source>check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, see the report for whether they can be repaired, 2 = missing beyond any repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)</source>
         <translation>verificar o ficheiro nzb (se os artigos estão disponíveis na Usenet). Código de saída: 0 = todos os artigos presentes, 1 = faltam artigos, consulte o relatório para saber se são reparáveis, 2 = perda irreparável, 3 = sem veredicto (nzb ilegível, nenhum servidor ativado para verificação, ou ligações falhadas)</translation>
     </message>
@@ -3745,7 +3745,7 @@ O seu ficheiro de configuração activo é:
         <translation>os servidores ativados para a verificação de nzb não têm um número de ligações positivo</translation>
     </message>
     <message>
-        <location line="+1047"/>
+        <location line="+1064"/>
         <source>Commented out or deleted in &apos;%1&apos; while ngPost was running, so it stops using them: %2.</source>
         <translation>Comentado ou apagado em «%1» enquanto o ngPost corria, pelo que deixa de os usar: %2.</translation>
     </message>
@@ -4324,7 +4324,7 @@ O seu ficheiro de configuração activo é:
         <translation>Erro: não foi possível gravar o arquivo de configuração padrão: %1</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1301"/>
+        <location filename="../NgPost.h" line="+1306"/>
         <source>PACKing auto using: %1</source>
         <translation>Comptatação automática usando: %1</translation>
     </message>
@@ -4384,7 +4384,7 @@ O seu ficheiro de configuração activo é:
         <translation>Se você gostaria de traduzir ngPost em seu idioma, é fácil, por favor, entre em contato comigo em Matthieu.Bruel@gmail.com</translation>
     </message>
     <message>
-        <location filename="../NgPost.cpp" line="-5645"/>
+        <location filename="../NgPost.cpp" line="-5662"/>
         <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
         <translation>renomeia os ficheiros de entrada com um nome aleatório antes de os comprimir, para que o arquivo não contenha o nome original (a usar com --compress)</translation>
     </message>
@@ -4396,7 +4396,7 @@ O seu ficheiro de configuração activo é:
 </translation>
     </message>
     <message>
-        <location line="+2630"/>
+        <location line="+2647"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation>## &apos;filename&apos; renomeia os ficheiros de entrada com um nome aleatório antes de os</translation>
     </message>
@@ -4406,8 +4406,8 @@ O seu ficheiro de configuração activo é:
         <translation>## comprimir, para que o arquivo não contenha nome original. Ambos ao mesmo tempo.</translation>
     </message>
     <message>
-        <location line="-2416"/>
-        <location line="+1329"/>
+        <location line="-2433"/>
+        <location line="+1346"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX deve ser um inteiro positivo de até 2147483647.</translation>
     </message>
@@ -4520,7 +4520,7 @@ O seu ficheiro de configuração activo é:
 <context>
     <name>NntpConnection</name>
     <message>
-        <location filename="../NntpConnection.cpp" line="+140"/>
+        <location filename="../NntpConnection.cpp" line="+143"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>O servidor «%1» deve passar pelo VPN mas o túnel não está ligado</translation>
     </message>
@@ -4550,7 +4550,7 @@ O seu ficheiro de configuração activo é:
         <translation>ligação fechada antes da confirmação do servidor</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+28"/>
         <source>Connection lost, trying to reconnect! (nb disconnected: %1)</source>
         <translation>Conexão perdida, tentanto reconectar!nb disconectada: %1)</translation>
     </message>
@@ -4608,27 +4608,27 @@ O seu ficheiro de configuração activo é:
         <translation>[Conexão #%1] Erro conectando ao servidor %2:%3</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+21"/>
         <source>[Connection #%1] The configured user for %2:%3 contains a line break and cannot be sent</source>
         <translation>[Ligação #%1] O utilizador configurado para %2:%3 contém uma quebra de linha e não pode ser enviado</translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+24"/>
         <source>[Connection #%1] Error sending user &apos;%4&apos; to server %2:%3</source>
         <translation>[Conexão #%1] Erro ao enviar usuário &apos;%4&apos; para o servidor %2:%3</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>[Connection #%1] The configured password for %2:%3 contains a line break and cannot be sent</source>
         <translation>[Ligação #%1] A palavra-passe configurada para %2:%3 contém uma quebra de linha e não pode ser enviada</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+22"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
         <translation>[Ligação n.º%1] Erro de autenticação no servidor %2:%3 com o utilizador «%4»</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+39"/>
         <source>start sending article: %1</source>
         <translation>iniciar envio do artigo: %1</translation>
     </message>
@@ -6140,7 +6140,7 @@ Guardar o modelo agora?</translation>
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+749"/>
+        <location filename="../PostingJob.cpp" line="+750"/>
         <source>Try to resume posting</source>
         <translation>Tentar resumir a postagem</translation>
     </message>
@@ -6176,13 +6176,13 @@ Guardar o modelo agora?</translation>
     </message>
     <message>
         <location line="+56"/>
-        <location line="+400"/>
+        <location line="+418"/>
         <location line="+8"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
         <translation>Não foi possível copiar nfo %1 para %2</translation>
     </message>
     <message>
-        <location line="-355"/>
+        <location line="-373"/>
         <source>Error: there are no NntpConnection...</source>
         <translation>Erro: não há ConexãoNntp...</translation>
     </message>
@@ -6219,7 +6219,12 @@ Guardar o modelo agora?</translation>
         <translation>perdemos todas as conexões...</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+12"/>
+        <source>The server refused the credentials %1 times in a row, with no connection accepted in between: the post is stopped. Check the user and password of the server.</source>
+        <translation>O servidor recusou as credenciais %1 vezes seguidas, sem aceitar nenhuma ligação entretanto: a publicação é interrompida. Verifique o utilizador e a palavra-passe do servidor.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>Sleep for %1 sec before trying to reconnect</source>
         <translation>Dormir por %1 seg antes de tentar reconectar</translation>
     </message>
@@ -6495,7 +6500,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>Não foi possível renomear o arquivo %1</translation>
     </message>
     <message>
-        <location line="-856"/>
+        <location line="-874"/>
         <source>Could not stop the external process before restoring source files</source>
         <translation>Não foi possível parar o processo externo antes de restaurar os ficheiros de origem</translation>
     </message>
@@ -6505,7 +6510,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>Não foi possível guardar o estado do artigo interrompido: %1</translation>
     </message>
     <message>
-        <location line="+517"/>
+        <location line="+535"/>
         <source>Opening %1 configured NNTP connections…</source>
         <translation>Abrindo %1 conexões NNTP configuradas…</translation>
     </message>
@@ -6601,7 +6606,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>ERRO: o diretório temporário precisa ser um diretório GRAVÁVEL...</translation>
     </message>
     <message>
-        <location line="-2139"/>
+        <location line="-2157"/>
         <source>History: could not create post record: %1</source>
         <translation>Histórico: não foi possível criar o registo do post: %1</translation>
     </message>
@@ -6621,7 +6626,7 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <translation>Histórico: não foi possível criar o registo do ficheiro: %1</translation>
     </message>
     <message>
-        <location line="+1195"/>
+        <location line="+1213"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>Não foi possível regenerar o NZB final do histórico: %1</translation>
     </message>

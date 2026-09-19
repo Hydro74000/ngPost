@@ -158,6 +158,11 @@ class Session:
                     if self.opts.fail_auth:
                         await self.write_line(b"481 auth rejected (test injection)")
                         continue
+                    if self.opts.fail_auth_count > 0:
+                        self.opts.fail_auth_count -= 1
+                        self.log("rejecting AUTHINFO PASS (fail-auth-count)")
+                        await self.write_line(b"481 auth rejected (test injection)")
+                        continue
                     expected_user, expected_pass = "", ""
                     if self.opts.require_auth:
                         expected_user, expected_pass = self.opts.require_auth.split(":", 1)
@@ -348,6 +353,8 @@ def main(argv: list[str]) -> int:
                    help="If set to 'user:pass', reject AUTHINFO PASS that does not match")
     p.add_argument("--fail-auth", action="store_true",
                    help="Always reject AUTHINFO PASS with 481")
+    p.add_argument("--fail-auth-count", type=int, default=0,
+                   help="Reject the first N AUTHINFO PASS with 481, server-wide, then accept")
     p.add_argument("--drop-after-bytes", type=int, default=0,
                    help="Close the connection after N bytes have been received (0 = never)")
     p.add_argument("--drop-before-post-reply", action="store_true",

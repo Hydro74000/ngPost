@@ -447,7 +447,7 @@ Dit is de standaard waarmee elke nieuwe post begint; elke post kan alsnog anders
         <translation>genereer willekeurige wachtwoord</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+205"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+207"/>
         <source>Select a Folder</source>
         <translation>Selecteer een Map</translation>
     </message>
@@ -462,7 +462,7 @@ Dit is de standaard waarmee elke nieuwe post begint; elke post kan alsnog anders
         <translation>Aantal volumes beperken tot</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-73"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-75"/>
         <source>Volume size</source>
         <translation>Volumegrootte</translation>
     </message>
@@ -476,7 +476,7 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
 Voer een geheel aantal MiB tussen 0 en 1000000 in (0 schakelt splitsen alleen uit als de volumelimiet uitstaat).</translation>
     </message>
     <message>
-        <location line="+56"/>
+        <location line="+58"/>
         <source>The volume size is calculated automatically from the source size and the volume limit.</source>
         <translation>De volumegrootte wordt automatisch berekend uit de brongrootte en de volumelimiet.</translation>
     </message>
@@ -501,7 +501,7 @@ Voer een geheel aantal MiB tussen 0 en 1000000 in (0 schakelt splitsen alleen ui
         <translation>1 MiB = 1.048.576 bytes. De berekening gebruikt de brongrootte, met afronding.</translation>
     </message>
     <message>
-        <location line="-94"/>
+        <location line="-96"/>
         <source>Save</source>
         <translation>Opslaan</translation>
     </message>
@@ -2258,12 +2258,12 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+5473"/>
+        <location line="+5490"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Verwijder de root (bovenliggende) map bij het comprimeren van mappen met RAR</translation>
     </message>
     <message>
-        <location line="-5470"/>
+        <location line="-5487"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP-server met de indeling (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2492,7 +2492,7 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
         <translation>Posting geannuleerd door gebruiker.</translation>
     </message>
     <message>
-        <location line="+4039"/>
+        <location line="+4056"/>
         <source>VPN warning</source>
         <translation>VPN-waarschuwing</translation>
     </message>
@@ -2525,7 +2525,7 @@ Instelling: Knop &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route
         <translation>Annuleren</translation>
     </message>
     <message>
-        <location line="-2516"/>
+        <location line="-2533"/>
         <source>Full debug logs are ON
 </source>
         <translation>Volledige foutopsporings logboeken zijn AAN
@@ -2555,12 +2555,12 @@ Dat is niet het geval voor &apos;%1&apos; dat mappen bevat: %2</translation>
     </message>
     <message>
         <location line="+139"/>
-        <location line="+1243"/>
+        <location line="+1260"/>
         <source>Generate new random poster for each post</source>
         <translation>Genereer een nieuwe willekeurige poster voor elk post</translation>
     </message>
     <message>
-        <location line="-1212"/>
+        <location line="-1229"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>Je moet een getal opgeven voor het aantal nieuwe pogingen om een ​​artikel te posten (optie -r)</translation>
     </message>
@@ -2628,7 +2628,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Niets te doen ...</translation>
     </message>
     <message>
-        <location line="+470"/>
+        <location line="+487"/>
         <source>The config file &apos;%1&apos; is not readable...</source>
         <translation>Het configuratie bestand %1  is niet leesbaar ...</translation>
     </message>
@@ -2640,14 +2640,14 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
 </translation>
     </message>
     <message>
-        <location line="-2157"/>
+        <location line="-2174"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Niet-ondersteund protocol voor NZB_UPLOAD_URL (%1). Je kunt alleen:%2 gebruiken
 </translation>
     </message>
     <message>
-        <location line="+2326"/>
+        <location line="+2343"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost begint met loggen: %1</translation>
     </message>
@@ -2672,7 +2672,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Fout bij het parseren van Proxy Socks5-parameters. De syntaxis moet zijn:%1</translation>
     </message>
     <message>
-        <location line="-2445"/>
+        <location line="-2462"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>het historie bestand %1  mag geen directory zijn...
@@ -2687,7 +2687,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
 </translation>
     </message>
     <message>
-        <location line="+2505"/>
+        <location line="+2522"/>
         <source>should be a directory!...</source>
         <translation>moet een directory zijn! ...</translation>
     </message>
@@ -2722,7 +2722,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Verkeerde trefwoorden voor PACK: %1. Het moet een subset zijn van (%2)</translation>
     </message>
     <message>
-        <location line="-2585"/>
+        <location line="-2602"/>
         <source>date</source>
         <translation>datum</translation>
     </message>
@@ -3017,12 +3017,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <location line="+4"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+3920"/>
+        <location line="+3937"/>
         <source>Warning: %1</source>
         <translation>Waarschuwing: %1</translation>
     </message>
     <message>
-        <location line="-4135"/>
+        <location line="-4152"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>Bevestiging vereist. Voer opnieuw uit met --yes om het posten te hervatten.</translation>
     </message>
@@ -3168,7 +3168,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>--par2_path kiest %1 in plaats van %2: de par2-argumenten uit uw configuratie worden voor deze run genegeerd en %1 gebruikt zijn eigen standaardwaarden. De configuratie blijft ongewijzigd.</translation>
     </message>
     <message>
-        <location line="+640"/>
+        <location line="+657"/>
         <source>Commented out or deleted in &apos;%1&apos; while ngPost was running, so it stops using them: %2.</source>
         <translation>Uitgecommentarieerd of verwijderd in &apos;%1&apos; terwijl ngPost liep, dus ngPost gebruikt ze niet meer: %2.</translation>
     </message>
@@ -3228,7 +3228,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>## Alleen de redundantie per post wordt vervangen. Weer uitcommentariëren keert terug.</translation>
     </message>
     <message>
-        <location line="-4417"/>
+        <location line="-4434"/>
         <location line="+1308"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>Het overnemen van de configuratiemap is mislukt; ngPost is gestopt voordat de nieuwe map werd gebruikt, zodat het de volgende keer veilig opnieuw kan proberen.</translation>
@@ -3280,7 +3280,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     </message>
     <message>
         <location line="+86"/>
-        <location line="+1202"/>
+        <location line="+1219"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE moet een positief geheel getal zijn</translation>
     </message>
@@ -4329,7 +4329,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>Fout: kan standaard configuratie bestand niet schrijven: %1</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1301"/>
+        <location filename="../NgPost.h" line="+1306"/>
         <source>PACKing auto using: %1</source>
         <translation>Automatisch inpakken met: %1</translation>
     </message>
@@ -4389,7 +4389,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>Als je ngPost in je eigen taal wilt vertalen, neem dan contact met me op via Matthieu.Bruel@gmail.com</translation>
     </message>
     <message>
-        <location filename="../NgPost.cpp" line="-5645"/>
+        <location filename="../NgPost.cpp" line="-5662"/>
         <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
         <translation>hernoem de invoerbestanden met een willekeurige naam vóór het comprimeren, zodat het archief de oorspronkelijke naam niet bevat (te gebruiken met --compress)</translation>
     </message>
@@ -4401,7 +4401,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
 </translation>
     </message>
     <message>
-        <location line="+2630"/>
+        <location line="+2647"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation>## &apos;filename&apos; hernoemt de invoerbestanden willekeurig vóór het comprimeren, zodat</translation>
     </message>
@@ -4411,8 +4411,8 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## het archief geen oorspronkelijke naam bevat. Beide kunnen tegelijk.</translation>
     </message>
     <message>
-        <location line="-2416"/>
-        <location line="+1329"/>
+        <location line="-2433"/>
+        <location line="+1346"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX moet een positief geheel getal van maximaal 2147483647 zijn.</translation>
     </message>
@@ -4525,7 +4525,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
 <context>
     <name>NntpConnection</name>
     <message>
-        <location filename="../NntpConnection.cpp" line="+140"/>
+        <location filename="../NntpConnection.cpp" line="+143"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>Server &apos;%1&apos; moet door het VPN maar de tunnel is niet verbonden</translation>
     </message>
@@ -4555,7 +4555,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>verbinding gesloten voor de serverbevestiging</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+28"/>
         <source>Connection lost, trying to reconnect! (nb disconnected: %1)</source>
         <translation>Verbinding verbroken, probeer opnieuw verbinding te maken! (nb verbroken: %1)</translation>
     </message>
@@ -4613,27 +4613,27 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>[Verbinding #%1]  Fout bij verbinden met server %2:%3</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+21"/>
         <source>[Connection #%1] The configured user for %2:%3 contains a line break and cannot be sent</source>
         <translation>[Verbinding #%1] De ingestelde gebruiker voor %2:%3 bevat een regeleinde en kan niet worden verzonden</translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+24"/>
         <source>[Connection #%1] Error sending user &apos;%4&apos; to server %2:%3</source>
         <translation>[Verbinding #%1]  Fout bij het verzenden van gebruiker %4  naar server %2:%3</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>[Connection #%1] The configured password for %2:%3 contains a line break and cannot be sent</source>
         <translation>[Verbinding #%1] Het ingestelde wachtwoord voor %2:%3 bevat een regeleinde en kan niet worden verzonden</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+22"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
         <translation>[Verbinding #%1] Authenticatiefout bij server %2:%3 met gebruiker &apos;%4&apos;</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+39"/>
         <source>start sending article: %1</source>
         <translation>begin met verzenden van artikel:%1</translation>
     </message>
@@ -6145,7 +6145,7 @@ Het model nu opslaan?</translation>
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+749"/>
+        <location filename="../PostingJob.cpp" line="+750"/>
         <source>Try to resume posting</source>
         <translation>Probeer het posten te hervatten</translation>
     </message>
@@ -6181,13 +6181,13 @@ Het model nu opslaan?</translation>
     </message>
     <message>
         <location line="+56"/>
-        <location line="+400"/>
+        <location line="+418"/>
         <location line="+8"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
         <translation>Kon nfo %1 niet kopiëren naar %2</translation>
     </message>
     <message>
-        <location line="-355"/>
+        <location line="-373"/>
         <source>Error: there are no NntpConnection...</source>
         <translation>Fout: er is geen Nntp-verbinding ...</translation>
     </message>
@@ -6224,7 +6224,12 @@ Het model nu opslaan?</translation>
         <translation>we verloren alle verbindingen ...</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+12"/>
+        <source>The server refused the credentials %1 times in a row, with no connection accepted in between: the post is stopped. Check the user and password of the server.</source>
+        <translation>De server heeft de inloggegevens %1 keer achter elkaar geweigerd, zonder tussendoor een verbinding te accepteren: het posten wordt gestopt. Controleer de gebruiker en het wachtwoord van de server.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>Sleep for %1 sec before trying to reconnect</source>
         <translation>Even geduld voor %1 sec voordat t opnieuw verbinding  probeert te maken</translation>
     </message>
@@ -6500,7 +6505,7 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
         <translation>Kan bestand %1  niet hernoemen</translation>
     </message>
     <message>
-        <location line="-856"/>
+        <location line="-874"/>
         <source>Could not stop the external process before restoring source files</source>
         <translation>Kon het externe proces niet stoppen voordat de bronbestanden werden hersteld</translation>
     </message>
@@ -6510,7 +6515,7 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
         <translation>Kon de staat van het onderbroken artikel niet opslaan: %1</translation>
     </message>
     <message>
-        <location line="+517"/>
+        <location line="+535"/>
         <source>Opening %1 configured NNTP connections…</source>
         <translation>%1 ingestelde NNTP-verbindingen openen…</translation>
     </message>
@@ -6606,7 +6611,7 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
         <translation>FOUT: de tijdelijke directory moet een SCHRIJFBARE directory zijn ...</translation>
     </message>
     <message>
-        <location line="-2139"/>
+        <location line="-2157"/>
         <source>History: could not create post record: %1</source>
         <translation>Geschiedenis: kon geen postrecord aanmaken: %1</translation>
     </message>
@@ -6626,7 +6631,7 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
         <translation>Geschiedenis: kon geen bestandsrecord aanmaken: %1</translation>
     </message>
     <message>
-        <location line="+1195"/>
+        <location line="+1213"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>Kon definitieve NZB niet regenereren uit geschiedenis: %1</translation>
     </message>
