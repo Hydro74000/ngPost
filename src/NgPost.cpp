@@ -2652,6 +2652,102 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     // engine fallback of PAR2_TOOL moot, and its announcement wrong.
     _par2PathOnCommandLine = parser.isSet(sOptionNames[Opt::PAR2_PATH]);
 
+    _prepareCliOutput(parser);
+
+    // Inspection commands must stay read-only. In particular, a renamed
+    // AppImage invoked only for --help/--version must not adopt configuration
+    // files as a side effect. Honor an explicit language for their output,
+    // but do not parse or migrate any configuration.
+    if (parser.isSet(sOptionNames[Opt::HELP]) || parser.isSet(sOptionNames[Opt::VERSION])) {
+        if (parser.isSet(sOptionNames[Opt::LANG]))
+            changeLanguage(parser.value(sOptionNames[Opt::LANG]).toLower());
+        _showVersionASCII();
+        if (parser.isSet(sOptionNames[Opt::HELP]))
+            _syntax(argv[0]);
+        return false;
+    }
+
+    if (!_loadCliConfig(parser))
+        return false;
+
+    _applyCliConfigOverrides(parser);
+
+    if (parser.isSet(sOptionNames[Opt::VPN_CLEANUP_UNATTRIBUTED])) {
+        if (!parser.isSet(sOptionNames[Opt::YES])) {
+            _error(tr("Error: --vpn-cleanup-unattributed requires --yes because it can interrupt "
+                      "another ngPost tunnel."),
+                   ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+        if (!_vpnManager || !_vpnManager->cleanupUnattributed(true))
+            _error(tr("VPN resources were not removed."), ERROR_CODE::ERR_VPN);
+        return false;
+    }
+
+    const bool hasHistoryCommand = _isHistoryCommand(parser);
+
+    _parseCliDisplayOptions(parser);
+
+    if (parser.isSet(sOptionNames[Opt::CHECK]))
+        return _startCliNzbCheck(parser);
+
+    if (!_parseCliInputMode(parser, hasHistoryCommand))
+        return false;
+
+    if (!_parseCliVpnOptions(parser))
+        return false;
+
+    if (!_parseCliPackingOptions(parser))
+        return false;
+
+    bool isMonitoring = false;
+    if (!_parseCliMonitorOptions(parser, isMonitoring))
+        return false;
+
+    if (!_parseCliArticleOptions(parser))
+        return false;
+
+    if (!_parseCliPostInfoOptions(parser))
+        return false;
+
+    if (!_parseCliPostCommandOptions(parser))
+        return false;
+
+    if (!_parseCliMetadataOptions(parser))
+        return false;
+
+    if (!_parseCliArticleSizeOptions(parser))
+        return false;
+
+    if (!_parseCliArchiveOptions(parser))
+        return false;
+
+    if (!_parseCliPar2Options(parser))
+        return false;
+
+    _parseCliArchiveNameOptions(parser);
+
+    if (!_parseCliServerList(parser))
+        return false;
+
+    if (!_parseCliSingleServer(parser))
+        return false;
+
+    bool startEventLoopFromHistory = false;
+    if (_handleHistoryCommand(parser, &startEventLoopFromHistory))
+        return startEventLoopFromHistory;
+
+
+    QList<QFileInfo> filesToUpload;
+    QStringList rawInputPaths;
+    if (!_collectCliInputFiles(parser, filesToUpload, rawInputPaths))
+        return false;
+
+    return _startCliPosting(parser, isMonitoring, filesToUpload, rawInputPaths);
+}
+
+void NgPost::_prepareCliOutput(const QCommandLineParser &parser)
+{
     // Decided before the configuration is even read, because loading it
     // already has things to say (a migrated config, for one) and stdout is
     // about to carry a record sheet someone will pipe.
@@ -2684,21 +2780,10 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
             _stdoutRedirect = nullptr;
         }
     }
+}
 
-    // Inspection commands must stay read-only. In particular, a renamed
-    // AppImage invoked only for --help/--version must not adopt configuration
-    // files as a side effect. Honor an explicit language for their output,
-    // but do not parse or migrate any configuration.
-    if (parser.isSet(sOptionNames[Opt::HELP]) || parser.isSet(sOptionNames[Opt::VERSION]))
-    {
-        if (parser.isSet(sOptionNames[Opt::LANG]))
-            changeLanguage(parser.value(sOptionNames[Opt::LANG]).toLower());
-        _showVersionASCII();
-        if (parser.isSet(sOptionNames[Opt::HELP]))
-            _syntax(argv[0]);
-        return false;
-    }
-
+bool NgPost::_loadCliConfig(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::CONF]))
     {
         const QString confPath = parser.value(sOptionNames[Opt::CONF]);
@@ -2740,6 +2825,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         }
     }
 
+    return true;
+}
+
+void NgPost::_applyCliConfigOverrides(const QCommandLineParser &parser)
+{
     // Command-line language has higher precedence than the adopted/default
     // config and must already be active for the one-time migration report.
     if (parser.isSet(sOptionNames[Opt::LANG]))
@@ -2765,20 +2855,10 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
 
     if (_historyService)
         _historyService->configure(_postDbFile, _historyStorePasswords);
+}
 
-    if (parser.isSet(sOptionNames[Opt::VPN_CLEANUP_UNATTRIBUTED])) {
-        if (!parser.isSet(sOptionNames[Opt::YES])) {
-            _error(tr("Error: --vpn-cleanup-unattributed requires --yes because it can interrupt another ngPost tunnel."),
-                   ERROR_CODE::ERR_WRONG_ARG);
-            return false;
-        }
-        if (!_vpnManager || !_vpnManager->cleanupUnattributed(true))
-            _error(tr("VPN resources were not removed."), ERROR_CODE::ERR_VPN);
-        return false;
-    }
-
-    const bool hasHistoryCommand = _isHistoryCommand(parser);
-
+void NgPost::_parseCliDisplayOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::DEBUG]))
     {
         _debug = 1;
@@ -2812,7 +2892,10 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
             _dispFilesPosting = false;
         }
     }
+}
 
+bool NgPost::_startCliNzbCheck(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::CHECK]))
     {
         bool const jsonReport = parser.isSet(sOptionNames[Opt::CHECK_JSON]);
@@ -2888,6 +2971,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         return true;
     }
 
+    return false;
+}
+
+bool NgPost::_parseCliInputMode(const QCommandLineParser &parser, bool hasHistoryCommand)
+{
     if (!hasHistoryCommand
         && !parser.isSet(sOptionNames[Opt::INPUT])
         && !parser.isSet(sOptionNames[Opt::AUTO_DIR])
@@ -2919,6 +3007,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (parser.isSet(sOptionNames[Opt::AUTO_INCLUDE_NFO]))
         _autoIncludeNfo = true;
 
+    return true;
+}
+
+bool NgPost::_parseCliVpnOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::VPN]) && parser.isSet(sOptionNames[Opt::NO_VPN]))
     {
         _error(tr("Error syntax: --vpn and --no_vpn are mutually exclusive"),
@@ -2952,6 +3045,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _vpnManager->blockSignals(vpnSignalsWereBlocked);
     }
 
+    return true;
+}
+
+bool NgPost::_parseCliPackingOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::COMPRESS]))
         _doCompress = true;
     if (parser.isSet(sOptionNames[Opt::GEN_PAR2]))
@@ -2992,9 +3090,13 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
                 }
             }
         }
-    }        
+    }
 
-    bool isMonitoring = false;
+    return true;
+}
+
+bool NgPost::_parseCliMonitorOptions(const QCommandLineParser &parser, bool &isMonitoring)
+{
     if (parser.isSet(sOptionNames[Opt::MONITOR_DIR]))
     {
         if (!_doCompress && (!_doPar2 || !_monitorIgnoreDir))
@@ -3025,6 +3127,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         }
     }
 
+    return true;
+}
+
+bool NgPost::_parseCliArticleOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::OBFUSCATE]))
     {
         _obfuscateArticles = true;
@@ -3054,6 +3161,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         }
     }
 
+    return true;
+}
+
+bool NgPost::_parseCliPostInfoOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::POST_INFO_TEMPLATE]))
     {
         // From the command line a relative path is relative to where the user
@@ -3082,6 +3194,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (parser.isSet(sOptionNames[Opt::NO_POST_INFO_ONLY_ON_SUCCESS]))
         _postInfoOnlySuccess = false;
 
+    return true;
+}
+
+bool NgPost::_parseCliPostCommandOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::NZB_POST_CMD]))
     {
         // Replace rather than append: the command line overrides the
@@ -3150,6 +3267,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     // Both paths converge here: the separator is final by now.
     _ensurePostHistoryHeader();
 
+    return true;
+}
+
+bool NgPost::_parseCliMetadataOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::META]))
     {
         for (const QString &meta : parser.values(sOptionNames[Opt::META]))
@@ -3193,6 +3315,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _from = randomStdFrom();
 
 
+    return true;
+}
+
+bool NgPost::_parseCliArticleSizeOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::MSG_ID]))
         sArticleIdSignature = escapeXML(parser.value(sOptionNames[Opt::MSG_ID])).toStdString();
 
@@ -3225,7 +3352,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     }
 
 
+    return true;
+}
 
+bool NgPost::_parseCliArchiveOptions(const QCommandLineParser &parser)
+{
     // compression section
     if (parser.isSet(sOptionNames[Opt::TMP_DIR]))
         _tmpPath = parser.value(sOptionNames[Opt::TMP_DIR]);
@@ -3255,6 +3386,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         }
         _rarMax = nb;
     }
+    return true;
+}
+
+bool NgPost::_parseCliPar2Options(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::PAR2_PCT]))
     {
         bool ok;
@@ -3303,6 +3439,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         return false;
     }
 
+    return true;
+}
+
+void NgPost::_parseCliArchiveNameOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::RAR_NAME]))
         _rarName = parser.value(sOptionNames[Opt::RAR_NAME]);
     if (parser.isSet(sOptionNames[Opt::RAR_PASS]))
@@ -3325,9 +3466,10 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         if (ok)
             _lengthPass = nb;
     }
+}
 
-
-
+bool NgPost::_parseCliServerList(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::SERVER]))
     {
         _nntpServers.clear();
@@ -3368,6 +3510,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         }
     }
 
+    return true;
+}
+
+bool NgPost::_parseCliSingleServer(const QCommandLineParser &parser)
+{
     // Server Section under
     // check if the server params are given in the command line
     if (parser.isSet(sOptionNames[Opt::HOST]))
@@ -3426,17 +3573,17 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     }
 
 
-    bool startEventLoopFromHistory = false;
-    if (_handleHistoryCommand(parser, &startEventLoopFromHistory))
-        return startEventLoopFromHistory;
+    return true;
+}
 
-
-    QList<QFileInfo> filesToUpload;
+bool NgPost::_collectCliInputFiles(const QCommandLineParser &parser,
+                                   QList<QFileInfo> &filesToUpload,
+                                   QStringList &rawInputPaths)
+{
     QStringList filesPath;
     // The raw -i values, before a folder is expanded into its files: this is
     // what the user actually asked to post, and the only thing that can feed
     // __sourcePath__ or protect a source file from being overwritten.
-    QStringList rawInputPaths;
     for (const QString &filePath : parser.values(sOptionNames[Opt::INPUT]))
     {
         rawInputPaths << QFileInfo(filePath).absoluteFilePath();
@@ -3498,6 +3645,14 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     }
 
 
+    return true;
+}
+
+bool NgPost::_startCliPosting(const QCommandLineParser &parser,
+                              bool isMonitoring,
+                              const QList<QFileInfo> &filesToUpload,
+                              const QStringList &rawInputPaths)
+{
     if (parser.isSet("o"))
     {
         QFileInfo nzb(parser.value(sOptionNames[Opt::OUTPUT]));

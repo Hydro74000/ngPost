@@ -949,6 +949,33 @@ private:
     void _writeConfigServers(QTextStream &stream);
     void _writeConfigVpnProfiles(QTextStream &stream);
 
+    void _prepareCliOutput(const QCommandLineParser &parser);
+    bool _loadCliConfig(const QCommandLineParser &parser);
+    void _applyCliConfigOverrides(const QCommandLineParser &parser);
+    void _parseCliDisplayOptions(const QCommandLineParser &parser);
+    bool _startCliNzbCheck(const QCommandLineParser &parser);
+    bool _parseCliInputMode(const QCommandLineParser &parser, bool hasHistoryCommand);
+    bool _parseCliVpnOptions(const QCommandLineParser &parser);
+    bool _parseCliPackingOptions(const QCommandLineParser &parser);
+    bool _parseCliMonitorOptions(const QCommandLineParser &parser, bool &isMonitoring);
+    bool _parseCliArticleOptions(const QCommandLineParser &parser);
+    bool _parseCliPostInfoOptions(const QCommandLineParser &parser);
+    bool _parseCliPostCommandOptions(const QCommandLineParser &parser);
+    bool _parseCliMetadataOptions(const QCommandLineParser &parser);
+    bool _parseCliArticleSizeOptions(const QCommandLineParser &parser);
+    bool _parseCliArchiveOptions(const QCommandLineParser &parser);
+    bool _parseCliPar2Options(const QCommandLineParser &parser);
+    void _parseCliArchiveNameOptions(const QCommandLineParser &parser);
+    bool _parseCliServerList(const QCommandLineParser &parser);
+    bool _parseCliSingleServer(const QCommandLineParser &parser);
+    bool _collectCliInputFiles(const QCommandLineParser &parser,
+                               QList<QFileInfo> &filesToUpload,
+                               QStringList &rawInputPaths);
+    bool _startCliPosting(const QCommandLineParser &parser,
+                          bool isMonitoring,
+                          const QList<QFileInfo> &filesToUpload,
+                          const QStringList &rawInputPaths);
+
     struct ConfigParseState;
     bool _parseConfigTransferKey(const QString &opt, QString val, QString &err);
     bool _parseConfigDisplayKey(const QString &opt, QString val);
