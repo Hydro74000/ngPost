@@ -431,6 +431,11 @@ private:
     //! jobs are finalized as failed in history; a refused resume keeps the
     //! original post resumable.
     void _abortBeforeTransfer(bool keepResumeResumable = false);
+    void _connectJobSignals();
+#ifdef __USE_HMI__
+    void _connectWidgetSignals();
+#endif
+    void _createHistoryRecord();
     void _postFiles();
     void _finishPosting();
 

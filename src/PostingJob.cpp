@@ -371,6 +371,30 @@ PostingJob::PostingJob(NgPost *ngPost,
 #ifdef __DEBUG__
     qDebug() << "[PostingJob] >>>> Construct " << this;
 #endif
+    _connectJobSignals();
+
+#ifdef __USE_HMI__
+    _connectWidgetSignals();
+#endif
+
+    connect(&_resumeTimer, &QTimer::timeout, this, &PostingJob::onResumeTriggered);
+#ifdef __COMPUTE_IMMEDIATE_SPEED__
+    if (_useHMI)
+        connect(&_immediateSpeedTimer,
+                &QTimer::timeout,
+                this,
+                &PostingJob::onImmediateSpeedComputation,
+                Qt::QueuedConnection);
+#endif
+
+    if (ngPost->debugMode())
+        _log(NntpConnection::sslSupportInfo());
+
+    _createHistoryRecord();
+}
+
+void PostingJob::_connectJobSignals()
+{
     connect(this, &PostingJob::startPosting, this, &PostingJob::onStartPosting, Qt::QueuedConnection);
     // Mark the request immediately: a natural completion may already be
     // queued ahead of onStopPosting, but must still count as cancelled.
@@ -402,8 +426,11 @@ PostingJob::PostingJob(NgPost *ngPost,
             Qt::QueuedConnection);
 
     //    connect(this, &PostingJob::scheduleNextArticle, this, &PostingJob::onPrepareNextArticle, Qt::QueuedConnection);
+}
 
 #ifdef __USE_HMI__
+void PostingJob::_connectWidgetSignals()
+{
     if (_postWidget) {
         connect(this,
                 &PostingJob::filePosted,
@@ -431,21 +458,12 @@ PostingJob::PostingJob(NgPost *ngPost,
                 &PostingWidget::onPostingJobDone,
                 Qt::QueuedConnection);
     }
+}
+
 #endif
 
-    connect(&_resumeTimer, &QTimer::timeout, this, &PostingJob::onResumeTriggered);
-#ifdef __COMPUTE_IMMEDIATE_SPEED__
-    if (_useHMI)
-        connect(&_immediateSpeedTimer,
-                &QTimer::timeout,
-                this,
-                &PostingJob::onImmediateSpeedComputation,
-                Qt::QueuedConnection);
-#endif
-
-    if (ngPost->debugMode())
-        _log(NntpConnection::sslSupportInfo());
-
+void PostingJob::_createHistoryRecord()
+{
     if (_ngPost->_ensureHistoryStore()) {
         PostHistoryService *history = _ngPost->historyService();
         if (_resumeFromHistory)
