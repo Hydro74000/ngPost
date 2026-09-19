@@ -165,6 +165,12 @@ private:
     inline void _error(const char *aMsg) const;        //!< log function for char *
     inline void _error(const std::string &aMsg) const; //!< log function for std::string
 
+    void _handlePostResponse(QByteArray &line);
+    void _handleArticleResponse(QByteArray &line);
+    bool _handleWelcome(QByteArray &line);
+    bool _handleAuthUser(QByteArray &line);
+    void _handleAuthPass(QByteArray &line);
+
     void _sendNextArticle();
     void _closeConnection(bool dropTransport = false);
     //! A transport close while an article is awaiting a definitive NNTP
