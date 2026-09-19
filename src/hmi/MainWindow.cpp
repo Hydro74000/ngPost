@@ -1407,6 +1407,46 @@ QWidget *MainWindow::_buildHistoryTab()
     QVBoxLayout *histLayout = new QVBoxLayout(histTab);
     histLayout->setContentsMargins(4, 4, 4, 4);
 
+    _buildHistoryFilters(histTab, histLayout);
+
+    // Splitter: table / detail panel
+    QSplitter *histSplitter = new QSplitter(Qt::Vertical, histTab);
+    histLayout->addWidget(histSplitter);
+
+    _buildHistoryTable(histSplitter);
+
+    _buildHistoryDetail(histSplitter);
+
+    QHBoxLayout *historyPageRow = new QHBoxLayout();
+    _histPrevPageBtn = new QPushButton(tr("Previous"), histTab);
+    _histNextPageBtn = new QPushButton(tr("Next"), histTab);
+    _histPageLabel = new QLabel(histTab);
+    _histPrevPageBtn->setEnabled(false);
+    _histNextPageBtn->setEnabled(false);
+    _histPageLabel->setAlignment(Qt::AlignCenter);
+    historyPageRow->addStretch();
+    historyPageRow->addWidget(_histPrevPageBtn);
+    historyPageRow->addWidget(_histPageLabel);
+    historyPageRow->addWidget(_histNextPageBtn);
+    historyPageRow->addStretch();
+    histLayout->addLayout(historyPageRow);
+
+    _innerHistoryTabs->addTab(histTab, tr("History"));
+
+    _buildHistoryStats();
+
+    _buildHistoryResume();
+
+    _connectHistoryControls();
+
+    // ===== Initial data load =====
+    _refreshHistoryViews();
+
+    return root;
+}
+
+void MainWindow::_buildHistoryFilters(QWidget *histTab, QVBoxLayout *histLayout)
+{
     // Filter row 1: search / status / password
     QHBoxLayout *filterRow1 = new QHBoxLayout();
     _historySearchEdit = new QLineEdit(histTab);
@@ -1472,11 +1512,10 @@ QWidget *MainWindow::_buildHistoryTab()
     filterRow2->addWidget(_histClearBtn);
     filterRow2->addStretch();
     histLayout->addLayout(filterRow2);
+}
 
-    // Splitter: table / detail panel
-    QSplitter *histSplitter = new QSplitter(Qt::Vertical, histTab);
-    histLayout->addWidget(histSplitter);
-
+void MainWindow::_buildHistoryTable(QSplitter *histSplitter)
+{
     // History table — 11 columns
     _historyTable = new QTableWidget(histSplitter);
     _historyTable->setObjectName(QStringLiteral("historyTable"));
@@ -1525,7 +1564,10 @@ QWidget *MainWindow::_buildHistoryTab()
     // Last, once the header is wired: widths kept from the previous run.
     _restoreHistoryColumns();
     histSplitter->addWidget(_historyTable);
+}
 
+void MainWindow::_buildHistoryDetail(QSplitter *histSplitter)
+{
     // Detail panel
     QWidget *detailPanel = new QWidget(histSplitter);
     QVBoxLayout *detailLayout = new QVBoxLayout(detailPanel);
@@ -1573,23 +1615,10 @@ QWidget *MainWindow::_buildHistoryTab()
     histSplitter->addWidget(detailPanel);
     histSplitter->setStretchFactor(0, 3);
     histSplitter->setStretchFactor(1, 1);
+}
 
-    QHBoxLayout *historyPageRow = new QHBoxLayout();
-    _histPrevPageBtn = new QPushButton(tr("Previous"), histTab);
-    _histNextPageBtn = new QPushButton(tr("Next"), histTab);
-    _histPageLabel = new QLabel(histTab);
-    _histPrevPageBtn->setEnabled(false);
-    _histNextPageBtn->setEnabled(false);
-    _histPageLabel->setAlignment(Qt::AlignCenter);
-    historyPageRow->addStretch();
-    historyPageRow->addWidget(_histPrevPageBtn);
-    historyPageRow->addWidget(_histPageLabel);
-    historyPageRow->addWidget(_histNextPageBtn);
-    historyPageRow->addStretch();
-    histLayout->addLayout(historyPageRow);
-
-    _innerHistoryTabs->addTab(histTab, tr("History"));
-
+void MainWindow::_buildHistoryStats()
+{
     // ===== Tab 1: Stats =====
     QWidget *statsTab = new QWidget(_innerHistoryTabs);
     QVBoxLayout *statsLayout = new QVBoxLayout(statsTab);
@@ -1650,7 +1679,10 @@ QWidget *MainWindow::_buildHistoryTab()
     _statsInnerTabs->addTab(_statsTopTable, tr("Top posts"));
 
     _innerHistoryTabs->addTab(statsTab, tr("Stats"));
+}
 
+void MainWindow::_buildHistoryResume()
+{
     // ===== Tab 2: Resume =====
     QWidget *resumeTab = new QWidget(_innerHistoryTabs);
     QVBoxLayout *resumeLayout = new QVBoxLayout(resumeTab);
@@ -1698,7 +1730,10 @@ QWidget *MainWindow::_buildHistoryTab()
     resumeLayout->addLayout(resumeActions);
 
     _innerHistoryTabs->addTab(resumeTab, tr("Resume"));
+}
 
+void MainWindow::_connectHistoryControls()
+{
     // ===== Connect signals =====
     auto refreshFirstHistoryPage = [this]() {
         _historyPageOffset = 0;
@@ -1762,11 +1797,6 @@ QWidget *MainWindow::_buildHistoryTab()
     connect(_bannerResumeBtn,     &QPushButton::clicked,  this, [this]() {
         _innerHistoryTabs->setCurrentIndex(2);
     });
-
-    // ===== Initial data load =====
-    _refreshHistoryViews();
-
-    return root;
 }
 
 void MainWindow::_refreshHistoryViews(bool rewindEmptyPage)

@@ -37,6 +37,8 @@ class PostingWidget;
 class AutoPostWidget;
 class QCheckBox;
 class QComboBox;
+class QVBoxLayout;
+class QSplitter;
 class QDateEdit;
 class QLabel;
 class QLineEdit;
@@ -359,6 +361,12 @@ private:
     //! Hide every VPN affordance where the platform has no VPN integration.
     void _applyVpnPlatformVisibility();
     void _initPostingBox();
+    void _buildHistoryFilters(QWidget *histTab, QVBoxLayout *histLayout);
+    void _buildHistoryTable(QSplitter *histSplitter);
+    void _buildHistoryDetail(QSplitter *histSplitter);
+    void _buildHistoryStats();
+    void _buildHistoryResume();
+    void _connectHistoryControls();
     QWidget *_buildHistoryTab();
     void     _retranslateHistoryTab();
     void _refreshHistoryViews(bool rewindEmptyPage = true);
