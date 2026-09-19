@@ -190,8 +190,9 @@ void TestYenc::worst_case_bound_is_never_exceeded_data()
     QTest::newRow("alternating escape/space") << alternating;
 
     QByteArray random(300000, '\0');
+    // Unsigned: i * 7919 overflows an int past i = 271 181.
     for (int i = 0; i < random.size(); ++i)
-        random[i] = static_cast<char>((i * 7919) & 0xFF);
+        random[i] = static_cast<char>((static_cast<unsigned>(i) * 7919u) & 0xFFu);
     QTest::newRow("pseudo random") << random;
 
     QTest::newRow("empty") << QByteArray();

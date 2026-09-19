@@ -685,6 +685,11 @@ NgPost::~NgPost()
 
     qDeleteAll(_nntpServers);
 
+    // Each ~QTranslator() takes itself off the application's list, installed
+    // or not. "en" maps to nullptr, and deleting that is a no-op.
+    qDeleteAll(_translators);
+    _translators.clear();
+
     if (_urlNzbUpload)
         delete _urlNzbUpload;
 

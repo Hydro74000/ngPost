@@ -1,8 +1,9 @@
 name: Code quality
 
-# Analyses no compiler runs: clang-tidy and cppcheck over the real compile
-# database of the GUI and headless builds. Not called by release.yml, so a push
-# runs it once.
+# What a plain build and test run cannot see: clang-tidy and cppcheck over the
+# real compile database of the GUI and headless builds, and the unit and
+# integration suites under AddressSanitizer and UndefinedBehaviorSanitizer.
+# Not called by release.yml, so a push runs it once.
 on:
   push:
   pull_request:
@@ -55,3 +56,77 @@ jobs:
 
       - name: Analyse
         run: bash .github/scripts/static-analysis.sh build/gui build/headless
+
+  sanitizers:
+    name: Unit and integration tests under ASan and UBSan
+    # The environment of the Linux jobs of unit-tests.yml and
+    # integration-tests.yml, so the per-binary floors of expected-counts.txt
+    # hold here too; only the build flags differ.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libsecret-1-dev bubblewrap
+
+      # tst_CliParser isolates the Qt TLS plugins with bwrap: see unit-tests.yml.
+      - name: Allow unprivileged user namespaces for bwrap
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: '6.8.2'
+          arch: 'linux_gcc_64'
+          modules: 'qtcharts'
+          cache: true
+
+      - name: Build QtKeychain
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
+                -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
+                -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build /tmp/qtkeychain/build -j"$(nproc)"
+          cmake --install /tmp/qtkeychain/build
+
+      # qmake's own sanitizer support. The ngPost binary the CLI and
+      # integration tests start is instrumented as well, so a leak or an
+      # overflow in the application fails the test that ran it.
+      - name: Build ngPost and the tests with sanitizers
+        run: |
+          flags=('CONFIG+=release' 'CONFIG+=sanitizer' 'CONFIG+=sanitize_address' 'CONFIG+=sanitize_undefined')
+          (cd src && qmake ngPost.pro "${flags[@]}" && make -j"$(nproc)")
+          (cd tests/unit && qmake unit.pro "${flags[@]}" && make -j"$(nproc)")
+          (cd tests/integration && qmake integration.pro "${flags[@]}" && make -j"$(nproc)")
+
+      - name: Bundle the pinned PAR2 tools
+        run: |
+          ./.github/scripts/fetch-par2-tools.sh "$RUNNER_TEMP/par2-tools"
+          echo "$RUNNER_TEMP/par2-tools" >> "$GITHUB_PATH"
+
+      # halt_on_error makes UBSan fatal like ASan, so a finding cannot pass as
+      # a warning in a green log. Leaks are reported at exit, where they turn
+      # the exit code non-zero.
+      - name: Run the tests
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost
+          QT_QPA_PLATFORM: offscreen
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          status=0
+          bash .github/scripts/run-qt-tests.sh tests/unit "unit" || status=1
+          bash .github/scripts/run-qt-tests.sh tests/integration "integration" || status=1
+          exit "$status"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sanitizer-test-logs
+          path: |
+            tests/unit/**/*.log
+            tests/integration/**/*.log
+          if-no-files-found: ignore
