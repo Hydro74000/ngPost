@@ -949,6 +949,51 @@ private:
     void _writeConfigServers(QTextStream &stream);
     void _writeConfigVpnProfiles(QTextStream &stream);
 
+    struct ConfigParseState;
+    bool _parseConfigTransferKey(const QString &opt, QString val, QString &err);
+    bool _parseConfigDisplayKey(const QString &opt, QString val);
+    bool _parseConfigVpnKey(const QString &opt, QString val, ConfigParseState &state);
+    bool _parseVpnProfileKey(const QString &opt, QString val, ConfigParseState &state);
+    bool _parseConfigNfoKey(const QString &opt, QString val);
+    bool _parseConfigArticleKey(const QString &opt, QString val);
+    bool _parseConfigIdentityKey(const QString &opt, QString val, QString &err);
+    bool _parseConfigPostInfoKey(const QString &opt, QString val, QString &err);
+    bool _parseConfigHistoryKey(const QString &opt, QString val, QString &err);
+#ifdef __USE_TMP_RAM__
+    bool _parseConfigRamKey(const QString &opt, QString val, QString &err);
+#endif
+    bool _parseConfigArchiveKey(const QString &opt,
+                                QString val,
+                                ConfigParseState &state,
+                                QString &err);
+    bool _parseConfigPackingKey(const QString &opt,
+                                QString val,
+                                ConfigParseState &state,
+                                QString &err);
+    bool _parseConfigPar2Key(const QString &opt,
+                             QString val,
+                             ConfigParseState &state,
+                             QString &err);
+    bool _parseServerKey(const QString &opt, QString val, ConfigParseState &state);
+    void _parseConfigKey(const QString &opt,
+                         const QString &val,
+                         ConfigParseState &state,
+                         QString &err);
+    void _readConfigToolPath(const QString &key,
+                             const QString &sourceKey,
+                             const QStringList &kinds,
+                             QString &tool,
+                             externaltool::PathMode &mode,
+                             QString &path,
+                             bool explicitMode,
+                             const QString &toolArgs,
+                             bool requested);
+    void _scanConfigLanguage(QFile &file);
+    void _readConfigFile(const QFileInfo &fileInfo, ConfigParseState &state, QString &err);
+    void _settleConfigToolNames(ConfigParseState &state);
+    bool _resolveConfigTools(const ConfigParseState &state);
+    void _validateConfigPar2Args(bool par2Requested);
+    void _applyConfigVpnProfiles(ConfigParseState &state);
     QString _parseConfig(const QString &configPath, bool isDefaultConfig = false);
     //! The value of the `obfuscate` config key for the current settings.
     QString _obfuscationKinds() const;

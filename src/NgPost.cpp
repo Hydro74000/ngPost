@@ -4012,6 +4012,645 @@ void NgPost::_applyPar2Fallback(bool announce)
                    .arg(par2Tool));
 }
 
+struct NgPost::ConfigParseState
+{
+    QList<VpnProfile> parsedVpnProfiles;
+    QString parsedActiveVpnProfile;
+    QString legacyVpnConfigPath;
+    QString legacyVpnBackend;
+    bool parsedPack = false;
+    bool legacyAutoCompress = false;
+    std::optional<QString> rarToolLine;
+    std::optional<QString> rarSourceLine;
+    std::optional<QString> par2ToolLine;
+    std::optional<QString> par2SourceLine;
+    NntpServerParams *serverParams = nullptr;
+    VpnProfile currentVpn;
+    bool inVpnProfile = false;
+};
+
+bool NgPost::_parseConfigTransferKey(const QString &opt, QString val, QString &err)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::THREAD]) {
+        int nb = val.toInt(&ok);
+        if (ok) {
+            if (nb < 1)
+                _nbThreads = 1;
+            else
+                _nbThreads = nb;
+        }
+    }
+    if (opt == sOptionNames[Opt::NZB_PATH]) {
+        if (val.isEmpty()) {
+            // Unset NZB_PATH: legitimate (use default current dir at post time)
+            _nzbPath.clear();
+            _nzbPathConf.clear();
+        } else {
+            QFileInfo nzbFI(val);
+            if (nzbFI.exists() && nzbFI.isDir() && nzbFI.isWritable()) {
+                _nzbPath = val;
+                _nzbPathConf = val;
+            } else
+                err += tr("the nzbPath '%1' is not writable...\n").arg(val);
+        }
+    } else if (opt == sOptionNames[Opt::NZB_UPLOAD_URL])
+        _setNzbUploadUrl(val, err);
+    else if (opt == sOptionNames[Opt::RESUME_WAIT]) {
+        ushort nb = val.toUShort(&ok);
+        if (ok && nb > sDefaultResumeWaitInSec)
+            _waitDurationBeforeAutoResume = nb;
+    } else if (opt == sOptionNames[Opt::NO_RESUME_AUTO]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _tryResumePostWhenConnectionLost = false;
+    } else if (opt == sOptionNames[Opt::PREPARE_PACKING]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _preparePacking = true;
+    } else if (opt == sOptionNames[Opt::SOCK_TIMEOUT]) {
+        int nb = val.toInt(&ok);
+        if (ok) {
+            int timeout = nb * 1000;
+            if (timeout > sMinSocketTimeOut)
+                _socketTimeOut = timeout;
+        }
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigDisplayKey(const QString &opt, QString val)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::MONITOR_FOLDERS]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _monitor_nzb_folders = true;
+    } else if (opt == sOptionNames[Opt::MONITOR_IGNORE_DIR]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _monitorIgnoreDir = true;
+    } else if (opt == sOptionNames[Opt::MONITOR_SEC_DELAY_SCAN]) {
+        int nb = val.toInt(&ok);
+        if (ok && nb > 1 && nb <= 120) {
+            _monitorSecDelayScan = static_cast<ushort>(nb);
+            FoldersMonitorForNewFiles::sMSleep = static_cast<ulong>(_monitorSecDelayScan) * 1000;
+        }
+    } else if (opt == sOptionNames[Opt::NZB_RM_ACCENTS]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _removeAccentsOnNzbFileName = true;
+    } else if (opt == sOptionNames[Opt::AUTO_CLOSE_TABS]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _autoCloseTabs = true;
+    } else if (opt == sOptionNames[Opt::CHECK_FOR_UPDATES]) {
+        val = val.toLower();
+        _checkForUpdates = (val == "true" || val == "on" || val == "1");
+    } else if (opt == sOptionNames[Opt::LAST_UPDATE_CHECK]) {
+        _lastUpdateCheckEpoch = val.toLongLong();
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigVpnKey(const QString &opt, QString val, ConfigParseState &state)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::VPN_AUTO_CONNECT]) {
+        val = val.toLower();
+        _vpnManager->setAutoConnect(val == "true" || val == "on" || val == "1");
+    } else if (opt == sOptionNames[Opt::VPN_ACTIVE_PROFILE]) {
+        state.parsedActiveVpnProfile = val;
+    } else if (opt == sOptionNames[Opt::VPN_LEASE_WAIT_MINUTES]) {
+        int minutes = val.toInt(&ok);
+        if (ok && minutes >= 0 && minutes <= 1440)
+            _vpnManager->setLeaseWaitMinutes(minutes);
+        else {
+            _vpnManager->setLeaseWaitMinutes(5);
+            _log(tr("Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5."));
+        }
+    } else if (opt == sOptionNames[Opt::VPN_RECOVERY_MAX_ATTEMPTS]) {
+        int attempts = val.toInt(&ok);
+        if (ok && attempts >= 0 && attempts <= 1000)
+            _vpnManager->setRecoveryMaxAttempts(attempts);
+        else {
+            _vpnManager->setRecoveryMaxAttempts(0);
+            _log(tr("Warning: VPN_RECOVERY_MAX_ATTEMPTS must be in 0..1000; using 0 (unlimited)."));
+        }
+    }
+    // Legacy single-profile keys (kept for migration only).
+    else if (opt == sOptionNames[Opt::VPN_BACKEND]) {
+        state.legacyVpnBackend = val;
+    } else if (opt == sOptionNames[Opt::VPN_CONFIG_PATH]) {
+        state.legacyVpnConfigPath = val;
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseVpnProfileKey(const QString &opt, QString val, ConfigParseState &state)
+{
+    // Inside [vpn_profile] block — these key names collide with
+    // server fields but we know we're in a vpn_profile context.
+    if (state.inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_NAME]) {
+        state.currentVpn.name = val;
+    } else if (state.inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_BACKEND]) {
+        bool backendOk = false;
+        VpnManager::Backend b = VpnManager::backendFromString(val, &backendOk);
+        if (backendOk)
+            state.currentVpn.backend = b;
+    } else if (state.inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_CONFIG_FILE]) {
+        state.currentVpn.configFileName = val;
+    } else if (state.inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_HAS_AUTH]) {
+        val = val.toLower();
+        state.currentVpn.hasAuth = (val == "true" || val == "on" || val == "1");
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigNfoKey(const QString &opt, QString val)
+{
+    if (opt == sOptionNames[Opt::KEEP_NFO_EXTENSION]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _keepNfoExtension = true;
+    } else if (opt == sOptionNames[Opt::NZB_COPY_NFO]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _copyNfoWithNzb = true;
+    } else if (opt == sOptionNames[Opt::AUTO_INCLUDE_NFO]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _autoIncludeNfo = true;
+    } else if (opt == sOptionNames[Opt::LOG_IN_FILE] && useHMI()) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1") {
+            // The configuration folder, on every platform. $HOME may be
+            // unset (a service, a container), which put the log at /ngPost.log,
+            // and the working directory of a GUI started from a shortcut
+            // is wherever the shortcut says.
+            QString const logFilePath = PathHelper::configDir() + QLatin1Char('/')
+                + sDefaultLogFile;
+
+            _logFile = new QFile(logFilePath);
+            if (_logFile->open(QIODevice::WriteOnly | QIODevice::Text)) {
+                _logStream = new QTextStream(_logFile);
+                _log(tr("ngPost starts logging: %1")
+                         .arg(QDateTime::currentDateTime().toString("yyyy/MM/dd hh:mm:ss")));
+            } else {
+                delete _logFile;
+                _logFile = nullptr;
+                _error(
+                    tr("Error opening log file: '%1'").arg(QDir::toNativeSeparators(logFilePath)));
+            }
+        }
+    } else if (opt == sOptionNames[Opt::MONITOR_EXT]) {
+        for (const QString &extension : val.split(","))
+            _monitorExtensions << extension.trimmed();
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigArticleKey(const QString &opt, QString val)
+{
+    if (opt == sOptionNames[Opt::OBFUSCATE]) {
+        // Historically a single word, and "article" was the only
+        // one understood. It is a list now, so that file name
+        // obfuscation -- until 5.6 reachable only from the GUI
+        // checkbox, and lost on every restart -- can be asked
+        // for in the configuration like everything else.
+        for (QString const &kind : val.toLower().split(QLatin1Char(','))) {
+            QString const what = kind.trimmed();
+            if (what.startsWith(QLatin1String("article"))) {
+                _obfuscateArticles = true;
+                qDebug() << "Do article obfuscation (the subject of each Article will be a UUID)\n";
+            } else if (what.startsWith(QLatin1String("filename"))
+                       || what.startsWith(QLatin1String("file_name"))
+                       || what.startsWith(QLatin1String("file name"))) {
+                _obfuscateFileName = true;
+                qDebug() << "Do file name obfuscation (the input files are renamed before "
+                            "compression)\n";
+            }
+        }
+    } else if (opt == sOptionNames[Opt::GROUP_POLICY]) {
+        val = val.toLower();
+        if (val == sGroupPolicies[GROUP_POLICY::EACH_POST]) {
+            _groupPolicy = GROUP_POLICY::EACH_POST;
+            if (_debug)
+                _log(tr("Group Policy: one group per Post"));
+        } else if (val == sGroupPolicies[GROUP_POLICY::EACH_FILE]) {
+            _groupPolicy = GROUP_POLICY::EACH_FILE;
+            if (_debug)
+                _log(tr("Group Policy: one group per File"));
+        }
+    } else if (opt == sOptionNames[Opt::DISP_PROGRESS]) {
+        val = val.toLower();
+        if (val == "bar") {
+            _dispProgressBar = true;
+            qDebug() << "Display progressbar bar\n";
+        } else if (val == "files") {
+            _dispFilesPosting = true;
+            qDebug() << "Display Files when start posting\n";
+        }
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigIdentityKey(const QString &opt, QString val, QString &err)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::MSG_ID]) {
+        sArticleIdSignature = val.toStdString();
+    } else if (opt == sOptionNames[Opt::ARTICLE_SIZE]) {
+        int nb = val.toInt(&ok);
+        if (ok && nb > 0)
+            sArticleSize = nb;
+        else
+            err += tr("ARTICLE_SIZE must be a positive integer") + QLatin1Char('\n');
+    } else if (opt == sOptionNames[Opt::NB_RETRY]) {
+        ushort nb = val.toUShort(&ok);
+        if (ok)
+            NntpArticle::setNbMaxRetry(nb);
+    } else if (opt == sOptionNames[Opt::FROM]) {
+        QRegularExpression email("\\w+@\\w+\\.\\w+");
+        if (!email.match(val).hasMatch())
+            val += "@ngPost.com";
+        val = escapeXML(val);
+        _from = val.toStdString();
+        _saveFrom = true;
+    } else if (opt == sOptionNames[Opt::GEN_FROM]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1") {
+            _genFrom = true;
+            if (_debug)
+                _cout << tr("Generate new random poster for each post") << "\n" << MB_FLUSH;
+        }
+    } else if (opt == sOptionNames[Opt::GROUPS])
+        updateGroups(val);
+
+    else if (opt == sOptionNames[Opt::LANG])
+        changeLanguage(val.toLower());
+
+    else if (opt == sOptionNames[Opt::SHUTDOWN_CMD])
+        _shutdownCmd = val;
+
+    else if (opt == sOptionNames[Opt::PROXY_SOCKS5]) {
+        QRegularExpression regExp(sProxyStrRegExp, QRegularExpression::CaseInsensitiveOption);
+        QRegularExpressionMatch match = regExp.match(val);
+        if (match.hasMatch()) {
+            _proxyUrl = val;
+            // "^(([^:]+):([^@]+)@)?([\\w\\.\\-_]+):(\\d+)$";
+            QString user = match.captured(2);
+            QString pass = match.captured(3);
+            QString host = match.captured(4);
+            ushort port = match.captured(5).toUShort();
+            _proxySocks5 = QNetworkProxy(QNetworkProxy::Socks5Proxy, host, port, user, pass);
+            QNetworkProxy::setApplicationProxy(_proxySocks5);
+        } else
+            err += tr("Error parsing Proxy Socks5 parameters. The syntax should be: %1")
+                       .arg(sProxyStrRegExp);
+
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigPostInfoKey(const QString &opt, QString val, QString &err)
+{
+    if (opt == sOptionNames[Opt::NZB_POST_CMD])
+        _nzbPostCmd << val;
+
+    else if (opt == sOptionNames[Opt::POST_INFO_TEMPLATE]) {
+        _postInfoTemplate = val;
+        _postInfoTemplateFromCli = false;
+    } else if (opt == sOptionNames[Opt::POST_INFO_OUTPUT]) {
+        if (val.trimmed().isEmpty())
+            err += tr("POST_INFO_OUTPUT can't be empty\n");
+        else {
+            _postInfoOutput = val;
+            _postInfoOutputFromCli = false;
+        }
+    } else if (opt == sOptionNames[Opt::POST_INFO_ONLY_ON_SUCCESS])
+        _postInfoOnlySuccess = (val.toLower() == "true");
+    else if (opt == sOptionNames[Opt::POST_CMD_TIMEOUT]) {
+        bool timeoutOk = false;
+        int nb = val.toInt(&timeoutOk);
+        if (timeoutOk && nb >= 0)
+            _postCmdTimeoutSec = nb;
+        else
+            err += tr("POST_CMD_TIMEOUT must be a number of seconds (0 = no limit)\n");
+    } else if (opt == sOptionNames[Opt::POST_CMD_FAIL_IS_ERROR])
+        _postCmdFailIsError = (val.toLower() == "true");
+    else if (opt == sOptionNames[Opt::POST_CMD_EXPOSE_PASSWORD])
+        _postCmdExposePassword = (val.toLower() == "true");
+    else if (opt == sOptionNames[Opt::NZB_UPLOAD_TIMEOUT]) {
+        bool timeoutOk = false;
+        int nb = val.toInt(&timeoutOk);
+        if (timeoutOk && nb >= 0)
+            _nzbUploadTimeoutSec = nb;
+        else
+            err += tr("NZB_UPLOAD_TIMEOUT must be a number of seconds (0 = no limit)\n");
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigHistoryKey(const QString &opt, QString val, QString &err)
+{
+    if (opt == sOptionNames[Opt::INPUT_DIR])
+        _inputDir = val;
+
+    else if (opt == sOptionNames[Opt::POST_HISTORY])
+        _setPostHistoryFile(val, err);
+
+    else if (opt == sOptionNames[Opt::FIELD_SEPARATOR])
+        _historyFieldSeparator = val;
+
+    else if (opt == sOptionNames[Opt::POST_DB])
+        _postDbFile = val;
+
+    else if (opt == sOptionNames[Opt::HISTORY_STORE_PASSWORDS])
+        _historyStorePasswords = val.toLower() == "true";
+    else
+        return false;
+    return true;
+}
+
+#ifdef __USE_TMP_RAM__
+bool NgPost::_parseConfigRamKey(const QString &opt, QString val, QString &err)
+{
+    bool ok = false;
+    // compression section
+
+    if (opt == sOptionNames[Opt::TMP_RAM]) {
+        _ramPath = val;
+        QFileInfo fi(_ramPath);
+        if (!fi.isDir())
+            err += QString("%1 %2\n")
+                       .arg(sOptionNames[Opt::TMP_RAM].toUpper())
+                       .arg(tr("should be a directory!..."));
+        else if (!fi.isWritable())
+            err += QString("%1 %2\n")
+                       .arg(sOptionNames[Opt::TMP_RAM].toUpper())
+                       .arg(tr("should be writable!..."));
+        else {
+            _storage = new QStorageInfo(_ramPath);
+
+            if (useHMI() || !_quiet)
+                _log(tr("Using RAM Storage %1, root: %2, type: %3, size: %4, available: %5")
+                         .arg(_ramPath)
+                         .arg(_storage->rootPath())
+                         .arg(QString(_storage->fileSystemType()))
+                         .arg(PostingJob::humanSize(static_cast<double>(_storage->bytesTotal())))
+                         .arg(PostingJob::humanSize(
+                             static_cast<double>(_storage->bytesAvailable()))));
+        }
+    } else if (opt == sOptionNames[Opt::TMP_RAM_RATIO]) {
+        double ratio = val.toDouble(&ok);
+        if (!ok || ratio < sRamRatioMin || ratio > sRamRatioMax)
+            err += QString("%1 %2\n")
+                       .arg(sOptionNames[Opt::TMP_RAM_RATIO].toUpper())
+                       .arg(tr("should be a ratio between %1 and %2")
+                                .arg(sRamRatioMin)
+                                .arg(sRamRatioMax));
+        else
+            _ramRatio = ratio;
+    } else
+        return false;
+    return true;
+}
+#endif
+
+bool NgPost::_parseConfigArchiveKey(const QString &opt,
+                                    QString val,
+                                    ConfigParseState &state,
+                                    QString &err)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::TMP_DIR])
+        _tmpPath = val;
+    else if (opt == sOptionNames[Opt::RAR_PATH])
+        _rarPathConfig = val;
+    else if (opt == sOptionNames[Opt::RAR_TOOL])
+        state.rarToolLine = val;
+    else if (opt == sOptionNames[Opt::RAR_SOURCE])
+        state.rarSourceLine = val;
+    else if (opt == sOptionNames[Opt::RAR_PASS]) {
+        _rarPassFixed = val;
+        _rarPass = val;
+    } else if (opt == sOptionNames[Opt::RAR_EXTRA])
+        _rarArgs = val;
+    else if (opt == sOptionNames[Opt::RAR_SIZE]) {
+        uint nb = val.toUInt(&ok);
+        if (ok)
+            _rarSize = nb;
+    } else if (opt == sOptionNames[Opt::RAR_MAX]) {
+        uint nb = val.toUInt(&ok);
+        if (!ok || nb == 0 || nb > uint(INT_MAX))
+            err += tr("RAR_MAX must be a positive integer no greater than 2147483647.")
+                + QLatin1Char('\n');
+        else {
+            _useRarMax = true;
+            _rarMax = nb;
+        }
+    } else if (opt == sOptionNames[Opt::KEEP_RAR]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1") {
+            _keepRar = true;
+            _keepRarDefault = true;
+        }
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigPackingKey(const QString &opt,
+                                    QString val,
+                                    ConfigParseState &state,
+                                    QString &err)
+{
+    if (opt == sOptionNames[Opt::AUTO_COMPRESS]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            state.legacyAutoCompress = true;
+        if (useHMI())
+            _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click "
+                    "SAVE to update your conf and then go check it."));
+        else if (!_quiet)
+            _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please refer to "
+                    "the conf example: %1")
+                     .arg("https://github.com/Hydro74000/ngPost/blob/master/"
+                          "ngPost.conf.example#L140"));
+    } else if (opt == sOptionNames[Opt::PACK]) {
+        val = val.toLower();
+        state.parsedPack = true;
+        QStringList packKeywords = val.split(","), wrongKeywords, parsedKeywords,
+                    allowedKeywords = defaultPackKeywords();
+        for (auto it = packKeywords.cbegin(), itEnd = packKeywords.cend(); it != itEnd; ++it) {
+            QString keyWord = (*it).trimmed();
+            if (allowedKeywords.contains(keyWord))
+                parsedKeywords << keyWord;
+            else
+                wrongKeywords << keyWord.toUpper();
+        }
+
+        if (wrongKeywords.size())
+            err += tr("Wrong keywords for PACK: %1. It should be a subset of (%2)")
+                       .arg(wrongKeywords.join(", "), allowedKeywords.join(", ").toUpper());
+        else {
+            _packAutoKeywords = parsedKeywords;
+            if (useHMI())
+                enableAutoPacking();
+        }
+    } else if (opt == sOptionNames[Opt::RAR_NO_ROOT_FOLDER]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _rarNoRootFolder = true;
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigPar2Key(const QString &opt,
+                                 QString val,
+                                 ConfigParseState &state,
+                                 QString &err)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::PAR2_PCT]) {
+        uint nb = val.toUInt(&ok);
+        if (ok) {
+            _par2Pct = nb;
+            _par2PctDefault = nb;
+        }
+    } else if (opt == sOptionNames[Opt::PAR2_TOOL])
+        state.par2ToolLine = val;
+    else if (opt == sOptionNames[Opt::PAR2_PATH])
+        _par2PathConfig = val;
+    else if (opt == sOptionNames[Opt::PAR2_SOURCE])
+        state.par2SourceLine = val;
+    else if (opt == sOptionNames[Opt::PAR2_ARGS_CUSTOM])
+        _par2ArgsCustom = val;
+    else if (opt == sOptionNames[Opt::PAR2_ARGS])
+        _par2Args = val;
+    else if (opt == sOptionNames[Opt::PAR2_BLOCK_SIZE]) {
+        qint64 nb = val.toLongLong(&ok);
+        if (ok && nb > 0)
+            _par2BlockSize = nb;
+        else
+            err += QString("%1 %2\n")
+                       .arg(sOptionNames[Opt::PAR2_BLOCK_SIZE].toUpper())
+                       .arg(tr("should be a positive number of bytes!..."));
+    } else if (opt == sOptionNames[Opt::LENGTH_NAME]) {
+        uint nb = val.toUInt(&ok);
+        if (ok)
+            _lengthName = nb;
+    } else if (opt == sOptionNames[Opt::LENGTH_PASS]) {
+        uint nb = val.toUInt(&ok);
+        if (ok)
+            _lengthPass = _lengthPassDefault = nb;
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseServerKey(const QString &opt, QString val, ConfigParseState &state)
+{
+    bool ok = false;
+
+    // Server Section under
+    // state.serverParams is set for each of these keys: the block
+    // above creates it for any key of topLevelServerKeys(),
+    // which lists exactly this section.
+    // NOLINTBEGIN(clang-analyzer-core.NullDereference,clang-analyzer-core.CallAndMessage)
+    if (opt == sOptionNames[Opt::HOST]) {
+        state.serverParams->host = val;
+    } else if (opt == sOptionNames[Opt::PORT]) {
+        ushort nb = val.toUShort(&ok);
+        if (ok)
+            state.serverParams->port = nb;
+
+    } else if (opt == sOptionNames[Opt::SSL]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1") {
+            state.serverParams->useSSL = true;
+            if (state.serverParams->port == NntpServerParams::sDefaultPort)
+                state.serverParams->port = NntpServerParams::sDefaultSslPort;
+        }
+    } else if (opt == sOptionNames[Opt::ENABLED]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            state.serverParams->enabled = true;
+        else
+            state.serverParams->enabled = false;
+    } else if (opt == sOptionNames[Opt::NZBCHECK]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            state.serverParams->nzbCheck = true;
+        else
+            state.serverParams->nzbCheck = false;
+    } else if (opt == sOptionNames[Opt::SERVER_USE_VPN].toLower()) {
+        val = val.toLower();
+        state.serverParams->useVpn = (val == "true" || val == "on" || val == "1");
+    } else if (opt == sOptionNames[Opt::USER]) {
+        state.serverParams->user = val.toStdString();
+        state.serverParams->auth = true;
+    } else if (opt == sOptionNames[Opt::PASS]) {
+        state.serverParams->pass = val.toStdString();
+        state.serverParams->auth = true;
+    } else if (opt == sOptionNames[Opt::CONNECTION]) {
+        int nb = val.toInt(&ok);
+        if (ok)
+            state.serverParams->nbCons = nb;
+    }
+    // NOLINTEND(clang-analyzer-core.NullDereference,clang-analyzer-core.CallAndMessage)
+    else
+        return false;
+    return true;
+}
+
+void NgPost::_parseConfigKey(const QString &opt,
+                             const QString &val,
+                             ConfigParseState &state,
+                             QString &err)
+{
+    if (_parseConfigTransferKey(opt, val, err))
+        return;
+    if (_parseConfigDisplayKey(opt, val))
+        return;
+    if (_parseConfigVpnKey(opt, val, state))
+        return;
+    if (_parseVpnProfileKey(opt, val, state))
+        return;
+    if (_parseConfigNfoKey(opt, val))
+        return;
+    if (_parseConfigArticleKey(opt, val))
+        return;
+    if (_parseConfigIdentityKey(opt, val, err))
+        return;
+    if (_parseConfigPostInfoKey(opt, val, err))
+        return;
+    if (_parseConfigHistoryKey(opt, val, err))
+        return;
+#ifdef __USE_TMP_RAM__
+    if (_parseConfigRamKey(opt, val, err))
+        return;
+#endif
+    if (_parseConfigArchiveKey(opt, val, state, err))
+        return;
+    if (_parseConfigPackingKey(opt, val, state, err))
+        return;
+    if (_parseConfigPar2Key(opt, val, state, err))
+        return;
+    if (_parseServerKey(opt, val, state))
+        return;
+}
+
 QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
 {
     QString err;
@@ -4032,18 +4671,8 @@ QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
     if (_vpnManager)
         vpnSignalsWereBlocked = _vpnManager->blockSignals(true);
 
-    // Phase 4 — collected during parse, applied to VpnManager at end.
-    // clang-format off
-    QList<VpnProfile> parsedVpnProfiles;
-    QString           parsedActiveVpnProfile;
-    QString           legacyVpnConfigPath;
-    QString           legacyVpnBackend;
-    bool              parsedPack = false;
-    bool              legacyAutoCompress = false;
-    // clang-format on
+    ConfigParseState state;
 
-    // The tool lines are settled once the whole file is read: see readPath below.
-    std::optional<QString> rarToolLine, rarSourceLine, par2ToolLine, par2SourceLine;
     _par2ArgsCustom.clear();
     _par2ToolFallback = par2::Tool::Auto;
     _par2PathConfig.clear();
@@ -4066,897 +4695,23 @@ QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
         }
     }
 
-    QFile file(fileInfo.absoluteFilePath());
-    if (file.open(QIODevice::ReadOnly))
-    {
-        NntpServerParams *serverParams = nullptr;
-        VpnProfile        currentVpn;
-        currentVpn.configBaseDir = _loadedConfigDir;
-        bool              inVpnProfile = false;
-        auto flushVpnProfile = [&]() {
-            if (inVpnProfile && currentVpn.isValid())
-                parsedVpnProfiles << currentVpn;
-            currentVpn   = VpnProfile();
-            currentVpn.configBaseDir = _loadedConfigDir;
-            inVpnProfile = false;
-        };
-        // Settle the language before the main loop emits anything. Parsing is
-        // single pass, so a LANG line placed low in the file used to leave
-        // every diagnostic above it in English -- which is exactly the file
-        // layout a translated user ends up with. One cheap scan, then rewind.
-        {
-            QTextStream langScan(&file);
-            while (!langScan.atEnd()) {
-                QString const scanned = langScan.readLine().trimmed();
-                if (scanned.isEmpty() || scanned.startsWith('#') || scanned.startsWith('/'))
-                    continue;
-                int const eq = scanned.indexOf('=');
-                if (eq < 0)
-                    continue;
-                if (scanned.left(eq).trimmed().toLower() == sOptionNames[Opt::LANG]) {
-                    changeLanguage(scanned.mid(eq + 1).trimmed().toLower());
-                    break;
-                }
-            }
-            file.seek(0);
-        }
+    _readConfigFile(fileInfo, state, err);
 
-        QTextStream stream(&file);
-        while (!stream.atEnd())
-        {
-            QString line = stream.readLine().trimmed();
-            // saveConfig keeps the inactive GUI limit as #RAR_MAX = N. Read
-            // that preference without enabling it; an active key always wins.
-            if (!_useRarMax && line.startsWith(QStringLiteral("#RAR_MAX"), Qt::CaseInsensitive)) {
-                const int equal = line.indexOf('=');
-                if (equal > 0 && line.left(equal).trimmed().compare(QStringLiteral("#RAR_MAX"), Qt::CaseInsensitive) == 0) {
-                    bool ok = false;
-                    const uint maximum = line.mid(equal + 1).trimmed().toUInt(&ok);
-                    if (ok && maximum > 0 && maximum <= uint(INT_MAX)) _rarMax = maximum;
-                }
-            }
-            if (line.isEmpty() || line.startsWith('#') || line.startsWith('/'))
-                continue;
-            else if (line == "[server]")
-            {
-                flushVpnProfile();
-                serverParams = new NntpServerParams();
-                _nntpServers << serverParams;
-            }
-            else if (line == "[vpn_profile]")
-            {
-                flushVpnProfile();
-                serverParams = nullptr;
-                inVpnProfile = true;
-                currentVpn   = VpnProfile();
-                currentVpn.configBaseDir = _loadedConfigDir;
-            }
-            else
-            {
-                const int equalIdx = line.indexOf('=');
-                if (equalIdx > 0)
-                {
-                    QString opt = line.left(equalIdx).trimmed().toLower(),
-                            val = line.mid(equalIdx + 1).trimmed();
-                    bool ok = false;
+    _settleConfigToolNames(state);
 
-                    // Those keys still parse, but no block ever created the
-                    // object they write into -- so a file written that way used
-                    // to crash here on a null pointer. Give them the server
-                    // they imply.
-                    if (!serverParams && topLevelServerKeys().contains(opt)) {
-                        serverParams = new NntpServerParams();
-                        _nntpServers << serverParams;
-                    }
+    const bool par2Requested = _resolveConfigTools(state);
 
-                    if (opt == sOptionNames[Opt::THREAD])
-                    {
-                        int nb = val.toInt(&ok);
-                        if (ok)
-                        {
-                            if (nb < 1)
-                                _nbThreads = 1;
-                            else
-                                _nbThreads = nb;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::NZB_PATH])
-                    {
-                        if (val.isEmpty())
-                        {
-                            // Unset NZB_PATH: legitimate (use default current dir at post time)
-                            _nzbPath.clear();
-                            _nzbPathConf.clear();
-                        }
-                        else
-                        {
-                            QFileInfo nzbFI(val);
-                            if (nzbFI.exists() && nzbFI.isDir() && nzbFI.isWritable())
-                            {
-                                _nzbPath     = val;
-                                _nzbPathConf = val;
-                            }
-                            else
-                                err += tr("the nzbPath '%1' is not writable...\n").arg(val);
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::NZB_UPLOAD_URL])
-                        _setNzbUploadUrl(val, err);
-                    else if (opt == sOptionNames[Opt::RESUME_WAIT])
-                    {
-                        ushort nb = val.toUShort(&ok);
-                        if (ok && nb > sDefaultResumeWaitInSec)
-                            _waitDurationBeforeAutoResume = nb;
-                    }
-                    else if (opt == sOptionNames[Opt::NO_RESUME_AUTO])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _tryResumePostWhenConnectionLost = false;
-                    }
-                    else if (opt == sOptionNames[Opt::PREPARE_PACKING])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _preparePacking = true;
-                    }
-                    else if (opt == sOptionNames[Opt::SOCK_TIMEOUT])
-                    {
-                        int nb = val.toInt(&ok);
-                        if (ok)
-                        {
-                            int timeout = nb *1000;
-                            if (timeout > sMinSocketTimeOut)
-                                _socketTimeOut = timeout;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::MONITOR_FOLDERS])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _monitor_nzb_folders = true;
-                    }
-                    else if (opt == sOptionNames[Opt::MONITOR_IGNORE_DIR])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _monitorIgnoreDir = true;
-                    }
-                    else if (opt == sOptionNames[Opt::MONITOR_SEC_DELAY_SCAN])
-                    {
-                        int nb = val.toInt(&ok);
-                        if (ok && nb > 1 && nb <= 120) {
-                            _monitorSecDelayScan = static_cast<ushort>(nb);
-                            FoldersMonitorForNewFiles::sMSleep = static_cast<ulong>(
-                                                                     _monitorSecDelayScan)
-                                * 1000;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::NZB_RM_ACCENTS])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _removeAccentsOnNzbFileName = true;
-                    }
-                    else if (opt == sOptionNames[Opt::AUTO_CLOSE_TABS])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _autoCloseTabs = true;
-                    }
-                    else if (opt == sOptionNames[Opt::CHECK_FOR_UPDATES])
-                    {
-                        val = val.toLower();
-                        _checkForUpdates = (val == "true" || val == "on" || val == "1");
-                    }
-                    else if (opt == sOptionNames[Opt::LAST_UPDATE_CHECK])
-                    {
-                        _lastUpdateCheckEpoch = val.toLongLong();
-                    }
-                    else if (opt == sOptionNames[Opt::VPN_AUTO_CONNECT])
-                    {
-                        val = val.toLower();
-                        _vpnManager->setAutoConnect(val == "true" || val == "on" || val == "1");
-                    }
-                    else if (opt == sOptionNames[Opt::VPN_ACTIVE_PROFILE])
-                    {
-                        parsedActiveVpnProfile = val;
-                    }
-                    else if (opt == sOptionNames[Opt::VPN_LEASE_WAIT_MINUTES])
-                    {
-                        int minutes = val.toInt(&ok);
-                        if (ok && minutes >= 0 && minutes <= 1440)
-                            _vpnManager->setLeaseWaitMinutes(minutes);
-                        else {
-                            _vpnManager->setLeaseWaitMinutes(5);
-                            _log(tr("Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5."));
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::VPN_RECOVERY_MAX_ATTEMPTS])
-                    {
-                        int attempts = val.toInt(&ok);
-                        if (ok && attempts >= 0 && attempts <= 1000)
-                            _vpnManager->setRecoveryMaxAttempts(attempts);
-                        else {
-                            _vpnManager->setRecoveryMaxAttempts(0);
-                            _log(tr("Warning: VPN_RECOVERY_MAX_ATTEMPTS must be in 0..1000; using 0 (unlimited)."));
-                        }
-                    }
-                    // Legacy single-profile keys (kept for migration only).
-                    else if (opt == sOptionNames[Opt::VPN_BACKEND])
-                    {
-                        legacyVpnBackend = val;
-                    }
-                    else if (opt == sOptionNames[Opt::VPN_CONFIG_PATH])
-                    {
-                        legacyVpnConfigPath = val;
-                    }
-                    // Inside [vpn_profile] block — these key names collide with
-                    // server fields but we know we're in a vpn_profile context.
-                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_NAME])
-                    {
-                        currentVpn.name = val;
-                    }
-                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_BACKEND])
-                    {
-                        bool backendOk = false;
-                        VpnManager::Backend b = VpnManager::backendFromString(val, &backendOk);
-                        if (backendOk)
-                            currentVpn.backend = b;
-                    }
-                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_CONFIG_FILE])
-                    {
-                        currentVpn.configFileName = val;
-                    }
-                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_HAS_AUTH])
-                    {
-                        val = val.toLower();
-                        currentVpn.hasAuth =
-                            (val == "true" || val == "on" || val == "1");
-                    }
-                    else if (opt == sOptionNames[Opt::KEEP_NFO_EXTENSION])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _keepNfoExtension = true;
-                    }
-                    else if (opt == sOptionNames[Opt::NZB_COPY_NFO])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _copyNfoWithNzb = true;
-                    }
-                    else if (opt == sOptionNames[Opt::AUTO_INCLUDE_NFO])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _autoIncludeNfo = true;
-                    }
-                    else if (opt == sOptionNames[Opt::LOG_IN_FILE] && useHMI())
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                        {
-                            // The configuration folder, on every platform. $HOME may be
-                            // unset (a service, a container), which put the log at /ngPost.log,
-                            // and the working directory of a GUI started from a shortcut
-                            // is wherever the shortcut says.
-                            QString const logFilePath = PathHelper::configDir() + QLatin1Char('/')
-                                + sDefaultLogFile;
-
-                            _logFile = new QFile(logFilePath);
-                            if (_logFile->open(QIODevice::WriteOnly|QIODevice::Text))
-                            {
-                                _logStream = new QTextStream(_logFile);
-                                _log(tr("ngPost starts logging: %1").arg(QDateTime::currentDateTime().toString("yyyy/MM/dd hh:mm:ss")));
-                            }
-                            else
-                            {
-                                delete _logFile;
-                                _logFile = nullptr;
-                                _error(tr("Error opening log file: '%1'")
-                                           .arg(QDir::toNativeSeparators(logFilePath)));
-                            }
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::MONITOR_EXT])
-                    {
-                        for (const QString &extension : val.split(","))
-                            _monitorExtensions << extension.trimmed();
-                    }
-                    else if (opt == sOptionNames[Opt::OBFUSCATE])
-                    {
-                        // Historically a single word, and "article" was the only
-                        // one understood. It is a list now, so that file name
-                        // obfuscation -- until 5.6 reachable only from the GUI
-                        // checkbox, and lost on every restart -- can be asked
-                        // for in the configuration like everything else.
-                        for (QString const &kind : val.toLower().split(QLatin1Char(',')))
-                        {
-                            QString const what = kind.trimmed();
-                            if (what.startsWith(QLatin1String("article")))
-                            {
-                                _obfuscateArticles = true;
-                                qDebug() << "Do article obfuscation (the subject of each Article will be a UUID)\n";
-                            }
-                            else if (what.startsWith(QLatin1String("filename"))
-                                     || what.startsWith(QLatin1String("file_name"))
-                                     || what.startsWith(QLatin1String("file name")))
-                            {
-                                _obfuscateFileName = true;
-                                qDebug() << "Do file name obfuscation (the input files are renamed before compression)\n";
-                            }
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::GROUP_POLICY])
-                    {
-                        val = val.toLower();
-                        if (val == sGroupPolicies[GROUP_POLICY::EACH_POST])
-                        {
-                            _groupPolicy = GROUP_POLICY::EACH_POST;
-                            if (_debug)
-                                _log(tr("Group Policy: one group per Post"));
-                        }
-                        else if (val == sGroupPolicies[GROUP_POLICY::EACH_FILE])
-                        {
-                            _groupPolicy = GROUP_POLICY::EACH_FILE;
-                            if (_debug)
-                                _log(tr("Group Policy: one group per File"));
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::DISP_PROGRESS])
-                    {
-                        val = val.toLower();
-                        if (val == "bar")
-                        {
-                            _dispProgressBar = true;
-                            qDebug() << "Display progressbar bar\n";
-                        }
-                        else if (val == "files")
-                        {
-                            _dispFilesPosting = true;
-                            qDebug() << "Display Files when start posting\n";
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::MSG_ID])
-                    {
-                        sArticleIdSignature = val.toStdString();
-                    }
-                    else if (opt == sOptionNames[Opt::ARTICLE_SIZE])
-                    {
-                        int nb = val.toInt(&ok);
-                        if (ok && nb > 0)
-                            sArticleSize = nb;
-                        else
-                            err += tr("ARTICLE_SIZE must be a positive integer") + QLatin1Char('\n');
-                    }
-                    else if (opt == sOptionNames[Opt::NB_RETRY])
-                    {
-                        ushort nb = val.toUShort(&ok);
-                        if (ok)
-                            NntpArticle::setNbMaxRetry(nb);
-                    }
-                    else if (opt == sOptionNames[Opt::FROM])
-                    {
-                        QRegularExpression email("\\w+@\\w+\\.\\w+");
-                        if (!email.match(val).hasMatch())
-                            val += "@ngPost.com";
-                        val = escapeXML(val);
-                        _from = val.toStdString();
-                        _saveFrom = true;
-                    }
-                    else if (opt == sOptionNames[Opt::GEN_FROM])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                        {
-                            _genFrom = true;
-                            if (_debug)
-                                _cout << tr("Generate new random poster for each post") << "\n" << MB_FLUSH;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::GROUPS])
-                        updateGroups(val);
-
-                    else if (opt == sOptionNames[Opt::LANG])
-                        changeLanguage(val.toLower());
-
-                    else if (opt == sOptionNames[Opt::SHUTDOWN_CMD])
-                        _shutdownCmd = val;
-
-                    else if (opt == sOptionNames[Opt::PROXY_SOCKS5])
-                    {
-                        QRegularExpression regExp(sProxyStrRegExp,  QRegularExpression::CaseInsensitiveOption);
-                        QRegularExpressionMatch match = regExp.match(val);
-                        if (match.hasMatch())
-                        {
-                            _proxyUrl = val;
-                            // "^(([^:]+):([^@]+)@)?([\\w\\.\\-_]+):(\\d+)$";
-                            QString user  = match.captured(2);
-                            QString pass  = match.captured(3);
-                            QString host  = match.captured(4);
-                            ushort  port  = match.captured(5).toUShort();
-                            _proxySocks5 = QNetworkProxy(QNetworkProxy::Socks5Proxy, host, port, user, pass);
-                            QNetworkProxy::setApplicationProxy(_proxySocks5);
-                        }
-                        else
-                            err += tr("Error parsing Proxy Socks5 parameters. The syntax should be: %1").arg(sProxyStrRegExp);
-
-                    }
-
-                    else if (opt == sOptionNames[Opt::NZB_POST_CMD])
-                        _nzbPostCmd << val;
-
-                    else if (opt == sOptionNames[Opt::POST_INFO_TEMPLATE])
-                    {
-                        _postInfoTemplate        = val;
-                        _postInfoTemplateFromCli = false;
-                    }
-                    else if (opt == sOptionNames[Opt::POST_INFO_OUTPUT])
-                    {
-                        if (val.trimmed().isEmpty())
-                            err += tr("POST_INFO_OUTPUT can't be empty\n");
-                        else {
-                            _postInfoOutput = val;
-                            _postInfoOutputFromCli = false;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::POST_INFO_ONLY_ON_SUCCESS])
-                        _postInfoOnlySuccess = (val.toLower() == "true");
-                    else if (opt == sOptionNames[Opt::POST_CMD_TIMEOUT])
-                    {
-                        bool timeoutOk = false;
-                        int nb = val.toInt(&timeoutOk);
-                        if (timeoutOk && nb >= 0)
-                            _postCmdTimeoutSec = nb;
-                        else
-                            err += tr("POST_CMD_TIMEOUT must be a number of seconds (0 = no limit)\n");
-                    }
-                    else if (opt == sOptionNames[Opt::POST_CMD_FAIL_IS_ERROR])
-                        _postCmdFailIsError = (val.toLower() == "true");
-                    else if (opt == sOptionNames[Opt::POST_CMD_EXPOSE_PASSWORD])
-                        _postCmdExposePassword = (val.toLower() == "true");
-                    else if (opt == sOptionNames[Opt::NZB_UPLOAD_TIMEOUT])
-                    {
-                        bool timeoutOk = false;
-                        int nb = val.toInt(&timeoutOk);
-                        if (timeoutOk && nb >= 0)
-                            _nzbUploadTimeoutSec = nb;
-                        else
-                            err += tr("NZB_UPLOAD_TIMEOUT must be a number of seconds (0 = no limit)\n");
-                    }
-
-                    else if (opt == sOptionNames[Opt::INPUT_DIR])
-                        _inputDir = val;
-
-                    else if (opt == sOptionNames[Opt::POST_HISTORY])
-                        _setPostHistoryFile(val, err);
-
-                    else if (opt == sOptionNames[Opt::FIELD_SEPARATOR])
-                        _historyFieldSeparator = val;
-
-                    else if (opt == sOptionNames[Opt::POST_DB])
-                        _postDbFile = val;
-
-                    else if (opt == sOptionNames[Opt::HISTORY_STORE_PASSWORDS])
-                        _historyStorePasswords = val.toLower() == "true";
-
-                    // compression section
-
-#ifdef __USE_TMP_RAM__
-                    else if (opt == sOptionNames[Opt::TMP_RAM])
-                    {
-                        _ramPath = val;
-                        QFileInfo fi(_ramPath);
-                        if (!fi.isDir())
-                            err += QString("%1 %2\n").arg(sOptionNames[Opt::TMP_RAM].toUpper()).arg(tr("should be a directory!..."));
-                        else if (!fi.isWritable())
-                            err += QString("%1 %2\n").arg(sOptionNames[Opt::TMP_RAM].toUpper()).arg(tr("should be writable!..."));
-                        else
-                        {
-                            _storage = new QStorageInfo(_ramPath);
-
-                            if (useHMI() || !_quiet)
-                                _log(tr("Using RAM Storage %1, root: %2, type: %3, size: %4, available: %5").arg(
-                                         _ramPath).arg(
-                                         _storage->rootPath()).arg(
-                                         QString(_storage->fileSystemType())).arg(
-                                         PostingJob::humanSize(static_cast<double>(_storage->bytesTotal()))).arg(
-                                         PostingJob::humanSize(static_cast<double>(_storage->bytesAvailable()))));
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::TMP_RAM_RATIO])
-                    {
-                        double ratio = val.toDouble(&ok);
-                        if (!ok || ratio < sRamRatioMin || ratio > sRamRatioMax)
-                            err += QString("%1 %2\n").arg(
-                                        sOptionNames[Opt::TMP_RAM_RATIO].toUpper()).arg(
-                                        tr("should be a ratio between %1 and %2").arg(sRamRatioMin).arg(sRamRatioMax));
-                        else
-                            _ramRatio = ratio;
-                    }
-#endif
-                    else if (opt == sOptionNames[Opt::TMP_DIR])
-                        _tmpPath = val;
-                    else if (opt == sOptionNames[Opt::RAR_PATH])
-                        _rarPathConfig = val;
-                    else if (opt == sOptionNames[Opt::RAR_TOOL])
-                        rarToolLine = val;
-                    else if (opt == sOptionNames[Opt::RAR_SOURCE])
-                        rarSourceLine = val;
-                    else if (opt == sOptionNames[Opt::RAR_PASS])
-                    {
-                        _rarPassFixed = val;
-                        _rarPass      = val;
-                    }
-                    else if (opt == sOptionNames[Opt::RAR_EXTRA])
-                        _rarArgs = val;
-                    else if (opt == sOptionNames[Opt::RAR_SIZE])
-                    {
-                        uint nb = val.toUInt(&ok);
-                        if (ok)
-                            _rarSize = nb;
-                    }
-                    else if (opt == sOptionNames[Opt::RAR_MAX])
-                    {
-                        uint nb = val.toUInt(&ok);
-                        if (!ok || nb == 0 || nb > uint(INT_MAX))
-                            err += tr("RAR_MAX must be a positive integer no greater than 2147483647.") + QLatin1Char('\n');
-                        else
-                        {
-                            _useRarMax = true;
-                            _rarMax = nb;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::KEEP_RAR])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                        {
-                            _keepRar        = true;
-                            _keepRarDefault = true;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::AUTO_COMPRESS])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            legacyAutoCompress = true;
-                        if (useHMI())
-                            _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it."));
-                        else if (!_quiet)
-                            _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please refer to the conf example: %1").arg(
-                                     "https://github.com/Hydro74000/ngPost/blob/master/ngPost.conf.example#L140"));
-                    }
-                    else if (opt == sOptionNames[Opt::PACK])
-                    {
-                        val = val.toLower();
-                        parsedPack = true;
-                        QStringList packKeywords = val.split(","), wrongKeywords,
-                                parsedKeywords,
-                                allowedKeywords = defaultPackKeywords();
-                        for (auto it = packKeywords.cbegin(), itEnd = packKeywords.cend(); it != itEnd; ++it)
-                        {
-                            QString keyWord = (*it).trimmed();
-                            if (allowedKeywords.contains(keyWord))
-                                parsedKeywords << keyWord;
-                            else
-                                wrongKeywords << keyWord.toUpper();
-                        }
-
-                        if (wrongKeywords.size())
-                            err += tr("Wrong keywords for PACK: %1. It should be a subset of (%2)").arg(
-                                        wrongKeywords.join(", "), allowedKeywords.join(", ").toUpper());
-                        else
-                        {
-                            _packAutoKeywords = parsedKeywords;
-                            if (useHMI())
-                                enableAutoPacking();
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::RAR_NO_ROOT_FOLDER])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _rarNoRootFolder = true;
-                    }
-
-                    else if (opt == sOptionNames[Opt::PAR2_PCT])
-                    {
-                        uint nb = val.toUInt(&ok);
-                        if (ok)
-                        {
-                            _par2Pct = nb;
-                            _par2PctDefault = nb;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::PAR2_TOOL])
-                        par2ToolLine = val;
-                    else if (opt == sOptionNames[Opt::PAR2_PATH])
-                        _par2PathConfig = val;
-                    else if (opt == sOptionNames[Opt::PAR2_SOURCE])
-                        par2SourceLine = val;
-                    else if (opt == sOptionNames[Opt::PAR2_ARGS_CUSTOM])
-                        _par2ArgsCustom = val;
-                    else if (opt == sOptionNames[Opt::PAR2_ARGS])
-                        _par2Args = val;
-                    else if (opt == sOptionNames[Opt::PAR2_BLOCK_SIZE])
-                    {
-                        qint64 nb = val.toLongLong(&ok);
-                        if (ok && nb > 0)
-                            _par2BlockSize = nb;
-                        else
-                            err += QString("%1 %2\n").arg(sOptionNames[Opt::PAR2_BLOCK_SIZE].toUpper()).arg(tr("should be a positive number of bytes!..."));
-                    }
-                    else if (opt == sOptionNames[Opt::LENGTH_NAME])
-                    {
-                        uint nb = val.toUInt(&ok);
-                        if (ok)
-                            _lengthName = nb;
-                    }
-                    else if (opt == sOptionNames[Opt::LENGTH_PASS])
-                    {
-                        uint nb = val.toUInt(&ok);
-                        if (ok)
-                            _lengthPass = _lengthPassDefault = nb;
-                    }
-
-
-                    // Server Section under
-                    // serverParams is set for each of these keys: the block
-                    // above creates it for any key of topLevelServerKeys(),
-                    // which lists exactly this section.
-                    // NOLINTBEGIN(clang-analyzer-core.NullDereference,clang-analyzer-core.CallAndMessage)
-                    else if (opt == sOptionNames[Opt::HOST]) {
-                        serverParams->host = val;
-                    } else if (opt == sOptionNames[Opt::PORT]) {
-                        ushort nb = val.toUShort(&ok);
-                        if (ok)
-                            serverParams->port = nb;
-
-                    } else if (opt == sOptionNames[Opt::SSL]) {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                        {
-                            serverParams->useSSL = true;
-                            if (serverParams->port == NntpServerParams::sDefaultPort)
-                                serverParams->port = NntpServerParams::sDefaultSslPort;
-                        }
-                    } else if (opt == sOptionNames[Opt::ENABLED]) {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            serverParams->enabled = true;
-                        else
-                            serverParams->enabled = false;
-                    } else if (opt == sOptionNames[Opt::NZBCHECK]) {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            serverParams->nzbCheck = true;
-                        else
-                            serverParams->nzbCheck = false;
-                    } else if (opt == sOptionNames[Opt::SERVER_USE_VPN].toLower()) {
-                        val = val.toLower();
-                        serverParams->useVpn =
-                            (val == "true" || val == "on" || val == "1");
-                    } else if (opt == sOptionNames[Opt::USER]) {
-                        serverParams->user = val.toStdString();
-                        serverParams->auth = true;
-                    } else if (opt == sOptionNames[Opt::PASS]) {
-                        serverParams->pass = val.toStdString();
-                        serverParams->auth = true;
-                    } else if (opt == sOptionNames[Opt::CONNECTION]) {
-                        int nb = val.toInt(&ok);
-                        if (ok)
-                            serverParams->nbCons = nb;
-                    }
-                    // NOLINTEND(clang-analyzer-core.NullDereference,clang-analyzer-core.CallAndMessage)
-                }
-            }
-        }
-        // Flush any trailing [vpn_profile] block (no [section] header after it).
-        flushVpnProfile();
-        file.close();
-    }
-
-    // Checked once the whole file is read, like the paths they qualify: as for
-    // every key, the last line wins. A value that means nothing is reported and
-    // read as if the line were absent, but not in err (see readPath below).
-    if (rarToolLine) {
-        const QString rarTool = rarToolLine->trimmed().toLower();
-        if (rarTool == QLatin1String("rar") || rarTool == QLatin1String("7zip"))
-            _rarTool = rarTool;
-        else {
-            _error(tr("RAR_TOOL must be rar or 7zip."));
-            rarToolLine.reset();
-        }
-    }
-    if (par2ToolLine && !par2::parseTool(*par2ToolLine, _par2Tool))
-        _error(tr("PAR2_TOOL must be auto, parpar, par2cmdline or multipar."));
-    if (rarSourceLine && !externaltool::parseMode(*rarSourceLine, _rarPathMode)) {
-        _error(tr("RAR_SOURCE must be auto or custom."));
-        rarSourceLine.reset();
-    }
-    if (par2SourceLine && !externaltool::parseMode(*par2SourceLine, _par2PathMode)) {
-        _error(tr("PAR2_SOURCE must be auto or custom."));
-        par2SourceLine.reset();
-    }
-
-    // A missing tool is only worth saying when this configuration can use it:
-    // an install that never compresses or generates par2 would otherwise be
-    // told at every start about a tool it does not use. A post that asks for
-    // it later (the GUI boxes, --compress, --gen_par2) still gets the explicit
-    // message from PostingJob::_canCompress() and _canGenPar2().
-    bool const legacyPacking = legacyAutoCompress && !parsedPack;
-    bool const par2Requested = _par2Pct > 0 || _doPar2 || legacyPacking
-        || _packAutoKeywords.contains(sOptionNames[Opt::GEN_PAR2]);
-    bool const compressRequested = _doCompress || legacyPacking
-        || _packAutoKeywords.contains(sOptionNames[Opt::COMPRESS]);
-
-    // How a *_PATH line is read. With an explicit *_SOURCE, as written: a custom
-    // path never falls back to another executable. Without one, the configuration
-    // predates *_SOURCE: a bundled path (even of an old AppImage mount) becomes
-    // automatic discovery of that tool, an executable path stays custom, and a
-    // path that no longer exists falls back to automatic discovery, as PAR2_PATH
-    // always did. A line that does not do what it says is reported, but not in
-    // err: that stops ngPost, the very place where the settings get fixed.
-    auto readPath = [this](const QString &key,
-                           const QString &sourceKey,
-                           const QStringList &kinds,
-                           QString &tool,
-                           externaltool::PathMode &mode,
-                           QString &path,
-                           bool explicitMode,
-                           const QString &toolArgs,
-                           bool requested) {
-        if (path.isEmpty())
-            return;
-        if (explicitMode) {
-            if (mode == externaltool::PathMode::Automatic) {
-                _error(tr("Configuration: %1 is ignored because %2 = auto. Set %2 = custom to use "
-                          "this path.")
-                           .arg(key, sourceKey));
-                path.clear();
-            } else if (requested && !externaltool::executable(path))
-                _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
-                          "tool will stop before the transfer.")
-                           .arg(key, path));
-            return;
-        }
-        // The file name says which engine the line meant. It only matters when
-        // that engine can run the configured arguments: adopt it when they were
-        // written for it, or when it is installed. Otherwise auto detection
-        // stays, and builds the arguments for whichever engine it finds -- the
-        // bundle may well have lost that engine (ParPar is optional on Windows).
-        const auto adoptNamedEngine = [&](const QString &named) {
-            if (tool == QLatin1String("auto") && kinds.contains(named)
-                && (!toolArgs.isEmpty() || externaltool::resolve(named).available()))
-                tool = named;
-        };
-        const QString bundled = externaltool::bundledTool(path);
-        if (kinds.contains(bundled) && (tool == QLatin1String("auto") || tool == bundled)) {
-            adoptNamedEngine(bundled);
-            mode = externaltool::PathMode::Automatic;
-            path.clear();
-            return;
-        }
-        if (externaltool::executable(path)) {
-            mode = externaltool::PathMode::Custom;
-            return;
-        }
-        adoptNamedEngine(externaltool::toolForFile(path));
-        mode = externaltool::PathMode::Automatic;
-        if (requested) {
-            const QString found = externaltool::resolve(tool).path;
-            if (found.isEmpty())
-                _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
-                          "tool will stop before the transfer.")
-                           .arg(key, path));
-            else
-                _error(tr("Configuration: %1 = %2 is not an executable file; ngPost uses %3, found "
-                          "automatically, instead.")
-                           .arg(key, path, found));
-        }
-        // Keep legacy user paths, even when unavailable. Save them without a
-        // *_SOURCE line so a reload retains this fallback and can use the
-        // original executable again if it becomes available.
-    };
-    QString par2Tool = par2::toolName(_par2Tool);
-    readPath(QStringLiteral("PAR2_PATH"),
-             QStringLiteral("PAR2_SOURCE"),
-             { QStringLiteral("parpar"),
-               QStringLiteral("par2cmdline"),
-               QStringLiteral("multipar") },
-             par2Tool,
-             _par2PathMode,
-             _par2PathConfig,
-             par2SourceLine.has_value(),
-             par2ArgsInUse(),
-             par2Requested);
-    par2::parseTool(par2Tool, _par2Tool);
-    const QString rarNamed = externaltool::archiverForFile(_rarPathConfig);
-    if (!rarToolLine && !rarNamed.isEmpty()
-        && (!rarSourceLine || _rarPathMode == externaltool::PathMode::Custom))
-        _rarTool = rarNamed;
-    readPath(QStringLiteral("RAR_PATH"),
-             QStringLiteral("RAR_SOURCE"),
-             { QStringLiteral("rar"), QStringLiteral("7zip") },
-             _rarTool,
-             _rarPathMode,
-             _rarPathConfig,
-             rarSourceLine.has_value(),
-             _rarArgs,
-             compressRequested);
-    // The example configuration sets RAR_TOOL = rar next to a commented
-    // RAR_PATH = /usr/bin/7z: rar's switches would make 7-Zip fail every time.
-    if (_rarPathMode == externaltool::PathMode::Custom && !rarNamed.isEmpty()
-        && rarNamed != _rarTool) {
-        _error(tr("Configuration: RAR_TOOL = %1 does not match RAR_PATH = %2; %3 is used.")
-                   .arg(_rarTool, _rarPathConfig, rarNamed));
-        _rarTool = rarNamed;
-    }
-    _par2Path = externaltool::resolve(par2Tool, _par2PathMode, _par2PathConfig).path;
-    _rarPath = externaltool::resolve(_rarTool, _rarPathMode, _rarPathConfig).path;
-
-    // A custom line written for another engine cannot run: par2j reads
-    // /switches where the other two read -switches. Said here rather than at the
-    // par2 step, after the compression, with only the tool's own error to show.
-    if (par2Requested && !_par2ArgsCustom.isEmpty()) {
-        bool multiParStyle = false, otherStyle = false;
-        for (QString const &token : QProcess::splitCommand(_par2ArgsCustom)) {
-            multiParStyle = multiParStyle || token.startsWith(QLatin1Char('/'));
-            otherStyle = otherStyle || token.startsWith(QLatin1Char('-'));
-        }
-        bool const multiPar = par2ToolInUse() == par2::Tool::MultiPar;
-        if ((multiPar && otherStyle && !multiParStyle)
-            || (!multiPar && multiParStyle && !otherStyle))
-            _error(tr("Configuration: PAR2_ARGS_CUSTOM is written for another tool than %1, so the "
-                      "par2 step would fail. Comment that line out, or write it for %1.")
-                       .arg(par2::toolName(par2ToolInUse())));
-    }
+    _validateConfigPar2Args(par2Requested);
 
     // --par2_path replaces this choice for the run, and says so itself.
     _applyPar2Fallback(par2Requested && !_par2PathOnCommandLine);
 
-    if (legacyAutoCompress && !parsedPack)
-    {
+    if (state.legacyAutoCompress && !state.parsedPack) {
         _packAutoKeywords = defaultPackKeywords();
         enableAutoPacking();
     }
 
-    // Phase 4 — legacy single-profile config (VPN_BACKEND + VPN_CONFIG_PATH).
-    // Migrate it into a "Default" profile by copying the .ovpn/.conf into
-    // <configDir>/vpn/ if no [vpn_profile] block was found.
-    if (parsedVpnProfiles.isEmpty() && !legacyVpnConfigPath.isEmpty())
-    {
-        QFileInfo legacy(legacyVpnConfigPath);
-        if (legacy.exists() && legacy.isFile())
-        {
-            const QString vpnBase = QDir(_loadedConfigDir.isEmpty()
-                                             ? PathHelper::configDir()
-                                             : _loadedConfigDir)
-                                        .filePath(QStringLiteral("vpn"));
-            QDir().mkpath(vpnBase);
-            QString destName  = legacy.fileName();
-            QString destPath  = QDir(vpnBase).filePath(destName);
-            if (!QFile::exists(destPath))
-                QFile::copy(legacyVpnConfigPath, destPath);
-            VpnProfile p;
-            p.name           = QStringLiteral("Default");
-            bool ok = false;
-            VpnManager::Backend b = VpnManager::backendFromString(legacyVpnBackend, &ok);
-            p.backend        = ok ? b : VpnManager::Backend::OpenVPN;
-            p.configFileName = destName;
-            p.configBaseDir  = _loadedConfigDir;
-            p.hasAuth        = false; // legacy didn't track creds
-            parsedVpnProfiles << p;
-            parsedActiveVpnProfile = p.name;
-            if (useHMI() || !_quiet)
-                _log(tr("VPN: migrated legacy VPN_CONFIG_PATH into profile 'Default'"));
-        }
-    }
-
-    if (_vpnManager)
-        _vpnManager->setProfilesFromConfig(parsedVpnProfiles, parsedActiveVpnProfile);
+    _applyConfigVpnProfiles(state);
 
     if (err.isEmpty())
         _ensurePostHistoryHeader();
@@ -5473,9 +5228,8 @@ void NgPost::_dumpParams() const
 
 void NgPost::_showVersionASCII() const
 {
-    _cout << sNgPostASCII
-          << "                          v" << sVersion << "\n\n"
-          << PostingJob::sslSupportInfo()  << "\n"
+    _cout << sNgPostASCII << "                          v" << sVersion << "\n\n"
+          << PostingJob::sslSupportInfo() << "\n"
           << MB_FLUSH;
 }
 
@@ -6054,3 +5808,304 @@ const QString NgPost::sNgPostASCII = QString(
     "     |___|  /\\___  /|____|   \\____/____  > |__|\n"
     "          \\//_____/                    \\/\n"
     "             ---   b y   H y d r o   ---\n");
+
+void NgPost::_scanConfigLanguage(QFile &file)
+{
+    // Settle the language before the main loop emits anything. Parsing is
+    // single pass, so a LANG line placed low in the file used to leave
+    // every diagnostic above it in English -- which is exactly the file
+    // layout a translated user ends up with. One cheap scan, then rewind.
+    {
+        QTextStream langScan(&file);
+        while (!langScan.atEnd()) {
+            QString const scanned = langScan.readLine().trimmed();
+            if (scanned.isEmpty() || scanned.startsWith('#') || scanned.startsWith('/'))
+                continue;
+            int const eq = scanned.indexOf('=');
+            if (eq < 0)
+                continue;
+            if (scanned.left(eq).trimmed().toLower() == sOptionNames[Opt::LANG]) {
+                changeLanguage(scanned.mid(eq + 1).trimmed().toLower());
+                break;
+            }
+        }
+        file.seek(0);
+    }
+}
+
+
+void NgPost::_readConfigFile(const QFileInfo &fileInfo, ConfigParseState &state, QString &err)
+{
+    QFile file(fileInfo.absoluteFilePath());
+    if (file.open(QIODevice::ReadOnly)) {
+        state.currentVpn.configBaseDir = _loadedConfigDir;
+        auto flushVpnProfile = [&]() {
+            if (state.inVpnProfile && state.currentVpn.isValid())
+                state.parsedVpnProfiles << state.currentVpn;
+            state.currentVpn = VpnProfile();
+            state.currentVpn.configBaseDir = _loadedConfigDir;
+            state.inVpnProfile = false;
+        };
+        _scanConfigLanguage(file);
+
+        QTextStream stream(&file);
+        while (!stream.atEnd()) {
+            QString line = stream.readLine().trimmed();
+            // saveConfig keeps the inactive GUI limit as #RAR_MAX = N. Read
+            // that preference without enabling it; an active key always wins.
+            if (!_useRarMax && line.startsWith(QStringLiteral("#RAR_MAX"), Qt::CaseInsensitive)) {
+                const int equal = line.indexOf('=');
+                if (equal > 0
+                    && line.left(equal).trimmed().compare(QStringLiteral("#RAR_MAX"),
+                                                          Qt::CaseInsensitive)
+                        == 0) {
+                    bool ok = false;
+                    const uint maximum = line.mid(equal + 1).trimmed().toUInt(&ok);
+                    if (ok && maximum > 0 && maximum <= uint(INT_MAX))
+                        _rarMax = maximum;
+                }
+            }
+            if (line.isEmpty() || line.startsWith('#') || line.startsWith('/'))
+                continue;
+            else if (line == "[server]") {
+                flushVpnProfile();
+                state.serverParams = new NntpServerParams();
+                _nntpServers << state.serverParams;
+            } else if (line == "[vpn_profile]") {
+                flushVpnProfile();
+                state.serverParams = nullptr;
+                state.inVpnProfile = true;
+                state.currentVpn = VpnProfile();
+                state.currentVpn.configBaseDir = _loadedConfigDir;
+            } else {
+                const int equalIdx = line.indexOf('=');
+                if (equalIdx > 0) {
+                    QString opt = line.left(equalIdx).trimmed().toLower(),
+                            val = line.mid(equalIdx + 1).trimmed();
+
+                    // Those keys still parse, but no block ever created the
+                    // object they write into -- so a file written that way used
+                    // to crash here on a null pointer. Give them the server
+                    // they imply.
+                    if (!state.serverParams && topLevelServerKeys().contains(opt)) {
+                        state.serverParams = new NntpServerParams();
+                        _nntpServers << state.serverParams;
+                    }
+
+                    _parseConfigKey(opt, val, state, err);
+                }
+            }
+        }
+        // Flush any trailing [vpn_profile] block (no [section] header after it).
+        flushVpnProfile();
+        file.close();
+    }
+}
+
+
+void NgPost::_readConfigToolPath(const QString &key,
+                                 const QString &sourceKey,
+                                 const QStringList &kinds,
+                                 QString &tool,
+                                 externaltool::PathMode &mode,
+                                 QString &path,
+                                 bool explicitMode,
+                                 const QString &toolArgs,
+                                 bool requested)
+{
+    if (path.isEmpty())
+        return;
+    if (explicitMode) {
+        if (mode == externaltool::PathMode::Automatic) {
+            _error(tr("Configuration: %1 is ignored because %2 = auto. Set %2 = custom to use "
+                      "this path.")
+                       .arg(key, sourceKey));
+            path.clear();
+        } else if (requested && !externaltool::executable(path))
+            _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
+                      "tool will stop before the transfer.")
+                       .arg(key, path));
+        return;
+    }
+    // The file name says which engine the line meant. It only matters when
+    // that engine can run the configured arguments: adopt it when they were
+    // written for it, or when it is installed. Otherwise auto detection
+    // stays, and builds the arguments for whichever engine it finds -- the
+    // bundle may well have lost that engine (ParPar is optional on Windows).
+    const auto adoptNamedEngine = [&](const QString &named) {
+        if (tool == QLatin1String("auto") && kinds.contains(named)
+            && (!toolArgs.isEmpty() || externaltool::resolve(named).available()))
+            tool = named;
+    };
+    const QString bundled = externaltool::bundledTool(path);
+    if (kinds.contains(bundled) && (tool == QLatin1String("auto") || tool == bundled)) {
+        adoptNamedEngine(bundled);
+        mode = externaltool::PathMode::Automatic;
+        path.clear();
+        return;
+    }
+    if (externaltool::executable(path)) {
+        mode = externaltool::PathMode::Custom;
+        return;
+    }
+    adoptNamedEngine(externaltool::toolForFile(path));
+    mode = externaltool::PathMode::Automatic;
+    if (requested) {
+        const QString found = externaltool::resolve(tool).path;
+        if (found.isEmpty())
+            _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
+                      "tool will stop before the transfer.")
+                       .arg(key, path));
+        else
+            _error(tr("Configuration: %1 = %2 is not an executable file; ngPost uses %3, found "
+                      "automatically, instead.")
+                       .arg(key, path, found));
+    }
+    // Keep legacy user paths, even when unavailable. Save them without a
+    // *_SOURCE line so a reload retains this fallback and can use the
+    // original executable again if it becomes available.
+}
+
+void NgPost::_settleConfigToolNames(ConfigParseState &state)
+{
+    // Checked once the whole file is read, like the paths they qualify: as for
+    // every key, the last line wins. A value that means nothing is reported and
+    // read as if the line were absent, but not in err (see readPath below).
+    if (state.rarToolLine) {
+        const QString rarTool = state.rarToolLine->trimmed().toLower();
+        if (rarTool == QLatin1String("rar") || rarTool == QLatin1String("7zip"))
+            _rarTool = rarTool;
+        else {
+            _error(tr("RAR_TOOL must be rar or 7zip."));
+            state.rarToolLine.reset();
+        }
+    }
+    if (state.par2ToolLine && !par2::parseTool(*state.par2ToolLine, _par2Tool))
+        _error(tr("PAR2_TOOL must be auto, parpar, par2cmdline or multipar."));
+    if (state.rarSourceLine && !externaltool::parseMode(*state.rarSourceLine, _rarPathMode)) {
+        _error(tr("RAR_SOURCE must be auto or custom."));
+        state.rarSourceLine.reset();
+    }
+    if (state.par2SourceLine && !externaltool::parseMode(*state.par2SourceLine, _par2PathMode)) {
+        _error(tr("PAR2_SOURCE must be auto or custom."));
+        state.par2SourceLine.reset();
+    }
+}
+
+
+bool NgPost::_resolveConfigTools(const ConfigParseState &state)
+{
+    // A missing tool is only worth saying when this configuration can use it:
+    // an install that never compresses or generates par2 would otherwise be
+    // told at every start about a tool it does not use. A post that asks for
+    // it later (the GUI boxes, --compress, --gen_par2) still gets the explicit
+    // message from PostingJob::_canCompress() and _canGenPar2().
+    bool const legacyPacking = state.legacyAutoCompress && !state.parsedPack;
+    bool const par2Requested = _par2Pct > 0 || _doPar2 || legacyPacking
+        || _packAutoKeywords.contains(sOptionNames[Opt::GEN_PAR2]);
+    bool const compressRequested = _doCompress || legacyPacking
+        || _packAutoKeywords.contains(sOptionNames[Opt::COMPRESS]);
+
+    // How a *_PATH line is read. With an explicit *_SOURCE, as written: a custom
+    // path never falls back to another executable. Without one, the configuration
+    // predates *_SOURCE: a bundled path (even of an old AppImage mount) becomes
+    // automatic discovery of that tool, an executable path stays custom, and a
+    // path that no longer exists falls back to automatic discovery, as PAR2_PATH
+    // always did. A line that does not do what it says is reported, but not in
+    // err: that stops ngPost, the very place where the settings get fixed.
+    QString par2Tool = par2::toolName(_par2Tool);
+    _readConfigToolPath(QStringLiteral("PAR2_PATH"),
+                        QStringLiteral("PAR2_SOURCE"),
+                        { QStringLiteral("parpar"),
+                          QStringLiteral("par2cmdline"),
+                          QStringLiteral("multipar") },
+                        par2Tool,
+                        _par2PathMode,
+                        _par2PathConfig,
+                        state.par2SourceLine.has_value(),
+                        par2ArgsInUse(),
+                        par2Requested);
+    par2::parseTool(par2Tool, _par2Tool);
+    const QString rarNamed = externaltool::archiverForFile(_rarPathConfig);
+    if (!state.rarToolLine && !rarNamed.isEmpty()
+        && (!state.rarSourceLine || _rarPathMode == externaltool::PathMode::Custom))
+        _rarTool = rarNamed;
+    _readConfigToolPath(QStringLiteral("RAR_PATH"),
+                        QStringLiteral("RAR_SOURCE"),
+                        { QStringLiteral("rar"), QStringLiteral("7zip") },
+                        _rarTool,
+                        _rarPathMode,
+                        _rarPathConfig,
+                        state.rarSourceLine.has_value(),
+                        _rarArgs,
+                        compressRequested);
+    // The example configuration sets RAR_TOOL = rar next to a commented
+    // RAR_PATH = /usr/bin/7z: rar's switches would make 7-Zip fail every time.
+    if (_rarPathMode == externaltool::PathMode::Custom && !rarNamed.isEmpty()
+        && rarNamed != _rarTool) {
+        _error(tr("Configuration: RAR_TOOL = %1 does not match RAR_PATH = %2; %3 is used.")
+                   .arg(_rarTool, _rarPathConfig, rarNamed));
+        _rarTool = rarNamed;
+    }
+    _par2Path = externaltool::resolve(par2Tool, _par2PathMode, _par2PathConfig).path;
+    _rarPath = externaltool::resolve(_rarTool, _rarPathMode, _rarPathConfig).path;
+
+    return par2Requested;
+}
+
+
+void NgPost::_validateConfigPar2Args(bool par2Requested)
+{
+    // A custom line written for another engine cannot run: par2j reads
+    // /switches where the other two read -switches. Said here rather than at the
+    // par2 step, after the compression, with only the tool's own error to show.
+    if (par2Requested && !_par2ArgsCustom.isEmpty()) {
+        bool multiParStyle = false, otherStyle = false;
+        for (QString const &token : QProcess::splitCommand(_par2ArgsCustom)) {
+            multiParStyle = multiParStyle || token.startsWith(QLatin1Char('/'));
+            otherStyle = otherStyle || token.startsWith(QLatin1Char('-'));
+        }
+        bool const multiPar = par2ToolInUse() == par2::Tool::MultiPar;
+        if ((multiPar && otherStyle && !multiParStyle)
+            || (!multiPar && multiParStyle && !otherStyle))
+            _error(tr("Configuration: PAR2_ARGS_CUSTOM is written for another tool than %1, so the "
+                      "par2 step would fail. Comment that line out, or write it for %1.")
+                       .arg(par2::toolName(par2ToolInUse())));
+    }
+}
+
+
+void NgPost::_applyConfigVpnProfiles(ConfigParseState &state)
+{
+    // Phase 4 — legacy single-profile config (VPN_BACKEND + VPN_CONFIG_PATH).
+    // Migrate it into a "Default" profile by copying the .ovpn/.conf into
+    // <configDir>/vpn/ if no [vpn_profile] block was found.
+    if (state.parsedVpnProfiles.isEmpty() && !state.legacyVpnConfigPath.isEmpty()) {
+        QFileInfo legacy(state.legacyVpnConfigPath);
+        if (legacy.exists() && legacy.isFile()) {
+            const QString vpnBase = QDir(_loadedConfigDir.isEmpty() ? PathHelper::configDir()
+                                                                    : _loadedConfigDir)
+                                        .filePath(QStringLiteral("vpn"));
+            QDir().mkpath(vpnBase);
+            QString destName = legacy.fileName();
+            QString destPath = QDir(vpnBase).filePath(destName);
+            if (!QFile::exists(destPath))
+                QFile::copy(state.legacyVpnConfigPath, destPath);
+            VpnProfile p;
+            p.name = QStringLiteral("Default");
+            bool ok = false;
+            VpnManager::Backend b = VpnManager::backendFromString(state.legacyVpnBackend, &ok);
+            p.backend = ok ? b : VpnManager::Backend::OpenVPN;
+            p.configFileName = destName;
+            p.configBaseDir = _loadedConfigDir;
+            p.hasAuth = false; // legacy didn't track creds
+            state.parsedVpnProfiles << p;
+            state.parsedActiveVpnProfile = p.name;
+            if (useHMI() || !_quiet)
+                _log(tr("VPN: migrated legacy VPN_CONFIG_PATH into profile 'Default'"));
+        }
+    }
+
+    if (_vpnManager)
+        _vpnManager->setProfilesFromConfig(state.parsedVpnProfiles, state.parsedActiveVpnProfile);
+}
