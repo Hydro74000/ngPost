@@ -26,3 +26,4 @@ doc/
 # every layer that follows the source copy.
 Dockerfile
 .dockerignore
+.hadolint.yaml

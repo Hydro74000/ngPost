@@ -41,6 +41,13 @@ RUN qmake6 CONFIG+=no_hmi /src/src/ngPost.pro \
 
 FROM debian:${DEBIAN_VERSION}
 
+# What registries show. "source" also links the ghcr.io package to its
+# repository; release.yml adds the version, the revision and the date.
+LABEL org.opencontainers.image.title="ngPost" \
+      org.opencontainers.image.description="Usenet poster, headless build, with par2cmdline and 7-Zip" \
+      org.opencontainers.image.source="https://github.com/Hydro74000/ngPost" \
+      org.opencontainers.image.documentation="https://github.com/Hydro74000/ngPost/wiki/Docker"
+
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
         libqt6core6t64 \

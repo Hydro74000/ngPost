@@ -1059,18 +1059,22 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      # The Dockerfile labels the source and the documentation; the release
+      # says which version, from which commit, built when.
       - name: Build the image
-        run: docker build --build-arg JOBS="$(nproc)" -t ngpost:release .
-
-      - name: It runs, and holds what it promises
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.package_version }}
         run: |
-          docker run --rm ngpost:release --version
-          docker run --rm --entrypoint sh ngpost:release -c '
-            set -e
-            command -v par2 >/dev/null || { echo "par2cmdline missing"; exit 1; }
-            command -v 7z   >/dev/null || { echo "7-Zip missing"; exit 1; }
-            ! ldd /usr/local/bin/ngPost | grep -E "libQt6Widgets|libQt6Gui|libX11"
-          '
+          docker build --build-arg JOBS="$(nproc)" \
+            --label org.opencontainers.image.version="$VERSION" \
+            --label org.opencontainers.image.revision="$GITHUB_SHA" \
+            --label org.opencontainers.image.created="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t ngpost:release .
+
+      # What docker.yml checks on every change, down to a real post, run on the
+      # very image pushed below: a tag cannot point at bytes that skipped it.
+      - name: Test the image
+        run: bash .github/scripts/test-docker-image.sh ngpost:release
 
       # No third-party action: the token this pushes with is the one GitHub
       # hands the job, and it never leaves the runner.
