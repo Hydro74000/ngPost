@@ -896,6 +896,75 @@ void PostingJob::_postFiles()
         _originalDirectory = fileDir.absolutePath();
     }
 
+    _copyNfoToArchive();
+
+    _collectPackedFiles();
+
+    if (!_initPosting()) {
+        _abortBeforeTransfer(_resumeFromHistory);
+        return;
+    }
+
+    if (_nbThreads > QThread::idealThreadCount())
+        _nbThreads = QThread::idealThreadCount();
+
+    int nbPosters = _nbThreads / 2, nbCon = _createNntpConnections();
+    if (nbPosters < 1)
+        nbPosters = 1;
+    if (!nbCon) {
+        _error(tr("Error: there are no NntpConnection..."));
+        _abortBeforeTransfer(_resumeFromHistory);
+        return;
+    }
+
+    if (!_nzb->open(QIODevice::WriteOnly)) {
+        _error(tr("Error: Can't create nzb output file: %1").arg(_nzbFilePath));
+        _abortBeforeTransfer(_resumeFromHistory);
+        return;
+    } else {
+        _writeNzbHeader();
+    }
+
+    // The transfer really starts here, which can be long after the job was
+    // created: it may have waited in the queue, and been packed meanwhile.
+    _timeStart.start();
+    _startedAtWall = QDateTime::currentDateTime();
+    if (_historyPostId && _ngPost->historyService()) {
+        QString err;
+        // Only now is the retry genuinely running: source validation,
+        // connections and NZB creation all succeeded. Until this point a
+        // refused resume leaves the previous terminal row exactly as it was.
+        if (_resumeFromHistory
+            && !_ngPost->historyService()->markPostResuming(_historyPostId, &err)) {
+            _historyDataUnreliable = true;
+            _warn(
+                tr("History: could not mark post %1 as resuming: %2").arg(_historyPostId).arg(err));
+        }
+        if (!_ngPost->historyService()->markPostStarted(_historyPostId, &err)) {
+            _historyDataUnreliable = true;
+            _warn(tr("History: could not record the start of post %1: %2")
+                      .arg(_historyPostId)
+                      .arg(err));
+        }
+    }
+
+    _startPosterThreads(nbPosters, nbCon);
+
+    // Prepare 2 Articles for each connections
+    _preparePostersArticles();
+
+#ifdef __COMPUTE_IMMEDIATE_SPEED__
+    _immediateSpeedTimer.start(NgPost::immediateSpeedDurationMs());
+#endif
+
+    for (Poster *poster : _posters)
+        poster->unlockQueue();
+
+    emit postingStarted();
+}
+
+void PostingJob::_copyNfoToArchive()
+{
     // keep nfo visible: copy any .nfo file into the archive folder so it is
     // posted alongside the rar volumes (named after the archive)
     if (_ngPost->_keepNfoExtension && _compressDir && _doCompress) {
@@ -925,7 +994,10 @@ void PostingJob::_postFiles()
                 _error(tr("Couldn't copy nfo %1 to %2").arg(srcPath, destPath));
         }
     }
+}
 
+void PostingJob::_collectPackedFiles()
+{
     // _compressDir exists whenever packing ran: startCompressFiles() and
     // startGenPar2() create it or fail the job, and a resumed post runs with
     // both options off (ResumePlanner). Testing it here instead would post the
@@ -968,82 +1040,41 @@ void PostingJob::_postFiles()
         }
         emit archiveFileNames(archiveNames);
     }
+}
 
-    if (!_initPosting()) {
-        _abortBeforeTransfer(_resumeFromHistory);
-        return;
+void PostingJob::_writeNzbHeader()
+{
+    const QString &tab = _ngPost->space();
+    _nzbStream.setDevice(_nzb);
+    _nzbStream << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+               << "<!DOCTYPE nzb PUBLIC \"-//newzBin//DTD NZB 1.1//EN\" "
+                  "\"http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd\">\n"
+               << "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n";
+
+    // Only the metadata the user chose to publish: an nzb circulates, and
+    // a portal link or a private note has no business travelling with it.
+    QMap<QString, MetaValue> publishedMeta;
+    for (auto it = _options.meta.cbegin(); it != _options.meta.cend(); ++it) {
+        if (it.value().scope == MetaScope::Nzb)
+            publishedMeta.insert(it.key(), it.value());
     }
+    const QString declaredPass = _rarPass.isEmpty() ? _options.declaredPassword : _rarPass;
 
-    if (_nbThreads > QThread::idealThreadCount())
-        _nbThreads = QThread::idealThreadCount();
-
-    int nbPosters = _nbThreads / 2, nbCon = _createNntpConnections();
-    if (nbPosters < 1)
-        nbPosters = 1;
-    if (!nbCon) {
-        _error(tr("Error: there are no NntpConnection..."));
-        _abortBeforeTransfer(_resumeFromHistory);
-        return;
+    if (!declaredPass.isEmpty() || !publishedMeta.isEmpty()) {
+        _nzbStream << tab << "<head>\n";
+        for (auto it = publishedMeta.cbegin(); it != publishedMeta.cend(); ++it)
+            _nzbStream << tab << tab << "<meta type=\"" << NgPost::escapeXML(it.key()) << "\">"
+                       << NgPost::escapeXML(it.value().value) << "</meta>\n";
+        if (!declaredPass.isEmpty())
+            _nzbStream << tab << tab << "<meta type=\"password\">"
+                       << NgPost::escapeXML(declaredPass) << "</meta>\n";
+        _nzbStream << tab << "</head>\n\n";
     }
+    _nzbStream << MB_FLUSH;
+}
 
-    if (!_nzb->open(QIODevice::WriteOnly)) {
-        _error(tr("Error: Can't create nzb output file: %1").arg(_nzbFilePath));
-        _abortBeforeTransfer(_resumeFromHistory);
-        return;
-    } else {
-        const QString &tab = _ngPost->space();
-        _nzbStream.setDevice(_nzb);
-        _nzbStream << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                   << "<!DOCTYPE nzb PUBLIC \"-//newzBin//DTD NZB 1.1//EN\" "
-                      "\"http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd\">\n"
-                   << "<nzb xmlns=\"http://www.newzbin.com/DTD/2003/nzb\">\n";
-
-        // Only the metadata the user chose to publish: an nzb circulates, and
-        // a portal link or a private note has no business travelling with it.
-        QMap<QString, MetaValue> publishedMeta;
-        for (auto it = _options.meta.cbegin(); it != _options.meta.cend(); ++it) {
-            if (it.value().scope == MetaScope::Nzb)
-                publishedMeta.insert(it.key(), it.value());
-        }
-        const QString declaredPass = _rarPass.isEmpty() ? _options.declaredPassword : _rarPass;
-
-        if (!declaredPass.isEmpty() || !publishedMeta.isEmpty()) {
-            _nzbStream << tab << "<head>\n";
-            for (auto it = publishedMeta.cbegin(); it != publishedMeta.cend(); ++it)
-                _nzbStream << tab << tab << "<meta type=\"" << NgPost::escapeXML(it.key()) << "\">"
-                           << NgPost::escapeXML(it.value().value) << "</meta>\n";
-            if (!declaredPass.isEmpty())
-                _nzbStream << tab << tab << "<meta type=\"password\">"
-                           << NgPost::escapeXML(declaredPass) << "</meta>\n";
-            _nzbStream << tab << "</head>\n\n";
-        }
-        _nzbStream << MB_FLUSH;
-    }
-
-    // The transfer really starts here, which can be long after the job was
-    // created: it may have waited in the queue, and been packed meanwhile.
-    _timeStart.start();
-    _startedAtWall = QDateTime::currentDateTime();
-    if (_historyPostId && _ngPost->historyService()) {
-        QString err;
-        // Only now is the retry genuinely running: source validation,
-        // connections and NZB creation all succeeded. Until this point a
-        // refused resume leaves the previous terminal row exactly as it was.
-        if (_resumeFromHistory
-            && !_ngPost->historyService()->markPostResuming(_historyPostId, &err)) {
-            _historyDataUnreliable = true;
-            _warn(tr("History: could not mark post %1 as resuming: %2")
-                      .arg(_historyPostId)
-                      .arg(err));
-        }
-        if (!_ngPost->historyService()->markPostStarted(_historyPostId, &err)) {
-            _historyDataUnreliable = true;
-            _warn(tr("History: could not record the start of post %1: %2")
-                      .arg(_historyPostId)
-                      .arg(err));
-        }
-    }
-
+void PostingJob::_startPosterThreads(int nbPosters, int nbCon)
+{
     //    QMutexLocker lock(&_secureArticles); // start the connections but they must wait _prepareArticles
 
     if (nbPosters > nbCon)
@@ -1072,18 +1103,6 @@ void PostingJob::_postFiles()
 
         poster->startThreads();
     }
-
-    // Prepare 2 Articles for each connections
-    _preparePostersArticles();
-
-#ifdef __COMPUTE_IMMEDIATE_SPEED__
-    _immediateSpeedTimer.start(NgPost::immediateSpeedDurationMs());
-#endif
-
-    for (Poster *poster : _posters)
-        poster->unlockQueue();
-
-    emit postingStarted();
 }
 
 void PostingJob::onStopPosting()

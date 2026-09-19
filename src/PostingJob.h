@@ -436,6 +436,10 @@ private:
     void _connectWidgetSignals();
 #endif
     void _createHistoryRecord();
+    void _copyNfoToArchive();
+    void _collectPackedFiles();
+    void _writeNzbHeader();
+    void _startPosterThreads(int nbPosters, int nbCon);
     void _postFiles();
     void _finishPosting();
 
