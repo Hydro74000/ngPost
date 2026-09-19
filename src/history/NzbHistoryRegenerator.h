@@ -29,6 +29,33 @@ public:
                   const QString &passwordOverride = QString());
 
 private:
+    bool _writeHeader(qint64 postId,
+                      const PostHistoryStore::PostDetails &details,
+                      QTextStream &stream,
+                      bool includePassword,
+                      QString *error,
+                      const QString &passwordOverride);
+    bool _writeFiles(const PostHistoryStore::PostDetails &details,
+                     QTextStream &stream,
+                     QStringList *warnings,
+                     QString *error);
+    bool _writeFile(const PostHistoryStore::PostDetails &details,
+                    const PostHistoryStore::FileSummary &file,
+                    QTextStream &stream,
+                    int padding,
+                    qint64 postFullArticleBytesHint,
+                    bool hasExactArticleSize,
+                    bool useBodyBytes,
+                    int &repairedArticleBytes,
+                    QStringList *warnings,
+                    QString *error);
+    void _writeSegments(const PostHistoryStore::FileSummary &file,
+                        const QList<PostHistoryStore::ArticleSummary> &articles,
+                        QTextStream &stream,
+                        qint64 fullArticleBytes,
+                        bool useBodyBytes,
+                        int &repairedArticleBytes);
+
     PostHistoryStore *_store;
 };
 
