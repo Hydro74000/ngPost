@@ -5479,6 +5479,486 @@ void NgPost::_showVersionASCII() const
           << MB_FLUSH;
 }
 
+void NgPost::_writeConfigGeneral(QTextStream &stream)
+{
+    // clang-format off
+    // One stream line per line of the file: the layout mirrors what is written.
+    stream << tr("# ngPost configuration file") << "\n"
+           << "#\n"
+           << "#\n"
+           << "\n"
+           << tr("## Lang for the app. Currently supported: EN, FR, ES, DE, NL, PT, ZH") << "\n"
+           << "lang = " << _lang.toUpper() << "\n"
+           << "\n"
+           << tr("## use Proxy (only Socks5 type!)") << "\n"
+           << (_proxyUrl.isEmpty()  ? "#PROXY_SOCKS5 = user:pass@192.168.1.1:5555" : _proxyUrl)  << "\n"
+           << "\n"
+           << tr("## destination folder for all your nzb") << "\n"
+           << tr("## if you don't put anything, the nzb will be generated in the folder of ngPost on Windows and in /tmp on Linux") << "\n"
+           << tr("## this will be overwritten if you use the option -o with the full path of the nzb") << "\n"
+           << "nzbPath  = " << (_nzbPath.isEmpty() ? _nzbPathConf : _nzbPath) << "\n"
+           << "\n"
+           << tr("## Shutdown command to switch off the computer when ngPost is done with all its queued posting") << "\n"
+           << tr("## this should mainly used with the auto posting") << "\n"
+           << tr("## you could use whatever script instead (like to send a mail...)") << "\n"
+           << tr("## the three lines below are for Windows, Linux and macOS, in that order;")
+           << "\n"
+           << tr("## the last two need sudo rights without a password. Uncomment one as it is:")
+           << "\n"
+           << tr("## anything after the = is the command, including a note in parentheses.")
+           << "\n"
+           << "#SHUTDOWN_CMD = shutdown /s /f /t 0\n"
+           << "#SHUTDOWN_CMD = sudo -n /sbin/poweroff\n"
+           << "#SHUTDOWN_CMD = sudo -n shutdown -h now\n"
+           << "SHUTDOWN_CMD = " << _shutdownCmd << "\n"
+           << "\n"
+           << tr("## upload the nzb to a specific URL") << "\n"
+           << tr("## only http, https or ftp (neither ftps or sftp are supported)") << "\n"
+           << tr("#NZB_UPLOAD_URL = ftp://user:pass@url_or_ip:21") << "\n"
+           << (_urlNzbUploadStr.isEmpty() ? QString() : QString("NZB_UPLOAD_URL = %1\n").arg(_urlNzbUpload->url()))
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigPostCommands(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## execute a command or script at the end of each post (see examples)") << "\n"
+           << tr("## you can use several post commands by defining several NZB_POST_CMD") << "\n"
+           << tr("## here is the list of the available variables") << "\n"
+           << "" ;
+    for (PostInfoTemplate::FieldDoc const &field : PostInfoTemplate::fields())
+        stream << "##   " << QString::fromLatin1(field.placeholder).leftJustified(22)
+               << ": "
+               << QCoreApplication::translate("PostInfoTemplate", field.description)
+               << "\n";
+    stream << "##   " << QString(QStringLiteral("__date:<format>__")).leftJustified(22)
+           << ": " << tr("date of the post, ex: __date:dd/MM/yyyy__") << "\n"
+           << "##   " << QString(QStringLiteral("__meta:<name>__")).leftJustified(22)
+           << ": " << tr("one of your own fields (--post_meta, or --meta to publish it too)")
+           << "\n"
+           << "#\n"
+           << "#NZB_POST_CMD = scp \"__nzbPath__\" myBox.com:~/nzbs/\n"
+           << "#NZB_POST_CMD = zip \"__nzbPath__.zip\" \"__nzbPath__\"\n"
+           << "#NZB_POST_CMD = ~/scripts/postNZB.sh \"__nzbPath__\" \"__groups__\" __rarName__ __rarPass__ __sizeInByte__ __nbFiles__ __nbArticles__ __nbArticlesFailed__\n"
+           << "#NZB_POST_CMD = mysql -h localhost -D myDB -u myUser -pmyPass-e \"INSERT INTO POST (release, rarName, rarPass, size) VALUES('__nzbName__', '__rarName__', '__rarPass__', '__sizeInByte__')\"\n"
+           << "#NZB_POST_CMD = cmd.exe /C move \"__nzbPath__\" \"C:\\ngPost\\nzb\\__nzbName__{{__rarPass__}}.nzb\"\n"
+           << "#NZB_POST_CMD = curl -X POST -F \"file=@__nzbPath__\" -F \"api=12345\" -F \"cat=45\" -F \"private=no\" https://usenet.com/post-api\n"
+           << "" ;
+    for (const QString &nzbPostCmd : _nzbPostCmd)
+        stream << "NZB_POST_CMD = " << nzbPostCmd << "\n";
+    stream << "\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigPostInfo(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## write a post info file next to the nzb after each post") << "\n"
+           << tr("## you give the model, ngPost fills in the blanks: it knows no index format") << "\n"
+           << tr("## the model can live anywhere you can read, the file anywhere you can write") << "\n"
+           << tr("## a bare file name means \"next to this file\"; write the full path otherwise") << "\n"
+           << "#POST_INFO_TEMPLATE = my_record_sheet.txt\n"
+           << (_postInfoTemplate.isEmpty()
+                   ? QString()
+                   : QString("POST_INFO_TEMPLATE = %1\n").arg(_postInfoTemplate))
+           << "\n"
+           << tr("## where to write it (the variables above work here too)") << "\n"
+           << (_postInfoOutput == QString(sDefaultPostInfoOutput) ? "#" : "")
+           << "POST_INFO_OUTPUT = " << _postInfoOutput << "\n"
+           << "\n"
+           << tr("## by default no post info file is written for a failed or partial post,") << "\n"
+           << tr("## which is what you want when an index imports them automatically") << "\n"
+           << (_postInfoOnlySuccess ? "#" : "") << "POST_INFO_ONLY_ON_SUCCESS = "
+           << (_postInfoOnlySuccess ? "true" : "false") << "\n"
+           << "\n"
+           << tr("## kill a post command that hangs, in seconds (0 = wait forever)") << "\n"
+           << tr("## ngPost waits for its post commands before quitting, so a stuck one") << "\n"
+           << tr("## keeps it alive; Ctrl+C always interrupts") << "\n"
+           << (_postCmdTimeoutSec == 0 ? "#" : "") << "POST_CMD_TIMEOUT = "
+           << (_postCmdTimeoutSec == 0 ? 300 : _postCmdTimeoutSec) << "\n"
+           << "\n"
+           << tr("## same for the nzb upload, which would otherwise block the exit") << "\n"
+           << (_nzbUploadTimeoutSec == sDefaultNzbUploadTimeoutSec ? "#" : "")
+           << "NZB_UPLOAD_TIMEOUT = " << _nzbUploadTimeoutSec << "\n"
+           << "\n"
+           << tr("## a post command that fails is reported but does not fail the run;") << "\n"
+           << tr("## set this to true if you automate and want a non zero exit code") << "\n"
+           << (_postCmdFailIsError ? "" : "#") << "POST_CMD_FAIL_IS_ERROR = true\n"
+           << "\n"
+           << tr("## the archive password is never put in the environment nor in the json") << "\n"
+           << tr("## given to a post command; __rarPass__ in the arguments still works") << "\n"
+           << (_postCmdExposePassword ? "" : "#") << "POST_CMD_EXPOSE_PASSWORD = true\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigMonitoring(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## nzb files are normally all created in nzbPath") << "\n"
+           << tr("## but using this option, the nzb of each monitoring folder will be stored in their own folder (created in nzbPath)") << "\n"
+           << (_monitor_nzb_folders  ? "" : "#") << "MONITOR_NZB_FOLDERS = true\n"
+           << "\n"
+           << tr("## for monitoring, extension file filter for new incoming files (coma separated, no dot)") << "\n"
+           << (_monitorExtensions.isEmpty()  ? "#" : "") << "MONITOR_EXTENSIONS = "
+           << (_monitorExtensions.isEmpty() ? "mkv,mp4,avi,zip,tar,gz,iso" : _monitorExtensions.join(",")) << "\n"
+           << "\n"
+           << tr("## for monitoring, ignore new incoming folders") << "\n"
+           << (_monitorIgnoreDir  ? "" : "#") << "MONITOR_IGNORE_DIR = true\n"
+           << tr("## for monitoring, delay to check the size of an incoming file/folder to make sure it is fully arrived before posting it") << "\n"
+           << tr("## must be between 1sec and 120sec (otherwise default: 1sec)") << "\n"
+           << "MONITOR_SEC_DELAY_SCAN = "  << _monitorSecDelayScan << "\n"
+           << "\n\n"
+           << tr("## Default folder to open to select files from the HMI") << "\n"
+           << "inputDir = " << _inputDir << "\n"
+           << "\n"
+           << tr("## History posting file") << "\n"
+           << tr("## each succesful post will append a line with the date, the file name, the archive name, the password...") << "\n"
+           << (_postHistoryFile.isEmpty()  ? "#" : "") <<"POST_HISTORY = "
+           << (_postHistoryFile.isEmpty()  ? "/nzb/ngPost_history.csv" : _postHistoryFile) << "\n"
+           << "\n"
+           << tr("## Character used to separate fields in the history posting file") << "\n"
+           << (_historyFieldSeparator == QString(sDefaultFieldSeparator) ? "#" : "") << "FIELD_SEPARATOR = " << _historyFieldSeparator << "\n"
+           << "\n"
+           << tr("## Structured SQLite history database") << "\n"
+           << "POST_DB = " << _postDbFile << "\n"
+           << tr("## Store archive passwords in the structured history database") << "\n"
+           << "HISTORY_STORE_PASSWORDS = " << (_historyStorePasswords ? "true" : "false") << "\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigPosting(QTextStream &stream)
+{
+    // clang-format off
+    stream << "GROUPS   = " << _grpList.join(",") << "\n"
+           << "\n"
+           << tr("## If you give several Groups (comma separated) you've 3 policies for posting:") << "\n"
+           << tr("##    ALL       : everything is posted on ALL the Groups") << "\n"
+           << tr("##    EACH_POST : each Post will be posted on a random Group from the list") << "\n"
+           << tr("##    EACH_FILE : each File will be posted on a random Group from the list") << "\n"
+           << "GROUP_POLICY = " << sGroupPolicies[_groupPolicy].toUpper()
+           << "\n"
+           << "\n"
+           << tr("## uncomment the next line if you want a fixed uploader email (in the nzb and in the header of each articles)") << "\n"
+           << tr("## if you let it commented, we'll generate ONE random email for all the posts of the session") << "\n"
+           << (_saveFrom  ? "" : "#") << "FROM = " << _from.c_str() << "\n"
+           << "\n"
+           << tr("## Generate new random poster for each post (--auto or --monitor)") << "\n"
+           << tr("## if this option is set the FROM email just above will be ignored") << "\n"
+           << (_genFrom  ? "" : "#") << "GEN_FROM = true" << "\n"
+           << "\n"
+           << "\n"
+           << tr("## uncomment the next line to limit the number of threads,  (by default it'll use the number of cores)") << "\n"
+           << tr("## all the connections are spread equally on those posting threads") << "\n"
+           << "thread  =  " << _nbThreads << "\n"
+           << "\n"
+           << "\n"
+           << tr("## How to display progressbar in command line: NONE, BAR, FILES") << "\n"
+           << (_dispProgressBar  ? "" : "#") << "DISP_Progress = BAR\n"
+           << (_dispFilesPosting ? "" : "#") << "DISP_Progress = FILES\n"
+           << "\n"
+           << "\n"
+           << tr("## suffix of the msg_id for all the articles (cf nzb file)") << "\n"
+           << (sArticleIdSignature == "ngPost" ? "#msg_id  =  ngPost\n" : QString("msg_id  =  %1\n").arg(sArticleIdSignature.c_str()))
+           << "\n"
+           << tr("## article size (default 700k)") << "\n"
+           << "article_size = " << sArticleSize << "\n"
+           << "\n"
+           << tr("## number of retry to post an Article in case of failure (probably due to an already existing msg-id)") << "\n"
+           << "retry = " << NntpArticle::nbMaxTrySending() << "\n"
+           << "\n"
+           << "\n"
+           << tr("## uncomment the following line to obfuscate the subjects of each Article") << "\n"
+           << tr("## /!\\ CAREFUL you won't find your post if you lose the nzb file /!\\") << "\n"
+           << tr("## 'filename' renames the input files with a random name before compressing") << "\n"
+           << tr("## them, so the archive carries no original name. Both can be asked at once.") << "\n"
+           << (_obfuscateArticles || _obfuscateFileName ? "" : "#") << "obfuscate = "
+           << _obfuscationKinds() << "\n"
+           << "\n"
+           << tr("## remove accents and special characters from the nzb file names") << "\n"
+           << (_removeAccentsOnNzbFileName  ? "" : "#") << "NZB_RM_ACCENTS = true\n"
+           << "\n"
+           << tr("## close Quick Post Tabs when posted successfully (for the GUI)") << "\n"
+           << (_autoCloseTabs  ? "" : "#") << "AUTO_CLOSE_TABS = true\n"
+           << "\n"
+           << tr("## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)") << "\n"
+           << "CHECK_FOR_UPDATES = " << (_checkForUpdates ? "true" : "false") << "\n"
+           << tr("## (internal) last update check timestamp, epoch seconds \xe2\x80\x94 managed automatically") << "\n"
+           << "LAST_UPDATE_CHECK = " << _lastUpdateCheckEpoch << "\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigVpn(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## tunnel selected ngPost connections through an embedded VPN") << "\n"
+           << tr("## the VPN affects ngPost only; the rest of the system is unchanged") << "\n"
+           << "VPN_AUTO_CONNECT = " << (_vpnManager && _vpnManager->autoConnect() ? "true" : "false") << "\n"
+           << "VPN_ACTIVE_PROFILE = " << (_vpnManager ? _vpnManager->activeProfileName() : QString()) << "\n"
+           << tr("## CLI only: wait for the machine-wide VPN lease (0 fails immediately; range 0..1440)") << "\n"
+           << "VPN_LEASE_WAIT_MINUTES = " << (_vpnManager ? _vpnManager->leaseWaitMinutes() : 5) << "\n"
+           << tr("## VPN recovery attempts (0 = unlimited; range 0..1000)") << "\n"
+           << "VPN_RECOVERY_MAX_ATTEMPTS = " << (_vpnManager ? _vpnManager->recoveryMaxAttempts() : 0) << "\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigTransfer(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## when obfuscating file names, keep the .nfo extension visible") << "\n"
+           << (_keepNfoExtension ? "" : "#") << "KEEP_NFO_EXTENSION = true\n"
+           << "\n"
+           << tr("## copy the .nfo file (if present in the original files) next to the generated nzb") << "\n"
+           << (_copyNfoWithNzb ? "" : "#") << "NZB_COPY_NFO = true\n"
+           << "\n"
+           << tr("## auto-post (--auto / --monitor): if a posted file has a sibling .nfo") << "\n"
+           << tr("## (same name, different extension) next to it, include that .nfo in the same post") << "\n"
+           << (_autoIncludeNfo ? "" : "#") << "AUTO_INCLUDE_NFO = true\n"
+           << "\n"
+           << "\n"
+           << tr("## Time to wait (seconds) before trying to resume a Post automatically in case of loss of Network (min: %1)").arg(
+                  sDefaultResumeWaitInSec) << "\n"
+           << "RESUME_WAIT = " << _waitDurationBeforeAutoResume << "\n"
+           << "\n"
+           << tr("## By default, ngPost tries to resume a Post if the network is down.") << "\n"
+           << tr("## it won't stop trying until the network is back and the post is finished properly") << "\n"
+           << tr("## disabling auto-resume still preserves unconfirmed articles as unknown") << "\n"
+           << (_tryResumePostWhenConnectionLost  ? "#" : "") << "NO_RESUME_AUTO = true\n"
+           << "\n"
+           << tr("## if there is no activity on a connection it will be closed and restarted") << "\n"
+           << tr("## The duration is in second, default: %1, min: %2)").arg(sDefaultSocketTimeOut/1000).arg(sMinSocketTimeOut/1000) << "\n"
+           << "SOCK_TIMEOUT = " << _socketTimeOut / 1000 << "\n"
+           << "\n"
+           << tr("## when several Posts are queued, prepare the packing of the next Post while uploading the current one") << "\n"
+           << (_preparePacking ? "" : "#") << "PREPARE_PACKING = true" << "\n"
+           << "\n"
+           << tr("## For GUI ONLY, save the logs in a file (to debug potential crashes)") << "\n"
+           << tr("## ngPost.log is written in the ngPost configuration folder") << "\n"
+           << tr("## The log is overwritten each time ngPost is launched") << "\n"
+           << tr("## => after a crash, please SAVE the log before relaunching ngPost") << "\n"
+           << (_logStream != nullptr ? "" : "#") << "LOG_IN_FILE = true" << "\n"
+           << "\n"
+           << "\n"
+           << "\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigPacking(QTextStream &stream)
+{
+    // clang-format off
+    stream << "##############################################################\n"
+           << "##           Compression and par2 section                   ##\n"
+           << "##############################################################\n"
+           << "\n"
+           << tr("## Shortcut for automatic packing for both GUI and CMD using --pack") << "\n"
+           << tr("## coma separated list using the keywords COMPRESS, GEN_NAME, GEN_PASS and GEN_PAR2") << "\n"
+           << tr("## For Auto posting and Monitoring if you don't use COMPRESS you need GEN_PA2") << "\n"
+           << tr("#PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2") << "\n"
+           << tr("#PACK = GEN_PAR2") << "\n";
+    // Rebuild the PACK keyword list from the current per-job flag state
+    // each time we save, otherwise toggling Compress / Generate Par2 in
+    // the GUI never propagates to the on-disk PACK = ... line and the
+    // user's choice silently rolls back to whatever was loaded.
+    if (_packAuto) {
+        _packAutoKeywords.clear();
+        if (_doCompress) _packAutoKeywords << sOptionNames[Opt::COMPRESS];
+        if (_genName)    _packAutoKeywords << sOptionNames[Opt::GEN_NAME];
+        if (_genPass)    _packAutoKeywords << sOptionNames[Opt::GEN_PASS];
+        if (_doPar2)     _packAutoKeywords << sOptionNames[Opt::GEN_PAR2];
+    }
+    stream << (_packAuto && _packAutoKeywords.size() ? QString("PACK = %1\n").arg(_packAutoKeywords.join(", ").toUpper()) : "")
+           << "\n"
+           << tr("## use the same Password for all your Posts using compression") << "\n"
+      #ifdef __USE_HMI__
+           << (_hmi?(_hmi->useFixedPassword()?"":"#"):(_rarPassFixed.isEmpty()  ? "#" : ""))
+      #else
+           << (_rarPassFixed.isEmpty()  ? "#" : "")
+      #endif
+           << "RAR_PASS = " << (_rarPassFixed.isEmpty()  ? "yourPassword" : _rarPassFixed) << "\n"
+           << "\n"
+           << tr("## temporary folder where the compressed files and par2 will be stored") << "\n"
+           << tr("## so we can post directly a compressed (obfuscated or not) archive of the selected files") << "\n"
+           << tr("## /!\\ The directory MUST HAVE WRITE PERMISSION /!\\") << "\n"
+           << tr("## this is set for Linux environment, Windows users MUST change it") << "\n"
+           << "TMP_DIR = " << _tmpPath << "\n"
+           << "\n";
+#ifdef __USE_TMP_RAM__
+    stream << tr("## temporary folder with size constraint, typically a tmpfs partition") << "\n"
+           << tr("## the size of a post multiply by TMP_RAM_RATIO must available on the disk") << "\n"
+           << tr("## otherwise ngPost will use TMP_DIR (with no check there)") << "\n"
+           << tr("## (uncomment and define TMP_RAM to activate the feature, make sure the path is writable)") << "\n"
+           << (_ramPath.isEmpty() ? "#" : "") << "TMP_RAM = " << (_ramPath.isEmpty() ? "/mnt/ngPost_tmpfs" : _ramPath) << "\n"
+           << "\n"
+           << tr("## Ratio used on the source files size to compensate the par2 generation") << "\n"
+           << tr("## min is 10% to be sure (so 1.1), max 2.0") << "\n"
+           << "TMP_RAM_RATIO = " << _ramRatio << "\n"
+           << "\n";
+#endif
+    // clang-format on
+}
+
+void NgPost::_writeConfigArchive(QTextStream &stream)
+{
+    // clang-format off
+    stream << "RAR_TOOL = " << _rarTool << "\n"
+           << (_rarPathMode == externaltool::PathMode::Automatic && !_rarPathConfig.isEmpty()
+                   ? QString() : QString("RAR_SOURCE = %1\n").arg(externaltool::modeName(_rarPathMode)))
+           << tr("## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.") << "\n"
+           << (!_rarPathConfig.isEmpty() ? QString("RAR_PATH = %1\n").arg(_rarPathConfig) : QString())
+           << "\n"
+           << tr("## RAR EXTRA options (the first 'a' and '-idp' will be added automatically)") << "\n"
+           << tr("## -hp will be added if you use a password with --gen_pass, --rar_pass or using the HMI") << "\n"
+           << tr("## -v42m will be added with --rar_size or using the HMI") << "\n"
+           << tr("## you could change the compression level, lock the archive, add redundancy...") << "\n"
+           << tr("## the first line below is for rar, the second for 7-zip:") << "\n"
+           << "#RAR_EXTRA = -ep1 -m0 -k -rr5p\n"
+           << "#RAR_EXTRA = -mx0 -mhe=on\n"
+           << (_rarArgs.isEmpty() ? "" : QString("RAR_EXTRA = %1\n").arg(_rarArgs) )
+           << "\n"
+           << tr("## RAR volume size in MiB (1 MiB = 1048576 bytes; 0 means no split without RAR_MAX)") << "\n"
+           << tr("## feel free to change the value or to comment the next line if you don't want to split the archive") << "\n"
+           << "RAR_SIZE = " << _rarSize << "\n"
+           << "\n"
+           << tr("## Optional maximum number of archive volumes; commented means no limit.") << "\n"
+           << tr("## When enabled, this limit takes priority over RAR_SIZE if a larger volume size is needed.") << "\n"
+           << tr("## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.") << "\n"
+           << (_useRarMax ? "" : "#") << "RAR_MAX = " << _rarMax << "\n"
+           << "\n"
+           << tr("##  keep rar folder after posting (otherwise it is automatically deleted uppon successful post)") << "\n"
+           << (_keepRarDefault ? "" : "#") << "KEEP_RAR = true\n"
+           << "\n"
+           << "## " << tr("Remove root (parent) folder when compressing Folders using RAR") << "\n"
+           << (_rarNoRootFolder  ? "" : "#") << "RAR_NO_ROOT_FOLDER = true\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigPar2(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## par2 redundancy percentage (0 by default meaning NO par2 generation)") << "\n"
+           << "PAR2_PCT = " << _par2PctDefault << "\n"
+           << "PAR2_TOOL = " << par2::toolName(_par2Tool) << "\n"
+           << (_par2PathMode == externaltool::PathMode::Automatic && !_par2PathConfig.isEmpty()
+                   ? QString() : QString("PAR2_SOURCE = %1\n").arg(externaltool::modeName(_par2PathMode)))
+           << "\n"
+           << tr("## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.") << "\n";
+    if (!_par2PathConfig.isEmpty())
+        stream << "PAR2_PATH = " << _par2PathConfig << "\n";
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
+    stream << "#PAR2_PATH = <your_path>parpar.exe\n"
+           << "#PAR2_PATH = <your_path>par2j64.exe\n";
+#else
+    stream << "#PAR2_PATH = /usr/bin/par2\n"
+           << "#PAR2_PATH = <your_path>/parpar\n";
+#endif
+    stream << "\n"
+           << tr("## fixed parameters for the par2 (or alternative) command") << "\n"
+           << tr("## The PAR2 Settings window of the GUI owns this line and rewrites it from its "
+                 "fields, so editing it here does not last.")
+           << "\n"
+           << (_par2Args.isEmpty() ? "" : QString("PAR2_ARGS = %1\n").arg(_par2Args))
+           << "\n"
+           << tr("## Your own arguments: uncomment one line below and ngPost runs it instead of")
+           << "\n"
+           << tr("## PAR2_ARGS, without ever rewriting it. Only the redundancy of each post is")
+           << "\n"
+           << tr("## replaced. Comment it again to go back to the PAR2 Settings fields.") << "\n"
+           << tr("## Write it for the tool PAR2_TOOL selects: one rejects the switches of another.")
+           << "\n"
+           << tr("## the three lines below are for ParPar, par2cmdline and MultiPar, in that")
+           << "\n"
+           << tr("## order. Uncomment one as it is: everything after the = is passed to the")
+           << "\n"
+           << tr("## tool, a note in parentheses included.") << "\n"
+           << "#PAR2_ARGS_CUSTOM = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q\n"
+           << "#PAR2_ARGS_CUSTOM = c -l -m1024 -r8 -s768000\n"
+           << "#PAR2_ARGS_CUSTOM = c /rr8 /sn3000 /rd3 /ls2 /lr260000000\n"
+           << (_par2ArgsCustom.isEmpty()
+                   ? ""
+                   : QString("PAR2_ARGS_CUSTOM = %1\n").arg(_par2ArgsCustom))
+           << "\n"
+           << tr("## PAR2 slice size in bytes, used by --check to weigh a loss against the")
+           << "\n"
+           << tr("## recovery blocks. Without it the check infers one and refuses to declare")
+           << "\n"
+           << tr("## a post beyond repair.") << "\n"
+           << "#PAR2_BLOCK_SIZE = 768000\n"
+           << (_par2BlockSize > 0 ? QString("PAR2_BLOCK_SIZE = %1\n").arg(_par2BlockSize) : "")
+           << "\n"
+           << "\n"
+           << tr("## length of the random generated archive's file name") << "\n"
+           << "LENGTH_NAME = " << _lengthName << "\n"
+           << "\n"
+           << tr("## length of the random archive's passsword") << "\n"
+           << "LENGTH_PASS = "<< _lengthPassDefault << "\n"
+           << "\n"
+           << "\n"
+           << "\n"
+           << "\n"
+           << "##############################################################\n"
+           << "##                   servers section                        ##\n"
+           << "##############################################################\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigServers(QTextStream &stream)
+{
+    // clang-format off
+    for (NntpServerParams *param : _nntpServers)
+    {
+        stream << "[server]\n"
+               << "host = " << param->host << "\n"
+               << "port = " << param->port << "\n"
+               << "ssl  = " << (param->useSSL ? "true" : "false") << "\n"
+               << "user = " << param->user.c_str() << "\n"
+               << "pass = " << param->pass.c_str() << "\n"
+               << "connection = " << param->nbCons << "\n"
+               << "enabled = " << (param->enabled ? "true":"false") << "\n"
+               << "nzbCheck = " << (param->nzbCheck ? "true":"false") << "\n"
+               << "useVpn = " << (param->useVpn ? "true":"false") << "\n"
+               << "\n\n";
+    }
+    stream << tr("## You can add as many server if you have several providers by adding other \"server\" sections") << "\n"
+           << "#[server]\n"
+           << "#host = news.otherprovider.com\n"
+           << "#port = 563\n"
+           << "#ssl  = true\n"
+           << "#user = myOtherUser\n"
+           << "#pass = myOtherPass\n"
+           << "#connection = 15\n"
+           << "#enabled = false\n"
+           << "#nzbCheck = false\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigVpnProfiles(QTextStream &stream)
+{
+    // clang-format off
+    // Phase 4 — VPN profiles. The config files themselves live under
+    // <configDir>/vpn/; we only persist metadata here. Credentials are
+    // never saved in this file (keychain or inline-in-ovpn only).
+    if (_vpnManager) {
+        for (VpnProfile const &p : _vpnManager->profiles()) {
+            stream << "[vpn_profile]\n"
+                   << "name        = " << p.name << "\n"
+                   << "backend     = " << VpnManager::backendToString(p.backend) << "\n"
+                   << "config_file = " << p.configFileName << "\n"
+                   << "has_auth    = " << (p.hasAuth ? "true" : "false") << "\n"
+                   << "\n";
+        }
+    }
+    // clang-format on
+}
+
 void NgPost::saveConfig()
 {
 #ifdef __USE_HMI__
@@ -5504,419 +5984,18 @@ void NgPost::saveConfig()
     QString text;
     {
         QTextStream stream(&text);
-        // clang-format off
-        // One stream line per line of the file: the layout mirrors what is written.
-        stream << tr("# ngPost configuration file") << "\n"
-               << "#\n"
-               << "#\n"
-               << "\n"
-               << tr("## Lang for the app. Currently supported: EN, FR, ES, DE, NL, PT, ZH") << "\n"
-               << "lang = " << _lang.toUpper() << "\n"
-               << "\n"
-               << tr("## use Proxy (only Socks5 type!)") << "\n"
-               << (_proxyUrl.isEmpty()  ? "#PROXY_SOCKS5 = user:pass@192.168.1.1:5555" : _proxyUrl)  << "\n"
-               << "\n"
-               << tr("## destination folder for all your nzb") << "\n"
-               << tr("## if you don't put anything, the nzb will be generated in the folder of ngPost on Windows and in /tmp on Linux") << "\n"
-               << tr("## this will be overwritten if you use the option -o with the full path of the nzb") << "\n"
-               << "nzbPath  = " << (_nzbPath.isEmpty() ? _nzbPathConf : _nzbPath) << "\n"
-               << "\n"
-               << tr("## Shutdown command to switch off the computer when ngPost is done with all its queued posting") << "\n"
-               << tr("## this should mainly used with the auto posting") << "\n"
-               << tr("## you could use whatever script instead (like to send a mail...)") << "\n"
-               << tr("## the three lines below are for Windows, Linux and macOS, in that order;")
-               << "\n"
-               << tr("## the last two need sudo rights without a password. Uncomment one as it is:")
-               << "\n"
-               << tr("## anything after the = is the command, including a note in parentheses.")
-               << "\n"
-               << "#SHUTDOWN_CMD = shutdown /s /f /t 0\n"
-               << "#SHUTDOWN_CMD = sudo -n /sbin/poweroff\n"
-               << "#SHUTDOWN_CMD = sudo -n shutdown -h now\n"
-               << "SHUTDOWN_CMD = " << _shutdownCmd << "\n"
-               << "\n"
-               << tr("## upload the nzb to a specific URL") << "\n"
-               << tr("## only http, https or ftp (neither ftps or sftp are supported)") << "\n"
-               << tr("#NZB_UPLOAD_URL = ftp://user:pass@url_or_ip:21") << "\n"
-               << (_urlNzbUploadStr.isEmpty() ? QString() : QString("NZB_UPLOAD_URL = %1\n").arg(_urlNzbUpload->url()))
-               << "\n"
-               << tr("## execute a command or script at the end of each post (see examples)") << "\n"
-               << tr("## you can use several post commands by defining several NZB_POST_CMD") << "\n"
-               << tr("## here is the list of the available variables") << "\n"
-               << "" ;
-        for (PostInfoTemplate::FieldDoc const &field : PostInfoTemplate::fields())
-            stream << "##   " << QString::fromLatin1(field.placeholder).leftJustified(22)
-                   << ": "
-                   << QCoreApplication::translate("PostInfoTemplate", field.description)
-                   << "\n";
-        stream << "##   " << QString(QStringLiteral("__date:<format>__")).leftJustified(22)
-               << ": " << tr("date of the post, ex: __date:dd/MM/yyyy__") << "\n"
-               << "##   " << QString(QStringLiteral("__meta:<name>__")).leftJustified(22)
-               << ": " << tr("one of your own fields (--post_meta, or --meta to publish it too)")
-               << "\n"
-               << "#\n"
-               << "#NZB_POST_CMD = scp \"__nzbPath__\" myBox.com:~/nzbs/\n"
-               << "#NZB_POST_CMD = zip \"__nzbPath__.zip\" \"__nzbPath__\"\n"
-               << "#NZB_POST_CMD = ~/scripts/postNZB.sh \"__nzbPath__\" \"__groups__\" __rarName__ __rarPass__ __sizeInByte__ __nbFiles__ __nbArticles__ __nbArticlesFailed__\n"
-               << "#NZB_POST_CMD = mysql -h localhost -D myDB -u myUser -pmyPass-e \"INSERT INTO POST (release, rarName, rarPass, size) VALUES('__nzbName__', '__rarName__', '__rarPass__', '__sizeInByte__')\"\n"
-               << "#NZB_POST_CMD = cmd.exe /C move \"__nzbPath__\" \"C:\\ngPost\\nzb\\__nzbName__{{__rarPass__}}.nzb\"\n"
-               << "#NZB_POST_CMD = curl -X POST -F \"file=@__nzbPath__\" -F \"api=12345\" -F \"cat=45\" -F \"private=no\" https://usenet.com/post-api\n"
-               << "" ;
-        for (const QString &nzbPostCmd : _nzbPostCmd)
-            stream << "NZB_POST_CMD = " << nzbPostCmd << "\n";
-        stream << "\n"
-               << "\n"
-               << tr("## write a post info file next to the nzb after each post") << "\n"
-               << tr("## you give the model, ngPost fills in the blanks: it knows no index format") << "\n"
-               << tr("## the model can live anywhere you can read, the file anywhere you can write") << "\n"
-               << tr("## a bare file name means \"next to this file\"; write the full path otherwise") << "\n"
-               << "#POST_INFO_TEMPLATE = my_record_sheet.txt\n"
-               << (_postInfoTemplate.isEmpty()
-                       ? QString()
-                       : QString("POST_INFO_TEMPLATE = %1\n").arg(_postInfoTemplate))
-               << "\n"
-               << tr("## where to write it (the variables above work here too)") << "\n"
-               << (_postInfoOutput == QString(sDefaultPostInfoOutput) ? "#" : "")
-               << "POST_INFO_OUTPUT = " << _postInfoOutput << "\n"
-               << "\n"
-               << tr("## by default no post info file is written for a failed or partial post,") << "\n"
-               << tr("## which is what you want when an index imports them automatically") << "\n"
-               << (_postInfoOnlySuccess ? "#" : "") << "POST_INFO_ONLY_ON_SUCCESS = "
-               << (_postInfoOnlySuccess ? "true" : "false") << "\n"
-               << "\n"
-               << tr("## kill a post command that hangs, in seconds (0 = wait forever)") << "\n"
-               << tr("## ngPost waits for its post commands before quitting, so a stuck one") << "\n"
-               << tr("## keeps it alive; Ctrl+C always interrupts") << "\n"
-               << (_postCmdTimeoutSec == 0 ? "#" : "") << "POST_CMD_TIMEOUT = "
-               << (_postCmdTimeoutSec == 0 ? 300 : _postCmdTimeoutSec) << "\n"
-               << "\n"
-               << tr("## same for the nzb upload, which would otherwise block the exit") << "\n"
-               << (_nzbUploadTimeoutSec == sDefaultNzbUploadTimeoutSec ? "#" : "")
-               << "NZB_UPLOAD_TIMEOUT = " << _nzbUploadTimeoutSec << "\n"
-               << "\n"
-               << tr("## a post command that fails is reported but does not fail the run;") << "\n"
-               << tr("## set this to true if you automate and want a non zero exit code") << "\n"
-               << (_postCmdFailIsError ? "" : "#") << "POST_CMD_FAIL_IS_ERROR = true\n"
-               << "\n"
-               << tr("## the archive password is never put in the environment nor in the json") << "\n"
-               << tr("## given to a post command; __rarPass__ in the arguments still works") << "\n"
-               << (_postCmdExposePassword ? "" : "#") << "POST_CMD_EXPOSE_PASSWORD = true\n"
-               << "\n"
-               << tr("## nzb files are normally all created in nzbPath") << "\n"
-               << tr("## but using this option, the nzb of each monitoring folder will be stored in their own folder (created in nzbPath)") << "\n"
-               << (_monitor_nzb_folders  ? "" : "#") << "MONITOR_NZB_FOLDERS = true\n"
-               << "\n"
-               << tr("## for monitoring, extension file filter for new incoming files (coma separated, no dot)") << "\n"
-               << (_monitorExtensions.isEmpty()  ? "#" : "") << "MONITOR_EXTENSIONS = "
-               << (_monitorExtensions.isEmpty() ? "mkv,mp4,avi,zip,tar,gz,iso" : _monitorExtensions.join(",")) << "\n"
-               << "\n"
-               << tr("## for monitoring, ignore new incoming folders") << "\n"
-               << (_monitorIgnoreDir  ? "" : "#") << "MONITOR_IGNORE_DIR = true\n"
-               << tr("## for monitoring, delay to check the size of an incoming file/folder to make sure it is fully arrived before posting it") << "\n"
-               << tr("## must be between 1sec and 120sec (otherwise default: 1sec)") << "\n"
-               << "MONITOR_SEC_DELAY_SCAN = "  << _monitorSecDelayScan << "\n"
-               << "\n\n"
-               << tr("## Default folder to open to select files from the HMI") << "\n"
-               << "inputDir = " << _inputDir << "\n"
-               << "\n"
-               << tr("## History posting file") << "\n"
-               << tr("## each succesful post will append a line with the date, the file name, the archive name, the password...") << "\n"
-               << (_postHistoryFile.isEmpty()  ? "#" : "") <<"POST_HISTORY = "
-               << (_postHistoryFile.isEmpty()  ? "/nzb/ngPost_history.csv" : _postHistoryFile) << "\n"
-               << "\n"
-               << tr("## Character used to separate fields in the history posting file") << "\n"
-               << (_historyFieldSeparator == QString(sDefaultFieldSeparator) ? "#" : "") << "FIELD_SEPARATOR = " << _historyFieldSeparator << "\n"
-               << "\n"
-               << tr("## Structured SQLite history database") << "\n"
-               << "POST_DB = " << _postDbFile << "\n"
-               << tr("## Store archive passwords in the structured history database") << "\n"
-               << "HISTORY_STORE_PASSWORDS = " << (_historyStorePasswords ? "true" : "false") << "\n"
-               << "\n"
-               << "GROUPS   = " << _grpList.join(",") << "\n"
-               << "\n"
-               << tr("## If you give several Groups (comma separated) you've 3 policies for posting:") << "\n"
-               << tr("##    ALL       : everything is posted on ALL the Groups") << "\n"
-               << tr("##    EACH_POST : each Post will be posted on a random Group from the list") << "\n"
-               << tr("##    EACH_FILE : each File will be posted on a random Group from the list") << "\n"
-               << "GROUP_POLICY = " << sGroupPolicies[_groupPolicy].toUpper()
-               << "\n"
-               << "\n"
-               << tr("## uncomment the next line if you want a fixed uploader email (in the nzb and in the header of each articles)") << "\n"
-               << tr("## if you let it commented, we'll generate ONE random email for all the posts of the session") << "\n"
-               << (_saveFrom  ? "" : "#") << "FROM = " << _from.c_str() << "\n"
-               << "\n"
-               << tr("## Generate new random poster for each post (--auto or --monitor)") << "\n"
-               << tr("## if this option is set the FROM email just above will be ignored") << "\n"
-               << (_genFrom  ? "" : "#") << "GEN_FROM = true" << "\n"
-               << "\n"
-               << "\n"
-               << tr("## uncomment the next line to limit the number of threads,  (by default it'll use the number of cores)") << "\n"
-               << tr("## all the connections are spread equally on those posting threads") << "\n"
-               << "thread  =  " << _nbThreads << "\n"
-               << "\n"
-               << "\n"
-               << tr("## How to display progressbar in command line: NONE, BAR, FILES") << "\n"
-               << (_dispProgressBar  ? "" : "#") << "DISP_Progress = BAR\n"
-               << (_dispFilesPosting ? "" : "#") << "DISP_Progress = FILES\n"
-               << "\n"
-               << "\n"
-               << tr("## suffix of the msg_id for all the articles (cf nzb file)") << "\n"
-               << (sArticleIdSignature == "ngPost" ? "#msg_id  =  ngPost\n" : QString("msg_id  =  %1\n").arg(sArticleIdSignature.c_str()))
-               << "\n"
-               << tr("## article size (default 700k)") << "\n"
-               << "article_size = " << sArticleSize << "\n"
-               << "\n"
-               << tr("## number of retry to post an Article in case of failure (probably due to an already existing msg-id)") << "\n"
-               << "retry = " << NntpArticle::nbMaxTrySending() << "\n"
-               << "\n"
-               << "\n"
-               << tr("## uncomment the following line to obfuscate the subjects of each Article") << "\n"
-               << tr("## /!\\ CAREFUL you won't find your post if you lose the nzb file /!\\") << "\n"
-               << tr("## 'filename' renames the input files with a random name before compressing") << "\n"
-               << tr("## them, so the archive carries no original name. Both can be asked at once.") << "\n"
-               << (_obfuscateArticles || _obfuscateFileName ? "" : "#") << "obfuscate = "
-               << _obfuscationKinds() << "\n"
-               << "\n"
-               << tr("## remove accents and special characters from the nzb file names") << "\n"
-               << (_removeAccentsOnNzbFileName  ? "" : "#") << "NZB_RM_ACCENTS = true\n"
-               << "\n"
-               << tr("## close Quick Post Tabs when posted successfully (for the GUI)") << "\n"
-               << (_autoCloseTabs  ? "" : "#") << "AUTO_CLOSE_TABS = true\n"
-               << "\n"
-               << tr("## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)") << "\n"
-               << "CHECK_FOR_UPDATES = " << (_checkForUpdates ? "true" : "false") << "\n"
-               << tr("## (internal) last update check timestamp, epoch seconds \xe2\x80\x94 managed automatically") << "\n"
-               << "LAST_UPDATE_CHECK = " << _lastUpdateCheckEpoch << "\n"
-               << "\n"
-               << tr("## tunnel selected ngPost connections through an embedded VPN") << "\n"
-               << tr("## the VPN affects ngPost only; the rest of the system is unchanged") << "\n"
-               << "VPN_AUTO_CONNECT = " << (_vpnManager && _vpnManager->autoConnect() ? "true" : "false") << "\n"
-               << "VPN_ACTIVE_PROFILE = " << (_vpnManager ? _vpnManager->activeProfileName() : QString()) << "\n"
-               << tr("## CLI only: wait for the machine-wide VPN lease (0 fails immediately; range 0..1440)") << "\n"
-               << "VPN_LEASE_WAIT_MINUTES = " << (_vpnManager ? _vpnManager->leaseWaitMinutes() : 5) << "\n"
-               << tr("## VPN recovery attempts (0 = unlimited; range 0..1000)") << "\n"
-               << "VPN_RECOVERY_MAX_ATTEMPTS = " << (_vpnManager ? _vpnManager->recoveryMaxAttempts() : 0) << "\n"
-               << "\n"
-               << tr("## when obfuscating file names, keep the .nfo extension visible") << "\n"
-               << (_keepNfoExtension ? "" : "#") << "KEEP_NFO_EXTENSION = true\n"
-               << "\n"
-               << tr("## copy the .nfo file (if present in the original files) next to the generated nzb") << "\n"
-               << (_copyNfoWithNzb ? "" : "#") << "NZB_COPY_NFO = true\n"
-               << "\n"
-               << tr("## auto-post (--auto / --monitor): if a posted file has a sibling .nfo") << "\n"
-               << tr("## (same name, different extension) next to it, include that .nfo in the same post") << "\n"
-               << (_autoIncludeNfo ? "" : "#") << "AUTO_INCLUDE_NFO = true\n"
-               << "\n"
-               << "\n"
-               << tr("## Time to wait (seconds) before trying to resume a Post automatically in case of loss of Network (min: %1)").arg(
-                      sDefaultResumeWaitInSec) << "\n"
-               << "RESUME_WAIT = " << _waitDurationBeforeAutoResume << "\n"
-               << "\n"
-               << tr("## By default, ngPost tries to resume a Post if the network is down.") << "\n"
-               << tr("## it won't stop trying until the network is back and the post is finished properly") << "\n"
-               << tr("## disabling auto-resume still preserves unconfirmed articles as unknown") << "\n"
-               << (_tryResumePostWhenConnectionLost  ? "#" : "") << "NO_RESUME_AUTO = true\n"
-               << "\n"
-               << tr("## if there is no activity on a connection it will be closed and restarted") << "\n"
-               << tr("## The duration is in second, default: %1, min: %2)").arg(sDefaultSocketTimeOut/1000).arg(sMinSocketTimeOut/1000) << "\n"
-               << "SOCK_TIMEOUT = " << _socketTimeOut / 1000 << "\n"
-               << "\n"
-               << tr("## when several Posts are queued, prepare the packing of the next Post while uploading the current one") << "\n"
-               << (_preparePacking ? "" : "#") << "PREPARE_PACKING = true" << "\n"
-               << "\n"
-               << tr("## For GUI ONLY, save the logs in a file (to debug potential crashes)") << "\n"
-               << tr("## ngPost.log is written in the ngPost configuration folder") << "\n"
-               << tr("## The log is overwritten each time ngPost is launched") << "\n"
-               << tr("## => after a crash, please SAVE the log before relaunching ngPost") << "\n"
-               << (_logStream != nullptr ? "" : "#") << "LOG_IN_FILE = true" << "\n"
-               << "\n"
-               << "\n"
-               << "\n"
-               << "\n"
-               << "##############################################################\n"
-               << "##           Compression and par2 section                   ##\n"
-               << "##############################################################\n"
-               << "\n"
-               << tr("## Shortcut for automatic packing for both GUI and CMD using --pack") << "\n"
-               << tr("## coma separated list using the keywords COMPRESS, GEN_NAME, GEN_PASS and GEN_PAR2") << "\n"
-               << tr("## For Auto posting and Monitoring if you don't use COMPRESS you need GEN_PA2") << "\n"
-               << tr("#PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2") << "\n"
-               << tr("#PACK = GEN_PAR2") << "\n";
-        // Rebuild the PACK keyword list from the current per-job flag state
-        // each time we save, otherwise toggling Compress / Generate Par2 in
-        // the GUI never propagates to the on-disk PACK = ... line and the
-        // user's choice silently rolls back to whatever was loaded.
-        if (_packAuto) {
-            _packAutoKeywords.clear();
-            if (_doCompress) _packAutoKeywords << sOptionNames[Opt::COMPRESS];
-            if (_genName)    _packAutoKeywords << sOptionNames[Opt::GEN_NAME];
-            if (_genPass)    _packAutoKeywords << sOptionNames[Opt::GEN_PASS];
-            if (_doPar2)     _packAutoKeywords << sOptionNames[Opt::GEN_PAR2];
-        }
-        stream << (_packAuto && _packAutoKeywords.size() ? QString("PACK = %1\n").arg(_packAutoKeywords.join(", ").toUpper()) : "")
-               << "\n"
-               << tr("## use the same Password for all your Posts using compression") << "\n"
-          #ifdef __USE_HMI__
-               << (_hmi?(_hmi->useFixedPassword()?"":"#"):(_rarPassFixed.isEmpty()  ? "#" : ""))
-          #else
-               << (_rarPassFixed.isEmpty()  ? "#" : "")
-          #endif
-               << "RAR_PASS = " << (_rarPassFixed.isEmpty()  ? "yourPassword" : _rarPassFixed) << "\n"
-               << "\n"
-               << tr("## temporary folder where the compressed files and par2 will be stored") << "\n"
-               << tr("## so we can post directly a compressed (obfuscated or not) archive of the selected files") << "\n"
-               << tr("## /!\\ The directory MUST HAVE WRITE PERMISSION /!\\") << "\n"
-               << tr("## this is set for Linux environment, Windows users MUST change it") << "\n"
-               << "TMP_DIR = " << _tmpPath << "\n"
-               << "\n";
-#ifdef __USE_TMP_RAM__
-        stream << tr("## temporary folder with size constraint, typically a tmpfs partition") << "\n"
-               << tr("## the size of a post multiply by TMP_RAM_RATIO must available on the disk") << "\n"
-               << tr("## otherwise ngPost will use TMP_DIR (with no check there)") << "\n"
-               << tr("## (uncomment and define TMP_RAM to activate the feature, make sure the path is writable)") << "\n"
-               << (_ramPath.isEmpty() ? "#" : "") << "TMP_RAM = " << (_ramPath.isEmpty() ? "/mnt/ngPost_tmpfs" : _ramPath) << "\n"
-               << "\n"
-               << tr("## Ratio used on the source files size to compensate the par2 generation") << "\n"
-               << tr("## min is 10% to be sure (so 1.1), max 2.0") << "\n"
-               << "TMP_RAM_RATIO = " << _ramRatio << "\n"
-               << "\n";
-#endif
-        stream << "RAR_TOOL = " << _rarTool << "\n"
-               << (_rarPathMode == externaltool::PathMode::Automatic && !_rarPathConfig.isEmpty()
-                       ? QString() : QString("RAR_SOURCE = %1\n").arg(externaltool::modeName(_rarPathMode)))
-               << tr("## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.") << "\n"
-               << (!_rarPathConfig.isEmpty() ? QString("RAR_PATH = %1\n").arg(_rarPathConfig) : QString())
-               << "\n"
-               << tr("## RAR EXTRA options (the first 'a' and '-idp' will be added automatically)") << "\n"
-               << tr("## -hp will be added if you use a password with --gen_pass, --rar_pass or using the HMI") << "\n"
-               << tr("## -v42m will be added with --rar_size or using the HMI") << "\n"
-               << tr("## you could change the compression level, lock the archive, add redundancy...") << "\n"
-               << tr("## the first line below is for rar, the second for 7-zip:") << "\n"
-               << "#RAR_EXTRA = -ep1 -m0 -k -rr5p\n"
-               << "#RAR_EXTRA = -mx0 -mhe=on\n"
-               << (_rarArgs.isEmpty() ? "" : QString("RAR_EXTRA = %1\n").arg(_rarArgs) )
-               << "\n"
-               << tr("## RAR volume size in MiB (1 MiB = 1048576 bytes; 0 means no split without RAR_MAX)") << "\n"
-               << tr("## feel free to change the value or to comment the next line if you don't want to split the archive") << "\n"
-               << "RAR_SIZE = " << _rarSize << "\n"
-               << "\n"
-               << tr("## Optional maximum number of archive volumes; commented means no limit.") << "\n"
-               << tr("## When enabled, this limit takes priority over RAR_SIZE if a larger volume size is needed.") << "\n"
-               << tr("## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.") << "\n"
-               << (_useRarMax ? "" : "#") << "RAR_MAX = " << _rarMax << "\n"
-               << "\n"
-               << tr("##  keep rar folder after posting (otherwise it is automatically deleted uppon successful post)") << "\n"
-               << (_keepRarDefault ? "" : "#") << "KEEP_RAR = true\n"
-               << "\n"
-               << "## " << tr("Remove root (parent) folder when compressing Folders using RAR") << "\n"
-               << (_rarNoRootFolder  ? "" : "#") << "RAR_NO_ROOT_FOLDER = true\n"
-               << "\n"
-               << tr("## par2 redundancy percentage (0 by default meaning NO par2 generation)") << "\n"
-               << "PAR2_PCT = " << _par2PctDefault << "\n"
-               << "PAR2_TOOL = " << par2::toolName(_par2Tool) << "\n"
-               << (_par2PathMode == externaltool::PathMode::Automatic && !_par2PathConfig.isEmpty()
-                       ? QString() : QString("PAR2_SOURCE = %1\n").arg(externaltool::modeName(_par2PathMode)))
-               << "\n"
-               << tr("## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.") << "\n";
-        if (!_par2PathConfig.isEmpty())
-            stream << "PAR2_PATH = " << _par2PathConfig << "\n";
-#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
-        stream << "#PAR2_PATH = <your_path>parpar.exe\n"
-               << "#PAR2_PATH = <your_path>par2j64.exe\n";
-#else
-        stream << "#PAR2_PATH = /usr/bin/par2\n"
-               << "#PAR2_PATH = <your_path>/parpar\n";
-#endif
-        stream << "\n"
-               << tr("## fixed parameters for the par2 (or alternative) command") << "\n"
-               << tr("## The PAR2 Settings window of the GUI owns this line and rewrites it from its "
-                     "fields, so editing it here does not last.")
-               << "\n"
-               << (_par2Args.isEmpty() ? "" : QString("PAR2_ARGS = %1\n").arg(_par2Args))
-               << "\n"
-               << tr("## Your own arguments: uncomment one line below and ngPost runs it instead of")
-               << "\n"
-               << tr("## PAR2_ARGS, without ever rewriting it. Only the redundancy of each post is")
-               << "\n"
-               << tr("## replaced. Comment it again to go back to the PAR2 Settings fields.") << "\n"
-               << tr("## Write it for the tool PAR2_TOOL selects: one rejects the switches of another.")
-               << "\n"
-               << tr("## the three lines below are for ParPar, par2cmdline and MultiPar, in that")
-               << "\n"
-               << tr("## order. Uncomment one as it is: everything after the = is passed to the")
-               << "\n"
-               << tr("## tool, a note in parentheses included.") << "\n"
-               << "#PAR2_ARGS_CUSTOM = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q\n"
-               << "#PAR2_ARGS_CUSTOM = c -l -m1024 -r8 -s768000\n"
-               << "#PAR2_ARGS_CUSTOM = c /rr8 /sn3000 /rd3 /ls2 /lr260000000\n"
-               << (_par2ArgsCustom.isEmpty()
-                       ? ""
-                       : QString("PAR2_ARGS_CUSTOM = %1\n").arg(_par2ArgsCustom))
-               << "\n"
-               << tr("## PAR2 slice size in bytes, used by --check to weigh a loss against the")
-               << "\n"
-               << tr("## recovery blocks. Without it the check infers one and refuses to declare")
-               << "\n"
-               << tr("## a post beyond repair.") << "\n"
-               << "#PAR2_BLOCK_SIZE = 768000\n"
-               << (_par2BlockSize > 0 ? QString("PAR2_BLOCK_SIZE = %1\n").arg(_par2BlockSize) : "")
-               << "\n"
-               << "\n"
-               << tr("## length of the random generated archive's file name") << "\n"
-               << "LENGTH_NAME = " << _lengthName << "\n"
-               << "\n"
-               << tr("## length of the random archive's passsword") << "\n"
-               << "LENGTH_PASS = "<< _lengthPassDefault << "\n"
-               << "\n"
-               << "\n"
-               << "\n"
-               << "\n"
-               << "##############################################################\n"
-               << "##                   servers section                        ##\n"
-               << "##############################################################\n"
-               << "\n";
-
-        for (NntpServerParams *param : _nntpServers)
-        {
-            stream << "[server]\n"
-                   << "host = " << param->host << "\n"
-                   << "port = " << param->port << "\n"
-                   << "ssl  = " << (param->useSSL ? "true" : "false") << "\n"
-                   << "user = " << param->user.c_str() << "\n"
-                   << "pass = " << param->pass.c_str() << "\n"
-                   << "connection = " << param->nbCons << "\n"
-                   << "enabled = " << (param->enabled ? "true":"false") << "\n"
-                   << "nzbCheck = " << (param->nzbCheck ? "true":"false") << "\n"
-                   << "useVpn = " << (param->useVpn ? "true":"false") << "\n"
-                   << "\n\n";
-        }
-        stream << tr("## You can add as many server if you have several providers by adding other \"server\" sections") << "\n"
-               << "#[server]\n"
-               << "#host = news.otherprovider.com\n"
-               << "#port = 563\n"
-               << "#ssl  = true\n"
-               << "#user = myOtherUser\n"
-               << "#pass = myOtherPass\n"
-               << "#connection = 15\n"
-               << "#enabled = false\n"
-               << "#nzbCheck = false\n"
-               << "\n";
-
-        // Phase 4 — VPN profiles. The config files themselves live under
-        // <configDir>/vpn/; we only persist metadata here. Credentials are
-        // never saved in this file (keychain or inline-in-ovpn only).
-        if (_vpnManager) {
-            for (VpnProfile const &p : _vpnManager->profiles()) {
-                stream << "[vpn_profile]\n"
-                       << "name        = " << p.name << "\n"
-                       << "backend     = " << VpnManager::backendToString(p.backend) << "\n"
-                       << "config_file = " << p.configFileName << "\n"
-                       << "has_auth    = " << (p.hasAuth ? "true" : "false") << "\n"
-                       << "\n";
-            }
-        }
-
-        // clang-format on
+        _writeConfigGeneral(stream);
+        _writeConfigPostCommands(stream);
+        _writeConfigPostInfo(stream);
+        _writeConfigMonitoring(stream);
+        _writeConfigPosting(stream);
+        _writeConfigVpn(stream);
+        _writeConfigTransfer(stream);
+        _writeConfigPacking(stream);
+        _writeConfigArchive(stream);
+        _writeConfigPar2(stream);
+        _writeConfigServers(stream);
+        _writeConfigVpnProfiles(stream);
         stream.flush();
         if (stream.status() != QTextStream::Ok) {
             _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));

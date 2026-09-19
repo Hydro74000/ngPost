@@ -936,6 +936,19 @@ private:
     //! only the former is remembered for the merge, and asking
     //! PathHelper::configFilePath() here would create the folder a read-only
     //! invocation must leave alone.
+    void _writeConfigGeneral(QTextStream &stream);
+    void _writeConfigPostCommands(QTextStream &stream);
+    void _writeConfigPostInfo(QTextStream &stream);
+    void _writeConfigMonitoring(QTextStream &stream);
+    void _writeConfigPosting(QTextStream &stream);
+    void _writeConfigVpn(QTextStream &stream);
+    void _writeConfigTransfer(QTextStream &stream);
+    void _writeConfigPacking(QTextStream &stream);
+    void _writeConfigArchive(QTextStream &stream);
+    void _writeConfigPar2(QTextStream &stream);
+    void _writeConfigServers(QTextStream &stream);
+    void _writeConfigVpnProfiles(QTextStream &stream);
+
     QString _parseConfig(const QString &configPath, bool isDefaultConfig = false);
     //! The value of the `obfuscate` config key for the current settings.
     QString _obfuscationKinds() const;
