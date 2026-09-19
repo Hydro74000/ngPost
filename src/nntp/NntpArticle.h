@@ -9,6 +9,8 @@
 #include <QtGlobal>
 #include <QUuid>
 #include <QObject>
+
+#include <memory>
 class NntpFile;
 class NntpConnection;
 
@@ -35,8 +37,8 @@ private:
     QUuid _uuid;          //!< to generate a unique Message-ID for the Header
 
     const std::string *_from;    //!< NNTP header From (owned by PostingJob)
-    char *_subject;              //!< NNTP header Subject (if defined it won't be obfuscated)
-    char *_body;                 //!< full body of the Article with the yEnc header
+    std::unique_ptr<char[]> _subject; //!< NNTP header Subject (if defined it won't be obfuscated)
+    std::unique_ptr<char[]> _body;    //!< full body of the Article with the yEnc header
 
     const qint64 _filePos;   //!< position in the File (for yEnc header)
     const qint64 _fileBytes; //!< bytes of the original file that are encoded
@@ -98,15 +100,10 @@ public:
 
 void NntpArticle::freeMemory()
 {
-    if (_subject)
-    {
-        delete[] _subject;
-        _subject = nullptr;
-    }
+    _subject.reset();
     if (_body)
     {
-        delete[] _body;
-        _body = nullptr;
+        _body.reset();
         _bodyWireSize = 0;
     }
 }

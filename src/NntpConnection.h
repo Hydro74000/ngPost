@@ -59,7 +59,11 @@ private:
     const int _conId;                   //!< connection id
     const NntpServerParams &_srvParams; //!< server parameters
 
-    QTcpSocket *_socket; //!< Real TCP socket
+    //! Owned, without a Qt parent on purpose: created by onStartConnection() in
+    //! this connection's thread, released by deleteSocket() with deleteLater() and
+    //! nulled, so a queued event can never reach a deleted socket. Not a
+    //! unique_ptr: a QObject living in another thread must not be deleted at once.
+    QTcpSocket *_socket;
     bool _isConnected;   //!< to avoid to rely on iSocket && iSocket->isOpen()
 
     QString _logPrefix; //!< log prefix: NntpConnection[<iSocketDescriptor>]

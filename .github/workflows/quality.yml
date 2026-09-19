@@ -1,8 +1,8 @@
 name: Code quality
 
 # What a plain build and test run cannot see: clang-tidy and cppcheck over the
-# real compile database of the GUI and headless builds, and the unit and
-# integration suites under AddressSanitizer and UndefinedBehaviorSanitizer.
+# real compile database of the GUI and headless builds, and the unit,
+# integration and GUI suites under AddressSanitizer and UndefinedBehaviorSanitizer.
 # Not called by release.yml, so a push runs it once.
 on:
   push:
@@ -58,16 +58,23 @@ jobs:
         run: bash .github/scripts/static-analysis.sh build/gui build/headless
 
   sanitizers:
-    name: Unit and integration tests under ASan and UBSan
-    # The environment of the Linux jobs of unit-tests.yml and
-    # integration-tests.yml, so the per-binary floors of expected-counts.txt
-    # hold here too; only the build flags differ.
+    name: Unit, integration and GUI tests under ASan and UBSan
+    # The environment of the Linux jobs of unit-tests.yml, integration-tests.yml
+    # and gui-tests.yml, so the per-binary floors of expected-counts.txt hold
+    # here too; only the build flags differ. The GUI suite earns its place: it
+    # found a slot called on a half-destroyed PostingWidget the others miss.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      # xcb/xkbcommon: gui-tests.yml -- Qt loads them even under offscreen QPA.
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libsecret-1-dev bubblewrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libsecret-1-dev bubblewrap \
+            libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 \
+            libxcb-xfixes0 libxcb-xkb1 libxcb-cursor0
 
       # tst_CliParser isolates the Qt TLS plugins with bwrap: see unit-tests.yml.
       - name: Allow unprivileged user namespaces for bwrap
@@ -100,6 +107,7 @@ jobs:
           (cd src && qmake ngPost.pro "${flags[@]}" && make -j"$(nproc)")
           (cd tests/unit && qmake unit.pro "${flags[@]}" && make -j"$(nproc)")
           (cd tests/integration && qmake integration.pro "${flags[@]}" && make -j"$(nproc)")
+          (cd tests/gui && qmake gui.pro "${flags[@]}" && make -j"$(nproc)")
 
       - name: Bundle the pinned PAR2 tools
         run: |
@@ -119,6 +127,7 @@ jobs:
           status=0
           bash .github/scripts/run-qt-tests.sh tests/unit "unit" || status=1
           bash .github/scripts/run-qt-tests.sh tests/integration "integration" || status=1
+          bash .github/scripts/run-qt-tests.sh tests/gui "GUI" || status=1
           exit "$status"
 
       - name: Upload logs on failure
@@ -129,4 +138,5 @@ jobs:
           path: |
             tests/unit/**/*.log
             tests/integration/**/*.log
+            tests/gui/**/*.log
           if-no-files-found: ignore

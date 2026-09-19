@@ -78,6 +78,11 @@ PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber) :
 
 PostingWidget::~PostingWidget()
 {
+    // The file list and its model are children, deleted by ~QWidget() after
+    // this body has run. The model announces modelReset as it goes, and Qt
+    // only drops this object's connections in ~QObject(), later still: the
+    // signal would reach a PostingWidget that no longer exists (UBSan).
+    disconnect(_ui->filesList->model(), nullptr, this, nullptr);
     delete _ui;
 }
 

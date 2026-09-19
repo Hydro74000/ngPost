@@ -29,8 +29,6 @@ NntpArticle::NntpArticle(NntpFile *file,
     , _part(part)
     , _uuid(QUuid::createUuid())
     , _from(from)
-    , _subject(nullptr)
-    , _body(nullptr)
     , _filePos(pos)
     , _fileBytes(bytes)
     , _bodySize(0)
@@ -49,10 +47,8 @@ NntpArticle::NntpArticle(NntpFile *file,
         ss << _nntpFile->nameWithQuotes().toStdString() << " (" << part << "/" << _nntpFile->nbArticles() << ")";
 
         std::string subject = ss.str();
-        _subject = new char[subject.size() + 1];
-        std::copy(subject.begin(), subject.end(), _subject);
-        _subject[subject.size()] = '\0';
-
+        _subject = std::make_unique<char[]>(subject.size() + 1); // zeroed: terminated
+        std::copy(subject.begin(), subject.end(), _subject.get());
     }
 }
 
@@ -168,8 +164,10 @@ void NntpArticle::yEncBody(const char data[])
                           + static_cast<size_t>(ypartLen) + yEncWorstCaseSize(_fileBytes)
                           + kTailCapacity;
 
-    _body     = new char[capacity];
-    char *ptr = _body;
+    // Not make_unique<char[]>: it would zero ~700 KB that the lines below
+    // overwrite at once (make_unique_for_overwrite is C++20).
+    _body.reset(new char[capacity]);
+    char *ptr = _body.get();
     std::memcpy(ptr, head, static_cast<size_t>(headLen));
     ptr += headLen;
     // The body is assembled piece by piece and never read as a C string.
@@ -201,7 +199,7 @@ void NntpArticle::yEncBody(const char data[])
     Q_ASSERT(tailLen > 0 && static_cast<size_t>(tailLen) < kTailCapacity);
     ptr += tailLen;
 
-    size_t const bodySize = static_cast<size_t>(ptr - _body);
+    size_t const bodySize = static_cast<size_t>(ptr - _body.get());
     _bodyWireSize         = static_cast<qint64>(bodySize);
 
     // What goes in the nzb is the article as the server stores it, so drop the
@@ -247,7 +245,7 @@ void NntpArticle::write(NntpConnection *con, const std::string &idSignature)
     const std::string articleHeader = header(idSignature);
     _nntpFile->onArticlePostingStarted(this, _nbTrySending);
     con->write(articleHeader.data(), static_cast<qint64>(articleHeader.size()));
-    con->write(_body, _bodyWireSize);
+    con->write(_body.get(), _bodyWireSize);
 }
 
 std::string NntpArticle::header(const std::string &idSignature) const
@@ -263,11 +261,14 @@ std::string NntpArticle::header(const std::string &idSignature) const
     // one such byte ends the header line and turns the rest into a header --
     // or into a body -- of the attacker's choosing.
     std::stringstream ss;
+    // One header per line, as they go on the wire.
+    // clang-format off
     ss << "From: "        << Nntp::sanitizedHeaderValue(_from == nullptr ? NgPost::randomStdFrom() : *_from) << Nntp::ENDLINE
        << "Newsgroups: "  << Nntp::sanitizedHeaderValue(_nntpFile->groups())  << Nntp::ENDLINE
-       << "Subject: "     << Nntp::sanitizedHeaderValue(_subject == nullptr ? msgId.constData() : _subject) << Nntp::ENDLINE
+       << "Subject: "     << Nntp::sanitizedHeaderValue(!_subject ? msgId.constData() : _subject.get()) << Nntp::ENDLINE
        << "Message-ID: <" << msgId.constData() << "@" << idSignature << ">" << Nntp::ENDLINE
        << Nntp::ENDLINE;
+    // clang-format on
     _msgId = QString("%1@%2").arg(QString::fromUtf8(msgId.constData()), QString::fromStdString(idSignature));
     return ss.str();
 }
@@ -284,6 +285,6 @@ void NntpArticle::dumpToFile(const QString &path, const std::string &articleIdSi
 
     std::string const articleHeader = header(articleIdSignature);
     file.write(articleHeader.data(), static_cast<qint64>(articleHeader.size()));
-    file.write(_body, _bodyWireSize);
+    file.write(_body.get(), _bodyWireSize);
     file.close();
 }
