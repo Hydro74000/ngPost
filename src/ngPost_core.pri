@@ -67,21 +67,21 @@ macx: QMAKE_CXXFLAGS += -Wno-error=implicit-function-declaration
 # compiler with a plain -I, so a warning inside a Qt header -- GCC 16 with Qt
 # 6.11 already emits -Wsfinae-incomplete from qchar.h -- would fail the build
 # too. Declaring them system headers silences that: GCC and clang drop a -I
-# that duplicates an -isystem, MSVC reads /external:I. A glob, not the QT
-# list, because modules are added further down this file.
+# that duplicates an -isystem (a glob, not the QT list, because modules are
+# added further down this file); MSVC is told below.
 ngpost_werror {
-    NGPOST_THIRD_PARTY_HEADERS = $$[QT_INSTALL_HEADERS] $$files($$[QT_INSTALL_HEADERS]/Qt*)
-    !isEmpty(QT_KEYCHAIN_PREFIX): NGPOST_THIRD_PARTY_HEADERS += $$QT_KEYCHAIN_PREFIX/include
     !msvc {
+        NGPOST_THIRD_PARTY_HEADERS = $$[QT_INSTALL_HEADERS] $$files($$[QT_INSTALL_HEADERS]/Qt*)
+        !isEmpty(QT_KEYCHAIN_PREFIX): NGPOST_THIRD_PARTY_HEADERS += $$QT_KEYCHAIN_PREFIX/include
         QMAKE_CXXFLAGS += -Werror
         for(dir, NGPOST_THIRD_PARTY_HEADERS): QMAKE_CXXFLAGS += -isystem $$shell_quote($$dir)
         macx: QMAKE_CXXFLAGS += -iframework $$shell_quote($$[QT_INSTALL_LIBS])
     }
-    msvc {
-        QMAKE_CXXFLAGS += /WX /external:W0
-        for(dir, NGPOST_THIRD_PARTY_HEADERS): \
-            QMAKE_CXXFLAGS += /external:I$$shell_quote($$system_path($$dir))
-    }
+    # One /external:I per Qt module made the command line longer than nmake
+    # accepts (U1095). Every Qt and QtKeychain header is included with angle
+    # brackets and none of ours is, so /external:anglebrackets draws the same
+    # line in one flag.
+    msvc: QMAKE_CXXFLAGS += /WX /external:anglebrackets /external:W0
 }
 
 DEFINES += __USE_CONNECTION_TIMEOUT__

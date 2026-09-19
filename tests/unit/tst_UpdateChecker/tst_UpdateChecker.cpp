@@ -180,9 +180,12 @@ private slots:
     void trusted_urls() {
         QVERIFY(UpdateChecker::isTrustedDownloadUrl(QUrl("https://github.com/a")));
         QVERIFY(UpdateChecker::isTrustedDownloadUrl(QUrl("https://release-assets.githubusercontent.com/a")));
-        for (const char *url : {"http://github.com/a", "https://evilgithub.com/a",
-             "https://github.com.attacker.test/a", "https://user:pass@github.com/a",
-             "https://github.com:444/a", "file:///tmp/archive"})
+        for (const char *url : { "http://github.com/a",
+                                 "https://evilgithub.com/a",
+                                 "https://github.com.attacker.test/a",
+                                 "https://user:pass@github.com/a",
+                                 "https://github.com:444/a",
+                                 "file:///tmp/archive" })
             QVERIFY2(!UpdateChecker::isTrustedDownloadUrl(QUrl(QString::fromLatin1(url))), url);
     }
     //! Plain releases order by their numbers, and equal numbers are not newer.
