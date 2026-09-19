@@ -79,140 +79,13 @@ PostInfoDialog::PostInfoDialog(const QString                  &configuredTemplat
                                   "blanks."),
                                this));
 
-    // ---- which model -----------------------------------------------------
-    QHBoxLayout *tmplRow = new QHBoxLayout();
-    tmplRow->addWidget(new QLabel(tr("Model:"), this));
+    _buildTemplateControls(root);
 
-    _templateList = new QComboBox(this);
-    _templateList->setObjectName(QStringLiteral("postInfoTemplateList"));
-    tmplRow->addWidget(_templateList, 1);
+    _buildOutputControls(root);
 
-    // A small cross to drop a model from the list. Next to it rather than
-    // inside each row: a combo box has no per item button, and a half working
-    // one in a popup is worse than an obvious button.
-    _forgetButton = new QPushButton(QString(QChar(0x2715)), this);
-    _forgetButton->setObjectName(QStringLiteral("postInfoForgetButton"));
-    _forgetButton->setFixedWidth(34);
-    _forgetButton->setToolTip(tr("Remove this model from the list"));
-    tmplRow->addWidget(_forgetButton);
+    _buildModelPanel(root);
 
-    _reloadButton = new QPushButton(tr("Reload"), this);
-    _reloadButton->setObjectName(QStringLiteral("postInfoLoadFieldsButton"));
-    _reloadButton->setToolTip(tr("Read the file again, dropping the changes made here."));
-    tmplRow->addWidget(_reloadButton);
-
-    root->addLayout(tmplRow);
-
-    _setAsDefault = new QCheckBox(tr("Use this model for my next posts too"), this);
-    _setAsDefault->setObjectName(QStringLiteral("postInfoSetAsDefault"));
-    _setAsDefault->setToolTip(
-        tr("Writes it in your configuration as POST_INFO_TEMPLATE, so it becomes\n"
-           "the model offered by default. This post uses it either way."));
-    root->addWidget(_setAsDefault);
-
-    // ---- where it goes ---------------------------------------------------
-    QHBoxLayout *outRow = new QHBoxLayout();
-    outRow->addWidget(new QLabel(tr("Write it to:"), this));
-
-    _output = new QLineEdit(this);
-    _output->setObjectName(QStringLiteral("postInfoOutput"));
-    // Empty means "whatever the configuration says", so show that as the
-    // placeholder rather than pre-filling it: a filled field would look like a
-    // choice this post made, and would stop following a later config change.
-    _output->setPlaceholderText(_configuredOutput);
-    _output->setToolTip(tr("Leave empty to follow your configuration. Variables work here:\n"
-                           "__nzbDir__/__nzbName__.info.txt writes it next to the nzb."));
-    outRow->addWidget(_output, 1);
-
-    // QChar rather than an octal escape: QStringLiteral takes those bytes as
-    // Latin-1, which put "\u00e2\u0080\u00a6" on the button instead of an ellipsis.
-    _outputButton = new QPushButton(QString(QChar(0x2026)), this);
-    _outputButton->setObjectName(QStringLiteral("postInfoOutputButton"));
-    _outputButton->setFixedWidth(34);
-    _outputButton->setToolTip(tr("Choose a folder for this post's sheet"));
-    outRow->addWidget(_outputButton);
-
-    root->addLayout(outRow);
-
-    _outputHint = new QLabel(this);
-    _outputHint->setObjectName(QStringLiteral("postInfoOutputHint"));
-    _outputHint->setWordWrap(true);
-    root->addWidget(_outputHint);
-
-    _templateHint = new QLabel(this);
-    _templateHint->setObjectName(QStringLiteral("postInfoTemplateHint"));
-    _templateHint->setWordWrap(true);
-    root->addWidget(_templateHint);
-
-    // ---- the model: the file, line by line -------------------------------
-    QGroupBox   *modelBox    = new QGroupBox(tr("The model \342\200\224 the file, line by line"), this);
-    QVBoxLayout *modelLayout = new QVBoxLayout(modelBox);
-    modelLayout->addWidget(new QLabel(
-        tr("This is the file itself. Anything in a line is written as it is, and every "
-           "__variable__ is replaced by its value.\nA line starting with # is a comment: it is "
-           "never written. Changes here only reach the file through \302\253 Save as\342\200\246 \302\273."),
-        modelBox));
-
-    _model = new QTableWidget(modelBox);
-    _model->setObjectName(QStringLiteral("postInfoModelTable"));
-    _model->setColumnCount(4);
-    _model->verticalHeader()->hide();
-    _model->setHorizontalHeaderLabels(
-        QStringList{ tr("Field"), tr("Content of the line"), tr("What will come out"), QString() });
-    _model->horizontalHeader()->setSectionResizeMode(ColExpression, QHeaderView::Stretch);
-    _model->horizontalHeader()->setSectionResizeMode(ColPreview, QHeaderView::Stretch);
-    _model->setColumnWidth(ColLabel, 150);
-    _model->setColumnWidth(ColDelLine, 34);
-    modelLayout->addWidget(_model, 1);
-
-    QHBoxLayout *modelActions = new QHBoxLayout();
-    _addLineButton            = new QPushButton(tr("Add a line"), modelBox);
-    _addLineButton->setObjectName(QStringLiteral("postInfoAddLineButton"));
-    _addLineButton->setToolTip(tr("Inserts a line under the selected one, at the end otherwise."));
-    modelActions->addWidget(_addLineButton);
-
-    _saveAsButton = new QPushButton(tr("Save as\342\200\246"), modelBox);
-    _saveAsButton->setObjectName(QStringLiteral("postInfoSaveAsButton"));
-    _saveAsButton->setToolTip(tr("Writes these lines to a model file of your own."));
-    modelActions->addWidget(_saveAsButton);
-    modelActions->addStretch();
-    modelLayout->addLayout(modelActions);
-
-    root->addWidget(modelBox, 3);
-
-    // ---- your fields: the values of THIS post ----------------------------
-    QGroupBox   *fieldsBox    = new QGroupBox(tr("Your fields \342\200\224 the values of this post"), this);
-    QVBoxLayout *fieldsLayout = new QVBoxLayout(fieldsBox);
-    fieldsLayout->addWidget(new QLabel(
-        tr("One line per __meta:name__ the model uses. These values belong to this post, not to "
-           "the model:\nthey are never written into the file above. A field always goes into the "
-           "post info file \342\200\224 tick \302\253 Also in NZB \302\273 to publish it in the nzb too."),
-        fieldsBox));
-
-    _fields = new QTableWidget(fieldsBox);
-    _fields->setObjectName(QStringLiteral("postInfoFieldsTable"));
-    _fields->setColumnCount(4);
-    _fields->verticalHeader()->hide();
-    _fields->setHorizontalHeaderLabels(
-        QStringList{ tr("Name"), tr("Value"), tr("Also in NZB"), QString() });
-    _fields->horizontalHeaderItem(ColNzb)->setToolTip(
-        tr("Off: the field is written in the post info file only.\n"
-           "On: it is written there AND published in the nzb, which circulates."));
-    _fields->horizontalHeader()->setSectionResizeMode(ColValue, QHeaderView::Stretch);
-    _fields->setColumnWidth(ColName, 150);
-    _fields->setColumnWidth(ColNzb, 90);
-    _fields->setColumnWidth(ColDelField, 34);
-    fieldsLayout->addWidget(_fields, 1);
-
-    QHBoxLayout *fieldActions = new QHBoxLayout();
-    _addFieldButton           = new QPushButton(tr("Add a field"), fieldsBox);
-    _addFieldButton->setObjectName(QStringLiteral("postInfoAddFieldButton"));
-    _addFieldButton->setToolTip(tr("Adds a field of yours, and the line that writes it."));
-    fieldActions->addWidget(_addFieldButton);
-    fieldActions->addStretch();
-    fieldsLayout->addLayout(fieldActions);
-
-    root->addWidget(fieldsBox, 2);
+    _buildFieldsPanel(root);
 
     // ---- the way out -----------------------------------------------------
     QHBoxLayout *bottom = new QHBoxLayout();
@@ -922,4 +795,157 @@ void PostInfoDialog::onShowHelp()
 
     help.resize(760, 600);
     help.exec();
+}
+
+void PostInfoDialog::_buildTemplateControls(QVBoxLayout *root)
+{
+    // ---- which model -----------------------------------------------------
+    QHBoxLayout *tmplRow = new QHBoxLayout();
+    tmplRow->addWidget(new QLabel(tr("Model:"), this));
+
+    _templateList = new QComboBox(this);
+    _templateList->setObjectName(QStringLiteral("postInfoTemplateList"));
+    tmplRow->addWidget(_templateList, 1);
+
+    // A small cross to drop a model from the list. Next to it rather than
+    // inside each row: a combo box has no per item button, and a half working
+    // one in a popup is worse than an obvious button.
+    _forgetButton = new QPushButton(QString(QChar(0x2715)), this);
+    _forgetButton->setObjectName(QStringLiteral("postInfoForgetButton"));
+    _forgetButton->setFixedWidth(34);
+    _forgetButton->setToolTip(tr("Remove this model from the list"));
+    tmplRow->addWidget(_forgetButton);
+
+    _reloadButton = new QPushButton(tr("Reload"), this);
+    _reloadButton->setObjectName(QStringLiteral("postInfoLoadFieldsButton"));
+    _reloadButton->setToolTip(tr("Read the file again, dropping the changes made here."));
+    tmplRow->addWidget(_reloadButton);
+
+    root->addLayout(tmplRow);
+
+    _setAsDefault = new QCheckBox(tr("Use this model for my next posts too"), this);
+    _setAsDefault->setObjectName(QStringLiteral("postInfoSetAsDefault"));
+    _setAsDefault->setToolTip(
+        tr("Writes it in your configuration as POST_INFO_TEMPLATE, so it becomes\n"
+           "the model offered by default. This post uses it either way."));
+    root->addWidget(_setAsDefault);
+}
+
+
+void PostInfoDialog::_buildOutputControls(QVBoxLayout *root)
+{
+    // ---- where it goes ---------------------------------------------------
+    QHBoxLayout *outRow = new QHBoxLayout();
+    outRow->addWidget(new QLabel(tr("Write it to:"), this));
+
+    _output = new QLineEdit(this);
+    _output->setObjectName(QStringLiteral("postInfoOutput"));
+    // Empty means "whatever the configuration says", so show that as the
+    // placeholder rather than pre-filling it: a filled field would look like a
+    // choice this post made, and would stop following a later config change.
+    _output->setPlaceholderText(_configuredOutput);
+    _output->setToolTip(tr("Leave empty to follow your configuration. Variables work here:\n"
+                           "__nzbDir__/__nzbName__.info.txt writes it next to the nzb."));
+    outRow->addWidget(_output, 1);
+
+    // QChar rather than an octal escape: QStringLiteral takes those bytes as
+    // Latin-1, which put "\u00e2\u0080\u00a6" on the button instead of an ellipsis.
+    _outputButton = new QPushButton(QString(QChar(0x2026)), this);
+    _outputButton->setObjectName(QStringLiteral("postInfoOutputButton"));
+    _outputButton->setFixedWidth(34);
+    _outputButton->setToolTip(tr("Choose a folder for this post's sheet"));
+    outRow->addWidget(_outputButton);
+
+    root->addLayout(outRow);
+
+    _outputHint = new QLabel(this);
+    _outputHint->setObjectName(QStringLiteral("postInfoOutputHint"));
+    _outputHint->setWordWrap(true);
+    root->addWidget(_outputHint);
+
+    _templateHint = new QLabel(this);
+    _templateHint->setObjectName(QStringLiteral("postInfoTemplateHint"));
+    _templateHint->setWordWrap(true);
+    root->addWidget(_templateHint);
+}
+
+
+void PostInfoDialog::_buildModelPanel(QVBoxLayout *root)
+{
+    // ---- the model: the file, line by line -------------------------------
+    QGroupBox *modelBox = new QGroupBox(tr("The model \342\200\224 the file, line by line"), this);
+    QVBoxLayout *modelLayout = new QVBoxLayout(modelBox);
+    modelLayout->addWidget(new QLabel(
+        tr("This is the file itself. Anything in a line is written as it is, and every "
+           "__variable__ is replaced by its value.\nA line starting with # is a comment: it is "
+           "never written. Changes here only reach the file through \302\253 Save as\342\200\246 "
+           "\302\273."),
+        modelBox));
+
+    _model = new QTableWidget(modelBox);
+    _model->setObjectName(QStringLiteral("postInfoModelTable"));
+    _model->setColumnCount(4);
+    _model->verticalHeader()->hide();
+    _model->setHorizontalHeaderLabels(
+        QStringList{ tr("Field"), tr("Content of the line"), tr("What will come out"), QString() });
+    _model->horizontalHeader()->setSectionResizeMode(ColExpression, QHeaderView::Stretch);
+    _model->horizontalHeader()->setSectionResizeMode(ColPreview, QHeaderView::Stretch);
+    _model->setColumnWidth(ColLabel, 150);
+    _model->setColumnWidth(ColDelLine, 34);
+    modelLayout->addWidget(_model, 1);
+
+    QHBoxLayout *modelActions = new QHBoxLayout();
+    _addLineButton = new QPushButton(tr("Add a line"), modelBox);
+    _addLineButton->setObjectName(QStringLiteral("postInfoAddLineButton"));
+    _addLineButton->setToolTip(tr("Inserts a line under the selected one, at the end otherwise."));
+    modelActions->addWidget(_addLineButton);
+
+    _saveAsButton = new QPushButton(tr("Save as\342\200\246"), modelBox);
+    _saveAsButton->setObjectName(QStringLiteral("postInfoSaveAsButton"));
+    _saveAsButton->setToolTip(tr("Writes these lines to a model file of your own."));
+    modelActions->addWidget(_saveAsButton);
+    modelActions->addStretch();
+    modelLayout->addLayout(modelActions);
+
+    root->addWidget(modelBox, 3);
+}
+
+
+void PostInfoDialog::_buildFieldsPanel(QVBoxLayout *root)
+{
+    // ---- your fields: the values of THIS post ----------------------------
+    QGroupBox *fieldsBox = new QGroupBox(tr("Your fields \342\200\224 the values of this post"),
+                                         this);
+    QVBoxLayout *fieldsLayout = new QVBoxLayout(fieldsBox);
+    fieldsLayout->addWidget(new QLabel(
+        tr("One line per __meta:name__ the model uses. These values belong to this post, not to "
+           "the model:\nthey are never written into the file above. A field always goes into the "
+           "post info file \342\200\224 tick \302\253 Also in NZB \302\273 to publish it in the "
+           "nzb too."),
+        fieldsBox));
+
+    _fields = new QTableWidget(fieldsBox);
+    _fields->setObjectName(QStringLiteral("postInfoFieldsTable"));
+    _fields->setColumnCount(4);
+    _fields->verticalHeader()->hide();
+    _fields->setHorizontalHeaderLabels(
+        QStringList{ tr("Name"), tr("Value"), tr("Also in NZB"), QString() });
+    _fields->horizontalHeaderItem(ColNzb)->setToolTip(
+        tr("Off: the field is written in the post info file only.\n"
+           "On: it is written there AND published in the nzb, which circulates."));
+    _fields->horizontalHeader()->setSectionResizeMode(ColValue, QHeaderView::Stretch);
+    _fields->setColumnWidth(ColName, 150);
+    _fields->setColumnWidth(ColNzb, 90);
+    _fields->setColumnWidth(ColDelField, 34);
+    fieldsLayout->addWidget(_fields, 1);
+
+    QHBoxLayout *fieldActions = new QHBoxLayout();
+    _addFieldButton = new QPushButton(tr("Add a field"), fieldsBox);
+    _addFieldButton->setObjectName(QStringLiteral("postInfoAddFieldButton"));
+    _addFieldButton->setToolTip(tr("Adds a field of yours, and the line that writes it."));
+    fieldActions->addWidget(_addFieldButton);
+    fieldActions->addStretch();
+    fieldsLayout->addLayout(fieldActions);
+
+    root->addWidget(fieldsBox, 2);
 }
