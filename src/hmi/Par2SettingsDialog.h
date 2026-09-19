@@ -20,6 +20,7 @@ class QLabel;
 class QDialogButtonBox;
 class QFormLayout;
 class QHBoxLayout;
+class QToolButton;
 class QProcess;
 class QPushButton;
 
@@ -33,6 +34,12 @@ public:
     ~Par2SettingsDialog() override;
     void accept() override;
 private:
+    void _buildToolControls(QFormLayout *form);
+    void _buildRecoveryControls(QFormLayout *form);
+    void _buildAdvancedControls(QFormLayout *details);
+    void _loadSettings(QToolButton *advancedButton);
+    void _connectControls();
+    void _scanFiles(const QFileInfoList &files);
     bool event(QEvent *event) override;
     bool _layoutReady = false;
     NgPost *_ngPost;
