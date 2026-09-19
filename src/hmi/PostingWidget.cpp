@@ -81,7 +81,7 @@ PostingWidget::~PostingWidget()
     delete _ui;
 }
 
-void PostingWidget::onFilePosted(QString filePath, uint nbArticles, uint nbFailed)
+void PostingWidget::onFilePosted(const QString &filePath, uint nbArticles, uint nbFailed)
 {
     int nbFiles = _ui->filesList->count();
     for (int i = 0 ; i < nbFiles ; ++i)
@@ -106,7 +106,7 @@ void PostingWidget::onFilePosted(QString filePath, uint nbArticles, uint nbFaile
     }
 }
 
-void PostingWidget::onArchiveFileNames(QStringList paths)
+void PostingWidget::onArchiveFileNames(const QStringList &paths)
 {
     _ui->filesList->clear();
     for (const QString & path : paths)

@@ -2285,7 +2285,10 @@ RunResult runWithMeta(const QString &bin, const QStringList &metaArgs, HomeSandb
 {
     const QString stub = sandbox.rootPath() + QStringLiteral("/in.bin");
     QFile f(stub);
-    f.open(QIODevice::WriteOnly);
+    // A helper returning a value cannot QVERIFY; and every run below would
+    // test a missing input rather than the option it is about.
+    if (!f.open(QIODevice::WriteOnly))
+        qFatal("cannot write the stub input %s", qPrintable(stub));
     f.write("hello");
     f.close();
 

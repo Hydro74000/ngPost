@@ -169,13 +169,13 @@ public:
     void requestHistorySnapshot(const PostHistoryStore::ListFilter &filter,
                                 const QSet<qint64> &ignoredResumeIds,
                                 QObject *receiver,
-                                HistorySnapshotCallback callback);
+                                const HistorySnapshotCallback &callback);
     void requestStatsSnapshot(const QString &dateFrom,
                               const QString &dateTo,
                               const QString &groupFilter,
                               QObject *receiver,
-                              StatsSnapshotCallback callback);
-    void requestPostDetails(qint64 postId, QObject *receiver, DetailsCallback callback);
+                              const StatsSnapshotCallback &callback);
+    void requestPostDetails(qint64 postId, QObject *receiver, const DetailsCallback &callback);
 
 signals:
     void error(QString msg);

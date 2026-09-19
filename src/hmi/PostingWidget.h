@@ -69,7 +69,7 @@ private:
 
 public:
     explicit PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber);
-    ~PostingWidget();
+    ~PostingWidget() override;
 
     void setIDLE();
     void setPosting();
@@ -122,8 +122,8 @@ signals:
     void submissionEligibilityChanged();
 
 public slots: // for PostingJob
-    void onFilePosted(QString filePath, uint nbArticles, uint nbFailed);
-    void onArchiveFileNames(QStringList paths);
+    void onFilePosted(const QString &filePath, uint nbArticles, uint nbFailed);
+    void onArchiveFileNames(const QStringList &paths);
     void onArticlesNumber(int nbArticles);
     void onPostingJobDone();
 

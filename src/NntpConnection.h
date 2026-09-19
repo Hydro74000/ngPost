@@ -96,7 +96,7 @@ public:
     NntpConnection &operator=(const NntpConnection &) = delete;
     NntpConnection &operator=(const NntpConnection &&) = delete;
 
-    ~NntpConnection(); //!< destructor: delete the QTcpSocket
+    ~NntpConnection() override; //!< destructor: delete the QTcpSocket
 
     inline int getId() const; //!< NntpConnection id: iSocketDescriptor
 

@@ -118,9 +118,10 @@ public:
     //! Update an existing profile by name. The profile's `name` may change;
     //! `oldName` identifies the entry to replace.
     using ConfigRollback = std::function<bool()>;
-    bool updateProfile(QString const &oldName, VpnProfile const &p,
+    bool updateProfile(QString const &oldName,
+                       VpnProfile const &p,
                        bool configFileChanged = true,
-                       ConfigRollback restorePreviousConfig = {});
+                       const ConfigRollback &restorePreviousConfig = {});
     //! Remove a profile by name. Also deletes its config file from
     //! <configDir>/vpn/ and removes credentials from the keychain.
     bool removeProfile(QString const &name);

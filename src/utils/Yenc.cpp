@@ -137,6 +137,8 @@ qint64 Yenc::encode(const char data[], qint64 dataSize, uchar encbuffer[], quint
                 c += 64;
             }
             break;
+
+        default: break;
         }
 
         *(pointer++) = c;

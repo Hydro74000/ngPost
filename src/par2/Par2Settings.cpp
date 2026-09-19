@@ -82,7 +82,7 @@ QString joinArguments(const QStringList &args)
     }
     return quoted.join(QLatin1Char(' '));
 }
-static qint64 byteSize(QString text)
+static qint64 byteSize(const QString &text)
 {
     const auto match = QRegularExpression(QStringLiteral("^(\\d+)([BKMGT]?)$"),
                                          QRegularExpression::CaseInsensitiveOption).match(text);
@@ -224,10 +224,9 @@ Settings Settings::read(Tool kind, const QString &arguments)
     if (multiParByteLimit && multiParPerFile >= 4 && multiParPerFile < sMultiParSizeLimit) {
         s.volumes = Volumes::Size;
         s.volumeBytes = multiParPerFile;
-    } else if (multiParByteLimit || multiParPerFile == 0) {
-        // "/ls2" without a byte limit, or with "/lr0", has no guided meaning.
-        s.custom = true;
-    } else if (multiParPerFile > 0) {
+    } else if (multiParByteLimit || multiParPerFile >= 0) {
+        // No guided meaning: "/ls2" with a byte limit outside the guided range
+        // or with "/lr0", and a block-count limit, which cannot become bytes.
         s.custom = true;
     }
     if (autoScale) {

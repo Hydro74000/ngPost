@@ -22,7 +22,7 @@ public:
     {
     }
 
-    QString format(QString text, bool newEntry)
+    QString format(const QString &text, bool newEntry)
     {
         if (newEntry) {
             // The caller starts the new line itself, so a carriage return

@@ -862,11 +862,11 @@ public slots:
 #endif
 
 private slots:
-    void onLog(QString msg, bool newline);
-    void onConnectionRetry(QString server, QString detail);
+    void onLog(const QString &msg, bool newline);
+    void onConnectionRetry(const QString &server, const QString &detail);
     void flushConnectionRetries();
-    void onError(QString msg);
-    void onErrorConnecting(QString err);
+    void onError(const QString &msg);
+    void onErrorConnecting(const QString &err);
     void onRefreshprogressbarBar();
 
     void onNewFileToProcess(const QFileInfo &fileInfo);

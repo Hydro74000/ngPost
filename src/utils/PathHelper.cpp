@@ -113,7 +113,7 @@ ConfigMigrationResult result(ConfigMigrationStatus status,
 //! a copy of, .save marks a file ngPost stopped reading.
 QString savePathFor(const QString &path)
 {
-    const QString simple = path + QStringLiteral(".save");
+    QString simple = path + QStringLiteral(".save");
     if (!QFile::exists(simple))
         return simple;
 
@@ -237,7 +237,7 @@ bool copyFileAtomically(const QString &from, const QString &to, QString *error)
     target.setPermissions(source.permissions());
 
     QByteArray block;
-    while (!(block = source.read(1024 * 1024)).isEmpty()) {
+    while (!(block = source.read(qint64(1024) * 1024)).isEmpty()) {
         if (target.write(block) != block.size()) {
             if (error)
                 *error = QStringLiteral("cannot copy it (%1)").arg(target.errorString());
@@ -880,7 +880,7 @@ QString legacyConfigFilePath()
 
 QString backupPathFor(const QString &path)
 {
-    const QString simple = path + QStringLiteral(".bak");
+    QString simple = path + QStringLiteral(".bak");
     if (!QFile::exists(simple))
         return simple;
 

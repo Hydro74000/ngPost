@@ -908,6 +908,11 @@ void PostingJob::_postFiles()
         }
     }
 
+    // _compressDir exists whenever packing ran: startCompressFiles() and
+    // startGenPar2() create it or fail the job, and a resumed post runs with
+    // both options off (ResumePlanner). Testing it here instead would post the
+    // original files, unencrypted, if that ever broke.
+    // NOLINTBEGIN(clang-analyzer-core.CallAndMessage)
     if (_doCompress) {
         _files.clear();
         for (const QFileInfo &file : _compressDir->entryInfoList(QDir::Files, QDir::Name))
@@ -916,6 +921,7 @@ void PostingJob::_postFiles()
         for (const QFileInfo &file : _compressDir->entryInfoList(QDir::Files, QDir::Name))
             _files << file;
     }
+    // NOLINTEND(clang-analyzer-core.CallAndMessage)
 
     // Sort the upload queue alphabetically by filename (case-insensitive) so
     // posting order is deterministic. With par2cmdline / parpar / multipar
@@ -967,7 +973,7 @@ void PostingJob::_postFiles()
         _abortBeforeTransfer(_resumeFromHistory);
         return;
     } else {
-        QString tab = _ngPost->space();
+        const QString &tab = _ngPost->space();
         _nzbStream.setDevice(_nzb);
         _nzbStream << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                    << "<!DOCTYPE nzb PUBLIC \"-//newzBin//DTD NZB 1.1//EN\" "
@@ -1035,8 +1041,8 @@ void PostingJob::_postFiles()
 #endif
 
     int conIdx = 0;
-    for (ushort posterIdx = 0; posterIdx < nbPosters; ++posterIdx) {
-        Poster *poster = new Poster(this, posterIdx);
+    for (int posterIdx = 0; posterIdx < nbPosters; ++posterIdx) {
+        Poster *poster = new Poster(this, static_cast<ushort>(posterIdx));
         _posters.append(poster);
         poster->lockQueue(); // lock queue so the connection will wait before starting building Articles
 
@@ -2124,7 +2130,7 @@ void PostingJob::_printStats() const
     QString size = postSize();
 
     int duration = static_cast<int>(_timeStart.elapsed() - _pauseDuration);
-    double sec = duration / 1000;
+    double sec = duration / 1000.0;
 
     QString msgEnd("\n"), ts = QString("[%1] ").arg(timestamp());
     if (!_ngPost->useHMI())
@@ -2271,7 +2277,7 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
                 else
                     postSize += fileInfo.size();
             }
-            postSize /= 1024 * 1024; // to get it in MB
+            postSize /= qint64(1024) * 1024; // to get it in MB
             if (volSize > 0) {
                 if (postSize / volSize > _options.rarMax)
                     volSize = static_cast<uint>(postSize / _options.rarMax) + 1;
@@ -2566,6 +2572,8 @@ void PostingJob::_cleanExtProc()
 
 void PostingJob::_cleanCompressDir()
 {
+    if (!_compressDir)
+        return;
     if (!_keepRar)
         _compressDir->removeRecursively();
     if (_ngPost->debugMode())

@@ -60,7 +60,7 @@ private:
 
 public:
     explicit AutoPostWidget(NgPost *ngPost, MainWindow *hmi);
-    ~AutoPostWidget();
+    ~AutoPostWidget() override;
 
     void init();
     void refreshPar2Default();

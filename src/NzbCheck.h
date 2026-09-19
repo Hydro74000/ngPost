@@ -213,7 +213,7 @@ public:
     };
 
     NzbCheck();
-    ~NzbCheck();
+    ~NzbCheck() override;
 
     int parseNzb();
     void checkPost();

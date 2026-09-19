@@ -123,7 +123,7 @@ QString bundledTool(const QString &path, const QString &appDir)
 {
     if (!QDir::isAbsolutePath(path))
         return {};
-    const QString tool = toolForFile(path);
+    QString tool = toolForFile(path);
     if (tool.isEmpty())
         return {};
     const QString clean = QDir::cleanPath(QDir::fromNativeSeparators(path));

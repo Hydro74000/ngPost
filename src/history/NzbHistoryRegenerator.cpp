@@ -17,7 +17,7 @@
 namespace
 {
 
-QString escapeXml(QString s)
+QString escapeXml(const QString &s)
 {
     return NgPost::escapeXML(s);
 }
@@ -144,7 +144,7 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
         && passwordOverride.isEmpty() && warnings)
         *warnings << tr("post had an archive password, but it is not stored");
 
-    const QString tab = NgPost::space();
+    const QString &tab = NgPost::space();
     stream << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
            << "<!DOCTYPE nzb PUBLIC \"-//newzBin//DTD NZB 1.1//EN\" "
               "\"http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd\">\n"

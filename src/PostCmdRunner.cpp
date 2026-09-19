@@ -405,10 +405,9 @@ QString PostCmdRunner::_writeJsonFile(PostInfoData const &data,
                                       Settings const     &settings,
                                       QString            *error) const
 {
-    QString const path =
-        QDir::temp().filePath(QStringLiteral("ngPost_%1_%2.json")
-                                  .arg(QCoreApplication::applicationPid())
-                                  .arg(data.historyPostId));
+    QString path = QDir::temp().filePath(QStringLiteral("ngPost_%1_%2.json")
+                                             .arg(QCoreApplication::applicationPid())
+                                             .arg(data.historyPostId));
 
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly)) {

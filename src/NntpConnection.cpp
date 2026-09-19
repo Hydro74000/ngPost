@@ -306,6 +306,8 @@ void NntpConnection::_closeConnection(bool dropTransport)
         if (dropTransport) {
             // A stalled or failed transport never flushes its write buffer:
             // disconnectFromHost() would wait for it until TCP gives up.
+            // The test below is not redundant: abort() re-enters onDisconnected().
+            // cppcheck-suppress nullPointerRedundantCheck
             _socket->abort();
             // From a connected state abort() emits disconnected(), and
             // onDisconnected() has already released the socket.

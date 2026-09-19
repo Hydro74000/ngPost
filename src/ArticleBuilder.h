@@ -63,7 +63,7 @@ private slots:
 
 public:
     ArticleBuilder(Poster *poster, QObject *parent = nullptr);
-    ~ArticleBuilder();
+    ~ArticleBuilder() override;
 
     NntpArticle *getNextArticle(const QString &threadName);
 };

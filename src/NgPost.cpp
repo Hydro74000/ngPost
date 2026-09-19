@@ -745,7 +745,7 @@ void NgPost::_finishPosting()
 #ifdef __USE_HMI__
             if (!_hmi)
 #endif
-                std::cout << std::endl;
+                std::cout << '\n';
         }
     }
 }
@@ -1446,12 +1446,12 @@ int NgPost::startHMI()
 #endif
 
 
-void NgPost::onLog(QString msg, bool newline)
+void NgPost::onLog(const QString &msg, bool newline)
 {
     _log(msg, newline);
 }
 
-void NgPost::onConnectionRetry(QString server, QString detail)
+void NgPost::onConnectionRetry(const QString &server, const QString &detail)
 {
     if (debugMode()) {
         _log(detail);
@@ -1473,7 +1473,7 @@ void NgPost::flushConnectionRetries()
                  .arg(it.value()));
 }
 
-void NgPost::onError(QString msg)
+void NgPost::onError(const QString &msg)
 {
     // Worker diagnostics are intentionally generic.  They may arrive after a
     // typed terminal decision (for example ERR_VPN followed by the final
@@ -1485,7 +1485,7 @@ void NgPost::onError(QString msg)
 }
 
 
-void NgPost::onErrorConnecting(QString err)
+void NgPost::onErrorConnecting(const QString &err)
 {
     if (_err == ERROR_CODE::NONE)
         _err = ERROR_CODE::COMPLETED_WITH_ERRORS;
@@ -3596,6 +3596,9 @@ QString NgPost::nzbPath(const QString &monitorFolder)
 //! keys at the top level, and _parseConfig() still reads them that way. The
 //! merge needs the same list: writing such a key above the sections again would
 //! add a second server on the next start.
+//! Every key of the server section of _parseConfig(), and only those: that
+//! function creates the server a top-level key implies before writing into it,
+//! so a key missing here would be written through a null pointer.
 QStringList const &NgPost::topLevelServerKeys()
 {
     static QStringList const keys{
@@ -3828,7 +3831,7 @@ bool NgPost::_adoptConfigValue(QString const &key, QString const &value)
 
 QMap<QString, QString> NgPost::_mergeExternalConfigEdits(QString &text)
 {
-    QMap<QString, QString> const mine = topLevelSettings(text);
+    QMap<QString, QString> mine = topLevelSettings(text);
     QString const conf = PathHelper::configFilePath();
     QFile file(conf);
     // Nothing read from this file yet (first run, or a -c configuration): there
@@ -4215,7 +4218,9 @@ QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
                         int nb = val.toInt(&ok);
                         if (ok && nb > 1 && nb <= 120) {
                             _monitorSecDelayScan = static_cast<ushort>(nb);
-                            FoldersMonitorForNewFiles::sMSleep = _monitorSecDelayScan * 1000;
+                            FoldersMonitorForNewFiles::sMSleep = static_cast<ulong>(
+                                                                     _monitorSecDelayScan)
+                                * 1000;
                         }
                     }
                     else if (opt == sOptionNames[Opt::NZB_RM_ACCENTS])
@@ -4688,23 +4693,19 @@ QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
                     }
 
 
-
-
-
                     // Server Section under
-                    else if (opt == sOptionNames[Opt::HOST])
-                    {
+                    // serverParams is set for each of these keys: the block
+                    // above creates it for any key of topLevelServerKeys(),
+                    // which lists exactly this section.
+                    // NOLINTBEGIN(clang-analyzer-core.NullDereference,clang-analyzer-core.CallAndMessage)
+                    else if (opt == sOptionNames[Opt::HOST]) {
                         serverParams->host = val;
-                    }
-                    else if (opt == sOptionNames[Opt::PORT])
-                    {
+                    } else if (opt == sOptionNames[Opt::PORT]) {
                         ushort nb = val.toUShort(&ok);
                         if (ok)
                             serverParams->port = nb;
 
-                    }
-                    else if (opt == sOptionNames[Opt::SSL])
-                    {
+                    } else if (opt == sOptionNames[Opt::SSL]) {
                         val = val.toLower();
                         if (val == "true" || val == "on" || val == "1")
                         {
@@ -4712,45 +4713,34 @@ QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
                             if (serverParams->port == NntpServerParams::sDefaultPort)
                                 serverParams->port = NntpServerParams::sDefaultSslPort;
                         }
-                    }
-                    else if (opt == sOptionNames[Opt::ENABLED])
-                    {
+                    } else if (opt == sOptionNames[Opt::ENABLED]) {
                         val = val.toLower();
                         if (val == "true" || val == "on" || val == "1")
                             serverParams->enabled = true;
                         else
                             serverParams->enabled = false;
-                    }
-                    else if (opt == sOptionNames[Opt::NZBCHECK])
-                    {
+                    } else if (opt == sOptionNames[Opt::NZBCHECK]) {
                         val = val.toLower();
                         if (val == "true" || val == "on" || val == "1")
                             serverParams->nzbCheck = true;
                         else
                             serverParams->nzbCheck = false;
-                    }
-                    else if (opt == sOptionNames[Opt::SERVER_USE_VPN].toLower())
-                    {
+                    } else if (opt == sOptionNames[Opt::SERVER_USE_VPN].toLower()) {
                         val = val.toLower();
                         serverParams->useVpn =
                             (val == "true" || val == "on" || val == "1");
-                    }
-                    else if (opt == sOptionNames[Opt::USER])
-                    {
+                    } else if (opt == sOptionNames[Opt::USER]) {
                         serverParams->user = val.toStdString();
                         serverParams->auth = true;
-                    }
-                    else if (opt == sOptionNames[Opt::PASS])
-                    {
+                    } else if (opt == sOptionNames[Opt::PASS]) {
                         serverParams->pass = val.toStdString();
                         serverParams->auth = true;
-                    }
-                    else if (opt == sOptionNames[Opt::CONNECTION])
-                    {
+                    } else if (opt == sOptionNames[Opt::CONNECTION]) {
                         int nb = val.toInt(&ok);
                         if (ok)
                             serverParams->nbCons = nb;
-                    }               
+                    }
+                    // NOLINTEND(clang-analyzer-core.NullDereference,clang-analyzer-core.CallAndMessage)
                 }
             }
         }

@@ -69,7 +69,7 @@ private:
 
 public:
     FoldersMonitorForNewFiles(const QString &folderPath, QObject *parent = nullptr);
-    ~FoldersMonitorForNewFiles();
+    ~FoldersMonitorForNewFiles() override;
 
 #ifdef NGPOST_TESTING
     static bool retryWriteLockForTest(ushort &lockRetries, ushort maxRetries)

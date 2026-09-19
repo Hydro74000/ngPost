@@ -164,7 +164,10 @@ void UpdateChecker::checkLatestRelease()
     connect(reply, &QIODevice::readyRead, this, [reply] {
         QByteArray body = reply->property("boundedBody").toByteArray();
         const QByteArray chunk = reply->read(65536);
-        if (body.size() + chunk.size() > 1024 * 1024) { reply->abort(); return; }
+        if (body.size() + chunk.size() > qsizetype(1024) * 1024) {
+            reply->abort();
+            return;
+        }
         body += chunk;
         reply->setProperty("boundedBody", body);
     });
@@ -184,7 +187,8 @@ void UpdateChecker::onReleaseInfoReceived()
     }
 
     const QByteArray body = reply->property("boundedBody").toByteArray() + reply->readAll();
-    if (body.size() > 1024 * 1024) return;
+    if (body.size() > qsizetype(1024) * 1024)
+        return;
     QJsonParseError err;
     const QJsonDocument doc = QJsonDocument::fromJson(body, &err);
     if (err.error != QJsonParseError::NoError || (!doc.isObject() && !doc.isArray()))
@@ -204,8 +208,7 @@ void UpdateChecker::onReleaseInfoReceived()
     {
         const QString mine = buildTag();
         QString best;
-        for (const QJsonValue &v : doc.array())
-        {
+        for (const auto &v : doc.array()) {
             const QJsonObject candidate = v.toObject();
             if (candidate.value("draft").toBool())
                 continue;
@@ -263,8 +266,7 @@ void UpdateChecker::onReleaseInfoReceived()
 
     const QString wantedName = assetNameForCurrentOS(_latestTag);
     const QJsonArray assets  = root.value("assets").toArray();
-    for (const QJsonValue &v : assets)
-    {
+    for (const auto &v : assets) {
         const QJsonObject a = v.toObject();
         if (a.value("name").toString() == wantedName)
         {
@@ -448,12 +450,15 @@ void UpdateChecker::startDownloadAndInstall()
     QUrl manifest = _assetUrl;
     manifest.setPath(_assetUrl.path().left(_assetUrl.path().lastIndexOf('/') + 1) + QStringLiteral("manifest.json"));
     manifest.setQuery(QString());
-    downloadFile(manifest, QStringLiteral("manifest.json"), 1024 * 1024, [this] {
+    downloadFile(manifest, QStringLiteral("manifest.json"), qint64(1024) * 1024, [this] {
         downloadFile(_assetUrl, QStringLiteral("archive"), _assetSize, [this] { prepareInstall(); });
     });
 }
 
-void UpdateChecker::downloadFile(const QUrl &url, const QString &name, qint64 cap, std::function<void()> done)
+void UpdateChecker::downloadFile(const QUrl &url,
+                                 const QString &name,
+                                 qint64 cap,
+                                 const std::function<void()> &done)
 {
     if (_cancelled) return;
     _downloadFile.reset(new QFile(_work->filePath(name)));

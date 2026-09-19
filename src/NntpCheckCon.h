@@ -73,7 +73,7 @@ private:
 
 public:
     NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &srvParams);
-    ~NntpCheckCon();
+    ~NntpCheckCon() override;
 
 signals:
     void startConnection();

@@ -46,7 +46,7 @@ namespace
 QString bundledVpnBinDir()
 {
 #ifdef Q_OS_LINUX
-    QString const dir = QCoreApplication::applicationDirPath() + QStringLiteral("/vpn");
+    QString dir = QCoreApplication::applicationDirPath() + QStringLiteral("/vpn");
     if (QFileInfo::exists(dir + QStringLiteral("/wg"))
         || QFileInfo::exists(dir + QStringLiteral("/wireguard-go")))
         return dir;
@@ -378,12 +378,13 @@ void WireGuardBackend::_handleLine(QString const &line)
     }
     VpnFailureKind failure = VpnFailureKind::Internal;
     if (message.legacy) failure = VpnFailureKind::HelperOutdated;
-    else if (message.type == Type::Busy) failure = VpnFailureKind::LeaseBusy;
+    else if (message.type == Type::Busy || message.type == Type::LegacyOwnerActive)
+        failure = VpnFailureKind::LeaseBusy;
     else if (message.type == Type::LeaseTimeout) failure = VpnFailureKind::LeaseTimeout;
     else if (message.type == Type::LeaseUnavailable) failure = VpnFailureKind::LeaseUnavailable;
     else if (message.type == Type::RuntimeNotVolatile) failure = VpnFailureKind::RuntimeNotVolatile;
-    else if (message.type == Type::UnattributedVpnState) failure = VpnFailureKind::UnattributedVpnState;
-    else if (message.type == Type::LegacyOwnerActive) failure = VpnFailureKind::LeaseBusy;
+    else if (message.type == Type::UnattributedVpnState)
+        failure = VpnFailureKind::UnattributedVpnState;
     else if (message.type == Type::Error)
         failure = vpnFailureKindFromProtocol(
             message.fields.value(QStringLiteral("failure")));

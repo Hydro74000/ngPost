@@ -172,6 +172,8 @@ void NntpArticle::yEncBody(const char data[])
     char *ptr = _body;
     std::memcpy(ptr, head, static_cast<size_t>(headLen));
     ptr += headLen;
+    // The body is assembled piece by piece and never read as a C string.
+    // NOLINTNEXTLINE(bugprone-not-null-terminated-result)
     std::memcpy(ptr, filename.data(), filename.size());
     ptr += filename.size();
     std::memcpy(ptr, ypart, static_cast<size_t>(ypartLen));

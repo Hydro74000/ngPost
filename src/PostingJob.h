@@ -232,7 +232,7 @@ public:
                const PostingJobOptions &options,
                PostingWidget *postWidget = nullptr,
                QObject *parent = nullptr);
-    ~PostingJob();
+    ~PostingJob() override;
 
     qint64 articleSizeBytes() const { return _articleSizeBytes; }
 

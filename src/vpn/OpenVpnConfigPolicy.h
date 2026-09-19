@@ -72,7 +72,7 @@ struct Verdict
 
 //! Largest profile accepted. A real one is a few kilobytes; the cap bounds the
 //! work done on a file that root is about to read.
-constexpr qint64 kMaxConfigBytes = 1024 * 1024;
+constexpr qint64 kMaxConfigBytes = qint64(1024) * 1024;
 
 //! Inspect the bytes of a .ovpn profile.
 Verdict inspect(QByteArray const &config);

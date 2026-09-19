@@ -72,7 +72,10 @@ private:
     friend class TestUpdateChecker;
 #endif
     QString assetNameForCurrentOS(const QString &tag) const;
-    void downloadFile(const QUrl &url, const QString &name, qint64 cap, std::function<void()> done);
+    void downloadFile(const QUrl &url,
+                      const QString &name,
+                      qint64 cap,
+                      const std::function<void()> &done);
     void prepareInstall();
     void failDownload(const QString &message);
 

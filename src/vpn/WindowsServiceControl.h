@@ -7,7 +7,8 @@ namespace WindowsServiceControl {
 enum class State { Stopped, Running, StartPending, StopPending, Unknown };
 enum class StopResult { Stopped, Pending, Failed };
 // One non-blocking polling step. Successful submission is NEVER completion.
-inline StopResult stopStep(std::function<State()> query, std::function<bool()> request)
+inline StopResult stopStep(const std::function<State()> &query,
+                           const std::function<bool()> &request)
 {
     switch (query()) {
     case State::Stopped: return StopResult::Stopped;

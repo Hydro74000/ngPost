@@ -76,7 +76,7 @@ struct Verdict
 
 //! Largest profile accepted. A real one is well under a kilobyte; the cap
 //! bounds the work done on a file a privileged process is about to read.
-constexpr qint64 kMaxConfigBytes = 1024 * 1024;
+constexpr qint64 kMaxConfigBytes = qint64(1024) * 1024;
 
 //! Inspect the bytes of a WireGuard profile.
 Verdict inspect(QByteArray const &config);

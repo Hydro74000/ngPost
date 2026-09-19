@@ -42,7 +42,7 @@ public:
     NntpFile(PostingJob *postingJob, const QFileInfo &file,
              uint num, uint nbFiles, int padding,
              const QList<QString> &grpList);
-    ~NntpFile();
+    ~NntpFile() override;
 
     inline void addArticle(NntpArticle *article);
 

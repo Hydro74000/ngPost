@@ -64,7 +64,7 @@ public:
     //! exposed so the encoder and the bound can be fuzzed against each other.
     static size_t yEncWorstCaseSize(qint64 nbBytes);
 
-    ~NntpArticle();
+    ~NntpArticle() override;
 
     QString str() const;
 

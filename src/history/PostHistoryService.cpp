@@ -20,6 +20,8 @@
 #include <QTimer>
 #include <QtGlobal>
 
+#include <utility>
+
 namespace
 {
 
@@ -593,7 +595,9 @@ void PostHistoryService::_invokeQueued(Func func)
 {
     if (!_worker)
         return;
-    QMetaObject::invokeMethod(_worker, [worker = _worker, func]() { func(worker); }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(_worker, [worker = _worker, func = std::move(func)]() {
+        func(worker);
+    }, Qt::QueuedConnection);
 }
 
 template<typename Func>
@@ -1075,7 +1079,7 @@ bool PostHistoryService::checkResume(qint64 postId, ResumeRow *row, QString *err
 void PostHistoryService::requestHistorySnapshot(const PostHistoryStore::ListFilter &filter,
                                                 const QSet<qint64> &ignoredResumeIds,
                                                 QObject *receiver,
-                                                HistorySnapshotCallback callback)
+                                                const HistorySnapshotCallback &callback)
 {
     if (!receiver || !callback)
         return;
@@ -1095,7 +1099,7 @@ void PostHistoryService::requestStatsSnapshot(const QString &dateFrom,
                                               const QString &dateTo,
                                               const QString &groupFilter,
                                               QObject *receiver,
-                                              StatsSnapshotCallback callback)
+                                              const StatsSnapshotCallback &callback)
 {
     if (!receiver || !callback)
         return;
@@ -1111,7 +1115,9 @@ void PostHistoryService::requestStatsSnapshot(const QString &dateFrom,
     });
 }
 
-void PostHistoryService::requestPostDetails(qint64 postId, QObject *receiver, DetailsCallback callback)
+void PostHistoryService::requestPostDetails(qint64 postId,
+                                            QObject *receiver,
+                                            const DetailsCallback &callback)
 {
     if (!receiver || !callback)
         return;

@@ -1,0 +1,57 @@
+name: Code quality
+
+# Analyses no compiler runs: clang-tidy and cppcheck over the real compile
+# database of the GUI and headless builds. Not called by release.yml, so a push
+# runs it once.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# A newer push supersedes this run: finishing it only delays the result that
+# matters and holds a runner.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  static-analysis:
+    name: clang-tidy and cppcheck
+    runs-on: ubuntu-24.04
+    # Fedora, pinned by digest: its clang-tidy (22) and cppcheck (2.21) are the
+    # versions .clang-tidy and the suppressions were reviewed with. The
+    # Ubuntu runner ships clang-tidy 18 and cppcheck 2.13, which report other
+    # things, and an analyser whose verdict depends on the machine is no gate.
+    # Reproduce locally in the same image with
+    # .github/scripts/static-analysis.sh <build-dir>...
+    container:
+      image: fedora:44@sha256:43b29f65a41eb9c35e1cd5323e3bdf3b655c2357a9f4f1ff2f9c2798e5045d80
+    steps:
+      - name: Install the toolchain
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            git make clang clang-tools-extra cppcheck bear python3 \
+            qt6-qtbase-devel qt6-qtcharts-devel qtkeychain-qt6-devel
+          clang-tidy --version | head -2
+          cppcheck --version
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # bear records the compile database the two analysers read. The headless
+      # build compiles other #ifdef branches, so both are analysed.
+      - name: Build the GUI and headless variants
+        run: |
+          for variant in gui headless; do
+            extra=""
+            [ "$variant" = headless ] && extra="CONFIG+=no_hmi"
+            mkdir -p "build/$variant"
+            (cd "build/$variant" \
+              && qmake6 -spec linux-clang ../../src/ngPost.pro CONFIG+=release $extra \
+              && bear -- make -j"$(nproc)")
+          done
+
+      - name: Analyse
+        run: bash .github/scripts/static-analysis.sh build/gui build/headless

@@ -449,9 +449,10 @@ bool VpnManager::addProfile(VpnProfile const &p)
     return true;
 }
 
-bool VpnManager::updateProfile(QString const &oldName, VpnProfile const &p,
+bool VpnManager::updateProfile(QString const &oldName,
+                               VpnProfile const &p,
                                bool configFileChanged,
-                               ConfigRollback restorePreviousConfig)
+                               const ConfigRollback &restorePreviousConfig)
 {
     int idx = findProfileIndex(oldName);
     if (idx < 0 || !p.isValid()) return false;
@@ -2072,7 +2073,7 @@ void VpnManager::runStartupStaleCleanup()
                 if (QFileInfo(QString::fromLocal8Bit(argv.at(i))).fileName()
                         != QLatin1String("ngpost-vpn-helper.sh"))
                     continue;
-                QByteArray const action = argv.at(i + 1);
+                QByteArray const &action = argv.at(i + 1);
                 if (action == "openvpn" || action == "wireguard") {
                     legacyHelperPid = pid;
                     break;

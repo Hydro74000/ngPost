@@ -17,7 +17,7 @@ inline QString quoteArgument(QString const &argument)
         result += c;
         slashes = 0;
     }
-    return result + QString(2 * slashes, QLatin1Char('\\')) + QLatin1Char('"');
+    return result + QString(2 * qsizetype(slashes), QLatin1Char('\\')) + QLatin1Char('"');
 }
 
 inline QString serialize(QStringList const &arguments)

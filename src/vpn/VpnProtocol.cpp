@@ -114,7 +114,7 @@ Message parse(QString const &source)
     }
 
     for (int i = 1; i < tokens.size(); ++i) {
-        QString const token = tokens.at(i);
+        QString const &token = tokens.at(i);
         int const equal = token.indexOf(QLatin1Char('='));
         if (equal <= 0) {
             result.type = Type::Invalid;

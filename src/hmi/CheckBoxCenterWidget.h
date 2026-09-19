@@ -29,7 +29,7 @@ class CheckBoxCenterWidget : public QWidget
     Q_OBJECT
 public:
     CheckBoxCenterWidget(QWidget *parent = nullptr, bool isChecked = false);
-    ~CheckBoxCenterWidget() = default;
+    ~CheckBoxCenterWidget() override = default;
 
     bool isChecked() const;
     void setChecked(bool checked);
