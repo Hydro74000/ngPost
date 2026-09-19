@@ -1,4 +1,4 @@
-# uninstall-wg-tunnel.ps1 — remove a WireGuard tunnel service previously
+# uninstall-wg-tunnel.ps1 -- remove a WireGuard tunnel service previously
 # registered via install-wg-tunnel.ps1. Called by ngPost (via UAC) when the
 # user deletes a WireGuard profile.
 

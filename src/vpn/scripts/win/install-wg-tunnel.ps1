@@ -1,8 +1,8 @@
-# install-wg-tunnel.ps1 — register a WireGuard tunnel service for ngPost.
+# install-wg-tunnel.ps1 -- register a WireGuard tunnel service for ngPost.
 #
 # Called by ngPost (via UAC elevation) when the user creates or edits a
 # WireGuard profile on Windows. The work happens in three steps:
-#   0. stage + validate — the profile is copied into an administrators-only
+#   0. stage + validate -- the profile is copied into an administrators-only
 #      folder and the COPY is validated and installed. ngPost validates the
 #      original too, but it lives in the user's own configuration folder: any
 #      process running as that user can rewrite it between that check and this
@@ -10,10 +10,10 @@
 #      meaningful if the file can no longer change, which is what the copy
 #      buys. Same reasoning as the Linux helper, which sanitises its own copy
 #      as root instead of trusting the caller's file.
-#   1. wireguard.exe /installtunnelservice <staged conf>  — creates a Windows
+#   1. wireguard.exe /installtunnelservice <staged conf>  -- creates a Windows
 #      service named "WireGuardTunnel$<basename-of-conf>" running as SYSTEM.
 #      The basename is preserved by the copy, so the service name is unchanged.
-#   2. sc sdset <service> ...                       — extends the service ACL
+#   2. sc sdset <service> ...                       -- extends the service ACL
 #      to grant SERVICE_START + SERVICE_STOP to the invoking user, so that
 #      subsequent runtime connect/disconnect from ngPost (unprivileged) does
 #      NOT require UAC.

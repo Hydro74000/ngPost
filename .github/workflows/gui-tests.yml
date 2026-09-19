@@ -51,7 +51,7 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
                 -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
-          cmake --build build -j$(nproc)
+          cmake --build build -j"$(nproc)"
           cmake --install build
 
       - name: Compile translations (.ts -> .qm)
@@ -66,14 +66,14 @@ jobs:
       - name: Build ngPost (needed by tests' RESOURCES + locateNgPostBinary fallback)
         run: |
           cd src
-          qmake ngPost.pro CONFIG+=release
-          make -j$(nproc)
+          qmake ngPost.pro CONFIG+=release CONFIG+=ngpost_werror
+          make -j"$(nproc)"
 
       - name: Build GUI tests
         run: |
           cd tests/gui
-          qmake gui.pro CONFIG+=release
-          make -j$(nproc)
+          qmake gui.pro CONFIG+=release CONFIG+=ngpost_werror
+          make -j"$(nproc)"
 
       - name: Run GUI tests under offscreen QPA
         env:
@@ -129,13 +129,13 @@ jobs:
       - name: Build ngPost (needed by tests' RESOURCES + locateNgPostBinary fallback)
         run: |
           cd src
-          qmake ngPost.pro CONFIG+=release
+          qmake ngPost.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(sysctl -n hw.ncpu)"
 
       - name: Build GUI tests
         run: |
           cd tests/gui
-          qmake gui.pro CONFIG+=release
+          qmake gui.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(sysctl -n hw.ncpu)"
 
       - name: Bundle the pinned PAR2 tools
@@ -203,14 +203,14 @@ jobs:
           Get-ChildItem lang/ngPost_*.ts | ForEach-Object {
             lrelease $_.FullName -qm "resources/lang/$($_.BaseName).qm"
           }
-          qmake ngPost.pro -spec win32-msvc CONFIG+=release
+          qmake ngPost.pro -spec win32-msvc CONFIG+=release CONFIG+=ngpost_werror
           nmake
 
       - name: Build GUI tests
         shell: pwsh
         run: |
           cd tests/gui
-          qmake gui.pro -spec win32-msvc CONFIG+=release
+          qmake gui.pro -spec win32-msvc CONFIG+=release CONFIG+=ngpost_werror
           nmake
 
       - name: Run GUI tests under offscreen QPA

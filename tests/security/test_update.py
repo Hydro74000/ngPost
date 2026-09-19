@@ -1,5 +1,4 @@
 import importlib.util
-import io
 import json
 from pathlib import Path
 import tempfile
@@ -106,7 +105,8 @@ class UpdateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             install, candidate, backup = root / 'install', root / 'new', root / 'old'
-            install.mkdir(); candidate.mkdir()
+            install.mkdir()
+            candidate.mkdir()
             (install / 'version').write_text('old')
             (candidate / 'version').write_text('new')
             rename = updater.os.rename
@@ -126,7 +126,8 @@ class UpdateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             install, candidate, backup = root / 'install', root / 'new', root / 'old'
-            install.mkdir(); candidate.mkdir()
+            install.mkdir()
+            candidate.mkdir()
             (install / 'version').write_text('old')
             (candidate / 'version').write_text('new')
             with mock.patch.object(updater.os, 'name', 'nt'):
@@ -148,7 +149,8 @@ class UpdateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             old, new = root / 'installed', root / 'candidate'
-            old.mkdir(); new.mkdir()
+            old.mkdir()
+            new.mkdir()
             (old / 'version').write_text('old')
             (new / 'version').write_text('new')
             updater.replace(new, old, root / 'backup')
@@ -163,7 +165,8 @@ class UpdateTests(unittest.TestCase):
                 root = Path(d)
                 install, work = root / 'install', root / 'work'
                 candidate = work / 'new'
-                install.mkdir(); candidate.mkdir(parents=True)
+                install.mkdir()
+                candidate.mkdir(parents=True)
                 (install / 'version').write_text('old')
                 (candidate / 'version').write_text('new')
                 (work / 'prepared.json').write_text(json.dumps({'candidate': str(candidate), 'install': str(install)}))

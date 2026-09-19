@@ -62,6 +62,9 @@ using QKeychain::Job;
 namespace {
 constexpr char kKeychainService[] = "ngPost-vpn";
 
+// Read by the Linux stale-session cleanup and by its test hook only: defining it
+// elsewhere leaves an unused function, which macOS builds warn about.
+#if defined(Q_OS_LINUX) || defined(NGPOST_TESTING)
 bool parseLinuxOwnerManifest(QByteArray bytes, qint64 *ownerPid,
                              QString *ownerStart)
 {
@@ -93,6 +96,7 @@ bool parseLinuxOwnerManifest(QByteArray bytes, qint64 *ownerPid,
         *ownerStart = match.captured(2);
     return true;
 }
+#endif
 
 bool helperDeclaresProtocol2(QByteArray const &prefix)
 {

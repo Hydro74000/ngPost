@@ -46,7 +46,7 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
                 -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
-          cmake --build build -j$(nproc)
+          cmake --build build -j"$(nproc)"
           cmake --install build
 
       - name: Compile translations (.ts -> .qm)
@@ -61,14 +61,14 @@ jobs:
       - name: Build ngPost
         run: |
           cd src
-          qmake ngPost.pro CONFIG+=release
-          make -j$(nproc)
+          qmake ngPost.pro CONFIG+=release CONFIG+=ngpost_werror
+          make -j"$(nproc)"
 
       - name: Build tests
         run: |
           cd tests/vpn
-          qmake vpn.pro CONFIG+=release
-          make -j$(nproc)
+          qmake vpn.pro CONFIG+=release CONFIG+=ngpost_werror
+          make -j"$(nproc)"
 
       - name: Verify WireGuard module + passwordless sudo
         # GitHub-hosted Ubuntu runners ship with the wireguard module and

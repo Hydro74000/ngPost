@@ -110,17 +110,22 @@ function Assert-EntryExit([int] $Expected, [string] $Body) {
 }
 
 # Fail if a future change brings runtime compilation back into the elevated path.
-function Add-Type { throw 'runtime compilation is forbidden in the staging tests' }
+function Add-Type {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '',
+        Justification = 'Shadowing Add-Type is the test: any call to it must fail.')]
+    param()
+    throw 'runtime compilation is forbidden in the staging tests'
+}
 
 $base = Join-Path ([IO.Path]::GetPathRoot($env:SystemRoot)) ('ngpost-wg-test-' + [guid]::NewGuid())
 $source = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName() + '.conf')
 $adminAcl = 'O:BAG:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)'
 $userSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-$profile = "[Interface] # interface = comment`nPrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`nAddress = 10.0.0.2/32`n[Peer] # peer`nPublicKey = AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=`nAllowedIPs = 0.0.0.0/0`n"
+$wgProfile = "[Interface] # interface = comment`nPrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`nAddress = 10.0.0.2/32`n[Peer] # peer`nPublicKey = AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=`nAllowedIPs = 0.0.0.0/0`n"
 $link = $null
 try {
     New-PrivateStagingDirectory -Path $base
-    [IO.File]::WriteAllText($source, $profile)
+    [IO.File]::WriteAllText($source, $wgProfile)
     $staging = New-ProtectedStagingDir -BasePath $base
 
     Test-Case 'private directory creation does not need TEMP or a compiler' {
@@ -144,7 +149,7 @@ try {
         if ($again -ne $staging) { throw 'staging changed' }
         $staged = New-StagedWireGuardProfile -ConfPath $source -Staging $staging
         if ([IO.Path]::GetFileName($staged) -ne [IO.Path]::GetFileName($source)) { throw 'basename changed' }
-        if ([IO.File]::ReadAllText($staged) -ne $profile) { throw 'profile changed' }
+        if ([IO.File]::ReadAllText($staged) -ne $wgProfile) { throw 'profile changed' }
         Assert-TrustedStagingPath -Path $staged -Private
     }
     Test-Case 'missing WireGuard returns exit 2 under ErrorActionPreference Stop' {
@@ -171,15 +176,15 @@ try {
         try {
             Assert-EntryExit 3 (Get-EntryStatement '^try\s*\{\s*\$stagedConf =')
             $destination = Join-Path $staging ([IO.Path]::GetFileName($source))
-            if ([IO.File]::ReadAllText($destination) -ne $profile) { throw 'installed profile changed' }
-        } finally { [IO.File]::WriteAllText($source, $profile) }
+            if ([IO.File]::ReadAllText($destination) -ne $wgProfile) { throw 'installed profile changed' }
+        } finally { [IO.File]::WriteAllText($source, $wgProfile) }
     }
     Test-Case 'untrusted staged destination returns exit 10 rather than profile error 3' {
         $destination = Join-Path $staging ([IO.Path]::GetFileName($source))
         Set-TestSecurity $destination ("O:${userSid}G:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)")
         try {
             Assert-EntryExit 10 (Get-EntryStatement '^try\s*\{\s*\$stagedConf =')
-            if ([IO.File]::ReadAllText($destination) -ne $profile) { throw 'untrusted destination changed' }
+            if ([IO.File]::ReadAllText($destination) -ne $wgProfile) { throw 'untrusted destination changed' }
         } finally { Set-TestSecurity $destination $adminAcl }
     }
     Test-Case 'service installer launch failure returns exit 4' {
@@ -247,11 +252,11 @@ try {
             [IO.File]::WriteAllText($source, "[Interface]`n$key = whoami # comment`n")
             Assert-Refused { New-StagedWireGuardProfile -ConfPath $source -Staging $staging } 'runs a command'
         }
-        if ([IO.File]::ReadAllText($destination) -ne $profile) { throw 'old profile was replaced' }
+        if ([IO.File]::ReadAllText($destination) -ne $wgProfile) { throw 'old profile was replaced' }
     }
     Test-Case 'WOF compression is accepted while untrusted write permissions are refused' {
         $compressed = Join-Path $staging 'compressed.conf'
-        [IO.File]::WriteAllText($compressed, $profile + ("# padding`n" * 16384))
+        [IO.File]::WriteAllText($compressed, $wgProfile + ("# padding`n" * 16384))
         $compact = Join-Path ([Environment]::SystemDirectory) 'compact.exe'
         & $compact /C /EXE:XPRESS4K /F $compressed | Out-Null
         if ($LASTEXITCODE -ne 0) { throw 'compact failed' }
@@ -269,7 +274,7 @@ try {
     Test-Case 'a preexisting untrusted destination cannot be overwritten' {
         $destination = Join-Path $staging ([IO.Path]::GetFileName($source))
         Set-TestSecurity $destination ("O:${userSid}G:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)")
-        [IO.File]::WriteAllText($source, $profile)
+        [IO.File]::WriteAllText($source, $wgProfile)
         Assert-Refused { New-StagedWireGuardProfile -ConfPath $source -Staging $staging } 'untrusted owner'
         Set-TestSecurity $destination $adminAcl
     }
@@ -288,7 +293,7 @@ try {
     Test-Case 'cleanup removes only the requested tunnel and tolerates its absence' {
         $name = [IO.Path]::GetFileNameWithoutExtension($source)
         $other = Join-Path $staging 'other.conf'
-        [IO.File]::WriteAllText($other, $profile)
+        [IO.File]::WriteAllText($other, $wgProfile)
         Remove-StagedWireGuardProfile -TunnelName $name -BasePath $base
         Remove-StagedWireGuardProfile -TunnelName $name -BasePath $base
         if (@(Get-ChildItem -LiteralPath $staging).Count -ne 1 -or -not (Test-Path $other)) {

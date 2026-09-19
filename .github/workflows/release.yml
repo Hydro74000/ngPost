@@ -160,7 +160,7 @@ jobs:
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
-          cmake --build build -j$(nproc)
+          cmake --build build -j"$(nproc)"
           cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
@@ -181,7 +181,7 @@ jobs:
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
-          make -j$(nproc)
+          make -j"$(nproc)"
       - name: Smoke test the built binary
         run: |
           # Nothing else in this workflow ever runs what it is about to publish.
@@ -671,7 +671,7 @@ jobs:
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
-          cmake --build build -j$(sysctl -n hw.ncpu)
+          cmake --build build -j"$(sysctl -n hw.ncpu)"
           cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
@@ -692,7 +692,7 @@ jobs:
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
-          make -j$(sysctl -n hw.ncpu)
+          make -j"$(sysctl -n hw.ncpu)"
       - name: Bundle Qt frameworks into .app
         run: |
           macdeployqt src/ngPost.app
@@ -804,7 +804,7 @@ jobs:
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
-          cmake --build build -j$(nproc)
+          cmake --build build -j"$(nproc)"
           cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
@@ -825,7 +825,7 @@ jobs:
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
-          make -j$(nproc)
+          make -j"$(nproc)"
       - name: Prepare AppDir
         run: |
           resolve_bin() {
@@ -898,8 +898,8 @@ jobs:
           SSL=$(find /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu -maxdepth 1 -name 'libssl.so.3' 2>/dev/null | head -1)
           CRYPTO=$(find /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu -maxdepth 1 -name 'libcrypto.so.3' 2>/dev/null | head -1)
           test -n "$SSL" && test -n "$CRYPTO" || { echo "OpenSSL libs not found"; exit 1; }
-          echo "ssl=$SSL"       >> $GITHUB_OUTPUT
-          echo "crypto=$CRYPTO" >> $GITHUB_OUTPUT
+          echo "ssl=$SSL"       >> "$GITHUB_OUTPUT"
+          echo "crypto=$CRYPTO" >> "$GITHUB_OUTPUT"
       - name: Locate QtKeychain library
         id: qtkeychain
         run: |
@@ -911,7 +911,7 @@ jobs:
                  /lib/x86_64-linux-gnu -maxdepth 2 \
                  -name 'libqt6keychain.so*' 2>/dev/null | sort | head -1)
           test -n "$KC" || { echo "libqt6keychain not found"; exit 1; }
-          echo "kc=$KC" >> $GITHUB_OUTPUT
+          echo "kc=$KC" >> "$GITHUB_OUTPUT"
       - name: Download linuxdeployqt
         run: |
           wget -q -O linuxdeployqt https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
@@ -963,7 +963,7 @@ jobs:
           ./linuxdeploy --appimage-extract > /dev/null
           ./squashfs-root/usr/bin/linuxdeploy-plugin-appimage --appdir AppDir
           mkdir -p dist
-          mv *.AppImage *.AppImage.zsync dist/
+          mv -- *.AppImage *.AppImage.zsync dist/
           ls -la dist/
           # Hard fail if zsync file wasn't generated (means UPDATE_INFORMATION wasn't picked up)
           test -f dist/*.AppImage.zsync || { echo "ERROR: .zsync file not generated"; exit 1; }
@@ -973,7 +973,7 @@ jobs:
           # so a missing Qt network plugin or OpenSSL inside the bundle fails
           # here rather than on someone's machine after the release.
           cd dist
-          APPIMAGE=$(ls *.AppImage)
+          APPIMAGE=$(ls -- *.AppImage)
           out=$(./"$APPIMAGE" --version 2>&1)
           echo "$out"
           echo "$out" | grep -q "SSL support: yes" \
@@ -984,7 +984,7 @@ jobs:
           APPIMAGE_UPDATE_GLOB: ${{ needs.release-metadata.outputs.appimage_update_glob }}
         run: |
           cd dist
-          APPIMAGE=$(ls *.AppImage)
+          APPIMAGE=$(ls -- *.AppImage)
           ./"$APPIMAGE" --appimage-extract >/dev/null
           squashfs-root/usr/bin/parpar --version 2>&1 | grep -Fx "$PARPAR_VERSION"
           squashfs-root/usr/bin/par2 -V | grep -F "par2cmdline version $PAR2CMDLINE_VERSION"

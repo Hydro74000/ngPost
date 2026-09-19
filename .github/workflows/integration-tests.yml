@@ -51,13 +51,13 @@ jobs:
           for ts in lang/ngPost_*.ts; do
             lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
           done
-          qmake ngPost.pro CONFIG+=release
+          qmake ngPost.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(nproc)"
 
       - name: Build integration tests
         run: |
           cd tests/integration
-          qmake integration.pro CONFIG+=release
+          qmake integration.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(nproc)"
 
       - name: Run integration tests
@@ -110,13 +110,13 @@ jobs:
           for ts in lang/ngPost_*.ts; do
             lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
           done
-          qmake ngPost.pro CONFIG+=release
+          qmake ngPost.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(sysctl -n hw.ncpu)"
 
       - name: Build integration tests
         run: |
           cd tests/integration
-          qmake integration.pro CONFIG+=release
+          qmake integration.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(sysctl -n hw.ncpu)"
 
       - name: Run integration tests
@@ -175,14 +175,14 @@ jobs:
           Get-ChildItem lang/ngPost_*.ts | ForEach-Object {
             lrelease $_.FullName -qm "resources/lang/$($_.BaseName).qm"
           }
-          qmake ngPost.pro -spec win32-msvc CONFIG+=release
+          qmake ngPost.pro -spec win32-msvc CONFIG+=release CONFIG+=ngpost_werror
           nmake
 
       - name: Build integration tests
         shell: pwsh
         run: |
           cd tests/integration
-          qmake integration.pro -spec win32-msvc CONFIG+=release
+          qmake integration.pro -spec win32-msvc CONFIG+=release CONFIG+=ngpost_werror
           nmake
 
       - name: Run integration tests

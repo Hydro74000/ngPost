@@ -1,0 +1,31 @@
+# What an editor needs to match the code before clang-format ever runs.
+# .clang-format (WebKit base) stays the authority for C++ layout.
+#
+# No trim_trailing_whitespace: about 60 tracked files still carry trailing
+# blanks, and trimming them on save would rewrite untouched lines -- the diff
+# noise and blame loss the change-only format check exists to avoid.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[*.{cpp,h,c,hpp}]
+indent_style = space
+indent_size = 4
+max_line_length = 100
+
+[*.{py,sh,ps1,pro,pri}]
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml,json}]
+indent_style = space
+indent_size = 2
+
+# Binary or generated: leave them exactly as they are.
+[*.{qm,ts,zip,png,ico,icns,jpg,gif}]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset

@@ -133,8 +133,9 @@ files=$(grep -c '<file ' "$nzb" || true)
 segments=$(grep -c '<segment ' "$nzb" || true)
 articles=$(find "$work/dump" -name '*.eml' | wc -l)
 echo "nzb: $files files, $segments segments; server: $articles articles"
-[ "$segments" -gt 0 ] && [ "$segments" -eq "$articles" ] \
-    || fail "the nzb lists $segments segments, the server received $articles articles"
+if [ "$segments" -eq 0 ] || [ "$segments" -ne "$articles" ]; then
+    fail "the nzb lists $segments segments, the server received $articles articles"
+fi
 grep -q '\.7z' "$nzb" || fail "no 7-Zip volume in the nzb"
 grep -q '\.par2' "$nzb" || fail "no par2 file in the nzb"
 grep -q '<meta type="password">' "$nzb" || fail "the archive password is not in the nzb"

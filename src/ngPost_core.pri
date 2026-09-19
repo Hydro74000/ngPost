@@ -59,6 +59,31 @@ macx: QMAKE_CXXFLAGS += -Wno-error=implicit-function-declaration
 # stays on the GCC and clang toolchains.
 !msvc: QMAKE_CXXFLAGS += -Wshadow
 
+# CI builds pass CONFIG+=ngpost_werror so that any new warning fails the job.
+# It stays off by default: a newer compiler at a packager's must not turn a
+# fresh warning into a broken build.
+#
+# Only our own code is held to it. qmake hands Qt's header directories to the
+# compiler with a plain -I, so a warning inside a Qt header -- GCC 16 with Qt
+# 6.11 already emits -Wsfinae-incomplete from qchar.h -- would fail the build
+# too. Declaring them system headers silences that: GCC and clang drop a -I
+# that duplicates an -isystem, MSVC reads /external:I. A glob, not the QT
+# list, because modules are added further down this file.
+ngpost_werror {
+    NGPOST_THIRD_PARTY_HEADERS = $$[QT_INSTALL_HEADERS] $$files($$[QT_INSTALL_HEADERS]/Qt*)
+    !isEmpty(QT_KEYCHAIN_PREFIX): NGPOST_THIRD_PARTY_HEADERS += $$QT_KEYCHAIN_PREFIX/include
+    !msvc {
+        QMAKE_CXXFLAGS += -Werror
+        for(dir, NGPOST_THIRD_PARTY_HEADERS): QMAKE_CXXFLAGS += -isystem $$shell_quote($$dir)
+        macx: QMAKE_CXXFLAGS += -iframework $$shell_quote($$[QT_INSTALL_LIBS])
+    }
+    msvc {
+        QMAKE_CXXFLAGS += /WX /external:W0
+        for(dir, NGPOST_THIRD_PARTY_HEADERS): \
+            QMAKE_CXXFLAGS += /external:I$$shell_quote($$system_path($$dir))
+    }
+}
+
 DEFINES += __USE_CONNECTION_TIMEOUT__
 DEFINES += __COMPUTE_IMMEDIATE_SPEED__
 

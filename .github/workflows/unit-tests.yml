@@ -114,13 +114,13 @@ jobs:
           for ts in lang/ngPost_*.ts; do
             lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
           done
-          qmake ngPost.pro CONFIG+=release
+          qmake ngPost.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(nproc)"
 
       - name: Build unit tests
         run: |
           cd tests/unit
-          qmake unit.pro CONFIG+=release
+          qmake unit.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(nproc)"
 
       - name: Bundle the pinned PAR2 tools
@@ -182,13 +182,13 @@ jobs:
           for ts in lang/ngPost_*.ts; do
             lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
           done
-          qmake ngPost.pro CONFIG+=release
+          qmake ngPost.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(sysctl -n hw.ncpu)"
 
       - name: Build unit tests
         run: |
           cd tests/unit
-          qmake unit.pro CONFIG+=release
+          qmake unit.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(sysctl -n hw.ncpu)"
 
       - name: Bundle the pinned PAR2 tools
@@ -256,14 +256,14 @@ jobs:
           Get-ChildItem lang/ngPost_*.ts | ForEach-Object {
             lrelease $_.FullName -qm "resources/lang/$($_.BaseName).qm"
           }
-          qmake ngPost.pro -spec win32-msvc CONFIG+=release
+          qmake ngPost.pro -spec win32-msvc CONFIG+=release CONFIG+=ngpost_werror
           nmake
 
       - name: Build unit tests
         shell: pwsh
         run: |
           cd tests/unit
-          qmake unit.pro -spec win32-msvc CONFIG+=release
+          qmake unit.pro -spec win32-msvc CONFIG+=release CONFIG+=ngpost_werror
           nmake
 
       - name: Bundle the pinned PAR2 tools
@@ -293,6 +293,22 @@ jobs:
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
             if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
           }
+
+      # Parsing proves the syntax only. Windows PowerShell 5.1 is what runs the
+      # elevated scripts, so the analysis runs there too. Rules and the reasons
+      # for the two excluded ones: PSScriptAnalyzerSettings.psd1.
+      - name: Analyze PowerShell scripts
+        shell: powershell
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
+          Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0
+          $scripts = git ls-files '*.ps1'
+          $findings = $scripts | ForEach-Object {
+            Invoke-ScriptAnalyzer -Path $_ -Settings ./PSScriptAnalyzerSettings.psd1
+          }
+          $findings | Format-Table ScriptName, Line, RuleName, Message -AutoSize -Wrap | Out-String -Width 200
+          if ($findings) { throw "PSScriptAnalyzer: $(@($findings).Count) finding(s)" }
 
       - name: Test Windows WireGuard staging and profile policy
         shell: powershell
