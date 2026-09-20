@@ -932,10 +932,6 @@ private:
     bool _confirmMasterSwitchWithoutVpnProfileIfNeeded();
 
     void _syntax(char *appName);
-    //! \a isDefaultConfig tells the file saveConfig() writes from a -c one:
-    //! only the former is remembered for the merge, and asking
-    //! PathHelper::configFilePath() here would create the folder a read-only
-    //! invocation must leave alone.
     void _writeConfigGeneral(QTextStream &stream);
     void _writeConfigPostCommands(QTextStream &stream);
     void _writeConfigPostInfo(QTextStream &stream);
@@ -984,10 +980,10 @@ private:
     bool _parseConfigNfoKey(const QString &opt, QString val);
     bool _parseConfigArticleKey(const QString &opt, QString val);
     bool _parseConfigIdentityKey(const QString &opt, QString val, QString &err);
-    bool _parseConfigPostInfoKey(const QString &opt, QString val, QString &err);
-    bool _parseConfigHistoryKey(const QString &opt, QString val, QString &err);
+    bool _parseConfigPostInfoKey(const QString &opt, const QString &val, QString &err);
+    bool _parseConfigHistoryKey(const QString &opt, const QString &val, QString &err);
 #ifdef __USE_TMP_RAM__
-    bool _parseConfigRamKey(const QString &opt, QString val, QString &err);
+    bool _parseConfigRamKey(const QString &opt, const QString &val, QString &err);
 #endif
     bool _parseConfigArchiveKey(const QString &opt,
                                 QString val,
@@ -998,7 +994,7 @@ private:
                                 ConfigParseState &state,
                                 QString &err);
     bool _parseConfigPar2Key(const QString &opt,
-                             QString val,
+                             const QString &val,
                              ConfigParseState &state,
                              QString &err);
     bool _parseServerKey(const QString &opt, QString val, ConfigParseState &state);
@@ -1021,6 +1017,10 @@ private:
     bool _resolveConfigTools(const ConfigParseState &state);
     void _validateConfigPar2Args(bool par2Requested);
     void _applyConfigVpnProfiles(ConfigParseState &state);
+    //! \a isDefaultConfig tells the file saveConfig() writes from a -c one:
+    //! only the former is remembered for the merge, and asking
+    //! PathHelper::configFilePath() here would create the folder a read-only
+    //! invocation must leave alone.
     QString _parseConfig(const QString &configPath, bool isDefaultConfig = false);
     //! The value of the `obfuscate` config key for the current settings.
     QString _obfuscationKinds() const;

@@ -4475,7 +4475,7 @@ bool NgPost::_parseConfigIdentityKey(const QString &opt, QString val, QString &e
     return true;
 }
 
-bool NgPost::_parseConfigPostInfoKey(const QString &opt, QString val, QString &err)
+bool NgPost::_parseConfigPostInfoKey(const QString &opt, const QString &val, QString &err)
 {
     if (opt == sOptionNames[Opt::NZB_POST_CMD])
         _nzbPostCmd << val;
@@ -4515,7 +4515,7 @@ bool NgPost::_parseConfigPostInfoKey(const QString &opt, QString val, QString &e
     return true;
 }
 
-bool NgPost::_parseConfigHistoryKey(const QString &opt, QString val, QString &err)
+bool NgPost::_parseConfigHistoryKey(const QString &opt, const QString &val, QString &err)
 {
     if (opt == sOptionNames[Opt::INPUT_DIR])
         _inputDir = val;
@@ -4537,7 +4537,7 @@ bool NgPost::_parseConfigHistoryKey(const QString &opt, QString val, QString &er
 }
 
 #ifdef __USE_TMP_RAM__
-bool NgPost::_parseConfigRamKey(const QString &opt, QString val, QString &err)
+bool NgPost::_parseConfigRamKey(const QString &opt, const QString &val, QString &err)
 {
     bool ok = false;
     // compression section
@@ -4672,7 +4672,7 @@ bool NgPost::_parseConfigPackingKey(const QString &opt,
 }
 
 bool NgPost::_parseConfigPar2Key(const QString &opt,
-                                 QString val,
+                                 const QString &val,
                                  ConfigParseState &state,
                                  QString &err)
 {
@@ -4720,7 +4720,7 @@ bool NgPost::_parseServerKey(const QString &opt, QString val, ConfigParseState &
 
     // Server Section under
     // state.serverParams is set for each of these keys: the block
-    // above creates it for any key of topLevelServerKeys(),
+    // in _readConfigFile creates it for any key of topLevelServerKeys(),
     // which lists exactly this section.
     // NOLINTBEGIN(clang-analyzer-core.NullDereference,clang-analyzer-core.CallAndMessage)
     if (opt == sOptionNames[Opt::HOST]) {
@@ -4804,6 +4804,307 @@ void NgPost::_parseConfigKey(const QString &opt,
         return;
     if (_parseServerKey(opt, val, state))
         return;
+}
+
+void NgPost::_scanConfigLanguage(QFile &file)
+{
+    // Settle the language before the main loop emits anything. Parsing is
+    // single pass, so a LANG line placed low in the file used to leave
+    // every diagnostic above it in English -- which is exactly the file
+    // layout a translated user ends up with. One cheap scan, then rewind.
+    {
+        QTextStream langScan(&file);
+        while (!langScan.atEnd()) {
+            QString const scanned = langScan.readLine().trimmed();
+            if (scanned.isEmpty() || scanned.startsWith('#') || scanned.startsWith('/'))
+                continue;
+            int const eq = scanned.indexOf('=');
+            if (eq < 0)
+                continue;
+            if (scanned.left(eq).trimmed().toLower() == sOptionNames[Opt::LANG]) {
+                changeLanguage(scanned.mid(eq + 1).trimmed().toLower());
+                break;
+            }
+        }
+        file.seek(0);
+    }
+}
+
+
+void NgPost::_readConfigFile(const QFileInfo &fileInfo, ConfigParseState &state, QString &err)
+{
+    QFile file(fileInfo.absoluteFilePath());
+    if (file.open(QIODevice::ReadOnly)) {
+        state.currentVpn.configBaseDir = _loadedConfigDir;
+        auto flushVpnProfile = [&]() {
+            if (state.inVpnProfile && state.currentVpn.isValid())
+                state.parsedVpnProfiles << state.currentVpn;
+            state.currentVpn = VpnProfile();
+            state.currentVpn.configBaseDir = _loadedConfigDir;
+            state.inVpnProfile = false;
+        };
+        _scanConfigLanguage(file);
+
+        QTextStream stream(&file);
+        while (!stream.atEnd()) {
+            QString line = stream.readLine().trimmed();
+            // saveConfig keeps the inactive GUI limit as #RAR_MAX = N. Read
+            // that preference without enabling it; an active key always wins.
+            if (!_useRarMax && line.startsWith(QStringLiteral("#RAR_MAX"), Qt::CaseInsensitive)) {
+                const int equal = line.indexOf('=');
+                if (equal > 0
+                    && line.left(equal).trimmed().compare(QStringLiteral("#RAR_MAX"),
+                                                          Qt::CaseInsensitive)
+                        == 0) {
+                    bool ok = false;
+                    const uint maximum = line.mid(equal + 1).trimmed().toUInt(&ok);
+                    if (ok && maximum > 0 && maximum <= uint(INT_MAX))
+                        _rarMax = maximum;
+                }
+            }
+            if (line.isEmpty() || line.startsWith('#') || line.startsWith('/'))
+                continue;
+            else if (line == "[server]") {
+                flushVpnProfile();
+                state.serverParams = new NntpServerParams();
+                _nntpServers << state.serverParams;
+            } else if (line == "[vpn_profile]") {
+                flushVpnProfile();
+                state.serverParams = nullptr;
+                state.inVpnProfile = true;
+                state.currentVpn = VpnProfile();
+                state.currentVpn.configBaseDir = _loadedConfigDir;
+            } else {
+                const int equalIdx = line.indexOf('=');
+                if (equalIdx > 0) {
+                    QString opt = line.left(equalIdx).trimmed().toLower(),
+                            val = line.mid(equalIdx + 1).trimmed();
+
+                    // Those keys still parse, but no block ever created the
+                    // object they write into -- so a file written that way used
+                    // to crash here on a null pointer. Give them the server
+                    // they imply.
+                    if (!state.serverParams && topLevelServerKeys().contains(opt)) {
+                        state.serverParams = new NntpServerParams();
+                        _nntpServers << state.serverParams;
+                    }
+
+                    _parseConfigKey(opt, val, state, err);
+                }
+            }
+        }
+        // Flush any trailing [vpn_profile] block (no [section] header after it).
+        flushVpnProfile();
+        file.close();
+    }
+}
+
+
+void NgPost::_readConfigToolPath(const QString &key,
+                                 const QString &sourceKey,
+                                 const QStringList &kinds,
+                                 QString &tool,
+                                 externaltool::PathMode &mode,
+                                 QString &path,
+                                 bool explicitMode,
+                                 const QString &toolArgs,
+                                 bool requested)
+{
+    if (path.isEmpty())
+        return;
+    if (explicitMode) {
+        if (mode == externaltool::PathMode::Automatic) {
+            _error(tr("Configuration: %1 is ignored because %2 = auto. Set %2 = custom to use "
+                      "this path.")
+                       .arg(key, sourceKey));
+            path.clear();
+        } else if (requested && !externaltool::executable(path))
+            _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
+                      "tool will stop before the transfer.")
+                       .arg(key, path));
+        return;
+    }
+    // The file name says which engine the line meant. It only matters when
+    // that engine can run the configured arguments: adopt it when they were
+    // written for it, or when it is installed. Otherwise auto detection
+    // stays, and builds the arguments for whichever engine it finds -- the
+    // bundle may well have lost that engine (ParPar is optional on Windows).
+    const auto adoptNamedEngine = [&](const QString &named) {
+        if (tool == QLatin1String("auto") && kinds.contains(named)
+            && (!toolArgs.isEmpty() || externaltool::resolve(named).available()))
+            tool = named;
+    };
+    const QString bundled = externaltool::bundledTool(path);
+    if (kinds.contains(bundled) && (tool == QLatin1String("auto") || tool == bundled)) {
+        adoptNamedEngine(bundled);
+        mode = externaltool::PathMode::Automatic;
+        path.clear();
+        return;
+    }
+    if (externaltool::executable(path)) {
+        mode = externaltool::PathMode::Custom;
+        return;
+    }
+    adoptNamedEngine(externaltool::toolForFile(path));
+    mode = externaltool::PathMode::Automatic;
+    if (requested) {
+        const QString found = externaltool::resolve(tool).path;
+        if (found.isEmpty())
+            _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
+                      "tool will stop before the transfer.")
+                       .arg(key, path));
+        else
+            _error(tr("Configuration: %1 = %2 is not an executable file; ngPost uses %3, found "
+                      "automatically, instead.")
+                       .arg(key, path, found));
+    }
+    // Keep legacy user paths, even when unavailable. Save them without a
+    // *_SOURCE line so a reload retains this fallback and can use the
+    // original executable again if it becomes available.
+}
+
+void NgPost::_settleConfigToolNames(ConfigParseState &state)
+{
+    // Checked once the whole file is read, like the paths they qualify: as for
+    // every key, the last line wins. A value that means nothing is reported and
+    // read as if the line were absent, but not in err (see _readConfigToolPath()).
+    if (state.rarToolLine) {
+        const QString rarTool = state.rarToolLine->trimmed().toLower();
+        if (rarTool == QLatin1String("rar") || rarTool == QLatin1String("7zip"))
+            _rarTool = rarTool;
+        else {
+            _error(tr("RAR_TOOL must be rar or 7zip."));
+            state.rarToolLine.reset();
+        }
+    }
+    if (state.par2ToolLine && !par2::parseTool(*state.par2ToolLine, _par2Tool))
+        _error(tr("PAR2_TOOL must be auto, parpar, par2cmdline or multipar."));
+    if (state.rarSourceLine && !externaltool::parseMode(*state.rarSourceLine, _rarPathMode)) {
+        _error(tr("RAR_SOURCE must be auto or custom."));
+        state.rarSourceLine.reset();
+    }
+    if (state.par2SourceLine && !externaltool::parseMode(*state.par2SourceLine, _par2PathMode)) {
+        _error(tr("PAR2_SOURCE must be auto or custom."));
+        state.par2SourceLine.reset();
+    }
+}
+
+
+bool NgPost::_resolveConfigTools(const ConfigParseState &state)
+{
+    // A missing tool is only worth saying when this configuration can use it:
+    // an install that never compresses or generates par2 would otherwise be
+    // told at every start about a tool it does not use. A post that asks for
+    // it later (the GUI boxes, --compress, --gen_par2) still gets the explicit
+    // message from PostingJob::_canCompress() and _canGenPar2().
+    bool const legacyPacking = state.legacyAutoCompress && !state.parsedPack;
+    bool const par2Requested = _par2Pct > 0 || _doPar2 || legacyPacking
+        || _packAutoKeywords.contains(sOptionNames[Opt::GEN_PAR2]);
+    bool const compressRequested = _doCompress || legacyPacking
+        || _packAutoKeywords.contains(sOptionNames[Opt::COMPRESS]);
+
+    // How a *_PATH line is read. With an explicit *_SOURCE, as written: a custom
+    // path never falls back to another executable. Without one, the configuration
+    // predates *_SOURCE: a bundled path (even of an old AppImage mount) becomes
+    // automatic discovery of that tool, an executable path stays custom, and a
+    // path that no longer exists falls back to automatic discovery, as PAR2_PATH
+    // always did. A line that does not do what it says is reported, but not in
+    // err: that stops ngPost, the very place where the settings get fixed.
+    QString par2Tool = par2::toolName(_par2Tool);
+    _readConfigToolPath(QStringLiteral("PAR2_PATH"),
+                        QStringLiteral("PAR2_SOURCE"),
+                        { QStringLiteral("parpar"),
+                          QStringLiteral("par2cmdline"),
+                          QStringLiteral("multipar") },
+                        par2Tool,
+                        _par2PathMode,
+                        _par2PathConfig,
+                        state.par2SourceLine.has_value(),
+                        par2ArgsInUse(),
+                        par2Requested);
+    par2::parseTool(par2Tool, _par2Tool);
+    const QString rarNamed = externaltool::archiverForFile(_rarPathConfig);
+    if (!state.rarToolLine && !rarNamed.isEmpty()
+        && (!state.rarSourceLine || _rarPathMode == externaltool::PathMode::Custom))
+        _rarTool = rarNamed;
+    _readConfigToolPath(QStringLiteral("RAR_PATH"),
+                        QStringLiteral("RAR_SOURCE"),
+                        { QStringLiteral("rar"), QStringLiteral("7zip") },
+                        _rarTool,
+                        _rarPathMode,
+                        _rarPathConfig,
+                        state.rarSourceLine.has_value(),
+                        _rarArgs,
+                        compressRequested);
+    // The example configuration sets RAR_TOOL = rar next to a commented
+    // RAR_PATH = /usr/bin/7z: rar's switches would make 7-Zip fail every time.
+    if (_rarPathMode == externaltool::PathMode::Custom && !rarNamed.isEmpty()
+        && rarNamed != _rarTool) {
+        _error(tr("Configuration: RAR_TOOL = %1 does not match RAR_PATH = %2; %3 is used.")
+                   .arg(_rarTool, _rarPathConfig, rarNamed));
+        _rarTool = rarNamed;
+    }
+    _par2Path = externaltool::resolve(par2Tool, _par2PathMode, _par2PathConfig).path;
+    _rarPath = externaltool::resolve(_rarTool, _rarPathMode, _rarPathConfig).path;
+
+    return par2Requested;
+}
+
+
+void NgPost::_validateConfigPar2Args(bool par2Requested)
+{
+    // A custom line written for another engine cannot run: par2j reads
+    // /switches where the other two read -switches. Said here rather than at the
+    // par2 step, after the compression, with only the tool's own error to show.
+    if (par2Requested && !_par2ArgsCustom.isEmpty()) {
+        bool multiParStyle = false, otherStyle = false;
+        for (QString const &token : QProcess::splitCommand(_par2ArgsCustom)) {
+            multiParStyle = multiParStyle || token.startsWith(QLatin1Char('/'));
+            otherStyle = otherStyle || token.startsWith(QLatin1Char('-'));
+        }
+        bool const multiPar = par2ToolInUse() == par2::Tool::MultiPar;
+        if ((multiPar && otherStyle && !multiParStyle)
+            || (!multiPar && multiParStyle && !otherStyle))
+            _error(tr("Configuration: PAR2_ARGS_CUSTOM is written for another tool than %1, so the "
+                      "par2 step would fail. Comment that line out, or write it for %1.")
+                       .arg(par2::toolName(par2ToolInUse())));
+    }
+}
+
+
+void NgPost::_applyConfigVpnProfiles(ConfigParseState &state)
+{
+    // Phase 4 — legacy single-profile config (VPN_BACKEND + VPN_CONFIG_PATH).
+    // Migrate it into a "Default" profile by copying the .ovpn/.conf into
+    // <configDir>/vpn/ if no [vpn_profile] block was found.
+    if (state.parsedVpnProfiles.isEmpty() && !state.legacyVpnConfigPath.isEmpty()) {
+        QFileInfo legacy(state.legacyVpnConfigPath);
+        if (legacy.exists() && legacy.isFile()) {
+            const QString vpnBase = QDir(_loadedConfigDir.isEmpty() ? PathHelper::configDir()
+                                                                    : _loadedConfigDir)
+                                        .filePath(QStringLiteral("vpn"));
+            QDir().mkpath(vpnBase);
+            QString destName = legacy.fileName();
+            QString destPath = QDir(vpnBase).filePath(destName);
+            if (!QFile::exists(destPath))
+                QFile::copy(state.legacyVpnConfigPath, destPath);
+            VpnProfile p;
+            p.name = QStringLiteral("Default");
+            bool ok = false;
+            VpnManager::Backend b = VpnManager::backendFromString(state.legacyVpnBackend, &ok);
+            p.backend = ok ? b : VpnManager::Backend::OpenVPN;
+            p.configFileName = destName;
+            p.configBaseDir = _loadedConfigDir;
+            p.hasAuth = false; // legacy didn't track creds
+            state.parsedVpnProfiles << p;
+            state.parsedActiveVpnProfile = p.name;
+            if (useHMI() || !_quiet)
+                _log(tr("VPN: migrated legacy VPN_CONFIG_PATH into profile 'Default'"));
+        }
+    }
+
+    if (_vpnManager)
+        _vpnManager->setProfilesFromConfig(state.parsedVpnProfiles, state.parsedActiveVpnProfile);
 }
 
 QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
@@ -5963,304 +6264,3 @@ const QString NgPost::sNgPostASCII = QString(
     "     |___|  /\\___  /|____|   \\____/____  > |__|\n"
     "          \\//_____/                    \\/\n"
     "             ---   b y   H y d r o   ---\n");
-
-void NgPost::_scanConfigLanguage(QFile &file)
-{
-    // Settle the language before the main loop emits anything. Parsing is
-    // single pass, so a LANG line placed low in the file used to leave
-    // every diagnostic above it in English -- which is exactly the file
-    // layout a translated user ends up with. One cheap scan, then rewind.
-    {
-        QTextStream langScan(&file);
-        while (!langScan.atEnd()) {
-            QString const scanned = langScan.readLine().trimmed();
-            if (scanned.isEmpty() || scanned.startsWith('#') || scanned.startsWith('/'))
-                continue;
-            int const eq = scanned.indexOf('=');
-            if (eq < 0)
-                continue;
-            if (scanned.left(eq).trimmed().toLower() == sOptionNames[Opt::LANG]) {
-                changeLanguage(scanned.mid(eq + 1).trimmed().toLower());
-                break;
-            }
-        }
-        file.seek(0);
-    }
-}
-
-
-void NgPost::_readConfigFile(const QFileInfo &fileInfo, ConfigParseState &state, QString &err)
-{
-    QFile file(fileInfo.absoluteFilePath());
-    if (file.open(QIODevice::ReadOnly)) {
-        state.currentVpn.configBaseDir = _loadedConfigDir;
-        auto flushVpnProfile = [&]() {
-            if (state.inVpnProfile && state.currentVpn.isValid())
-                state.parsedVpnProfiles << state.currentVpn;
-            state.currentVpn = VpnProfile();
-            state.currentVpn.configBaseDir = _loadedConfigDir;
-            state.inVpnProfile = false;
-        };
-        _scanConfigLanguage(file);
-
-        QTextStream stream(&file);
-        while (!stream.atEnd()) {
-            QString line = stream.readLine().trimmed();
-            // saveConfig keeps the inactive GUI limit as #RAR_MAX = N. Read
-            // that preference without enabling it; an active key always wins.
-            if (!_useRarMax && line.startsWith(QStringLiteral("#RAR_MAX"), Qt::CaseInsensitive)) {
-                const int equal = line.indexOf('=');
-                if (equal > 0
-                    && line.left(equal).trimmed().compare(QStringLiteral("#RAR_MAX"),
-                                                          Qt::CaseInsensitive)
-                        == 0) {
-                    bool ok = false;
-                    const uint maximum = line.mid(equal + 1).trimmed().toUInt(&ok);
-                    if (ok && maximum > 0 && maximum <= uint(INT_MAX))
-                        _rarMax = maximum;
-                }
-            }
-            if (line.isEmpty() || line.startsWith('#') || line.startsWith('/'))
-                continue;
-            else if (line == "[server]") {
-                flushVpnProfile();
-                state.serverParams = new NntpServerParams();
-                _nntpServers << state.serverParams;
-            } else if (line == "[vpn_profile]") {
-                flushVpnProfile();
-                state.serverParams = nullptr;
-                state.inVpnProfile = true;
-                state.currentVpn = VpnProfile();
-                state.currentVpn.configBaseDir = _loadedConfigDir;
-            } else {
-                const int equalIdx = line.indexOf('=');
-                if (equalIdx > 0) {
-                    QString opt = line.left(equalIdx).trimmed().toLower(),
-                            val = line.mid(equalIdx + 1).trimmed();
-
-                    // Those keys still parse, but no block ever created the
-                    // object they write into -- so a file written that way used
-                    // to crash here on a null pointer. Give them the server
-                    // they imply.
-                    if (!state.serverParams && topLevelServerKeys().contains(opt)) {
-                        state.serverParams = new NntpServerParams();
-                        _nntpServers << state.serverParams;
-                    }
-
-                    _parseConfigKey(opt, val, state, err);
-                }
-            }
-        }
-        // Flush any trailing [vpn_profile] block (no [section] header after it).
-        flushVpnProfile();
-        file.close();
-    }
-}
-
-
-void NgPost::_readConfigToolPath(const QString &key,
-                                 const QString &sourceKey,
-                                 const QStringList &kinds,
-                                 QString &tool,
-                                 externaltool::PathMode &mode,
-                                 QString &path,
-                                 bool explicitMode,
-                                 const QString &toolArgs,
-                                 bool requested)
-{
-    if (path.isEmpty())
-        return;
-    if (explicitMode) {
-        if (mode == externaltool::PathMode::Automatic) {
-            _error(tr("Configuration: %1 is ignored because %2 = auto. Set %2 = custom to use "
-                      "this path.")
-                       .arg(key, sourceKey));
-            path.clear();
-        } else if (requested && !externaltool::executable(path))
-            _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
-                      "tool will stop before the transfer.")
-                       .arg(key, path));
-        return;
-    }
-    // The file name says which engine the line meant. It only matters when
-    // that engine can run the configured arguments: adopt it when they were
-    // written for it, or when it is installed. Otherwise auto detection
-    // stays, and builds the arguments for whichever engine it finds -- the
-    // bundle may well have lost that engine (ParPar is optional on Windows).
-    const auto adoptNamedEngine = [&](const QString &named) {
-        if (tool == QLatin1String("auto") && kinds.contains(named)
-            && (!toolArgs.isEmpty() || externaltool::resolve(named).available()))
-            tool = named;
-    };
-    const QString bundled = externaltool::bundledTool(path);
-    if (kinds.contains(bundled) && (tool == QLatin1String("auto") || tool == bundled)) {
-        adoptNamedEngine(bundled);
-        mode = externaltool::PathMode::Automatic;
-        path.clear();
-        return;
-    }
-    if (externaltool::executable(path)) {
-        mode = externaltool::PathMode::Custom;
-        return;
-    }
-    adoptNamedEngine(externaltool::toolForFile(path));
-    mode = externaltool::PathMode::Automatic;
-    if (requested) {
-        const QString found = externaltool::resolve(tool).path;
-        if (found.isEmpty())
-            _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
-                      "tool will stop before the transfer.")
-                       .arg(key, path));
-        else
-            _error(tr("Configuration: %1 = %2 is not an executable file; ngPost uses %3, found "
-                      "automatically, instead.")
-                       .arg(key, path, found));
-    }
-    // Keep legacy user paths, even when unavailable. Save them without a
-    // *_SOURCE line so a reload retains this fallback and can use the
-    // original executable again if it becomes available.
-}
-
-void NgPost::_settleConfigToolNames(ConfigParseState &state)
-{
-    // Checked once the whole file is read, like the paths they qualify: as for
-    // every key, the last line wins. A value that means nothing is reported and
-    // read as if the line were absent, but not in err (see readPath below).
-    if (state.rarToolLine) {
-        const QString rarTool = state.rarToolLine->trimmed().toLower();
-        if (rarTool == QLatin1String("rar") || rarTool == QLatin1String("7zip"))
-            _rarTool = rarTool;
-        else {
-            _error(tr("RAR_TOOL must be rar or 7zip."));
-            state.rarToolLine.reset();
-        }
-    }
-    if (state.par2ToolLine && !par2::parseTool(*state.par2ToolLine, _par2Tool))
-        _error(tr("PAR2_TOOL must be auto, parpar, par2cmdline or multipar."));
-    if (state.rarSourceLine && !externaltool::parseMode(*state.rarSourceLine, _rarPathMode)) {
-        _error(tr("RAR_SOURCE must be auto or custom."));
-        state.rarSourceLine.reset();
-    }
-    if (state.par2SourceLine && !externaltool::parseMode(*state.par2SourceLine, _par2PathMode)) {
-        _error(tr("PAR2_SOURCE must be auto or custom."));
-        state.par2SourceLine.reset();
-    }
-}
-
-
-bool NgPost::_resolveConfigTools(const ConfigParseState &state)
-{
-    // A missing tool is only worth saying when this configuration can use it:
-    // an install that never compresses or generates par2 would otherwise be
-    // told at every start about a tool it does not use. A post that asks for
-    // it later (the GUI boxes, --compress, --gen_par2) still gets the explicit
-    // message from PostingJob::_canCompress() and _canGenPar2().
-    bool const legacyPacking = state.legacyAutoCompress && !state.parsedPack;
-    bool const par2Requested = _par2Pct > 0 || _doPar2 || legacyPacking
-        || _packAutoKeywords.contains(sOptionNames[Opt::GEN_PAR2]);
-    bool const compressRequested = _doCompress || legacyPacking
-        || _packAutoKeywords.contains(sOptionNames[Opt::COMPRESS]);
-
-    // How a *_PATH line is read. With an explicit *_SOURCE, as written: a custom
-    // path never falls back to another executable. Without one, the configuration
-    // predates *_SOURCE: a bundled path (even of an old AppImage mount) becomes
-    // automatic discovery of that tool, an executable path stays custom, and a
-    // path that no longer exists falls back to automatic discovery, as PAR2_PATH
-    // always did. A line that does not do what it says is reported, but not in
-    // err: that stops ngPost, the very place where the settings get fixed.
-    QString par2Tool = par2::toolName(_par2Tool);
-    _readConfigToolPath(QStringLiteral("PAR2_PATH"),
-                        QStringLiteral("PAR2_SOURCE"),
-                        { QStringLiteral("parpar"),
-                          QStringLiteral("par2cmdline"),
-                          QStringLiteral("multipar") },
-                        par2Tool,
-                        _par2PathMode,
-                        _par2PathConfig,
-                        state.par2SourceLine.has_value(),
-                        par2ArgsInUse(),
-                        par2Requested);
-    par2::parseTool(par2Tool, _par2Tool);
-    const QString rarNamed = externaltool::archiverForFile(_rarPathConfig);
-    if (!state.rarToolLine && !rarNamed.isEmpty()
-        && (!state.rarSourceLine || _rarPathMode == externaltool::PathMode::Custom))
-        _rarTool = rarNamed;
-    _readConfigToolPath(QStringLiteral("RAR_PATH"),
-                        QStringLiteral("RAR_SOURCE"),
-                        { QStringLiteral("rar"), QStringLiteral("7zip") },
-                        _rarTool,
-                        _rarPathMode,
-                        _rarPathConfig,
-                        state.rarSourceLine.has_value(),
-                        _rarArgs,
-                        compressRequested);
-    // The example configuration sets RAR_TOOL = rar next to a commented
-    // RAR_PATH = /usr/bin/7z: rar's switches would make 7-Zip fail every time.
-    if (_rarPathMode == externaltool::PathMode::Custom && !rarNamed.isEmpty()
-        && rarNamed != _rarTool) {
-        _error(tr("Configuration: RAR_TOOL = %1 does not match RAR_PATH = %2; %3 is used.")
-                   .arg(_rarTool, _rarPathConfig, rarNamed));
-        _rarTool = rarNamed;
-    }
-    _par2Path = externaltool::resolve(par2Tool, _par2PathMode, _par2PathConfig).path;
-    _rarPath = externaltool::resolve(_rarTool, _rarPathMode, _rarPathConfig).path;
-
-    return par2Requested;
-}
-
-
-void NgPost::_validateConfigPar2Args(bool par2Requested)
-{
-    // A custom line written for another engine cannot run: par2j reads
-    // /switches where the other two read -switches. Said here rather than at the
-    // par2 step, after the compression, with only the tool's own error to show.
-    if (par2Requested && !_par2ArgsCustom.isEmpty()) {
-        bool multiParStyle = false, otherStyle = false;
-        for (QString const &token : QProcess::splitCommand(_par2ArgsCustom)) {
-            multiParStyle = multiParStyle || token.startsWith(QLatin1Char('/'));
-            otherStyle = otherStyle || token.startsWith(QLatin1Char('-'));
-        }
-        bool const multiPar = par2ToolInUse() == par2::Tool::MultiPar;
-        if ((multiPar && otherStyle && !multiParStyle)
-            || (!multiPar && multiParStyle && !otherStyle))
-            _error(tr("Configuration: PAR2_ARGS_CUSTOM is written for another tool than %1, so the "
-                      "par2 step would fail. Comment that line out, or write it for %1.")
-                       .arg(par2::toolName(par2ToolInUse())));
-    }
-}
-
-
-void NgPost::_applyConfigVpnProfiles(ConfigParseState &state)
-{
-    // Phase 4 — legacy single-profile config (VPN_BACKEND + VPN_CONFIG_PATH).
-    // Migrate it into a "Default" profile by copying the .ovpn/.conf into
-    // <configDir>/vpn/ if no [vpn_profile] block was found.
-    if (state.parsedVpnProfiles.isEmpty() && !state.legacyVpnConfigPath.isEmpty()) {
-        QFileInfo legacy(state.legacyVpnConfigPath);
-        if (legacy.exists() && legacy.isFile()) {
-            const QString vpnBase = QDir(_loadedConfigDir.isEmpty() ? PathHelper::configDir()
-                                                                    : _loadedConfigDir)
-                                        .filePath(QStringLiteral("vpn"));
-            QDir().mkpath(vpnBase);
-            QString destName = legacy.fileName();
-            QString destPath = QDir(vpnBase).filePath(destName);
-            if (!QFile::exists(destPath))
-                QFile::copy(state.legacyVpnConfigPath, destPath);
-            VpnProfile p;
-            p.name = QStringLiteral("Default");
-            bool ok = false;
-            VpnManager::Backend b = VpnManager::backendFromString(state.legacyVpnBackend, &ok);
-            p.backend = ok ? b : VpnManager::Backend::OpenVPN;
-            p.configFileName = destName;
-            p.configBaseDir = _loadedConfigDir;
-            p.hasAuth = false; // legacy didn't track creds
-            state.parsedVpnProfiles << p;
-            state.parsedActiveVpnProfile = p.name;
-            if (useHMI() || !_quiet)
-                _log(tr("VPN: migrated legacy VPN_CONFIG_PATH into profile 'Default'"));
-        }
-    }
-
-    if (_vpnManager)
-        _vpnManager->setProfilesFromConfig(state.parsedVpnProfiles, state.parsedActiveVpnProfile);
-}

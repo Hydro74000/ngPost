@@ -776,4 +776,5 @@ void Par2SettingsDialog::_scanFiles(const QFileInfoList &files)
             return result;
         }));
     }
-}
+    // The watcher is owned by this dialog and also deleted by its finished slot.
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
