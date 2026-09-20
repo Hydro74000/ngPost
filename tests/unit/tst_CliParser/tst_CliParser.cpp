@@ -163,6 +163,10 @@ private slots:
     //! server object no block had created, which crashed the process.
     void server_keys_without_a_block_are_not_a_crash();
 
+    //! CLI replacements release the configured servers, including on errors.
+    void cli_server_replacements_data();
+    void cli_server_replacements();
+
     //! A check-enabled server with zero configured connections cannot ever
     //! emit a disconnect signal; reject it before entering the event loop.
     void check_with_zero_connections_does_not_hang();
@@ -519,6 +523,60 @@ void TestCliParser::server_keys_without_a_block_are_not_a_crash()
              qPrintable(QStringLiteral("a pre-[server] configuration must be read, not crash on; exit=%1 out=%2")
                             .arg(r.exitCode)
                             .arg(r.stdoutText + r.stderrText)));
+}
+
+void TestCliParser::cli_server_replacements_data()
+{
+    QTest::addColumn<QStringList>("options");
+    QTest::addColumn<int>("expectedExit");
+    QTest::newRow("host") << QStringList{ "-h", "127.0.0.1" } << 0;
+    QTest::newRow("servers")
+        << QStringList{ "-S", "127.0.0.1:119:1:nossl", "-S", "127.0.0.2:563:2:ssl" } << 0;
+    QTest::newRow("servers-and-host")
+        << QStringList{ "-S", "127.0.0.1:119:1:nossl", "-h", "127.0.0.2" } << 0;
+    QTest::newRow("invalid-second-server")
+        << QStringList{ "-S", "127.0.0.1:119:1:nossl", "-S", "invalid" } << 14; // ERR_SERVER_REGEX
+    QTest::newRow("invalid-host-port")
+        << QStringList{ "-h", "127.0.0.1", "-P", "invalid" } << 15; // ERR_SERVER_PORT
+}
+
+void TestCliParser::cli_server_replacements()
+{
+    QFETCH(QStringList, options);
+    QFETCH(int, expectedExit);
+    HomeSandbox sandbox;
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/servers.conf");
+    const QByteArray contents = "[server]\nhost = first.example.invalid\nenabled = false\n"
+                                "user = long-first-user-for-allocation\n"
+                                "pass = long-first-password-for-allocation\n"
+                                "[server]\nhost = second.example.invalid\nenabled = false\n"
+                                "user = long-second-user-for-allocation\n"
+                                "pass = long-second-password-for-allocation\n";
+    QFile config(confPath);
+    QVERIFY(config.open(QIODevice::WriteOnly));
+    QCOMPARE(config.write(contents), contents.size());
+    config.close();
+
+    QStringList args{
+        "-c",     confPath,    "--history",
+        "--json", "--post_db", sandbox.rootPath() + QStringLiteral("/history.sqlite")
+    };
+    args.append(options);
+    const RunResult result = run(_bin, args, sandbox.rootPath());
+    QVERIFY2(!result.timedOut, qPrintable(result.stderrText));
+    QVERIFY2(!result.crashed, qPrintable(result.stderrText));
+    // With NGPOST_BIN instrumented, LeakSanitizer must stay clean even on an
+    // expected CLI error (whose exit code can coincide with the sanitizer's).
+    QVERIFY2(!result.stderrText.contains(QStringLiteral("Sanitizer")),
+             qPrintable(result.stderrText));
+    QCOMPARE(result.exitCode, expectedExit);
+    if (expectedExit == 0) {
+        const QJsonDocument history = QJsonDocument::fromJson(result.stdoutText.toUtf8());
+        QVERIFY2(history.isArray(), qPrintable(result.stdoutText));
+        QVERIFY(history.array().isEmpty());
+    }
+    QVERIFY(config.open(QIODevice::ReadOnly));
+    QCOMPARE(config.readAll(), contents);
 }
 
 void TestCliParser::check_with_zero_connections_does_not_hang()

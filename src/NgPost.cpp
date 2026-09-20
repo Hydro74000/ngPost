@@ -3472,6 +3472,7 @@ bool NgPost::_parseCliServerList(const QCommandLineParser &parser)
 {
     if (parser.isSet(sOptionNames[Opt::SERVER]))
     {
+        qDeleteAll(_nntpServers);
         _nntpServers.clear();
         QRegularExpression regExp(sNntpServerStrRegExp,  QRegularExpression::CaseInsensitiveOption);
         for (const QString &serverParam : parser.values(sOptionNames[Opt::SERVER]))
@@ -3522,8 +3523,10 @@ bool NgPost::_parseCliSingleServer(const QCommandLineParser &parser)
         QString host = parser.value(sOptionNames[Opt::HOST]);
 
 
-        if (!parser.isSet(sOptionNames[Opt::SERVER]))
+        if (!parser.isSet(sOptionNames[Opt::SERVER])) {
+            qDeleteAll(_nntpServers);
             _nntpServers.clear();
+        }
         NntpServerParams *server = new NntpServerParams(host);
         _nntpServers << server;
 

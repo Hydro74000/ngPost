@@ -48,7 +48,7 @@
 # engine skip instead: tst_Par2Settings reports 15 rather than 17 on Linux. Fetch
 # the tools before reading a local failure as a lost test.
 
-tst_CliParser                 63  Linux
+tst_CliParser                 68  Linux
 tst_FoldersMonitor            10  Linux
 tst_GoldenNzb                  4  Linux
 tst_MainWindow               140  Linux
@@ -78,7 +78,7 @@ tst_Yenc                      30  Linux
 # Lower than Linux where the platform decides: tst_CliParser skips the five
 # cases that isolate the Qt TLS plugins with bwrap, tst_MainWindow skips the
 # GPU probe and the bundled-tool case, tst_VpnProfile skips one install check.
-tst_CliParser                 58  Darwin
+tst_CliParser                 63  Darwin
 tst_FoldersMonitor            10  Darwin
 tst_GoldenNzb                  4  Darwin
 tst_MainWindow               139  Darwin
@@ -107,7 +107,7 @@ tst_Yenc                      30  Darwin
 # The Windows-only suites run here and only here; tst_PathHelper and
 # tst_PostInfoTemplate skip the cases that need a symlink privilege, and
 # tst_MainWindow skips the tool-path cases that need a POSIX file mode.
-tst_CliParser                 60  Windows
+tst_CliParser                 65  Windows
 tst_FoldersMonitor            10  Windows
 tst_GoldenNzb                  4  Windows
 tst_MainWindow               129  Windows
