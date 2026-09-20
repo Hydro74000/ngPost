@@ -92,7 +92,7 @@
 42	src/NgPost.cpp	NgPost::_parseConfigPar2Key( const QString & opt , const QString & val , ConfigParseState & state , QString & err)
 39	src/NgPost.cpp	NgPost::_parseConfigPostInfoKey( const QString & opt , const QString & val , QString & err)
 42	src/NgPost.cpp	NgPost::_parseConfigRamKey( const QString & opt , const QString & val , QString & err)
-50	src/NgPost.cpp	NgPost::_parseConfigTransferKey( const QString & opt , QString val , QString & err)
+49	src/NgPost.cpp	NgPost::_parseConfigTransferKey( const QString & opt , QString val , QString & err)
 34	src/NgPost.cpp	NgPost::_parseConfigVpnKey( const QString & opt , QString val , ConfigParseState & state)
 54	src/NgPost.cpp	NgPost::_parseServerKey( const QString & opt , QString val , ConfigParseState & state)
 20	src/NgPost.cpp	NgPost::_parseVpnProfileKey( const QString & opt , QString val , ConfigParseState & state)

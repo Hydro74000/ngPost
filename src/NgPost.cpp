@@ -4197,8 +4197,7 @@ bool NgPost::_parseConfigTransferKey(const QString &opt, QString val, QString &e
             else
                 _nbThreads = nb;
         }
-    }
-    if (opt == sOptionNames[Opt::NZB_PATH]) {
+    } else if (opt == sOptionNames[Opt::NZB_PATH]) {
         if (val.isEmpty()) {
             // Unset NZB_PATH: legitimate (use default current dir at post time)
             _nzbPath.clear();
