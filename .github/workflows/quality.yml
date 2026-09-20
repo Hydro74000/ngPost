@@ -19,6 +19,24 @@ permissions:
   contents: read
 
 jobs:
+  function-length:
+    name: Function length ratchet
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install pinned lizard and dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/function-length"
+          "$RUNNER_TEMP/function-length/bin/pip" install --require-hashes --only-binary=:all: \
+            -r .github/scripts/function-length-requirements.txt
+          echo "$RUNNER_TEMP/function-length/bin" >> "$GITHUB_PATH"
+
+      - name: Verify the ratchet and its negative controls
+        run: |
+          python -m unittest discover -s tests/quality -p test_function_length.py -v
+          python .github/scripts/check-function-length.py
+
   static-analysis:
     name: clang-tidy and cppcheck
     runs-on: ubuntu-24.04
@@ -50,7 +68,7 @@ jobs:
             [ "$variant" = headless ] && extra="CONFIG+=no_hmi"
             mkdir -p "build/$variant"
             (cd "build/$variant" \
-              && qmake6 -spec linux-clang ../../src/ngPost.pro CONFIG+=release $extra \
+              && qmake6 -spec linux-clang ../../src/ngPost.pro CONFIG+=release CONFIG+=ngpost_werror $extra \
               && bear -- make -j"$(nproc)")
           done
 
