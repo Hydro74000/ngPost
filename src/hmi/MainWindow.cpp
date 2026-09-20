@@ -1794,7 +1794,7 @@ void MainWindow::_connectHistoryControls()
     connect(_resumePurgeBtn,      &QPushButton::clicked,  this, &MainWindow::_onResumePurge);
     connect(_resumeIgnoreBtn,     &QPushButton::clicked,  this, &MainWindow::_onResumeIgnore);
     connect(_resumeDeleteBtn,     &QPushButton::clicked,  this, &MainWindow::_onResumeDeleteEntries);
-    connect(_bannerResumeBtn,     &QPushButton::clicked,  this, [this]() {
+    connect(_bannerResumeBtn, &QPushButton::clicked, this, [this]() {
         _innerHistoryTabs->setCurrentIndex(2);
     });
 }

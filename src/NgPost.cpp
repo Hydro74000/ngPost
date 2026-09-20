@@ -609,8 +609,7 @@ void NgPost::_connectVpnRecoverySignals()
         if (_activeJob)
             _activeJob->pause(PostingJob::PauseReason::User);
     });
-    connect(_vpnManager, &VpnManager::recoveryExhausted,
-            this, [this](VpnManager::FailureKind) {
+    connect(_vpnManager, &VpnManager::recoveryExhausted, this, [this](VpnManager::FailureKind) {
         if (!useHMI()) {
             _error(tr("VPN recovery exhausted; the post was preserved for resume."),
                    ERROR_CODE::ERR_VPN);
