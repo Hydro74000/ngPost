@@ -389,6 +389,12 @@ private:
     PostingJob *_activeJob;
     QQueue<PostingJob *> _pendingJobs;
     PostingJob *_packingJob;
+    bool _queuePaused = false;
+    bool _cancelingAll = false;
+    quint64 _postingCancelGeneration = 0;
+    bool _resumeActiveJob();
+    bool _confirmPostingAdmission();
+    void _startNextPostingJob();
 
     QString _historyFieldSeparator;
     QString _postHistoryFile;
@@ -794,7 +800,8 @@ public:
     inline bool removeRarRootFolder() const;
 
     bool isPaused() const;
-    void pause() const;
+    void pause();
+    void cancelAllPostingJobs();
     void resume();
 
     inline bool tryResumePostWhenConnectionLost() const;
@@ -841,6 +848,7 @@ public:
     PostHistoryService *historyService() const { return _historyService; }
 
 signals:
+    void postingStateChanged();
     void par2DefaultsChanged();
     void log(QString msg, bool newline); //!< in case we signal from another thread
     void error(QString msg);             //!< in case we signal from another thread

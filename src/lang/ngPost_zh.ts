@@ -2056,6 +2056,22 @@ This also removes all associated file and article records.</source>
         <source>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</source>
         <translation>按标签页顺序提交 %1 个已准备的发布任务。跳过空白、已完成、已排队和正在运行的任务。至少需要两个发布标签页。</translation>
     </message>
+    <message>
+        <source>Pause all tabs</source>
+        <translation>暂停所有标签页</translation>
+    </message>
+    <message>
+        <source>Resume all tabs</source>
+        <translation>恢复所有标签页</translation>
+    </message>
+    <message>
+        <source>Stop all tabs</source>
+        <translation>停止所有标签页</translation>
+    </message>
+    <message>
+        <source>Cancel all active and queued posts</source>
+        <translation>取消所有正在进行和排队的发布</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6806,8 +6822,8 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
     <message>
         <location line="+3"/>
         <location filename="../hmi/PostingWidget.cpp" line="+488"/>
-        <source>Post Files</source>
-        <translation>发布文件</translation>
+        <source>Start Quick Post #%1</source>
+        <translation>开始快速发布 #%1</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="-702"/>

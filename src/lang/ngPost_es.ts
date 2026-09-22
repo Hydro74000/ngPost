@@ -2055,6 +2055,22 @@ Are you sure you want to quit?</source>
         <source>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</source>
         <translation>Enviar %1 publicaciones preparadas en el orden de las pestañas. Se omiten las vacías, terminadas, en cola y activas. Requiere al menos dos pestañas de publicación.</translation>
     </message>
+    <message>
+        <source>Pause all tabs</source>
+        <translation>Pausar todas las pestañas</translation>
+    </message>
+    <message>
+        <source>Resume all tabs</source>
+        <translation>Reanudar todas las pestañas</translation>
+    </message>
+    <message>
+        <source>Stop all tabs</source>
+        <translation>Detener todas las pestañas</translation>
+    </message>
+    <message>
+        <source>Cancel all active and queued posts</source>
+        <translation>Cancelar todas las publicaciones activas y en espera</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6806,8 +6822,8 @@ Establezca PAR2_SOURCE = custom y corrija PAR2_PATH en la configuración (Ajuste
     <message>
         <location line="+3"/>
         <location filename="../hmi/PostingWidget.cpp" line="+488"/>
-        <source>Post Files</source>
-        <translation>Publicar Ficheros</translation>
+        <source>Start Quick Post #%1</source>
+        <translation>Iniciar Publicación Rápida #%1</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="-79"/>

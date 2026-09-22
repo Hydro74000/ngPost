@@ -2043,6 +2043,22 @@ Are you sure you want to quit?</source>
         <source>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</source>
         <translation>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</translation>
     </message>
+    <message>
+        <source>Pause all tabs</source>
+        <translation>Pause all tabs</translation>
+    </message>
+    <message>
+        <source>Resume all tabs</source>
+        <translation>Resume all tabs</translation>
+    </message>
+    <message>
+        <source>Stop all tabs</source>
+        <translation>Stop all tabs</translation>
+    </message>
+    <message>
+        <source>Cancel all active and queued posts</source>
+        <translation>Cancel all active and queued posts</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6772,8 +6788,8 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
     <message>
         <location line="+3"/>
         <location filename="../hmi/PostingWidget.cpp" line="+488"/>
-        <source>Post Files</source>
-        <translation></translation>
+        <source>Start Quick Post #%1</source>
+        <translation>Start Quick Post #%1</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="-79"/>

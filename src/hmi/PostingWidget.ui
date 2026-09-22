@@ -350,11 +350,7 @@
         <string>Let's Post!</string>
        </property>
        <property name="text">
-        <string>Post Files</string>
-       </property>
-       <property name="icon">
-        <iconset resource="../resources/resources.qrc">
-         <normaloff>:/icons/ngPost.png</normaloff>:/icons/ngPost.png</iconset>
+        <string>Start Quick Post #%1</string>
        </property>
       </widget>
      </item>

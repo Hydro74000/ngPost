@@ -633,3 +633,5 @@ audit*
 tests/*.md
 src/utils/update/update_rc.py
 revue*
+docs/code-quality-lot5.md
+docs/quick-post-controls-validation.md

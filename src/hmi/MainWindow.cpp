@@ -302,7 +302,7 @@ void MainWindow::init(NgPost *ngPost)
     _ui->postTabWidget->clear();
     _ui->postTabWidget->setUsesScrollButtons(true);
     _ui->postTabWidget->setStyleSheet(sTabWidgetStyle);
-    _ui->postTabWidget->addTab(_quickJobTab, QIcon(":/icons/quick.png"), _ngPost->quickJobName());
+    _ui->postTabWidget->addTab(_quickJobTab, QIcon(":/icons/quick.svg"), QString("%1 #1").arg(_ngPost->quickJobName()));
     tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
     _ui->postTabWidget->addTab(_autoPostTab, QIcon(":/icons/auto.png"), _ngPost->folderMonitoringName());
     tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
@@ -316,12 +316,7 @@ void MainWindow::init(NgPost *ngPost)
     connect(tabBar, &QWidget::customContextMenuRequested, this, &MainWindow::onTabContextMenu);
     connect(tabBar, &QTabBar::tabCloseRequested,          this, &MainWindow::onCloseJob);
     _ui->postTabWidget->setTabsClosable(true);
-    _postAllButton = new QPushButton(_ui->postTabWidget);
-    _postAllButton->setObjectName(QStringLiteral("postAllTabsButton"));
-    _ui->postTabWidget->setCornerWidget(_postAllButton, Qt::TopRightCorner);
-    connect(_postAllButton, &QPushButton::clicked, this, &MainWindow::onPostAllTabs);
-    connect(_ui->postTabWidget, &QTabWidget::currentChanged, this, &MainWindow::updatePostAllButton);
-    updatePostAllButton();
+    _buildPostingControls();
     _ui->postTabWidget->installEventFilter(this);
 
     setJobLabel(1);
@@ -358,7 +353,7 @@ QWidget *MainWindow::buildHistoryTabForTest()
 
 
 void MainWindow::updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded, const QString &avgSpeed
-                                   #ifdef __COMPUTE_IMMEDIATE_SPEED__
+                               #ifdef __COMPUTE_IMMEDIATE_SPEED__
                                        , const QString &immediateSpeed
                                    #endif
                                    )
@@ -689,63 +684,59 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::changeEvent(QEvent *event)
 {
-    if(event)
-    {
-        QStringList serverTableHeader;
-        QTabBar *tabBar = _ui->postTabWidget->tabBar();
-        int lastTabIdx = tabBar->count() - 1;
-        switch(event->type()) {
-        // this event is send if a translator is loaded
-        case QEvent::LanguageChange:
-            qDebug() << "MainWindow::changeEvent";
-            _ui->retranslateUi(this);
-            if (_par2SettingsButton) _par2SettingsButton->setText(tr("PAR2 Settings…"));
-            updatePostAllButton();
-#ifdef __COMPUTE_IMMEDIATE_SPEED__
-            _ui->uploadLbl->setToolTip(tr("Immediate speed (avg on %1 sec) - (nb Articles uploaded / total number of Articles) - avg speed").arg(NgPost::immediateSpeedDuration()));
-#endif
-            _ui->shutdownCB->setToolTip(tr("Shutdown computer when all the current Posts are done (with command: %1)").arg(
-                                            _ngPost->_shutdownCmd));
-
-            _ui->serverBox->setTitle(tr("Servers"));
-            _ui->fileBox->setTitle(tr("Files"));
-            _ui->postingBox->setTitle(tr("Parameters"));
-            _ui->logBox->setTitle(tr("Posting Log"));
-
-            tabBar->setTabText(0, _ngPost->quickJobName());
-            tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
-            tabBar->setTabText(1, _ngPost->folderMonitoringName());
-            tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
-            tabBar->setTabText(2, tr("History"));
-            tabBar->setTabToolTip(2, tr("Post history, statistics and resume center"));
-            for (int i = 3 ; i < lastTabIdx; ++i)
-                if (_getPostWidget(i))
-                    tabBar->setTabText(i, _ngPost->quickJobName());
-            tabBar->setTabText(lastTabIdx, tr("New"));
-            tabBar->setTabToolTip(lastTabIdx, QString("Create a new %1").arg(_ngPost->quickJobName()));
-
-            setJobLabel(_ui->postTabWidget->currentIndex());
-
-            for (const char *header : sServerListHeaders)
-                serverTableHeader << tr(header);
-            _ui->serversTable->setHorizontalHeaderLabels(serverTableHeader);
-
-
-            _quickJobTab->retranslate();
-            _autoPostTab->retranslate();
-            for (int i = 2 ; i < _ui->postTabWidget->count() - 1; ++i)
-                if (PostingWidget *postWidget = _getPostWidget(i))
-                    postWidget->retranslate();
-            _retranslateHistoryTab();
-            break;
-
-            // this event is send, if the system, language changes
-        default:
-            break;
-        }
-    }
     QMainWindow::changeEvent(event);
+    if (!_ngPost || !_postAllButton) return;
+    if (event->type() == QEvent::LanguageChange) _retranslate();
+    if (event->type() == QEvent::PaletteChange) _refreshPostingControls();
 }
+
+void MainWindow::_retranslate()
+{
+    QStringList serverTableHeader;
+    QTabBar *tabBar = _ui->postTabWidget->tabBar();
+    const int lastTabIdx = tabBar->count() - 1;
+    qDebug() << "MainWindow::changeEvent";
+    _ui->retranslateUi(this);
+    if (_par2SettingsButton) _par2SettingsButton->setText(tr("PAR2 Settings…"));
+    updatePostAllButton();
+#ifdef __COMPUTE_IMMEDIATE_SPEED__
+    _ui->uploadLbl->setToolTip(tr("Immediate speed (avg on %1 sec) - (nb Articles uploaded / total number of Articles) - avg speed").arg(NgPost::immediateSpeedDuration()));
+#endif
+    _ui->shutdownCB->setToolTip(tr("Shutdown computer when all the current Posts are done (with command: %1)").arg(
+                                    _ngPost->_shutdownCmd));
+
+    _ui->serverBox->setTitle(tr("Servers"));
+    _ui->fileBox->setTitle(tr("Files"));
+    _ui->postingBox->setTitle(tr("Parameters"));
+    _ui->logBox->setTitle(tr("Posting Log"));
+
+    tabBar->setTabText(0, QString("%1 #1").arg(_ngPost->quickJobName()));
+    tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
+    tabBar->setTabText(1, _ngPost->folderMonitoringName());
+    tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
+    tabBar->setTabText(2, tr("History"));
+    tabBar->setTabToolTip(2, tr("Post history, statistics and resume center"));
+    for (int i = 3 ; i < lastTabIdx; ++i)
+        if (auto *post = _getPostWidget(i))
+            tabBar->setTabText(i, QString("%1 #%2").arg(_ngPost->quickJobName()).arg(post->displayNumber()));
+    tabBar->setTabText(lastTabIdx, tr("New"));
+    tabBar->setTabToolTip(lastTabIdx, QString("Create a new %1").arg(_ngPost->quickJobName()));
+
+    setJobLabel(_ui->postTabWidget->currentIndex());
+
+    for (const char *header : sServerListHeaders)
+        serverTableHeader << tr(header);
+    _ui->serversTable->setHorizontalHeaderLabels(serverTableHeader);
+
+
+    _quickJobTab->retranslate();
+    _autoPostTab->retranslate();
+    for (int i = 2 ; i < _ui->postTabWidget->count() - 1; ++i)
+        if (PostingWidget *postWidget = _getPostWidget(i))
+            postWidget->retranslate();
+    _retranslateHistoryTab();
+}
+
 
 
 
@@ -2020,19 +2011,25 @@ void MainWindow::_onHistoryHeaderContextMenu(const QPoint &pos)
         _resetHistoryColumns();
 }
 
+uint MainWindow::_nextQuickJobNumber() const
+{
+    uint number = 2;
+    for (const auto *post : _postingWidgets())
+        number = qMax(number, post->jobNumber());
+    return number + 1;
+}
+
 PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &files)
 {
     if (!lastTabIdx)
         lastTabIdx = _ui->postTabWidget->count() -1;
-    PostingWidget *newPostingWidget = new PostingWidget(_ngPost, this, static_cast<uint>(lastTabIdx));
+    PostingWidget *newPostingWidget = new PostingWidget(_ngPost, this, _nextQuickJobNumber());
     newPostingWidget->init();
     _connectPostingWidget(newPostingWidget);
-    // Tab layout: 0=quick (#1), 1=folder, 2=history, 3="+" — so a tab inserted
-    // at lastTabIdx becomes the (lastTabIdx-1)-th quick post for display.
-    QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(lastTabIdx - 1);
+    QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(newPostingWidget->displayNumber());
     _ui->postTabWidget->insertTab(lastTabIdx,
                                   newPostingWidget ,
-                                  QIcon(":/icons/quick.png"),
+                                  QIcon(":/icons/quick.svg"),
                                   tabName);
     _ui->postTabWidget->setTabToolTip(lastTabIdx, tabName);
 
@@ -2094,34 +2091,24 @@ void MainWindow::setTab(QWidget *postWidget)
 
 void MainWindow::clearJobTab(QWidget *postWidget)
 {
-    int nbJob = _ui->postTabWidget->count() -1;
-    for (int i = 0 ; i < nbJob ; ++i)
-    {
-        if (_ui->postTabWidget->widget(i) == postWidget)
-        {
-            QTabBar *bar = _ui->postTabWidget->tabBar();
-            bar->setTabToolTip(i, "");
-            bar->setTabTextColor(i, Qt::black);
-            bar->setTabIcon(i, QIcon(":/icons/quick.png"));
-        }
-    }
+    const int index = _ui->postTabWidget->indexOf(postWidget);
+    if (index < 0) return;
+    auto *bar = _ui->postTabWidget->tabBar();
+    bar->setTabToolTip(index, "");
+    bar->setTabTextColor(index, palette().color(QPalette::Window).lightness() < 128
+                                   ? QColor(Qt::white) : palette().color(QPalette::WindowText));
+    bar->setTabIcon(index, QIcon(":/icons/quick.svg"));
 }
 
 void MainWindow::updateJobTab(QWidget *postWidget, const QColor &color, const QIcon &icon, const QString &tooltip)
 {
-    int nbJob = _ui->postTabWidget->count() -1;
-    for (int i = 0 ; i < nbJob ; ++i)
-    {
-        if (_ui->postTabWidget->widget(i) == postWidget)
-        {
-            QTabBar *bar = _ui->postTabWidget->tabBar();
-            if (!tooltip.isEmpty())
-                bar->setTabToolTip(i, tooltip);
-            bar->setTabTextColor(i, color);
-            bar->setTabIcon(i, icon);
-            break;
-        }
-    }
+    const int index = _ui->postTabWidget->indexOf(postWidget);
+    if (index < 0) return;
+    auto *bar = _ui->postTabWidget->tabBar();
+    auto *post = qobject_cast<PostingWidget *>(postWidget);
+    if (!tooltip.isEmpty()) bar->setTabToolTip(index, tooltip);
+    bar->setTabTextColor(index, post ? post->postingTextColor() : color);
+    if (!icon.isNull()) bar->setTabIcon(index, icon);
 }
 
 void MainWindow::setJobLabel(int jobNumber)
@@ -2358,10 +2345,32 @@ void MainWindow::onPar2Settings()
     dialog.exec();
 }
 
+void MainWindow::_buildPostingControls()
+{
+    _postAllButton = new QPushButton(_ui->postTabWidget);
+    _postAllButton->setObjectName(QStringLiteral("postAllTabsButton"));
+    _postAllButton->setIcon(QIcon(":/icons/ngPost.png"));
+    auto *controls = new QWidget(_ui->postTabWidget);
+    auto *layout = new QHBoxLayout(controls);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(_postAllButton);
+    // Move the existing global pause control next to Post All Tabs.
+    layout->addWidget(_ui->pauseButton);
+    _stopAllButton = new QPushButton(controls);
+    _stopAllButton->setObjectName(QStringLiteral("stopAllTabsButton"));
+    _stopAllButton->setIcon(style()->standardIcon(QStyle::SP_MediaStop));
+    layout->addWidget(_stopAllButton);
+    _ui->postTabWidget->setCornerWidget(controls, Qt::TopRightCorner);
+    connect(_stopAllButton, &QPushButton::clicked, _ngPost, &NgPost::cancelAllPostingJobs);
+    connect(_ngPost, &NgPost::postingStateChanged, this, &MainWindow::updatePostAllButton);
+    connect(_postAllButton, &QPushButton::clicked, this, &MainWindow::onPostAllTabs);
+    connect(_ui->postTabWidget, &QTabWidget::currentChanged, this, &MainWindow::updatePostAllButton);
+    updatePostAllButton();
+}
+
 void MainWindow::updatePostAllButton()
 {
-    if (!_postAllButton)
-        return;
+    if (!_postAllButton) return;
     int tabs = 0, ready = 0;
     for (const auto *post : _postingWidgets()) {
         ++tabs;
@@ -2369,27 +2378,33 @@ void MainWindow::updatePostAllButton()
     }
     _postAllButton->setText(tr("Post all tabs"));
     _postAllButton->setToolTip(tr("Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.").arg(ready));
-    _postAllButton->setEnabled(!_submittingAll && tabs > 1 && ready > 0);
+    _postAllButton->setEnabled(!_submittingAll && !_ngPost->_cancelingAll && tabs > 1 && ready > 0);
+    _refreshPostingControls();
 }
 
 void MainWindow::onPostAllTabs()
 {
-    if (_submittingAll || !_postAllButton || !_postAllButton->isEnabled())
-        return;
+    if (_submittingAll || !_postAllButton || !_postAllButton->isEnabled()) return;
     {
         QScopedValueRollback<bool> guard(_submittingAll, true);
         updatePostAllButton();
-        QList<QPointer<PostingWidget>> posts;
-        for (auto *post : _postingWidgets())
-            if (post->canSubmit())
-                posts << post;
-        updateServers();
-        updateParams();
-        for (const auto &post : posts)
-            if (post && post->canSubmit())
-                post->postFiles(false);
+        _submitPreparedTabs();
     }
     updatePostAllButton();
+}
+
+void MainWindow::_submitPreparedTabs()
+{
+    const quint64 generation = _ngPost->_postingCancelGeneration;
+    QList<QPointer<PostingWidget>> posts;
+    for (auto *post : _postingWidgets())
+        if (post->canSubmit()) posts << post;
+    updateServers();
+    updateParams();
+    for (const auto &post : posts) {
+        if (generation != _ngPost->_postingCancelGeneration) break;
+        if (post && post->canSubmit()) post->postFiles(false);
+    }
 }
 
 void MainWindow::onSaveConfig()
@@ -2504,17 +2519,24 @@ void MainWindow::onShutdownToggled(bool checked)
         _ngPost->setShutdownWhenDone(false);
 }
 
-void MainWindow::setPauseIcon(bool pause)
+void MainWindow::_refreshPostingControls()
 {
-    if (pause)
-        _ui->pauseButton->setIcon(QIcon(":/icons/pause.png"));
-    else
-        _ui->pauseButton->setIcon(QIcon(":/icons/play.png"));
+    const bool enabled = _ngPost->hasPostingJobs() && !_ngPost->_cancelingAll;
+    const bool paused = _ngPost->isPaused();
+    _ui->pauseButton->setEnabled(enabled);
+    _ui->pauseButton->setIcon(QIcon(paused ? ":/icons/play.png" : ":/icons/pause.png"));
+    _ui->pauseButton->setToolTip(paused ? tr("Resume all tabs") : tr("Pause all tabs"));
+    _ui->pauseButton->setAccessibleName(_ui->pauseButton->toolTip());
+    _stopAllButton->setEnabled(enabled);
+    _stopAllButton->setAccessibleName(tr("Stop all tabs"));
+    _stopAllButton->setToolTip(tr("Cancel all active and queued posts"));
+    for (auto *post : _postingWidgets())
+        post->refreshPostingState();
 }
 
 void MainWindow::onPauseClicked()
 {
-    if (_ngPost->isPosting())
+    if (_ngPost->hasPostingJobs())
     {
         if (_ngPost->isPaused())
             _ngPost->resume();
@@ -3276,7 +3298,6 @@ const QString MainWindow::sTabWidgetStyle = "\
         }\
         QTabBar::tab {\
             background: palette(button);\
-            color: palette(buttonText);\
             border: 2px solid palette(mid);\
             border-bottom-color: palette(window);\
             border-top-left-radius: 4px;\
@@ -3286,7 +3307,6 @@ const QString MainWindow::sTabWidgetStyle = "\
         }\
         QTabBar::tab:selected, QTabBar::tab:hover {\
             background: palette(window);\
-            color: palette(windowText);\
         }\
         QTabBar::tab:selected {\
             border-color: palette(dark);\

@@ -103,6 +103,9 @@ public:
     QMap<QString, MetaValue> postInfoMeta() const { return _postInfoMeta; }
 
     void retranslate();
+    uint displayNumber() const { return _jobNumber == 1 ? 1 : _jobNumber - 1; }
+    void refreshPostingState();
+    QColor postingTextColor() const;
 
     void setNzbPassword(const QString &pass);
     void setPackingAuto(bool enabled, const QStringList &keys);
@@ -147,6 +150,7 @@ private slots: // for the HMI
 
 
 private:
+    bool _confirmNzbOverwrite(const QString &nzbPath);
     void _buildPostInfoRow();
     void retranslatePostInfoTexts();
     void _buildFilesList(QFileInfoList &files, bool &hasFolder);

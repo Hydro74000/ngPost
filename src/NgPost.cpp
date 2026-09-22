@@ -543,20 +543,15 @@ void NgPost::_initVpnManager()
     connect(_vpnManager, &VpnManager::stateChanged,
             this, [this](VpnManager::State s) {
         if (s == VpnManager::State::Connected) {
+            if (_queuePaused || _cancelingAll) return;
             if (_activeJob) {
                 if (_activeJob->resumeIfPausedFor(PostingJob::PauseReason::VpnRecovery)) {
-#ifdef __USE_HMI__
-                    if (_hmi)
-                        _hmi->setPauseIcon(true);
-#endif
                     _progressbarTimer.start(_refreshRate);
                 }
                 return;
             }
-            if (_pendingJobs.isEmpty()) return;
-            _activeJob = _pendingJobs.dequeue();
-            _retainVpnForJob(_activeJob);
-            emit _activeJob->startPosting(true);
+            _startNextPostingJob();
+            emit postingStateChanged();
             return;
         }
         if (_activeJob
@@ -1831,25 +1826,35 @@ void NgPost::maybeFinishApplication()
 
 bool NgPost::isPaused() const
 {
-    if (_activeJob && _activeJob->isPaused())
+    if (_queuePaused || (_activeJob && _activeJob->isPaused()))
         return true;
     else
         return false;
 }
 
-void NgPost::pause() const
+void NgPost::pause()
 {
+    if (!hasPostingJobs() || _cancelingAll) return;
+    _queuePaused = true;
+    const auto notify = qScopeGuard([this] { emit postingStateChanged(); });
     if (_activeJob)
     {
         _activeJob->pause(PostingJob::PauseReason::User);
-#ifdef __USE_HMI__
-        if (_hmi)
-            _hmi->setPauseIcon(false);
-#endif
     }
 }
 
 void NgPost::resume()
+{
+    if (_cancelingAll) return;
+    const auto notify = qScopeGuard([this] { emit postingStateChanged(); });
+    if (!_resumeActiveJob()) return;
+    _queuePaused = false;
+    _startNextPostingJob();
+    if (_preparePacking && !_packingJob && _activeJob && _activeJob->isPacked())
+        _prepareNextPacking();
+}
+
+bool NgPost::_resumeActiveJob()
 {
     if (_activeJob && _activeJob->isPaused())
     {
@@ -1859,15 +1864,17 @@ void NgPost::resume()
                 || _vpnManager->health() != VpnManager::VpnHealth::Healthy)) {
             if (_vpnManager->state() == VpnManager::State::Stopping) {
                 _log(tr("The post remains paused until the requested VPN stop completes."));
-                return;
+                return false;
             }
             VpnManager::Admission const admission =
                 _vpnManager->admitJob(_nntpServers, _activeJob->_vpnRequired);
             if (admission != VpnManager::Admission::Proceed) {
                 if (admission == VpnManager::Admission::Wait
-                    && _activeJob->waitForVpnAfterUserResume())
+                    && _activeJob->waitForVpnAfterUserResume()) {
+                    _queuePaused = false;
                     _retainVpnForJob(_activeJob);
-                return;
+                }
+                return false;
             }
         }
         if (_activeJob->pauseReason() == PostingJob::PauseReason::VpnRecovery
@@ -1875,15 +1882,12 @@ void NgPost::resume()
             && (_vpnManager->state() != VpnManager::State::Connected
                 || _vpnManager->health() != VpnManager::VpnHealth::Healthy)) {
             _log(tr("The post remains paused until VPN recovery completes."));
-            return;
+            return false;
         }
         _activeJob->resume();
-#ifdef __USE_HMI__
-        if (_hmi)
-            _hmi->setPauseIcon(true);
-#endif
         _progressbarTimer.start(_refreshRate);
     }
+    return true;
 }
 
 
@@ -2232,7 +2236,7 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPackingDone] job: " << job
 
 void NgPost::_prepareNextPacking()
 {
-    if (_pendingJobs.size())
+    if (!_queuePaused && !_cancelingAll && !_pendingJobs.isEmpty())
     {
         _packingJob = _pendingJobs.first();
         if (_packingJob->hasPacking())
@@ -2244,6 +2248,13 @@ void NgPost::_prepareNextPacking()
 
 void NgPost::onPostingJobFinished()
 {
+    const auto notify = qScopeGuard([this] {
+        if (!hasPostingJobs()) {
+            _queuePaused = false;
+            _cancelingAll = false;
+        }
+        emit postingStateChanged();
+    });
     PostingJob *job = static_cast<PostingJob*>(sender());
 #ifdef __DEBUG__
 qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
@@ -2292,79 +2303,18 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
         _releaseVpnForJob(finishedJob);
         finishedJob->deleteLater();
 
-        if (_pendingJobs.size())
-        {
-            // The next job may itself need (or not) the VPN. Re-admit it so
-            // we either dequeue normally, defer (Wait), or refuse to activate
-            // it now if the VPN can't come up.
-            VpnManager::Admission nextAdm = VpnManager::Admission::Proceed;
-            if (_vpnManager)
-                nextAdm = _vpnManager->admitJob(
-                    _nntpServers, _pendingJobs.head()->_vpnRequired);
-            if (nextAdm != VpnManager::Admission::Proceed) {
-                // Leave it in pending; the stateChanged(Connected) hook (or
-                // a Blocked->fixed user action) will eventually flush.
-                return;
-            }
-            _activeJob = _pendingJobs.dequeue();
-            _retainVpnForJob(_activeJob);
-
-#ifdef __USE_HMI__
-            if (_hmi)
-                _hmi->setTab(_activeJob->widget());
-#endif
-            if (_preparePacking)
-            {
-                if (_packingJob == _activeJob)
-                {
-                    _packingJob = nullptr;
-                    if (_activeJob->isPacked())
-                    {
-                        _activeJob->_postFiles();
-                        _prepareNextPacking();
-                    }
-                    else if (!_activeJob->hasPacking())
-                    {
-                        if (debugFull())
-                            _log(tr("start non packing job..."));
-                        emit _activeJob->startPosting(true);
-                        _prepareNextPacking();
-                    }
-                    // otherwise it will be triggered automatically when the packing is finished
-                    // as it is now the active job ;)
-                }
-                else if (_packingJob == nullptr)
-                {
-                    // Recovery path: the previous active job was cancelled
-                    // while still mid-packing, so _prepareNextPacking() had
-                    // not yet pre-packed the now-dequeued job. Start it
-                    // normally (its own packing happens as part of postFiles)
-                    // and schedule pre-pack of whatever comes after.
-                    if (debugFull())
-                        _log(tr("Recovering: starting next job that wasn't pre-packed"));
-                    emit _activeJob->startPosting(true);
-                    _prepareNextPacking();
-                }
-                else
-                    _error("next active job different to the packing one..."); // should never happen...
-            }
-            else
-                emit _activeJob->startPosting(true);
-        }
+        if (!_pendingJobs.isEmpty())
+            _startNextPostingJob();
         else
-        {
-            // Everything that had to be posted is out; the barrier decides
-            // when it is safe to quit or to power the machine off, because
-            // the post commands and the nzb uploads may still be running.
             maybeFinishApplication();
-        }
     }
     else if (_preparePacking && job ==_packingJob)
     {
         _packingJob = nullptr;
         _pendingJobs.dequeue(); // remove the packingJob
         job->deleteLater();
-        _error(tr("packing job finished unexpectedly..."));
+        if (!job->cancelRequested())
+            _error(tr("packing job finished unexpectedly..."));
         _prepareNextPacking();
     }
     else
@@ -2375,6 +2325,68 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
         _pendingJobs.removeOne(job);
         job->deleteLater();
     }
+}
+
+void NgPost::_startNextPostingJob()
+{
+    if (_activeJob || _queuePaused || _cancelingAll || _pendingJobs.isEmpty())
+        return;
+    // The next job may itself need (or not) the VPN. Re-admit it so
+    // we either dequeue normally, defer (Wait), or refuse to activate
+    // it now if the VPN can't come up.
+    VpnManager::Admission nextAdm = VpnManager::Admission::Proceed;
+    if (_vpnManager)
+        nextAdm = _vpnManager->admitJob(
+            _nntpServers, _pendingJobs.head()->_vpnRequired);
+    if (nextAdm != VpnManager::Admission::Proceed) {
+        // Leave it in pending; the stateChanged(Connected) hook (or
+        // a Blocked->fixed user action) will eventually flush.
+        return;
+    }
+    _activeJob = _pendingJobs.dequeue();
+    _retainVpnForJob(_activeJob);
+
+#ifdef __USE_HMI__
+    if (_hmi)
+        _hmi->setTab(_activeJob->widget());
+#endif
+    if (_preparePacking)
+    {
+        if (_packingJob == _activeJob)
+        {
+            _packingJob = nullptr;
+            if (_activeJob->isPacked())
+            {
+                _activeJob->_postFiles();
+                _prepareNextPacking();
+            }
+            else if (!_activeJob->hasPacking())
+            {
+                if (debugFull())
+                    _log(tr("start non packing job..."));
+                emit _activeJob->startPosting(true);
+                _prepareNextPacking();
+            }
+            // otherwise it will be triggered automatically when the packing is finished
+            // as it is now the active job ;)
+        }
+        else if (_packingJob == nullptr)
+        {
+            // Recovery path: the previous active job was cancelled
+            // while still mid-packing, so _prepareNextPacking() had
+            // not yet pre-packed the now-dequeued job. Start it
+            // normally (its own packing happens as part of postFiles)
+            // and schedule pre-pack of whatever comes after.
+            if (debugFull())
+                _log(tr("Recovering: starting next job that wasn't pre-packed"));
+            emit _activeJob->startPosting(true);
+            _prepareNextPacking();
+        }
+        else
+            _error("next active job different to the packing one..."); // should never happen...
+    }
+    else
+        emit _activeJob->startPosting(true);
 }
 
 void NgPost::_startShutdown()
@@ -2563,6 +2575,21 @@ void NgPost::closeAllPostingJobs()
     _pendingJobs.clear();
     if (_activeJob)
         _activeJob->onStopPosting();
+}
+
+void NgPost::cancelAllPostingJobs()
+{
+    if (!hasPostingJobs() || _cancelingAll) return;
+    _cancelingAll = true;
+    ++_postingCancelGeneration;
+    _queuePaused = false;
+    _resetShutdownCompletion();
+    // Mark every job before queued completion callbacks can advance the queue.
+    for (PostingJob *job : _pendingJobs)
+        if (!job->cancelRequested()) emit job->stopPosting();
+    if (_activeJob && !_activeJob->cancelRequested())
+        emit _activeJob->stopPosting();
+    emit postingStateChanged();
 }
 
 void NgPost::stopActivePostingForResume()
@@ -5532,13 +5559,22 @@ bool NgPost::_confirmMasterSwitchWithoutVpnProfileIfNeeded()
 #endif
 }
 
+bool NgPost::_confirmPostingAdmission()
+{
+    const quint64 generation = _postingCancelGeneration;
+    // Admission can run a nested event loop. A stop remains binding even if
+    // every canceled job has finished before the user answers the dialog.
+    return !_cancelingAll && _confirmMasterSwitchWithoutVpnProfileIfNeeded()
+           && generation == _postingCancelGeneration;
+}
+
 bool NgPost::startPostingJob(PostingJob *job)
 {
+    const auto notify = qScopeGuard([this] { emit postingStateChanged(); });
     // Admission may open a VPN dialog before this job enters _pendingJobs or
     // _activeJob. Its nested event loop must not allow shutdown in that gap.
     const auto admission = holdShutdown();
     _lastPostingStartCanceled = false;
-
 #ifdef __DEBUG__
 qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
          << ", file: " << job->nzbName();
@@ -5552,7 +5588,7 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
     }
 #endif
 
-    if (!_confirmMasterSwitchWithoutVpnProfileIfNeeded()) {
+    if (!_confirmPostingAdmission()) {
         _lastPostingStartCanceled = true;
         _discardUnstartedJob(job);
         return false;
@@ -5586,12 +5622,12 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
         return false;
     }
 
-    if (_activeJob)
+    if (_activeJob || _queuePaused)
     {
         _pendingJobs << job;
         if (_preparePacking)
         {
-            if (_activeJob->isPacked() && !_packingJob)
+            if (_activeJob && _activeJob->isPacked() && !_packingJob)
                 _prepareNextPacking();
         }
         return false;

@@ -2055,6 +2055,22 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <source>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</source>
         <translation>Enviar %1 posts preparados na ordem das abas. Posts vazios, concluídos, na fila e ativos são ignorados. Requer pelo menos duas abas de postagem.</translation>
     </message>
+    <message>
+        <source>Pause all tabs</source>
+        <translation>Pausar todas as abas</translation>
+    </message>
+    <message>
+        <source>Resume all tabs</source>
+        <translation>Retomar todas as abas</translation>
+    </message>
+    <message>
+        <source>Stop all tabs</source>
+        <translation>Parar todas as abas</translation>
+    </message>
+    <message>
+        <source>Cancel all active and queued posts</source>
+        <translation>Cancelar todas as postagens ativas e na fila</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6805,8 +6821,8 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
     <message>
         <location line="+3"/>
         <location filename="../hmi/PostingWidget.cpp" line="+488"/>
-        <source>Post Files</source>
-        <translation>Postar Arquivos</translation>
+        <source>Start Quick Post #%1</source>
+        <translation>Iniciar Postagem Rápida #%1</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="-79"/>

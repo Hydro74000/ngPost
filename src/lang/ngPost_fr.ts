@@ -2046,6 +2046,22 @@ Are you sure you want to quit?</source>
         <source>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</source>
         <translation>Soumettre %1 posts préparés dans l’ordre des onglets. Les posts vides, terminés, en file ou actifs sont ignorés. Nécessite au moins deux onglets de post.</translation>
     </message>
+    <message>
+        <source>Pause all tabs</source>
+        <translation>Mettre tous les onglets en pause</translation>
+    </message>
+    <message>
+        <source>Resume all tabs</source>
+        <translation>Reprendre tous les onglets</translation>
+    </message>
+    <message>
+        <source>Stop all tabs</source>
+        <translation>Arrêter tous les onglets</translation>
+    </message>
+    <message>
+        <source>Cancel all active and queued posts</source>
+        <translation>Annuler tous les envois actifs et en attente</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6796,8 +6812,8 @@ Définissez PAR2_SOURCE = custom et corrigez PAR2_PATH dans la configuration (Pa
     <message>
         <location line="+3"/>
         <location filename="../hmi/PostingWidget.cpp" line="+488"/>
-        <source>Post Files</source>
-        <translation>Poster Fichiers</translation>
+        <source>Start Quick Post #%1</source>
+        <translation>Démarrer le Post Rapide #%1</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="-79"/>

@@ -2057,6 +2057,22 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <source>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</source>
         <translation>%1 voorbereide posts in tabvolgorde toevoegen. Lege, voltooide, wachtende en actieve posts worden overgeslagen. Minimaal twee posttabbladen vereist.</translation>
     </message>
+    <message>
+        <source>Pause all tabs</source>
+        <translation>Alle tabbladen pauzeren</translation>
+    </message>
+    <message>
+        <source>Resume all tabs</source>
+        <translation>Alle tabbladen hervatten</translation>
+    </message>
+    <message>
+        <source>Stop all tabs</source>
+        <translation>Alle tabbladen stoppen</translation>
+    </message>
+    <message>
+        <source>Cancel all active and queued posts</source>
+        <translation>Alle actieve en wachtende posts annuleren</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6810,8 +6826,8 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
     <message>
         <location line="+3"/>
         <location filename="../hmi/PostingWidget.cpp" line="+488"/>
-        <source>Post Files</source>
-        <translation>Post Bestanden</translation>
+        <source>Start Quick Post #%1</source>
+        <translation>Quick Post #%1 starten</translation>
     </message>
     <message>
         <location filename="../hmi/PostingWidget.cpp" line="-702"/>

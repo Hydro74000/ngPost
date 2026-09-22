@@ -395,6 +395,7 @@ PostingJob::PostingJob(NgPost *ngPost,
 
 void PostingJob::_connectJobSignals()
 {
+    connect(this, &PostingJob::pauseChanged, _ngPost, &NgPost::postingStateChanged);
     connect(this, &PostingJob::startPosting, this, &PostingJob::onStartPosting, Qt::QueuedConnection);
     // Mark the request immediately: a natural completion may already be
     // queued ahead of onStopPosting, but must still count as cancelled.
@@ -425,7 +426,6 @@ void PostingJob::_connectJobSignals()
             &NgPost::onPostingJobFinished,
             Qt::QueuedConnection);
 
-    //    connect(this, &PostingJob::scheduleNextArticle, this, &PostingJob::onPrepareNextArticle, Qt::QueuedConnection);
 }
 
 #ifdef __USE_HMI__
@@ -594,14 +594,14 @@ void PostingJob::pause(PauseReason reason)
         return;
     }
     _log("Pause posting...");
-    // Publish the admission barrier before queuing connection shutdown. A
-    // fast NNTP reply must not let a worker reserve/send one more article in
-    // the interval before its killConnection event is processed.
+    // Block article admission before queuing connection shutdown, so a fast
+    // NNTP reply cannot let a worker send again before killConnection runs.
     _isPaused = 0x1;
     _pauseReason = reason;
     _pauseTimer.start();
     for (NntpConnection *con : _nntpConnections)
         emit con->killConnection();
+    emit pauseChanged();
 }
 
 void PostingJob::resume()
@@ -609,9 +609,8 @@ void PostingJob::resume()
     if (!MB_LoadAtomic(_isPaused))
         return;
     _log("Resume posting...");
-    // Clear the worker-visible barrier before startConnection is queued. The
-    // connection thread is allowed to run concurrently as soon as emit()
-    // returns.
+    // Clear the barrier before emitting startConnection: its thread may run
+    // concurrently as soon as the signal is queued.
     _isPaused = 0x0;
     _pauseReason = PauseReason::None;
     _pauseDuration += _pauseTimer.elapsed();
@@ -622,6 +621,7 @@ void PostingJob::resume()
         _nntpConnections.swap(_closedConnections);
     for (NntpConnection *con : _nntpConnections)
         emit con->startConnection();
+    emit pauseChanged();
 }
 
 bool PostingJob::resumeIfPausedFor(PauseReason reason)
@@ -793,6 +793,7 @@ void PostingJob::onImmediateSpeedComputation()
 
 void PostingJob::onStartPosting(bool isActiveJob)
 {
+    if (_finishIfCanceled()) return;
     _isActiveJob = isActiveJob;
 #ifdef __DEBUG__
     qDebug() << "[MB_TRACE][Issue#82][PostingJob::onStartPosting] job: " << this
@@ -813,8 +814,7 @@ void PostingJob::onStartPosting(bool isActiveJob)
 #endif
         _log(QString("\n\n[%1] %2: %3").arg(timestamp()).arg(tr("Start posting")).arg(_nzbName));
 
-    // Resolve the .nfo source path NOW (before compression/obfuscation mutates _files),
-    // but defer the actual copy until the post finishes successfully (_finishPosting).
+    // Resolve the .nfo before packing changes _files; copy it only after success.
     if (_ngPost->_copyNfoWithNzb && !_nzbFilePath.isEmpty())
         _resolveNfoSource();
 
@@ -884,8 +884,8 @@ void PostingJob::onStartPosting(bool isActiveJob)
 #include "Poster.h"
 void PostingJob::_postFiles()
 {
+    if (_finishIfCanceled()) return;
     _postStarted = true;
-
 #ifdef __USE_HMI__
     if (_postWidget) // in case we were in Pending mode
         _postWidget->setPosting();
@@ -1107,15 +1107,40 @@ void PostingJob::_startPosterThreads(int nbPosters, int nbCon)
 
 void PostingJob::onStopPosting()
 {
-    _cancelRequested = true; // also cover direct callers (closing all jobs)
-    if (_extProc) {
-        _log(tr("killing external process..."));
-        _extProc->terminate();
-        _extProc->waitForFinished();
-    } else {
+    _cancelRequested = true;
+    if (_finishedAtWall.isValid()) return;
+    if (_extProc && _extProc->state() != QProcess::NotRunning)
+        _terminateExternalProcess();
+    else
+        _finishIfCanceled();
+}
+
+void PostingJob::_terminateExternalProcess()
+{
+    _log(tr("killing external process..."));
+    _extProc->terminate();
+    // Windows console tools and POSIX tools ignoring SIGTERM need a kill.
+    // Keep the event loop responsive while giving the tool time to exit.
+    QTimer::singleShot(1000, _extProc, [process = _extProc] {
+        if (process->state() != QProcess::NotRunning) process->kill();
+    });
+}
+
+bool PostingJob::_finishIfCanceled()
+{
+    if (!_cancelRequested) return false;
+    if (_finishedAtWall.isValid()) return true;
+    _cleanExtProc();
+    _restoreObfuscatedFileNames();
+    // An unstarted retry must preserve the previous outcome and counters.
+    if (_resumeFromHistory && !_timeStart.isValid())
+        _finishedAtWall = QDateTime::currentDateTime();
+    else
         _finishPosting();
-        emit postingFinished();
-    }
+    // After transfer starts, the generated files are the sources for resume.
+    if (!_postStarted) _cleanCompressDir();
+    emit postingFinished();
+    return true;
 }
 
 void PostingJob::onDisconnectedConnection(NntpConnection *con)
@@ -2398,6 +2423,7 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
 
 void PostingJob::onCompressionFinished(int exitCode)
 {
+    if (_finishIfCanceled()) return;
     if (_ngPost->debugMode())
         _log(tr("=> rar exit code: %1\n").arg(exitCode));
     else
@@ -2407,9 +2433,7 @@ void PostingJob::onCompressionFinished(int exitCode)
     _log("[PostingJob::_compressFiles] compression finished...");
 #endif
 
-    // Unconditional, even with --rm_posted: _delOriginalFiles() removes the
-    // files by their ORIGINAL path, so leaving them renamed meant it deleted
-    // nothing and left the obfuscated copies behind.
+    // Restore even with --rm_posted: deletion uses the ORIGINAL paths.
     //
     // A failure here does NOT cancel the post. The archive is built and
     // perfectly postable; putting a source file back under its real name is
@@ -2568,6 +2592,7 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
 
 void PostingJob::onGenPar2Finished(int exitCode)
 {
+    if (_finishIfCanceled()) return;
     if (_ngPost->debugMode())
         _log(tr("=> par2 exit code: %1\n").arg(exitCode));
     else
@@ -2575,9 +2600,8 @@ void PostingJob::onGenPar2Finished(int exitCode)
 
     _cleanExtProc();
 
-    // An exit code alone is not proof: par2j handed switches it does not know
-    // -- ParPar's, say, on a PAR2_ARGS_CUSTOM line -- prints its usage and
-    // exits 0, and the files would go out without any recovery data.
+    // par2j can print usage and exit 0 on unsupported arguments. Require a
+    // recovery file as proof that parity generation actually succeeded.
     bool const wrote = !_compressDir
         || !_compressDir->entryList({ QStringLiteral("*.par2") }, QDir::Files).isEmpty();
     if (exitCode != 0 || !wrote) {

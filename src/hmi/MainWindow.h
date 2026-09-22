@@ -72,6 +72,12 @@ private:
     PostingWidget  *_quickJobTab;
     AutoPostWidget *_autoPostTab;
     QPushButton *_postAllButton = nullptr;
+    QPushButton *_stopAllButton = nullptr;
+    void _refreshPostingControls();
+    void _buildPostingControls();
+    void _retranslate();
+    void _submitPreparedTabs();
+    uint _nextQuickJobNumber() const;
     QPushButton *_par2SettingsButton = nullptr;
     bool _submittingAll = false;
 
@@ -235,7 +241,6 @@ public:
     inline AutoPostWidget *autoWidget() const;
     void closeTab(PostingWidget *postWidget);
 
-    void setPauseIcon(bool pause);
 
     static const QColor  sPostingColor;
     static const QString sPostingIcon;

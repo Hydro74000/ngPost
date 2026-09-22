@@ -345,6 +345,7 @@ public:
 #endif
 
 signals:
+    void pauseChanged();
     void startPosting(
         bool isActiveJob); //!< connected to onStartPosting (to be able to run on a different Thread)
     void stopPosting();
@@ -458,6 +459,8 @@ private:
     bool _canCompress(bool checkTemporaryPath = true) const;
     bool _canGenPar2(bool checkTemporaryPath = true) const;
 
+    bool _finishIfCanceled();
+    void _terminateExternalProcess();
     void _cleanExtProc();
     void _cleanCompressDir();
 

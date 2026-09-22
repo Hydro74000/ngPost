@@ -62,11 +62,11 @@ PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber) :
     _postInfoMeta()
 {
     _ui->setupUi(this);
+    _ui->postButton->setText(tr("Start Quick Post #%1").arg(displayNumber()));
     connect(_ui->filesList->model(), &QAbstractItemModel::rowsInserted, this, &PostingWidget::submissionEligibilityChanged);
     connect(_ui->filesList->model(), &QAbstractItemModel::rowsRemoved, this, &PostingWidget::submissionEligibilityChanged);
     connect(_ui->filesList->model(), &QAbstractItemModel::modelReset, this, &PostingWidget::submissionEligibilityChanged);
     _buildPostInfoRow();
-
     connect(_ui->postButton, &QAbstractButton::clicked, this, &PostingWidget::onPostFiles);
     connect(_ui->nzbPassCB,  &QAbstractButton::toggled, this, &PostingWidget::onNzbPassToggled);
     connect(_ui->genPass,    &QAbstractButton::clicked, this, &PostingWidget::onGenNzbPassword);
@@ -205,17 +205,7 @@ void PostingWidget::postFiles(bool updateMainParams)
         QString nzbPath = _ngPost->nzbPath();
         if (!nzbPath.endsWith(".nzb"))
             nzbPath += ".nzb";
-        QFileInfo fiNzb(nzbPath);
-        if (fiNzb.exists())
-        {
-            int overwrite = QMessageBox::question(nullptr,
-                                                  tr("Overwrite existing nzb file?"),
-                                                  tr("The nzb file '%1' already exists.\nWould you like to overwrite it ?").arg(nzbPath),
-                                                  QMessageBox::Yes,
-                                                  QMessageBox::No);
-            if (overwrite == QMessageBox::No)
-                return;
-        }
+        if (!_confirmNzbOverwrite(nzbPath)) return;
 
         _postingFinished = false;
         _state = STATE::POSTING;
@@ -273,11 +263,22 @@ void PostingWidget::postFiles(bool updateMainParams)
     else  if (_state == STATE::POSTING)
     {
         _state = STATE::STOPPING;
-        emit submissionEligibilityChanged();
         emit _postingJob->stopPosting();
+        emit submissionEligibilityChanged();
     }
 }
 
+
+bool PostingWidget::_confirmNzbOverwrite(const QString &nzbPath)
+{
+    const quint64 generation = _ngPost->_postingCancelGeneration;
+    if (QFileInfo::exists(nzbPath)
+        && QMessageBox::question(nullptr, tr("Overwrite existing nzb file?"),
+                                 tr("The nzb file '%1' already exists.\nWould you like to overwrite it ?").arg(nzbPath),
+                                 QMessageBox::Yes, QMessageBox::No) != QMessageBox::Yes)
+        return false;
+    return generation == _ngPost->_postingCancelGeneration;
+}
 
 void PostingWidget::onNzbPassToggled(bool checked)
 {
@@ -784,8 +785,8 @@ bool PostingWidget::writesPostInfoFile() const
 void PostingWidget::retranslate()
 {
     _ui->retranslateUi(this);
+    refreshPostingState();
     refreshPar2Default();
-    // code built widgets are not touched by retranslateUi()
     retranslatePostInfoTexts();
     // The tooltips of the dependent controls carry both their help text and,
     // while they are greyed, what they are waiting for. retranslateUi() has just
@@ -871,9 +872,34 @@ bool PostingWidget::_fileAlreadyInList(const QString &fileName, int currentNbFil
     return false;
 }
 
+QColor PostingWidget::postingTextColor() const
+{
+    const bool submitted = _postingJob && !_postingFinished;
+    const bool stopping = submitted && _postingJob->cancelRequested();
+    const bool active = submitted && _ngPost->_activeJob == _postingJob;
+    const bool paused = submitted && !stopping
+                        && (_ngPost->_queuePaused || _postingJob->isPaused());
+    const QPalette theme = _hmi->palette();
+    const bool dark = theme.color(QPalette::Window).lightness() < 128;
+    if (paused) return dark ? QColor(Qt::yellow) : QColor(160, 110, 0);
+    if (active && !stopping) return dark ? QColor(0x4c, 0xff, 0x4c) : QColor(Qt::darkGreen);
+    return dark ? QColor(Qt::white) : theme.color(QPalette::WindowText);
+}
+
+void PostingWidget::refreshPostingState()
+{
+    const bool submitted = _postingJob && !_postingFinished;
+    const bool stopping = submitted && _postingJob->cancelRequested();
+    const bool active = submitted && _ngPost->_activeJob == _postingJob;
+    _ui->postButton->setText(!submitted ? tr("Start Quick Post #%1").arg(displayNumber())
+                                      : active ? tr("Stop Posting") : tr("Cancel Posting"));
+    _ui->postButton->setEnabled(!stopping && !_ngPost->_cancelingAll);
+    _hmi->updateJobTab(this, postingTextColor(), QIcon());
+}
+
 void PostingWidget::setIDLE()
 {
-    _ui->postButton->setText(tr("Post Files"));
+    _ui->postButton->setText(tr("Start Quick Post #%1").arg(displayNumber()));
     _state = STATE::IDLE;
     emit submissionEligibilityChanged();
 }
@@ -900,14 +926,12 @@ void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files,
     _state = STATE::POSTING;
     _ui->nzbFileEdit->setText(job->nzbFilePath());
 
-    if (hasStarted) {
-        _ui->postButton->setText(tr("Stop Posting"));
-        _hmi->updateJobTab(this, _hmi->sPostingColor, QIcon(_hmi->sPostingIcon), job->nzbName());
-    } else {
-        _ui->postButton->setText(tr("Cancel Posting"));
-        _hmi->updateJobTab(this, _hmi->sPendingColor, QIcon(_hmi->sPendingIcon), job->nzbName());
-    }
+    _ui->postButton->setText(hasStarted ? tr("Stop Posting") : tr("Cancel Posting"));
+    _hmi->updateJobTab(this, hasStarted ? _hmi->sPostingColor : _hmi->sPendingColor,
+                      QIcon(hasStarted ? _hmi->sPostingIcon : _hmi->sPendingIcon), job->nzbName());
+    emit submissionEligibilityChanged();
 }
+
 
 void PostingWidget::refreshPar2Default()
 {
