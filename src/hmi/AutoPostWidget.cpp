@@ -270,10 +270,10 @@ void AutoPostWidget::onMonitoringClicked()
 
 void AutoPostWidget::newFileToProcess(const QFileInfo &fileInfo)
 {
-    QListWidgetItem *newItem = new QListWidgetItem(
-                QIcon(fileInfo.isDir()?":/icons/folder.png":":/icons/file.png"),
-                QString("- %1").arg(fileInfo.absoluteFilePath()));
-    newItem->setForeground(_hmi->sPendingColor);
+    const QIcon icon(fileInfo.isDir() ? ":/icons/folder.png" : ":/icons/file.png");
+    auto *newItem = new QListWidgetItem(icon, QString("- %1").arg(fileInfo.absoluteFilePath()));
+    newItem->setData(Qt::UserRole, true);
+    newItem->setForeground(_hmi->pendingColor());
     _ui->filesList->addItem(newItem);
 }
 
@@ -420,8 +420,7 @@ void AutoPostWidget::updateFinishedJob(const QString &path, uint nbArticles, uin
 {
     QString srcPath = QString("- %1").arg(path);
     int nbFiles = _ui->filesList->count();
-    for (int i = 1; i < nbFiles; ++i)
-    {
+    for (int i = 1; i < nbFiles; ++i) {
         QListWidgetItem *item = _ui->filesList->item(i);
         if (item->text() == srcPath)
         {
@@ -436,6 +435,7 @@ void AutoPostWidget::updateFinishedJob(const QString &path, uint nbArticles, uin
                 else
                     color = _hmi->sArticlesFailedColor;
             }
+            item->setData(Qt::UserRole, false);
             item->setForeground(color);
             break;
         }
@@ -623,4 +623,13 @@ void AutoPostWidget::refreshPar2Default()
     _ui->redundancySB->setMinimumWidth(_ui->redundancySB->sizeHint().width());
     // The tooltip of the redundancy names the arguments a post runs with.
     updatePackingDependents();
+}
+
+void AutoPostWidget::refreshPendingColors()
+{
+    for (int i = 0; i < _ui->filesList->count(); ++i) {
+        auto *item = _ui->filesList->item(i);
+        if (item->data(Qt::UserRole).toBool())
+            item->setForeground(_hmi->pendingColor());
+    }
 }

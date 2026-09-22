@@ -80,6 +80,8 @@ public:
 
     void setPackingAuto(bool enabled, const QStringList &keys);
 
+    void refreshPendingColors();
+
 public slots:
     void onMonitorJobStart();
 

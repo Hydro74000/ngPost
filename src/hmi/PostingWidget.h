@@ -31,8 +31,10 @@ class PostingJob;
 #include <QFileInfoList>
 #include <QMap>
 
+class QAction;
 class QCheckBox;
 class QGroupBox;
+class QLineEdit;
 class QPushButton;
 class QTableWidget;
 class QToolButton;
@@ -158,8 +160,11 @@ private:
     void retranslatePostInfoTexts();
     void _buildFilesList(QFileInfoList &files, bool &hasFolder);
     bool _fileAlreadyInList(const QString &fileName, int currentNbFiles) const;
+    void _setupCopyActions();
+    void _copyToClipboard(QAction *action, QLineEdit *edit, const QString &statusMsg);
 
-
+    QAction *_copyCompressNameAction = nullptr;
+    QAction *_copyPassAction = nullptr;
 };
 
 uint PostingWidget::jobNumber() const { return _jobNumber; }

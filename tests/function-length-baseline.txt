@@ -756,6 +756,7 @@
 11	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onSelectAutoDirClicked()
 14	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onSelectFilesClicked()
 8	src/hmi/AutoPostWidget.cpp	AutoPostWidget::refreshPar2Default()
+8	src/hmi/AutoPostWidget.cpp	AutoPostWidget::refreshPendingColors()
 15	src/hmi/AutoPostWidget.cpp	AutoPostWidget::retranslate()
 10	src/hmi/AutoPostWidget.cpp	AutoPostWidget::retranslatePostInfoTexts()
 23	src/hmi/AutoPostWidget.cpp	AutoPostWidget::setPackingAuto( bool enabled , const QStringList & keys)
@@ -839,7 +840,7 @@
 33	src/hmi/MainWindow.cpp	MainWindow::_trimLogPane() const
 22	src/hmi/MainWindow.cpp	MainWindow::addNewQuickTab( int lastTabIdx , const QFileInfoList & files)
 4	src/hmi/MainWindow.cpp	MainWindow::buildHistoryTabForTest()
-59	src/hmi/MainWindow.cpp	MainWindow::changeEvent( QEvent * event)
+11	src/hmi/MainWindow.cpp	MainWindow::changeEvent( QEvent * event)
 14	src/hmi/MainWindow.cpp	MainWindow::clearJobTab( QWidget * postWidget)
 63	src/hmi/MainWindow.cpp	MainWindow::closeEvent( QCloseEvent * event)
 26	src/hmi/MainWindow.cpp	MainWindow::closeTab( PostingWidget * postWidget)
@@ -851,6 +852,7 @@
 12	src/hmi/MainWindow.cpp	MainWindow::hasFinishedPosts() const
 9	src/hmi/MainWindow.cpp	MainWindow::hasUnsubmittedPosts() const
 71	src/hmi/MainWindow.cpp	MainWindow::init( NgPost * ngPost)
+4	src/hmi/MainWindow.cpp	MainWindow::isDarkMode() const
 8	src/hmi/MainWindow.cpp	MainWindow::log( const QString & aMsg , bool newline) const
 4	src/hmi/MainWindow.cpp	MainWindow::logBlockCountForTest() const
 11	src/hmi/MainWindow.cpp	MainWindow::logError( const QString & error) const
@@ -881,6 +883,11 @@
 7	src/hmi/MainWindow.cpp	MainWindow::onUniqueFromToggled( bool checked)
 11	src/hmi/MainWindow.cpp	MainWindow::onVpnSettingsClicked()
 18	src/hmi/MainWindow.cpp	MainWindow::onVpnStateChanged( VpnManager :: State newState)
+4	src/hmi/MainWindow.cpp	MainWindow::pendingColor( bool dark)
+4	src/hmi/MainWindow.cpp	MainWindow::pendingColor() const
+4	src/hmi/MainWindow.cpp	MainWindow::pendingIcon( bool dark)
+4	src/hmi/MainWindow.cpp	MainWindow::pendingIcon() const
+4	src/hmi/MainWindow.cpp	MainWindow::pendingIconPath( bool dark)
 4	src/hmi/MainWindow.cpp	MainWindow::setJobLabel( int jobNumber)
 7	src/hmi/MainWindow.cpp	MainWindow::setPauseIcon( bool pause)
 12	src/hmi/MainWindow.cpp	MainWindow::setTab( QWidget * postWidget)
@@ -966,13 +973,15 @@
 7	src/hmi/PostInfoDialog.cpp	PostInfoDialog::templateOverride() const
 4	src/hmi/PostInfoDialog.cpp	cellName( char const * role , int row)
 1	src/hmi/PostInfoDialog.h	PostInfoDialog::sessionTemplates() const
-28	src/hmi/PostingWidget.cpp	PostingWidget::PostingWidget( NgPost * ngPost , MainWindow * hmi , uint jobNumber)
+27	src/hmi/PostingWidget.cpp	PostingWidget::PostingWidget( NgPost * ngPost , MainWindow * hmi , uint jobNumber)
 13	src/hmi/PostingWidget.cpp	PostingWidget::_buildFilesList( QFileInfoList & files , bool & hasFolder)
 32	src/hmi/PostingWidget.cpp	PostingWidget::_buildPostInfoRow()
+22	src/hmi/PostingWidget.cpp	PostingWidget::_copyToClipboard( QAction * action , QLineEdit * edit , const QString & statusMsg)
 9	src/hmi/PostingWidget.cpp	PostingWidget::_fileAlreadyInList( const QString & fileName , int currentNbFiles) const
 40	src/hmi/PostingWidget.cpp	PostingWidget::_postInfoPreview() const
+40	src/hmi/PostingWidget.cpp	PostingWidget::_setupCopyActions()
 16	src/hmi/PostingWidget.cpp	PostingWidget::addPath( const QString & path , int currentNbFiles , int isDir)
-22	src/hmi/PostingWidget.cpp	PostingWidget::attachResumeJob( PostingJob * job , const QFileInfoList & files , bool hasStarted)
+21	src/hmi/PostingWidget.cpp	PostingWidget::attachResumeJob( PostingJob * job , const QFileInfoList & files , bool hasStarted)
 4	src/hmi/PostingWidget.cpp	PostingWidget::canSubmit() const
 15	src/hmi/PostingWidget.cpp	PostingWidget::genNameAndPassword( bool genName , bool genPass , bool doPar2)
 9	src/hmi/PostingWidget.cpp	PostingWidget::handleDropEvent( QDropEvent * e)
@@ -995,11 +1004,12 @@
 22	src/hmi/PostingWidget.cpp	PostingWidget::onPostingJobDone()
 12	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFilesClicked()
 12	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFolderClicked()
-112	src/hmi/PostingWidget.cpp	PostingWidget::postFiles( bool updateMainParams)
+90	src/hmi/PostingWidget.cpp	PostingWidget::postFiles( bool updateMainParams)
 7	src/hmi/PostingWidget.cpp	PostingWidget::previewFiles() const
 8	src/hmi/PostingWidget.cpp	PostingWidget::refreshPar2Default()
+12	src/hmi/PostingWidget.cpp	PostingWidget::refreshPostingState()
 20	src/hmi/PostingWidget.cpp	PostingWidget::resetForNextPost()
-19	src/hmi/PostingWidget.cpp	PostingWidget::retranslate()
+18	src/hmi/PostingWidget.cpp	PostingWidget::retranslate()
 10	src/hmi/PostingWidget.cpp	PostingWidget::retranslatePostInfoTexts()
 6	src/hmi/PostingWidget.cpp	PostingWidget::setIDLE()
 5	src/hmi/PostingWidget.cpp	PostingWidget::setNzbPassword( const QString & pass)

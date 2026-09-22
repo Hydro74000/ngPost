@@ -41,27 +41,30 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QDir>
-#include <QKeyEvent>
+#include <QAction>
+#include <QApplication>
 #include <QClipboard>
+#include <QKeyEvent>
 #include <QMimeData>
+#include <QStatusBar>
+#include <QTimer>
+#include <QToolTip>
 
 
-
-PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber) :
-    QWidget(hmi),
-    _ui(new Ui::PostingWidget),
-    _hmi(hmi),
-    _ngPost(ngPost),
-    _jobNumber(jobNumber),
-    _postingJob(nullptr),
-    _state(STATE::IDLE),
-    _postingFinished(false),
-    _postInfoCB(nullptr),
-    _postInfoButton(nullptr),
-    _postInfoTemplate(),
-    _postInfoMeta()
+PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber)
+    : QWidget(hmi)
+    , _ui(new Ui::PostingWidget)
+    , _hmi(hmi)
+    , _ngPost(ngPost)
+    , _jobNumber(jobNumber)
+    , _postingJob(nullptr)
+    , _state(STATE::IDLE)
+    , _postingFinished(false)
+    , _postInfoCB(nullptr)
+    , _postInfoButton(nullptr)
 {
     _ui->setupUi(this);
+    _setupCopyActions();
     _ui->postButton->setText(tr("Start Quick Post #%1").arg(displayNumber()));
     connect(_ui->filesList->model(), &QAbstractItemModel::rowsInserted, this, &PostingWidget::submissionEligibilityChanged);
     connect(_ui->filesList->model(), &QAbstractItemModel::rowsRemoved, this, &PostingWidget::submissionEligibilityChanged);
@@ -262,23 +265,11 @@ void PostingWidget::postFiles(bool updateMainParams)
             return;
         }
 
-        QString buttonTxt;
-        QColor  tabColor;
-        QString tabIcon;
-        if (hasStarted)
-        {
-            buttonTxt = tr("Stop Posting");
-            tabColor  = _hmi->sPostingColor;
-            tabIcon   = _hmi->sPostingIcon;
-        }
-        else
-        {
-            buttonTxt = tr("Cancel Posting");
-            tabColor  = _hmi->sPendingColor;
-            tabIcon   = _hmi->sPendingIcon;
-        }
-        _ui->postButton->setText(buttonTxt);
-        _hmi->updateJobTab(this, tabColor, QIcon(tabIcon), _postingJob->nzbName());
+        _ui->postButton->setText(hasStarted ? tr("Stop Posting") : tr("Cancel Posting"));
+        _hmi->updateJobTab(this,
+                           hasStarted ? _hmi->sPostingColor : _hmi->pendingColor(),
+                           hasStarted ? QIcon(_hmi->sPostingIcon) : _hmi->pendingIcon(),
+                           _postingJob->nzbName());
     }
     else  if (_state == STATE::POSTING)
     {
@@ -808,18 +799,17 @@ void PostingWidget::retranslate()
     refreshPostingState();
     refreshPar2Default();
     retranslatePostInfoTexts();
-    // The tooltips of the dependent controls carry both their help text and,
-    // while they are greyed, what they are waiting for. retranslateUi() has just
-    // reset them to the plain .ui text, so let the handlers rebuild both halves
-    // in the new language instead of setting them here and losing the state.
+    _copyCompressNameAction->setText(tr("Copy archive name to clipboard"));
+    _copyPassAction->setText(tr("Copy password to clipboard"));
     onCompressCB(_ui->compressCB->isChecked());
     onPar2CB(_ui->par2CB->isChecked());
-    _ui->filesList->setToolTip(QString("%1<ul><li>%2</li><li>%3</li><li>%4</li></ul>%5").arg(
-                                   tr("You can add files or folder by:")).arg(
-                                   tr("Drag & Drop files/folders")).arg(
-                                   tr("Right Click to add Files")).arg(
-                                   tr("Click on Select Files/Folder buttons")).arg(
-                                   tr("Bare in mind you can select items in the list and press DEL to remove them")));
+    _ui->filesList->setToolTip(
+        QString("%1<ul><li>%2</li><li>%3</li><li>%4</li></ul>%5")
+            .arg(tr("You can add files or folder by:"),
+                 tr("Drag & Drop files/folders"),
+                 tr("Right Click to add Files"),
+                 tr("Click on Select Files/Folder buttons"),
+                 tr("Bare in mind you can select items in the list and press DEL to remove them")));
 }
 
 void PostingWidget::setNzbPassword(const QString &pass)
@@ -911,10 +901,12 @@ void PostingWidget::refreshPostingState()
     const bool submitted = _postingJob && !_postingFinished;
     const bool stopping = submitted && _postingJob->cancelRequested();
     const bool active = submitted && _ngPost->_activeJob == _postingJob;
-    _ui->postButton->setText(!submitted ? tr("Start Quick Post #%1").arg(displayNumber())
-                                      : active ? tr("Stop Posting") : tr("Cancel Posting"));
+    _ui->postButton->setText(!submitted   ? tr("Start Quick Post #%1").arg(displayNumber())
+                                 : active ? tr("Stop Posting")
+                                          : tr("Cancel Posting"));
     _ui->postButton->setEnabled(!stopping && !_ngPost->_cancelingAll);
-    _hmi->updateJobTab(this, postingTextColor(), QIcon());
+    const QIcon icon = (submitted && !active) ? _hmi->pendingIcon() : QIcon();
+    _hmi->updateJobTab(this, postingTextColor(), icon);
 }
 
 void PostingWidget::setIDLE()
@@ -947,8 +939,10 @@ void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files,
     _ui->nzbFileEdit->setText(job->nzbFilePath());
 
     _ui->postButton->setText(hasStarted ? tr("Stop Posting") : tr("Cancel Posting"));
-    _hmi->updateJobTab(this, hasStarted ? _hmi->sPostingColor : _hmi->sPendingColor,
-                      QIcon(hasStarted ? _hmi->sPostingIcon : _hmi->sPendingIcon), job->nzbName());
+    _hmi->updateJobTab(this,
+                       hasStarted ? _hmi->sPostingColor : _hmi->pendingColor(),
+                       hasStarted ? QIcon(_hmi->sPostingIcon) : _hmi->pendingIcon(),
+                       job->nzbName());
     emit submissionEligibilityChanged();
 }
 
@@ -969,4 +963,75 @@ void PostingWidget::setPar2PercentageOverride(int percentage)
 bool PostingWidget::hasPar2PercentageOverride() const
 {
     return _ui->redundancySB->value() >= 0;
+}
+
+static const char *sActionLineEditStyle =
+    "QLineEdit QToolButton { border: none; background: transparent; padding: 0px; margin: 0px; }"
+    "QLineEdit QToolButton:hover { border: none; background: rgba(128, 128, 128, 40); "
+    "border-radius: 3px; }"
+    "QLineEdit QToolButton:pressed { border: none; background: rgba(128, 128, 128, 80); "
+    "border-radius: 3px; }";
+
+void PostingWidget::_setupCopyActions()
+{
+    _ui->compressNameEdit->setStyleSheet(sActionLineEditStyle);
+    _ui->nzbPassEdit->setStyleSheet(sActionLineEditStyle);
+
+    const QIcon copyIcon(QStringLiteral(":/icons/copy.png"));
+
+    _copyCompressNameAction = _ui->compressNameEdit->addAction(copyIcon,
+                                                               QLineEdit::TrailingPosition);
+    _copyCompressNameAction->setText(tr("Copy archive name to clipboard"));
+
+    _copyPassAction = _ui->nzbPassEdit->addAction(copyIcon, QLineEdit::TrailingPosition);
+    _copyPassAction->setText(tr("Copy password to clipboard"));
+
+    for (auto *action : { _copyCompressNameAction, _copyPassAction }) {
+        auto *resetTimer = new QTimer(action);
+        resetTimer->setSingleShot(true);
+        connect(resetTimer, &QTimer::timeout, action, [action, copyIcon] {
+            action->setIcon(copyIcon);
+        });
+    }
+
+    for (auto *tb : _ui->compressNameEdit->findChildren<QToolButton *>()) {
+        tb->setCursor(Qt::PointingHandCursor);
+        tb->setAutoRaise(true);
+    }
+    for (auto *tb : _ui->nzbPassEdit->findChildren<QToolButton *>()) {
+        tb->setCursor(Qt::PointingHandCursor);
+        tb->setAutoRaise(true);
+    }
+
+    connect(_copyCompressNameAction, &QAction::triggered, this, [this]() {
+        _copyToClipboard(_copyCompressNameAction,
+                         _ui->compressNameEdit,
+                         tr("Archive name copied to clipboard."));
+    });
+    connect(_copyPassAction, &QAction::triggered, this, [this]() {
+        _copyToClipboard(_copyPassAction, _ui->nzbPassEdit, tr("Password copied to clipboard."));
+    });
+}
+
+void PostingWidget::_copyToClipboard(QAction *action, QLineEdit *edit, const QString &statusMsg)
+{
+    if (!edit || !action)
+        return;
+
+    const QString text = edit->text();
+    if (text.isEmpty()) {
+        QToolTip::showText(QCursor::pos(), tr("Nothing to copy"), edit, {}, 1500);
+        return;
+    }
+
+    QApplication::clipboard()->setText(text);
+
+    if (_hmi && _hmi->statusBar())
+        _hmi->statusBar()->showMessage(statusMsg, 3000);
+
+    QToolTip::showText(QCursor::pos(), tr("Copied!"), edit, {}, 1500);
+
+    action->setIcon(QIcon(QStringLiteral(":/icons/ok.png")));
+    // Restart the action's feedback timer; repeated clicks always restore the copy icon.
+    action->findChild<QTimer *>()->start(1200);
 }

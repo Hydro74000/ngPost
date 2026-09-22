@@ -20,6 +20,7 @@
 #include <QTextBlock>
 #include <QTextBrowser>
 #include <QApplication>
+#include <QClipboard>
 #include <QCheckBox>
 #include <QToolButton>
 
@@ -54,6 +55,7 @@
 
 #include "hmi/MainWindow.h"
 #include "hmi/PostingWidget.h"
+#include "nntp/NntpFile.h"
 #include "hmi/StartupTabBar.h"
 #include "hmi/AutoPostWidget.h"
 #include "hmi/CheckBoxCenterWidget.h"
@@ -410,6 +412,11 @@ private slots:
     //! value that no longer points at a fixed tab is ignored rather than
     //! opening on nothing.
     void pinned_startup_tab_opens_on_the_next_start();
+    void posting_widget_copy_actions_integrate_inside_textboxes();
+    void pending_clock_icon_adapts_to_dark_mode();
+    void copy_feedback_recovers_after_repeated_clicks();
+    void auto_post_pending_rows_follow_palette_changes();
+    void canceled_job_ignores_queued_file_notifications();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -436,7 +443,7 @@ void TestMainWindow::add_server_row_creates_named_widgets()
 {
     MainWindow window;
 
-    auto *table = window.findChild<QTableWidget*>(QStringLiteral("serversTable"));
+    auto *table = window.findChild<QTableWidget *>(QStringLiteral("serversTable"));
     QVERIFY2(table, "serversTable not found in MainWindow");
 
     const int before = table->rowCount();
@@ -445,17 +452,21 @@ void TestMainWindow::add_server_row_creates_named_widgets()
 
     // The Phase 1d retrofit gives each dynamic widget a `<Role>_<row>` name.
     // First row should be suffixed _0.
-    for (const char *name : { "serverEnabledCb_0", "serverHostEdit_0",
-                              "serverPortEdit_0",  "serverSslCb_0",
-                              "serverUseVpnCb_0",  "serverNbConsEdit_0",
-                              "serverUserEdit_0",  "serverPassEdit_0",
+    for (const char *name : { "serverEnabledCb_0",
+                              "serverHostEdit_0",
+                              "serverPortEdit_0",
+                              "serverSslCb_0",
+                              "serverUseVpnCb_0",
+                              "serverNbConsEdit_0",
+                              "serverUserEdit_0",
+                              "serverPassEdit_0",
                               "serverDelButton_0" }) {
-        QVERIFY2(window.findChild<QWidget*>(QString::fromLatin1(name)),
+        QVERIFY2(window.findChild<QWidget *>(QString::fromLatin1(name)),
                  qPrintable(QStringLiteral("widget not found: %1").arg(QString::fromLatin1(name))));
     }
 
     // Specifically check the default port is the documented 563 (NNTP/SSL).
-    auto *portEdit = window.findChild<QLineEdit*>(QStringLiteral("serverPortEdit_0"));
+    auto *portEdit = window.findChild<QLineEdit *>(QStringLiteral("serverPortEdit_0"));
     QVERIFY(portEdit);
     QCOMPARE(portEdit->text(), QStringLiteral("563"));
 }
@@ -522,7 +533,8 @@ void TestMainWindow::save_config_preserves_an_older_configuration()
     // every setting must still be there, with its value
     const QVector<QPair<QString, QString>> expected = {
         { QStringLiteral("FIELD_SEPARATOR"), QStringLiteral("|") },
-        { QStringLiteral("GROUP_POLICY"), QStringLiteral("EACH_FILE") }, // saved upper case, parsed case insensitively
+        { QStringLiteral("GROUP_POLICY"),
+          QStringLiteral("EACH_FILE") }, // saved upper case, parsed case insensitively
         { QStringLiteral("article_size"), QStringLiteral("512000") },
         { QStringLiteral("retry"), QStringLiteral("7") },
         { QStringLiteral("RAR_SIZE"), QStringLiteral("42") },
@@ -677,10 +689,9 @@ void TestMainWindow::save_config_preserves_existing_file_when_atomic_open_fails(
 
     const QString configDir = QFileInfo(confPath).absolutePath();
     const QFile::Permissions originalDirPermissions = QFile::permissions(configDir);
-    const QFile::Permissions readOnlyDirPermissions =
-        QFileDevice::ReadOwner | QFileDevice::ExeOwner
-        | QFileDevice::ReadGroup | QFileDevice::ExeGroup
-        | QFileDevice::ReadOther | QFileDevice::ExeOther;
+    const QFile::Permissions readOnlyDirPermissions = QFileDevice::ReadOwner | QFileDevice::ExeOwner
+        | QFileDevice::ReadGroup | QFileDevice::ExeGroup | QFileDevice::ReadOther
+        | QFileDevice::ExeOther;
     if (!QFile::setPermissions(configDir, readOnlyDirPermissions))
         QSKIP("Could not make the test configuration directory read-only");
 
@@ -814,8 +825,7 @@ void TestMainWindow::post_info_stays_on_across_tabs_and_posts()
     // Emptying a tab to queue the next post clears what described the previous
     // one, but must NOT turn the feature off.
     QVERIFY(QMetaObject::invokeMethod(second, "onClearFilesClicked", Qt::DirectConnection));
-    QVERIFY2(boxOf(second)->isChecked(),
-             "clearing the files must not untick the post info box");
+    QVERIFY2(boxOf(second)->isChecked(), "clearing the files must not untick the post info box");
 }
 
 void TestMainWindow::post_info_dialog_offers_the_fields_of_the_model()
@@ -916,12 +926,16 @@ void TestMainWindow::post_info_dialog_offers_a_destination()
     }
 
     PostInfoData preview;
-    preview.nzbDir  = sandbox.rootPath() + QStringLiteral("/nzb");
+    preview.nzbDir = sandbox.rootPath() + QStringLiteral("/nzb");
     preview.nzbName = QStringLiteral("mon-post");
 
     const QString configured = QStringLiteral("__nzbDir__/__nzbName__.info.txt");
-    PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>(), QStringList(),
-                       preview, configured);
+    PostInfoDialog dlg(tmplPath,
+                       QString(),
+                       QMap<QString, MetaValue>(),
+                       QStringList(),
+                       preview,
+                       configured);
 
     auto *out = dlg.findChild<QLineEdit *>(QStringLiteral("postInfoOutput"));
     auto *hint = dlg.findChild<QLabel *>(QStringLiteral("postInfoOutputHint"));
@@ -975,8 +989,8 @@ void TestMainWindow::post_info_dialog_previews_every_line()
     }
 
     PostInfoData preview;
-    preview.rarName      = QStringLiteral("my-archive");
-    preview.rarPass      = QStringLiteral("qwerty42");
+    preview.rarName = QStringLiteral("my-archive");
+    preview.rarPass = QStringLiteral("qwerty42");
     preview.originalName = QStringLiteral("rando.mkv");
 
     PostInfoDialog dlg(tmplPath, QString(), QMap<QString, MetaValue>(), QStringList(), preview);
@@ -999,8 +1013,7 @@ void TestMainWindow::post_info_dialog_previews_every_line()
         PostInfoDialog dateDlg(datePath, QString(), QMap<QString, MetaValue>());
         auto *dp = dateDlg.findChild<QLineEdit *>(QStringLiteral("postInfoModelPreview_0"));
         QVERIFY(dp);
-        QCOMPARE(dp->text(),
-                 QDateTime::currentDateTime().toString(QStringLiteral("dd/MM/yyyy")));
+        QCOMPARE(dp->text(), QDateTime::currentDateTime().toString(QStringLiteral("dd/MM/yyyy")));
     }
 
     // a value already known while preparing the post is shown as it will be
@@ -1135,9 +1148,8 @@ void TestMainWindow::post_info_dialog_keeps_the_models_opened_this_session()
 {
     HomeSandbox sandbox;
     const QString configured = sandbox.rootPath() + QStringLiteral("/default.tpl");
-    const QString other      = sandbox.rootPath() + QStringLiteral("/baselien.tpl");
-    for (const QString &path : { configured, other })
-    {
+    const QString other = sandbox.rootPath() + QStringLiteral("/baselien.tpl");
+    for (const QString &path : { configured, other }) {
         QFile tmpl(path);
         QVERIFY(tmpl.open(QIODevice::WriteOnly));
         tmpl.write("titre =__meta:titre__\n");
@@ -1211,16 +1223,16 @@ void TestMainWindow::auto_post_tab_carries_one_post_info_choice()
 void TestMainWindow::add_two_servers_yields_unique_object_names()
 {
     MainWindow window;
-    auto *table = window.findChild<QTableWidget*>(QStringLiteral("serversTable"));
+    auto *table = window.findChild<QTableWidget *>(QStringLiteral("serversTable"));
 
     addServer(&window);
     addServer(&window);
     QCOMPARE(table->rowCount(), 2);
 
-    QVERIFY(window.findChild<QLineEdit*>(QStringLiteral("serverHostEdit_0")));
-    QVERIFY(window.findChild<QLineEdit*>(QStringLiteral("serverHostEdit_1")));
-    QVERIFY(window.findChild<QPushButton*>(QStringLiteral("serverDelButton_0")));
-    QVERIFY(window.findChild<QPushButton*>(QStringLiteral("serverDelButton_1")));
+    QVERIFY(window.findChild<QLineEdit *>(QStringLiteral("serverHostEdit_0")));
+    QVERIFY(window.findChild<QLineEdit *>(QStringLiteral("serverHostEdit_1")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("serverDelButton_0")));
+    QVERIFY(window.findChild<QPushButton *>(QStringLiteral("serverDelButton_1")));
 }
 
 void TestMainWindow::vpn_checkbox_toggled_emits_signal()
@@ -1228,7 +1240,7 @@ void TestMainWindow::vpn_checkbox_toggled_emits_signal()
     MainWindow window;
     addServer(&window);
 
-    auto *vpnCb = window.findChild<CheckBoxCenterWidget*>(QStringLiteral("serverUseVpnCb_0"));
+    auto *vpnCb = window.findChild<CheckBoxCenterWidget *>(QStringLiteral("serverUseVpnCb_0"));
     QVERIFY2(vpnCb, "serverUseVpnCb_0 not found");
 
     // _addServer wires the checkbox's toggled() signal to
@@ -1248,7 +1260,7 @@ void TestMainWindow::vpn_checkbox_toggled_emits_signal()
 void TestMainWindow::history_detail_text_does_not_resize_window()
 {
     MainWindow window;
-    auto *tabs = window.findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    auto *tabs = window.findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
     QVERIFY2(tabs, "postTabWidget not found in MainWindow");
 
     QWidget *historyTab = window.buildHistoryTabForTest();
@@ -1260,14 +1272,15 @@ void TestMainWindow::history_detail_text_does_not_resize_window()
     QTest::qWait(50);
     const QSize before = window.size();
 
-    auto *detail = window.findChild<QLabel*>(QStringLiteral("historyDetailInfo"));
+    auto *detail = window.findChild<QLabel *>(QStringLiteral("historyDetailInfo"));
     QVERIFY2(detail, "historyDetailInfo not found");
 
     QString rows;
     for (int i = 0; i < 200; ++i) {
         rows += QStringLiteral("<tr><td>file_%1_with_a_long_name.bin</td>"
                                "<td align='right'>4 MB</td>"
-                               "<td align='center'>posted</td></tr>").arg(i);
+                               "<td align='center'>posted</td></tr>")
+                    .arg(i);
     }
     detail->setText(QStringLiteral("<table>%1</table>").arg(rows));
     QApplication::processEvents();
@@ -1303,15 +1316,15 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
     QVERIFY2(window, "NgPost did not create a GUI MainWindow for the test");
     window->init(&ngPost);
 
-    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
     QVERIFY2(tabs, "postTabWidget not found");
     tabs->setCurrentIndex(0);
     QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
 
-    auto *redundancy = quickTab->findChild<QSpinBox*>(QStringLiteral("redundancySB"));
-    auto *compress = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
-    auto *par2 = quickTab->findChild<QCheckBox*>(QStringLiteral("par2CB"));
+    auto *redundancy = quickTab->findChild<QSpinBox *>(QStringLiteral("redundancySB"));
+    auto *compress = quickTab->findChild<QCheckBox *>(QStringLiteral("compressCB"));
+    auto *par2 = quickTab->findChild<QCheckBox *>(QStringLiteral("par2CB"));
     QVERIFY2(redundancy, "redundancySB not found on Quick tab");
     QVERIFY(compress);
     QVERIFY(par2);
@@ -1330,7 +1343,7 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
     // which writes the file itself. Per-post PAR2 overrides never replace the default.
     {
         CompressionSettingsDialog dlg(&ngPost, window);
-        auto *rarMax = dlg.findChild<QCheckBox*>(QStringLiteral("rarMaxCB"));
+        auto *rarMax = dlg.findChild<QCheckBox *>(QStringLiteral("rarMaxCB"));
         QVERIFY2(rarMax, "rarMaxCB not found in the Compression settings dialog");
         QVERIFY2(rarMax->isChecked(), "the dialog did not load RAR_MAX from the config");
         rarMax->setChecked(false);
@@ -1342,15 +1355,13 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
     QFile saved(confPath);
     QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
     QString content = QString::fromUtf8(saved.readAll());
-    QVERIFY2(content.contains(QStringLiteral("\n#RAR_MAX = 99\n")),
-             qPrintable(content));
-    QVERIFY2(content.contains(QStringLiteral("\nPAR2_PCT = 8\n")),
-             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("\n#RAR_MAX = 99\n")), qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("\nPAR2_PCT = 8\n")), qPrintable(content));
 
     saved.close();
     {
         CompressionSettingsDialog dlg(&ngPost, window);
-        auto *rarMax = dlg.findChild<QCheckBox*>(QStringLiteral("rarMaxCB"));
+        auto *rarMax = dlg.findChild<QCheckBox *>(QStringLiteral("rarMaxCB"));
         QVERIFY(rarMax);
         QVERIFY2(!rarMax->isChecked(), "the dialog did not reload the state it just wrote");
         rarMax->setChecked(true);
@@ -1361,12 +1372,9 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
 
     QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
     content = QString::fromUtf8(saved.readAll());
-    QVERIFY2(content.contains(QStringLiteral("\nRAR_MAX = 99\n")),
-             qPrintable(content));
-    QVERIFY2(!content.contains(QStringLiteral("\n#RAR_MAX = 99\n")),
-             qPrintable(content));
-    QVERIFY2(content.contains(QStringLiteral("\nPAR2_PCT = 8\n")),
-             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("\nRAR_MAX = 99\n")), qPrintable(content));
+    QVERIFY2(!content.contains(QStringLiteral("\n#RAR_MAX = 99\n")), qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("\nPAR2_PCT = 8\n")), qPrintable(content));
 }
 
 void TestMainWindow::add_server_and_edit_fields_persists_without_save_button()
@@ -1394,8 +1402,8 @@ void TestMainWindow::add_server_and_edit_fields_persists_without_save_button()
 
     QVERIFY(QMetaObject::invokeMethod(window, "onAddServer", Qt::DirectConnection));
 
-    auto *hostEdit = window->findChild<QLineEdit*>(QStringLiteral("serverHostEdit_0"));
-    auto *userEdit = window->findChild<QLineEdit*>(QStringLiteral("serverUserEdit_0"));
+    auto *hostEdit = window->findChild<QLineEdit *>(QStringLiteral("serverHostEdit_0"));
+    auto *userEdit = window->findChild<QLineEdit *>(QStringLiteral("serverUserEdit_0"));
     QVERIFY2(hostEdit, "serverHostEdit_0 not found");
     QVERIFY2(userEdit, "serverUserEdit_0 not found");
 
@@ -1410,13 +1418,12 @@ void TestMainWindow::add_server_and_edit_fields_persists_without_save_button()
     QFile saved(confPath);
     QVERIFY(saved.open(QIODevice::ReadOnly | QIODevice::Text));
     const QString content = QString::fromUtf8(saved.readAll());
-    QVERIFY2(content.contains(QStringLiteral("host = news.example.com")),
-             qPrintable(content));
-    QVERIFY2(content.contains(QStringLiteral("user = bob")),
-             qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("host = news.example.com")), qPrintable(content));
+    QVERIFY2(content.contains(QStringLiteral("user = bob")), qPrintable(content));
 }
 
-namespace {
+namespace
+{
 
 //! Boots an NgPost on a sandboxed HOME with the given configuration and returns
 //! its initialised MainWindow. Every test below needs the same six lines.
@@ -1425,8 +1432,7 @@ MainWindow *bootWindow(NgPost &ngPost, const QString &confBody, QString *error)
     const QString confPath = PathHelper::configFilePath();
     {
         QFile conf(confPath);
-        if (!conf.open(QIODevice::WriteOnly | QIODevice::Text))
-        {
+        if (!conf.open(QIODevice::WriteOnly | QIODevice::Text)) {
             *error = QStringLiteral("Could not write test config: %1").arg(confPath);
             return nullptr;
         }
@@ -1453,8 +1459,7 @@ MainWindow *bootWindow(NgPost &ngPost, const QString &confBody, QString *error)
     }
 
     MainWindow *window = ngPost.mainWindowForTest();
-    if (!window)
-    {
+    if (!window) {
         *error = QStringLiteral("NgPost did not create a GUI MainWindow for the test");
         return nullptr;
     }
@@ -1488,12 +1493,12 @@ void TestMainWindow::posting_tab_lines_are_in_the_new_order()
     MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
     QVERIFY2(window, qPrintable(err));
 
-    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
     QVERIFY2(tabs, "postTabWidget not found");
     QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
 
-    auto *column = quickTab->findChild<QVBoxLayout*>(QStringLiteral("verticalLayout"));
+    auto *column = quickTab->findChild<QVBoxLayout *>(QStringLiteral("verticalLayout"));
     QVERIFY2(column, "verticalLayout not found on the quick tab");
 
     QStringList order;
@@ -1501,28 +1506,28 @@ void TestMainWindow::posting_tab_lines_are_in_the_new_order()
         order << itemName(column->itemAt(i));
 
     const QStringList expected{
-        QStringLiteral("horizontalLayout_9"),  // line A: nzb, nfo, post info sheet
+        QStringLiteral("horizontalLayout_9"), // line A: nzb, nfo, post info sheet
         QStringLiteral("filesList"),
-        QStringLiteral("horizontalLayout_4"),  // the Select Files / Folder buttons
-        QStringLiteral("packingLayout"),       // one line: how this post is packed
+        QStringLiteral("horizontalLayout_4"), // the Select Files / Folder buttons
+        QStringLiteral("packingLayout"),      // one line: how this post is packed
         QStringLiteral("postLayout"),
     };
     QCOMPARE(order, expected);
 
     // The configuration widgets left the tab for the dialog; a leftover copy
     // here would silently overwrite what the dialog wrote.
-    QVERIFY(!quickTab->findChild<QLineEdit*>(QStringLiteral("compressPathEdit")));
-    QVERIFY(!quickTab->findChild<QLineEdit*>(QStringLiteral("rarEdit")));
-    QVERIFY(!quickTab->findChild<QLineEdit*>(QStringLiteral("rarSizeEdit")));
+    QVERIFY(!quickTab->findChild<QLineEdit *>(QStringLiteral("compressPathEdit")));
+    QVERIFY(!quickTab->findChild<QLineEdit *>(QStringLiteral("rarEdit")));
+    QVERIFY(!quickTab->findChild<QLineEdit *>(QStringLiteral("rarSizeEdit")));
 
     // The check box labels the field it commands, so there is no separate label.
-    QVERIFY(!quickTab->findChild<QLabel*>(QStringLiteral("compressNameLbl")));
-    auto *compressBox = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
+    QVERIFY(!quickTab->findChild<QLabel *>(QStringLiteral("compressNameLbl")));
+    auto *compressBox = quickTab->findChild<QCheckBox *>(QStringLiteral("compressCB"));
     QVERIFY(compressBox);
     QVERIFY(compressBox->text().endsWith(QLatin1Char(':')));
 
     // The volume limit followed the volume size into the dialog.
-    QVERIFY(!quickTab->findChild<QCheckBox*>(QStringLiteral("rarMaxCB")));
+    QVERIFY(!quickTab->findChild<QCheckBox *>(QStringLiteral("rarMaxCB")));
 }
 
 void TestMainWindow::compression_settings_dialog_owns_the_configuration_widgets()
@@ -1536,21 +1541,21 @@ void TestMainWindow::compression_settings_dialog_owns_the_configuration_widgets(
     MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
     QVERIFY2(window, qPrintable(err));
 
-    QVERIFY2(window->findChild<QPushButton*>(QStringLiteral("compressionSettingsBtn")),
+    QVERIFY2(window->findChild<QPushButton *>(QStringLiteral("compressionSettingsBtn")),
              "the head does not offer the Compression settings button");
     // The fixed password left the head with everything that served it.
-    QVERIFY(!window->findChild<QCheckBox*>(QStringLiteral("rarPassCB")));
-    QVERIFY(!window->findChild<QLineEdit*>(QStringLiteral("rarPassEdit")));
+    QVERIFY(!window->findChild<QCheckBox *>(QStringLiteral("rarPassCB")));
+    QVERIFY(!window->findChild<QLineEdit *>(QStringLiteral("rarPassEdit")));
 
     CompressionSettingsDialog dlg(&ngPost, window);
-    QVERIFY(dlg.findChild<QLineEdit*>(QStringLiteral("compressPathEdit")));
-    QVERIFY(dlg.findChild<QLineEdit*>(QStringLiteral("rarEdit")));
-    QVERIFY(dlg.findChild<QLineEdit*>(QStringLiteral("rarSizeEdit")));
-    QVERIFY(dlg.findChild<QCheckBox*>(QStringLiteral("rarMaxCB")));
-    QVERIFY(dlg.findChild<QCheckBox*>(QStringLiteral("keepRarDefaultCB")));
-    QVERIFY(dlg.findChild<QCheckBox*>(QStringLiteral("rarPassCB")));
-    QVERIFY(dlg.findChild<QLineEdit*>(QStringLiteral("rarPassEdit")));
-    QVERIFY(dlg.findChild<QSpinBox*>(QStringLiteral("rarLengthSB")));
+    QVERIFY(dlg.findChild<QLineEdit *>(QStringLiteral("compressPathEdit")));
+    QVERIFY(dlg.findChild<QLineEdit *>(QStringLiteral("rarEdit")));
+    QVERIFY(dlg.findChild<QLineEdit *>(QStringLiteral("rarSizeEdit")));
+    QVERIFY(dlg.findChild<QCheckBox *>(QStringLiteral("rarMaxCB")));
+    QVERIFY(dlg.findChild<QCheckBox *>(QStringLiteral("keepRarDefaultCB")));
+    QVERIFY(dlg.findChild<QCheckBox *>(QStringLiteral("rarPassCB")));
+    QVERIFY(dlg.findChild<QLineEdit *>(QStringLiteral("rarPassEdit")));
+    QVERIFY(dlg.findChild<QSpinBox *>(QStringLiteral("rarLengthSB")));
 }
 
 void TestMainWindow::compression_settings_dialog_persists_on_validation()
@@ -1569,9 +1574,9 @@ void TestMainWindow::compression_settings_dialog_persists_on_validation()
     QVERIFY2(window, qPrintable(err));
 
     CompressionSettingsDialog dlg(&ngPost, window);
-    auto *rarSize  = dlg.findChild<QLineEdit*>(QStringLiteral("rarSizeEdit"));
-    auto *passCB   = dlg.findChild<QCheckBox*>(QStringLiteral("rarPassCB"));
-    auto *passEdit = dlg.findChild<QLineEdit*>(QStringLiteral("rarPassEdit"));
+    auto *rarSize = dlg.findChild<QLineEdit *>(QStringLiteral("rarSizeEdit"));
+    auto *passCB = dlg.findChild<QCheckBox *>(QStringLiteral("rarPassCB"));
+    auto *passEdit = dlg.findChild<QLineEdit *>(QStringLiteral("rarPassEdit"));
     QVERIFY(rarSize && passCB && passEdit);
 
     // What the dialog loaded is what the configuration said.
@@ -1602,17 +1607,17 @@ void TestMainWindow::greyed_controls_say_what_they_need()
     MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
     QVERIFY2(window, qPrintable(err));
 
-    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
     QVERIFY(tabs);
     QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
 
-    auto *compress   = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
-    auto *par2       = quickTab->findChild<QCheckBox*>(QStringLiteral("par2CB"));
-    auto *keepRar    = quickTab->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
-    auto *nzbPass    = quickTab->findChild<QCheckBox*>(QStringLiteral("nzbPassCB"));
-    auto *nzbPassEd  = quickTab->findChild<QLineEdit*>(QStringLiteral("nzbPassEdit"));
-    auto *redundancy = quickTab->findChild<QSpinBox*>(QStringLiteral("redundancySB"));
+    auto *compress = quickTab->findChild<QCheckBox *>(QStringLiteral("compressCB"));
+    auto *par2 = quickTab->findChild<QCheckBox *>(QStringLiteral("par2CB"));
+    auto *keepRar = quickTab->findChild<QCheckBox *>(QStringLiteral("keepRarCB"));
+    auto *nzbPass = quickTab->findChild<QCheckBox *>(QStringLiteral("nzbPassCB"));
+    auto *nzbPassEd = quickTab->findChild<QLineEdit *>(QStringLiteral("nzbPassEdit"));
+    auto *redundancy = quickTab->findChild<QSpinBox *>(QStringLiteral("redundancySB"));
     QVERIFY(compress && par2 && keepRar && nzbPass && nzbPassEd && redundancy);
 
     compress->setChecked(false);
@@ -1670,13 +1675,13 @@ void TestMainWindow::state_tooltips_survive_a_language_change()
     MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
     QVERIFY2(window, qPrintable(err));
 
-    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
     QVERIFY(tabs);
     auto *quickTab = qobject_cast<PostingWidget *>(tabs->widget(2));
     QVERIFY(quickTab);
 
-    auto *compress = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
-    auto *keepRar  = quickTab->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
+    auto *compress = quickTab->findChild<QCheckBox *>(QStringLiteral("compressCB"));
+    auto *keepRar = quickTab->findChild<QCheckBox *>(QStringLiteral("keepRarCB"));
     QVERIFY(compress && keepRar);
 
     compress->setChecked(false);
@@ -1701,22 +1706,22 @@ void TestMainWindow::auto_post_tab_greys_the_same_controls_as_a_posting_tab()
     MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
     QVERIFY2(window, qPrintable(err));
 
-    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
     QVERIFY(tabs);
     QWidget *autoTab = tabs->widget(1);
     QVERIFY(autoTab);
 
     // The paths and the volume size are gone from here too: one dialog owns them.
-    QVERIFY(!autoTab->findChild<QLineEdit*>(QStringLiteral("compressPathEdit")));
-    QVERIFY(!autoTab->findChild<QLineEdit*>(QStringLiteral("rarEdit")));
-    QVERIFY(!autoTab->findChild<QLineEdit*>(QStringLiteral("rarSizeEdit")));
+    QVERIFY(!autoTab->findChild<QLineEdit *>(QStringLiteral("compressPathEdit")));
+    QVERIFY(!autoTab->findChild<QLineEdit *>(QStringLiteral("rarEdit")));
+    QVERIFY(!autoTab->findChild<QLineEdit *>(QStringLiteral("rarSizeEdit")));
 
-    QVERIFY(!autoTab->findChild<QCheckBox*>(QStringLiteral("rarMaxCB")));
+    QVERIFY(!autoTab->findChild<QCheckBox *>(QStringLiteral("rarMaxCB")));
 
-    auto *compress   = autoTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
-    auto *par2       = autoTab->findChild<QCheckBox*>(QStringLiteral("par2CB"));
-    auto *keepRar    = autoTab->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
-    auto *redundancy = autoTab->findChild<QSpinBox*>(QStringLiteral("redundancySB"));
+    auto *compress = autoTab->findChild<QCheckBox *>(QStringLiteral("compressCB"));
+    auto *par2 = autoTab->findChild<QCheckBox *>(QStringLiteral("par2CB"));
+    auto *keepRar = autoTab->findChild<QCheckBox *>(QStringLiteral("keepRarCB"));
+    auto *redundancy = autoTab->findChild<QSpinBox *>(QStringLiteral("redundancySB"));
     QVERIFY(compress && par2 && keepRar && redundancy);
 
     // This tab forces PAR2 on when compression goes off (it cannot post folders
@@ -1744,17 +1749,17 @@ void TestMainWindow::default_archive_password_still_reaches_the_posting_tabs()
     MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
     QVERIFY2(window, qPrintable(err));
 
-    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
     QVERIFY(tabs);
     QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
-    auto *nzbPassEdit = quickTab->findChild<QLineEdit*>(QStringLiteral("nzbPassEdit"));
+    auto *nzbPassEdit = quickTab->findChild<QLineEdit *>(QStringLiteral("nzbPassEdit"));
     QVERIFY(nzbPassEdit);
     QVERIFY(nzbPassEdit->text().isEmpty());
 
     CompressionSettingsDialog dlg(&ngPost, window);
-    auto *passCB   = dlg.findChild<QCheckBox*>(QStringLiteral("rarPassCB"));
-    auto *passEdit = dlg.findChild<QLineEdit*>(QStringLiteral("rarPassEdit"));
+    auto *passCB = dlg.findChild<QCheckBox *>(QStringLiteral("rarPassCB"));
+    auto *passEdit = dlg.findChild<QLineEdit *>(QStringLiteral("rarPassEdit"));
     QVERIFY(passCB && passEdit);
     passCB->setChecked(true);
     passEdit->setText(QStringLiteral("hunter2"));
@@ -1762,7 +1767,9 @@ void TestMainWindow::default_archive_password_still_reaches_the_posting_tabs()
 
     // What the head used to do live on every keystroke now happens once, when
     // the dialog is validated.
-    QVERIFY(QMetaObject::invokeMethod(window, "onRarPassUpdated", Qt::DirectConnection,
+    QVERIFY(QMetaObject::invokeMethod(window,
+                                      "onRarPassUpdated",
+                                      Qt::DirectConnection,
                                       Q_ARG(QString, dlg.fixedPassword())));
     QCOMPARE(nzbPassEdit->text(), QStringLiteral("hunter2"));
     QVERIFY(window->useFixedPassword());
@@ -1781,17 +1788,17 @@ void TestMainWindow::keep_archives_default_is_owned_by_the_dialog()
     MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
     QVERIFY2(window, qPrintable(err));
 
-    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
     QVERIFY(tabs);
     QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
-    auto *keepRar = quickTab->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
+    auto *keepRar = quickTab->findChild<QCheckBox *>(QStringLiteral("keepRarCB"));
     QVERIFY(keepRar);
     QVERIFY(!keepRar->isChecked());
 
     {
         CompressionSettingsDialog dlg(&ngPost, window);
-        auto *def = dlg.findChild<QCheckBox*>(QStringLiteral("keepRarDefaultCB"));
+        auto *def = dlg.findChild<QCheckBox *>(QStringLiteral("keepRarDefaultCB"));
         QVERIFY2(def, "keepRarDefaultCB not found in the Compression settings dialog");
         QVERIFY(!def->isChecked());
         def->setChecked(true);
@@ -1809,7 +1816,7 @@ void TestMainWindow::keep_archives_default_is_owned_by_the_dialog()
     PostingWidget *fresh = window->addNewQuickTab(tabs->count() - 1);
     QVERIFY(fresh);
     fresh->init();
-    auto *freshKeep = fresh->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
+    auto *freshKeep = fresh->findChild<QCheckBox *>(QStringLiteral("keepRarCB"));
     QVERIFY(freshKeep);
     QVERIFY2(freshKeep->isChecked(), "a new tab did not pick up the configured default");
 
@@ -1933,7 +1940,7 @@ void TestMainWindow::history_columns_can_be_resized_by_hand()
     QVERIFY(window);
     window->init(&ngPost);
 
-    auto *table = window->findChild<QTableWidget*>(QStringLiteral("historyTable"));
+    auto *table = window->findChild<QTableWidget *>(QStringLiteral("historyTable"));
     QVERIFY2(table, "historyTable not found");
     QHeaderView *header = table->horizontalHeader();
 
@@ -1965,7 +1972,7 @@ void TestMainWindow::history_column_widths_survive_a_restart()
     QByteArray arg0("tst_MainWindow");
     char *argv[] = { arg0.data(), nullptr };
     const QString columnsKey = QStringLiteral("MainWindow/historyColumns");
-    const int     nameColumn = 1;
+    const int nameColumn = 1;
 
     {
         NgPost ngPost(argc, argv);
@@ -1975,7 +1982,7 @@ void TestMainWindow::history_column_widths_survive_a_restart()
         QVERIFY(window);
         window->init(&ngPost);
 
-        auto *table = window->findChild<QTableWidget*>(QStringLiteral("historyTable"));
+        auto *table = window->findChild<QTableWidget *>(QStringLiteral("historyTable"));
         QVERIFY2(table, "historyTable not found");
 
         // Nothing is written as long as ngPost owns the widths.
@@ -1999,7 +2006,7 @@ void TestMainWindow::history_column_widths_survive_a_restart()
         QVERIFY(window);
         window->init(&ngPost);
 
-        auto *table = window->findChild<QTableWidget*>(QStringLiteral("historyTable"));
+        auto *table = window->findChild<QTableWidget *>(QStringLiteral("historyTable"));
         QVERIFY2(table, "historyTable not found");
         QCOMPARE(table->horizontalHeader()->sectionSize(nameColumn), 137);
 
@@ -2030,9 +2037,9 @@ void TestMainWindow::startup_tab_is_the_quick_post_until_one_is_pinned()
     QVERIFY(window);
     window->init(&ngPost);
 
-    auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
     QVERIFY2(tabs, "postTabWidget not found");
-    auto *tabBar = qobject_cast<StartupTabBar*>(tabs->tabBar());
+    auto *tabBar = qobject_cast<StartupTabBar *>(tabs->tabBar());
     QVERIFY2(tabBar, "the post tab widget does not carry a StartupTabBar");
 
     // Nothing pinned: the quick post tab, and no title in bold.
@@ -2061,8 +2068,7 @@ void TestMainWindow::startup_tab_is_the_quick_post_until_one_is_pinned()
     QCOMPARE(tabs->currentWidget(), quick);
 
     // The three fixed tabs offer the option, unticked...
-    for (int tabIndex = 0; tabIndex < 3; ++tabIndex)
-    {
+    for (int tabIndex = 0; tabIndex < 3; ++tabIndex) {
         QMenu menu;
         window->fillTabContextMenuForTest(menu, tabIndex);
         QAction *startup = menu.actions().value(0);
@@ -2135,9 +2141,9 @@ void TestMainWindow::pinned_startup_tab_opens_on_the_next_start()
         QVERIFY(window);
         window->init(&ngPost);
 
-        auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+        auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
         QVERIFY(tabs);
-        auto *tabBar = qobject_cast<StartupTabBar*>(tabs->tabBar());
+        auto *tabBar = qobject_cast<StartupTabBar *>(tabs->tabBar());
         QVERIFY(tabBar);
 
         const int expectedIndex = 2 - savedId;
@@ -2160,9 +2166,9 @@ void TestMainWindow::pinned_startup_tab_opens_on_the_next_start()
         QVERIFY(window);
         window->init(&ngPost);
 
-        auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
+        auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
         QVERIFY(tabs);
-        auto *tabBar = qobject_cast<StartupTabBar*>(tabs->tabBar());
+        auto *tabBar = qobject_cast<StartupTabBar *>(tabs->tabBar());
         QVERIFY(tabBar);
 
         QCOMPARE(tabs->currentIndex(), 2);
@@ -2179,23 +2185,19 @@ void TestMainWindow::obfuscate_config_key_carries_both_kinds()
     struct Case
     {
         const char *value;
-        bool        articles;
-        bool        fileName;
+        bool articles;
+        bool fileName;
     };
     // "file_name" and "file name" are accepted too: the GUI has always called
     // this "File Name Obfuscation", and a user copying that wording into the
     // config should not be met with silence.
     const QVector<Case> cases = {
-        { "article", true, false },
-        { "filename", false, true },
-        { "article, filename", true, true },
-        { "filename, article", true, true },
-        { "file_name", false, true },
-        { "FileName", false, true },
+        { "article", true, false },          { "filename", false, true },
+        { "article, filename", true, true }, { "filename, article", true, true },
+        { "file_name", false, true },        { "FileName", false, true },
     };
 
-    for (Case const &c : cases)
-    {
+    for (Case const &c : cases) {
         HomeSandbox sandbox;
         const QString confPath = PathHelper::configFilePath();
         {
@@ -2288,7 +2290,7 @@ void TestMainWindow::log_pane_stays_within_its_budget()
     // whole slice over, so that is the ceiling, not the cap itself.
     QVERIFY2(win.logBlockCountForTest() <= 200 + 1000 + 1,
              qPrintable(QStringLiteral("log pane held %1 blocks for a cap of 200")
-                                .arg(win.logBlockCountForTest())));
+                            .arg(win.logBlockCountForTest())));
     QVERIFY(win.logBlockCountForTest() >= 200);
 }
 
@@ -2300,8 +2302,7 @@ void TestMainWindow::log_pane_keeps_the_newest_lines()
     for (int i = 0; i < 3000; ++i)
         win.log(QStringLiteral("line %1").arg(i));
 
-    const QString kept = win.findChild<QTextBrowser *>(QStringLiteral("logBrowser"))
-                                 ->toPlainText();
+    const QString kept = win.findChild<QTextBrowser *>(QStringLiteral("logBrowser"))->toPlainText();
     QVERIFY2(kept.contains(QStringLiteral("line 2999")), "the newest line was trimmed away");
     QVERIFY2(!kept.contains(QStringLiteral("line 0\n")), "the oldest line survived the trim");
 }
@@ -2376,8 +2377,8 @@ void TestMainWindow::log_pane_fragment_splitting_preserves_text_boundaries()
     const int cap = win.logMaxBlockCharactersForTest();
     const QString emoji = QString::fromUtf8("\xF0\x9F\x99\x82");
     const QString payload = QString(cap - 1, QLatin1Char('a')) + emoji
-        + QStringLiteral("b\r\nc\rd\ne") + QChar(0x2028) + QStringLiteral("f")
-        + QChar(0x2029) + QString(cap + 3, QLatin1Char('z'));
+        + QStringLiteral("b\r\nc\rd\ne") + QChar(0x2028) + QStringLiteral("f") + QChar(0x2029)
+        + QString(cap + 3, QLatin1Char('z'));
     win.log(payload, false);
 
     QTextBrowser *browser = win.findChild<QTextBrowser *>(QStringLiteral("logBrowser"));
@@ -2409,7 +2410,7 @@ void TestMainWindow::vpn_affordances_follow_platform_support()
     const bool supported = VpnManager::vpnPlatformSupported();
 
     QWidget *settingsBtn = win.findChild<QWidget *>(QStringLiteral("vpnSettingsBtn"));
-    QWidget *stateLbl    = win.findChild<QWidget *>(QStringLiteral("vpnStateLbl"));
+    QWidget *stateLbl = win.findChild<QWidget *>(QStringLiteral("vpnStateLbl"));
     QVERIFY(settingsBtn);
     QVERIFY(stateLbl);
     // isVisibleTo(), not isVisible(): the window is never shown here, and we
@@ -2464,7 +2465,7 @@ void TestMainWindow::log_pane_shows_markup_as_plain_text()
     // ngPost's. Emphasis belongs in a QTextCharFormat -- see logError().
     win.log(QStringLiteral("<h3>Start Post #1: movie.nzb</h3>"), true);
     QVERIFY2(browser->document()->toPlainText().contains(
-                     QStringLiteral("<h3>Start Post #1: movie.nzb</h3>")),
+                 QStringLiteral("<h3>Start Post #1: movie.nzb</h3>")),
              qPrintable(browser->document()->toPlainText()));
 }
 
@@ -2472,17 +2473,17 @@ void TestMainWindow::no_log_call_passes_html_markup()
 {
     // Only the tags a log line would plausibly carry, so a message that merely
     // says "a < b" is not an offender.
-    static QRegularExpression const markupInLogCall(
-            QStringLiteral(R"(_log\s*\(\s*(?:tr|QStringLiteral|QString)\s*\()"
-                           R"("[^"]*<\s*/?\s*(?:h[1-6]|b|i|u|p|br|div|span|font|a|em|strong|pre|code)\b)"));
+    static QRegularExpression const markupInLogCall(QStringLiteral(
+        R"(_log\s*\(\s*(?:tr|QStringLiteral|QString)\s*\()"
+        R"("[^"]*<\s*/?\s*(?:h[1-6]|b|i|u|p|br|div|span|font|a|em|strong|pre|code)\b)"));
 
-    QStringList  offenders;
+    QStringList offenders;
     QDirIterator it(QStringLiteral(NGPOST_SOURCE_ROOT "/src"),
                     QStringList{ QStringLiteral("*.cpp") },
                     QDir::Files,
                     QDirIterator::Subdirectories);
     while (it.hasNext()) {
-        QString const   path = it.next();
+        QString const path = it.next();
         QFileInfo const info(path);
         // Generated and build-tree copies are not sources anyone edits.
         if (info.fileName().startsWith(QStringLiteral("moc_"))
@@ -2493,8 +2494,8 @@ void TestMainWindow::no_log_call_passes_html_markup()
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
             continue;
 
-        QRegularExpressionMatchIterator m =
-                markupInLogCall.globalMatch(QString::fromUtf8(file.readAll()));
+        QRegularExpressionMatchIterator m = markupInLogCall.globalMatch(
+            QString::fromUtf8(file.readAll()));
         while (m.hasNext())
             offenders << QStringLiteral("%1: %2").arg(info.fileName(),
                                                       m.next().captured().simplified());
@@ -2502,7 +2503,7 @@ void TestMainWindow::no_log_call_passes_html_markup()
 
     QVERIFY2(offenders.isEmpty(),
              qPrintable(QStringLiteral("log messages carrying markup:\n%1")
-                                .arg(offenders.join(QLatin1Char('\n')))));
+                            .arg(offenders.join(QLatin1Char('\n')))));
 }
 
 int main(int argc, char **argv)
@@ -2521,12 +2522,14 @@ int main(int argc, char **argv)
     const auto helperName = QFileInfo(app.applicationFilePath()).fileName();
     if (helperName.startsWith("ngpost-opencl-")) {
         QFile output;
-        if (!output.open(stdout, QIODevice::WriteOnly)) return 2;
+        if (!output.open(stdout, QIODevice::WriteOnly))
+            return 2;
         if (!app.arguments().contains("--opencl-list")) {
             output.write("ParPar test helper\n");
             return 0;
         }
-        if (helperName.contains("slow")) QThread::msleep(400);
+        if (helperName.contains("slow"))
+            QThread::msleep(400);
         if (helperName.contains("failed")) {
             output.write("Error: Could not load OpenCL runtime\n");
             return 1;
@@ -2535,44 +2538,55 @@ int main(int argc, char **argv)
             output.write("not a device listing\n");
             return 0;
         }
-        if (helperName.contains("none")) output.write("{\"platforms\":[]}");
+        if (helperName.contains("none"))
+            output.write("{\"platforms\":[]}");
         else if (helperName.contains("offline"))
-            output.write(R"({"platforms":[{"devices":[{"name":"Offline","type":"GPU","available":false,"supported":true}]}]})");
+            output.write(
+                R"({"platforms":[{"devices":[{"name":"Offline","type":"GPU","available":false,"supported":true}]}]})");
         else
-            output.write(R"({"platforms":[{"devices":[{"name":"Microsoft Basic Render Driver","type":"CPU","available":true,"supported":true}]}]})");
+            output.write(
+                R"({"platforms":[{"devices":[{"name":"Microsoft Basic Render Driver","type":"CPU","available":true,"supported":true}]}]})");
         return 0;
     }
     if (helperName.startsWith("ngpost-controlled-")) {
-        if (app.arguments().contains("--help")) return 0;
+        if (app.arguments().contains("--help"))
+            return 0;
         std::signal(SIGTERM, SIG_IGN);
         QFile started(app.applicationFilePath() + ".started");
-        if (!started.open(QIODevice::WriteOnly)) return 2;
+        if (!started.open(QIODevice::WriteOnly))
+            return 2;
         started.close();
         QElapsedTimer deadline;
         deadline.start();
         while (!QFile::exists(app.applicationFilePath() + ".release") && deadline.elapsed() < 15000)
             QThread::msleep(10);
         for (const QString &arg : app.arguments()) {
-            if (!arg.endsWith(".rar") && !arg.endsWith(".par2")) continue;
+            if (!arg.endsWith(".rar") && !arg.endsWith(".par2"))
+                continue;
             QFile output(arg);
-            if (!output.open(QIODevice::WriteOnly)) return 2;
+            if (!output.open(QIODevice::WriteOnly))
+                return 2;
             return output.write(QByteArray(8192, 'x')) == 8192 ? 0 : 3;
         }
         return 4;
     }
     if (QFileInfo(app.applicationFilePath()).fileName().startsWith("ngpost-recording-")) {
         const auto args = app.arguments().mid(1);
-        if (args.isEmpty() || args.contains("--help")) return 0;
+        if (args.isEmpty() || args.contains("--help"))
+            return 0;
         if (helperName.contains("fail"))
             return 9;
         QFile recorded(app.applicationFilePath() + ".args");
-        if (!recorded.open(QIODevice::WriteOnly)) return 1;
+        if (!recorded.open(QIODevice::WriteOnly))
+            return 1;
         recorded.write(args.join('\n').toUtf8());
         recorded.close();
         for (const auto &arg : args) {
-            if (!arg.endsWith(".rar") && !arg.endsWith(".par2")) continue;
+            if (!arg.endsWith(".rar") && !arg.endsWith(".par2"))
+                continue;
             QFile output(arg);
-            if (!output.open(QIODevice::WriteOnly)) return 2;
+            if (!output.open(QIODevice::WriteOnly))
+                return 2;
             return output.write(QByteArray(8192, 'x')) == 8192 ? 0 : 3;
         }
         return 4;
@@ -2586,14 +2600,17 @@ void TestMainWindow::post_all_tabs_submits_only_prepared_posts()
 {
     HomeSandbox sandbox;
     ngpost::tests::MockNntpServer mock;
-    QVERIFY(mock.start({"--slow-mode-ms", "15"}));
+    QVERIFY(mock.start({ "--slow-mode-ms", "15" }));
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString err;
-    const QString conf = QString("GROUPS = alt.binaries.test\nthread = 1\nTMP_DIR = %1\nnzbPath = %1\n[server]\nhost = 127.0.0.1\nport = %2\nssl = false\nconnection = 1\n")
-                             .arg(sandbox.rootPath()).arg(mock.port());
+    const QString conf =
+        QString("GROUPS = alt.binaries.test\nthread = 1\nTMP_DIR = %1\nnzbPath = "
+                "%1\n[server]\nhost = 127.0.0.1\nport = %2\nssl = false\nconnection = 1\n")
+            .arg(sandbox.rootPath())
+            .arg(mock.port());
     auto *window = bootWindow(ngPost, conf, &err);
     QVERIFY2(window, qPrintable(err));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
@@ -2606,7 +2623,7 @@ void TestMainWindow::post_all_tabs_submits_only_prepared_posts()
     auto *missing = window->addNewQuickTab(tabs->count() - 1);
     window->addNewQuickTab(tabs->count() - 1); // empty, deliberately ignored
     QStringList completionOrder;
-    const QList<PostingWidget *> posts{first, second, third, missing};
+    const QList<PostingWidget *> posts{ first, second, third, missing };
     for (int i = 0; i < posts.size(); ++i) {
         const QString path = sandbox.rootPath() + QString("/input%1.bin").arg(i);
         QFile f(path);
@@ -2618,7 +2635,8 @@ void TestMainWindow::post_all_tabs_submits_only_prepared_posts()
             if (posts[i]->isPostingFinished() && !completionOrder.contains(QString::number(i)))
                 completionOrder << QString::number(i);
         });
-        if (posts[i] == missing) QVERIFY(QFile::remove(path));
+        if (posts[i] == missing)
+            QVERIFY(QFile::remove(path));
     }
     // The visual order, not the job number or creation order, controls submission.
     tabs->tabBar()->moveTab(tabs->indexOf(third), tabs->indexOf(second));
@@ -2629,8 +2647,10 @@ void TestMainWindow::post_all_tabs_submits_only_prepared_posts()
     QVERIFY(third->isPosting());
     QVERIFY(!missing->isPosting());
     button->click(); // the missing-file tab cannot duplicate or stop queued jobs
-    QTRY_VERIFY_WITH_TIMEOUT(first->isPostingFinished() && second->isPostingFinished() && third->isPostingFinished(), 20000);
-    QCOMPARE(completionOrder, QStringList({"0", "2", "1"}));
+    QTRY_VERIFY_WITH_TIMEOUT(first->isPostingFinished() && second->isPostingFinished()
+                                 && third->isPostingFinished(),
+                             20000);
+    QCOMPARE(completionOrder, QStringList({ "0", "2", "1" }));
     QCOMPARE(mock.receivedArticles().size(), 3);
     QVERIFY(!missing->isPostingFinished());
     window->closeTab(missing);
@@ -2639,7 +2659,9 @@ void TestMainWindow::post_all_tabs_submits_only_prepared_posts()
     QVERIFY(QMetaObject::invokeMethod(first, "onClearFilesClicked", Qt::DirectConnection));
     const QString path = sandbox.rootPath() + "/again.bin";
     QFile f(path);
-    QVERIFY(f.open(QIODevice::WriteOnly)); f.write("again"); f.close();
+    QVERIFY(f.open(QIODevice::WriteOnly));
+    f.write("again");
+    f.close();
     first->addPath(path, 0);
     QVERIFY(button->isEnabled());
     button->click();
@@ -2652,11 +2674,12 @@ void TestMainWindow::par2_dialog_defaults_overrides_and_cancel()
     HomeSandbox sandbox;
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString err;
     // This executable accepts --help on all test platforms; no PAR2 generation is needed here.
-    const auto conf = QString("GROUPS = alt.binaries.test\nPAR2_PCT = 8\nPAR2_TOOL = par2cmdline\nPAR2_PATH = %1\nPAR2_ARGS = c -r8 -s65536 -l\n")
+    const auto conf = QString("GROUPS = alt.binaries.test\nPAR2_PCT = 8\nPAR2_TOOL = "
+                              "par2cmdline\nPAR2_PATH = %1\nPAR2_ARGS = c -r8 -s65536 -l\n")
                           .arg(QCoreApplication::applicationFilePath());
     auto *window = bootWindow(ngPost, conf, &err);
     QVERIFY2(window, qPrintable(err));
@@ -2677,9 +2700,11 @@ void TestMainWindow::par2_dialog_defaults_overrides_and_cancel()
     }
     QCOMPARE(ngPost.par2DefaultPercentage(), 8u);
     QFile sample(sandbox.rootPath() + "/preview.bin");
-    QVERIFY(sample.open(QIODevice::WriteOnly)); sample.write(QByteArray(1048576, 'p')); sample.close();
+    QVERIFY(sample.open(QIODevice::WriteOnly));
+    sample.write(QByteArray(1048576, 'p'));
+    sample.close();
     {
-        Par2SettingsDialog dialog(&ngPost, {QFileInfo(sample)}, true, true, window);
+        Par2SettingsDialog dialog(&ngPost, { QFileInfo(sample) }, true, true, window);
         dialog.findChild<QSpinBox *>("par2DefaultPct")->setValue(15);
         QTRY_VERIFY(dialog.findChild<QLabel *>("par2Estimate")->text().contains("source blocks"));
         QVERIFY(dialog.findChild<QLabel *>("par2Estimate")->text().contains("override"));
@@ -2694,7 +2719,8 @@ void TestMainWindow::par2_dialog_defaults_overrides_and_cancel()
     QVERIFY(QMetaObject::invokeMethod(window, "onSaveConfig", Qt::DirectConnection));
     QFile config(PathHelper::configFilePath());
     QVERIFY(config.open(QIODevice::ReadOnly | QIODevice::Text));
-    const auto saved = config.readAll(); config.close();
+    const auto saved = config.readAll();
+    config.close();
     QVERIFY(saved.contains("PAR2_PCT = 15\n"));
     QVERIFY(saved.contains("PAR2_TOOL = par2cmdline\n"));
     {
@@ -2706,8 +2732,13 @@ void TestMainWindow::par2_dialog_defaults_overrides_and_cancel()
     config.close();
     autoPct->setValue(31);
     {
-        Par2SettingsDialog dialog(&ngPost, {QFileInfo(sandbox.rootPath() + "/missing")}, false, false, window);
-        QTRY_VERIFY(dialog.findChild<QLabel *>("par2Estimate")->text().contains("could not be read"));
+        Par2SettingsDialog dialog(&ngPost,
+                                  { QFileInfo(sandbox.rootPath() + "/missing") },
+                                  false,
+                                  false,
+                                  window);
+        QTRY_VERIFY(
+            dialog.findChild<QLabel *>("par2Estimate")->text().contains("could not be read"));
         dialog.findChild<QSpinBox *>("par2DefaultPct")->setValue(19);
         dialog.accept();
     }
@@ -2721,11 +2752,12 @@ void TestMainWindow::par2_dialog_preserves_exact_volume_bytes()
     HomeSandbox sandbox;
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
-    const auto conf = QString("GROUPS = alt.binaries.test\nPAR2_PCT = 8\nPAR2_TOOL = parpar\n"
-                              "PAR2_PATH = %1\nPAR2_ARGS = -r8% -s32B --max-input-slices=32B -p<32B\n")
+    const auto conf = QString(
+                          "GROUPS = alt.binaries.test\nPAR2_PCT = 8\nPAR2_TOOL = parpar\n"
+                          "PAR2_PATH = %1\nPAR2_ARGS = -r8% -s32B --max-input-slices=32B -p<32B\n")
                           .arg(QCoreApplication::applicationFilePath());
     auto *window = bootWindow(ngPost, conf, &error);
     QVERIFY2(window, qPrintable(error));
@@ -2741,17 +2773,22 @@ void TestMainWindow::par2_dialog_preserves_exact_volume_bytes()
 void TestMainWindow::par2_dialog_detects_real_gpu()
 {
     const auto deviceId = qEnvironmentVariable("NGPOST_TEST_OPENCL_DEVICE");
-    if (deviceId.isEmpty()) QSKIP("Set NGPOST_TEST_OPENCL_DEVICE to test a real OpenCL GPU.");
+    if (deviceId.isEmpty())
+        QSKIP("Set NGPOST_TEST_OPENCL_DEVICE to test a real OpenCL GPU.");
     HomeSandbox sandbox;
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     const auto executable = par2::findExecutable(par2::Tool::ParPar);
     QVERIFY(!executable.isEmpty());
     QString error;
-    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
-                                             "PAR2_PCT = 10\nPAR2_ARGS = -s1M --auto-slice-size -r10%\n").arg(executable), &error);
+    auto *window = bootWindow(ngPost,
+                              QString(
+                                  "GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
+                                  "PAR2_PCT = 10\nPAR2_ARGS = -s1M --auto-slice-size -r10%\n")
+                                  .arg(executable),
+                              &error);
     QVERIFY2(window, qPrintable(error));
     Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
     dialog.findChild<QCheckBox *>("par2Gpu")->setChecked(true);
@@ -2793,11 +2830,15 @@ void TestMainWindow::par2_dialog_refuses_gpu_without_opencl()
 
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
-    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
-                                             "PAR2_PCT = 10\nPAR2_ARGS = -s1M --auto-slice-size -r10%\n").arg(stub), &error);
+    auto *window = bootWindow(ngPost,
+                              QString(
+                                  "GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
+                                  "PAR2_PCT = 10\nPAR2_ARGS = -s1M --auto-slice-size -r10%\n")
+                                  .arg(stub),
+                              &error);
     QVERIFY2(window, qPrintable(error));
     Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
     auto *save = dialog.findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save);
@@ -2833,8 +2874,9 @@ void TestMainWindow::par2_dialog_checks_opencl_data()
 {
     QTest::addColumn<QString>("mode");
     QTest::addColumn<bool>("usable");
-    for (const auto *mode : {"none", "failed", "invalid", "offline", "slow-cpu"})
-        QTest::newRow(mode) << QString::fromLatin1(mode) << (QString::fromLatin1(mode) == "slow-cpu");
+    for (const auto *mode : { "none", "failed", "invalid", "offline", "slow-cpu" })
+        QTest::newRow(mode) << QString::fromLatin1(mode)
+                            << (QString::fromLatin1(mode) == "slow-cpu");
 }
 
 void TestMainWindow::par2_dialog_checks_opencl()
@@ -2844,11 +2886,17 @@ void TestMainWindow::par2_dialog_checks_opencl()
     HomeSandbox sandbox;
     const auto stub = openClHelper(sandbox.rootPath(), mode);
     QVERIFY(!stub.isEmpty());
-    int argc = 1; QByteArray arg0("tst_MainWindow"); char *argv[] = {arg0.data(), nullptr};
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
-    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
-                                             "PAR2_PCT = 10\nPAR2_ARGS = -s1M --auto-slice-size -r10% --opencl-process=100%\n").arg(stub), &error);
+    auto *window = bootWindow(
+        ngPost,
+        QString("GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
+                "PAR2_PCT = 10\nPAR2_ARGS = -s1M --auto-slice-size -r10% --opencl-process=100%\n")
+            .arg(stub),
+        &error);
     QVERIFY2(window, qPrintable(error));
     Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
     auto *save = dialog.findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save);
@@ -2880,11 +2928,17 @@ void TestMainWindow::par2_dialog_rechecks_changed_opencl_tool()
     const auto failed = openClHelper(sandbox.rootPath(), "failed");
     const auto cpu = openClHelper(sandbox.rootPath(), "slow-cpu");
     QVERIFY(!failed.isEmpty() && !cpu.isEmpty());
-    int argc = 1; QByteArray arg0("tst_MainWindow"); char *argv[] = {arg0.data(), nullptr};
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
-    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
-                                             "PAR2_ARGS = -s1M --auto-slice-size --opencl-process=100%\n").arg(failed), &error);
+    auto *window = bootWindow(ngPost,
+                              QString(
+                                  "GROUPS = alt.binaries.test\nPAR2_TOOL = parpar\nPAR2_PATH = %1\n"
+                                  "PAR2_ARGS = -s1M --auto-slice-size --opencl-process=100%\n")
+                                  .arg(failed),
+                              &error);
     QVERIFY2(window, qPrintable(error));
     Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
     auto *path = dialog.findChild<QLineEdit *>("par2Path");
@@ -2961,12 +3015,17 @@ void TestMainWindow::par2_dialog_runs_a_typed_path_only_once_typing_ends()
 void TestMainWindow::par2_dialog_multipar_clears_inexact_check_hint()
 {
     HomeSandbox sandbox;
-    int argc = 1; QByteArray arg0("tst_MainWindow"); char *argv[] = {arg0.data(), nullptr};
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
-    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nPAR2_TOOL = multipar\nPAR2_PATH = %1\n"
-                                             "PAR2_PCT = 10\nPAR2_ARGS = c /ss1048576 /rr10\nPAR2_BLOCK_SIZE = 1048576\n")
-                                             .arg(QCoreApplication::applicationFilePath()), &error);
+    auto *window = bootWindow(
+        ngPost,
+        QString("GROUPS = alt.binaries.test\nPAR2_TOOL = multipar\nPAR2_PATH = %1\n"
+                "PAR2_PCT = 10\nPAR2_ARGS = c /ss1048576 /rr10\nPAR2_BLOCK_SIZE = 1048576\n")
+            .arg(QCoreApplication::applicationFilePath()),
+        &error);
     QVERIFY2(window, qPrintable(error));
     Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
     dialog.findChild<QSpinBox *>("par2DefaultPct")->setValue(12);
@@ -2975,14 +3034,16 @@ void TestMainWindow::par2_dialog_multipar_clears_inexact_check_hint()
     QFile config(PathHelper::configFilePath());
     QVERIFY(config.open(QIODevice::ReadOnly));
     const auto saved = config.readAll();
-    QVERIFY(!QRegularExpression("(?m)^PAR2_BLOCK_SIZE\\s*=\\s*1048576").match(QString::fromUtf8(saved)).hasMatch());
+    QVERIFY(!QRegularExpression("(?m)^PAR2_BLOCK_SIZE\\s*=\\s*1048576")
+                 .match(QString::fromUtf8(saved))
+                 .hasMatch());
     QVERIFY(saved.contains("/ss1048576"));
 }
 
 void TestMainWindow::sizing_dialogs_translations_fit_data()
 {
     QTest::addColumn<QString>("language");
-    for (const auto *language : {"en", "fr", "de", "es", "nl", "pt", "zh"})
+    for (const auto *language : { "en", "fr", "de", "es", "nl", "pt", "zh" })
         QTest::newRow(language) << QString::fromLatin1(language);
 }
 
@@ -2992,12 +3053,14 @@ void TestMainWindow::sizing_dialogs_translations_fit()
     HomeSandbox sandbox;
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
-    auto *window = bootWindow(ngPost, QString("GROUPS = alt.binaries.test\nRAR_SIZE = 250\nRAR_MAX = 99\n"
-                                             "PAR2_TOOL = par2cmdline\nPAR2_PATH = %1\nPAR2_PCT = 10\n")
-                                         .arg(QCoreApplication::applicationFilePath()), &error);
+    auto *window = bootWindow(ngPost,
+                              QString("GROUPS = alt.binaries.test\nRAR_SIZE = 250\nRAR_MAX = 99\n"
+                                      "PAR2_TOOL = par2cmdline\nPAR2_PATH = %1\nPAR2_PCT = 10\n")
+                                  .arg(QCoreApplication::applicationFilePath()),
+                              &error);
     QVERIFY2(window, qPrintable(error));
     QTranslator translator;
     QVERIFY(translator.load(":/lang/ngPost_" + language + ".qm"));
@@ -3010,29 +3073,36 @@ void TestMainWindow::sizing_dialogs_translations_fit()
             QTRY_VERIFY(dialog.frameGeometry().height() <= available.height());
             QTRY_VERIFY(dialog.frameGeometry().width() <= available.width());
             for (auto *field : dialog.findChildren<QWidget *>()) {
-                if (!field->isVisible()) continue;
+                if (!field->isVisible())
+                    continue;
                 // Embedded editors use their parent's frame and deliberately
                 // have less height than a standalone QLineEdit's size hint.
                 if (qobject_cast<QAbstractSpinBox *>(field->parentWidget())
-                    || qobject_cast<QComboBox *>(field->parentWidget())) continue;
+                    || qobject_cast<QComboBox *>(field->parentWidget()))
+                    continue;
                 if (qobject_cast<QComboBox *>(field) || qobject_cast<QAbstractSpinBox *>(field)
                     || qobject_cast<QLineEdit *>(field) || qobject_cast<QPlainTextEdit *>(field)) {
-                    QTRY_VERIFY2(field->height() >= field->minimumSizeHint().height(), qPrintable(field->objectName()));
+                    QTRY_VERIFY2(field->height() >= field->minimumSizeHint().height(),
+                                 qPrintable(field->objectName()));
                     auto *scroll = dialog.findChild<QScrollArea *>("par2SettingsScroll");
                     if (scroll && scroll->widget()->isAncestorOf(field))
                         QTRY_VERIFY2(field->mapTo(scroll->widget(), QPoint()).x() + field->width()
-                                     <= scroll->widget()->width(), qPrintable(field->objectName()));
+                                         <= scroll->widget()->width(),
+                                     qPrintable(field->objectName()));
                 }
             }
         }
         for (auto *label : dialog.findChildren<QLabel *>()) {
-            if (!label->wordWrap() || !label->isVisible()) continue;
-            QTRY_VERIFY2(label->height() >= label->heightForWidth(label->width()), qPrintable(label->text()));
+            if (!label->wordWrap() || !label->isVisible())
+                continue;
+            QTRY_VERIFY2(label->height() >= label->heightForWidth(label->width()),
+                         qPrintable(label->text()));
         }
         for (auto *box : dialog.findChildren<QDialogButtonBox *>())
             for (auto *button : box->buttons()) {
                 QVERIFY(button->isVisible());
-                QVERIFY(dialog.rect().contains(QRect(button->mapTo(&dialog, QPoint()), button->size())));
+                QVERIFY(dialog.rect().contains(
+                    QRect(button->mapTo(&dialog, QPoint()), button->size())));
             }
         const auto directory = qEnvironmentVariable("NGPOST_TEST_SCREENSHOT_DIR");
         if (!directory.isEmpty()) {
@@ -3069,11 +3139,13 @@ void TestMainWindow::rar_limit_value_persists_and_zero_is_rejected()
     HomeSandbox sandbox;
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     {
         NgPost ngPost(argc, argv);
         QString err;
-        auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\nRAR_SIZE = 250\nRAR_MAX = 99\n", &err);
+        auto *window = bootWindow(ngPost,
+                                  "GROUPS = alt.binaries.test\nRAR_SIZE = 250\nRAR_MAX = 99\n",
+                                  &err);
         QVERIFY2(window, qPrintable(err));
         CompressionSettingsDialog dialog(&ngPost, window);
         auto *maximum = dialog.findChild<QSpinBox *>("rarMaxSB");
@@ -3104,7 +3176,8 @@ void TestMainWindow::rar_limit_value_persists_and_zero_is_rejected()
     }
     QFile file(PathHelper::configFilePath());
     QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
-    file.write("RAR_MAX = 0\n"); file.close();
+    file.write("RAR_MAX = 0\n");
+    file.close();
     NgPost invalid(argc, argv);
     QVERIFY(invalid.parseDefaultConfig().contains("RAR_MAX"));
 }
@@ -3143,29 +3216,42 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
 #endif
         // A native executable exercises QProcess quoting and Unicode paths on
         // Windows as well as Unix. Its small recording mode lives in main().
-        if (!QFile::copy(QCoreApplication::applicationFilePath(), path)) return QString();
+        if (!QFile::copy(QCoreApplication::applicationFilePath(), path))
+            return QString();
         return path;
     };
     const auto rar = helper(QString::fromUtf8("archive helper é"));
     const auto par = helper(QString::fromUtf8("recovery helper é"));
     QVERIFY(!rar.isEmpty() && !par.isEmpty());
     ngpost::tests::MockNntpServer mock;
-    QVERIFY(mock.start({"--slow-mode-ms", "15"}));
-    int argc = 1; QByteArray arg0("tst_MainWindow"); char *argv[] = {arg0.data(), nullptr};
+    QVERIFY(mock.start({ "--slow-mode-ms", "15" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString err;
     const auto conf = QString("GROUPS = alt.binaries.test\nthread = 1\nTMP_DIR = %1\nnzbPath = %1\n"
-                              "RAR_PATH = %2\nRAR_SIZE = %5\n%6RAR_MAX = %7\nPAR2_PATH = %3\nPAR2_TOOL = par2cmdline\n"
-                              "PAR2_PCT = 8\nPAR2_ARGS = c -r8 -s4096\n[server]\nhost = 127.0.0.1\nport = %4\nssl = false\nconnection = 1\n")
-                          .arg(root, rar, par).arg(mock.port()).arg(requestedSize).arg(limited ? "" : "#").arg(maximum);
+                              "RAR_PATH = %2\nRAR_SIZE = %5\n%6RAR_MAX = %7\nPAR2_PATH = "
+                              "%3\nPAR2_TOOL = par2cmdline\n"
+                              "PAR2_PCT = 8\nPAR2_ARGS = c -r8 -s4096\n[server]\nhost = "
+                              "127.0.0.1\nport = %4\nssl = false\nconnection = 1\n")
+                          .arg(root, rar, par)
+                          .arg(mock.port())
+                          .arg(requestedSize)
+                          .arg(limited ? "" : "#")
+                          .arg(maximum);
     auto *window = bootWindow(ngPost, conf, &err);
     QVERIFY2(window, qPrintable(err));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
     auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(tabs->count() - 1);
     QFile firstFile(root + "/first.bin"), secondFile(root + "/second.bin");
-    QVERIFY(firstFile.open(QIODevice::WriteOnly)); firstFile.write(QByteArray(500000, 'a')); firstFile.close();
-    QVERIFY(secondFile.open(QIODevice::WriteOnly)); QVERIFY(secondFile.resize(sourceSize)); secondFile.close();
+    QVERIFY(firstFile.open(QIODevice::WriteOnly));
+    firstFile.write(QByteArray(500000, 'a'));
+    firstFile.close();
+    QVERIFY(secondFile.open(QIODevice::WriteOnly));
+    QVERIFY(secondFile.resize(sourceSize));
+    secondFile.close();
     first->addPath(firstFile.fileName(), 0);
     second->addPath(secondFile.fileName(), 0);
     second->findChild<QCheckBox *>("compressCB")->setChecked(true);
@@ -3181,7 +3267,8 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
         Par2SettingsDialog parDialog(&ngPost, {}, false, false, window);
         auto *tool = parDialog.findChild<QComboBox *>("par2Tool");
         tool->setCurrentIndex(tool->findData(int(par2::Tool::ParPar)));
-        parDialog.findChild<QLineEdit *>("par2Path")->setText(QCoreApplication::applicationFilePath());
+        parDialog.findChild<QLineEdit *>("par2Path")
+            ->setText(QCoreApplication::applicationFilePath());
         parDialog.findChild<QSpinBox *>("par2DefaultPct")->setValue(50);
         parDialog.accept();
         QCOMPARE(parDialog.result(), int(QDialog::Accepted));
@@ -3189,8 +3276,9 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
     QTRY_VERIFY_WITH_TIMEOUT(first->isPostingFinished() && second->isPostingFinished(), 20000);
     QFile rarArgs(rar + ".args"), parArgs(par + ".args");
     QVERIFY(rarArgs.open(QIODevice::ReadOnly));
-    const auto recordedRar = QString::fromUtf8(rarArgs.readAll()).split('\n').filter(QRegularExpression("^-v"));
-    QCOMPARE(recordedRar, volumeArgument.isEmpty() ? QStringList{} : QStringList{volumeArgument});
+    const auto recordedRar =
+        QString::fromUtf8(rarArgs.readAll()).split('\n').filter(QRegularExpression("^-v"));
+    QCOMPARE(recordedRar, volumeArgument.isEmpty() ? QStringList{} : QStringList{ volumeArgument });
     QVERIFY(parArgs.open(QIODevice::ReadOnly));
     const auto recorded = parArgs.readAll().split('\n');
     QVERIFY(recorded.contains("-r17"));
@@ -3199,7 +3287,8 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
     QCOMPARE(mock.receivedArticles().size(), 3);
     bool adjustmentLogged = false;
     for (auto *log : window->findChildren<QTextBrowser *>())
-        adjustmentLogged |= log->toPlainText().contains(QString("increased from %1 MiB to %2 MiB").arg(requestedSize).arg(increasedSize));
+        adjustmentLogged |= log->toPlainText().contains(
+            QString("increased from %1 MiB to %2 MiB").arg(requestedSize).arg(increasedSize));
     QCOMPARE(adjustmentLogged, requestedSize > 0 && increasedSize > 0);
 }
 
@@ -3208,25 +3297,34 @@ void TestMainWindow::post_all_continues_after_overwrite_declined_and_auto_close(
     HomeSandbox sandbox;
     ngpost::tests::MockNntpServer mock;
     QVERIFY(mock.start());
-    int argc = 1; QByteArray arg0("tst_MainWindow"); char *argv[] = {arg0.data(), nullptr};
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString err;
-    const auto conf = QString("GROUPS = alt.binaries.test\nthread = 1\nAUTO_CLOSE_TABS = true\nnzbPath = %1\n"
-                              "[server]\nhost = 127.0.0.1\nport = %2\nssl = false\nconnection = 1\n")
-                          .arg(sandbox.rootPath()).arg(mock.port());
+    const auto conf =
+        QString("GROUPS = alt.binaries.test\nthread = 1\nAUTO_CLOSE_TABS = true\nnzbPath = %1\n"
+                "[server]\nhost = 127.0.0.1\nport = %2\nssl = false\nconnection = 1\n")
+            .arg(sandbox.rootPath())
+            .arg(mock.port());
     auto *window = bootWindow(ngPost, conf, &err);
     QVERIFY2(window, qPrintable(err));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
     auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     QPointer<PostingWidget> second = window->addNewQuickTab(tabs->count() - 1);
-    for (auto *post : {first, second.data()}) {
+    for (auto *post : { first, second.data() }) {
         const QString path = sandbox.rootPath() + (post == first ? "/existing.bin" : "/fresh.bin");
-        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("sample"); file.close();
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("sample");
+        file.close();
         post->addPath(path, 0);
     }
     const auto nzbPath = first->findChild<QLineEdit *>("nzbFileEdit")->text();
     QFile existing(nzbPath.endsWith(".nzb") ? nzbPath : nzbPath + ".nzb");
-    QVERIFY(existing.open(QIODevice::WriteOnly)); existing.write("original nzb"); existing.close();
+    QVERIFY(existing.open(QIODevice::WriteOnly));
+    existing.write("original nzb");
+    existing.close();
     bool declined = false;
     QTimer dismiss;
     connect(&dismiss, &QTimer::timeout, window, [&] {
@@ -3243,7 +3341,8 @@ void TestMainWindow::post_all_continues_after_overwrite_declined_and_auto_close(
     QVERIFY(first->canSubmit());
     QTRY_VERIFY_WITH_TIMEOUT(second.isNull(), 15000);
     QCOMPARE(mock.receivedArticles().size(), 1);
-    QVERIFY(existing.open(QIODevice::ReadOnly)); QCOMPARE(existing.readAll(), QByteArray("original nzb"));
+    QVERIFY(existing.open(QIODevice::ReadOnly));
+    QCOMPARE(existing.readAll(), QByteArray("original nzb"));
     QVERIFY(!window->findChild<QPushButton *>("postAllTabsButton")->isEnabled());
 }
 
@@ -5489,7 +5588,7 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     QFETCH(bool, dark);
     HomeSandbox sandbox;
     ngpost::tests::MockNntpServer mock;
-    QVERIFY(mock.start({"--slow-mode-ms", "100"}));
+    QVERIFY(mock.start({ "--slow-mode-ms", "100" }));
     const QPalette original = qApp->palette();
     const auto restore = qScopeGuard([&] { qApp->setPalette(original); });
     QPalette palette = original;
@@ -5498,12 +5597,16 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     qApp->setPalette(palette);
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString err;
-    auto *window = bootWindow(ngPost,
-        QString("GROUPS = alt.binaries.test\nthread = 1\nTMP_DIR = %1\nnzbPath = %1\n[server]\nhost = 127.0.0.1\nport = %2\nssl = false\nconnection = 1\n")
-            .arg(sandbox.rootPath()).arg(mock.port()), &err);
+    auto *window = bootWindow(
+        ngPost,
+        QString("GROUPS = alt.binaries.test\nthread = 1\nTMP_DIR = %1\nnzbPath = "
+                "%1\n[server]\nhost = 127.0.0.1\nport = %2\nssl = false\nconnection = 1\n")
+            .arg(sandbox.rootPath())
+            .arg(mock.port()),
+        &err);
     QVERIFY2(window, qPrintable(err));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
     auto *all = window->findChild<QPushButton *>("postAllTabsButton");
@@ -5525,7 +5628,7 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     auto *second = window->addNewQuickTab(0);
     auto *third = window->addNewQuickTab(0);
     auto *empty = window->addNewQuickTab(0);
-    const QList<PostingWidget *> posts{first, second, third};
+    const QList<PostingWidget *> posts{ first, second, third };
     for (int i = 0; i < posts.size(); ++i) {
         QCOMPARE(posts[i]->findChild<QPushButton *>("postButton")->text(),
                  QString("Start Quick Post #%1").arg(i + 1));
@@ -5546,7 +5649,8 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
         const QRect area = tabs->tabBar()->tabRect(2).intersected(image.rect());
         for (int y = area.top(); y <= area.bottom(); ++y)
             for (int x = area.left(); x <= area.right(); ++x)
-                if (image.pixelColor(x, y) == color) return true;
+                if (image.pixelColor(x, y) == color)
+                    return true;
         return false;
     };
     QVERIFY(textIsRendered(dark ? QColor(0x4c, 0xff, 0x4c) : QColor(Qt::darkGreen)));
@@ -5560,7 +5664,8 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     for (auto *post : posts)
         QCOMPARE(tabs->tabBar()->tabTextColor(tabs->indexOf(post)),
                  dark ? QColor(Qt::yellow) : QColor(160, 110, 0));
-    QCOMPARE(tabs->tabBar()->tabTextColor(tabs->indexOf(empty)), palette.color(QPalette::WindowText));
+    QCOMPARE(tabs->tabBar()->tabTextColor(tabs->indexOf(empty)),
+             palette.color(QPalette::WindowText));
     // Finishing the active tab while globally paused must leave the queue held.
     first->findChild<QPushButton *>("postButton")->click();
     QTRY_VERIFY_WITH_TIMEOUT(first->isPostingFinished() && !ngPost.isPosting(), 10000);
@@ -5587,7 +5692,8 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     QVERIFY(!stop->isEnabled());
     QVERIFY(!empty->isPostingFinished());
     for (auto *post : posts) {
-        QCOMPARE(tabs->tabBar()->tabTextColor(tabs->indexOf(post)), palette.color(QPalette::WindowText));
+        QCOMPARE(tabs->tabBar()->tabTextColor(tabs->indexOf(post)),
+                 palette.color(QPalette::WindowText));
         QCOMPARE(post->findChild<QPushButton *>("postButton")->text(),
                  QString("Start Quick Post #%1").arg(post->displayNumber()));
     }
@@ -5607,7 +5713,7 @@ void TestMainWindow::global_post_controls_translations()
     QVERIFY(mock.start());
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString err;
     auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &err);
@@ -5616,12 +5722,14 @@ void TestMainWindow::global_post_controls_translations()
     auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(0);
     auto *third = window->addNewQuickTab(0);
-    for (auto *post : {first, second}) {
-        QVERIFY(addShutdownTestFile(post, sandbox.rootPath() + QString("/%1.bin").arg(post->jobNumber())));
+    for (auto *post : { first, second }) {
+        QVERIFY(
+            addShutdownTestFile(post,
+                                sandbox.rootPath() + QString("/%1.bin").arg(post->jobNumber())));
         post->onPostFiles();
     }
     ngPost.pause();
-    for (const QString lang : {"en", "fr", "de", "es", "nl", "pt", "zh"}) {
+    for (const QString lang : { "en", "fr", "de", "es", "nl", "pt", "zh" }) {
         QTranslator translator;
         QVERIFY(translator.load(QString(":/lang/ngPost_%1.qm").arg(lang)));
         qApp->installTranslator(&translator);
@@ -5644,7 +5752,8 @@ void TestMainWindow::global_post_controls_translations()
             QCOMPARE(control->size(), QSize(all->sizeHint().height(), all->sizeHint().height()));
             QCOMPARE(control->iconSize(), all->iconSize());
         }
-        QVERIFY(!translator.translate("MainWindow", "Cancel all active and queued posts").isEmpty());
+        QVERIFY(
+            !translator.translate("MainWindow", "Cancel all active and queued posts").isEmpty());
         qApp->removeTranslator(&translator);
     }
     ngPost.cancelAllPostingJobs();
@@ -5655,10 +5764,10 @@ void TestMainWindow::global_cancel_during_confirmation()
 {
     HomeSandbox sandbox;
     ngpost::tests::MockNntpServer mock;
-    QVERIFY(mock.start({"--slow-mode-ms", "100"}));
+    QVERIFY(mock.start({ "--slow-mode-ms", "100" }));
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
     auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
@@ -5667,8 +5776,10 @@ void TestMainWindow::global_cancel_during_confirmation()
     auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(0);
     auto *third = window->addNewQuickTab(0);
-    for (auto *post : {first, second, third})
-        QVERIFY(addShutdownTestFile(post, sandbox.rootPath() + QString("/%1.bin").arg(post->jobNumber())));
+    for (auto *post : { first, second, third })
+        QVERIFY(
+            addShutdownTestFile(post,
+                                sandbox.rootPath() + QString("/%1.bin").arg(post->jobNumber())));
     QFile existing(second->findChild<QLineEdit *>("nzbFileEdit")->text());
     QVERIFY(existing.open(QIODevice::WriteOnly));
     existing.write("original nzb");
@@ -5678,13 +5789,15 @@ void TestMainWindow::global_cancel_during_confirmation()
     connect(&answer, &QTimer::timeout, window, [&] {
         for (auto *widget : QApplication::topLevelWidgets()) {
             auto *box = qobject_cast<QMessageBox *>(widget);
-            if (!box || !box->text().contains("already exists")) continue;
+            if (!box || !box->text().contains("already exists"))
+                continue;
             if (!canceled) {
                 window->findChild<QPushButton *>("stopAllTabsButton")->click();
                 canceled = true;
             }
             // The global stop has already finished before the user answers Yes.
-            if (ngPost.hasPostingJobs()) return;
+            if (ngPost.hasPostingJobs())
+                return;
             answer.stop();
             box->done(QMessageBox::Yes);
         }
@@ -5726,14 +5839,16 @@ void TestMainWindow::global_cancel_external_tool()
         ;
     QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), helper));
     ngpost::tests::MockNntpServer mock;
-    QVERIFY(mock.start({"--slow-mode-ms", "50"}));
+    QVERIFY(mock.start({ "--slow-mode-ms", "50" }));
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
-    auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port())
-                             + (prepack ? "PREPARE_PACKING = true\n" : ""), &error);
+    auto *window = bootWindow(ngPost,
+                              shutdownTestConfig(sandbox.rootPath(), mock.port())
+                                  + (prepack ? "PREPARE_PACKING = true\n" : ""),
+                              &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
     auto *post = qobject_cast<PostingWidget *>(tabs->widget(2));
@@ -5777,10 +5892,13 @@ void TestMainWindow::global_cancel_external_tool()
     connect(&heartbeat, &QTimer::timeout, window, [&] { ++heartbeats; });
     heartbeat.start(10);
     QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs() && post->isPostingFinished(), 5000);
-    QVERIFY2(elapsed.elapsed() < 5000, "Cancellation must kill an uncooperative external tool promptly");
-    if (!successfulExit) QVERIFY2(heartbeats > 5, "Cancellation froze the GUI thread");
+    QVERIFY2(elapsed.elapsed() < 5000,
+             "Cancellation must kill an uncooperative external tool promptly");
+    if (!successfulExit)
+        QVERIFY2(heartbeats > 5, "Cancellation froze the GUI thread");
     QCOMPARE(started.count(), 0);
-    if (!prepack) QCOMPARE(mock.receivedArticles().size(), 0);
+    if (!prepack)
+        QCOMPARE(mock.receivedArticles().size(), 0);
     QVERIFY(QFile::exists(sandbox.rootPath() + "/source.bin"));
 }
 
@@ -5791,7 +5909,7 @@ void TestMainWindow::canceled_job_never_starts()
     QVERIFY(mock.start());
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
     auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
@@ -5829,21 +5947,25 @@ void TestMainWindow::global_pause_holds_pending_and_new_posts()
     QFETCH(bool, cancelPending);
     HomeSandbox sandbox;
     ngpost::tests::MockNntpServer mock;
-    QVERIFY(mock.start({"--slow-mode-ms", "50"}));
+    QVERIFY(mock.start({ "--slow-mode-ms", "50" }));
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
-    auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port())
-                             + (preparePacking ? "PREPARE_PACKING = true\n" : ""), &error);
+    auto *window = bootWindow(ngPost,
+                              shutdownTestConfig(sandbox.rootPath(), mock.port())
+                                  + (preparePacking ? "PREPARE_PACKING = true\n" : ""),
+                              &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
     auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(0);
     auto *third = window->addNewQuickTab(0);
-    for (auto *post : {first, second, third})
-        QVERIFY(addShutdownTestFile(post, sandbox.rootPath() + QString("/%1.bin").arg(post->jobNumber())));
+    for (auto *post : { first, second, third })
+        QVERIFY(
+            addShutdownTestFile(post,
+                                sandbox.rootPath() + QString("/%1.bin").arg(post->jobNumber())));
     first->onPostFiles();
     second->onPostFiles();
     auto *pause = window->findChild<QPushButton *>("pauseButton");
@@ -5857,8 +5979,10 @@ void TestMainWindow::global_pause_holds_pending_and_new_posts()
     QVERIFY(ngPost.isPaused());
     QVERIFY(!ngPost.isPosting());
     QVERIFY(pause->isEnabled() && stop->isEnabled());
-    if (cancelPending) stop->click();
-    else pause->click();
+    if (cancelPending)
+        stop->click();
+    else
+        pause->click();
     QTRY_VERIFY_WITH_TIMEOUT(second->isPostingFinished() && third->isPostingFinished(), 10000);
     QTRY_VERIFY(!ngPost.hasPostingJobs());
     QCOMPARE(mock.receivedArticles().size(), cancelPending ? 0 : 2);
@@ -5871,7 +5995,7 @@ void TestMainWindow::quick_post_numbers_icons_and_palette()
     HomeSandbox sandbox;
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
     auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
@@ -5882,8 +6006,9 @@ void TestMainWindow::quick_post_numbers_icons_and_palette()
     window->closeTab(second);
     auto *fourth = window->addNewQuickTab(0);
     tabs->tabBar()->moveTab(tabs->indexOf(fourth), tabs->indexOf(third));
-    for (auto *post : {third, fourth}) {
-        QVERIFY(tabs->tabText(tabs->indexOf(post)).endsWith(QString("#%1").arg(post->displayNumber())));
+    for (auto *post : { third, fourth }) {
+        QVERIFY(
+            tabs->tabText(tabs->indexOf(post)).endsWith(QString("#%1").arg(post->displayNumber())));
         QCOMPARE(post->findChild<QPushButton *>("postButton")->text(),
                  QString("Start Quick Post #%1").arg(post->displayNumber()));
     }
@@ -5894,12 +6019,13 @@ void TestMainWindow::quick_post_numbers_icons_and_palette()
     for (int y = 0; y < icon.height(); ++y)
         for (int x = 0; x < icon.width(); ++x) {
             const QColor color = icon.pixelColor(x, y);
-            yellow |= color.alpha() > 200 && color.red() > 220 && color.green() > 170 && color.blue() < 100;
+            yellow |= color.alpha() > 200 && color.red() > 220 && color.green() > 170
+                && color.blue() < 100;
         }
     QVERIFY2(yellow, "The Quick Post lightning must render yellow with the installed Qt plugins");
     const auto original = qApp->palette();
     const auto restore = qScopeGuard([&] { qApp->setPalette(original); });
-    for (bool dark : {true, false, true}) {
+    for (bool dark : { true, false, true }) {
         auto palette = original;
         palette.setColor(QPalette::Window, dark ? QColor(30, 30, 30) : QColor(Qt::white));
         palette.setColor(QPalette::WindowText, dark ? QColor(Qt::white) : QColor(Qt::black));
@@ -6180,10 +6306,10 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
     QFETCH(bool, compressed);
     HomeSandbox sandbox;
     ngpost::tests::MockNntpServer mock;
-    QVERIFY(mock.start({"--slow-mode-ms", "60"}));
+    QVERIFY(mock.start({ "--slow-mode-ms", "60" }));
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
-    char *argv[] = {arg0.data(), nullptr};
+    char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
     QString error;
     auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
@@ -6199,9 +6325,9 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
     QCOMPARE(file.write(QByteArray(8192, 'h')), qint64(8192));
     file.close();
     PostingJobOptions options;
-    options.files = {QFileInfo(source)};
-    options.inputPaths = {source};
-    options.grpList = {"alt.binaries.test"};
+    options.files = { QFileInfo(source) };
+    options.inputPaths = { source };
+    options.grpList = { "alt.binaries.test" };
     options.from = "test@example.invalid";
     options.nzbFilePath = sandbox.rootPath() + "/first.nzb";
     options.articleSizeBytes = 512;
@@ -6245,7 +6371,8 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
     QVERIFY(expectedArticles > 1);
     ngPost.cancelAllPostingJobs();
     QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs() && first->isPostingFinished()
-                            && queued->isPostingFinished(), 10000);
+                                 && queued->isPostingFinished(),
+                             10000);
     QVERIFY(!first->canSubmit() && !queued->canSubmit());
     QCOMPARE(activeFinished.count(), 1);
     QCOMPARE(pendingFinished.count(), 1);
@@ -6267,14 +6394,17 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
         for (const auto &article : articles) {
             QVERIFY(article.status != "posting");
             if (article.status == "posted")
-                confirmedIds.insert(QString::number(article.fileId) + ":" + QString::number(article.part), article.msgId);
+                confirmedIds.insert(QString::number(article.fileId) + ":"
+                                        + QString::number(article.part),
+                                    article.msgId);
         }
     QVERIFY(!confirmedIds.isEmpty());
     for (const auto &storedFile : stopped.files)
         QVERIFY2(QFile::exists(storedFile.originalPath), qPrintable(storedFile.originalPath));
     PostHistoryService::ResumeRow decision;
     QVERIFY(history->checkResume(activeId, &decision, &error));
-    QVERIFY2(decision.state != "not_resumable" && !decision.state.isEmpty(), qPrintable(decision.reason));
+    QVERIFY2(decision.state != "not_resumable" && !decision.state.isEmpty(),
+             qPrintable(decision.reason));
     QVERIFY(!history->checkResume(pendingId, &decision, &error));
     QCOMPARE(decision.state, QString("not_resumable"));
     // Cancel a retry before its queued start: no new row, no rewritten outcome.
@@ -6315,7 +6445,8 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
             ++total;
             QCOMPARE(article.status, QString("posted"));
             const auto key = QString::number(article.fileId) + ":" + QString::number(article.part);
-            if (confirmedIds.contains(key)) QCOMPARE(article.msgId, confirmedIds.value(key));
+            if (confirmedIds.contains(key))
+                QCOMPARE(article.msgId, confirmedIds.value(key));
         }
     QCOMPARE(total, expectedArticles);
     QFile nzb(done.nzbPath);
@@ -6516,4 +6647,317 @@ void TestMainWindow::posting_controls_do_not_overlap_tab_scrollers()
             QCOMPARE(visibleScrollers, 2);
         }
     }
+}
+
+void TestMainWindow::posting_widget_copy_actions_integrate_inside_textboxes()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    QVERIFY(tabs);
+    auto *post = qobject_cast<PostingWidget *>(tabs->widget(2));
+    QVERIFY(post);
+
+    auto *compressEdit = post->findChild<QLineEdit *>("compressNameEdit");
+    auto *passEdit = post->findChild<QLineEdit *>("nzbPassEdit");
+    QVERIFY(compressEdit);
+    QVERIFY(passEdit);
+
+    // Verify each line edit has at least one action (the copy action)
+    QCOMPARE(compressEdit->actions().size(), 1);
+    QCOMPARE(passEdit->actions().size(), 1);
+
+    auto *copyCompressAct = compressEdit->actions().first();
+    auto *copyPassAct = passEdit->actions().first();
+    QVERIFY(copyCompressAct);
+    QVERIFY(copyPassAct);
+    QVERIFY(!copyCompressAct->icon().isNull());
+    QVERIFY(!copyPassAct->icon().isNull());
+    QVERIFY(!copyCompressAct->toolTip().isEmpty());
+    QVERIFY(!copyPassAct->toolTip().isEmpty());
+
+    // Verify child tool buttons exist and have hand cursor
+    auto compressButtons = compressEdit->findChildren<QToolButton *>();
+    auto passButtons = passEdit->findChildren<QToolButton *>();
+    QCOMPARE(compressButtons.size(), 1);
+    QCOMPARE(passButtons.size(), 1);
+    QCOMPARE(compressButtons.first()->cursor().shape(), Qt::PointingHandCursor);
+    QCOMPARE(passButtons.first()->cursor().shape(), Qt::PointingHandCursor);
+
+    // Test copying archive name
+    QApplication::clipboard()->setText(QStringLiteral("initial_clipboard"));
+    compressEdit->setText(QStringLiteral("my_sample_archive"));
+    copyCompressAct->trigger();
+    QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("my_sample_archive"));
+
+    // Test copying password
+    passEdit->setText(QStringLiteral("my_secret_pass_456"));
+    copyPassAct->trigger();
+    QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("my_secret_pass_456"));
+
+    // Empty edit does not overwrite clipboard
+    passEdit->clear();
+    copyPassAct->trigger();
+    QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("my_secret_pass_456"));
+
+    // Newly created tab also has the actions properly set up
+    auto *secondPost = window->addNewQuickTab(0);
+    QVERIFY(secondPost);
+    auto *secCompressEdit = secondPost->findChild<QLineEdit *>("compressNameEdit");
+    auto *secPassEdit = secondPost->findChild<QLineEdit *>("nzbPassEdit");
+    QVERIFY(secCompressEdit);
+    QVERIFY(secPassEdit);
+    QCOMPARE(secCompressEdit->actions().size(), 1);
+    QCOMPARE(secPassEdit->actions().size(), 1);
+    secCompressEdit->setText(QStringLiteral("second_tab_archive"));
+    secCompressEdit->actions().first()->trigger();
+    QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("second_tab_archive"));
+}
+
+void TestMainWindow::pending_clock_icon_adapts_to_dark_mode()
+{
+    // 1. Static and path helpers
+    QCOMPARE(MainWindow::pendingColor(false), QColor(Qt::darkBlue));
+    QCOMPARE(MainWindow::pendingColor(true), QColor(0x66, 0xAA, 0xFF));
+    QCOMPARE(MainWindow::pendingIconPath(false), QStringLiteral(":/icons/pending.png"));
+    QCOMPARE(MainWindow::pendingIconPath(true), QStringLiteral(":/icons/pending_light.png"));
+
+    // 2. Icon color rendering verification
+    const auto hasLightBlue = [](const QIcon &icon) {
+        const QImage img = icon.pixmap(24, 24).toImage();
+        for (int y = 0; y < img.height(); ++y)
+            for (int x = 0; x < img.width(); ++x) {
+                const QColor c = img.pixelColor(x, y);
+                if (c.alpha() > 200 && c.red() > 80 && c.green() > 150 && c.blue() > 230)
+                    return true;
+            }
+        return false;
+    };
+    const auto hasDarkBlue = [](const QIcon &icon) {
+        const QImage img = icon.pixmap(24, 24).toImage();
+        for (int y = 0; y < img.height(); ++y)
+            for (int x = 0; x < img.width(); ++x) {
+                const QColor c = img.pixelColor(x, y);
+                if (c.alpha() > 200 && c.red() < 50 && c.green() < 50 && c.blue() > 200)
+                    return true;
+            }
+        return false;
+    };
+
+    QVERIFY(!hasLightBlue(MainWindow::pendingIcon(false)));
+    QVERIFY(hasDarkBlue(MainWindow::pendingIcon(false)));
+    QVERIFY(hasLightBlue(MainWindow::pendingIcon(true)));
+    QVERIFY(!hasDarkBlue(MainWindow::pendingIcon(true)));
+
+    // 3. Tab integration with theme switching
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    QVERIFY(tabs);
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
+    QVERIFY(first);
+
+    const auto original = qApp->palette();
+    const auto restore = qScopeGuard([&] { qApp->setPalette(original); });
+
+    // Set dark theme first
+    QPalette darkPalette = original;
+    darkPalette.setColor(QPalette::Window, QColor(30, 30, 30));
+    darkPalette.setColor(QPalette::WindowText, QColor(Qt::white));
+    qApp->setPalette(darkPalette);
+    QCoreApplication::processEvents();
+
+    QVERIFY(window->isDarkMode());
+    QCOMPARE(window->pendingColor(), QColor(0x66, 0xAA, 0xFF));
+    QVERIFY(hasLightBlue(window->pendingIcon()));
+
+    // Submit first job (active), then second job (pending)
+    const QString sample1 = sandbox.rootPath() + "/sample1.bin";
+    QFile f1(sample1);
+    QVERIFY(f1.open(QIODevice::WriteOnly));
+    f1.write("payload1");
+    f1.close();
+    first->addPath(sample1, 0);
+
+    auto *second = window->addNewQuickTab(tabs->count() - 1);
+    QVERIFY(second);
+    const QString sample2 = sandbox.rootPath() + "/sample2.bin";
+    QFile f2(sample2);
+    QVERIFY(f2.open(QIODevice::WriteOnly));
+    f2.write("payload2");
+    f2.close();
+    second->addPath(sample2, 0);
+
+    first->postFiles(true);
+    ngPost.pause(); // Hold the queue before the first queued start is processed.
+    second->postFiles(true);
+
+    const int secondIdx = tabs->indexOf(second);
+    QCOMPARE(second->findChild<QPushButton *>("postButton")->text(),
+             QStringLiteral("Cancel Posting"));
+
+    // In dark mode, pending tab must display light blue clock icon
+    QVERIFY(hasLightBlue(tabs->tabIcon(secondIdx)));
+    QVERIFY(!hasDarkBlue(tabs->tabIcon(secondIdx)));
+
+    // Switch to light mode: tab icon must change to dark blue clock
+    QPalette lightPalette = original;
+    lightPalette.setColor(QPalette::Window, QColor(240, 240, 240));
+    lightPalette.setColor(QPalette::WindowText, QColor(Qt::black));
+    qApp->setPalette(lightPalette);
+    QCoreApplication::processEvents();
+
+    QVERIFY(!window->isDarkMode());
+    QCOMPARE(window->pendingColor(), QColor(Qt::darkBlue));
+    QVERIFY(hasDarkBlue(tabs->tabIcon(secondIdx)));
+    QVERIFY(!hasLightBlue(tabs->tabIcon(secondIdx)));
+
+    // Switch back to dark mode: tab icon must return to light blue clock
+    qApp->setPalette(darkPalette);
+    QCoreApplication::processEvents();
+
+    QVERIFY(hasLightBlue(tabs->tabIcon(secondIdx)));
+    QVERIFY(!hasDarkBlue(tabs->tabIcon(secondIdx)));
+
+    // Cancel pending and active jobs before exiting
+    second->findChild<QPushButton *>("postButton")->click();
+    first->findChild<QPushButton *>("postButton")->click();
+    QTRY_VERIFY(!ngPost.hasPostingJobs());
+    QCOMPARE(mock.receivedArticles().size(), 0);
+}
+
+void TestMainWindow::copy_feedback_recovers_after_repeated_clicks()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *post = window->addNewQuickTab(0);
+    post->findChild<QCheckBox *>("compressCB")->setChecked(true);
+    post->findChild<QCheckBox *>("nzbPassCB")->setChecked(true);
+    auto *edit = post->findChild<QLineEdit *>("nzbPassEdit");
+    auto *button = edit->findChild<QToolButton *>();
+    auto *action = edit->actions().first();
+    QVERIFY(button->isEnabled());
+    edit->setText("repeat-copy-password");
+    const auto original = action->icon().pixmap(24, 24).toImage();
+    button->click();
+    QCOMPARE(QApplication::clipboard()->text(), edit->text());
+    QVERIFY(action->icon().pixmap(24, 24).toImage() != original);
+    button->click();
+    QTest::qWait(1500);
+    QCOMPARE(action->icon().pixmap(24, 24).toImage(), original);
+    // Closing the tab while feedback is active must safely destroy its timer.
+    button->click();
+    QPointer<PostingWidget> closed(post);
+    window->closeTab(post);
+    QTRY_VERIFY(closed.isNull());
+    QTest::qWait(1300);
+}
+
+void TestMainWindow::auto_post_pending_rows_follow_palette_changes()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *automatic = window->findChild<AutoPostWidget *>();
+    QVERIFY(automatic);
+    auto *list = automatic->findChild<QListWidget *>("filesList");
+    list->addItem("monitoring folder");
+    const QString completedPath = sandbox.rootPath() + "/complete.bin";
+    automatic->newFileToProcess(QFileInfo(completedPath));
+    auto *completed = list->item(list->count() - 1);
+    automatic->updateFinishedJob(completedPath, 1, 1, 0);
+    QCOMPARE(completed->foreground().color(), MainWindow::sDoneOKColor);
+    automatic->newFileToProcess(QFileInfo(sandbox.rootPath() + "/pending.bin"));
+    auto *pending = list->item(list->count() - 1);
+    const auto original = qApp->palette();
+    const auto restore = qScopeGuard([&] { qApp->setPalette(original); });
+    for (bool dark : { true, false, true }) {
+        auto palette = original;
+        palette.setColor(QPalette::Window, dark ? QColor(30, 30, 30) : QColor(Qt::white));
+        palette.setColor(QPalette::WindowText, dark ? QColor(Qt::white) : QColor(Qt::black));
+        qApp->setPalette(palette);
+        QCoreApplication::processEvents();
+        QCOMPARE(pending->foreground().color(), MainWindow::pendingColor(dark));
+        QCOMPARE(completed->foreground().color(), MainWindow::sDoneOKColor);
+        automatic->newFileToProcess(QFileInfo(sandbox.rootPath() + "/another.bin"));
+        QCOMPARE(list->item(list->count() - 1)->foreground().color(),
+                 MainWindow::pendingColor(dark));
+    }
+}
+
+void TestMainWindow::canceled_job_ignores_queued_file_notifications()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "100" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *post = qobject_cast<PostingWidget *>(tabs->widget(2));
+    QVERIFY(addShutdownTestFile(post, sandbox.rootPath() + "/late.bin"));
+    PostingJobOptions options;
+    options.files = post->previewFiles();
+    options.grpList = { "alt.binaries.test" };
+    options.from = "test@example.invalid";
+    options.nzbFilePath = sandbox.rootPath() + "/late.nzb";
+    QPointer<PostingJob> job = new PostingJob(&ngPost, options, post);
+    post->attachResumeJob(job, options.files, true);
+    QVERIFY(ngPost.startPostingJob(job));
+    QTRY_VERIFY(job->startedAtWall().isValid());
+    QSignalSpy finished(job, &PostingJob::postingFinished);
+    QSignalSpy filePosted(job, &PostingJob::filePosted);
+    auto *lateFile = new NntpFile(job, options.files.first(), 1, 1, 1, options.grpList);
+    lateFile->setParent(job);
+    QVERIFY(connect(lateFile,
+                    SIGNAL(allArticlesArePosted()),
+                    job,
+                    SLOT(onNntpFilePosted()),
+                    Qt::QueuedConnection));
+    QVERIFY(connect(lateFile,
+                    SIGNAL(errorReadingFile()),
+                    job,
+                    SLOT(onNntpErrorReading()),
+                    Qt::QueuedConnection));
+    // The worker's notifications are already queued when cancellation closes the NZB.
+    emit lateFile->allArticlesArePosted();
+    emit lateFile->errorReadingFile();
+    job->onStopPosting();
+    QCOMPARE(finished.count(), 1);
+    QCoreApplication::sendPostedEvents(job, QEvent::MetaCall);
+    QCOMPARE(filePosted.count(), 0);
+    QCOMPARE(finished.count(), 1);
+    QVERIFY(!job->hasPostFinishedSuccessfully());
+    QTRY_VERIFY(!ngPost.hasPostingJobs());
 }

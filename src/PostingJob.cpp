@@ -1213,19 +1213,19 @@ void PostingJob::onNntpFileStartPosting()
 
 void PostingJob::onNntpFilePosted()
 {
+    if (_finishedAtWall.isValid())
+        return;
     NntpFile *nntpFile = static_cast<NntpFile *>(sender());
     _totalSize += static_cast<quint64>(nntpFile->fileSize());
     ++_nbPosted;
     if (_postWidget)
         emit filePosted(nntpFile->path(), nntpFile->nbArticles(), nntpFile->nbFailedArticles());
-
     if (_ngPost->_dispFilesPosting && !_ngPost->useHMI())
         _log(QString("[%1][%2: %3] <<<<< %4")
                  .arg(timestamp())
                  .arg(tr("avg. speed"))
                  .arg(avgSpeed())
                  .arg(nntpFile->name()));
-
     if (_ngPost->historyService() && nntpFile->historyFileId())
         _ngPost->historyService()->enqueueUpdateFileStatus(
             nntpFile->historyFileId(),
@@ -1255,14 +1255,14 @@ void PostingJob::onNntpFilePosted()
 
 void PostingJob::onNntpErrorReading()
 {
+    if (_finishedAtWall.isValid())
+        return;
     NntpFile *nntpFile = static_cast<NntpFile *>(sender());
     ++_nbPosted;
     if (_postWidget)
         emit filePosted(nntpFile->path(), nntpFile->nbArticles(), nntpFile->nbArticles());
-
     if (_ngPost->_dispFilesPosting && !_ngPost->useHMI())
         _log(tr("[avg. speed: %1] <<<<< %2").arg(avgSpeed()).arg(nntpFile->name()));
-
     _filesInProgress.remove(nntpFile);
     _filesFailed.insert(nntpFile);
     if (_ngPost->historyService() && nntpFile->historyFileId())

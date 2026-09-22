@@ -249,11 +249,19 @@ public:
     static const QString sPostingIcon;
     static const QColor  sPendingColor;
     static const QString sPendingIcon;
+    static const QString sPendingLightIcon;
     static const QColor  sDoneOKColor;
     static const QString sDoneOKIcon;
     static const QColor  sDoneKOColor;
     static const QString sDoneKOIcon;
     static const QColor  sArticlesFailedColor;
+
+    bool isDarkMode() const;
+    QColor pendingColor() const;
+    QIcon pendingIcon() const;
+    static QColor pendingColor(bool dark);
+    static QIcon pendingIcon(bool dark);
+    static QString pendingIconPath(bool dark);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;

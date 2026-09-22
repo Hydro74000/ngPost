@@ -183,6 +183,7 @@ const QColor  MainWindow::sPostingColor = QColor(255,162, 0); // gold (#FFA200)
 const QString MainWindow::sPostingIcon  = ":/icons/uploading.png";
 const QColor  MainWindow::sPendingColor = Qt::darkBlue;
 const QString MainWindow::sPendingIcon  = ":/icons/pending.png";
+const QString MainWindow::sPendingLightIcon = ":/icons/pending_light.png";
 const QColor  MainWindow::sDoneOKColor  = Qt::darkGreen;
 const QString MainWindow::sDoneOKIcon   = ":/icons/ok.png";
 const QColor  MainWindow::sDoneKOColor  = Qt::darkRed;
@@ -695,7 +696,11 @@ void MainWindow::changeEvent(QEvent *event)
     QMainWindow::changeEvent(event);
     if (!_ngPost || !_postAllButton) return;
     if (event->type() == QEvent::LanguageChange) _retranslate();
-    if (event->type() == QEvent::PaletteChange) _refreshPostingControls();
+    if (event->type() == QEvent::PaletteChange) {
+        _refreshPostingControls();
+        if (_autoPostTab)
+            _autoPostTab->refreshPendingColors();
+    }
 }
 
 void MainWindow::_retranslate()
@@ -2130,6 +2135,36 @@ void MainWindow::updateJobTab(QWidget *postWidget, const QColor &color, const QI
     if (!tooltip.isEmpty()) bar->setTabToolTip(index, tooltip);
     bar->setTabTextColor(index, post ? post->postingTextColor() : color);
     if (!icon.isNull()) bar->setTabIcon(index, icon);
+}
+
+bool MainWindow::isDarkMode() const
+{
+    return palette().color(QPalette::Window).lightness() < 128;
+}
+
+QColor MainWindow::pendingColor() const
+{
+    return pendingColor(isDarkMode());
+}
+
+QIcon MainWindow::pendingIcon() const
+{
+    return pendingIcon(isDarkMode());
+}
+
+QString MainWindow::pendingIconPath(bool dark)
+{
+    return dark ? sPendingLightIcon : sPendingIcon;
+}
+
+QColor MainWindow::pendingColor(bool dark)
+{
+    return dark ? QColor(0x66, 0xAA, 0xFF) : sPendingColor;
+}
+
+QIcon MainWindow::pendingIcon(bool dark)
+{
+    return QIcon(pendingIconPath(dark));
 }
 
 void MainWindow::refreshJobLabel()
