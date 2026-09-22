@@ -2347,19 +2347,32 @@ void MainWindow::onPar2Settings()
 
 void MainWindow::_buildPostingControls()
 {
-    _postAllButton = new QPushButton(_ui->postTabWidget);
-    _postAllButton->setObjectName(QStringLiteral("postAllTabsButton"));
-    _postAllButton->setIcon(QIcon(":/icons/ngPost.png"));
     auto *controls = new QWidget(_ui->postTabWidget);
     auto *layout = new QHBoxLayout(controls);
     layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(4);
+
+    _postAllButton = new QPushButton(controls);
+    _postAllButton->setObjectName(QStringLiteral("postAllTabsButton"));
+    _postAllButton->setIcon(QIcon(":/icons/ngPost.png"));
     layout->addWidget(_postAllButton);
+
     // Move the existing global pause control next to Post All Tabs.
     layout->addWidget(_ui->pauseButton);
+
     _stopAllButton = new QPushButton(controls);
     _stopAllButton->setObjectName(QStringLiteral("stopAllTabsButton"));
-    _stopAllButton->setIcon(style()->standardIcon(QStyle::SP_MediaStop));
+    _stopAllButton->setIcon(QIcon(":/icons/stop.png"));
     layout->addWidget(_stopAllButton);
+
+    const QSize iconSize = _postAllButton->iconSize();
+    _ui->pauseButton->setIconSize(iconSize);
+    _stopAllButton->setIconSize(iconSize);
+
+    const int buttonHeight = _postAllButton->sizeHint().height();
+    _ui->pauseButton->setFixedSize(buttonHeight, buttonHeight);
+    _stopAllButton->setFixedSize(buttonHeight, buttonHeight);
+
     _ui->postTabWidget->setCornerWidget(controls, Qt::TopRightCorner);
     connect(_stopAllButton, &QPushButton::clicked, _ngPost, &NgPost::cancelAllPostingJobs);
     connect(_ngPost, &NgPost::postingStateChanged, this, &MainWindow::updatePostAllButton);
@@ -2379,6 +2392,9 @@ void MainWindow::updatePostAllButton()
     _postAllButton->setText(tr("Post all tabs"));
     _postAllButton->setToolTip(tr("Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.").arg(ready));
     _postAllButton->setEnabled(!_submittingAll && !_ngPost->_cancelingAll && tabs > 1 && ready > 0);
+    const int buttonHeight = _postAllButton->sizeHint().height();
+    _ui->pauseButton->setFixedSize(buttonHeight, buttonHeight);
+    _stopAllButton->setFixedSize(buttonHeight, buttonHeight);
     _refreshPostingControls();
 }
 
@@ -2528,6 +2544,7 @@ void MainWindow::_refreshPostingControls()
     _ui->pauseButton->setToolTip(paused ? tr("Resume all tabs") : tr("Pause all tabs"));
     _ui->pauseButton->setAccessibleName(_ui->pauseButton->toolTip());
     _stopAllButton->setEnabled(enabled);
+    _stopAllButton->setIcon(QIcon(":/icons/stop.png"));
     _stopAllButton->setAccessibleName(tr("Stop all tabs"));
     _stopAllButton->setToolTip(tr("Cancel all active and queued posts"));
     for (auto *post : _postingWidgets())

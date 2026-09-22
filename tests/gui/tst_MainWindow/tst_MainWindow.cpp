@@ -5478,6 +5478,12 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     QVERIFY(!pause->isEnabled());
     QVERIFY(!stop->isEnabled());
     QVERIFY(!all->icon().isNull());
+    QVERIFY(!stop->icon().isNull());
+    QCOMPARE(pause->iconSize(), all->iconSize());
+    QCOMPARE(stop->iconSize(), all->iconSize());
+    QCOMPARE(pause->size(), stop->size());
+    QCOMPARE(pause->height(), all->sizeHint().height());
+    QCOMPARE(pause->width(), pause->height());
     auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
     auto *second = window->addNewQuickTab(0);
     auto *third = window->addNewQuickTab(0);
