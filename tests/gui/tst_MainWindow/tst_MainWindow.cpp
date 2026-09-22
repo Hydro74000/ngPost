@@ -5603,8 +5603,8 @@ void TestMainWindow::global_post_controls_translations()
                  QCoreApplication::translate("PostingWidget", "Cancel Posting"));
         QVERIFY(ngPost.isPaused());
         const auto *all = window->findChild<QPushButton *>("postAllTabsButton");
-        for (const auto *control : {window->findChild<QPushButton *>("pauseButton"),
-                                   window->findChild<QPushButton *>("stopAllTabsButton")}) {
+        for (const auto *control : { window->findChild<QPushButton *>("pauseButton"),
+                                     window->findChild<QPushButton *>("stopAllTabsButton") }) {
             QCOMPARE(control->size(), QSize(all->sizeHint().height(), all->sizeHint().height()));
             QCOMPARE(control->iconSize(), all->iconSize());
         }

@@ -612,6 +612,8 @@ src/ngPost
 src/ui_*.h
 src/qmake_qmake_immediate_rc.py
 src/resources/resources_rc.py
+# Python exports generated from Qt Designer forms (the app uses C++ uic output).
+src/hmi/*_ui.py
 .claude/
 
 # tests/ build artifacts. Only the per-test source files
