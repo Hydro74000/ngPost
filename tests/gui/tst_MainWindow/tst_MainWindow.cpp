@@ -419,6 +419,7 @@ private slots:
     void auto_post_pending_rows_follow_palette_changes();
     void canceled_job_ignores_queued_file_notifications();
     void post_splitter_log_toggle_button_collapses_and_restores();
+    void log_box_auto_opens_on_error_and_persists_state();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -6980,12 +6981,7 @@ void TestMainWindow::post_splitter_log_toggle_button_collapses_and_restores()
 
     QToolButton *btn = window->logToggleBtnForTest();
     QVERIFY(btn);
-    QVERIFY(!window->isLogBoxCollapsedForTest());
-    QCOMPARE(btn->arrowType(), Qt::RightArrow);
-    QCOMPARE(btn->toolTip(), MainWindow::tr("Close Posting Log"));
-
-    btn->click();
-    QCoreApplication::processEvents();
+    // Collapsed by default on fresh boot
     QVERIFY(window->isLogBoxCollapsedForTest());
     QCOMPARE(btn->arrowType(), Qt::LeftArrow);
     QCOMPARE(btn->toolTip(), MainWindow::tr("Open Posting Log"));
@@ -6995,4 +6991,52 @@ void TestMainWindow::post_splitter_log_toggle_button_collapses_and_restores()
     QVERIFY(!window->isLogBoxCollapsedForTest());
     QCOMPARE(btn->arrowType(), Qt::RightArrow);
     QCOMPARE(btn->toolTip(), MainWindow::tr("Close Posting Log"));
+
+    btn->click();
+    QCoreApplication::processEvents();
+    QVERIFY(window->isLogBoxCollapsedForTest());
+    QCOMPARE(btn->arrowType(), Qt::LeftArrow);
+    QCOMPARE(btn->toolTip(), MainWindow::tr("Open Posting Log"));
+}
+
+void TestMainWindow::log_box_auto_opens_on_error_and_persists_state()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    window->show();
+    QCoreApplication::processEvents();
+
+    QVERIFY(window->isLogBoxCollapsedForTest());
+
+    // Calling logError auto-opens the collapsed log box
+    window->logError("Simulated posting error");
+    QCoreApplication::processEvents();
+    QVERIFY(!window->isLogBoxCollapsedForTest());
+    QCOMPARE(window->logToggleBtnForTest()->arrowType(), Qt::RightArrow);
+
+    // Boot a second window in same sandbox to verify persisted open state
+    NgPost ngPost2(argc, argv);
+    auto *window2 = bootWindow(ngPost2, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window2, qPrintable(error));
+    window2->show();
+    QCoreApplication::processEvents();
+    QVERIFY(!window2->isLogBoxCollapsedForTest());
+
+    // Collapse in second window and verify it persists to a third window
+    window2->logToggleBtnForTest()->click();
+    QCoreApplication::processEvents();
+    QVERIFY(window2->isLogBoxCollapsedForTest());
+
+    NgPost ngPost3(argc, argv);
+    auto *window3 = bootWindow(ngPost3, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window3, qPrintable(error));
+    window3->show();
+    QCoreApplication::processEvents();
+    QVERIFY(window3->isLogBoxCollapsedForTest());
 }

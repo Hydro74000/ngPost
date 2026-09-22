@@ -45,6 +45,8 @@ class QLineEdit;
 class QMenu;
 class QPushButton;
 class QToolButton;
+class QResizeEvent;
+class QShowEvent;
 class QTableWidget;
 class QTabWidget;
 class QTimer;
@@ -211,6 +213,7 @@ public:
     QToolButton *logToggleBtnForTest() const { return _logToggleBtn; }
     bool isLogBoxCollapsedForTest() const { return _isLogBoxCollapsed(); }
     void toggleLogBoxForTest() { _onToggleLogBox(); }
+    void setLogBoxCollapsedForTest(bool collapsed) { _setLogBoxCollapsed(collapsed, true); }
 #endif
 
     void updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded, const QString &avgSpeed = "0 B/s"
@@ -274,6 +277,8 @@ protected:
 
     void closeEvent(QCloseEvent *event) override;
     void changeEvent(QEvent* event) override;
+    void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 public slots:
     void onSetProgressBarRange(int nbArticles);
@@ -415,12 +420,15 @@ private:
 
     void _initLogBoxToggle();
     void _updateLogToggleBtn();
+    void _updateLogToggleBtnGeometry();
     bool _isLogBoxCollapsed() const;
+    void _setLogBoxCollapsed(bool collapsed, bool saveSetting = true);
     void _onToggleLogBox();
     void _onPostSplitterMoved(int pos, int index);
+    void _saveLogBoxState() const;
 
     QToolButton *_logToggleBtn = nullptr;
-    int _lastLogBoxWidth = 0;
+    int _lastLogBoxWidth = 250;
 
 
     static const QString sGroupBoxStyle;
