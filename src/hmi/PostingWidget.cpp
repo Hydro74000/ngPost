@@ -121,7 +121,7 @@ void PostingWidget::onArchiveFileNames(const QStringList &paths)
 void PostingWidget::onArticlesNumber(int nbArticles)
 {
     Q_UNUSED(nbArticles);
-    _hmi->setJobLabel(static_cast<int>(_jobNumber));
+    _hmi->refreshJobLabel();
 }
 
 void PostingWidget::onPostingJobDone()

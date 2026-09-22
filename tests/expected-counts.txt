@@ -51,7 +51,7 @@
 tst_CliParser                 68  Linux
 tst_FoldersMonitor            10  Linux
 tst_GoldenNzb                  4  Linux
-tst_MainWindow               172  Linux
+tst_MainWindow               179  Linux
 tst_MockNntp                   8  Linux
 tst_NntpFile                  29  Linux
 tst_OpenVpnConfigPolicy       74  Linux
@@ -74,7 +74,7 @@ tst_WireGuardBackend          13  Linux
 tst_WireGuardConfigPolicy     21  Linux
 tst_Yenc                      30  Linux
 
-# Quick Post controls/history review: Linux GUI floor refreshed on 2026-09-22.
+# Quick Post controls/history review: Linux and Windows GUI floors refreshed on 2026-09-22.
 
 # macOS, measured 2026-09-17 on macos-15 / Qt 6.8.2.
 # Lower than Linux where the platform decides: tst_CliParser skips the five
@@ -112,7 +112,7 @@ tst_Yenc                      30  Darwin
 tst_CliParser                 65  Windows
 tst_FoldersMonitor            10  Windows
 tst_GoldenNzb                  4  Windows
-tst_MainWindow               129  Windows
+tst_MainWindow               163  Windows
 tst_MockNntp                   8  Windows
 tst_NntpFile                  29  Windows
 tst_OpenVpnConfigPolicy       74  Windows

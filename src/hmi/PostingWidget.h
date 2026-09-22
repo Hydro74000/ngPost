@@ -103,7 +103,7 @@ public:
     QMap<QString, MetaValue> postInfoMeta() const { return _postInfoMeta; }
 
     void retranslate();
-    uint displayNumber() const { return _jobNumber == 1 ? 1 : _jobNumber - 1; }
+    uint displayNumber() const { return _jobNumber; }
     void refreshPostingState();
     QColor postingTextColor() const;
 

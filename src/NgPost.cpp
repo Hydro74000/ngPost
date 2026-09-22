@@ -1576,7 +1576,6 @@ void NgPost::onNewFileToProcess(const QFileInfo & fileInfo)
     if (_hmi)
     {
         _hmi->updateAutoPostingParams(); // refreshes _autoIncludeNfo from the UI
-        _hmi->setJobLabel(-1);
         _delAuto = _hmi->autoWidget()->deleteFilesOncePosted();
     }
 #endif

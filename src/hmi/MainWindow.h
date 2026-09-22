@@ -77,7 +77,10 @@ private:
     void _buildPostingControls();
     void _retranslate();
     void _submitPreparedTabs();
-    uint _nextQuickJobNumber() const;
+    bool _isPostingQueueRunning() const;
+    uint _nextQuickJobNumber();
+    uint _highestQuickJobNumber = 1;
+    int _progressJobNumber = 1;
     QPushButton *_par2SettingsButton = nullptr;
     bool _submittingAll = false;
 
@@ -225,7 +228,7 @@ public:
     void clearJobTab(QWidget *postWidget);
     void updateJobTab(QWidget *postWidget, const QColor &color, const QIcon &icon, const QString &tooltip = "");
 
-    void setJobLabel(int jobNumber);
+    void refreshJobLabel();
 
     void log(const QString &aMsg, bool newline = true) const; //!< log function for QString
     void logError(const QString &error) const; //!< log function for QString

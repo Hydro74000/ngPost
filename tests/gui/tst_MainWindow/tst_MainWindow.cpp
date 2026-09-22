@@ -31,6 +31,7 @@
 #include <QFileDialog>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
 #include <QPlainTextEdit>
 #include <QAction>
@@ -165,6 +166,12 @@ private slots:
     void global_pause_holds_pending_and_new_posts_data();
     void global_pause_holds_pending_and_new_posts();
     void quick_post_numbers_icons_and_palette();
+    void quick_post_numbering_lifecycle_and_reset();
+    void quick_post_numbering_with_backend_queue_data();
+    void quick_post_numbering_with_backend_queue();
+    void quick_post_numbering_from_new_and_auto_tabs();
+    void progress_label_tracks_the_running_post_data();
+    void progress_label_tracks_the_running_post();
     void global_cancel_external_tool_data();
     void global_cancel_external_tool();
     void canceled_job_never_starts();
@@ -5873,6 +5880,265 @@ void TestMainWindow::quick_post_numbers_icons_and_palette()
     }
 }
 
+void TestMainWindow::quick_post_numbering_lifecycle_and_reset()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    QVERIFY(first);
+    QCOMPARE(first->jobNumber(), 1u);
+    QCOMPARE(first->displayNumber(), 1u);
+    QVERIFY(tabs->tabText(0).endsWith("#1"));
+
+    // 1. Sequential additions when idle
+    auto *second = window->addNewQuickTab(0);
+    auto *third = window->addNewQuickTab(0);
+    auto *fourth = window->addNewQuickTab(0);
+    QCOMPARE(second->displayNumber(), 2u);
+    QCOMPARE(third->displayNumber(), 3u);
+    QCOMPARE(fourth->displayNumber(), 4u);
+    QCOMPARE(second->jobNumber(), 2u);
+    QCOMPARE(third->jobNumber(), 3u);
+    QCOMPARE(fourth->jobNumber(), 4u);
+
+    // 2. Close an intermediate tab (#2) while others remain open: must not reuse #2
+    window->closeTab(second);
+    auto *fifth = window->addNewQuickTab(0);
+    QCOMPARE(fifth->displayNumber(), 5u);
+    QCOMPARE(fifth->jobNumber(), 5u);
+
+    // 3. Close the highest tab (#5) while others (#3, #4) remain open: must not reuse #5
+    window->closeTab(fifth);
+    auto *sixth = window->addNewQuickTab(0);
+    QCOMPARE(sixth->displayNumber(), 6u);
+    QCOMPARE(sixth->jobNumber(), 6u);
+
+    // 4. Simulate active queue / running post on first tab
+    PostingJobOptions options;
+    options.grpList = { "alt.binaries.test" };
+    options.from = "test@example.invalid";
+    options.nzbFilePath = sandbox.rootPath() + "/test.nzb";
+    QPointer<PostingJob> job = new PostingJob(&ngPost, options, first);
+    first->attachResumeJob(job, {}, true);
+    QVERIFY(first->isPosting());
+
+    // Close all remaining extra tabs while the queue is running
+    window->closeTab(third);
+    window->closeTab(fourth);
+    window->closeTab(sixth);
+    QCOMPARE(window->findChild<QTabWidget *>("postTabWidget")->count(), 4);
+
+    // Adding a tab while the queue is running must NOT go backwards or reset to 2
+    auto *seventh = window->addNewQuickTab(0);
+    QCOMPARE(seventh->displayNumber(), 7u);
+    QCOMPARE(seventh->jobNumber(), 7u);
+
+    // 5. Job finishes, but extra tab #7 is still open: must not reset
+    first->onPostingJobDone();
+    delete job;
+    QVERIFY(!first->isPosting());
+    auto *eighth = window->addNewQuickTab(0);
+    QCOMPARE(eighth->displayNumber(), 8u);
+
+    // 6. Close all extra tabs now that everything is idle: reset occurs
+    window->closeTab(seventh);
+    window->closeTab(eighth);
+    QCOMPARE(window->findChild<QTabWidget *>("postTabWidget")->count(), 4);
+
+    // Now tout est terminé ET fermé: next tab resets cleanly to #2
+    auto *resetTab = window->addNewQuickTab(0);
+    QCOMPARE(resetTab->displayNumber(), 2u);
+    QCOMPARE(resetTab->jobNumber(), 2u);
+    QVERIFY(tabs->tabText(tabs->indexOf(resetTab)).endsWith("#2"));
+    QCOMPARE(resetTab->findChild<QPushButton *>("postButton")->text(),
+             QString("Start Quick Post #2"));
+
+    // Next tab continues monotonically to #3
+    auto *afterReset = window->addNewQuickTab(0);
+    QCOMPARE(afterReset->displayNumber(), 3u);
+    QCOMPARE(afterReset->jobNumber(), 3u);
+}
+
+void TestMainWindow::quick_post_numbering_with_backend_queue_data()
+{
+    QTest::addColumn<bool>("pendingOnly");
+    QTest::newRow("active monitor job") << false;
+    QTest::newRow("paused pending monitor job") << true;
+}
+
+void TestMainWindow::quick_post_numbering_with_backend_queue()
+{
+    QFETCH(bool, pendingOnly);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *extra = window->addNewQuickTab(0);
+    QCOMPARE(extra->jobNumber(), 2u);
+    auto *first = qobject_cast<PostingWidget *>(
+        window->findChild<QTabWidget *>("postTabWidget")->widget(0));
+    QVERIFY(addShutdownTestFile(first, sandbox.rootPath() + "/source.bin"));
+    PostingJobOptions options;
+    options.files = first->previewFiles();
+    options.grpList = { "alt.binaries.test" };
+    options.from = "test@example.invalid";
+    options.nzbFilePath = sandbox.rootPath() + "/monitor.nzb";
+    QPointer<PostingJob> active = new PostingJob(&ngPost, options);
+    QVERIFY(ngPost.startPostingJob(active));
+    ngPost.pause();
+    if (pendingOnly) {
+        options.nzbFilePath = sandbox.rootPath() + "/pending.nzb";
+        auto *pending = new PostingJob(&ngPost, options);
+        QVERIFY(!ngPost.startPostingJob(pending));
+        emit active->stopPosting();
+        QTRY_VERIFY(!ngPost.isPosting());
+    }
+    QVERIFY(ngPost.hasPostingJobs());
+    QVERIFY(!first->isPosting());
+    window->closeTab(extra);
+    auto *next = window->addNewQuickTab(0);
+    QCOMPARE(next->jobNumber(), 3u);
+    window->closeTab(next);
+    ngPost.cancelAllPostingJobs();
+    QTRY_VERIFY(!ngPost.hasPostingJobs());
+    auto *reset = window->addNewQuickTab(0);
+    QCOMPARE(reset->jobNumber(), 2u);
+    QCOMPARE(mock.receivedArticles().size(), 0);
+}
+
+void TestMainWindow::quick_post_numbering_from_new_and_auto_tabs()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    QVERIFY(
+        QMetaObject::invokeMethod(tabs->tabBar(), "tabBarClicked", Q_ARG(int, tabs->count() - 1)));
+    auto *second = qobject_cast<PostingWidget *>(tabs->widget(3));
+    QVERIFY(second);
+    QCOMPARE(second->jobNumber(), 2u);
+    auto *automatic = window->findChild<AutoPostWidget *>();
+    QVERIFY(automatic);
+    automatic->findChild<QCheckBox *>("compressCB")->setChecked(false);
+    automatic->findChild<QCheckBox *>("startJobsCB")->setChecked(false);
+    auto *files = automatic->findChild<QListWidget *>("filesList");
+    QVERIFY(files);
+    for (int i = 0; i < 2; ++i) {
+        QFile file(sandbox.rootPath() + QString("/auto-%1.bin").arg(i));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("test");
+        file.close();
+        files->addItem(file.fileName());
+    }
+    QVERIFY(QMetaObject::invokeMethod(automatic, "onGenQuickPosts"));
+    QCOMPARE(tabs->count(), 7);
+    for (int index = 4; index <= 5; ++index) {
+        auto *post = qobject_cast<PostingWidget *>(tabs->widget(index));
+        QVERIFY(post);
+        QCOMPARE(post->jobNumber(), uint(index - 1));
+        QCOMPARE(post->previewFiles().size(), 1);
+        QVERIFY(tabs->tabText(index).endsWith(QString("#%1").arg(post->jobNumber())));
+    }
+    // The UI close path also preserves the high-water mark.
+    QVERIFY(QMetaObject::invokeMethod(tabs->tabBar(), "tabCloseRequested", Q_ARG(int, 5)));
+    QCOMPARE(window->addNewQuickTab(0)->jobNumber(), 5u);
+    QVERIFY(!ngPost.hasPostingJobs());
+}
+
+void TestMainWindow::progress_label_tracks_the_running_post_data()
+{
+    QTest::addColumn<int>("number");
+    QTest::newRow("default quick post") << 1;
+    QTest::newRow("moved quick post after closing a tab") << 3;
+    QTest::newRow("monitor job without a posting tab") << -1;
+}
+
+void TestMainWindow::progress_label_tracks_the_running_post()
+{
+    QFETCH(int, number);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *label = window->findChild<QLabel *>("jobLabel");
+    QVERIFY(label);
+    QCOMPARE(label->text(), QString("<b><u>Post #1</u></b>"));
+    auto *post = qobject_cast<PostingWidget *>(tabs->widget(0));
+    if (number == 3) {
+        auto *second = window->addNewQuickTab(0);
+        post = window->addNewQuickTab(0);
+        window->closeTab(second);
+        auto *fourth = window->addNewQuickTab(0);
+        tabs->tabBar()->moveTab(tabs->indexOf(post), tabs->indexOf(fourth));
+    }
+    QVERIFY(addShutdownTestFile(post, sandbox.rootPath() + "/source.bin"));
+    PostingJobOptions options;
+    options.files = post->previewFiles();
+    options.grpList = { "alt.binaries.test" };
+    options.from = "test@example.invalid";
+    options.nzbFilePath = sandbox.rootPath() + "/progress.nzb";
+    auto *job = new PostingJob(&ngPost, options, number > 0 ? post : nullptr);
+    QSignalSpy started(job, &PostingJob::postingStarted);
+    if (number > 0)
+        post->attachResumeJob(job, options.files, true);
+    QVERIFY(ngPost.startPostingJob(job));
+    // Hold the real transfer while exercising selection and language changes.
+    ngPost.pause();
+    QTRY_COMPARE(started.count(), 1);
+    const QString expected = QString("<b><u>Post #%1</u></b>")
+                                 .arg(number > 0 ? QString::number(number) : "Auto");
+    QTRY_COMPARE(label->text(), expected);
+    if (number > 0) {
+        QFile incoming(sandbox.rootPath() + "/incoming.bin");
+        QVERIFY(incoming.open(QIODevice::WriteOnly));
+        incoming.write("queued monitor input");
+        incoming.close();
+        QVERIFY(QMetaObject::invokeMethod(&ngPost,
+                                          "onNewFileToProcess",
+                                          Qt::DirectConnection,
+                                          Q_ARG(QFileInfo, QFileInfo(incoming.fileName()))));
+        QCOMPARE(label->text(), expected);
+    }
+    // Select History, whose index is unrelated to the running post's number.
+    tabs->setCurrentIndex(2);
+    for (const QString &language : ngPost.languages()) {
+        ngPost.changeLanguage(language);
+        QCoreApplication::processEvents();
+        QCOMPARE(label->text(), expected);
+    }
+    ngPost.cancelAllPostingJobs();
+    QTRY_VERIFY(!ngPost.hasPostingJobs());
+    // Completed progress keeps its identity even after another retranslation.
+    QEvent languageChange(QEvent::LanguageChange);
+    QCoreApplication::sendEvent(window, &languageChange);
+    QCOMPARE(label->text(), expected);
+}
+
 void TestMainWindow::global_cancel_preserves_history_and_resume_data()
 {
     QTest::addColumn<bool>("compressed");
@@ -5993,9 +6259,18 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
     QCOMPARE(unchanged.post.avgSpeed, stopped.post.avgSpeed);
     QCOMPARE(unchanged.post.nbFailedArticles, stopped.post.nbFailedArticles);
     QCOMPARE(history->listPosts({}, &error).size(), 2);
+    // Exercise the history UI caller too: it must create the next numbered tab.
+    QTimer::singleShot(0, window, [] {
+        if (auto *question = qobject_cast<QMessageBox *>(QApplication::activeModalWidget()))
+            question->done(QMessageBox::Yes);
+    });
+    QVERIFY(window->resumePostForTest(activeId));
+    auto *resumed = qobject_cast<PostingWidget *>(tabs->currentWidget());
+    QVERIFY(resumed);
+    QCOMPARE(resumed->jobNumber(), retry->jobNumber() + 1);
+    QVERIFY(
+        tabs->tabText(tabs->indexOf(resumed)).endsWith(QString("#%1").arg(resumed->jobNumber())));
     // A real retry completes the same historical post and consolidates its NZB.
-    auto *resumed = window->addNewQuickTab(0);
-    QVERIFY2(ngPost.resumePostGui(activeId, resumed, &error), qPrintable(error));
     QTRY_VERIFY_WITH_TIMEOUT(resumed->isPostingFinished() && !ngPost.hasPostingJobs(), 15000);
     PostHistoryStore::PostDetails done;
     QVERIFY(history->loadPostDetails(activeId, &done, &error));

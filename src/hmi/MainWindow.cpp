@@ -27,6 +27,7 @@
 #include "AutoPostWidget.h"
 #include "StartupTabBar.h"
 #include "NgPost.h"
+#include "PostingJob.h"
 #include "CompressionSettingsDialog.h"
 #include "VpnSettingsDialog.h"
 #include "history/PostHistoryService.h"
@@ -319,7 +320,7 @@ void MainWindow::init(NgPost *ngPost)
     _buildPostingControls();
     _ui->postTabWidget->installEventFilter(this);
 
-    setJobLabel(1);
+    refreshJobLabel();
 
 
     for (const QString &lang : _ngPost->languages())
@@ -722,7 +723,7 @@ void MainWindow::_retranslate()
     tabBar->setTabText(lastTabIdx, tr("New"));
     tabBar->setTabToolTip(lastTabIdx, QString("Create a new %1").arg(_ngPost->quickJobName()));
 
-    setJobLabel(_ui->postTabWidget->currentIndex());
+    refreshJobLabel();
 
     for (const char *header : sServerListHeaders)
         serverTableHeader << tr(header);
@@ -2011,12 +2012,27 @@ void MainWindow::_onHistoryHeaderContextMenu(const QPoint &pos)
         _resetHistoryColumns();
 }
 
-uint MainWindow::_nextQuickJobNumber() const
+bool MainWindow::_isPostingQueueRunning() const
 {
-    uint number = 2;
-    for (const auto *post : _postingWidgets())
-        number = qMax(number, post->jobNumber());
-    return number + 1;
+    if (_ngPost && (_ngPost->hasPostingJobs() || _ngPost->isPosting()))
+        return true;
+    for (const auto *post : _postingWidgets()) {
+        if (post && post->isPosting())
+            return true;
+    }
+    return false;
+}
+
+uint MainWindow::_nextQuickJobNumber()
+{
+    const bool canReset = !_isPostingQueueRunning() && _postingWidgets().size() <= 1;
+    if (canReset) {
+        _highestQuickJobNumber = 1;
+    } else {
+        for (const auto *post : _postingWidgets())
+            _highestQuickJobNumber = qMax(_highestQuickJobNumber, post->jobNumber());
+    }
+    return ++_highestQuickJobNumber;
 }
 
 PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &files)
@@ -2111,9 +2127,17 @@ void MainWindow::updateJobTab(QWidget *postWidget, const QColor &color, const QI
     if (!icon.isNull()) bar->setTabIcon(index, icon);
 }
 
-void MainWindow::setJobLabel(int jobNumber)
+void MainWindow::refreshJobLabel()
 {
-    _ui->jobLabel->setText(QString("<b><u>Post #%1</u></b>").arg(jobNumber != 1 ? QString::number(jobNumber) : "Auto"));
+    // The selected tab can be unrelated to the transfer shown by the progress bar.
+    // Keep the last identity when the queue empties, including on retranslation.
+    if (_ngPost && _ngPost->_activeJob) {
+        const auto *post = _ngPost->_activeJob->widget();
+        _progressJobNumber = post ? static_cast<int>(post->jobNumber()) : -1;
+    }
+    _ui->jobLabel->setText(
+        QString("<b><u>Post #%1</u></b>")
+            .arg(_progressJobNumber > 0 ? QString::number(_progressJobNumber) : "Auto"));
 }
 
 
@@ -2372,6 +2396,7 @@ void MainWindow::_buildPostingControls()
     _ui->postTabWidget->setCornerWidget(controls, Qt::TopRightCorner);
     connect(_stopAllButton, &QPushButton::clicked, _ngPost, &NgPost::cancelAllPostingJobs);
     connect(_ngPost, &NgPost::postingStateChanged, this, &MainWindow::updatePostAllButton);
+    connect(_ngPost, &NgPost::postingStateChanged, this, &MainWindow::refreshJobLabel);
     connect(_postAllButton, &QPushButton::clicked, this, &MainWindow::onPostAllTabs);
     connect(_ui->postTabWidget, &QTabWidget::currentChanged, this, &MainWindow::updatePostAllButton);
     updatePostAllButton();
