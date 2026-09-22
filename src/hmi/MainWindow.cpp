@@ -3335,7 +3335,7 @@ const QString MainWindow::sTabWidgetStyle = "\
             border-top: 2px solid palette(mid);\
         }\
         QTabWidget::tab-bar {\
-            left: 5px;\
+            left: 0px;\
         }\
         QTabBar::tab {\
             background: palette(button);\

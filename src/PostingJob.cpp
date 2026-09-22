@@ -1790,13 +1790,12 @@ bool PostingJob::_initPosting()
 
 void PostingJob::_abortBeforeTransfer(bool keepResumeResumable)
 {
-    // Constructor-time history rows used to remain in status='posting' when
-    // compression, PAR2, connection creation or NZB opening failed. Finalize
-    // those jobs just like a transfer failure. A resume is the exception: its
-    // original terminal row has not yet been marked as running and must not be
-    // overwritten as a brand-new failure.
+    // Finalize fresh failures, preserving the original history for a resume.
     if (!keepResumeResumable)
         _finishPosting();
+    // No transfer owns these generated files yet; release them for a retry.
+    if (!_resumeFromHistory && !_timeStart.isValid())
+        _cleanCompressDir();
     emit postingFinished();
 }
 

@@ -126,8 +126,7 @@ void PostingWidget::onArticlesNumber(int nbArticles)
 
 void PostingWidget::onPostingJobDone()
 {
-    // we could arrive here twice: from PostingJob::postingFinished or PostingJob::noMoreConnection
-    // This could happen especially when we exceed the number of connections allowed by a provider
+    // Both postingFinished and noMoreConnection can notify the same completion.
     if (!_postingJob)
         return;
 
@@ -141,6 +140,7 @@ void PostingWidget::onPostingJobDone()
     else
         _hmi->clearJobTab(this);
 
+    _restoreAfterPreparationFailure();
     disconnect(_postingJob);
     _postingJob = nullptr; //!< we don't own it, NgPost will delete it
     _postingFinished = true;
@@ -149,7 +149,27 @@ void PostingWidget::onPostingJobDone()
 
 bool PostingWidget::canSubmit() const
 {
-    return _state == STATE::IDLE && !_postingJob && !_postingFinished && _ui->filesList->count() > 0;
+    return _state == STATE::IDLE && !_postingJob && _hasPreparedFiles();
+}
+
+bool PostingWidget::_hasPreparedFiles() const
+{
+    return (!_postingFinished || _retryablePreparationFailure) && _ui->filesList->count() > 0;
+}
+
+void PostingWidget::_restoreAfterPreparationFailure()
+{
+    // A fresh submission is safe only before any transfer started. Cancellations
+    // and history resumes keep their existing terminal/resume semantics.
+    _retryablePreparationFailure = !_postingJob->startedAtWall().isValid()
+        && !_postingJob->cancelRequested() && !_postingJob->isResumeFromHistory();
+    if (!_retryablePreparationFailure || _postingJob->inputPaths().isEmpty())
+        return;
+    // Packing may have replaced the list with temporary archives. Restore the
+    // user's sources without regenerating the NZB name, password or metadata.
+    _ui->filesList->clear2();
+    for (const QString &path : _postingJob->inputPaths())
+        _ui->filesList->addPath(path, QFileInfo(path).isDir());
 }
 
 QFileInfoList PostingWidget::previewFiles() const

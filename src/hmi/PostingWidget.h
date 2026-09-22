@@ -56,6 +56,9 @@ private:
     PostingJob        *_postingJob;
     STATE              _state;
     bool               _postingFinished;
+    bool _retryablePreparationFailure = false;
+    void _restoreAfterPreparationFailure();
+    bool _hasPreparedFiles() const;
 
     // Post info file, per post. One discreet checkbox on the tab; everything
     // else lives in a dialog, because a posting tab is about posting.

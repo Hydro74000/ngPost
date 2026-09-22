@@ -170,6 +170,10 @@ private slots:
     void quick_post_numbering_with_backend_queue_data();
     void quick_post_numbering_with_backend_queue();
     void quick_post_numbering_from_new_and_auto_tabs();
+    void auto_posts_can_retry_preparation_failures_data();
+    void auto_posts_can_retry_preparation_failures();
+    void preparation_retry_restores_sources_after_packing();
+    void posting_controls_do_not_overlap_tab_scrollers();
     void progress_label_tracks_the_running_post_data();
     void progress_label_tracks_the_running_post();
     void global_cancel_external_tool_data();
@@ -2559,6 +2563,8 @@ int main(int argc, char **argv)
     if (QFileInfo(app.applicationFilePath()).fileName().startsWith("ngpost-recording-")) {
         const auto args = app.arguments().mid(1);
         if (args.isEmpty() || args.contains("--help")) return 0;
+        if (helperName.contains("fail"))
+            return 9;
         QFile recorded(app.applicationFilePath() + ".args");
         if (!recorded.open(QIODevice::WriteOnly)) return 1;
         recorded.write(args.join('\n').toUtf8());
@@ -6240,6 +6246,7 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
     ngPost.cancelAllPostingJobs();
     QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs() && first->isPostingFinished()
                             && queued->isPostingFinished(), 10000);
+    QVERIFY(!first->canSubmit() && !queued->canSubmit());
     QCOMPARE(activeFinished.count(), 1);
     QCOMPARE(pendingFinished.count(), 1);
     QVERIFY(history->flush(&error));
@@ -6316,4 +6323,197 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
     QCOMPARE(nzb.readAll().count("<segment "), expectedArticles);
     QVERIFY(QMetaObject::invokeMethod(window, "_onHistoryRefresh", Qt::DirectConnection));
     QTRY_COMPARE(window->resumeTableForTest()->rowCount(), 0);
+}
+
+void TestMainWindow::auto_posts_can_retry_preparation_failures_data()
+{
+    QTest::addColumn<bool>("compress");
+    QTest::addColumn<bool>("missing");
+    QTest::newRow("missing par2") << false << true;
+    QTest::newRow("failed par2") << false << false;
+    QTest::newRow("missing compressor") << true << true;
+    QTest::newRow("failed compressor") << true << false;
+}
+
+void TestMainWindow::auto_posts_can_retry_preparation_failures()
+{
+    QFETCH(bool, compress);
+    QFETCH(bool, missing);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString suffix =
+#ifdef Q_OS_WIN
+        ".exe";
+#else
+        "";
+#endif
+    const QString broken = sandbox.rootPath() + "/ngpost-recording-fail" + suffix;
+    const QString working = sandbox.rootPath() + "/ngpost-recording-retry" + suffix;
+    QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), broken));
+    QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), working));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(
+        ngPost,
+        shutdownTestConfig(sandbox.rootPath(), mock.port())
+            + QString("TMP_DIR = %1\nRAR_SOURCE = custom\nRAR_PATH = %2\n"
+                      "PAR2_TOOL = par2cmdline\nPAR2_SOURCE = custom\nPAR2_PATH = %2\n")
+                  .arg(sandbox.rootPath(), broken),
+        &error);
+    QVERIFY2(window, qPrintable(error));
+    if (missing)
+        QVERIFY(QFile::remove(broken));
+    auto *automatic = window->findChild<AutoPostWidget *>();
+    automatic->findChild<QCheckBox *>("compressCB")->setChecked(compress);
+    automatic->findChild<QCheckBox *>("par2CB")->setChecked(!compress);
+    automatic->findChild<QCheckBox *>("startJobsCB")->setChecked(true);
+    auto *files = automatic->findChild<QListWidget *>("filesList");
+    for (int i = 0; i < 2; ++i) {
+        QFile source(sandbox.rootPath() + QString("/source-%1.bin").arg(i));
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        source.write("retry source");
+        source.close();
+        files->addItem(source.fileName());
+    }
+    QVERIFY(QMetaObject::invokeMethod(automatic, "onGenQuickPosts"));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    QCOMPARE(tabs->count(), 6);
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(3));
+    auto *second = qobject_cast<PostingWidget *>(tabs->widget(4));
+    QVERIFY(first && second);
+    QTRY_VERIFY(!ngPost.hasPostingJobs() && first->isPostingFinished()
+                && second->isPostingFinished());
+    QCOMPARE(mock.receivedArticles().size(), 0);
+    auto *all = window->findChild<QPushButton *>("postAllTabsButton");
+    auto *stop = window->findChild<QPushButton *>("stopAllTabsButton");
+    QVERIFY(first->canSubmit() && second->canSubmit());
+    QVERIFY(all->isEnabled());
+    QVERIFY(!stop->isEnabled());
+    const auto sources = first->previewFiles();
+    const auto nzb = first->findChild<QLineEdit *>("nzbFileEdit")->text();
+    const auto password = first->findChild<QLineEdit *>("nzbPassEdit")->text();
+    // An unchanged configuration may fail repeatedly without locking the tabs.
+    all->click();
+    QTRY_VERIFY(!ngPost.hasPostingJobs() && first->canSubmit() && second->canSubmit());
+    QCOMPARE(first->previewFiles(), sources);
+    QCOMPARE(first->findChild<QLineEdit *>("nzbFileEdit")->text(), nzb);
+    QCOMPARE(first->findChild<QLineEdit *>("nzbPassEdit")->text(), password);
+    if (compress) {
+        CompressionSettingsDialog dialog(&ngPost, window);
+        dialog.findChild<QLineEdit *>("rarEdit")->setText(working);
+        dialog.accept();
+        QCOMPARE(dialog.result(), int(QDialog::Accepted));
+    } else {
+        Par2SettingsDialog dialog(&ngPost, {}, false, false, window);
+        dialog.findChild<QLineEdit *>("par2Path")->setText(working);
+        dialog.accept();
+        QCOMPARE(dialog.result(), int(QDialog::Accepted));
+    }
+    all->click();
+    QVERIFY(stop->isEnabled());
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs() && first->isPostingFinished()
+                                 && second->isPostingFinished(),
+                             10000);
+    QVERIFY(!mock.receivedArticles().isEmpty());
+    QVERIFY(!first->canSubmit() && !second->canSubmit());
+    QVERIFY(!all->isEnabled() && !stop->isEnabled());
+    QCOMPARE(tabs->count(), 6);
+    QVERIFY(ngPost.historyService()->flush(&error));
+    const auto history = ngPost.historyService()->listPosts({}, &error);
+    QCOMPARE(history.size(), 6);
+    int successes = 0;
+    for (const auto &post : history)
+        successes += post.status == "success";
+    QCOMPARE(successes, 2);
+}
+
+void TestMainWindow::preparation_retry_restores_sources_after_packing()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString helper = sandbox.rootPath() + "/ngpost-recording-retry-source"
+#ifdef Q_OS_WIN
+        + ".exe"
+#endif
+        ;
+    QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), helper));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              shutdownTestConfig(sandbox.rootPath(), mock.port())
+                                  + QString("TMP_DIR = %1\nRAR_SOURCE = custom\nRAR_PATH = %2\n")
+                                        .arg(sandbox.rootPath(), helper),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *post = window->addNewQuickTab(0);
+    const QString source = sandbox.rootPath() + "/source.bin";
+    QVERIFY(addShutdownTestFile(post, source));
+    post->findChild<QCheckBox *>("compressCB")->setChecked(true);
+    post->findChild<QCheckBox *>("par2CB")->setChecked(false);
+    post->findChild<QLineEdit *>("compressNameEdit")->setText("retry-archive");
+    auto *nzb = post->findChild<QLineEdit *>("nzbFileEdit");
+    nzb->setText(sandbox.rootPath() + "/missing/output.nzb");
+    post->onPostFiles();
+    QTRY_VERIFY(!ngPost.hasPostingJobs() && post->isPostingFinished());
+    QVERIFY(post->canSubmit());
+    QCOMPARE(mock.receivedArticles().size(), 0);
+    QCOMPARE(post->previewFiles(), QFileInfoList{ QFileInfo(source) });
+    nzb->setText(sandbox.rootPath() + "/fixed.nzb");
+    // Individual retry uses the restored sources too.
+    post->findChild<QPushButton *>("postButton")->click();
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs() && post->isPostingFinished(), 10000);
+    QVERIFY2(!mock.receivedArticles().isEmpty(),
+             qPrintable(window->findChild<QTextBrowser *>("logBrowser")->toPlainText()));
+    QVERIFY(!post->canSubmit());
+    QVERIFY(QFile::exists(source));
+}
+
+void TestMainWindow::posting_controls_do_not_overlap_tab_scrollers()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *all = window->findChild<QPushButton *>("postAllTabsButton");
+    for (int i = 0; i < 20; ++i)
+        window->addNewQuickTab(0);
+    window->show();
+    for (const QString &language : { QString("fr"), QString("en"), QString("de") }) {
+        ngPost.changeLanguage(language);
+        for (int width : { 900, 1200 }) {
+            window->resize(width, 800);
+            QCoreApplication::processEvents();
+            const QRect controls(all->mapTo(tabs, QPoint()), all->size());
+            int visibleScrollers = 0;
+            for (auto *button : tabs->tabBar()->findChildren<QToolButton *>()) {
+                if (!button->isVisible())
+                    continue;
+                ++visibleScrollers;
+                const QRect arrow(button->mapTo(tabs, QPoint()), button->size());
+                QVERIFY2(!arrow.intersects(controls),
+                         qPrintable(QString("%1 at %2px: arrow [%3,%4], controls [%5,%6]")
+                                        .arg(language)
+                                        .arg(width)
+                                        .arg(arrow.left())
+                                        .arg(arrow.right())
+                                        .arg(controls.left())
+                                        .arg(controls.right())));
+                QVERIFY(tabs->rect().contains(arrow));
+            }
+            QCOMPARE(visibleScrollers, 2);
+        }
+    }
 }
