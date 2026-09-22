@@ -2345,7 +2345,7 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
             } else
                 volSize = static_cast<uint>(postSize / _options.rarMax) + 1;
 
-            if (volSize > requestedSize)
+            if (requestedSize > 0 && volSize > requestedSize)
                 _log(tr("Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.")
                          .arg(requestedSize).arg(volSize).arg(_options.rarMax));
 #ifdef __DEBUG__

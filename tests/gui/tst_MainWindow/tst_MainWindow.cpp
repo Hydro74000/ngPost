@@ -3200,7 +3200,7 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
     bool adjustmentLogged = false;
     for (auto *log : window->findChildren<QTextBrowser *>())
         adjustmentLogged |= log->toPlainText().contains(QString("increased from %1 MiB to %2 MiB").arg(requestedSize).arg(increasedSize));
-    QCOMPARE(adjustmentLogged, increasedSize > 0);
+    QCOMPARE(adjustmentLogged, requestedSize > 0 && increasedSize > 0);
 }
 
 void TestMainWindow::post_all_continues_after_overwrite_declined_and_auto_close()
