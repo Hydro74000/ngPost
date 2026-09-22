@@ -2369,10 +2369,6 @@ void MainWindow::_buildPostingControls()
     _ui->pauseButton->setIconSize(iconSize);
     _stopAllButton->setIconSize(iconSize);
 
-    const int buttonHeight = _postAllButton->sizeHint().height();
-    _ui->pauseButton->setFixedSize(buttonHeight, buttonHeight);
-    _stopAllButton->setFixedSize(buttonHeight, buttonHeight);
-
     _ui->postTabWidget->setCornerWidget(controls, Qt::TopRightCorner);
     connect(_stopAllButton, &QPushButton::clicked, _ngPost, &NgPost::cancelAllPostingJobs);
     connect(_ngPost, &NgPost::postingStateChanged, this, &MainWindow::updatePostAllButton);
@@ -2392,9 +2388,6 @@ void MainWindow::updatePostAllButton()
     _postAllButton->setText(tr("Post all tabs"));
     _postAllButton->setToolTip(tr("Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.").arg(ready));
     _postAllButton->setEnabled(!_submittingAll && !_ngPost->_cancelingAll && tabs > 1 && ready > 0);
-    const int buttonHeight = _postAllButton->sizeHint().height();
-    _ui->pauseButton->setFixedSize(buttonHeight, buttonHeight);
-    _stopAllButton->setFixedSize(buttonHeight, buttonHeight);
     _refreshPostingControls();
 }
 
@@ -2537,6 +2530,9 @@ void MainWindow::onShutdownToggled(bool checked)
 
 void MainWindow::_refreshPostingControls()
 {
+    const int buttonHeight = _postAllButton->sizeHint().height();
+    _ui->pauseButton->setFixedSize(buttonHeight, buttonHeight);
+    _stopAllButton->setFixedSize(buttonHeight, buttonHeight);
     const bool enabled = _ngPost->hasPostingJobs() && !_ngPost->_cancelingAll;
     const bool paused = _ngPost->isPaused();
     _ui->pauseButton->setEnabled(enabled);

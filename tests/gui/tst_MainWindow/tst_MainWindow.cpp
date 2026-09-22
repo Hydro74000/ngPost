@@ -5484,6 +5484,8 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     QCOMPARE(pause->size(), stop->size());
     QCOMPARE(pause->height(), all->sizeHint().height());
     QCOMPARE(pause->width(), pause->height());
+    QCOMPARE(stop->icon().pixmap(stop->iconSize()).toImage(),
+             QIcon(":/icons/stop.png").pixmap(stop->iconSize()).toImage());
     auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
     auto *second = window->addNewQuickTab(0);
     auto *third = window->addNewQuickTab(0);
@@ -5516,6 +5518,8 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     pause->click();
     QVERIFY(ngPost.isPaused());
     QCOMPARE(pause->toolTip(), QString("Resume all tabs"));
+    QCOMPARE(pause->icon().pixmap(pause->iconSize()).toImage(),
+             QIcon(":/icons/play.png").pixmap(pause->iconSize()).toImage());
     QVERIFY(textIsRendered(dark ? QColor(Qt::yellow) : QColor(160, 110, 0)));
     for (auto *post : posts)
         QCOMPARE(tabs->tabBar()->tabTextColor(tabs->indexOf(post)),
@@ -5533,6 +5537,8 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     QVERIFY(!ngPost.isPaused());
     QVERIFY(ngPost.isPosting());
     QCOMPARE(pause->toolTip(), QString("Pause all tabs"));
+    QCOMPARE(pause->icon().pixmap(pause->iconSize()).toImage(),
+             QIcon(":/icons/pause.png").pixmap(pause->iconSize()).toImage());
     QTRY_VERIFY_WITH_TIMEOUT(!mock.receivedArticles().isEmpty(), 10000);
     pause->click();
     QVERIFY(ngPost.isPaused());
@@ -5596,6 +5602,12 @@ void TestMainWindow::global_post_controls_translations()
         QCOMPARE(second->findChild<QPushButton *>("postButton")->text(),
                  QCoreApplication::translate("PostingWidget", "Cancel Posting"));
         QVERIFY(ngPost.isPaused());
+        const auto *all = window->findChild<QPushButton *>("postAllTabsButton");
+        for (const auto *control : {window->findChild<QPushButton *>("pauseButton"),
+                                   window->findChild<QPushButton *>("stopAllTabsButton")}) {
+            QCOMPARE(control->size(), QSize(all->sizeHint().height(), all->sizeHint().height()));
+            QCOMPARE(control->iconSize(), all->iconSize());
+        }
         QVERIFY(!translator.translate("MainWindow", "Cancel all active and queued posts").isEmpty());
         qApp->removeTranslator(&translator);
     }
