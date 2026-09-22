@@ -84,8 +84,8 @@ private:
     QPushButton *_par2SettingsButton = nullptr;
     bool _submittingAll = false;
 
-    //! Tab opened when ngPost starts: 0 quick post, 1 folder monitoring,
-    //! 2 history, and -1 when the user never picked one -- which is the quick
+    //! Tab opened when ngPost starts: 0 history, 1 folder monitoring,
+    //! 2 quick post, and -1 when the user never picked one -- which is the quick
     //! post tab, without a setting written anywhere.
     int             _startupTab;
 

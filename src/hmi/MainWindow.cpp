@@ -151,10 +151,13 @@ constexpr int kLogBudgetBytes[] = {
 };
 constexpr int kLogMaxDebugLevel = int(sizeof kLogBudgetBytes / sizeof *kLogBudgetBytes) - 1;
 
-//! Tab ngPost opens on, as an index in the post tab widget. Only the three
-//! fixed tabs can be picked; no key at all means the first one.
+//! Stable preference IDs retain the original order: quick=0, auto=1, history=2.
+//! The visual order is reversed; no key means Quick Post.
 const QString kStartupTabKey = QStringLiteral("MainWindow/startupTab");
-constexpr int kNbFixedTabs   = 3; //!< quick post, folder monitoring, history
+constexpr int kHistoryTab = 0;
+constexpr int kAutoPostTab = 1;
+constexpr int kQuickPostTab = 2;
+constexpr int kNbFixedTabs = 3;
 
 //! Column widths of the history table, as QHeaderView::saveState() writes
 //! them. Absent as long as the user has not resized a column: ngPost then
@@ -171,7 +174,7 @@ int readStartupTab()
     QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
     bool      ok    = false;
     int const index = guiSettings.value(kStartupTabKey, -1).toInt(&ok);
-    return (ok && index >= 0 && index < kNbFixedTabs) ? index : -1;
+    return (ok && index >= 0 && index < kNbFixedTabs) ? kNbFixedTabs - 1 - index : -1;
 }
 }
 
@@ -303,12 +306,16 @@ void MainWindow::init(NgPost *ngPost)
     _ui->postTabWidget->clear();
     _ui->postTabWidget->setUsesScrollButtons(true);
     _ui->postTabWidget->setStyleSheet(sTabWidgetStyle);
-    _ui->postTabWidget->addTab(_quickJobTab, QIcon(":/icons/quick.svg"), QString("%1 #1").arg(_ngPost->quickJobName()));
-    tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
-    _ui->postTabWidget->addTab(_autoPostTab, QIcon(":/icons/auto.png"), _ngPost->folderMonitoringName());
-    tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
     _ui->postTabWidget->addTab(_buildHistoryTab(), QIcon(":/icons/monitor.png"), tr("History"));
-    tabBar->setTabToolTip(2, tr("Post history, statistics and resume center"));
+    tabBar->setTabToolTip(kHistoryTab, tr("Post history, statistics and resume center"));
+    _ui->postTabWidget->addTab(_autoPostTab,
+                               QIcon(":/icons/auto.png"),
+                               _ngPost->folderMonitoringName());
+    tabBar->setTabToolTip(kAutoPostTab, _ngPost->folderMonitoringName());
+    _ui->postTabWidget->addTab(_quickJobTab,
+                               QIcon(":/icons/quick.svg"),
+                               QString("%1 #1").arg(_ngPost->quickJobName()));
+    tabBar->setTabToolTip(kQuickPostTab, tr("Default %1").arg(_ngPost->quickJobName()));
     _ui->postTabWidget->addTab(new QWidget(_ui->postTabWidget), QIcon(":/icons/plus.png"), tr("New"));
     tabBar->setTabToolTip(3, QString("Create a new %1").arg(_ngPost->quickJobName()));
 
@@ -594,7 +601,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
         qDebug() << "[MainWindow] getting key event: " << keyEvent->key();
         int currentTabIdx = _ui->postTabWidget->currentIndex();
-        if (currentTabIdx == 1)
+        if (currentTabIdx == kAutoPostTab)
             static_cast<AutoPostWidget*>(_ui->postTabWidget->currentWidget())->handleKeyEvent(keyEvent);
         else if (PostingWidget *postWidget = _getPostWidget(currentTabIdx))
             postWidget->handleKeyEvent(keyEvent);
@@ -612,7 +619,7 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 void MainWindow::dropEvent(QDropEvent *e)
 {
     int currentTabIdx = _ui->postTabWidget->currentIndex();
-    if (currentTabIdx == 1)
+    if (currentTabIdx == kAutoPostTab)
         _autoPostTab->handleDropEvent(e);
     else if (PostingWidget *postWidget = qobject_cast<PostingWidget*>(_ui->postTabWidget->currentWidget()))
         postWidget->handleDropEvent(e);
@@ -711,12 +718,12 @@ void MainWindow::_retranslate()
     _ui->postingBox->setTitle(tr("Parameters"));
     _ui->logBox->setTitle(tr("Posting Log"));
 
-    tabBar->setTabText(0, QString("%1 #1").arg(_ngPost->quickJobName()));
-    tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
-    tabBar->setTabText(1, _ngPost->folderMonitoringName());
-    tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
-    tabBar->setTabText(2, tr("History"));
-    tabBar->setTabToolTip(2, tr("Post history, statistics and resume center"));
+    tabBar->setTabText(kQuickPostTab, QString("%1 #1").arg(_ngPost->quickJobName()));
+    tabBar->setTabToolTip(kQuickPostTab, tr("Default %1").arg(_ngPost->quickJobName()));
+    tabBar->setTabText(kAutoPostTab, _ngPost->folderMonitoringName());
+    tabBar->setTabToolTip(kAutoPostTab, _ngPost->folderMonitoringName());
+    tabBar->setTabText(kHistoryTab, tr("History"));
+    tabBar->setTabToolTip(kHistoryTab, tr("Post history, statistics and resume center"));
     for (int i = 3 ; i < lastTabIdx; ++i)
         if (auto *post = _getPostWidget(i))
             tabBar->setTabText(i, QString("%1 #%2").arg(_ngPost->quickJobName()).arg(post->displayNumber()));
@@ -732,7 +739,7 @@ void MainWindow::_retranslate()
 
     _quickJobTab->retranslate();
     _autoPostTab->retranslate();
-    for (int i = 2 ; i < _ui->postTabWidget->count() - 1; ++i)
+    for (int i = kNbFixedTabs; i < _ui->postTabWidget->count() - 1; ++i)
         if (PostingWidget *postWidget = _getPostWidget(i))
             postWidget->retranslate();
     _retranslateHistoryTab();
@@ -815,7 +822,7 @@ StartupTabBar *MainWindow::_startupTabBar() const
 void MainWindow::_applyStartupTab()
 {
     _startupTabBar()->setStartupTab(_startupTab);
-    _ui->postTabWidget->setCurrentIndex(_startupTab < 0 ? 0 : _startupTab);
+    _ui->postTabWidget->setCurrentIndex(_startupTab < 0 ? kQuickPostTab : _startupTab);
 }
 
 void MainWindow::onToggleStartupTab(int tabIndex)
@@ -831,7 +838,7 @@ void MainWindow::onToggleStartupTab(int tabIndex)
     if (_startupTab < 0)
         guiSettings.remove(kStartupTabKey);
     else
-        guiSettings.setValue(kStartupTabKey, _startupTab);
+        guiSettings.setValue(kStartupTabKey, kNbFixedTabs - 1 - _startupTab);
     guiSettings.sync(); // saved now, not when ngPost is closed
 
     // The bold moves at once; the tick is read from _startupTab the next time
@@ -873,10 +880,9 @@ void MainWindow::_connectPostingWidget(PostingWidget *post)
 
 bool MainWindow::hasFinishedPosts() const
 {
-    // Post tabs live between the History tab and the trailing "New" one, so the
+    // Closable post tabs live after the fixed tabs and before "New", so the
     // last of them is count() - 2: onCloseAllFinishedQuickTabs() starts there.
-    for (int idx = 2 ; idx < _ui->postTabWidget->count() - 1 ; ++idx)
-    {
+    for (int idx = kNbFixedTabs; idx < _ui->postTabWidget->count() - 1; ++idx) {
         PostingWidget *postWidget = _getPostWidget(idx);
         if (postWidget && postWidget->isPostingFinished())
             return true;
@@ -887,8 +893,7 @@ bool MainWindow::hasFinishedPosts() const
 void MainWindow::onCloseAllFinishedQuickTabs()
 {
     // go backwards as we may delete the current tab ;)
-    for (int idx = _ui->postTabWidget->count() - 2 ; idx > 1  ; --idx)
-    {
+    for (int idx = _ui->postTabWidget->count() - 2; idx >= kNbFixedTabs; --idx) {
         PostingWidget *postWidget = _getPostWidget(idx);
         if (postWidget && postWidget->isPostingFinished())
             onCloseJob(idx);
@@ -1186,9 +1191,9 @@ void MainWindow::updateConfigFromUi()
         return;
 
     int currentTabIdx = _ui->postTabWidget->currentIndex();
-    if (currentTabIdx == 0)
+    if (currentTabIdx == kQuickPostTab)
         _quickJobTab->udatePostingParams();
-    else if (currentTabIdx == 1)
+    else if (currentTabIdx == kAutoPostTab)
         _autoPostTab->udatePostingParams();
     else
     {
@@ -2254,7 +2259,7 @@ int MainWindow::_serverRow(QObject *delButton)
 
 PostingWidget *MainWindow::_getPostWidget(int tabIndex) const
 {
-    if(tabIndex > 1 && tabIndex < _ui->postTabWidget->count() - 1)
+    if (tabIndex >= kNbFixedTabs && tabIndex < _ui->postTabWidget->count() - 1)
         return qobject_cast<PostingWidget*>(_ui->postTabWidget->widget(tabIndex));
     else
         return nullptr;
@@ -2263,8 +2268,7 @@ PostingWidget *MainWindow::_getPostWidget(int tabIndex) const
 int MainWindow::_getPostWidgetIndex(PostingWidget *postWidget) const
 {
     int nbJob = _ui->postTabWidget->count() -1;
-    for (int i = 2; i < nbJob ; ++i)
-    {
+    for (int i = kNbFixedTabs; i < nbJob; ++i) {
         if (_ui->postTabWidget->widget(i) == postWidget)
             return i;
     }
@@ -2459,8 +2463,7 @@ void MainWindow::onCloseJob(int index)
 {
     int nbJob = _ui->postTabWidget->count() -1;
     qDebug() << "onCloseJob on tab: " << index << ", count: " << nbJob;
-    if (index > 1 && index < nbJob )
-    {
+    if (index >= kNbFixedTabs && index < nbJob) {
         PostingWidget *postWidget = _getPostWidget(index);
         if (!postWidget)
             return;
@@ -2485,14 +2488,14 @@ void MainWindow::closeTab(PostingWidget *postWidget)
 {
     if (!postWidget)
         return;
-
     // The default Quick Post tab is a fixed one: it has no close button and
     // _getPostWidgetIndex never finds it. Auto close still has to leave it
     // ready for the next post, so it is emptied instead, back to how it opens.
     if (postWidget == _quickJobTab)
     {
         postWidget->resetForNextPost();
-        _ui->postTabWidget->tabBar()->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
+        _ui->postTabWidget->tabBar()->setTabToolTip(kQuickPostTab,
+                                                    tr("Default %1").arg(_ngPost->quickJobName()));
         return;
     }
 

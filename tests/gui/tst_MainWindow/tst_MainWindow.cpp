@@ -734,7 +734,7 @@ void TestMainWindow::post_info_row_exposes_a_checkbox_and_its_button()
 
     auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
     QVERIFY(tabs);
-    QWidget *quickTab = tabs->widget(0);
+    QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
 
     // One discreet checkbox on the tab, everything else behind a button
@@ -792,7 +792,7 @@ void TestMainWindow::post_info_stays_on_across_tabs_and_posts()
     };
 
     // the first tab
-    auto *first = boxOf(tabs->widget(0));
+    auto *first = boxOf(tabs->widget(2));
     QVERIFY(first);
     QVERIFY2(first->isChecked(), "a configured model should tick the box on its own");
 
@@ -1302,7 +1302,7 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
     auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
     QVERIFY2(tabs, "postTabWidget not found");
     tabs->setCurrentIndex(0);
-    QWidget *quickTab = tabs->widget(0);
+    QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
 
     auto *redundancy = quickTab->findChild<QSpinBox*>(QStringLiteral("redundancySB"));
@@ -1486,7 +1486,7 @@ void TestMainWindow::posting_tab_lines_are_in_the_new_order()
 
     auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
     QVERIFY2(tabs, "postTabWidget not found");
-    QWidget *quickTab = tabs->widget(0);
+    QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
 
     auto *column = quickTab->findChild<QVBoxLayout*>(QStringLiteral("verticalLayout"));
@@ -1600,7 +1600,7 @@ void TestMainWindow::greyed_controls_say_what_they_need()
 
     auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
     QVERIFY(tabs);
-    QWidget *quickTab = tabs->widget(0);
+    QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
 
     auto *compress   = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
@@ -1668,7 +1668,7 @@ void TestMainWindow::state_tooltips_survive_a_language_change()
 
     auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
     QVERIFY(tabs);
-    auto *quickTab = qobject_cast<PostingWidget*>(tabs->widget(0));
+    auto *quickTab = qobject_cast<PostingWidget *>(tabs->widget(2));
     QVERIFY(quickTab);
 
     auto *compress = quickTab->findChild<QCheckBox*>(QStringLiteral("compressCB"));
@@ -1742,7 +1742,7 @@ void TestMainWindow::default_archive_password_still_reaches_the_posting_tabs()
 
     auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
     QVERIFY(tabs);
-    QWidget *quickTab = tabs->widget(0);
+    QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
     auto *nzbPassEdit = quickTab->findChild<QLineEdit*>(QStringLiteral("nzbPassEdit"));
     QVERIFY(nzbPassEdit);
@@ -1779,7 +1779,7 @@ void TestMainWindow::keep_archives_default_is_owned_by_the_dialog()
 
     auto *tabs = window->findChild<QTabWidget*>(QStringLiteral("postTabWidget"));
     QVERIFY(tabs);
-    QWidget *quickTab = tabs->widget(0);
+    QWidget *quickTab = tabs->widget(2);
     QVERIFY(quickTab);
     auto *keepRar = quickTab->findChild<QCheckBox*>(QStringLiteral("keepRarCB"));
     QVERIFY(keepRar);
@@ -2033,8 +2033,28 @@ void TestMainWindow::startup_tab_is_the_quick_post_until_one_is_pinned()
 
     // Nothing pinned: the quick post tab, and no title in bold.
     QCOMPARE(window->startupTabForTest(), -1);
-    QCOMPARE(tabs->currentIndex(), 0);
+    QCOMPARE(tabs->currentIndex(), 2);
     QCOMPARE(tabBar->startupTab(), -1);
+
+    QCOMPARE(tabs->count(), 4);
+    QVERIFY(tabs->widget(0)->findChild<QTableWidget *>("historyTable"));
+    QVERIFY(qobject_cast<AutoPostWidget *>(tabs->widget(1)));
+    auto *quick = qobject_cast<PostingWidget *>(tabs->widget(2));
+    QVERIFY(quick);
+    QCOMPARE(quick->jobNumber(), 1u);
+    for (const QString &language : ngPost.languages()) {
+        ngPost.changeLanguage(language);
+        QCoreApplication::processEvents();
+        QCOMPARE(tabs->tabText(0), QCoreApplication::translate("MainWindow", "History"));
+        QCOMPARE(tabs->tabText(1), ngPost.folderMonitoringName());
+        QCOMPARE(tabs->tabText(2), QString("%1 #1").arg(ngPost.quickJobName()));
+        QCOMPARE(tabs->currentWidget(), quick);
+    }
+    // Fixed tabs must stay open, including Quick Post now at index 2.
+    for (int index = 0; index < 3; ++index)
+        QVERIFY(QMetaObject::invokeMethod(tabBar, "tabCloseRequested", Q_ARG(int, index)));
+    QCOMPARE(tabs->count(), 4);
+    QCOMPARE(tabs->currentWidget(), quick);
 
     // The three fixed tabs offer the option, unticked...
     for (int tabIndex = 0; tabIndex < 3; ++tabIndex)
@@ -2056,17 +2076,17 @@ void TestMainWindow::startup_tab_is_the_quick_post_until_one_is_pinned()
 
     // Pin the history tab: bold right away, saved right away, and the user is
     // left on the tab they were reading.
-    pickStartupEntry(window, 2);
-    QCOMPARE(window->startupTabForTest(), 2);
-    QCOMPARE(tabBar->startupTab(), 2);
-    QCOMPARE(tabs->currentIndex(), 0);
+    pickStartupEntry(window, 0);
+    QCOMPARE(window->startupTabForTest(), 0);
+    QCOMPARE(tabBar->startupTab(), 0);
+    QCOMPARE(tabs->currentIndex(), 2);
     {
         QSettings guiSettings(guiSettingsPath(), QSettings::IniFormat);
         QCOMPARE(guiSettings.value(QStringLiteral("MainWindow/startupTab")).toInt(), 2);
     }
 
     // The tick follows the pinned tab, and only it.
-    QVERIFY(startupEntryIsTicked(window, 2));
+    QVERIFY(startupEntryIsTicked(window, 0));
     QVERIFY(!startupEntryIsTicked(window, 1));
 
     // Pinning another tab moves the setting rather than adding one.
@@ -2098,11 +2118,12 @@ void TestMainWindow::pinned_startup_tab_opens_on_the_next_start()
     QByteArray arg0("tst_MainWindow");
     char *argv[] = { arg0.data(), nullptr };
 
-    {
-        QSettings guiSettings(guiSettingsPath(), QSettings::IniFormat);
-        guiSettings.setValue(QStringLiteral("MainWindow/startupTab"), 1);
-    }
-    {
+    // Existing preference IDs retain their meanings across the visual reorder.
+    for (int savedId = 0; savedId < 3; ++savedId) {
+        {
+            QSettings guiSettings(guiSettingsPath(), QSettings::IniFormat);
+            guiSettings.setValue(QStringLiteral("MainWindow/startupTab"), savedId);
+        }
         NgPost ngPost(argc, argv);
         const QString parseError = ngPost.parseDefaultConfig();
         QVERIFY2(parseError.isEmpty(), qPrintable(parseError));
@@ -2115,9 +2136,10 @@ void TestMainWindow::pinned_startup_tab_opens_on_the_next_start()
         auto *tabBar = qobject_cast<StartupTabBar*>(tabs->tabBar());
         QVERIFY(tabBar);
 
-        QCOMPARE(tabs->currentIndex(), 1);
-        QCOMPARE(tabBar->startupTab(), 1);
-        QVERIFY(startupEntryIsTicked(window, 1));
+        const int expectedIndex = 2 - savedId;
+        QCOMPARE(tabs->currentIndex(), expectedIndex);
+        QCOMPARE(tabBar->startupTab(), expectedIndex);
+        QVERIFY(startupEntryIsTicked(window, expectedIndex));
     }
 
     // A value pointing at no fixed tab (an old setting, a hand edited file)
@@ -2139,7 +2161,7 @@ void TestMainWindow::pinned_startup_tab_opens_on_the_next_start()
         auto *tabBar = qobject_cast<StartupTabBar*>(tabs->tabBar());
         QVERIFY(tabBar);
 
-        QCOMPARE(tabs->currentIndex(), 0);
+        QCOMPARE(tabs->currentIndex(), 2);
         QCOMPARE(tabBar->startupTab(), -1);
     }
 }
@@ -2572,7 +2594,7 @@ void TestMainWindow::post_all_tabs_submits_only_prepared_posts()
     auto *button = window->findChild<QPushButton *>("postAllTabsButton");
     QVERIFY(button && tabs);
     QVERIFY(!button->isEnabled());
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(tabs->count() - 1);
     auto *third = window->addNewQuickTab(tabs->count() - 1);
     auto *missing = window->addNewQuickTab(tabs->count() - 1);
@@ -2633,7 +2655,7 @@ void TestMainWindow::par2_dialog_defaults_overrides_and_cancel()
     auto *window = bootWindow(ngPost, conf, &err);
     QVERIFY2(window, qPrintable(err));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(tabs->count() - 1);
     auto *firstPct = first->findChild<QSpinBox *>("redundancySB");
     auto *secondPct = second->findChild<QSpinBox *>("redundancySB");
@@ -3133,7 +3155,7 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
     auto *window = bootWindow(ngPost, conf, &err);
     QVERIFY2(window, qPrintable(err));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(tabs->count() - 1);
     QFile firstFile(root + "/first.bin"), secondFile(root + "/second.bin");
     QVERIFY(firstFile.open(QIODevice::WriteOnly)); firstFile.write(QByteArray(500000, 'a')); firstFile.close();
@@ -3189,7 +3211,7 @@ void TestMainWindow::post_all_continues_after_overwrite_declined_and_auto_close(
     auto *window = bootWindow(ngPost, conf, &err);
     QVERIFY2(window, qPrintable(err));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     QPointer<PostingWidget> second = window->addNewQuickTab(tabs->count() - 1);
     for (auto *post : {first, second.data()}) {
         const QString path = sandbox.rootPath() + (post == first ? "/existing.bin" : "/fresh.bin");
@@ -4550,7 +4572,7 @@ void TestMainWindow::shutdown_waits_for_every_post()
         &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     QList<QPointer<PostingWidget>> posts{ first };
     for (int i = 1; i < 5; ++i)
         posts << window->addNewQuickTab(tabs->count() - 1);
@@ -4725,7 +4747,7 @@ void TestMainWindow::shutdown_requires_new_completed_post()
     auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *defaultPost = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *defaultPost = qobject_cast<PostingWidget *>(tabs->widget(2));
     QPointer<PostingWidget> other = window->addNewQuickTab(tabs->count() - 1);
     auto *completed = startDefault ? defaultPost : other.data();
     auto *blocker = startDefault ? other.data() : defaultPost;
@@ -4787,7 +4809,7 @@ void TestMainWindow::shutdown_waits_during_vpn_confirmation()
     auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *last = window->addNewQuickTab(tabs->count() - 1);
     QVERIFY(addShutdownTestFile(first, root + "/first.bin"));
     QVERIFY(addShutdownTestFile(last, root + "/last.bin"));
@@ -4854,7 +4876,7 @@ void TestMainWindow::shutdown_waits_for_posts_added_after_completion()
     auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(tabs->count() - 1);
     QVERIFY(addShutdownTestFile(first, root + "/first.bin"));
     QVERIFY(addShutdownTestFile(second, root + "/second.bin"));
@@ -4900,7 +4922,7 @@ void TestMainWindow::shutdown_requires_an_actual_transfer()
         &error);
     QVERIFY2(window, qPrintable(error));
     auto *post = qobject_cast<PostingWidget *>(
-        window->findChild<QTabWidget *>("postTabWidget")->widget(0));
+        window->findChild<QTabWidget *>("postTabWidget")->widget(2));
     QVERIFY(addShutdownTestFile(post, root + "/failed.bin"));
     QVERIFY(armTestShutdown(window));
     post->findChild<QCheckBox *>("compressCB")->setChecked(true);
@@ -4953,7 +4975,7 @@ void TestMainWindow::shutdown_handles_terminal_connection_loss()
                               &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *prepared = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *prepared = qobject_cast<PostingWidget *>(tabs->widget(2));
     if (preparedPost)
         QVERIFY(addShutdownTestFile(prepared, root + "/later.bin"));
     QFile file(root + "/large.bin");
@@ -5091,7 +5113,7 @@ void TestMainWindow::shutdown_ignores_requested_cancellation()
     auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *post = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *post = qobject_cast<PostingWidget *>(tabs->widget(2));
     QFile source(root + "/source.bin");
     QVERIFY(source.open(QIODevice::WriteOnly));
     QVERIFY(source.resize(stopAction.endsWith("completion") ? 4096 : 8 * 1024 * 1024));
@@ -5252,7 +5274,7 @@ void TestMainWindow::shutdown_waits_during_input_dialogs()
     auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *empty = window->addNewQuickTab(tabs->count() - 1);
     QVERIFY(addShutdownTestFile(first, root + "/first.bin"));
     QVERIFY(QDir().mkpath(root + "/input"));
@@ -5359,7 +5381,7 @@ void TestMainWindow::shutdown_waits_during_post_all_overwrite()
     auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *running = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *running = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *prepared = window->addNewQuickTab(tabs->count() - 1);
     QVERIFY(addShutdownTestFile(running, root + "/running.bin"));
     QVERIFY(addShutdownTestFile(prepared, root + "/prepared.bin"));
@@ -5426,7 +5448,7 @@ void TestMainWindow::shutdown_rechecks_are_coalesced_and_only_when_armed()
     auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
     QVERIFY2(window, qPrintable(error));
     auto *post = qobject_cast<PostingWidget *>(
-        window->findChild<QTabWidget *>("postTabWidget")->widget(0));
+        window->findChild<QTabWidget *>("postTabWidget")->widget(2));
     const auto addBurst = [&](const QString &prefix) {
         for (int i = 0; i < 50; ++i)
             if (!addShutdownTestFile(post, root + QString("/%1-%2.bin").arg(prefix).arg(i)))
@@ -5493,7 +5515,7 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     QCOMPARE(pause->width(), pause->height());
     QCOMPARE(stop->icon().pixmap(stop->iconSize()).toImage(),
              QIcon(":/icons/stop.png").pixmap(stop->iconSize()).toImage());
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(0);
     auto *third = window->addNewQuickTab(0);
     auto *empty = window->addNewQuickTab(0);
@@ -5511,10 +5533,11 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     all->click();
     QVERIFY(pause->isEnabled());
     QVERIFY(stop->isEnabled());
-    QCOMPARE(tabs->tabBar()->tabTextColor(0), dark ? QColor(0x4c, 0xff, 0x4c) : QColor(Qt::darkGreen));
+    QCOMPARE(tabs->tabBar()->tabTextColor(2),
+             dark ? QColor(0x4c, 0xff, 0x4c) : QColor(Qt::darkGreen));
     const auto textIsRendered = [tabs](QColor color) {
         const QImage image = tabs->tabBar()->grab().toImage();
-        const QRect area = tabs->tabBar()->tabRect(0).intersected(image.rect());
+        const QRect area = tabs->tabBar()->tabRect(2).intersected(image.rect());
         for (int y = area.top(); y <= area.bottom(); ++y)
             for (int x = area.left(); x <= area.right(); ++x)
                 if (image.pixelColor(x, y) == color) return true;
@@ -5584,7 +5607,7 @@ void TestMainWindow::global_post_controls_translations()
     auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &err);
     QVERIFY2(window, qPrintable(err));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(0);
     auto *third = window->addNewQuickTab(0);
     for (auto *post : {first, second}) {
@@ -5635,7 +5658,7 @@ void TestMainWindow::global_cancel_during_confirmation()
     auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(0);
     auto *third = window->addNewQuickTab(0);
     for (auto *post : {first, second, third})
@@ -5707,7 +5730,7 @@ void TestMainWindow::global_cancel_external_tool()
                              + (prepack ? "PREPARE_PACKING = true\n" : ""), &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *post = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *post = qobject_cast<PostingWidget *>(tabs->widget(2));
     if (prepack) {
         QFile input(sandbox.rootPath() + "/active.bin");
         QVERIFY(input.open(QIODevice::WriteOnly));
@@ -5768,7 +5791,7 @@ void TestMainWindow::canceled_job_never_starts()
     auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *post = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *post = qobject_cast<PostingWidget *>(tabs->widget(2));
     QVERIFY(addShutdownTestFile(post, sandbox.rootPath() + "/source.bin"));
     PostingJobOptions options;
     options.files = post->previewFiles();
@@ -5810,7 +5833,7 @@ void TestMainWindow::global_pause_holds_pending_and_new_posts()
                              + (preparePacking ? "PREPARE_PACKING = true\n" : ""), &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab(0);
     auto *third = window->addNewQuickTab(0);
     for (auto *post : {first, second, third})
@@ -5859,7 +5882,7 @@ void TestMainWindow::quick_post_numbers_icons_and_palette()
                  QString("Start Quick Post #%1").arg(post->displayNumber()));
     }
     QCOMPARE(fourth->displayNumber(), 4u);
-    const QImage icon = tabs->tabIcon(0).pixmap(24, 24).toImage();
+    const QImage icon = tabs->tabIcon(2).pixmap(24, 24).toImage();
     QVERIFY(!icon.isNull());
     bool yellow = false;
     for (int y = 0; y < icon.height(); ++y)
@@ -5876,7 +5899,7 @@ void TestMainWindow::quick_post_numbers_icons_and_palette()
         palette.setColor(QPalette::WindowText, dark ? QColor(Qt::white) : QColor(Qt::black));
         qApp->setPalette(palette);
         QCoreApplication::processEvents();
-        QCOMPARE(tabs->tabBar()->tabTextColor(0), dark ? QColor(Qt::white) : QColor(Qt::black));
+        QCOMPARE(tabs->tabBar()->tabTextColor(2), dark ? QColor(Qt::white) : QColor(Qt::black));
     }
 }
 
@@ -5891,11 +5914,11 @@ void TestMainWindow::quick_post_numbering_lifecycle_and_reset()
     auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
     QVERIFY2(window, qPrintable(error));
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     QVERIFY(first);
     QCOMPARE(first->jobNumber(), 1u);
     QCOMPARE(first->displayNumber(), 1u);
-    QVERIFY(tabs->tabText(0).endsWith("#1"));
+    QVERIFY(tabs->tabText(2).endsWith("#1"));
 
     // 1. Sequential additions when idle
     auto *second = window->addNewQuickTab(0);
@@ -5989,7 +6012,7 @@ void TestMainWindow::quick_post_numbering_with_backend_queue()
     auto *extra = window->addNewQuickTab(0);
     QCOMPARE(extra->jobNumber(), 2u);
     auto *first = qobject_cast<PostingWidget *>(
-        window->findChild<QTabWidget *>("postTabWidget")->widget(0));
+        window->findChild<QTabWidget *>("postTabWidget")->widget(2));
     QVERIFY(addShutdownTestFile(first, sandbox.rootPath() + "/source.bin"));
     PostingJobOptions options;
     options.files = first->previewFiles();
@@ -6088,7 +6111,7 @@ void TestMainWindow::progress_label_tracks_the_running_post()
     auto *label = window->findChild<QLabel *>("jobLabel");
     QVERIFY(label);
     QCOMPARE(label->text(), QString("<b><u>Post #1</u></b>"));
-    auto *post = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *post = qobject_cast<PostingWidget *>(tabs->widget(2));
     if (number == 3) {
         auto *second = window->addNewQuickTab(0);
         post = window->addNewQuickTab(0);
@@ -6125,7 +6148,7 @@ void TestMainWindow::progress_label_tracks_the_running_post()
         QCOMPARE(label->text(), expected);
     }
     // Select History, whose index is unrelated to the running post's number.
-    tabs->setCurrentIndex(2);
+    tabs->setCurrentIndex(0);
     for (const QString &language : ngPost.languages()) {
         ngPost.changeLanguage(language);
         QCoreApplication::processEvents();
@@ -6162,7 +6185,7 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
     auto *history = ngPost.historyService();
     QVERIFY(history);
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
-    auto *first = qobject_cast<PostingWidget *>(tabs->widget(0));
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *queued = window->addNewQuickTab(0);
     const QString source = sandbox.rootPath() + "/source.bin";
     QFile file(source);
