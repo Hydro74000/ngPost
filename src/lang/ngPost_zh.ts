@@ -713,7 +713,7 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3341"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3342"/>
         <source>VPN: disabled</source>
         <translation>VPN：已禁用</translation>
     </message>
@@ -914,26 +914,26 @@ Unlike the per post box, this choice is saved.</source>
         <translation>密码</translation>
     </message>
     <message>
-        <location line="-1208"/>
-        <location line="+408"/>
+        <location line="-1209"/>
+        <location line="+409"/>
         <location line="+1806"/>
         <source>Default %1</source>
         <translation>默认 %1</translation>
     </message>
     <message>
-        <location line="-2222"/>
-        <location line="+420"/>
+        <location line="-2223"/>
+        <location line="+421"/>
         <source>Post history, statistics and resume center</source>
         <translation>发贴历史、统计与续传中心</translation>
     </message>
     <message>
-        <location line="-411"/>
-        <location line="+415"/>
+        <location line="-412"/>
+        <location line="+416"/>
         <source>New</source>
         <translation>新建</translation>
     </message>
     <message>
-        <location line="-358"/>
+        <location line="-359"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>平均速度</translation>
@@ -1018,13 +1018,13 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+592"/>
+        <location line="+593"/>
         <location line="+213"/>
         <source>Files</source>
         <translation>文件</translation>
     </message>
     <message>
-        <location line="-804"/>
+        <location line="-805"/>
         <source>Parameters</source>
         <translation>参数</translation>
     </message>
@@ -1034,7 +1034,7 @@ Are you sure you want to quit?</source>
         <translation>发布日志</translation>
     </message>
     <message>
-        <location line="+71"/>
+        <location line="+72"/>
         <source>Quick Tabs Menu</source>
         <translation>快速标签页菜单</translation>
     </message>
@@ -1103,12 +1103,12 @@ The job stays in the queue.</source>
 任务保留在队列中。</translation>
     </message>
     <message>
-        <location line="-620"/>
+        <location line="-621"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>无法移除这些设置。详情请查看 VPN 日志。</translation>
     </message>
     <message>
-        <location line="+634"/>
+        <location line="+635"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>ngPost 中配置的 VPN 似乎已在运行；可能有另一个 ngPost 正在使用它。请查看 VPN 设置。</translation>
     </message>
@@ -1729,7 +1729,19 @@ This also removes all associated file and article records.</source>
         <translation>VPN：失败</translation>
     </message>
     <message>
-        <location line="-2060"/>
+        <location line="+60"/>
+        <location line="+1"/>
+        <source>Open Posting Log</source>
+        <translation>打开发布日志</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <location line="+1"/>
+        <source>Close Posting Log</source>
+        <translation>关闭发布日志</translation>
+    </message>
+    <message>
+        <location line="-2121"/>
         <location line="+168"/>
         <source>All statuses</source>
         <translation>所有状态</translation>
@@ -1860,8 +1872,8 @@ This also removes all associated file and article records.</source>
         <translation>删除条目</translation>
     </message>
     <message>
-        <location line="-1404"/>
-        <location line="+420"/>
+        <location line="-1405"/>
+        <location line="+421"/>
         <location line="+538"/>
         <location line="+168"/>
         <source>History</source>
@@ -2041,13 +2053,13 @@ This also removes all associated file and article records.</source>
         <translation>重置列宽</translation>
     </message>
     <message>
-        <location line="-1731"/>
+        <location line="-1732"/>
         <location line="+425"/>
         <source>PAR2 Settings…</source>
         <translation>PAR2 设置…</translation>
     </message>
     <message>
-        <location line="+1739"/>
+        <location line="+1740"/>
         <source>Post all tabs</source>
         <translation>发布所有标签页</translation>
     </message>
@@ -6977,22 +6989,20 @@ Some Usenet indexes ask for one.</source>
         <translation>全局（%1 %）</translation>
     </message>
     <message>
-        <location line="+57"/>
         <source>Archive name copied to clipboard.</source>
-        <translation>压缩包名称已复制到剪贴板。</translation>
+        <translation type="vanished">压缩包名称已复制到剪贴板。</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>Password copied to clipboard.</source>
-        <translation>密码已复制到剪贴板。</translation>
+        <translation type="vanished">密码已复制到剪贴板。</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+69"/>
         <source>Nothing to copy</source>
         <translation>没有可复制的内容</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+6"/>
         <source>Copied!</source>
         <translation>已复制！</translation>
     </message>

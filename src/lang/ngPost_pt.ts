@@ -713,7 +713,7 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3341"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3342"/>
         <source>VPN: disabled</source>
         <translation>VPN: desativado</translation>
     </message>
@@ -914,26 +914,26 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
         <translation>Senha</translation>
     </message>
     <message>
-        <location line="-1208"/>
-        <location line="+408"/>
+        <location line="-1209"/>
+        <location line="+409"/>
         <location line="+1806"/>
         <source>Default %1</source>
         <translation>Padrão %1</translation>
     </message>
     <message>
-        <location line="-2222"/>
-        <location line="+420"/>
+        <location line="-2223"/>
+        <location line="+421"/>
         <source>Post history, statistics and resume center</source>
         <translation>Histórico de publicações, estatísticas e centro de retoma</translation>
     </message>
     <message>
-        <location line="-411"/>
-        <location line="+415"/>
+        <location line="-412"/>
+        <location line="+416"/>
         <source>New</source>
         <translation>Novo</translation>
     </message>
     <message>
-        <location line="-358"/>
+        <location line="-359"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>velocidade média</translation>
@@ -1018,13 +1018,13 @@ Tem certeza que deseja sair?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+592"/>
+        <location line="+593"/>
         <location line="+213"/>
         <source>Files</source>
         <translation>Arquivos</translation>
     </message>
     <message>
-        <location line="-804"/>
+        <location line="-805"/>
         <source>Parameters</source>
         <translation>Parâmetros</translation>
     </message>
@@ -1034,7 +1034,7 @@ Tem certeza que deseja sair?</translation>
         <translation>Registro de Postagem</translation>
     </message>
     <message>
-        <location line="+71"/>
+        <location line="+72"/>
         <source>Quick Tabs Menu</source>
         <translation>Menu Rápido de Abas</translation>
     </message>
@@ -1103,12 +1103,12 @@ The job stays in the queue.</source>
 O trabalho fica na fila.</translation>
     </message>
     <message>
-        <location line="-620"/>
+        <location line="-621"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>Não foi possível remover estas definições. Consulte o registo da VPN para mais detalhes.</translation>
     </message>
     <message>
-        <location line="+634"/>
+        <location line="+635"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>A VPN configurada no ngPost parece já estar em execução; outro ngPost poderá estar a utilizá-la. Consulte as definições da VPN.</translation>
     </message>
@@ -1728,7 +1728,19 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>VPN: falhou</translation>
     </message>
     <message>
-        <location line="-2060"/>
+        <location line="+60"/>
+        <location line="+1"/>
+        <source>Open Posting Log</source>
+        <translation>Abrir registo de publicações</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <location line="+1"/>
+        <source>Close Posting Log</source>
+        <translation>Fechar registo de publicações</translation>
+    </message>
+    <message>
+        <location line="-2121"/>
         <location line="+168"/>
         <source>All statuses</source>
         <translation>Todos os estados</translation>
@@ -1859,8 +1871,8 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>Excluir entrada</translation>
     </message>
     <message>
-        <location line="-1404"/>
-        <location line="+420"/>
+        <location line="-1405"/>
+        <location line="+421"/>
         <location line="+538"/>
         <location line="+168"/>
         <source>History</source>
@@ -2040,13 +2052,13 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>Redefinir a largura das colunas</translation>
     </message>
     <message>
-        <location line="-1731"/>
+        <location line="-1732"/>
         <location line="+425"/>
         <source>PAR2 Settings…</source>
         <translation>Configurações PAR2…</translation>
     </message>
     <message>
-        <location line="+1739"/>
+        <location line="+1740"/>
         <source>Post all tabs</source>
         <translation>Postar todas as abas</translation>
     </message>
@@ -6976,22 +6988,20 @@ Alguns índices Usenet pedem um.</translation>
         <translation>Global (%1 %)</translation>
     </message>
     <message>
-        <location line="+57"/>
         <source>Archive name copied to clipboard.</source>
-        <translation>Nome do arquivo copiado para a área de transferência.</translation>
+        <translation type="vanished">Nome do arquivo copiado para a área de transferência.</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>Password copied to clipboard.</source>
-        <translation>Palavra-passe copiada para a área de transferência.</translation>
+        <translation type="vanished">Palavra-passe copiada para a área de transferência.</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+69"/>
         <source>Nothing to copy</source>
         <translation>Nada a copiar</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+6"/>
         <source>Copied!</source>
         <translation>Copiado!</translation>
     </message>

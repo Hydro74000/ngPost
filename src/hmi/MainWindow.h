@@ -44,6 +44,7 @@ class QLabel;
 class QLineEdit;
 class QMenu;
 class QPushButton;
+class QToolButton;
 class QTableWidget;
 class QTabWidget;
 class QTimer;
@@ -207,6 +208,9 @@ public:
     int      logMaxBlockCharactersForTest() const;
     void     setLogBlockCapForTest(int blocks) { _logBlockCap = blocks; }
     void     fillTabContextMenuForTest(QMenu &menu, int tabIndex) { _fillTabContextMenu(menu, tabIndex); }
+    QToolButton *logToggleBtnForTest() const { return _logToggleBtn; }
+    bool isLogBoxCollapsedForTest() const { return _isLogBoxCollapsed(); }
+    void toggleLogBoxForTest() { _onToggleLogBox(); }
 #endif
 
     void updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded, const QString &avgSpeed = "0 B/s"
@@ -408,6 +412,15 @@ private:
     StartupTabBar *_startupTabBar() const;
     void _fillTabContextMenu(QMenu &menu, int tabIndex);
     void _applyStartupTab();
+
+    void _initLogBoxToggle();
+    void _updateLogToggleBtn();
+    bool _isLogBoxCollapsed() const;
+    void _onToggleLogBox();
+    void _onPostSplitterMoved(int pos, int index);
+
+    QToolButton *_logToggleBtn = nullptr;
+    int _lastLogBoxWidth = 0;
 
 
     static const QString sGroupBoxStyle;

@@ -161,7 +161,7 @@ private:
     void _buildFilesList(QFileInfoList &files, bool &hasFolder);
     bool _fileAlreadyInList(const QString &fileName, int currentNbFiles) const;
     void _setupCopyActions();
-    void _copyToClipboard(QAction *action, QLineEdit *edit, const QString &statusMsg);
+    void _copyToClipboard(QAction *action, QLineEdit *edit);
 
     QAction *_copyCompressNameAction = nullptr;
     QAction *_copyPassAction = nullptr;

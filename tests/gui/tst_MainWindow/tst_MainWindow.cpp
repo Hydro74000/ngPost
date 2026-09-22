@@ -23,6 +23,7 @@
 #include <QClipboard>
 #include <QCheckBox>
 #include <QToolButton>
+#include <QStatusBar>
 
 #include "hmi/CheckBoxCenterWidget.h"
 #include "hmi/PostInfoDialog.h"
@@ -417,6 +418,7 @@ private slots:
     void copy_feedback_recovers_after_repeated_clicks();
     void auto_post_pending_rows_follow_palette_changes();
     void canceled_job_ignores_queued_file_notifications();
+    void post_splitter_log_toggle_button_collapses_and_restores();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -6863,6 +6865,7 @@ void TestMainWindow::copy_feedback_recovers_after_repeated_clicks()
     const auto original = action->icon().pixmap(24, 24).toImage();
     button->click();
     QCOMPARE(QApplication::clipboard()->text(), edit->text());
+    QVERIFY(window->statusBar()->currentMessage().isEmpty());
     QVERIFY(action->icon().pixmap(24, 24).toImage() != original);
     button->click();
     QTest::qWait(1500);
@@ -6960,4 +6963,36 @@ void TestMainWindow::canceled_job_ignores_queued_file_notifications()
     QCOMPARE(finished.count(), 1);
     QVERIFY(!job->hasPostFinishedSuccessfully());
     QTRY_VERIFY(!ngPost.hasPostingJobs());
+}
+
+void TestMainWindow::post_splitter_log_toggle_button_collapses_and_restores()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    window->show();
+    QCoreApplication::processEvents();
+
+    QToolButton *btn = window->logToggleBtnForTest();
+    QVERIFY(btn);
+    QVERIFY(!window->isLogBoxCollapsedForTest());
+    QCOMPARE(btn->arrowType(), Qt::RightArrow);
+    QCOMPARE(btn->toolTip(), MainWindow::tr("Close Posting Log"));
+
+    btn->click();
+    QCoreApplication::processEvents();
+    QVERIFY(window->isLogBoxCollapsedForTest());
+    QCOMPARE(btn->arrowType(), Qt::LeftArrow);
+    QCOMPARE(btn->toolTip(), MainWindow::tr("Open Posting Log"));
+
+    btn->click();
+    QCoreApplication::processEvents();
+    QVERIFY(!window->isLogBoxCollapsedForTest());
+    QCOMPARE(btn->arrowType(), Qt::RightArrow);
+    QCOMPARE(btn->toolTip(), MainWindow::tr("Close Posting Log"));
 }

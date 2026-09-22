@@ -1004,16 +1004,14 @@ void PostingWidget::_setupCopyActions()
     }
 
     connect(_copyCompressNameAction, &QAction::triggered, this, [this]() {
-        _copyToClipboard(_copyCompressNameAction,
-                         _ui->compressNameEdit,
-                         tr("Archive name copied to clipboard."));
+        _copyToClipboard(_copyCompressNameAction, _ui->compressNameEdit);
     });
     connect(_copyPassAction, &QAction::triggered, this, [this]() {
-        _copyToClipboard(_copyPassAction, _ui->nzbPassEdit, tr("Password copied to clipboard."));
+        _copyToClipboard(_copyPassAction, _ui->nzbPassEdit);
     });
 }
 
-void PostingWidget::_copyToClipboard(QAction *action, QLineEdit *edit, const QString &statusMsg)
+void PostingWidget::_copyToClipboard(QAction *action, QLineEdit *edit)
 {
     if (!edit || !action)
         return;
@@ -1025,9 +1023,6 @@ void PostingWidget::_copyToClipboard(QAction *action, QLineEdit *edit, const QSt
     }
 
     QApplication::clipboard()->setText(text);
-
-    if (_hmi && _hmi->statusBar())
-        _hmi->statusBar()->showMessage(statusMsg, 3000);
 
     QToolTip::showText(QCursor::pos(), tr("Copied!"), edit, {}, 1500);
 

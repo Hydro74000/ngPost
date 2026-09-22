@@ -68,6 +68,7 @@
 #include <QMessageBox>
 #include <QMenu>
 #include <QPushButton>
+#include <QToolButton>
 #include <QSizePolicy>
 #include <QSettings>
 #include <QStatusBar>
@@ -241,8 +242,7 @@ MainWindow::MainWindow(QWidget *parent) :
     _ui->postSplitter->setStretchFactor(0, 3);
     _ui->postSplitter->setStretchFactor(1, 1);
     _ui->postSplitter->setCollapsible(0, false);
-
-
+    _initLogBoxToggle();
     _ui->progressBar->setRange(0, 100);
     updateProgressBar(0, 0, "");
 
@@ -722,6 +722,7 @@ void MainWindow::_retranslate()
     _ui->fileBox->setTitle(tr("Files"));
     _ui->postingBox->setTitle(tr("Parameters"));
     _ui->logBox->setTitle(tr("Posting Log"));
+    _updateLogToggleBtn();
 
     tabBar->setTabText(kQuickPostTab, QString("%1 #1").arg(_ngPost->quickJobName()));
     tabBar->setTabToolTip(kQuickPostTab, tr("Default %1").arg(_ngPost->quickJobName()));
@@ -3349,6 +3350,96 @@ void MainWindow::onVpnStateChanged(VpnManager::State newState)
     case VpnManager::State::Failed:    text = tr("VPN: failed");                   break;
     }
     _ui->vpnStateLbl->setText(text);
+}
+
+void MainWindow::_initLogBoxToggle()
+{
+    _ui->postSplitter->setHandleWidth(14);
+    QSplitterHandle *postHandle = _ui->postSplitter->handle(1);
+    if (!postHandle)
+        return;
+
+    _logToggleBtn = new QToolButton(postHandle);
+    _logToggleBtn->setObjectName(QStringLiteral("logToggleBtn"));
+    _logToggleBtn->setFixedSize(14, 42);
+    _logToggleBtn->setCursor(Qt::PointingHandCursor);
+    _logToggleBtn->setStyleSheet(QStringLiteral("QToolButton {"
+                                                "  border: 1px solid palette(mid);"
+                                                "  border-radius: 3px;"
+                                                "  background: palette(button);"
+                                                "  padding: 0px;"
+                                                "}"
+                                                "QToolButton:hover {"
+                                                "  background: palette(light);"
+                                                "  border-color: palette(highlight);"
+                                                "}"
+                                                "QToolButton:pressed {"
+                                                "  background: palette(dark);"
+                                                "}"));
+
+    auto *handleLayout = new QVBoxLayout(postHandle);
+    handleLayout->setContentsMargins(0, 0, 0, 0);
+    handleLayout->setSpacing(0);
+    handleLayout->addStretch();
+    handleLayout->addWidget(_logToggleBtn);
+    handleLayout->addStretch();
+
+    connect(_logToggleBtn, &QToolButton::clicked, this, &MainWindow::_onToggleLogBox);
+    connect(_ui->postSplitter, &QSplitter::splitterMoved, this, &MainWindow::_onPostSplitterMoved);
+    _updateLogToggleBtn();
+}
+
+bool MainWindow::_isLogBoxCollapsed() const
+{
+    if (!_ui || !_ui->postSplitter || !_ui->logBox)
+        return false;
+    const QList<int> s = _ui->postSplitter->sizes();
+    if (s.size() < 2 || (s.at(0) == 0 && s.at(1) == 0))
+        return false;
+    return s.at(1) == 0 || !_ui->logBox->isVisible();
+}
+
+void MainWindow::_updateLogToggleBtn()
+{
+    if (!_logToggleBtn)
+        return;
+    const bool collapsed = _isLogBoxCollapsed();
+    _logToggleBtn->setArrowType(collapsed ? Qt::LeftArrow : Qt::RightArrow);
+    _logToggleBtn->setToolTip(collapsed ? tr("Open Posting Log") : tr("Close Posting Log"));
+    _logToggleBtn->setAccessibleName(collapsed ? tr("Open Posting Log") : tr("Close Posting Log"));
+}
+
+void MainWindow::_onToggleLogBox()
+{
+    const int total = _ui->postSplitter->width();
+    if (total <= 0)
+        return;
+
+    if (_isLogBoxCollapsed()) {
+        int w = _lastLogBoxWidth;
+        if (w < 80)
+            w = qMax(150, total / 4);
+        if (w >= total)
+            w = total / 4;
+        _ui->postSplitter->setSizes({ total - w, w });
+    } else {
+        const int cur = _ui->postSplitter->sizes().value(1, 0);
+        if (cur > 50)
+            _lastLogBoxWidth = cur;
+        _ui->postSplitter->setSizes({ total, 0 });
+    }
+    _updateLogToggleBtn();
+}
+
+void MainWindow::_onPostSplitterMoved(int pos, int index)
+{
+    Q_UNUSED(pos);
+    if (index == 1) {
+        const int cur = _ui->postSplitter->sizes().value(1, 0);
+        if (cur > 50)
+            _lastLogBoxWidth = cur;
+        _updateLogToggleBtn();
+    }
 }
 
 

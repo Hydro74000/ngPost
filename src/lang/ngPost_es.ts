@@ -723,7 +723,7 @@ A diferencia de la casilla por post, esta elección se guarda.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3341"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3342"/>
         <source>VPN: disabled</source>
         <translation>VPN: desactivado</translation>
     </message>
@@ -909,26 +909,26 @@ A diferencia de la casilla por post, esta elección se guarda.</translation>
         <translation>Contraseña</translation>
     </message>
     <message>
-        <location line="-1208"/>
-        <location line="+408"/>
+        <location line="-1209"/>
+        <location line="+409"/>
         <location line="+1806"/>
         <source>Default %1</source>
         <translation>Por Defecto %1</translation>
     </message>
     <message>
-        <location line="-2222"/>
-        <location line="+420"/>
+        <location line="-2223"/>
+        <location line="+421"/>
         <source>Post history, statistics and resume center</source>
         <translation>Historial de publicaciones, estadísticas y centro de reanudación</translation>
     </message>
     <message>
-        <location line="-411"/>
-        <location line="+415"/>
+        <location line="-412"/>
+        <location line="+416"/>
         <source>New</source>
         <translation>Nuevo</translation>
     </message>
     <message>
-        <location line="-358"/>
+        <location line="-359"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>velocidad media</translation>
@@ -1001,13 +1001,13 @@ Cierre ese otro ngPost para usar la VPN aquí. Si no hay ninguno en ejecución, 
     </message>
     <message>
         <location line="+1"/>
-        <location line="+592"/>
+        <location line="+593"/>
         <location line="+213"/>
         <source>Files</source>
         <translation>Ficheros</translation>
     </message>
     <message>
-        <location line="-804"/>
+        <location line="-805"/>
         <source>Parameters</source>
         <translation>Parámetros</translation>
     </message>
@@ -1017,7 +1017,7 @@ Cierre ese otro ngPost para usar la VPN aquí. Si no hay ninguno en ejecución, 
         <translation>Log de Publicación</translation>
     </message>
     <message>
-        <location line="+201"/>
+        <location line="+202"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
         <translation>&lt;h3&gt;Nueva versión disponible: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Actual: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;Ver versión en GitHub&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
@@ -1070,12 +1070,12 @@ The job stays in the queue.</source>
 El trabajo permanece en la cola.</translation>
     </message>
     <message>
-        <location line="-620"/>
+        <location line="-621"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>No se han podido eliminar estos ajustes. Consulte el registro de la VPN para más detalles.</translation>
     </message>
     <message>
-        <location line="+634"/>
+        <location line="+635"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>La VPN configurada en ngPost parece estar ya en funcionamiento; es posible que otro ngPost la esté usando. Consulte los ajustes de la VPN.</translation>
     </message>
@@ -1678,24 +1678,36 @@ Esto elimina también todos los registros de archivos y artículos asociados.</t
         <translation>VPN: fallido</translation>
     </message>
     <message>
-        <location line="-2700"/>
+        <location line="+60"/>
+        <location line="+1"/>
+        <source>Open Posting Log</source>
+        <translation>Abrir registro de publicaciones</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <location line="+1"/>
+        <source>Close Posting Log</source>
+        <translation>Cerrar registro de publicaciones</translation>
+    </message>
+    <message>
+        <location line="-2762"/>
         <source>close while still posting?</source>
         <translation>¿cerrar mientras se sigue publicando?</translation>
     </message>
     <message>
-        <location line="-454"/>
+        <location line="-453"/>
         <source>on</source>
         <translation>on</translation>
     </message>
     <message>
-        <location line="+455"/>
+        <location line="+454"/>
         <source>ngPost is currently posting.
 Are you sure you want to quit?</source>
         <translation>ngPost está actualmente publicando.
 ¿Estás seguro de que quieres dejarlo?</translation>
     </message>
     <message>
-        <location line="+145"/>
+        <location line="+146"/>
         <source>Quick Tabs Menu</source>
         <translation>Menú de Pestañas Rápidas</translation>
     </message>
@@ -1859,8 +1871,8 @@ Are you sure you want to quit?</source>
         <translation>Eliminar entrada</translation>
     </message>
     <message>
-        <location line="-1404"/>
-        <location line="+420"/>
+        <location line="-1405"/>
+        <location line="+421"/>
         <location line="+538"/>
         <location line="+168"/>
         <source>History</source>
@@ -2040,13 +2052,13 @@ Are you sure you want to quit?</source>
         <translation>Restablecer el ancho de las columnas</translation>
     </message>
     <message>
-        <location line="-1731"/>
+        <location line="-1732"/>
         <location line="+425"/>
         <source>PAR2 Settings…</source>
         <translation>Ajustes PAR2…</translation>
     </message>
     <message>
-        <location line="+1739"/>
+        <location line="+1740"/>
         <source>Post all tabs</source>
         <translation>Publicar todas las pestañas</translation>
     </message>
@@ -6977,22 +6989,20 @@ Algunos índices de Usenet lo piden.</translation>
         <translation>Global (%1 %)</translation>
     </message>
     <message>
-        <location line="+57"/>
         <source>Archive name copied to clipboard.</source>
-        <translation>Nombre del archivo copiado al portapapeles.</translation>
+        <translation type="vanished">Nombre del archivo copiado al portapapeles.</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>Password copied to clipboard.</source>
-        <translation>Contraseña copiada al portapapeles.</translation>
+        <translation type="vanished">Contraseña copiada al portapapeles.</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+69"/>
         <source>Nothing to copy</source>
         <translation>Nada que copiar</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+6"/>
         <source>Copied!</source>
         <translation>¡Copiado!</translation>
     </message>

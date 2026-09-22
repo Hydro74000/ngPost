@@ -715,7 +715,7 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3341"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3342"/>
         <source>VPN: disabled</source>
         <translation>VPN: uitgeschakeld</translation>
     </message>
@@ -916,26 +916,26 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
         <translation>Wachtwoord</translation>
     </message>
     <message>
-        <location line="-1208"/>
-        <location line="+408"/>
+        <location line="-1209"/>
+        <location line="+409"/>
         <location line="+1806"/>
         <source>Default %1</source>
         <translation>Standaard %1</translation>
     </message>
     <message>
-        <location line="-2222"/>
-        <location line="+420"/>
+        <location line="-2223"/>
+        <location line="+421"/>
         <source>Post history, statistics and resume center</source>
         <translation>Postgeschiedenis, statistieken en hervattingscentrum</translation>
     </message>
     <message>
-        <location line="-411"/>
-        <location line="+415"/>
+        <location line="-412"/>
+        <location line="+416"/>
         <source>New</source>
         <translation>Nieuw</translation>
     </message>
     <message>
-        <location line="-358"/>
+        <location line="-359"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>gemiddelde snelheid</translation>
@@ -1020,13 +1020,13 @@ Weet je zeker dat je wilt stoppen?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+592"/>
+        <location line="+593"/>
         <location line="+213"/>
         <source>Files</source>
         <translation>Bestanden</translation>
     </message>
     <message>
-        <location line="-804"/>
+        <location line="-805"/>
         <source>Parameters</source>
         <translation>Parameters</translation>
     </message>
@@ -1036,7 +1036,7 @@ Weet je zeker dat je wilt stoppen?</translation>
         <translation>Posts logboek</translation>
     </message>
     <message>
-        <location line="+71"/>
+        <location line="+72"/>
         <source>Quick Tabs Menu</source>
         <translation>Quick menu tabbladen</translation>
     </message>
@@ -1105,12 +1105,12 @@ The job stays in the queue.</source>
 De taak blijft in de wachtrij.</translation>
     </message>
     <message>
-        <location line="-620"/>
+        <location line="-621"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>Deze instellingen konden niet worden verwijderd. Zie het VPN-logboek voor details.</translation>
     </message>
     <message>
-        <location line="+634"/>
+        <location line="+635"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>De in ngPost geconfigureerde VPN lijkt al te draaien; mogelijk gebruikt een andere ngPost hem. Zie de VPN-instellingen.</translation>
     </message>
@@ -1730,7 +1730,19 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>VPN: mislukt</translation>
     </message>
     <message>
-        <location line="-2060"/>
+        <location line="+60"/>
+        <location line="+1"/>
+        <source>Open Posting Log</source>
+        <translation>Postlogboek openen</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <location line="+1"/>
+        <source>Close Posting Log</source>
+        <translation>Postlogboek sluiten</translation>
+    </message>
+    <message>
+        <location line="-2121"/>
         <location line="+168"/>
         <source>All statuses</source>
         <translation>Alle statussen</translation>
@@ -1861,8 +1873,8 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Item verwijderen</translation>
     </message>
     <message>
-        <location line="-1404"/>
-        <location line="+420"/>
+        <location line="-1405"/>
+        <location line="+421"/>
         <location line="+538"/>
         <location line="+168"/>
         <source>History</source>
@@ -2042,13 +2054,13 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Kolombreedtes herstellen</translation>
     </message>
     <message>
-        <location line="-1731"/>
+        <location line="-1732"/>
         <location line="+425"/>
         <source>PAR2 Settings…</source>
         <translation>PAR2-instellingen…</translation>
     </message>
     <message>
-        <location line="+1739"/>
+        <location line="+1740"/>
         <source>Post all tabs</source>
         <translation>Alle tabbladen posten</translation>
     </message>
@@ -6981,22 +6993,20 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>Globaal (%1 %)</translation>
     </message>
     <message>
-        <location line="+57"/>
         <source>Archive name copied to clipboard.</source>
-        <translation>Archiefnaam naar klembord gekopieerd.</translation>
+        <translation type="vanished">Archiefnaam naar klembord gekopieerd.</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>Password copied to clipboard.</source>
-        <translation>Wachtwoord naar het klembord gekopieerd.</translation>
+        <translation type="vanished">Wachtwoord naar het klembord gekopieerd.</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+69"/>
         <source>Nothing to copy</source>
         <translation>Niets te kopiëren</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+6"/>
         <source>Copied!</source>
         <translation>Gekopieerd!</translation>
     </message>
