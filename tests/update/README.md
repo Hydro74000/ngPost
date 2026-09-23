@@ -11,7 +11,8 @@ also a required dependency of `Build and Release`. Its tests run sequentially:
   corrupted download, failed preflight and rollback after a failed installed probe.
 - `test_update_handoff.py`: C++ notification through download of manifest/archive,
   embedded Python extraction and verification, detached installer readiness,
-  application exit and restart. Only HTTP transport is substituted, with the
+  application exit and restart, including launching from the installation directory
+  (which otherwise pins the Windows directory during rename). Only HTTP transport is substituted, with the
   production HTTPS URLs. No live release needs publishing to exercise this path.
 
 For a complete update rehearsal without publishing, dispatch `Build and Release`

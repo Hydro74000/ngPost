@@ -34,7 +34,7 @@ class HandoffTests(unittest.TestCase):
                 url + archive.name: str(archive)}))
             env = dict(os.environ, NGPOST_UPDATE_SCENARIO=str(scenario), QT_QPA_PLATFORM='offscreen')
             with (root / 'client.log').open('wb') as log:
-                result = subprocess.run([str(client), '--update-handoff'], env=env,
+                result = subprocess.run([str(client), '--update-handoff'], env=env, cwd=install,
                                         stdout=log, stderr=log, timeout=45)
             self.assertEqual(result.returncode, 0, (root / 'client.log').read_text())
             transactions = list(root.glob('.ngpost-update-*'))

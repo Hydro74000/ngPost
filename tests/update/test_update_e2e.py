@@ -96,11 +96,11 @@ class NativeUpdateTests(unittest.TestCase):
 
     def commit(self, cancel=False):
         generation = (self.install / 'generation').read_text()
-        with subprocess.Popen([str(executable(self.install)), '--hold']) as old:
+        with subprocess.Popen([str(executable(self.install)), '--hold'], cwd=self.install) as old:
             try:
                 with subprocess.Popen([sys.executable, '-I', str(INSTALLER), 'commit',
                                        str(self.work), '--pid', str(old.pid)],
-                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE) as installer:
+                                      cwd=self.install, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as installer:
                     try:
                         wait_file(self.work / 'ready', installer)
                         time.sleep(0.2)

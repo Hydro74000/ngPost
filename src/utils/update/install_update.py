@@ -302,6 +302,10 @@ if __name__ == '__main__':
         if args.phase == 'prepare':
             prepare(args.work, args.tag, args.asset, Path(args.install))
         else:
+            # A Windows process pins its current directory. The detached child
+            # can inherit the installation's cwd, so leave it before swapping.
+            args.work = args.work.resolve()
+            os.chdir(args.work)
             commit(args.work, args.pid)
     except Exception as error:
         (args.work / 'error.txt').write_text(str(error))

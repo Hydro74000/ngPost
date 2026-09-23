@@ -68,13 +68,13 @@ def check_package(archive, tag, previous_installer=None):
                    XDG_CONFIG_HOME=str(profile), APPDATA=str(profile), LOCALAPPDATA=str(profile))
         print(check_version(executable(install), env))
         # Real ngPost stays open until handoff acknowledges it is waiting.
-        with subprocess.Popen([str(executable(install))], env=env,
+        with subprocess.Popen([str(executable(install))], env=env, cwd=install,
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as old:
             try:
                 with (work / 'commit.log').open('wb') as log, subprocess.Popen(
                         [sys.executable, '-I', str(INSTALLER), 'commit', str(work),
                                        '--pid', str(old.pid)], env=env,
-                                      stdout=log, stderr=log) as installer:
+                                      cwd=install, stdout=log, stderr=log) as installer:
                     try:
                         wait_file(work / 'ready', installer)
                         if old.poll() is not None:
