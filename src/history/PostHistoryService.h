@@ -184,8 +184,20 @@ signals:
     void prepared(bool ok);
 
 private:
+    using ArticleKind = PostHistoryStore::ArticleEvent::Kind;
+
     template<typename Func>
     void _invokeQueued(Func func);
+    //! Queues the outcome of one article: the three enqueueArticle*() differ
+    //! only in \a kind (and a posted article carries no \a reason).
+    void _enqueueArticleEvent(ArticleKind kind,
+                              qint64 fileId,
+                              int part,
+                              const QString &msgId,
+                              const QString &reason,
+                              qint64 pos,
+                              qint64 bytes,
+                              qint64 bodyBytes);
 
     template<typename Func>
     bool _invokeBlocking(Func func);

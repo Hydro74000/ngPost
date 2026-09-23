@@ -901,6 +901,27 @@ void PostHistoryService::enqueueArticlePosting(qint64 fileId,
     _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
 }
 
+void PostHistoryService::_enqueueArticleEvent(ArticleKind kind,
+                                              qint64 fileId,
+                                              int part,
+                                              const QString &msgId,
+                                              const QString &reason,
+                                              qint64 pos,
+                                              qint64 bytes,
+                                              qint64 bodyBytes)
+{
+    PostHistoryStore::ArticleEvent event;
+    event.kind = kind;
+    event.fileId = fileId;
+    event.part = part;
+    event.msgId = msgId;
+    event.error = reason;
+    event.pos = pos;
+    event.bytes = bytes;
+    event.bodyBytes = bodyBytes;
+    _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
+}
+
 void PostHistoryService::enqueueArticlePosted(qint64 fileId,
                                               int part,
                                               const QString &msgId,
@@ -908,15 +929,7 @@ void PostHistoryService::enqueueArticlePosted(qint64 fileId,
                                               qint64 bytes,
                                               qint64 bodyBytes)
 {
-    PostHistoryStore::ArticleEvent event;
-    event.kind = PostHistoryStore::ArticleEvent::Kind::Posted;
-    event.fileId = fileId;
-    event.part = part;
-    event.msgId = msgId;
-    event.pos = pos;
-    event.bytes = bytes;
-    event.bodyBytes = bodyBytes;
-    _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
+    _enqueueArticleEvent(ArticleKind::Posted, fileId, part, msgId, { }, pos, bytes, bodyBytes);
 }
 
 void PostHistoryService::enqueueArticleFailed(qint64 fileId,
@@ -927,16 +940,7 @@ void PostHistoryService::enqueueArticleFailed(qint64 fileId,
                                               qint64 bytes,
                                               qint64 bodyBytes)
 {
-    PostHistoryStore::ArticleEvent event;
-    event.kind = PostHistoryStore::ArticleEvent::Kind::Failed;
-    event.fileId = fileId;
-    event.part = part;
-    event.msgId = msgId;
-    event.error = reason;
-    event.pos = pos;
-    event.bytes = bytes;
-    event.bodyBytes = bodyBytes;
-    _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
+    _enqueueArticleEvent(ArticleKind::Failed, fileId, part, msgId, reason, pos, bytes, bodyBytes);
 }
 
 void PostHistoryService::enqueueArticleUnknown(qint64 fileId,
@@ -947,16 +951,7 @@ void PostHistoryService::enqueueArticleUnknown(qint64 fileId,
                                                qint64 bytes,
                                                qint64 bodyBytes)
 {
-    PostHistoryStore::ArticleEvent event;
-    event.kind = PostHistoryStore::ArticleEvent::Kind::Unknown;
-    event.fileId = fileId;
-    event.part = part;
-    event.msgId = msgId;
-    event.error = reason;
-    event.pos = pos;
-    event.bytes = bytes;
-    event.bodyBytes = bodyBytes;
-    _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
+    _enqueueArticleEvent(ArticleKind::Unknown, fileId, part, msgId, reason, pos, bytes, bodyBytes);
 }
 
 bool PostHistoryService::flush(QString *error)

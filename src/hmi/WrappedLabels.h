@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Hydro74000. GPL-3.0-or-later.
 #ifndef WRAPPEDLABELS_H
 #define WRAPPEDLABELS_H
+#include <QEvent>
 #include <QLabel>
 #include <climits>
 
@@ -8,7 +9,7 @@
 //! label's current width, so a longer translation or a larger font is not cut.
 //! heightForWidth() would not do: it includes the previous minimum, so it cannot
 //! shrink a minimum measured before the form reached its actual width.
-//! Call it from the dialog's event() on LayoutRequest, Resize and Show.
+//! Call it from the dialog's event() when refitsWrappedLabels() says so.
 inline void fitWrappedLabels(const QWidget &root)
 {
     for (auto *label : root.findChildren<QLabel *>()) {
@@ -22,6 +23,13 @@ inline void fitWrappedLabels(const QWidget &root)
                   .height();
         label->setMinimumHeight(height + 2 * label->margin());
     }
+}
+
+//! The events after which fitWrappedLabels() has to run again.
+inline bool refitsWrappedLabels(const QEvent *event)
+{
+    return event->type() == QEvent::LayoutRequest || event->type() == QEvent::Resize
+        || event->type() == QEvent::Show;
 }
 
 #endif // WRAPPEDLABELS_H

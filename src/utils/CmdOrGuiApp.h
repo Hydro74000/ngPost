@@ -31,8 +31,11 @@ class CmdOrGuiApp
     // _ownsApp would be true in both halves of a copy. Only the const _mode
     // member currently prevents assignment, and nothing prevents copy
     // construction; the sole subclass happens to be a QObject, which is a
-    // coincidence rather than a guarantee.
-    Q_DISABLE_COPY(CmdOrGuiApp)
+    // coincidence rather than a guarantee. Spelled out rather than
+    // Q_DISABLE_COPY: analysers without Qt's macros (Codacy's cppcheck) could
+    // not see it and reported a missing copy constructor.
+    CmdOrGuiApp(const CmdOrGuiApp &) = delete;
+    CmdOrGuiApp &operator=(const CmdOrGuiApp &) = delete;
 
 protected:
     enum class AppMode : bool {CMD = 0, HMI = 1}; //!< supposed to be CMD but a simple HMI has been added

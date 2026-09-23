@@ -42,6 +42,7 @@ class NgPost;
 class NntpConnection;
 class NntpFile;
 class NntpArticle;
+class PostHistoryService;
 class PostingWidget;
 class Poster;
 
@@ -462,6 +463,10 @@ private:
     bool _finishIfCanceled();
     void _terminateExternalProcess();
     void _cleanExtProc();
+    void _createExtProc();
+    PostHistoryService *_recordHistoryArticleEnd(NntpArticle *article,
+                                                 const QString &reason,
+                                                 bool unknown);
     void _cleanCompressDir();
 
     QString _createArchiveFolder(const QString &tmpFolder, const QString &archiveName);

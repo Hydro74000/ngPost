@@ -173,6 +173,8 @@ private:
 
     void _sendNextArticle();
     void _closeConnection(bool dropTransport = false);
+    void _detachSocketSignals();
+    void _shutdownSocket();
     //! A transport close while an article is awaiting a definitive NNTP
     //! response is ambiguous: the server may already have accepted it. Keep
     //! the article resumable independently of VPN state and NO_RESUME_AUTO.

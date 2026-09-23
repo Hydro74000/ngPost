@@ -166,7 +166,7 @@ Par2SettingsDialog::Par2SettingsDialog(NgPost *ngPost, const QFileInfoList &file
 bool Par2SettingsDialog::event(QEvent *event)
 {
     const bool handled = QDialog::event(event);
-    if (_layoutReady && (event->type() == QEvent::LayoutRequest || event->type() == QEvent::Resize || event->type() == QEvent::Show))
+    if (_layoutReady && refitsWrappedLabels(event))
         fitWrappedLabels(*this);
     return handled;
 }

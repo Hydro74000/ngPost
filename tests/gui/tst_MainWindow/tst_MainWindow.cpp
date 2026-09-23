@@ -3266,8 +3266,11 @@ void TestMainWindow::queued_post_keeps_rar_and_par2_settings()
     second->findChild<QCheckBox *>("compressCB")->setChecked(true);
     second->findChild<QCheckBox *>("par2CB")->setChecked(true);
     second->setPar2PercentageOverride(17);
+    tabs->setCurrentWidget(second);
     window->findChild<QPushButton *>("postAllTabsButton")->click();
     QVERIFY(first->isPosting() && second->isPosting());
+    // The first post is on screen from the click, not once the queue moves on.
+    QCOMPARE(tabs->currentWidget(), first);
     QVERIFY(!QFileInfo::exists(rar + ".args")); // the second job is still waiting
     {
         CompressionSettingsDialog dialog(&ngPost, window);

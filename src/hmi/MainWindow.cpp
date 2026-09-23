@@ -2582,6 +2582,10 @@ void MainWindow::_submitPreparedTabs()
     QList<QPointer<PostingWidget>> posts;
     for (auto *post : _postingWidgets())
         if (post->canSubmit()) posts << post;
+    // Show the first post at once: the queue only switches tabs when it moves
+    // on to the next job, so the first one would stay out of view until then.
+    if (!posts.isEmpty())
+        _ui->postTabWidget->setCurrentWidget(posts.first());
     updateServers();
     updateParams();
     for (const auto &post : posts) {

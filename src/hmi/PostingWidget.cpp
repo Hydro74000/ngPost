@@ -542,10 +542,7 @@ void PostingWidget::init()
         _ui->nzbPassEdit->setText(_ngPost->_rarPassFixed);
     }
 
-    _ui->nameLengthSB->setRange(5, 50);
-    _ui->nameLengthSB->setValue(static_cast<int>(_ngPost->_lengthName));
-    _ui->passLengthSB->setRange(5, 50);
-    _ui->passLengthSB->setValue(static_cast<int>(_ngPost->_lengthPassDefault));
+    loadObfuscationLengths(_ui->nameLengthSB, _ui->passLengthSB, _ngPost);
 
     _ui->copyNfoWithNzbCB->setChecked(_ngPost->_copyNfoWithNzb);
 
@@ -947,11 +944,26 @@ void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files,
 }
 
 
+void PostingWidget::showPar2Default(QSpinBox *box, uint percentage)
+{
+    box->setSpecialValueText(tr("Global (%1 %)").arg(percentage));
+    box->setMaximumWidth(QWIDGETSIZE_MAX);
+    box->setMinimumWidth(box->sizeHint().width());
+}
+
+void PostingWidget::loadObfuscationLengths(QSpinBox *nameLength,
+                                           QSpinBox *passLength,
+                                           const NgPost *ngPost)
+{
+    nameLength->setRange(5, 50);
+    nameLength->setValue(static_cast<int>(ngPost->_lengthName));
+    passLength->setRange(5, 50);
+    passLength->setValue(static_cast<int>(ngPost->_lengthPassDefault));
+}
+
 void PostingWidget::refreshPar2Default()
 {
-    _ui->redundancySB->setSpecialValueText(tr("Global (%1 %)").arg(_ngPost->par2DefaultPercentage()));
-    _ui->redundancySB->setMaximumWidth(QWIDGETSIZE_MAX);
-    _ui->redundancySB->setMinimumWidth(_ui->redundancySB->sizeHint().width());
+    showPar2Default(_ui->redundancySB, _ngPost->par2DefaultPercentage());
     // The tooltip of the redundancy names the arguments a post runs with.
     onPar2CB(_ui->par2CB->isChecked());
 }

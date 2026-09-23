@@ -20,6 +20,21 @@ bool failure(QString *error, DWORD code = GetLastError())
     if (error) *error = QStringLiteral("SCM error %1").arg(code);
     return false;
 }
+//! The service manager and the named service in it, opened with \a rights.
+//! When the manager fails, the service is not attempted: GetLastError() still
+//! holds the manager's error. Members close in reverse: service, then manager.
+struct Service
+{
+    Handle manager;
+    Handle service;
+    Service(QString const &name, DWORD rights)
+        : manager(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT))
+        , service(manager.value
+                      ? OpenServiceW(manager.value, reinterpret_cast<LPCWSTR>(name.utf16()), rights)
+                      : nullptr)
+    {
+    }
+};
 }
 namespace WindowsServiceControl {
 State query(QString const &name, QString *error)
@@ -47,9 +62,8 @@ State query(QString const &name, QString *error)
 }
 bool requestStop(QString const &name, QString *error)
 {
-    Handle manager(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
-    if (!manager.value) return failure(error);
-    Handle service(OpenServiceW(manager.value, reinterpret_cast<LPCWSTR>(name.utf16()), SERVICE_STOP));
+    Service const scm(name, SERVICE_STOP);
+    Handle const &service = scm.service;
     if (!service.value) return failure(error);
     SERVICE_STATUS status = {};
     if (ControlService(service.value, SERVICE_CONTROL_STOP, &status)) return true;
@@ -60,10 +74,8 @@ bool requestStop(QString const &name, QString *error)
 }
 bool startDemand(QString const &name, QString *error)
 {
-    Handle manager(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
-    if (!manager.value) return failure(error);
-    Handle service(OpenServiceW(manager.value, reinterpret_cast<LPCWSTR>(name.utf16()),
-                               SERVICE_START | SERVICE_QUERY_CONFIG));
+    Service const scm(name, SERVICE_START | SERVICE_QUERY_CONFIG);
+    Handle const &service = scm.service;
     if (!service.value) return failure(error);
     DWORD size = 0;
     QueryServiceConfigW(service.value, nullptr, 0, &size);

@@ -336,6 +336,7 @@ private:
 #endif
     void _setState(State s);
     void _instantiateBackend();
+    void _connectBackend();
     bool _finishBackendStart(bool started);
     void _destroyBackend();
     //! False means shutdown is pending: keep signals/ownership and invoke

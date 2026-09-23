@@ -1410,6 +1410,12 @@ void VpnManager::_instantiateBackend()
     return;
 #endif
 
+    _connectBackend();
+}
+
+//! Routes every signal of the current backend to the manager.
+void VpnManager::_connectBackend()
+{
     connect(_currentBackend, &VpnBackend::ready,      this, &VpnManager::onBackendReady);
     connect(_currentBackend, &VpnBackend::restartReady, this, &VpnManager::onBackendRestartReady);
     connect(_currentBackend, &VpnBackend::restartFailed, this, &VpnManager::onBackendRestartFailed);
@@ -1981,14 +1987,7 @@ void VpnManager::setBackendForTest(VpnBackend *backend, State state)
     _currentBackend = backend;
     if (_currentBackend) {
         _currentBackend->setParent(this);
-        connect(_currentBackend, &VpnBackend::ready, this, &VpnManager::onBackendReady);
-        connect(_currentBackend, &VpnBackend::restartReady, this, &VpnManager::onBackendRestartReady);
-        connect(_currentBackend, &VpnBackend::restartFailed, this, &VpnManager::onBackendRestartFailed);
-        connect(_currentBackend, &VpnBackend::healthChanged, this, &VpnManager::onBackendHealthChanged);
-        connect(_currentBackend, &VpnBackend::terminated, this, &VpnManager::onBackendTerminated);
-        connect(_currentBackend, &VpnBackend::stopPending, this, &VpnManager::onBackendStopPending);
-        connect(_currentBackend, &VpnBackend::logLine, this, &VpnManager::logLine);
-        connect(_currentBackend, &VpnBackend::statusLine, this, &VpnManager::statusLine);
+        _connectBackend();
         _currentBackend->beginRun(++_nextRunId);
     }
     _setState(state);

@@ -85,22 +85,7 @@ NntpConnection::~NntpConnection()
 
     // this should already have been triggered as the sockets lives in another thread
     if (_socket) {
-        disconnect(_socket, &QAbstractSocket::disconnected, this, &NntpConnection::onDisconnected);
-        disconnect(_socket, &QIODevice::readyRead, this, &NntpConnection::onReadyRead);
-        disconnect(_socket,
-                   SIGNAL(errorOccurred(QAbstractSocket::SocketError)),
-                   this,
-                   SLOT(onErrors(QAbstractSocket::SocketError)));
-        if (_srvParams.useSSL)
-            disconnect(_socket,
-                       SIGNAL(sslErrors(QList<QSslError>)),
-                       this,
-                       SLOT(onSslErrors(QList<QSslError>)));
-
-        _socket->disconnectFromHost();
-        if (_socket->state() != QAbstractSocket::UnconnectedState)
-            _socket->waitForDisconnected();
-        deleteSocket();
+        _shutdownSocket();
     }
 #ifdef __USE_CONNECTION_TIMEOUT__
     if (_timeout)
@@ -234,23 +219,7 @@ void NntpConnection::onKillConnection()
         if (_ngPost->debugMode())
             _log("Killing connection..");
 
-        disconnect(_socket, &QAbstractSocket::disconnected, this, &NntpConnection::onDisconnected);
-        disconnect(_socket, &QIODevice::readyRead, this, &NntpConnection::onReadyRead);
-        disconnect(_socket,
-                   SIGNAL(errorOccurred(QAbstractSocket::SocketError)),
-                   this,
-                   SLOT(onErrors(QAbstractSocket::SocketError)));
-        if (_srvParams.useSSL)
-            disconnect(_socket,
-                       SIGNAL(sslErrors(QList<QSslError>)),
-                       this,
-                       SLOT(onSslErrors(QList<QSslError>)));
-
-        _socket->disconnectFromHost();
-        if (_socket->state() != QAbstractSocket::UnconnectedState)
-            _socket->waitForDisconnected();
-        deleteSocket();
-
+        _shutdownSocket();
     }
     // Pause/stop can cut an article after the socket write but before the
     // server reply. This is independent of whether the socket object survived
@@ -280,6 +249,32 @@ void NntpConnection::_preserveCurrentArticleAfterTransportLoss(QString const &re
     // _finishPosting() closes every transport before the counters are read.
 }
 
+//! Stops the socket from reaching this connection: data, errors, TLS errors.
+void NntpConnection::_detachSocketSignals()
+{
+    disconnect(_socket, &QIODevice::readyRead, this, &NntpConnection::onReadyRead);
+    disconnect(_socket,
+               SIGNAL(errorOccurred(QAbstractSocket::SocketError)),
+               this,
+               SLOT(onErrors(QAbstractSocket::SocketError)));
+    if (_srvParams.useSSL)
+        disconnect(_socket,
+                   SIGNAL(sslErrors(QList<QSslError>)),
+                   this,
+                   SLOT(onSslErrors(QList<QSslError>)));
+}
+
+//! Detaches every socket signal, closes the connection and deletes the socket.
+void NntpConnection::_shutdownSocket()
+{
+    disconnect(_socket, &QAbstractSocket::disconnected, this, &NntpConnection::onDisconnected);
+    _detachSocketSignals();
+    _socket->disconnectFromHost();
+    if (_socket->state() != QAbstractSocket::UnconnectedState)
+        _socket->waitForDisconnected();
+    deleteSocket();
+}
+
 void NntpConnection::_closeConnection(bool dropTransport)
 {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
@@ -292,16 +287,7 @@ void NntpConnection::_closeConnection(bool dropTransport)
         _timeout->stop();
 #endif
     if (_socket && _isConnected) {
-        disconnect(_socket, &QIODevice::readyRead, this, &NntpConnection::onReadyRead);
-        disconnect(_socket,
-                   SIGNAL(errorOccurred(QAbstractSocket::SocketError)),
-                   this,
-                   SLOT(onErrors(QAbstractSocket::SocketError)));
-        if (_srvParams.useSSL)
-            disconnect(_socket,
-                       SIGNAL(sslErrors(QList<QSslError>)),
-                       this,
-                       SLOT(onSslErrors(QList<QSslError>)));
+        _detachSocketSignals();
 
         if (dropTransport) {
             // A stalled or failed transport never flushes its write buffer:

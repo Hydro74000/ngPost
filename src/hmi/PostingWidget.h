@@ -36,6 +36,7 @@ class QCheckBox;
 class QGroupBox;
 class QLineEdit;
 class QPushButton;
+class QSpinBox;
 class QTableWidget;
 class QToolButton;
 class QWidget;
@@ -119,6 +120,14 @@ public:
     bool canSubmit() const;
     QFileInfoList previewFiles() const;
     void refreshPar2Default();
+    //! Shows the global PAR2 redundancy as \a box's special value, and widens
+    //! \a box to fit it. The Auto tab shares it.
+    static void showPar2Default(QSpinBox *box, uint percentage);
+    //! Loads the configured obfuscated name and password lengths. The Auto tab
+    //! shares it.
+    static void loadObfuscationLengths(QSpinBox *nameLength,
+                                       QSpinBox *passLength,
+                                       const NgPost *ngPost);
     void setPar2PercentageOverride(int percentage);
     bool hasPar2PercentageOverride() const;
 

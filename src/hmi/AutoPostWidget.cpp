@@ -64,10 +64,7 @@ void AutoPostWidget::init()
     _ui->redundancySB->setSuffix(QStringLiteral(" %"));
 
     _ui->autoDirEdit->setText(_ngPost->_inputDir);
-    _ui->nameLengthSB->setRange(5, 50);
-    _ui->nameLengthSB->setValue(static_cast<int>(_ngPost->_lengthName));
-    _ui->passLengthSB->setRange(5, 50);
-    _ui->passLengthSB->setValue(static_cast<int>(_ngPost->_lengthPassDefault));
+    PostingWidget::loadObfuscationLengths(_ui->nameLengthSB, _ui->passLengthSB, _ngPost);
 
     _ui->filesList->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
@@ -618,9 +615,7 @@ void AutoPostWidget::onEditPostInfo()
 
 void AutoPostWidget::refreshPar2Default()
 {
-    _ui->redundancySB->setSpecialValueText(tr("Global (%1 %)").arg(_ngPost->par2DefaultPercentage()));
-    _ui->redundancySB->setMaximumWidth(QWIDGETSIZE_MAX);
-    _ui->redundancySB->setMinimumWidth(_ui->redundancySB->sizeHint().width());
+    PostingWidget::showPar2Default(_ui->redundancySB, _ngPost->par2DefaultPercentage());
     // The tooltip of the redundancy names the arguments a post runs with.
     updatePackingDependents();
 }

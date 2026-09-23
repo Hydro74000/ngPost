@@ -112,9 +112,7 @@ bool CompressionSettingsDialog::event(QEvent *event)
 {
     const bool handled = QDialog::event(event);
     // The volume help and the tool status of the path row both wrap.
-    if (_layoutReady
-        && (event->type() == QEvent::LayoutRequest || event->type() == QEvent::Resize
-            || event->type() == QEvent::Show))
+    if (_layoutReady && refitsWrappedLabels(event))
         fitWrappedLabels(*this);
     return handled;
 }

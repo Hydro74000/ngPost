@@ -723,32 +723,37 @@ void PostingJob::recordHistoryArticlePosted(NntpArticle *article)
                                   article->nzbBytes());
 }
 
-void PostingJob::recordHistoryArticleFailed(NntpArticle *article, const QString &reason)
+//! Records that \a article failed, or that its outcome is \a unknown. The
+//! history service, or nullptr when there was nothing to record it in.
+PostHistoryService *PostingJob::_recordHistoryArticleEnd(NntpArticle *article,
+                                                         const QString &reason,
+                                                         bool unknown)
 {
     PostHistoryService *history = _ngPost->historyService();
     if (!article || !article->nntpFile() || !history)
-        return;
-    history->enqueueArticleFailed(article->nntpFile()->historyFileId(),
-                                  static_cast<int>(article->part()),
-                                  article->id(),
-                                  reason,
-                                  article->filePos(),
-                                  article->fileBytes(),
-                                  article->nzbBytes());
+        return nullptr;
+    auto const enqueue = unknown ? &PostHistoryService::enqueueArticleUnknown
+                                 : &PostHistoryService::enqueueArticleFailed;
+    (history->*enqueue)(article->nntpFile()->historyFileId(),
+                        static_cast<int>(article->part()),
+                        article->id(),
+                        reason,
+                        article->filePos(),
+                        article->fileBytes(),
+                        article->nzbBytes());
+    return history;
+}
+
+void PostingJob::recordHistoryArticleFailed(NntpArticle *article, const QString &reason)
+{
+    _recordHistoryArticleEnd(article, reason, false);
 }
 
 void PostingJob::recordHistoryArticleUnknown(NntpArticle *article, const QString &reason)
 {
-    PostHistoryService *history = _ngPost->historyService();
-    if (!article || !article->nntpFile() || !history)
+    PostHistoryService *history = _recordHistoryArticleEnd(article, reason, true);
+    if (!history)
         return;
-    history->enqueueArticleUnknown(article->nntpFile()->historyFileId(),
-                                   static_cast<int>(article->part()),
-                                   article->id(),
-                                   reason,
-                                   article->filePos(),
-                                   article->fileBytes(),
-                                   article->nzbBytes());
     // An unknown state is the crash-recovery boundary: do not leave it in the
     // normal batching window, because a second abrupt stop could otherwise
     // resurrect the preceding "posting" state and lose the ambiguity marker.
@@ -2273,22 +2278,7 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
     if (archiveTmpFolder.isEmpty())
         return false;
 
-    _extProc = new QProcess(this);
-    connect(_extProc,
-            &QProcess::errorOccurred,
-            this,
-            &PostingJob::onExtProcError,
-            Qt::QueuedConnection);
-    connect(_extProc,
-            &QProcess::readyReadStandardOutput,
-            this,
-            &PostingJob::onExtProcReadyReadStandardOutput,
-            Qt::DirectConnection);
-    connect(_extProc,
-            &QProcess::readyReadStandardError,
-            this,
-            &PostingJob::onExtProcReadyReadStandardError,
-            Qt::DirectConnection);
+    _createExtProc();
     connect(_extProc,
             static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
             this,
@@ -2549,22 +2539,7 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
         if (createdFolder.isEmpty())
             return false;
 
-        _extProc = new QProcess(this);
-        connect(_extProc,
-                &QProcess::errorOccurred,
-                this,
-                &PostingJob::onExtProcError,
-                Qt::QueuedConnection);
-        connect(_extProc,
-                &QProcess::readyReadStandardOutput,
-                this,
-                &PostingJob::onExtProcReadyReadStandardOutput,
-                Qt::DirectConnection);
-        connect(_extProc,
-                &QProcess::readyReadStandardError,
-                this,
-                &PostingJob::onExtProcReadyReadStandardError,
-                Qt::DirectConnection);
+        _createExtProc();
     }
 
     connect(_extProc,
@@ -2619,6 +2594,28 @@ void PostingJob::onGenPar2Finished(int exitCode)
 
         emit packingDone();
     }
+}
+
+//! A new external process whose errors and output reach this job; the caller
+//! connects its end.
+void PostingJob::_createExtProc()
+{
+    _extProc = new QProcess(this);
+    connect(_extProc,
+            &QProcess::errorOccurred,
+            this,
+            &PostingJob::onExtProcError,
+            Qt::QueuedConnection);
+    connect(_extProc,
+            &QProcess::readyReadStandardOutput,
+            this,
+            &PostingJob::onExtProcReadyReadStandardOutput,
+            Qt::DirectConnection);
+    connect(_extProc,
+            &QProcess::readyReadStandardError,
+            this,
+            &PostingJob::onExtProcReadyReadStandardError,
+            Qt::DirectConnection);
 }
 
 void PostingJob::_cleanExtProc()
