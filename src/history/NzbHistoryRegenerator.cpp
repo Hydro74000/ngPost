@@ -108,6 +108,40 @@ qint64 inferSegmentBytes(const PostHistoryStore::FileSummary &file,
     return fullArticleBytes;
 }
 
+//! What the history says went wrong with the articles of one file.
+struct ArticleIssues
+{
+    bool unknown = false;
+    bool nonPosted = false;
+    bool missing = false;
+};
+
+ArticleIssues scanArticles(const PostHistoryStore::FileSummary &file,
+                           const QList<PostHistoryStore::ArticleSummary> &articles)
+{
+    ArticleIssues issues;
+    issues.missing = articles.size() < file.totalArticles;
+    for (const PostHistoryStore::ArticleSummary &article : articles) {
+        if (article.status == QStringLiteral("unknown"))
+            issues.unknown = true;
+        if (article.status != QStringLiteral("posted"))
+            issues.nonPosted = true;
+        if (article.status == QStringLiteral("posted") && article.msgId.isEmpty())
+            issues.missing = true;
+    }
+    return issues;
+}
+
+int countConfirmedSegments(const QList<PostHistoryStore::ArticleSummary> &articles)
+{
+    int confirmedSegments = 0;
+    for (const PostHistoryStore::ArticleSummary &article : articles) {
+        if (article.status == QStringLiteral("posted") && !article.msgId.isEmpty())
+            ++confirmedSegments;
+    }
+    return confirmedSegments;
+}
+
 } // namespace
 
 NzbHistoryRegenerator::NzbHistoryRegenerator(PostHistoryStore *store)
@@ -297,41 +331,14 @@ bool NzbHistoryRegenerator::_writeFile(const PostHistoryStore::PostDetails &deta
                                                           articles,
                                                           postFullArticleBytesHint,
                                                           hasExactArticleSize);
-    bool hasUnknown = false;
-    bool hasNonPosted = false;
-    bool hasMissing = articles.size() < file.totalArticles;
-    for (const PostHistoryStore::ArticleSummary &article : articles) {
-        if (article.status == QStringLiteral("unknown"))
-            hasUnknown = true;
-        if (article.status != QStringLiteral("posted"))
-            hasNonPosted = true;
-        if (article.status == QStringLiteral("posted") && article.msgId.isEmpty())
-            hasMissing = true;
-    }
-    if (hasUnknown && warnings)
-        *warnings << tr("file %1 contains unknown articles").arg(file.postedName);
-    if (hasNonPosted && warnings)
-        *warnings << tr("file %1 contains non-posted articles").arg(file.postedName);
-    if (hasMissing && warnings)
-        *warnings << tr("file %1 has missing article records").arg(file.postedName);
-    if (details.post.status == QStringLiteral("success") && (hasNonPosted || hasMissing)) {
-        if (error)
-            *error = tr("history for successful file %1 is incomplete; refusing to replace "
-                        "the NZB")
-                         .arg(file.postedName);
+    if (!_checkFileHistory(details, file, articles, warnings, error))
         return false;
-    }
 
     // A <file> carrying no segment at all is not a usable NZB entry: no
     // client can act on it, and emitting it says strictly less than
     // leaving it out. Count what is actually confirmed first -- the
     // warnings above already tell the user the file is incomplete.
-    int confirmedSegments = 0;
-    for (const PostHistoryStore::ArticleSummary &article : articles) {
-        if (article.status == QStringLiteral("posted") && !article.msgId.isEmpty())
-            ++confirmedSegments;
-    }
-    if (confirmedSegments == 0) {
+    if (countConfirmedSegments(articles) == 0) {
         if (warnings)
             *warnings << tr("file %1 has no confirmed article and is left out of the NZB")
                              .arg(file.postedName);
@@ -352,6 +359,32 @@ bool NzbHistoryRegenerator::_writeFile(const PostHistoryStore::PostDetails &deta
     stream << tab << tab << "</groups>\n";
 
     _writeSegments(file, articles, stream, fullArticleBytes, useBodyBytes, repairedArticleBytes);
+    return true;
+}
+
+//! Warns about the gaps in the history of \a file. False, with \a error set,
+//! when a post recorded as successful has gaps: its NZB must not be replaced.
+bool NzbHistoryRegenerator::_checkFileHistory(
+    const PostHistoryStore::PostDetails &details,
+    const PostHistoryStore::FileSummary &file,
+    const QList<PostHistoryStore::ArticleSummary> &articles,
+    QStringList *warnings,
+    QString *error)
+{
+    const ArticleIssues issues = scanArticles(file, articles);
+    if (issues.unknown && warnings)
+        *warnings << tr("file %1 contains unknown articles").arg(file.postedName);
+    if (issues.nonPosted && warnings)
+        *warnings << tr("file %1 contains non-posted articles").arg(file.postedName);
+    if (issues.missing && warnings)
+        *warnings << tr("file %1 has missing article records").arg(file.postedName);
+    if (details.post.status == QStringLiteral("success") && (issues.nonPosted || issues.missing)) {
+        if (error)
+            *error = tr("history for successful file %1 is incomplete; refusing to replace "
+                        "the NZB")
+                         .arg(file.postedName);
+        return false;
+    }
     return true;
 }
 

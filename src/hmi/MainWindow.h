@@ -439,7 +439,11 @@ private:
     void _createZoomPopup();
     void _toggleZoomPopup();
     void _repositionZoomPopup();
-    void _scaleWidgetChildren(QWidget *parent, qreal scale, const QFont &font);
+    void _applyZoomFont(const QFont &f, qreal scale);
+    void _scaleZoomedControls(qreal scale);
+    void _showZoomLevel(int percent);
+    void _scheduleZoomSave();
+    void _scaleWidgetChildren(QWidget *parent, qreal scale);
     void _scaleTables(int rowHeight);
 
     QToolButton *_logToggleBtn = nullptr;

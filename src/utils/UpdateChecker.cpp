@@ -480,36 +480,66 @@ void UpdateChecker::downloadFile(const QUrl &url,
     auto written = std::make_shared<qint64>(0);
     auto error = std::make_shared<QString>();
     auto drain = [this, reply, cap, written, error] {
-        if (_downloadReply != reply || !_downloadFile) return;
-        while (reply->bytesAvailable() && error->isEmpty() && !_cancelled) {
-            const QByteArray data = reply->read(65536);
-            if (data.isEmpty()) break;
-            if (*written + data.size() > cap || _downloadFile->write(data) != data.size()) {
-                *error = tr("Update exceeds its size limit or could not be written.");
-                reply->abort();
-                return;
-            }
-            *written += data.size();
-        }
+        _drainDownload(reply, cap, written.get(), error.get());
     };
     connect(reply, &QIODevice::readyRead, this, drain);
     connect(reply, &QNetworkReply::downloadProgress, this, &UpdateChecker::downloadProgress);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, drain, written, error, name, cap, done] {
-        if (_downloadReply != reply) { reply->deleteLater(); return; }
+    connect(reply,
+            &QNetworkReply::finished,
+            this,
+            [this, reply, drain, written, error, name, cap, done] {
+        if (_downloadReply != reply) {
+            reply->deleteLater();
+            return;
+        }
         drain();
         _downloadReply = nullptr;
         reply->deleteLater();
-        const bool ok = !_cancelled && error->isEmpty() && reply->error() == QNetworkReply::NoError
-            && reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200
-            && (name != QLatin1String("archive") || *written == cap)
-            && _downloadFile && _downloadFile->flush();
-        _downloadFile.reset();
-        if (!ok) {
-            failDownload(error->isEmpty() ? tr("Update canceled, truncated or refused by the server.") : *error);
+        _completeDownload(reply, name, *written, cap, *error, done);
+    });
+}
+
+//! Moves what \a reply holds into the download file, \a cap bytes at most.
+void UpdateChecker::_drainDownload(QNetworkReply *reply,
+                                   qint64 cap,
+                                   qint64 *written,
+                                   QString *error)
+{
+    if (_downloadReply != reply || !_downloadFile)
+        return;
+    while (reply->bytesAvailable() && error->isEmpty() && !_cancelled) {
+        const QByteArray data = reply->read(65536);
+        if (data.isEmpty())
+            break;
+        if (*written + data.size() > cap || _downloadFile->write(data) != data.size()) {
+            *error = tr("Update exceeds its size limit or could not be written.");
+            reply->abort();
             return;
         }
-        done();
-    });
+        *written += data.size();
+    }
+}
+
+//! Once \a reply has finished: keeps the file and calls \a done when it is
+//! complete, fails the update otherwise. The archive must be exactly \a cap long.
+void UpdateChecker::_completeDownload(QNetworkReply *reply,
+                                      const QString &name,
+                                      qint64 written,
+                                      qint64 cap,
+                                      const QString &error,
+                                      const std::function<void()> &done)
+{
+    const bool ok = !_cancelled && error.isEmpty() && reply->error() == QNetworkReply::NoError
+        && reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200
+        && (name != QLatin1String("archive") || written == cap) && _downloadFile
+        && _downloadFile->flush();
+    _downloadFile.reset();
+    if (!ok) {
+        failDownload(error.isEmpty() ? tr("Update canceled, truncated or refused by the server.")
+                                     : error);
+        return;
+    }
+    done();
 }
 
 void UpdateChecker::prepareInstall()

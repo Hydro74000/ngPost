@@ -67,6 +67,10 @@ COPY --from=build /build/ngPost /usr/local/bin/ngPost
 # image, before any output of ngPost. C.UTF-8 ships with glibc itself.
 ENV LANG=C.UTF-8
 ENV XDG_CONFIG_HOME=/config
+# The image runs as 1000:1000. A new named or anonymous volume takes the owner
+# of its mount point, so give these two to that user before declaring them.
+# Bind mounts keep the host's owners: see the wiki's Docker page.
+RUN mkdir -p /config /data && chown 1000:1000 /config /data
 VOLUME ["/config", "/data"]
 WORKDIR /data
 

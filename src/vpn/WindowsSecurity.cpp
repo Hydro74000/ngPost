@@ -138,6 +138,98 @@ constexpr DWORD kDirectoryReplacementRights = FILE_DELETE_CHILD | DELETE
 constexpr DWORD kFileWriteRights = FILE_WRITE_DATA | FILE_APPEND_DATA | DELETE
                                   | WRITE_DAC | WRITE_OWNER | GENERIC_WRITE | GENERIC_ALL;
 
+//! The string form of \a sid, empty when there is none or it cannot be read.
+QString sidString(PSID sid)
+{
+    QString result;
+    LPWSTR text = nullptr;
+    if (sid && ConvertSidToStringSidW(sid, &text)) {
+        result = QString::fromWCharArray(text);
+        LocalFree(text);
+    }
+    return result;
+}
+
+//! WOF compression, deduplication and cloud placeholders also carry the
+//! reparse attribute. Only name-surrogate tags redirect into an unchecked tree.
+bool reparsePointIsSafe(QString const &path, QString const &nativePath, QString *detail)
+{
+    WIN32_FIND_DATAW data{ };
+    HANDLE const search = FindFirstFileW(reinterpret_cast<LPCWSTR>(nativePath.utf16()), &data);
+    if (search == INVALID_HANDLE_VALUE) {
+        if (detail)
+            *detail = QStringLiteral("cannot read the reparse tag of '%1'").arg(path);
+        return false;
+    }
+    FindClose(search);
+    if (IsReparseTagNameSurrogate(data.dwReserved0)) {
+        if (detail)
+            *detail = QStringLiteral("'%1' is a name-surrogate reparse point").arg(path);
+        return false;
+    }
+    return true;
+}
+
+bool ownerIsPrivileged(QString const &path, PSID owner, QString *detail)
+{
+    QString const ownerSid = sidString(owner);
+    if (!ownerSid.isEmpty() && isPrivilegedTrusteeSid(ownerSid))
+        return true;
+    if (detail) {
+        *detail = ownerSid.isEmpty()
+            ? QStringLiteral("'%1' has no identifiable owner").arg(path)
+            : QStringLiteral("'%1' is owned by %2, which can rewrite its permissions")
+                  .arg(path, ownerSid);
+    }
+    return false;
+}
+
+//! False when the access rule \a entry lets a non-administrative trustee write.
+bool aceIsAdminOnly(QString const &path, void *entry, DWORD writeRights, QString *detail)
+{
+    auto const *header = static_cast<ACE_HEADER const *>(entry);
+    // An inherit-only entry describes what children get, not this object.
+    if (header->AceFlags & INHERIT_ONLY_ACE)
+        return true;
+    if (header->AceType == ACCESS_DENIED_ACE_TYPE)
+        return true; // DENY precedence is deliberately not modelled
+    if (header->AceType != ACCESS_ALLOWED_ACE_TYPE) {
+        if (detail)
+            *detail = QStringLiteral("'%1' has an unsupported access rule").arg(path);
+        return false;
+    }
+
+    auto const *allowed = static_cast<ACCESS_ALLOWED_ACE const *>(entry);
+    if ((allowed->Mask & writeRights) == 0)
+        return true;
+
+    QString const trustee = sidString(
+        reinterpret_cast<PSID>(const_cast<DWORD *>(&allowed->SidStart)));
+    if (!trustee.isEmpty() && isPrivilegedTrusteeSid(trustee))
+        return true;
+    if (detail) {
+        *detail = trustee.isEmpty()
+            ? QStringLiteral("'%1' grants write access to an unidentifiable account").arg(path)
+            : QStringLiteral("'%1' grants write access to %2").arg(path, trustee);
+    }
+    return false;
+}
+
+bool daclIsAdminOnly(QString const &path, PACL dacl, DWORD writeRights, QString *detail)
+{
+    for (WORD i = 0; i < dacl->AceCount; ++i) {
+        void *entry = nullptr;
+        if (!GetAce(dacl, i, &entry)) {
+            if (detail)
+                *detail = QStringLiteral("cannot read an access rule of '%1'").arg(path);
+            return false;
+        }
+        if (!aceIsAdminOnly(path, entry, writeRights, detail))
+            return false;
+    }
+    return true;
+}
+
 //! False as soon as one ALLOW entry hands write-like rights to a trustee that
 //! is not already administrative -- or as soon as the OWNER is not one, because
 //! an owner keeps implicit WRITE_DAC on NTFS and can therefore grant itself
@@ -153,24 +245,9 @@ bool pathIsAdminOnly(QString const &path, QString *detail)
             *detail = QStringLiteral("cannot read the attributes of '%1'").arg(path);
         return false;
     }
-    // WOF compression, deduplication and cloud placeholders also carry this
-    // attribute. Only name-surrogate tags redirect into an unchecked tree.
-    if (attributes & FILE_ATTRIBUTE_REPARSE_POINT) {
-        WIN32_FIND_DATAW data{};
-        HANDLE const search = FindFirstFileW(
-            reinterpret_cast<LPCWSTR>(nativePath.utf16()), &data);
-        if (search == INVALID_HANDLE_VALUE) {
-            if (detail)
-                *detail = QStringLiteral("cannot read the reparse tag of '%1'").arg(path);
-            return false;
-        }
-        FindClose(search);
-        if (IsReparseTagNameSurrogate(data.dwReserved0)) {
-            if (detail)
-                *detail = QStringLiteral("'%1' is a name-surrogate reparse point").arg(path);
-            return false;
-        }
-    }
+    if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT)
+        && !reparsePointIsSafe(path, nativePath, detail))
+        return false;
     DWORD const writeRights = (attributes & FILE_ATTRIBUTE_DIRECTORY)
         ? kDirectoryReplacementRights : kFileWriteRights;
     PSECURITY_DESCRIPTOR descriptor = nullptr;
@@ -189,80 +266,17 @@ bool pathIsAdminOnly(QString const &path, QString *detail)
         return false;
     }
 
-    QString ownerSid;
-    if (owner) {
-        LPWSTR text = nullptr;
-        if (ConvertSidToStringSidW(owner, &text)) {
-            ownerSid = QString::fromWCharArray(text);
-            LocalFree(text);
-        }
-    }
-    if (ownerSid.isEmpty() || !isPrivilegedTrusteeSid(ownerSid)) {
-        LocalFree(descriptor);
-        if (detail) {
-            *detail = ownerSid.isEmpty()
-                ? QStringLiteral("'%1' has no identifiable owner").arg(path)
-                : QStringLiteral("'%1' is owned by %2, which can rewrite its permissions")
-                      .arg(path, ownerSid);
-        }
-        return false;
-    }
-
+    // owner and dacl point into descriptor: it is released only once both
+    // have been read.
+    bool adminOnly = ownerIsPrivileged(path, owner, detail);
     // A present-but-null DACL is not "no permissions", it is full access for
     // everyone -- the same trap applyProtectedDacl() guards on the way in.
-    if (!dacl) {
-        LocalFree(descriptor);
+    if (adminOnly && !dacl) {
         if (detail)
             *detail = QStringLiteral("'%1' has no access control at all").arg(path);
-        return false;
+        adminOnly = false;
     }
-
-    bool adminOnly = true;
-    for (WORD i = 0; adminOnly && i < dacl->AceCount; ++i) {
-        void *entry = nullptr;
-        if (!GetAce(dacl, i, &entry)) {
-            adminOnly = false;
-            if (detail)
-                *detail = QStringLiteral("cannot read an access rule of '%1'").arg(path);
-            break;
-        }
-
-        auto const *header = static_cast<ACE_HEADER const *>(entry);
-        // An inherit-only entry describes what children get, not this object.
-        if (header->AceFlags & INHERIT_ONLY_ACE)
-            continue;
-        if (header->AceType == ACCESS_DENIED_ACE_TYPE)
-            continue; // DENY precedence is deliberately not modelled
-        if (header->AceType != ACCESS_ALLOWED_ACE_TYPE) {
-            adminOnly = false;
-            if (detail)
-                *detail = QStringLiteral("'%1' has an unsupported access rule").arg(path);
-            break;
-        }
-
-        auto const *allowed = static_cast<ACCESS_ALLOWED_ACE const *>(entry);
-        if ((allowed->Mask & writeRights) == 0)
-            continue;
-
-        QString trustee;
-        LPWSTR  text = nullptr;
-        auto   *sid  = reinterpret_cast<PSID>(const_cast<DWORD *>(&allowed->SidStart));
-        if (ConvertSidToStringSidW(sid, &text)) {
-            trustee = QString::fromWCharArray(text);
-            LocalFree(text);
-        }
-
-        if (trustee.isEmpty() || !isPrivilegedTrusteeSid(trustee)) {
-            adminOnly = false;
-            if (detail) {
-                *detail = trustee.isEmpty()
-                    ? QStringLiteral("'%1' grants write access to an unidentifiable account")
-                          .arg(path)
-                    : QStringLiteral("'%1' grants write access to %2").arg(path, trustee);
-            }
-        }
-    }
-
+    adminOnly = adminOnly && daclIsAdminOnly(path, dacl, writeRights, detail);
     LocalFree(descriptor);
     return adminOnly;
 }

@@ -71,6 +71,88 @@ QString unescape(QString const &value)
     return QUrl::fromPercentEncoding(value.toLatin1());
 }
 
+namespace
+{
+//! Fields a v2 record of \a type must carry.
+QStringList requiredFields(Type type)
+{
+    static const QMap<Type, QStringList> required = {
+        { Type::Ready,
+          { QStringLiteral("attempt_id"),
+            QStringLiteral("iface"),
+            QStringLiteral("ip"),
+            QStringLiteral("dns") } },
+        { Type::Waiting,
+          { QStringLiteral("owner_pid"),
+            QStringLiteral("helper_pid"),
+            QStringLiteral("owner_uid"),
+            QStringLiteral("backend"),
+            QStringLiteral("since"),
+            QStringLiteral("deadline") } },
+        { Type::Busy,
+          { QStringLiteral("owner_pid"),
+            QStringLiteral("helper_pid"),
+            QStringLiteral("owner_uid"),
+            QStringLiteral("backend"),
+            QStringLiteral("since"),
+            QStringLiteral("age") } },
+        { Type::Suspect, { QStringLiteral("backend"), QStringLiteral("reason") } },
+        { Type::Down, { QStringLiteral("backend"), QStringLiteral("reason") } },
+        { Type::Healthy, { QStringLiteral("backend") } },
+        { Type::Error, { QStringLiteral("failure"), QStringLiteral("detail") } },
+        { Type::RestartFailed,
+          { QStringLiteral("attempt_id"), QStringLiteral("failure"), QStringLiteral("detail") } },
+        { Type::LeaseTimeout, { QStringLiteral("owner_pid"), QStringLiteral("waited_seconds") } },
+        { Type::LeaseUnavailable, { QStringLiteral("path"), QStringLiteral("detail") } },
+        { Type::RuntimeNotVolatile, { QStringLiteral("path"), QStringLiteral("fstype") } },
+        { Type::UnattributedVpnState, { QStringLiteral("resources") } },
+        { Type::LegacyOwnerActive, { QStringLiteral("owner_pid"), QStringLiteral("resources") } },
+        { Type::Log, { QStringLiteral("level"), QStringLiteral("detail") } }
+    };
+    return required.value(type);
+}
+
+//! Helper v1 records: READY <iface> <ip> [dns], ERROR <text> and LOG <text>.
+//! False when \a tokens are not one of them.
+bool parseLegacy(Message &result, QStringList const &tokens, QString const &line)
+{
+    if (result.type == Type::Ready && tokens.size() >= 3
+        && !tokens.at(1).contains(QLatin1Char('='))) {
+        result.legacy = true;
+        result.fields.insert(QStringLiteral("attempt_id"), QStringLiteral("0"));
+        result.fields.insert(QStringLiteral("iface"), tokens.at(1));
+        result.fields.insert(QStringLiteral("ip"), tokens.at(2));
+        if (tokens.size() >= 4)
+            result.fields.insert(QStringLiteral("dns"), tokens.at(3));
+        return true;
+    }
+    if ((result.type == Type::Error || result.type == Type::Log) && tokens.size() >= 2
+        && !tokens.at(1).contains(QLatin1Char('='))) {
+        result.legacy = true;
+        result.detail = line.mid(result.keyword.size()).trimmed();
+        return true;
+    }
+    return false;
+}
+
+//! The key=value tokens after the keyword; false on a malformed or repeated key.
+bool readFields(Message &result, QStringList const &tokens)
+{
+    for (int i = 1; i < tokens.size(); ++i) {
+        QString const &token = tokens.at(i);
+        int const equal = token.indexOf(QLatin1Char('='));
+        if (equal <= 0)
+            return false;
+        QString const key = token.left(equal);
+        QString const value = unescape(token.mid(equal + 1));
+        if (result.fields.contains(key))
+            return false;
+        result.fields.insert(key, value);
+    }
+    return true;
+}
+}
+
 Message parse(QString const &source)
 {
     Message result;
@@ -88,22 +170,8 @@ Message parse(QString const &source)
 
     // Compatibility with helper v1: READY <iface> <ip> [dns], ERROR <text>
     // and LOG <text>. PROTOCOL 2 makes every subsequent record explicitly v2.
-    if (result.type == Type::Ready && tokens.size() >= 3
-        && !tokens.at(1).contains(QLatin1Char('='))) {
-        result.legacy = true;
-        result.fields.insert(QStringLiteral("attempt_id"), QStringLiteral("0"));
-        result.fields.insert(QStringLiteral("iface"), tokens.at(1));
-        result.fields.insert(QStringLiteral("ip"), tokens.at(2));
-        if (tokens.size() >= 4)
-            result.fields.insert(QStringLiteral("dns"), tokens.at(3));
+    if (parseLegacy(result, tokens, line))
         return result;
-    }
-    if ((result.type == Type::Error || result.type == Type::Log)
-        && tokens.size() >= 2 && !tokens.at(1).contains(QLatin1Char('='))) {
-        result.legacy = true;
-        result.detail = line.mid(result.keyword.size()).trimmed();
-        return result;
-    }
 
     if (result.type == Type::Protocol) {
         if (tokens.size() == 2 && tokens.at(1) == QLatin1String("2"))
@@ -113,55 +181,14 @@ Message parse(QString const &source)
         return result;
     }
 
-    for (int i = 1; i < tokens.size(); ++i) {
-        QString const &token = tokens.at(i);
-        int const equal = token.indexOf(QLatin1Char('='));
-        if (equal <= 0) {
-            result.type = Type::Invalid;
-            result.fields.clear();
-            return result;
-        }
-        QString const key = token.left(equal);
-        QString const value = unescape(token.mid(equal + 1));
-        if (result.fields.contains(key)) {
-            result.type = Type::Invalid;
-            result.fields.clear();
-            return result;
-        }
-        result.fields.insert(key, value);
+    if (!readFields(result, tokens)) {
+        result.type = Type::Invalid;
+        result.fields.clear();
+        return result;
     }
     result.detail = result.fields.value(QStringLiteral("detail"));
 
-    QStringList required;
-    switch (result.type) {
-    case Type::Ready: required = {QStringLiteral("attempt_id"), QStringLiteral("iface"),
-                                  QStringLiteral("ip"), QStringLiteral("dns")}; break;
-    case Type::Waiting: required = {QStringLiteral("owner_pid"), QStringLiteral("helper_pid"),
-                                    QStringLiteral("owner_uid"), QStringLiteral("backend"),
-                                    QStringLiteral("since"), QStringLiteral("deadline")}; break;
-    case Type::Busy: required = {QStringLiteral("owner_pid"), QStringLiteral("helper_pid"),
-                                 QStringLiteral("owner_uid"), QStringLiteral("backend"),
-                                 QStringLiteral("since"), QStringLiteral("age")}; break;
-    case Type::Suspect:
-    case Type::Down: required = {QStringLiteral("backend"), QStringLiteral("reason")}; break;
-    case Type::Healthy: required = {QStringLiteral("backend")}; break;
-    case Type::Error: required = {QStringLiteral("failure"), QStringLiteral("detail")}; break;
-    case Type::RestartFailed: required = {QStringLiteral("attempt_id"),
-                                          QStringLiteral("failure"),
-                                          QStringLiteral("detail")}; break;
-    case Type::LeaseTimeout: required = {QStringLiteral("owner_pid"),
-                                         QStringLiteral("waited_seconds")}; break;
-    case Type::LeaseUnavailable: required = {QStringLiteral("path"),
-                                             QStringLiteral("detail")}; break;
-    case Type::RuntimeNotVolatile: required = {QStringLiteral("path"),
-                                               QStringLiteral("fstype")}; break;
-    case Type::UnattributedVpnState: required = {QStringLiteral("resources")}; break;
-    case Type::LegacyOwnerActive: required = {QStringLiteral("owner_pid"),
-                                              QStringLiteral("resources")}; break;
-    case Type::Log: required = {QStringLiteral("level"), QStringLiteral("detail")}; break;
-    default: break;
-    }
-    for (QString const &key : required) {
+    for (QString const &key : requiredFields(result.type)) {
         if (!result.fields.contains(key)) {
             result.type = Type::Invalid;
             result.fields.clear();

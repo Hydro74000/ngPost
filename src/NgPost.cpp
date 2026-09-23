@@ -4297,7 +4297,7 @@ bool NgPost::_parseConfigDisplayKey(const QString &opt, QString val)
         _lastUpdateCheckEpoch = val.toLongLong();
     } else if (opt == sOptionNames[Opt::UI_ZOOM]) {
         int const nb = val.toInt(&ok);
-        if (ok && nb >= 50 && nb <= 250)
+        if (ok && nb >= 80 && nb <= 150) // the range the zoom slider offers
             _uiZoom = static_cast<uint>(nb);
     } else
         return false;

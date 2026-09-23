@@ -351,7 +351,7 @@ void MainWindow::init(NgPost *ngPost)
     // started.
     _startupTab = readStartupTab();
     _applyStartupTab();
-    if (_ngPost && _ngPost->uiZoom() != 100)
+    if (_ngPost->uiZoom() != 100)
         applyUiZoom(_ngPost->uiZoom(), false);
 
     _ui->goCmdButton->hide();
@@ -459,6 +459,46 @@ int MainWindow::logMaxBlockCharactersForTest() const
 }
 #endif
 
+namespace
+{
+bool isLogLineBreak(QChar ch)
+{
+    return ch == QLatin1Char('\r') || ch == QLatin1Char('\n')
+        || ch.category() == QChar::Separator_Line || ch.category() == QChar::Separator_Paragraph;
+}
+
+//! Inserts text[pos, runEnd), which holds no line break, in blocks of at most
+//! kLogMaxBlockCharacters.
+void insertBoundedLogRun(QTextCursor &cursor,
+                         const QString &text,
+                         qsizetype pos,
+                         qsizetype runEnd,
+                         const QTextCharFormat &format)
+{
+    while (pos < runEnd) {
+        const int currentLength = qMax(0, cursor.block().length() - 1);
+        if (currentLength >= kLogMaxBlockCharacters) {
+            cursor.insertBlock();
+            continue;
+        }
+
+        qsizetype take = qMin<qsizetype>(kLogMaxBlockCharacters - currentLength, runEnd - pos);
+        // The limit is expressed in UTF-16 units, but never split a
+        // surrogate pair merely because it straddles the boundary.
+        if (pos + take < runEnd && text.at(pos + take - 1).isHighSurrogate()
+            && text.at(pos + take).isLowSurrogate()) {
+            if (take == 1) {
+                cursor.insertBlock();
+                continue;
+            }
+            --take;
+        }
+        cursor.insertText(text.mid(pos, take), format);
+        pos += take;
+    }
+}
+}
+
 void MainWindow::_insertBoundedLogText(const QString &text, bool startNewBlock,
                                        const QTextCharFormat &format) const
 {
@@ -475,10 +515,7 @@ void MainWindow::_insertBoundedLogText(const QString &text, bool startNewBlock,
     qsizetype pos = 0;
     while (pos < text.size()) {
         const QChar ch = text.at(pos);
-        const bool lineBreak = ch == QLatin1Char('\r') || ch == QLatin1Char('\n')
-            || ch.category() == QChar::Separator_Line
-            || ch.category() == QChar::Separator_Paragraph;
-        if (lineBreak) {
+        if (isLogLineBreak(ch)) {
             // QTextDocument treats CRLF as one paragraph boundary. Normalise
             // every supported separator to the same explicit block operation.
             if (ch == QLatin1Char('\r') && pos + 1 < text.size()
@@ -490,37 +527,10 @@ void MainWindow::_insertBoundedLogText(const QString &text, bool startNewBlock,
         }
 
         qsizetype runEnd = pos + 1;
-        while (runEnd < text.size()) {
-            const QChar candidate = text.at(runEnd);
-            if (candidate == QLatin1Char('\r') || candidate == QLatin1Char('\n')
-                || candidate.category() == QChar::Separator_Line
-                || candidate.category() == QChar::Separator_Paragraph)
-                break;
+        while (runEnd < text.size() && !isLogLineBreak(text.at(runEnd)))
             ++runEnd;
-        }
-
-        while (pos < runEnd) {
-            const int currentLength = qMax(0, cursor.block().length() - 1);
-            if (currentLength >= kLogMaxBlockCharacters) {
-                cursor.insertBlock();
-                continue;
-            }
-
-            qsizetype take = qMin<qsizetype>(kLogMaxBlockCharacters - currentLength,
-                                             runEnd - pos);
-            // The limit is expressed in UTF-16 units, but never split a
-            // surrogate pair merely because it straddles the boundary.
-            if (pos + take < runEnd && text.at(pos + take - 1).isHighSurrogate()
-                && text.at(pos + take).isLowSurrogate()) {
-                if (take == 1) {
-                    cursor.insertBlock();
-                    continue;
-                }
-                --take;
-            }
-            cursor.insertText(text.mid(pos, take), format);
-            pos += take;
-        }
+        insertBoundedLogRun(cursor, text, pos, runEnd, format);
+        pos = runEnd;
     }
 
     _ui->logBrowser->setTextCursor(cursor);
@@ -599,30 +609,74 @@ bool MainWindow::hasAutoCompress() const
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QResizeEvent>
-bool MainWindow::eventFilter(QObject *obj, QEvent *event)
+namespace
 {
-    if (_zoomPopup && _zoomPopup->isVisible()) {
-        if (event->type() == QEvent::MouseButtonPress) {
-            auto *mouseEvent = static_cast<QMouseEvent *>(event);
-            QWidget *clickedWidget = QApplication::widgetAt(mouseEvent->globalPosition().toPoint());
-            const bool insidePopup = (clickedWidget == _zoomPopup)
-                || (_zoomPopup && _zoomPopup->isAncestorOf(clickedWidget));
-            const bool insideBtn = (clickedWidget == _zoomBtn)
-                || (_zoomBtn && _zoomBtn->isAncestorOf(clickedWidget));
-            if (!insidePopup && !insideBtn) {
-                _zoomPopup->hide();
-                qApp->removeEventFilter(this);
-            }
-        } else if (event->type() == QEvent::KeyPress) {
-            auto *keyEvent = static_cast<QKeyEvent *>(event);
-            if (keyEvent->key() == Qt::Key_Escape) {
-                _zoomPopup->hide();
-                qApp->removeEventFilter(this);
-                return true;
-            }
-        }
+bool widgetWithin(const QWidget *area, const QWidget *widget)
+{
+    return area && widget && (widget == area || area->isAncestorOf(widget));
+}
+
+//! Closes the zoom popup on Escape or on a press outside it and its button. It
+//! filters the whole application only while the popup shows, and on its own:
+//! MainWindow::eventFilter must keep seeing just the objects it watches.
+class ZoomPopupDismisser : public QObject
+{
+public:
+    //! Owned by \a popup, on which makeDismissable() installs it.
+    ZoomPopupDismisser(QWidget *popup, QWidget *button)
+        : QObject(popup)
+        , _popup(popup)
+        , _button(button)
+    {
     }
 
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override
+    {
+        if (obj == _popup && event->type() == QEvent::Show)
+            qApp->installEventFilter(this);
+        else if (obj == _popup && event->type() == QEvent::Hide)
+            qApp->removeEventFilter(this);
+        else if (event->type() == QEvent::MouseButtonPress && obj->isWidgetType())
+            _dismissOutside(static_cast<QWidget *>(obj), static_cast<QMouseEvent *>(event));
+        else if (event->type() == QEvent::KeyPress && _popup->isVisible()
+                 && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Escape) {
+            _popup->hide();
+            return true;
+        }
+        return false;
+    }
+
+private:
+    void _dismissOutside(QWidget *receiver, const QMouseEvent *event)
+    {
+        // The press travels up to the parents a widget ignores it for, its
+        // position mapped at each step: look up what lies under it every time
+        // rather than trusting the receiver, and never use global coordinates,
+        // which Wayland does not provide.
+        QWidget *pressed = receiver->childAt(event->position().toPoint());
+        if (!pressed)
+            pressed = receiver;
+        if (_popup->isVisible() && !widgetWithin(_popup, pressed)
+            && !widgetWithin(_button, pressed))
+            _popup->hide();
+    }
+
+    QWidget *const _popup;
+    QWidget *const _button;
+};
+
+//! Hides \a popup until it is asked for, then closes it on Escape or on a
+//! press outside it and \a button.
+void makeDismissable(QWidget *popup, QWidget *button)
+{
+    popup->hide();
+    popup->installEventFilter(new ZoomPopupDismisser(popup, button));
+}
+}
+
+bool MainWindow::eventFilter(QObject *obj, QEvent *event)
+{
     if (event->type() == QEvent::Resize && _historyTable && obj == _historyTable->viewport())
         _fitHistoryColumns(false);
 
@@ -761,7 +815,7 @@ void MainWindow::_retranslate()
     _ui->postingBox->setTitle(tr("Parameters"));
     _ui->logBox->setTitle(tr("Posting Log"));
     _updateLogToggleBtn();
-    if (_zoomBtn && _ngPost)
+    if (_zoomBtn)
         _zoomBtn->setToolTip(tr("UI Zoom: %1% (Click to adjust)").arg(_ngPost->uiZoom()));
 
     tabBar->setTabText(kQuickPostTab, QString("%1 #1").arg(_ngPost->quickJobName()));
@@ -2092,8 +2146,8 @@ PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &f
         lastTabIdx = _ui->postTabWidget->count() -1;
     PostingWidget *newPostingWidget = new PostingWidget(_ngPost, this, _nextQuickJobNumber());
     newPostingWidget->init();
-    if (_ngPost && _ngPost->uiZoom() != 100)
-        _scaleWidgetChildren(newPostingWidget, _ngPost->uiZoom() / 100.0, font());
+    if (_ngPost->uiZoom() != 100)
+        _scaleWidgetChildren(newPostingWidget, _ngPost->uiZoom() / 100.0);
     _connectPostingWidget(newPostingWidget);
     QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(newPostingWidget->displayNumber());
     _ui->postTabWidget->insertTab(lastTabIdx,
@@ -3553,7 +3607,7 @@ void MainWindow::_createZoomPopup()
     shadow->setColor(QColor(0, 0, 0, 160));
     shadow->setOffset(0, 2);
     _zoomPopup->setGraphicsEffect(shadow);
-    _zoomPopup->hide();
+    makeDismissable(_zoomPopup, _zoomBtn);
 
     auto *popupLayout = new QVBoxLayout(_zoomPopup);
     popupLayout->setContentsMargins(10, 8, 10, 8);
@@ -3645,18 +3699,15 @@ void MainWindow::_toggleZoomPopup()
         return;
     if (_zoomPopup->isVisible()) {
         _zoomPopup->hide();
-        qApp->removeEventFilter(this);
         return;
     }
     _repositionZoomPopup();
     _zoomPopup->raise();
     _zoomPopup->show();
-    qApp->installEventFilter(this);
 }
 
-void MainWindow::_scaleWidgetChildren(QWidget *parent, qreal scale, const QFont &font)
+void MainWindow::_scaleWidgetChildren(QWidget *parent, qreal scale)
 {
-    Q_UNUSED(font);
     if (!parent)
         return;
 
@@ -3680,13 +3731,6 @@ void MainWindow::_scaleWidgetChildren(QWidget *parent, qreal scale, const QFont 
         sb->setMaximumWidth(qRound(60 * scale));
     for (auto *sb : parent->findChildren<QSpinBox *>(QStringLiteral("redundancySB")))
         sb->setMaximumWidth(qRound(70 * scale));
-
-    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("addFilesBtn")))
-        btn->setIconSize(QSize(iconSize, iconSize));
-    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("removeFilesBtn")))
-        btn->setIconSize(QSize(iconSize, iconSize));
-    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("addFolderBtn")))
-        btn->setIconSize(QSize(iconSize, iconSize));
 }
 
 void MainWindow::_scaleTables(int rowHeight)
@@ -3713,6 +3757,35 @@ void MainWindow::_scaleTables(int rowHeight)
     }
 }
 
+namespace
+{
+QFont scaledFont(const QFont &base, qreal scale)
+{
+    QFont f = base;
+    if (base.pointSizeF() > 0)
+        f.setPointSizeF(base.pointSizeF() * scale);
+    else if (base.pointSize() > 0)
+        f.setPointSize(qRound(base.pointSize() * scale));
+    else if (base.pixelSize() > 0)
+        f.setPixelSize(qRound(base.pixelSize() * scale));
+    else
+        f.setPointSize(qMax(6, qRound(10 * scale)));
+    return f;
+}
+
+//! \a font with the size of \a sized, whatever unit that size is expressed in.
+QFont resizedFont(QFont font, const QFont &sized)
+{
+    if (sized.pointSizeF() > 0)
+        font.setPointSizeF(sized.pointSizeF());
+    else if (sized.pixelSize() > 0)
+        font.setPixelSize(sized.pixelSize());
+    else
+        font.setPointSize(sized.pointSize());
+    return font;
+}
+}
+
 void MainWindow::applyUiZoom(int percent, bool userInteractive)
 {
     percent = qBound(80, percent, 150);
@@ -3720,31 +3793,25 @@ void MainWindow::applyUiZoom(int percent, bool userInteractive)
         _ngPost->setUiZoom(static_cast<uint>(percent));
 
     const qreal scale = percent / 100.0;
-    QFont f = _baseFont;
-    if (_baseFont.pointSizeF() > 0)
-        f.setPointSizeF(_baseFont.pointSizeF() * scale);
-    else if (_baseFont.pointSize() > 0)
-        f.setPointSize(qRound(_baseFont.pointSize() * scale));
-    else if (_baseFont.pixelSize() > 0)
-        f.setPixelSize(qRound(_baseFont.pixelSize() * scale));
-    else
-        f.setPointSize(qMax(6, qRound(10 * scale)));
+    const QFont f = scaledFont(_baseFont, scale);
+    _applyZoomFont(f, scale);
+    _scaleTables(qMax(26, QFontMetrics(f).height() + 10));
+    _scaleZoomedControls(scale);
+    _showZoomLevel(percent);
+    if (userInteractive)
+        _scheduleZoomSave();
+}
 
+void MainWindow::_applyZoomFont(const QFont &f, qreal scale)
+{
     setFont(f);
     QApplication::setFont(f);
 
+    // The popup keeps its own size, so that the control stays usable at any zoom.
     const auto allWidgets = findChildren<QWidget *>();
     for (QWidget *w : allWidgets) {
-        if (w == _zoomPopup || (_zoomPopup && _zoomPopup->isAncestorOf(w)))
-            continue;
-        QFont wf = w->font();
-        if (f.pointSizeF() > 0)
-            wf.setPointSizeF(f.pointSizeF());
-        else if (f.pixelSize() > 0)
-            wf.setPixelSize(f.pixelSize());
-        else
-            wf.setPointSize(f.pointSize());
-        w->setFont(wf);
+        if (!widgetWithin(_zoomPopup, w))
+            w->setFont(resizedFont(w->font(), f));
     }
 
     if (_ui->postTabWidget && _ui->postTabWidget->tabBar()) {
@@ -3754,28 +3821,31 @@ void MainWindow::applyUiZoom(int percent, bool userInteractive)
         _ui->postTabWidget->tabBar()->update();
         _ui->postTabWidget->updateGeometry();
     }
+}
 
-    const int rowHeight = qMax(26, QFontMetrics(f).height() + 10);
-    _scaleTables(rowHeight);
-
+void MainWindow::_scaleZoomedControls(qreal scale)
+{
     const int iconBtnSize = qRound(24 * scale);
-    const int iconSize = qRound(16 * scale);
+    const QSize iconSize(qRound(16 * scale), qRound(16 * scale));
 
     if (_ui->genPoster) {
         _ui->genPoster->setFixedSize(iconBtnSize, iconBtnSize);
-        _ui->genPoster->setIconSize(QSize(iconSize, iconSize));
+        _ui->genPoster->setIconSize(iconSize);
     }
     if (_ui->nzbPathButton)
         _ui->nzbPathButton->setMaximumWidth(qRound(30 * scale));
     if (_ui->articleSizeEdit)
         _ui->articleSizeEdit->setMaximumWidth(qRound(80 * scale));
     if (_zoomBtn)
-        _zoomBtn->setIconSize(QSize(iconSize, iconSize));
+        _zoomBtn->setIconSize(iconSize);
     if (_logToggleBtn)
-        _logToggleBtn->setIconSize(QSize(iconSize, iconSize));
+        _logToggleBtn->setIconSize(iconSize);
 
-    _scaleWidgetChildren(this, scale, f);
+    _scaleWidgetChildren(this, scale);
+}
 
+void MainWindow::_showZoomLevel(int percent)
+{
     if (_zoomValueLabel)
         _zoomValueLabel->setText(QString("%1%").arg(percent));
     if (_zoomBtn) {
@@ -3789,19 +3859,22 @@ void MainWindow::applyUiZoom(int percent, bool userInteractive)
 
     if (_zoomPopup && _zoomPopup->isVisible())
         _repositionZoomPopup();
+}
 
-    if (userInteractive) {
-        if (!_zoomSaveTimer) {
-            _zoomSaveTimer = new QTimer(this);
-            _zoomSaveTimer->setSingleShot(true);
-            _zoomSaveTimer->setInterval(500);
-            connect(_zoomSaveTimer, &QTimer::timeout, this, [this]() {
-                if (_ngPost)
-                    _ngPost->saveConfig();
-            });
-        }
-        _zoomSaveTimer->start();
+void MainWindow::_scheduleZoomSave()
+{
+    // A slider drag moves through every step: write the configuration once
+    // it settles, not once per step.
+    if (!_zoomSaveTimer) {
+        _zoomSaveTimer = new QTimer(this);
+        _zoomSaveTimer->setSingleShot(true);
+        _zoomSaveTimer->setInterval(500);
+        connect(_zoomSaveTimer, &QTimer::timeout, this, [this]() {
+            if (_ngPost)
+                _ngPost->saveConfig();
+        });
     }
+    _zoomSaveTimer->start();
 }
 
 void MainWindow::_configureWaylandSplitters()
@@ -3864,8 +3937,8 @@ const QString MainWindow::sTabWidgetStyle = "\
             border-bottom-color: palette(window);\
             border-top-left-radius: 4px;\
             border-top-right-radius: 4px;\
-            min-width: 8ex;\
-            padding: 2px;\
+            min-width: 10ex;\
+            padding: 0.35em 0.8em;\
         }\
         QTabBar::tab:selected, QTabBar::tab:hover {\
             background: palette(window);\

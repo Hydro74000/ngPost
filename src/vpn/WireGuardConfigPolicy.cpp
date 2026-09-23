@@ -82,6 +82,117 @@ WireGuardConfigPolicy::Verdict refuse(WireGuardConfigPolicy::Outcome outcome,
     verdict.reason     = reason;
     return verdict;
 }
+
+using Outcome = WireGuardConfigPolicy::Outcome;
+using Verdict = WireGuardConfigPolicy::Verdict;
+enum class Section {
+    None,
+    Interface,
+    Peer
+};
+
+//! \a raw without its line ending, its inline comment and surrounding blanks.
+QString normalizedLine(QByteArray const &raw)
+{
+    QString line = QString::fromUtf8(raw);
+    if (line.endsWith(QLatin1Char('\r')))
+        line.chop(1);
+    // WireGuard removes inline comments before parsing sections or keys.
+    int const comment = line.indexOf(QLatin1Char('#'));
+    if (comment >= 0)
+        line.truncate(comment);
+    return line.trimmed();
+}
+
+//! Switches \a section on an "[Interface]" or "[Peer]" header, refuses any other.
+Verdict readSectionHeader(QString const &line, int lineNumber, Section &section)
+{
+    if (!line.endsWith(QLatin1Char(']')))
+        return refuse(Outcome::UnknownSection,
+                      QString(),
+                      false,
+                      lineNumber,
+                      QCoreApplication::translate("WireGuardConfigPolicy",
+                                                  "malformed section header"));
+    QString const name = line.mid(1, line.size() - 2).trimmed().toLower();
+    if (name == QLatin1String("interface")) {
+        section = Section::Interface;
+    } else if (name == QLatin1String("peer")) {
+        section = Section::Peer;
+    } else {
+        return refuse(
+            Outcome::UnknownSection,
+            name,
+            false,
+            lineNumber,
+            QCoreApplication::translate("WireGuardConfigPolicy",
+                                        "only [Interface] and [Peer] sections are allowed"));
+    }
+    return Verdict{ };
+}
+
+Verdict inspectKeyLine(QString const &line, Section section, int lineNumber)
+{
+    int const separator = line.indexOf(QLatin1Char('='));
+    if (separator <= 0)
+        return refuse(Outcome::Malformed,
+                      QString(),
+                      false,
+                      lineNumber,
+                      QCoreApplication::translate("WireGuardConfigPolicy",
+                                                  "expected a Key = Value line"));
+
+    QString const key = line.left(separator).trimmed().toLower();
+    if (key.isEmpty())
+        return refuse(Outcome::Malformed,
+                      QString(),
+                      false,
+                      lineNumber,
+                      QCoreApplication::translate("WireGuardConfigPolicy",
+                                                  "expected a Key = Value line"));
+
+    bool const knownInterface = contains(kInterfaceKeys,
+                                         sizeof(kInterfaceKeys) / sizeof(*kInterfaceKeys),
+                                         key);
+    bool const knownPeer = contains(kPeerKeys, sizeof(kPeerKeys) / sizeof(*kPeerKeys), key);
+    bool const known = knownInterface || knownPeer;
+
+    if (section == Section::None)
+        return refuse(
+            Outcome::Malformed,
+            key,
+            known,
+            lineNumber,
+            QCoreApplication::translate("WireGuardConfigPolicy",
+                                        "a key appears before any [Interface] or [Peer] section"));
+
+    // Checked before the section match so the message says what is actually
+    // wrong: the key is refused for what it does, not for where it sits.
+    if (contains(kDangerousKeys, sizeof(kDangerousKeys) / sizeof(*kDangerousKeys), key))
+        return refuse(Outcome::DangerousKey,
+                      key,
+                      true,
+                      lineNumber,
+                      QCoreApplication::translate(
+                          "WireGuardConfigPolicy",
+                          "'%1' runs a command when the tunnel goes up or down, which ngPost "
+                          "never needs. Remove that line from the profile.")
+                          .arg(key));
+
+    bool const fits = (section == Section::Interface) ? knownInterface : knownPeer;
+    if (!fits)
+        return refuse(Outcome::UnknownKey,
+                      key,
+                      known,
+                      lineNumber,
+                      known ? QCoreApplication::translate("WireGuardConfigPolicy",
+                                                          "'%1' does not belong to this section")
+                                  .arg(key)
+                            : QCoreApplication::translate(
+                                  "WireGuardConfigPolicy",
+                                  "this profile carries a key ngPost has not reviewed"));
+    return Verdict{ };
+}
 } // namespace
 
 namespace WireGuardConfigPolicy
@@ -117,88 +228,22 @@ Verdict inspect(QByteArray const &config)
                           "WireGuardConfigPolicy",
                           "the WireGuard profile contains binary data"));
 
-    enum class Section { None, Interface, Peer };
     Section section = Section::None;
 
     QList<QByteArray> const lines = config.split('\n');
     for (int index = 0; index < lines.size(); ++index) {
-        int const   lineNumber = index + 1;
-        QString     line       = QString::fromUtf8(lines.at(index));
-        if (line.endsWith(QLatin1Char('\r')))
-            line.chop(1);
-        // WireGuard removes inline comments before parsing sections or keys.
-        int const comment = line.indexOf(QLatin1Char('#'));
-        if (comment >= 0)
-            line.truncate(comment);
-        line = line.trimmed();
+        int const lineNumber = index + 1;
+        QString const line = normalizedLine(lines.at(index));
 
         if (line.isEmpty() || line.startsWith(QLatin1Char('#'))
             || line.startsWith(QLatin1Char(';')))
             continue;
 
-        if (line.startsWith(QLatin1Char('['))) {
-            if (!line.endsWith(QLatin1Char(']')))
-                return refuse(Outcome::UnknownSection, QString(), false, lineNumber,
-                              QCoreApplication::translate("WireGuardConfigPolicy",
-                                                          "malformed section header"));
-            QString const name = line.mid(1, line.size() - 2).trimmed().toLower();
-            if (name == QLatin1String("interface")) {
-                section = Section::Interface;
-            } else if (name == QLatin1String("peer")) {
-                section = Section::Peer;
-            } else {
-                return refuse(Outcome::UnknownSection, name, false, lineNumber,
-                              QCoreApplication::translate(
-                                  "WireGuardConfigPolicy",
-                                  "only [Interface] and [Peer] sections are allowed"));
-            }
-            continue;
-        }
-
-        int const separator = line.indexOf(QLatin1Char('='));
-        if (separator <= 0)
-            return refuse(Outcome::Malformed, QString(), false, lineNumber,
-                          QCoreApplication::translate("WireGuardConfigPolicy",
-                                                      "expected a Key = Value line"));
-
-        QString const key = line.left(separator).trimmed().toLower();
-        if (key.isEmpty())
-            return refuse(Outcome::Malformed, QString(), false, lineNumber,
-                          QCoreApplication::translate("WireGuardConfigPolicy",
-                                                      "expected a Key = Value line"));
-
-        bool const knownInterface =
-            contains(kInterfaceKeys, sizeof(kInterfaceKeys) / sizeof(*kInterfaceKeys), key);
-        bool const knownPeer =
-            contains(kPeerKeys, sizeof(kPeerKeys) / sizeof(*kPeerKeys), key);
-        bool const known = knownInterface || knownPeer;
-
-        if (section == Section::None)
-            return refuse(Outcome::Malformed, key, known, lineNumber,
-                          QCoreApplication::translate(
-                              "WireGuardConfigPolicy",
-                              "a key appears before any [Interface] or [Peer] section"));
-
-        // Checked before the section match so the message says what is actually
-        // wrong: the key is refused for what it does, not for where it sits.
-        if (contains(kDangerousKeys, sizeof(kDangerousKeys) / sizeof(*kDangerousKeys), key))
-            return refuse(Outcome::DangerousKey, key, true, lineNumber,
-                          QCoreApplication::translate(
-                              "WireGuardConfigPolicy",
-                              "'%1' runs a command when the tunnel goes up or down, which ngPost "
-                              "never needs. Remove that line from the profile.")
-                              .arg(key));
-
-        bool const fits = (section == Section::Interface) ? knownInterface : knownPeer;
-        if (!fits)
-            return refuse(Outcome::UnknownKey, key, known, lineNumber,
-                          known ? QCoreApplication::translate(
-                                      "WireGuardConfigPolicy",
-                                      "'%1' does not belong to this section")
-                                      .arg(key)
-                                : QCoreApplication::translate(
-                                      "WireGuardConfigPolicy",
-                                      "this profile carries a key ngPost has not reviewed"));
+        Verdict const verdict = line.startsWith(QLatin1Char('['))
+            ? readSectionHeader(line, lineNumber, section)
+            : inspectKeyLine(line, section, lineNumber);
+        if (!verdict.isAccepted())
+            return verdict;
     }
 
     return Verdict{};

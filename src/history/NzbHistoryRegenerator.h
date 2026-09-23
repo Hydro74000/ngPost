@@ -49,6 +49,11 @@ private:
                     int &repairedArticleBytes,
                     QStringList *warnings,
                     QString *error);
+    bool _checkFileHistory(const PostHistoryStore::PostDetails &details,
+                           const PostHistoryStore::FileSummary &file,
+                           const QList<PostHistoryStore::ArticleSummary> &articles,
+                           QStringList *warnings,
+                           QString *error);
     void _writeSegments(const PostHistoryStore::FileSummary &file,
                         const QList<PostHistoryStore::ArticleSummary> &articles,
                         QTextStream &stream,

@@ -809,6 +809,22 @@ void NzbCheck::_printRecoveryAnalysis()
     }
 
     QPair<int, int> const usableRange = usableBlockRange();
+    _printRecoveryBlocks(usableRange, total);
+    _printRedundancy();
+    _cout << (hasIntactPar2Index()
+                  ? tr("  PAR2 metadata: the conventional base index was verified in full, "
+                       "but STAT cannot prove which packets it contains")
+                  : tr("  PAR2 metadata: not proven by the nzb. Recovery volumes are not "
+                       "required to repeat the vital packets, even when intact"))
+          << "\n";
+
+    _printDataLossNotes();
+    _printRecoveryVerdict(usableRange, usable, total);
+    _cout << MB_FLUSH;
+}
+
+void NzbCheck::_printRecoveryBlocks(QPair<int, int> const &usableRange, int total)
+{
     if (usableRange.first == usableRange.second)
         _cout << tr("  Recovery blocks: %1 of %2 still usable").arg(usableRange.first).arg(total)
               << "\n";
@@ -821,6 +837,10 @@ void NzbCheck::_printRecoveryAnalysis()
                      .arg(usableRange.second)
                      .arg(total)
               << "\n";
+}
+
+void NzbCheck::_printRedundancy()
+{
     QPair<double, double> const redundancy      = redundancyPercent();
     QPair<double, double> const redundancyRange = redundancyPercentRange();
     if (redundancy.first >= 0.0) {
@@ -839,33 +859,30 @@ void NzbCheck::_printRecoveryAnalysis()
                          .arg(redundancy.second, 0, 'f', 1)
                   << "\n";
     }
-    _cout << (hasIntactPar2Index()
-                      ? tr("  PAR2 metadata: the conventional base index was verified in full, "
-                           "but STAT cannot prove which packets it contains")
-                      : tr("  PAR2 metadata: not proven by the nzb. Recovery volumes are not "
-                           "required to repeat the vital packets, even when intact"))
-          << "\n";
+}
 
-    if (_nbMissingDataArticles > 0) {
-        QPair<int, int> const damaged = damagedBlockRange();
-        if (damaged.second < 0)
-            _cout << tr("  Damaged blocks: at least %1, with no upper bound - the nzb does not "
-                        "provide enough trustworthy file and segment sizes")
-                         .arg(damaged.first)
-                  << "\n";
-        else
-            _cout << tr("  Damaged blocks: %1 to %2, depending on article and slice layout "
-                        "(block size: %3 bytes, %4)")
-                         .arg(damaged.first)
-                         .arg(damaged.second)
-                         .arg(_par2BlockSize)
-                         .arg(_blockSizeSource.isEmpty() ? tr("declared") : _blockSizeSource)
-                  << "\n";
-        if (!_blockSizeMeasured)
-            _cout << tr("  The slice size was inferred, not read, so this analysis will not "
-                        "declare the post dead. Pass --par2_block_size to get a firm answer.")
-                  << "\n";
-    }
+void NzbCheck::_printDataLossNotes()
+{
+    if (_nbMissingDataArticles == 0)
+        return;
+    QPair<int, int> const damaged = damagedBlockRange();
+    if (damaged.second < 0)
+        _cout << tr("  Damaged blocks: at least %1, with no upper bound - the nzb does not "
+                    "provide enough trustworthy file and segment sizes")
+                     .arg(damaged.first)
+              << "\n";
+    else
+        _cout << tr("  Damaged blocks: %1 to %2, depending on article and slice layout "
+                    "(block size: %3 bytes, %4)")
+                     .arg(damaged.first)
+                     .arg(damaged.second)
+                     .arg(_par2BlockSize)
+                     .arg(_blockSizeSource.isEmpty() ? tr("declared") : _blockSizeSource)
+              << "\n";
+    if (!_blockSizeMeasured)
+        _cout << tr("  The slice size was inferred, not read, so this analysis will not "
+                    "declare the post dead. Pass --par2_block_size to get a firm answer.")
+              << "\n";
 
     // The nzb says which files exist, never which of them the PAR2 set actually
     // covers. ngPost itself copies the visible .nfo in after the PAR2 files are
@@ -873,12 +890,14 @@ void NzbCheck::_printRecoveryAnalysis()
     // its article is the one that went missing, no amount of blocks brings it
     // back. Nothing in the nzb lets a reader tell, so the assumption is stated
     // rather than silently made.
-    if (_nbMissingDataArticles > 0)
-        _cout << tr("  Assumes every non-PAR2 file is covered by the recovery set. A file added "
-                    "after the PAR2 files were built -- a .nfo kept visible, for instance -- is "
-                    "not, and a loss there cannot be repaired.")
-              << "\n";
+    _cout << tr("  Assumes every non-PAR2 file is covered by the recovery set. A file added "
+                "after the PAR2 files were built -- a .nfo kept visible, for instance -- is "
+                "not, and a loss there cannot be repaired.")
+          << "\n";
+}
 
+void NzbCheck::_printRecoveryVerdict(QPair<int, int> const &usableRange, int usable, int total)
+{
     switch (recoveryVerdict()) {
     case Recovery::NotNeeded:
         _cout << tr("  Verdict: COMPLETE - no data article is missing") << "\n";
@@ -930,7 +949,6 @@ void NzbCheck::_printRecoveryAnalysis()
               << "\n";
         break;
     }
-    _cout << MB_FLUSH;
 }
 
 void NzbCheck::_printJsonReport(qint64 durationMs, const QString &error)

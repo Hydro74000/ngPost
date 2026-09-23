@@ -75,7 +75,15 @@ private:
     par2::Settings settings() const;
     void changed();
     void updateControls();
+    void _updateChoiceControls(bool manual, par2::Tool tool, par2::Volumes volumes);
+    void _updateResourceControls(bool manual, par2::Tool tool);
+    void _allowToolChoices(par2::Tool tool, par2::Volumes volumes);
+    QString _gpuScanError() const;
+    QString _controlsError(const par2::Settings &s, bool manual, par2::Tool tool) const;
     void updatePreview();
+    bool _splitIntoVolumes(QVector<qint64> &sizes);
+    void _showInvalidEstimate(const par2::Settings &configured, const QVector<qint64> &sizes);
+    QString _estimateText(const par2::Estimate &e) const;
     void selectTool();
     void probeTool();
     void resetGpuScan();

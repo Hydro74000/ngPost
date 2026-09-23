@@ -311,6 +311,10 @@ private:
 
     void _printJsonReport(qint64 durationMs, const QString &error = QString());
     void _printRecoveryAnalysis();
+    void _printRecoveryBlocks(QPair<int, int> const &usableRange, int total);
+    void _printRedundancy();
+    void _printDataLossNotes();
+    void _printRecoveryVerdict(QPair<int, int> const &usableRange, int usable, int total);
     //! Settle _par2BlockSize / _articleSize once parsing is done, and record
     //! where each value came from so the report can own up to a guess.
     void _resolveSizes();

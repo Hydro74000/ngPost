@@ -359,7 +359,41 @@ private:
     void _releaseWindowsLease();
     bool _publishWindowsOwner(Backend backend, QString *detail);
     QString _windowsOwnerDiagnostic() const;
+    void _cleanupStaleWindowsState();
 #endif
+#ifdef Q_OS_LINUX
+    void _runLinuxStalePreflight();
+    void _cleanupStaleLinuxSession(QString const &manifestPath);
+    void _reportUnattributedLinuxState(bool ifaceExists,
+                                       bool ruleExists,
+                                       bool routeExists,
+                                       bool legacyPidExists);
+#endif
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
+    bool _refreshWireGuardServices(QString const &oldName,
+                                   VpnProfile const &oldProfile,
+                                   VpnProfile const &p,
+                                   bool configFileChanged,
+                                   ConfigRollback const &restorePreviousConfig);
+    bool _reinstallWireGuardService(QString const &service,
+                                    QString const &oldConfig,
+                                    QString const &newConfig,
+                                    bool restoreConfigFirst,
+                                    ConfigRollback const &restorePreviousConfig);
+    bool _replaceWireGuardService(QString const &oldService,
+                                  QString const &newService,
+                                  QString const &newConfig);
+#endif
+    //! Starting, up, reconnecting or stopping: a tunnel exists or is on its way.
+    bool _tunnelInUse() const;
+    void _resumeAfterConfirmedStop();
+    void _finishRequestedStop();
+    bool _recoverFromTermination(BackendTermination const &termination);
+    void _finishFailedTermination(BackendTermination const &termination);
+    QStringList _vpnServerNames(QList<NntpServerParams *> const &servers) const;
+    void _warnIgnoredMasterSwitch();
+    JobBlockReason _diagnoseVpnBlock(QString *detail) const;
+    Admission _startForAdmittedJob();
     void _finishRecoveryExhausted(FailureKind reason, QString const &detail);
     void _clearTunnelIdentity();
     JobBlockReason _blockReasonForFailure(FailureKind failure) const;

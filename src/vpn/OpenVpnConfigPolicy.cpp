@@ -286,75 +286,171 @@ OpenVpnConfigPolicy::Verdict reject(OpenVpnConfigPolicy::Outcome outcome,
 }
 }
 
-namespace OpenVpnConfigPolicy
+namespace
 {
-Verdict inspect(QByteArray const &config)
+using Outcome = OpenVpnConfigPolicy::Outcome;
+using Verdict = OpenVpnConfigPolicy::Verdict;
+
+//! "http-proxy <host> <port> [auto|auto-nct [method]]", nothing that names a file.
+bool httpProxyArgumentsOk(QStringList const &tokens)
 {
-    if (config.size() > kMaxConfigBytes)
-        return reject(Outcome::Malformed, QString(), 0,
-                      QStringLiteral("the profile is larger than a VPN profile ever is"));
-    if (config.contains('\0'))
-        return reject(Outcome::Malformed, QString(), 0,
-                      QStringLiteral("the profile contains binary data, not OpenVPN directives"));
+    bool const keywordOk = tokens.size() < 4 || tokens.at(3) == QLatin1String("auto")
+        || tokens.at(3) == QLatin1String("auto-nct");
+    static QStringList const authMethods{ QStringLiteral("none"),
+                                          QStringLiteral("basic"),
+                                          QStringLiteral("ntlm"),
+                                          QStringLiteral("ntlm2") };
+    bool const methodOk = tokens.size() < 5 || authMethods.contains(tokens.at(4).toLower());
+    return tokens.size() >= 3 && tokens.size() <= 5 && keywordOk && methodOk;
+}
 
-    QStringList const lines = QString::fromUtf8(config).split(QLatin1Char('\n'));
-    QStringList       kept;
-    QString           openBlob;   //!< tag of the opaque block being skipped
-    int               blobLine  = 0;
-    bool              inConnection = false;
+//! The arguments of an accepted \a directive, checked; accepted when they are safe.
+Verdict checkArguments(QString const &directive,
+                       QStringList const &tokens,
+                       int lineNumber,
+                       bool fileBearing)
+{
+    // ngPost passes the credentials on OpenVPN's command line, from a file
+    // it wrote itself with the permissions it chose. A path here would make
+    // root read one of the profile's choosing instead.
+    if (directive == QLatin1String("auth-user-pass") && tokens.size() > 1)
+        return reject(Outcome::UnsafeArgument,
+                      safeLabel(directive),
+                      lineNumber,
+                      QStringLiteral("ngPost supplies the credentials itself; this directive "
+                                     "must carry no file name"));
 
-    for (int i = 0; i < lines.size(); ++i) {
-        int const     lineNumber = i + 1;
-        QString const line       = lines.at(i).trimmed(); // also drops a CR from CRLF
+    // OpenVPN's proxy directives take an authentication FILE as a
+    // positional argument, and then hand its content to the proxy the
+    // profile itself named. That is not merely a root read: it is the read
+    // and the way off the machine in one line. Only the host/port form is
+    // accepted, plus OpenVPN's two non-file auth keywords.
+    if (directive == QLatin1String("http-proxy") && !httpProxyArgumentsOk(tokens))
+        return reject(Outcome::UnsafeArgument,
+                      safeLabel(directive),
+                      lineNumber,
+                      QStringLiteral("only \"http-proxy <host> <port>\" is accepted, "
+                                     "optionally followed by auto or auto-nct: any other "
+                                     "third argument names a credentials file that the "
+                                     "proxy would then be sent"));
+    if (directive == QLatin1String("socks-proxy") && tokens.size() > 3)
+        return reject(Outcome::UnsafeArgument,
+                      safeLabel(directive),
+                      lineNumber,
+                      QStringLiteral("only \"socks-proxy <host> <port>\" is accepted: a third "
+                                     "argument names a credentials file that the proxy would "
+                                     "then be sent"));
 
-        if (!openBlob.isEmpty()) {
-            kept << lines.at(i).trimmed();
-            if (line.compare(QStringLiteral("</%1>").arg(openBlob), Qt::CaseInsensitive) == 0)
-                openBlob.clear();
-            continue;
+    if (fileBearing) {
+        if (tokens.size() < 2)
+            return reject(Outcome::UnsafeArgument,
+                          safeLabel(directive),
+                          lineNumber,
+                          QStringLiteral("this directive needs a file name or an inline block"));
+        if (!isPlainSiblingName(tokens.at(1)))
+            return reject(Outcome::UnsafeArgument,
+                          safeLabel(directive),
+                          lineNumber,
+                          QStringLiteral("only a plain file name next to the profile is "
+                                         "accepted here, or an inline <block>"));
+    }
+    return { };
+}
+
+//! The walk over a profile, one line at a time. Each step answers with the
+//! rejection that ends the walk, or with an accepted verdict to go on.
+class ProfileInspector
+{
+public:
+    Verdict inspectLine(QString const &raw, int lineNumber)
+    {
+        QString const line = raw.trimmed(); // also drops a CR from CRLF
+
+        if (!_openBlob.isEmpty()) {
+            _kept << line;
+            if (line.compare(QStringLiteral("</%1>").arg(_openBlob), Qt::CaseInsensitive) == 0)
+                _openBlob.clear();
+            return { };
         }
 
         if (line.isEmpty() || line.startsWith(QLatin1Char('#')) || line.startsWith(QLatin1Char(';')))
-            continue;
+            return { };
 
-        if (line.startsWith(QLatin1Char('<'))) {
-            if (!line.endsWith(QLatin1Char('>')))
-                return reject(Outcome::Malformed, safeLabel(line), lineNumber,
-                              QStringLiteral("the inline block on this line is not terminated"));
+        if (line.startsWith(QLatin1Char('<')))
+            return _blockTag(line, lineNumber);
+        return _directive(line, lineNumber);
+    }
 
-            QString const tag     = line.mid(1, line.size() - 2).trimmed().toLower();
-            bool const    closing = tag.startsWith(QLatin1Char('/'));
-            QString const name    = closing ? tag.mid(1) : tag;
+    Verdict finish() const
+    {
+        if (!_openBlob.isEmpty())
+            return reject(Outcome::Malformed,
+                          safeLabel(_openBlob),
+                          _blobLine,
+                          QStringLiteral("this inline block is never closed"));
+        if (_inConnection)
+            return reject(Outcome::Malformed,
+                          QStringLiteral("connection"),
+                          0,
+                          QStringLiteral("a connection block is never closed"));
 
-            if (closing) {
-                if (name == QLatin1String("connection") && inConnection) {
-                    inConnection = false;
-                    kept << line;
-                    continue;
-                }
-                return reject(Outcome::Malformed, safeLabel(name), lineNumber,
-                              QStringLiteral("this inline block was closed but never opened"));
+        Verdict verdict;
+        verdict.sanitizedConfig = _kept.join(QLatin1Char('\n')).toUtf8();
+        if (!verdict.sanitizedConfig.isEmpty())
+            verdict.sanitizedConfig += '\n';
+        return verdict;
+    }
+
+private:
+    Verdict _blockTag(QString const &line, int lineNumber)
+    {
+        if (!line.endsWith(QLatin1Char('>')))
+            return reject(Outcome::Malformed,
+                          safeLabel(line),
+                          lineNumber,
+                          QStringLiteral("the inline block on this line is not terminated"));
+
+        QString const tag = line.mid(1, line.size() - 2).trimmed().toLower();
+        bool const closing = tag.startsWith(QLatin1Char('/'));
+        QString const name = closing ? tag.mid(1) : tag;
+
+        if (closing) {
+            if (name == QLatin1String("connection") && _inConnection) {
+                _inConnection = false;
+                _kept << line;
+                return { };
             }
-            if (name == QLatin1String("connection")) {
-                if (inConnection)
-                    return reject(Outcome::Malformed, safeLabel(name), lineNumber,
-                                  QStringLiteral("connection blocks cannot be nested"));
-                inConnection = true;
-                kept << line;
-                continue;
-            }
-            if (!inlineBlobSet().contains(name))
-                return reject(Outcome::UnknownDirective, safeLabel(name), lineNumber,
-                              QStringLiteral("ngPost does not recognise this inline block"));
-            openBlob = name;
-            blobLine = lineNumber;
-            kept << line;
-            continue;
+            return reject(Outcome::Malformed,
+                          safeLabel(name),
+                          lineNumber,
+                          QStringLiteral("this inline block was closed but never opened"));
         }
+        if (name == QLatin1String("connection")) {
+            if (_inConnection)
+                return reject(Outcome::Malformed,
+                              safeLabel(name),
+                              lineNumber,
+                              QStringLiteral("connection blocks cannot be nested"));
+            _inConnection = true;
+            _kept << line;
+            return { };
+        }
+        if (!inlineBlobSet().contains(name))
+            return reject(Outcome::UnknownDirective,
+                          safeLabel(name),
+                          lineNumber,
+                          QStringLiteral("ngPost does not recognise this inline block"));
+        _openBlob = name;
+        _blobLine = lineNumber;
+        _kept << line;
+        return { };
+    }
 
+    Verdict _directive(QString const &line, int lineNumber)
+    {
         QStringList const tokens = tokenize(line);
         if (tokens.isEmpty())
-            continue;
+            return { };
 
         QString directive = tokens.first();
         while (directive.startsWith(QLatin1String("--")))
@@ -367,7 +463,7 @@ Verdict inspect(QByteArray const &config)
 
         // Recognised, and deliberately not carried into the generated config.
         if (droppedSet().contains(directive))
-            continue;
+            return { };
 
         bool const fileBearing = fileBearingSet().contains(directive);
         if (!fileBearing && !allowedSet().contains(directive))
@@ -375,67 +471,42 @@ Verdict inspect(QByteArray const &config)
                           QStringLiteral("ngPost has not reviewed this directive, so it will not "
                                          "hand it to a process running as root"));
 
-        // ngPost passes the credentials on OpenVPN's command line, from a file
-        // it wrote itself with the permissions it chose. A path here would make
-        // root read one of the profile's choosing instead.
-        if (directive == QLatin1String("auth-user-pass") && tokens.size() > 1)
-            return reject(Outcome::UnsafeArgument, safeLabel(directive), lineNumber,
-                          QStringLiteral("ngPost supplies the credentials itself; this directive "
-                                         "must carry no file name"));
-
-        // OpenVPN's proxy directives take an authentication FILE as a
-        // positional argument, and then hand its content to the proxy the
-        // profile itself named. That is not merely a root read: it is the read
-        // and the way off the machine in one line. Only the host/port form is
-        // accepted, plus OpenVPN's two non-file auth keywords.
-        if (directive == QLatin1String("http-proxy")) {
-            bool const keywordOk = tokens.size() < 4
-                                || tokens.at(3) == QLatin1String("auto")
-                                || tokens.at(3) == QLatin1String("auto-nct");
-            static QStringList const authMethods{ QStringLiteral("none"),
-                                                  QStringLiteral("basic"),
-                                                  QStringLiteral("ntlm"),
-                                                  QStringLiteral("ntlm2") };
-            bool const methodOk = tokens.size() < 5
-                               || authMethods.contains(tokens.at(4).toLower());
-            if (tokens.size() < 3 || tokens.size() > 5 || !keywordOk || !methodOk)
-                return reject(Outcome::UnsafeArgument, safeLabel(directive), lineNumber,
-                              QStringLiteral("only \"http-proxy <host> <port>\" is accepted, "
-                                             "optionally followed by auto or auto-nct: any other "
-                                             "third argument names a credentials file that the "
-                                             "proxy would then be sent"));
-        }
-        if (directive == QLatin1String("socks-proxy") && tokens.size() > 3)
-            return reject(Outcome::UnsafeArgument, safeLabel(directive), lineNumber,
-                          QStringLiteral("only \"socks-proxy <host> <port>\" is accepted: a third "
-                                         "argument names a credentials file that the proxy would "
-                                         "then be sent"));
-
-        if (fileBearing) {
-            if (tokens.size() < 2)
-                return reject(Outcome::UnsafeArgument, safeLabel(directive), lineNumber,
-                              QStringLiteral("this directive needs a file name or an inline block"));
-            if (!isPlainSiblingName(tokens.at(1)))
-                return reject(Outcome::UnsafeArgument, safeLabel(directive), lineNumber,
-                              QStringLiteral("only a plain file name next to the profile is "
-                                             "accepted here, or an inline <block>"));
-        }
-
-        kept << line;
+        Verdict const verdict = checkArguments(directive, tokens, lineNumber, fileBearing);
+        if (verdict.isAccepted())
+            _kept << line;
+        return verdict;
     }
 
-    if (!openBlob.isEmpty())
-        return reject(Outcome::Malformed, safeLabel(openBlob), blobLine,
-                      QStringLiteral("this inline block is never closed"));
-    if (inConnection)
-        return reject(Outcome::Malformed, QStringLiteral("connection"), 0,
-                      QStringLiteral("a connection block is never closed"));
+    QStringList _kept;
+    QString _openBlob; //!< tag of the opaque block being skipped
+    int _blobLine = 0;
+    bool _inConnection = false;
+};
+}
 
-    Verdict verdict;
-    verdict.sanitizedConfig = kept.join(QLatin1Char('\n')).toUtf8();
-    if (!verdict.sanitizedConfig.isEmpty())
-        verdict.sanitizedConfig += '\n';
-    return verdict;
+namespace OpenVpnConfigPolicy
+{
+Verdict inspect(QByteArray const &config)
+{
+    if (config.size() > kMaxConfigBytes)
+        return reject(Outcome::Malformed,
+                      QString(),
+                      0,
+                      QStringLiteral("the profile is larger than a VPN profile ever is"));
+    if (config.contains('\0'))
+        return reject(Outcome::Malformed,
+                      QString(),
+                      0,
+                      QStringLiteral("the profile contains binary data, not OpenVPN directives"));
+
+    QStringList const lines = QString::fromUtf8(config).split(QLatin1Char('\n'));
+    ProfileInspector inspector;
+    for (int i = 0; i < lines.size(); ++i) {
+        Verdict const verdict = inspector.inspectLine(lines.at(i), i + 1);
+        if (!verdict.isAccepted())
+            return verdict;
+    }
+    return inspector.finish();
 }
 
 Verdict inspectFile(QString const &path)

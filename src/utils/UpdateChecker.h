@@ -76,6 +76,13 @@ private:
                       const QString &name,
                       qint64 cap,
                       const std::function<void()> &done);
+    void _drainDownload(QNetworkReply *reply, qint64 cap, qint64 *written, QString *error);
+    void _completeDownload(QNetworkReply *reply,
+                           const QString &name,
+                           qint64 written,
+                           qint64 cap,
+                           const QString &error,
+                           const std::function<void()> &done);
     void prepareInstall();
     void failDownload(const QString &message);
 

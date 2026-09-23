@@ -7185,6 +7185,10 @@ void TestMainWindow::log_box_restores_width_after_restart()
 void TestMainWindow::ui_zoom_control_adjusts_font_and_persists_setting()
 {
     HomeSandbox sandbox;
+    // Zooming sets the application font: the slots after this one must not
+    // inherit the last zoom level.
+    const QFont appFont = QApplication::font();
+    const auto restoreFont = qScopeGuard([&appFont] { QApplication::setFont(appFont); });
     MainWindow window;
     window.show();
     QCoreApplication::processEvents();
@@ -7201,7 +7205,17 @@ void TestMainWindow::ui_zoom_control_adjusts_font_and_persists_setting()
     QCoreApplication::processEvents();
     QVERIFY(popup->isVisible());
     QCOMPARE(popup->parent(), &window);
-    QVERIFY(popup->y() <= zoomBtn->y());
+    // Above the button, which sits in the status bar: compare in the window's
+    // coordinates, not in those of two different parents.
+    QVERIFY(popup->geometry().bottom() < zoomBtn->mapTo(&window, QPoint(0, 0)).y());
+
+    // A press inside the popup, even on a label that lets it through to its
+    // parents, leaves it open.
+    auto *popupLabel = popup->findChild<QLabel *>(QStringLiteral("zoomValueLabel"));
+    QVERIFY(popupLabel);
+    QTest::mouseClick(popupLabel, Qt::LeftButton);
+    QCoreApplication::processEvents();
+    QVERIFY(popup->isVisible());
 
     // Test dismissal by clicking outside
     QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, QPoint(10, 10));
@@ -7257,5 +7271,5 @@ void TestMainWindow::ui_zoom_control_adjusts_font_and_persists_setting()
     QCOMPARE(ngPost.uiZoom(), 130u);
     QCOMPARE(booted->zoomButton()->text(), QStringLiteral("130%"));
     QCOMPARE(booted->zoomSlider()->value(), 130);
-    delete booted;
+    // ngPost owns the window it created and deletes it.
 }

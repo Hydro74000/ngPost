@@ -214,6 +214,19 @@ void Par2SettingsDialog::updateControls()
     const bool manual = _custom->isChecked();
     const auto tool = effectiveTool();
     const auto volumes = choice<par2::Volumes>(_volumes);
+    _updateChoiceControls(manual, tool, volumes);
+    _updateResourceControls(manual, tool);
+    _allowToolChoices(tool, volumes);
+    auto s = settings();
+    const QString error = _controlsError(s, manual, tool);
+    _status->setText(error);
+    _buttons->button(QDialogButtonBox::Save)->setEnabled(error.isEmpty());
+    _argumentsPreview->setText(manual
+                                   ? _arguments->toPlainText()
+                                   : par2::joinArguments(s.arguments(uint(_percentage->value()))));
+}
+void Par2SettingsDialog::_updateChoiceControls(bool manual, par2::Tool tool, par2::Volumes volumes)
+{
     const bool cmd = tool == par2::Tool::Par2cmdline, multi = tool == par2::Tool::MultiPar;
     _volumeMiB->setMaximum(multi && !manual ? 1999999999.0 / 1048576 : 1048576);
     _blocks->setItemText(_blocks->findData(int(par2::Blocks::Size)),
@@ -229,6 +242,10 @@ void Par2SettingsDialog::updateControls()
     for (auto *spin : {_blockBytes, _volumeMiB})
         if (auto *slider = spin->parentWidget()->findChild<QSlider *>(spin->objectName() + QStringLiteral("Slider")))
             slider->setEnabled(spin->isEnabled());
+}
+void Par2SettingsDialog::_updateResourceControls(bool manual, par2::Tool tool)
+{
+    const bool cmd = tool == par2::Tool::Par2cmdline, multi = tool == par2::Tool::MultiPar;
     _threads->setEnabled(!manual && (_threadsSupported || _threads->value() != 0));
     _threads->setToolTip(_threadsSupported ? QString() : tr("This par2cmdline build does not support thread selection."));
     _memory->setEnabled(!manual);
@@ -238,24 +255,43 @@ void Par2SettingsDialog::updateControls()
     _findGpuButton->setEnabled(_device->isEnabled() && _gpuScan != GpuScan::Running);
     _form->setRowVisible(_gpu, !cmd || _gpu->isChecked());
     _form->setRowVisible(_deviceRow, tool == par2::Tool::ParPar);
+}
+void Par2SettingsDialog::_allowToolChoices(par2::Tool tool, par2::Volumes volumes)
+{
+    const bool cmd = tool == par2::Tool::Par2cmdline, multi = tool == par2::Tool::MultiPar;
     allow(_volumes, int(par2::Volumes::Size), !cmd);
     allow(_distribution, int(par2::Distribution::Equal), !cmd);
     allow(_distribution, int(par2::Distribution::Uniform), !multi && !(cmd && volumes == par2::Volumes::LargestInput));
     allow(_distribution, int(par2::Distribution::Decimal), multi && volumes != par2::Volumes::Count);
     allow(_distribution, int(par2::Distribution::PowersOfTwo), !(multi && volumes == par2::Volumes::Count));
-    auto s = settings();
+}
+QString Par2SettingsDialog::_gpuScanError() const
+{
+    if (_gpuScan == GpuScan::Unknown || _gpuScan == GpuScan::Running)
+        return tr("Checking OpenCL devices. Wait for the result or disable GPU acceleration.");
+    if (_gpuScan == GpuScan::Failed)
+        return tr("OpenCL could not be checked. Check the executable and OpenCL runtime, retry "
+                  "detection, or disable GPU acceleration.");
+    if (_gpuScan == GpuScan::None)
+        return tr("No OpenCL device was found: ParPar would fail and abort the post. "
+                  "Disable GPU acceleration or install an OpenCL driver.");
+    return { };
+}
+//! The reason Save is refused, the last applicable one winning; empty when allowed.
+QString Par2SettingsDialog::_controlsError(const par2::Settings &s,
+                                           bool manual,
+                                           par2::Tool tool) const
+{
     QString error = s.validate();
-    if (!manual && cmd && _gpu->isChecked()) error = tr("GPU acceleration is not supported by par2cmdline. Disable it before changing tools.");
+    if (!manual && tool == par2::Tool::Par2cmdline && _gpu->isChecked())
+        error = tr(
+            "GPU acceleration is not supported by par2cmdline. Disable it before changing tools.");
     // ParPar stops with "Unable to obtain OpenCL device info" and writes no par2
     // at all, which aborts the post. MultiPar just falls back to the CPU.
     if (!manual && tool == par2::Tool::ParPar && _gpu->isChecked()) {
-        if (_gpuScan == GpuScan::Unknown || _gpuScan == GpuScan::Running)
-            error = tr("Checking OpenCL devices. Wait for the result or disable GPU acceleration.");
-        else if (_gpuScan == GpuScan::Failed)
-            error = tr("OpenCL could not be checked. Check the executable and OpenCL runtime, retry detection, or disable GPU acceleration.");
-        else if (_gpuScan == GpuScan::None)
-            error = tr("No OpenCL device was found: ParPar would fail and abort the post. "
-                       "Disable GPU acceleration or install an OpenCL driver.");
+        const QString gpuError = _gpuScanError();
+        if (!gpuError.isEmpty())
+            error = gpuError;
     }
     if (!manual && !_threadsSupported && _threads->value() != 0)
         error = tr("This par2cmdline build does not support thread selection.");
@@ -263,9 +299,7 @@ void Par2SettingsDialog::updateControls()
     if (_toolPath->mode() == externaltool::PathMode::Custom
         && (!executable.isFile() || !executable.isExecutable()))
         error = tr("The selected executable is unavailable. Select an installed tool or Automatic.");
-    _status->setText(error);
-    _buttons->button(QDialogButtonBox::Save)->setEnabled(error.isEmpty());
-    _argumentsPreview->setText(manual ? _arguments->toPlainText() : par2::joinArguments(s.arguments(uint(_percentage->value()))));
+    return error;
 }
 void Par2SettingsDialog::selectTool()
 {
@@ -405,52 +439,73 @@ void Par2SettingsDialog::updatePreview()
     if (_scanIncomplete) { _preview->setText(tr("Estimate unavailable: some source sizes could not be read.")); return; }
     if (_sizes.isEmpty()) { _preview->setText(tr("Prepare a post to display an estimate.")); return; }
     auto sizes = _sizes;
-    if (_beforeCompression) {
-        qint64 total = 0;
-        for (auto size : sizes) {
-            if (size < 0 || total > std::numeric_limits<qint64>::max() - size) {
-                _preview->setText(tr("Estimate indeterminate for these arguments or block limits."));
-                return;
-            }
-            total += size;
-        }
-        qint64 volumeMiB = _ngPost->_rarSize;
-        if (_ngPost->_useRarMax && _ngPost->_rarMax > 0) {
-            const qint64 sourceMiB = total / 1048576;
-            if (volumeMiB == 0 || sourceMiB / volumeMiB > _ngPost->_rarMax)
-                volumeMiB = sourceMiB / _ngPost->_rarMax + 1;
-        }
-        sizes.clear();
-        const qint64 volume = volumeMiB > 0 ? volumeMiB * 1048576 : qMax<qint64>(1, total);
-        // An unreasonable volume count is not useful as an interactive estimate.
-        if (total / volume > 32768) { _preview->setText(tr("Estimate unavailable: too many source volumes.")); return; }
-        while (total > 0) { sizes << qMin(total, volume); total -= sizes.last(); }
-    }
+    if (_beforeCompression && !_splitIntoVolumes(sizes))
+        return;
     const auto configured = settings();
     const auto e = configured.estimate(sizes, uint(_percentage->value()));
     if (!e.valid) {
-        // par2j caps a post at 32768 source blocks: asking for smaller ones does
-        // not give more, it makes par2j pick its own size after scanning, and
-        // the PAR2 step then takes several times longer for the same result.
-        qint64 sourceBytes = 0;
-        for (qint64 size : sizes)
-            sourceBytes += size;
-        const qint64 wanted = configured.tool == par2::Tool::MultiPar
-                && configured.blocks == par2::Blocks::Size && configured.blockBytes > 0
-            ? (sourceBytes + configured.blockBytes - 1) / configured.blockBytes
-            : 0;
-        if (wanted > 32768) {
-            const qint64 least = ((sourceBytes + 32767) / 32768 + 3) / 4 * 4;
-            _preview->setText(tr("MultiPar stops at 32768 source blocks, and this post would need "
-                                 "%1: par2j enlarges the blocks itself, which makes the PAR2 step "
-                                 "several times longer. Choose a source block count, or a block "
-                                 "size of at least %2.")
-                                  .arg(wanted)
-                                  .arg(bytes(least)));
-        } else
-            _preview->setText(tr("Estimate indeterminate for these arguments or block limits."));
+        _showInvalidEstimate(configured, sizes);
         return;
     }
+    _preview->setText(_estimateText(e));
+}
+//! Replaces the source sizes with the archive volumes the compression will
+//! write. False, with the reason on the preview, when no estimate can follow.
+bool Par2SettingsDialog::_splitIntoVolumes(QVector<qint64> &sizes)
+{
+    qint64 total = 0;
+    for (auto size : sizes) {
+        if (size < 0 || total > std::numeric_limits<qint64>::max() - size) {
+            _preview->setText(tr("Estimate indeterminate for these arguments or block limits."));
+            return false;
+        }
+        total += size;
+    }
+    qint64 volumeMiB = _ngPost->_rarSize;
+    if (_ngPost->_useRarMax && _ngPost->_rarMax > 0) {
+        const qint64 sourceMiB = total / 1048576;
+        if (volumeMiB == 0 || sourceMiB / volumeMiB > _ngPost->_rarMax)
+            volumeMiB = sourceMiB / _ngPost->_rarMax + 1;
+    }
+    sizes.clear();
+    const qint64 volume = volumeMiB > 0 ? volumeMiB * 1048576 : qMax<qint64>(1, total);
+    // An unreasonable volume count is not useful as an interactive estimate.
+    if (total / volume > 32768) {
+        _preview->setText(tr("Estimate unavailable: too many source volumes."));
+        return false;
+    }
+    while (total > 0) {
+        sizes << qMin(total, volume);
+        total -= sizes.last();
+    }
+    return true;
+}
+void Par2SettingsDialog::_showInvalidEstimate(const par2::Settings &configured,
+                                              const QVector<qint64> &sizes)
+{
+    // par2j caps a post at 32768 source blocks: asking for smaller ones does
+    // not give more, it makes par2j pick its own size after scanning, and
+    // the PAR2 step then takes several times longer for the same result.
+    qint64 sourceBytes = 0;
+    for (qint64 size : sizes)
+        sourceBytes += size;
+    const qint64 wanted = configured.tool == par2::Tool::MultiPar
+            && configured.blocks == par2::Blocks::Size && configured.blockBytes > 0
+        ? (sourceBytes + configured.blockBytes - 1) / configured.blockBytes
+        : 0;
+    if (wanted > 32768) {
+        const qint64 least = ((sourceBytes + 32767) / 32768 + 3) / 4 * 4;
+        _preview->setText(tr("MultiPar stops at 32768 source blocks, and this post would need "
+                             "%1: par2j enlarges the blocks itself, which makes the PAR2 step "
+                             "several times longer. Choose a source block count, or a block "
+                             "size of at least %2.")
+                              .arg(wanted)
+                              .arg(bytes(least)));
+    } else
+        _preview->setText(tr("Estimate indeterminate for these arguments or block limits."));
+}
+QString Par2SettingsDialog::_estimateText(const par2::Estimate &e) const
+{
     QString text = _beforeCompression ? tr("Estimate before compression (source sizes and rounding):")
                                      : tr("Estimate for the current post:");
     text += QLatin1Char('\n') + tr("%1 source blocks of about %2; %3 recovery blocks, about %4.")
@@ -458,7 +513,7 @@ void Par2SettingsDialog::updatePreview()
     text += QLatin1Char('\n') + tr("Recovery volumes: %1; largest recovery data volume: %2 (metadata excluded).")
         .arg(e.volumeCount < 0 ? tr("indeterminate") : QString::number(e.volumeCount)).arg(bytes(e.largestRecoveryBytes));
     if (_percentageOverride) text += QLatin1Char('\n') + tr("This preview uses the global default; the current post has its own redundancy override.");
-    _preview->setText(text);
+    return text;
 }
 void Par2SettingsDialog::accept()
 {
