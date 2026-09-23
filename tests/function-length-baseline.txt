@@ -1219,7 +1219,7 @@
 5	src/par2/Par2Settings.cpp	par2::ArgumentReader::ArgumentReader( Settings & settings , const QString & commandLine)
 7	src/par2/Par2Settings.cpp	par2::ArgumentReader::number( const QString & text)
 5	src/par2/Par2Settings.cpp	par2::ArgumentReader::once( const QString & category)
-21	src/par2/Par2Settings.cpp	par2::ArgumentReader::read()
+21	src/par2/Par2Settings.cpp	par2::ArgumentReader::readArguments()
 38	src/par2/Par2Settings.cpp	par2::ArgumentReader::readMultiPar()
 12	src/par2/Par2Settings.cpp	par2::ArgumentReader::readMultiParDistribution( const QString & v)
 10	src/par2/Par2Settings.cpp	par2::ArgumentReader::readMultiParThreads( const QString & text)

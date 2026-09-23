@@ -109,7 +109,7 @@ public:
         , args(QProcess::splitCommand(commandLine))
     {
     }
-    void read()
+    void readArguments()
     {
         for (i = 0; i < args.size(); ++i) {
             a = args[i];
@@ -398,7 +398,7 @@ Settings Settings::parse(Tool kind, const QString &arguments)
             s.volumes = Volumes::LargestInput;
         return s;
     }
-    ArgumentReader(s, arguments).read();
+    ArgumentReader(s, arguments).readArguments();
     return s;
 }
 static QString blockError(const Settings &s)
