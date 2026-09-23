@@ -795,7 +795,7 @@
 63	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryStats()
 66	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTab()
 51	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTable( QSplitter * histSplitter)
-20	src/hmi/MainWindow.cpp	MainWindow::_configureWaylandSplitters()
+21	src/hmi/MainWindow.cpp	MainWindow::_configureWaylandSplitters()
 66	src/hmi/MainWindow.cpp	MainWindow::_connectHistoryControls()
 12	src/hmi/MainWindow.cpp	MainWindow::_connectPostingWidget( PostingWidget * post)
 21	src/hmi/MainWindow.cpp	MainWindow::_fillTabContextMenu( QMenu & menu , int tabIndex)
