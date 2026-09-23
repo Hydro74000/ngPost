@@ -32,6 +32,7 @@
 #include <QSet>
 #include <QUrl>
 class NgPost;
+class UpdateChecker;
 struct NntpServerParams;
 class NntpFile;
 class PostingWidget;
@@ -83,6 +84,7 @@ private:
     void _buildPostingControls();
     void _retranslate();
     void _submitPreparedTabs();
+    void _downloadUpdate(UpdateChecker *checker);
     bool _isPostingQueueRunning() const;
     uint _nextQuickJobNumber();
     uint _highestQuickJobNumber = 1;

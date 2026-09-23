@@ -1012,6 +1012,9 @@ void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes,
     if (!uc)
         return;
 
+    const auto shutdownHold = _ngPost->holdShutdown();
+    const bool automatic = uc->canInstallAutomatically() && !_ngPost->hasPostingJobs()
+        && !hasUnsubmittedPosts();
     QString notesPreview = notes.left(800);
     if (notes.size() > 800)
         notesPreview += "...";
@@ -1029,15 +1032,29 @@ void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes,
     box.setTextFormat(Qt::RichText);
     box.setTextInteractionFlags(Qt::TextBrowserInteraction);
     box.setText(body);
-    QPushButton *install = box.addButton(tr("Install and Restart"), QMessageBox::AcceptRole);
+    QPushButton *install = box.addButton(automatic ? tr("Install and Restart")
+                                                   : tr("View release on GitHub"),
+                                         QMessageBox::AcceptRole);
     box.addButton(tr("Later"), QMessageBox::RejectRole);
     box.setDefaultButton(install);
     box.exec();
     if (box.clickedButton() != install)
         return;
 
+    if (!automatic) {
+        QDesktopServices::openUrl(releasePage);
+        return;
+    }
+    _downloadUpdate(uc);
+}
+
+void MainWindow::_downloadUpdate(UpdateChecker *uc)
+{
     auto *progress = new QProgressDialog(tr("Downloading update..."), tr("Cancel"), 0, 100, this);
-    progress->setWindowModality(Qt::WindowModal);
+    auto progressHold = std::make_shared<decltype(_ngPost->holdShutdown())>(
+        _ngPost->holdShutdown());
+    connect(progress, &QObject::destroyed, this, [progressHold] {});
+    progress->setWindowModality(Qt::ApplicationModal);
     progress->setAttribute(Qt::WA_DeleteOnClose);
     progress->setAutoClose(false);
     progress->setAutoReset(false);
@@ -1061,6 +1078,7 @@ void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes,
             [this, uc, progress](const QString &msg) {
                 disconnect(progress, nullptr, uc, nullptr);
                 progress->close();
+                const auto shutdownHold = _ngPost->holdShutdown();
                 QMessageBox::warning(this, tr("Update failed"), msg);
             });
     connect(progress, &QProgressDialog::canceled, uc, &UpdateChecker::cancelDownload);

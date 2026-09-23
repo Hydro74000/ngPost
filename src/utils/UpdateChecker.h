@@ -20,6 +20,8 @@ class NgPost;
 class QNetworkAccessManager;
 class QNetworkReply;
 class QProcess;
+class QJsonObject;
+class QJsonDocument;
 
 class UpdateChecker : public QObject
 {
@@ -30,7 +32,10 @@ public:
 
     void checkLatestRelease();
 
-    static bool    isAppImage();
+    static bool isAppImage();
+    static QString installationDirectory();
+    static bool isReplaceableInstallation(const QString &directory);
+    bool canInstallAutomatically() const;
     static bool isTrustedDownloadUrl(const QUrl &url);
 
     //! True when \a candidate supersedes \a current, both given as release
@@ -71,6 +76,7 @@ private:
 #ifdef NGPOST_TESTING
     friend class TestUpdateChecker;
 #endif
+    static QJsonObject selectRelease(const QJsonDocument &document, const QString &current);
     QString assetNameForCurrentOS(const QString &tag) const;
     void downloadFile(const QUrl &url,
                       const QString &name,
@@ -84,6 +90,7 @@ private:
                            const QString &error,
                            const std::function<void()> &done);
     void prepareInstall();
+    void recordCheck();
     void failDownload(const QString &message);
 
     //! Drops the "cancelled" marker the detached installer polls for. False

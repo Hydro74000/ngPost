@@ -40,6 +40,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  test-update:
+    uses: ./.github/workflows/update-tests.yml
   test-unit:
     uses: ./.github/workflows/unit-tests.yml
   test-integration:
@@ -213,6 +215,15 @@ jobs:
           tar -C dist -czf "dist/${PKG}.tar.gz" "${PKG}"
           rm -rf "dist/${PKG}"
           ls -la dist/
+      - name: Validate update transactions on the release archive
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python3 tests/update/check_release_package.py --archive dist/*-linux-x86_64.tar.gz --tag "$RELEASE_TAG"
+          python3 tests/update/build_legacy_client.py "$RUNNER_TEMP/legacy-client"
+          python3 tests/update/check_legacy_package.py --archive dist/*-linux-x86_64.tar.gz --client "$RUNNER_TEMP/legacy-client/legacy-client"
+
       - name: Upload Linux Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -644,6 +655,31 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
           Remove-Item -Recurse -Force "dist/$pkg"
           Get-ChildItem dist
+      - name: Validate update transactions on the release ZIP
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $archive = (Get-ChildItem dist/*-windows-x86_64.zip).FullName
+          python tests/update/check_release_package.py --archive $archive --tag $env:RELEASE_TAG
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tests/update/build_legacy_client.py "$env:RUNNER_TEMP/legacy-client"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tests/update/check_legacy_package.py --archive $archive --client "$env:RUNNER_TEMP/legacy-client/release/legacy-client.exe"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Validate upgrade from the previous stable Windows Setup
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v5.5.1 --pattern 'ngPost-v5.5.1-windows-x86_64-setup.exe' --dir "$env:RUNNER_TEMP/previous-setup"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $previous = (Get-ChildItem "$env:RUNNER_TEMP/previous-setup/*.exe").FullName
+          $candidate = (Get-ChildItem dist/*-windows-x86_64-setup.exe).FullName
+          ./tests/update/test_setup_upgrade.ps1 -PreviousSetup $previous -CandidateSetup $candidate
+
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -754,6 +790,15 @@ jobs:
           out=$("$app/ngPost" --version 2>&1)
           echo "$out" | grep -q "SSL support: yes" \
             || { echo "FAIL: the packaged binary lost SSL"; echo "$out"; exit 1; }
+      - name: Validate update transactions on the release archive
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python3 tests/update/check_release_package.py --archive dist/*-macos.zip --tag "$RELEASE_TAG"
+          python3 tests/update/build_legacy_client.py "$RUNNER_TEMP/legacy-client"
+          python3 tests/update/check_legacy_package.py --archive dist/*-macos.zip --client "$RUNNER_TEMP/legacy-client/legacy-client"
+
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -1099,7 +1144,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [release-metadata, build-linux, build-windows, build-macos, build-appimage, test-unit, test-integration, test-gui, test-vpn]
+    needs: [release-metadata, build-linux, build-windows, build-macos, build-appimage, test-update, test-unit, test-integration, test-gui, test-vpn]
     permissions:
       contents: write
       id-token: write
@@ -1116,6 +1161,7 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
+          pattern: "{binary-*,appimage-*}"
           merge-multiple: true
       - name: List artifacts
         run: ls -la artifacts/

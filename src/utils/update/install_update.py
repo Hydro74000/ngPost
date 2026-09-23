@@ -246,8 +246,11 @@ def commit(work, pid):
     if not candidate.resolve().is_relative_to(work.resolve()) or install.parent != work.parent:
         raise ValueError('invalid transaction paths')
     journal = work / 'transaction.json'
-    journal.write_text(json.dumps({'install': str(install), 'candidate': str(candidate), 'backup': str(backup)}))
-    with journal.open('rb') as state:
+    # FlushFileBuffers (Windows fsync) requires a writable handle. Reopening
+    # the journal read-only made every Windows commit fail before readiness.
+    with journal.open('w') as state:
+        json.dump({'install': str(install), 'candidate': str(candidate), 'backup': str(backup)}, state)
+        state.flush()
         os.fsync(state.fileno())
     if os.name == 'nt':
         kernel = ctypes.WinDLL('kernel32', use_last_error=True)
@@ -278,7 +281,8 @@ def commit(work, pid):
         probe(install)
         # nosec B603
         # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
-        subprocess.Popen([str(executable(install))], cwd=install, start_new_session=True)
+        launched = subprocess.Popen([str(executable(install))], cwd=install, start_new_session=True)
+        (work / 'launched.json').write_text(json.dumps({'pid': launched.pid}))
     except BaseException:
         rollback(candidate, install, backup)
         raise

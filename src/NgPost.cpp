@@ -1646,8 +1646,6 @@ void NgPost::checkForNewVersion()
 {
     if (!_checkForUpdates)
         return;
-    if (UpdateChecker::isAppImage())
-        return; // handled by zsync embedded update info
     const qint64 now = QDateTime::currentSecsSinceEpoch();
     if (_lastUpdateCheckEpoch > 0 && (now - _lastUpdateCheckEpoch) < 86400)
         return; // once per day

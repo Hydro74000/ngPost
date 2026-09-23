@@ -47,6 +47,45 @@ bool UpdateChecker::isAppImage()
     return qEnvironmentVariableIsSet("APPIMAGE") || qEnvironmentVariableIsSet("APPDIR");
 }
 
+QString UpdateChecker::installationDirectory()
+{
+    QDir directory(QCoreApplication::applicationDirPath());
+#ifdef Q_OS_MACOS
+    if (directory.dirName() == QLatin1String("MacOS")) {
+        directory.cdUp();
+        if (directory.dirName() == QLatin1String("Contents"))
+            directory.cdUp();
+    }
+#endif
+    return directory.absolutePath();
+}
+
+bool UpdateChecker::isReplaceableInstallation(const QString &directory)
+{
+    const QFileInfo info(directory);
+    const QString path = info.canonicalFilePath();
+    const QFileInfo marker(directory + QStringLiteral("/.ngpost-installation"));
+    // Inno Setup owns its uninstall database and optional components. A ZIP
+    // directory swap would discard both; keep these installs on Setup.
+    return !info.isSymLink() && !path.isEmpty() && marker.isFile() && !marker.isSymLink()
+        && !QDir(path).isRoot() && path != QFileInfo(QDir::homePath()).canonicalFilePath()
+        && path != QLatin1String("/usr/bin") && path != QLatin1String("/usr/local/bin")
+        && QFileInfo(info.absolutePath()).isWritable()
+        && QDir(directory).entryList({ QStringLiteral("unins*.exe") }, QDir::Files).isEmpty();
+}
+
+bool UpdateChecker::canInstallAutomatically() const
+{
+#if defined(Q_PROCESSOR_X86_64) || defined(Q_OS_MACOS)
+    return !isAppImage() && isReplaceableInstallation(installationDirectory())
+        && isTrustedDownloadUrl(_assetUrl) && _assetSize > 0 && _assetSize <= 1024LL * 1024 * 1024
+        && (!QStandardPaths::findExecutable(QStringLiteral("python3")).isEmpty()
+            || !QStandardPaths::findExecutable(QStringLiteral("python")).isEmpty());
+#else
+    return false; // Published Linux/Windows archives target x86_64 only.
+#endif
+}
+
 QString UpdateChecker::stripVersionPrefix(const QString &tag)
 {
     QString s = tag.trimmed();
@@ -141,12 +180,8 @@ bool UpdateChecker::isVersionNewer(const QString &candidate, const QString &curr
 
 void UpdateChecker::checkLatestRelease()
 {
-    if (_reply || _busy) return;
-    if (isAppImage())
-    {
-        qDebug() << "[UpdateChecker] running as AppImage, skipping check (zsync handles updates)";
+    if (_reply || _busy)
         return;
-    }
 
     // A stable build asks GitHub for "the latest release", which by definition
     // ignores pre-releases. A pre-release build has to look at the list: what
@@ -197,38 +232,10 @@ void UpdateChecker::onReleaseInfoReceived()
         return;
     }
 
-    // "/releases/latest" answers with one release, "/releases" with a list.
-    // Pick the entry that supersedes this build by the most: the list is
-    // ordered by creation date, but a stable published before a later unstable
-    // is still the one to offer.
-    QJsonObject root;
-    if (doc.isObject())
-        root = doc.object();
-    else
-    {
-        const QString mine = buildTag();
-        QString best;
-        for (const auto &v : doc.array()) {
-            const QJsonObject candidate = v.toObject();
-            if (candidate.value("draft").toBool())
-                continue;
-            const QString tag = candidate.value("tag_name").toString();
-            if (tag.isEmpty() || !isVersionNewer(tag, mine))
-                continue;
-            if (best.isEmpty() || isVersionNewer(tag, best))
-            {
-                best = tag;
-                root = candidate;
-            }
-        }
-        if (best.isEmpty())
-        {
-            _ngPost->_lastUpdateCheckEpoch = QDateTime::currentSecsSinceEpoch();
-            _ngPost->saveConfig();
-            qDebug() << "[UpdateChecker] up to date (current" << mine << ")";
-            return;
-        }
-    }
+    const QJsonObject root = selectRelease(doc, buildTag());
+    recordCheck();
+    if (root.isEmpty())
+        return;
     _latestTag        = root.value("tag_name").toString();
     _releaseNotes     = root.value("body").toString();
     _releasePageUrl   = QUrl(root.value("html_url").toString());
@@ -236,33 +243,7 @@ void UpdateChecker::onReleaseInfoReceived()
     _assetFileName.clear();
     _assetSize = 0;
 
-    if (!QRegularExpression(QStringLiteral("^[vV]?[0-9]+(?:[.][0-9]+)+(?:-[A-Za-z0-9.-]+)?$"))
-             .match(_latestTag).hasMatch())
-        return;
     _releasePageUrl = QUrl(QStringLiteral("https://github.com/Hydro74000/ngPost/releases/tag/") + _latestTag);
-
-    // Update "last check" timestamp regardless of whether a newer version is available,
-    // so we honour the once-per-day cadence even when already up to date.
-    _ngPost->_lastUpdateCheckEpoch = QDateTime::currentSecsSinceEpoch();
-    _ngPost->saveConfig();
-
-    // A stable install is never offered a pre-release, whatever came back.
-    // The endpoint already excludes them, so this only closes the door on a
-    // future caller: isVersionNewer() alone would say yes to a HIGHER numbered
-    // pre-release, which is right for an unstable build and wrong here.
-    if (isPreRelease(_latestTag) && !isPreRelease(buildTag()))
-    {
-        qDebug() << "[UpdateChecker] ignoring pre-release" << _latestTag
-                 << "for stable build" << buildTag();
-        return;
-    }
-
-    if (!isVersionNewer(_latestTag, buildTag()))
-    {
-        qDebug() << "[UpdateChecker] up to date (current" << buildTag()
-                 << "latest" << _latestTag << ")";
-        return;
-    }
 
     const QString wantedName = assetNameForCurrentOS(_latestTag);
     const QJsonArray assets  = root.value("assets").toArray();
@@ -287,6 +268,36 @@ void UpdateChecker::onReleaseInfoReceived()
     }
 
     emit newVersionAvailable(_latestTag, _releaseNotes, _releasePageUrl);
+}
+
+QJsonObject UpdateChecker::selectRelease(const QJsonDocument &document, const QString &current)
+{
+    // GitHub's list is ordered by creation date, not version. A stable build
+    // must filter prereleases before choosing the best remaining candidate.
+    const auto releases = document.isArray() ? document.array() : QJsonArray{ document.object() };
+    const QRegularExpression validTag(
+        QStringLiteral("^[vV]?[0-9]+(?:[.][0-9]+)+(?:-[A-Za-z0-9.-]+)?$"));
+    QJsonObject best;
+    for (const auto &entry : releases) {
+        const auto release = entry.toObject();
+        const auto tag = release.value("tag_name").toString();
+        if (release.value("draft").toBool() || !validTag.match(tag).hasMatch()
+            || (!isPreRelease(current)
+                && (release.value("prerelease").toBool() || isPreRelease(tag)))
+            || !isVersionNewer(tag, current))
+            continue;
+        if (best.isEmpty() || isVersionNewer(tag, best.value("tag_name").toString()))
+            best = release;
+    }
+    return best;
+}
+
+void UpdateChecker::recordCheck()
+{
+    if (_ngPost) {
+        _ngPost->_lastUpdateCheckEpoch = QDateTime::currentSecsSinceEpoch();
+        _ngPost->saveConfig();
+    }
 }
 
 QString UpdateChecker::assetNameForCurrentOS(const QString &tag) const
@@ -415,21 +426,14 @@ void UpdateChecker::startDownloadAndInstall()
         failDownload(tr("Automatic updates require Python 3.9+. Install this release manually after checking its published SHA-256 hash."));
         return;
     }
-    _installDir = QCoreApplication::applicationDirPath();
-#ifdef Q_OS_MACOS
-    QDir bundle(_installDir);
-    bundle.cdUp(); bundle.cdUp();
-    _installDir = bundle.absolutePath();
-#endif
+    _installDir = installationDirectory();
     if (!QFileInfo::exists(_installDir + QStringLiteral("/.ngpost-installation"))) {
         failDownload(tr("This installation has no package ownership marker. Install a package manually after checking its SHA-256 hash before enabling automatic replacement."));
         return;
     }
     // Stage on the same filesystem. Replacing /usr/bin or another shared
     // directory is never an allowed updater operation.
-    if (QDir(_installDir).isRoot() || _installDir == QDir::homePath()
-        || _installDir == QLatin1String("/usr/bin") || _installDir == QLatin1String("/usr/local/bin")
-        || !QFileInfo(QFileInfo(_installDir).absolutePath()).isWritable()) {
+    if (!canInstallAutomatically()) {
         failDownload(tr("This installation cannot be replaced safely; use its package installer."));
         return;
     }

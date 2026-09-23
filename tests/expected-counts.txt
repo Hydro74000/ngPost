@@ -62,7 +62,7 @@ tst_PostHistory               48  Linux
 tst_PostInfoTemplate          36  Linux
 tst_RandomToken                3  Linux
 tst_SecretMasker              22  Linux
-tst_UpdateChecker             17  Linux
+tst_UpdateChecker             35  Linux
 tst_VpnDnsResolver             8  Linux
 tst_VpnE2E_WireGuard           7  Linux
 tst_VpnProfile                62  Linux
@@ -94,7 +94,7 @@ tst_PostHistory               48  Darwin
 tst_PostInfoTemplate          36  Darwin
 tst_RandomToken                3  Darwin
 tst_SecretMasker              22  Darwin
-tst_UpdateChecker             17  Darwin
+tst_UpdateChecker             35  Darwin
 tst_VpnDnsResolver             8  Darwin
 tst_VpnProfile                61  Darwin
 tst_VpnSocketBinder            8  Darwin
@@ -123,7 +123,7 @@ tst_PostHistory               48  Windows
 tst_PostInfoTemplate          34  Windows
 tst_RandomToken                3  Windows
 tst_SecretMasker              22  Windows
-tst_UpdateChecker             17  Windows
+tst_UpdateChecker             35  Windows
 tst_VpnDnsResolver             8  Windows
 tst_VpnProfile                62  Windows
 tst_VpnSocketBinder            8  Windows

@@ -602,6 +602,10 @@ Voer een geheel aantal MiB tussen 0 en 1000000 in (0 schakelt splitsen alleen ui
 <context>
     <name>MainWindow</name>
     <message>
+        <source>View release on GitHub</source>
+        <translation>Release op GitHub bekijken</translation>
+    </message>
+    <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
         <translation>Voeg een server toe (je kunt er zoveel gebruiken als je wilt)</translation>

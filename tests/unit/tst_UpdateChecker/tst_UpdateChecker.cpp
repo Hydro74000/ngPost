@@ -10,6 +10,10 @@
 #include <QtTest>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QTimer>
 
 namespace {
 class FakeUpdateReply : public QNetworkReply {
@@ -38,8 +42,18 @@ public:
 class FakeUpdateNetwork : public QNetworkAccessManager {
 public:
     FakeUpdateReply *last = nullptr;
-    QNetworkReply *createRequest(Operation, const QNetworkRequest &, QIODevice *) override {
+    QHash<QString, QByteArray> responses;
+    QNetworkReply *createRequest(Operation, const QNetworkRequest &request, QIODevice *) override
+    {
         last = new FakeUpdateReply(this);
+        if (!responses.isEmpty()) {
+            auto reply = last;
+            const auto bytes = responses.value(request.url().toString());
+            QTimer::singleShot(0, reply, [reply, bytes] {
+                reply->deliver(bytes);
+                reply->finish();
+            });
+        }
         return last;
     }
 };
@@ -50,6 +64,143 @@ class TestUpdateChecker : public QObject
     Q_OBJECT
 
 private slots:
+    void release_channels_data()
+    {
+        QTest::addColumn<QString>("current");
+        QTest::addColumn<QString>("expected");
+        QTest::newRow("stable-to-stable") << QString("v5.5.1") << QString("v5.6");
+        QTest::newRow("stable-stays-stable") << QString("v5.6") << QString();
+        QTest::newRow("unstable-to-stable")
+            << QString("v5.6-unstable.1") << QString("v5.7-unstable.2");
+        QTest::newRow("unstable-to-new-build")
+            << QString("v5.7-unstable.1") << QString("v5.7-unstable.2");
+        QTest::newRow("unstable-current") << QString("v5.7-unstable.2") << QString();
+        QTest::newRow("never-downgrade") << QString("v6.0") << QString();
+    }
+    void release_channels()
+    {
+        QFETCH(QString, current);
+        QFETCH(QString, expected);
+        const QJsonArray releases{
+            QJsonObject{ { "tag_name", "v100.0" }, { "draft", true } },
+            QJsonObject{ { "tag_name", "v99.0/bad" } },
+            QJsonObject{ { "tag_name", "v5.7-unstable.2" }, { "prerelease", true } },
+            QJsonObject{ { "tag_name", "v5.6" } },
+            QJsonObject{ { "tag_name", "v5.6-unstable.3" }, { "prerelease", true } }
+        };
+        QCOMPARE(UpdateChecker::selectRelease(QJsonDocument(releases), current)
+                     .value("tag_name")
+                     .toString(),
+                 expected);
+        const QJsonArray sameNumber{ releases.at(3), releases.at(4) };
+        QCOMPARE(UpdateChecker::selectRelease(QJsonDocument(sameNumber), "v5.6-unstable.1")
+                     .value("tag_name")
+                     .toString(),
+                 QString("v5.6"));
+    }
+    void release_notification_data()
+    {
+        QTest::addColumn<QString>("tag");
+        QTest::addColumn<bool>("draft");
+        QTest::addColumn<bool>("prerelease");
+        QTest::addColumn<bool>("offered");
+        QTest::newRow("upgrade") << QString("v99.0") << false << false << true;
+        QTest::newRow("same-version") << UpdateChecker::buildTag() << false << false << false;
+        QTest::newRow("downgrade") << QString("v1.0") << false << false << false;
+        QTest::newRow("draft") << QString("v99.0") << true << false << false;
+        QTest::newRow("prerelease-flag") << QString("v99.0") << false << true << false;
+        QTest::newRow("prerelease-tag") << QString("v99.0-rc.1") << false << true << false;
+        QTest::newRow("bad-tag") << QString("../99.0") << false << false << false;
+    }
+    void release_notification()
+    {
+        QFETCH(QString, tag);
+        QFETCH(bool, draft);
+        QFETCH(bool, prerelease);
+        QFETCH(bool, offered);
+        FakeUpdateNetwork network;
+        UpdateChecker checker(nullptr, &network);
+        QSignalSpy available(&checker, &UpdateChecker::newVersionAvailable);
+        const auto name = checker.assetNameForCurrentOS(tag);
+        const QString url = "https://github.com/Hydro74000/ngPost/releases/download/" + tag + "/"
+            + name;
+        QJsonObject release{ { "tag_name", tag },
+                             { "draft", draft },
+                             { "prerelease", prerelease },
+                             { "assets",
+                               QJsonArray{ QJsonObject{ { "name", name },
+                                                        { "browser_download_url", url },
+                                                        { "size", 123 } } } } };
+        checker.checkLatestRelease();
+        QVERIFY(network.last);
+        network.last->deliver(QJsonDocument(release).toJson());
+        network.last->finish();
+        QCOMPARE(available.size(), offered ? 1 : 0);
+        if (offered) {
+            QCOMPARE(checker._assetFileName, name);
+            QCOMPARE(checker._assetUrl, QUrl(url));
+            QCOMPARE(checker._assetSize, 123);
+        }
+    }
+    void missing_or_untrusted_asset_keeps_manual_notification_data()
+    {
+        QTest::addColumn<QString>("url");
+        QTest::newRow("missing") << QString();
+        QTest::newRow("foreign-host") << QString("https://example.org/archive");
+        QTest::newRow("other-repository")
+            << QString("https://github.com/other/repo/releases/download/v99.0/archive");
+    }
+    void missing_or_untrusted_asset_keeps_manual_notification()
+    {
+        QFETCH(QString, url);
+        FakeUpdateNetwork network;
+        UpdateChecker checker(nullptr, &network);
+        QSignalSpy available(&checker, &UpdateChecker::newVersionAvailable);
+        QJsonObject release{ { "tag_name", "v99.0" },
+                             { "assets",
+                               QJsonArray{
+                                   QJsonObject{ { "name", checker.assetNameForCurrentOS("v99.0") },
+                                                { "browser_download_url", url },
+                                                { "size", 123 } } } } };
+        checker.checkLatestRelease();
+        network.last->deliver(QJsonDocument(release).toJson());
+        network.last->finish();
+        QCOMPARE(available.size(), 1);
+        QVERIFY(checker._assetUrl.isEmpty());
+        QVERIFY(!checker.canInstallAutomatically());
+    }
+    void appimage_still_checks_for_updates()
+    {
+        const auto previous = qgetenv("APPIMAGE");
+        qputenv("APPIMAGE", "/tmp/ngPost.AppImage");
+        FakeUpdateNetwork network;
+        UpdateChecker checker(nullptr, &network);
+        checker.checkLatestRelease();
+        const bool requested = network.last != nullptr;
+        const bool automatic = checker.canInstallAutomatically();
+        if (previous.isNull())
+            qunsetenv("APPIMAGE");
+        else
+            qputenv("APPIMAGE", previous);
+        QVERIFY(requested);
+        QVERIFY(!automatic);
+    }
+    void only_owned_portable_installations_are_replaceable()
+    {
+        QTemporaryDir root;
+        const auto directory = root.path() + "/installation with spaces";
+        QVERIFY(QDir().mkpath(directory));
+        QVERIFY(!UpdateChecker::isReplaceableInstallation(directory)); // sources / distro packages
+        QFile marker(directory + "/.ngpost-installation");
+        QVERIFY(marker.open(QIODevice::WriteOnly));
+        marker.close();
+        QVERIFY(UpdateChecker::isReplaceableInstallation(directory));
+        QFile uninstall(directory + "/unins000.exe");
+        QVERIFY(uninstall.open(QIODevice::WriteOnly));
+        uninstall.close();
+        QVERIFY(
+            !UpdateChecker::isReplaceableInstallation(directory)); // Inno Setup owns this directory
+    }
     void checksum_verifier_is_embedded_in_every_build() {
         QFile file(QStringLiteral(":/update/install_update.py"));
         QVERIFY(file.open(QIODevice::ReadOnly));
@@ -307,5 +458,41 @@ void TestUpdateChecker::a_stable_install_keeps_the_answers_it_had()
     }
 }
 
-QTEST_GUILESS_MAIN(TestUpdateChecker)
+// Run the real C++ download / Python preparation / detached handoff in a
+// disposable installation. Only the HTTP transport is substituted; trusted
+// production URLs, payload limits, resources and installer processes are real.
+int main(int argc, char **argv)
+{
+    QCoreApplication app(argc, argv);
+    if (app.arguments().contains(QStringLiteral("--update-handoff"))) {
+        FakeUpdateNetwork network;
+        QFile scenario(qEnvironmentVariable("NGPOST_UPDATE_SCENARIO"));
+        if (!scenario.open(QIODevice::ReadOnly))
+            return 2;
+        const auto object = QJsonDocument::fromJson(scenario.readAll()).object();
+        for (auto it = object.begin(); it != object.end(); ++it) {
+            QFile payload(it.value().toString());
+            if (!payload.open(QIODevice::ReadOnly))
+                return 3;
+            network.responses.insert(it.key(), payload.readAll());
+        }
+        UpdateChecker checker(nullptr, &network);
+        QObject::connect(&checker,
+                         &UpdateChecker::newVersionAvailable,
+                         &checker,
+                         &UpdateChecker::startDownloadAndInstall);
+        QObject::connect(&checker,
+                         &UpdateChecker::downloadFailed,
+                         &app,
+                         [&app](const QString &error) {
+            qWarning().noquote() << error;
+            app.exit(4);
+        });
+        QTimer::singleShot(30000, &app, [&app] { app.exit(5); });
+        checker.checkLatestRelease();
+        return app.exec();
+    }
+    TestUpdateChecker tests;
+    return QTest::qExec(&tests, argc, argv);
+}
 #include "tst_UpdateChecker.moc"

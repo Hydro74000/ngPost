@@ -600,6 +600,10 @@ Introduza um número inteiro de MiB entre 0 e 1000000 (0 desativa a divisão ape
 <context>
     <name>MainWindow</name>
     <message>
+        <source>View release on GitHub</source>
+        <translation>Ver a versão no GitHub</translation>
+    </message>
+    <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
         <translation>Adicionar um servidor (você pode usar quantos desejar)</translation>
