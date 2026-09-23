@@ -192,6 +192,7 @@ private slots:
     void auto_posts_can_retry_preparation_failures();
     void preparation_retry_restores_sources_after_packing();
     void posting_controls_do_not_overlap_tab_scrollers();
+    void tabs_match_posting_controls_height();
     void progress_label_tracks_the_running_post_data();
     void progress_label_tracks_the_running_post();
     void global_cancel_external_tool_data();
@@ -438,6 +439,7 @@ private slots:
     void posting_panes_remain_resizable();
     void log_box_restores_width_after_restart();
     void ui_zoom_control_adjusts_font_and_persists_setting();
+    void ui_zoom_is_saved_without_a_log_line();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -6747,6 +6749,61 @@ void TestMainWindow::posting_controls_do_not_overlap_tab_scrollers()
     }
 }
 
+void TestMainWindow::tabs_match_posting_controls_height()
+{
+    HomeSandbox sandbox;
+    // Zooming sets the application font: the slots after this one must not
+    // inherit the last zoom level.
+    const QFont appFont = QApplication::font();
+    const auto restoreFont = qScopeGuard([&appFont] { QApplication::setFont(appFont); });
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *all = window->findChild<QPushButton *>("postAllTabsButton");
+    auto *pause = window->findChild<QPushButton *>("pauseButton");
+    QVERIFY(tabs && all && pause);
+    // Enough tabs for the scroll arrows to show.
+    for (int i = 0; i < 20; ++i)
+        window->addNewQuickTab(0);
+    window->resize(900, 800);
+    window->show();
+    // The tabs and their arrows used to stand a third taller than the buttons
+    // beside them, and the zoom only ever resized the buttons. They may only
+    // reach lower, over the top line of the pane the buttons stand on.
+    QTabBar *bar = tabs->tabBar();
+    QWidget *controls = tabs->cornerWidget(Qt::TopRightCorner);
+    QVERIFY(controls);
+    for (int zoom : { 100, 130, 80 }) {
+        window->applyUiZoom(zoom);
+        QCoreApplication::processEvents();
+        const int height = all->sizeHint().height();
+        QTRY_COMPARE(controls->y(), bar->y());
+        QCOMPARE(all->height(), height);
+        QCOMPARE(pause->height(), height);
+        QVERIFY(bar->height() >= height);
+        QCOMPARE(bar->tabRect(0).height(), bar->height());
+        int visibleScrollers = 0;
+        for (auto *arrow : bar->findChildren<QToolButton *>()) {
+            if (!arrow->isVisible())
+                continue;
+            ++visibleScrollers;
+            QCOMPARE(arrow->height(), bar->height());
+        }
+        QCOMPARE(visibleScrollers, 2);
+        const auto directory = qEnvironmentVariable("NGPOST_TEST_SCREENSHOT_DIR");
+        if (!directory.isEmpty()) {
+            QVERIFY(QDir().mkpath(directory));
+            const QRect strip(0, 0, tabs->width(), height + 12);
+            QVERIFY(tabs->grab(strip).save(QString("%1/tabs-%2.png").arg(directory).arg(zoom)));
+        }
+    }
+}
+
 void TestMainWindow::posting_widget_copy_actions_integrate_inside_textboxes()
 {
     HomeSandbox sandbox;
@@ -7361,4 +7418,35 @@ void TestMainWindow::ui_zoom_control_adjusts_font_and_persists_setting()
     QCOMPARE(booted->zoomButton()->text(), QStringLiteral("130%"));
     QCOMPARE(booted->zoomSlider()->value(), 130);
     // ngPost owns the window it created and deletes it.
+}
+
+void TestMainWindow::ui_zoom_is_saved_without_a_log_line()
+{
+    HomeSandbox sandbox;
+    const QFont appFont = QApplication::font();
+    const auto restoreFont = qScopeGuard([&appFont] { QApplication::setFont(appFont); });
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    MainWindow *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *log = window->findChild<QTextBrowser *>(QStringLiteral("logBrowser"));
+    QVERIFY(log);
+    const QString announce("file has been updated");
+    const int announced = log->toPlainText().count(announce);
+    const auto savedConfig = [] {
+        QFile config(PathHelper::configFilePath());
+        return config.open(QIODevice::ReadOnly | QIODevice::Text) ? config.readAll() : QByteArray();
+    };
+
+    // The zoom is window layout, written as quietly as the window geometry.
+    window->zoomSlider()->setValue(120);
+    QTRY_VERIFY(savedConfig().contains("UI_ZOOM = 120\n"));
+    QCOMPARE(log->toPlainText().count(announce), announced);
+
+    // Every other save still says so.
+    ngPost.saveConfig();
+    QCOMPARE(log->toPlainText().count(announce), announced + 1);
 }

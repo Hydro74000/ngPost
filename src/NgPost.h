@@ -717,7 +717,9 @@ public:
 
     inline bool dispPostingFile() const;
 
-    void saveConfig();
+    //! \a silent leaves out the line announcing the update, for a window layout
+    //! value such as the zoom; errors are reported either way.
+    void saveConfig(bool silent = false);
 
     UpdateChecker *updateChecker() const { return _updateChecker; }
 

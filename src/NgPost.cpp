@@ -6213,7 +6213,7 @@ void NgPost::_writeConfigVpnProfiles(QTextStream &stream)
     // clang-format on
 }
 
-void NgPost::saveConfig()
+void NgPost::saveConfig(bool silent)
 {
 #ifdef __USE_HMI__
     if (_hmi)
@@ -6222,10 +6222,9 @@ void NgPost::saveConfig()
 
     QString conf = PathHelper::configFilePath();
 
-    // Opened before the text is built, as it always was: when the folder
-    // refuses a new file, the configuration is left alone and the writer --
-    // which asks the windows for more than updateConfigFromUi() above took --
-    // does not run.
+    // Opened before the text is built, as it always was: when the folder refuses a
+    // new file, the configuration is left alone and the writer -- which asks the
+    // windows for more than updateConfigFromUi() above took -- does not run.
     QSaveFile file(conf);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
         _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
@@ -6282,7 +6281,8 @@ void NgPost::saveConfig()
                    .arg(conf));
     _configBelief = belief;
     _configSections = sectionsText(text);
-    _log(tr("the config '%1' file has been updated").arg(conf));
+    if (!silent)
+        _log(tr("the config '%1' file has been updated").arg(conf));
 }
 
 void NgPost::setDelFilesAfterPosted(bool delFiles)

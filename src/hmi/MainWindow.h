@@ -81,6 +81,7 @@ private:
     QPushButton *_postAllButton = nullptr;
     QPushButton *_stopAllButton = nullptr;
     void _refreshPostingControls();
+    void _fitPostingControls();
     void _buildPostingControls();
     void _retranslate();
     void _submitPreparedTabs();

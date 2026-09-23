@@ -58,6 +58,7 @@
 #include <QKeySequence>
 #include <QSlider>
 #include <QSplitter>
+#include <QStyleOption>
 #include <QTableWidget>
 #include <QTabWidget>
 #include <QTextStream>
@@ -163,6 +164,29 @@ constexpr int kHistoryTab = 0;
 constexpr int kAutoPostTab = 1;
 constexpr int kQuickPostTab = 2;
 constexpr int kNbFixedTabs = 3;
+
+//! What sTabWidgetStyle puts around the contents of an unselected tab, the
+//! tallest: a 2px border above and below, and a 2px top margin.
+constexpr int kTabFrameHeight = 2 + 2 + 2;
+
+//! How much taller than a corner widget of \a height the tab bar of \a tabs must
+//! be for the style to give that widget its whole height. Most styles stand it on
+//! the pane, which overlaps the bar (Fusion by 2px); QTabWidget also caps it at
+//! the bar height less PM_TabBarBaseHeight. The style is asked where it would go.
+int tabBarExcessOverCorner(const QTabWidget *tabs, int height)
+{
+    QStyleOptionTabWidgetFrame frame;
+    frame.initFrom(tabs);
+    frame.lineWidth = tabs->style()->pixelMetric(QStyle::PM_DefaultFrameWidth, nullptr, tabs);
+    frame.shape = QTabBar::RoundedNorth;
+    frame.tabBarSize = QSize(tabs->width(), height);
+    frame.rightCornerWidgetSize = QSize(1, height);
+    const QRect corner = tabs->style()->subElementRect(QStyle::SE_TabWidgetRightCorner,
+                                                       &frame,
+                                                       tabs);
+    return qMax(tabs->style()->pixelMetric(QStyle::PM_TabBarBaseHeight, nullptr, tabs),
+                -corner.top());
+}
 
 //! Column widths of the history table, as QHeaderView::saveState() writes
 //! them. Absent as long as the user has not resized a column: ngPost then
@@ -2737,11 +2761,31 @@ void MainWindow::onShutdownToggled(bool checked)
         _ngPost->setShutdownWhenDone(false);
 }
 
-void MainWindow::_refreshPostingControls()
+void MainWindow::_fitPostingControls()
 {
+    if (!_postAllButton)
+        return;
+    // Pause and Stop are squares as tall as Post all tabs, and the tabs beside
+    // them take that height too: with them the tab bar and its scroll arrows.
     const int buttonHeight = _postAllButton->sizeHint().height();
     _ui->pauseButton->setFixedSize(buttonHeight, buttonHeight);
     _stopAllButton->setFixedSize(buttonHeight, buttonHeight);
+
+    // What the tabs have beyond the buttons reaches down over the top line of
+    // the pane.
+    QTabBar *tabBar = _ui->postTabWidget->tabBar();
+    const int barHeight = buttonHeight + tabBarExcessOverCorner(_ui->postTabWidget, buttonHeight);
+    const int contents = qMax(barHeight - kTabFrameHeight, tabBar->fontMetrics().height());
+    const QString sheet = QStringLiteral("QTabBar::tab { height: %1px; }").arg(contents);
+    // A new style sheet repolishes the whole bar, and this runs on every change
+    // of the posting state.
+    if (tabBar->styleSheet() != sheet)
+        tabBar->setStyleSheet(sheet);
+}
+
+void MainWindow::_refreshPostingControls()
+{
+    _fitPostingControls();
     const bool enabled = _ngPost->hasPostingJobs() && !_ngPost->_cancelingAll;
     const bool paused = _ngPost->isPaused();
     _ui->pauseButton->setEnabled(enabled);
@@ -3885,7 +3929,7 @@ void MainWindow::_scaleZoomedControls(qreal scale)
         _zoomBtn->setIconSize(iconSize);
     if (_logToggleBtn)
         _logToggleBtn->setIconSize(iconSize);
-
+    _fitPostingControls();
     _scaleWidgetChildren(this, scale);
 }
 
@@ -3908,15 +3952,15 @@ void MainWindow::_showZoomLevel(int percent)
 
 void MainWindow::_scheduleZoomSave()
 {
-    // A slider drag moves through every step: write the configuration once
-    // it settles, not once per step.
+    // A slider drag moves through every step: write the configuration once it
+    // settles, and silently, like the rest of the window layout.
     if (!_zoomSaveTimer) {
         _zoomSaveTimer = new QTimer(this);
         _zoomSaveTimer->setSingleShot(true);
         _zoomSaveTimer->setInterval(500);
         connect(_zoomSaveTimer, &QTimer::timeout, this, [this]() {
             if (_ngPost)
-                _ngPost->saveConfig();
+                _ngPost->saveConfig(true);
         });
     }
     _zoomSaveTimer->start();
@@ -3983,7 +4027,7 @@ const QString MainWindow::sTabWidgetStyle = "\
             border-top-left-radius: 4px;\
             border-top-right-radius: 4px;\
             min-width: 10ex;\
-            padding: 0.35em 0.8em;\
+            padding: 0 0.8em;\
         }\
         QTabBar::tab:selected, QTabBar::tab:hover {\
             background: palette(window);\

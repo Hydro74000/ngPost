@@ -187,7 +187,7 @@
 15	src/NgPost.cpp	NgPost::requestShutdownRecheck()
 10	src/NgPost.cpp	NgPost::resume()
 64	src/NgPost.cpp	NgPost::resumePostGui( qint64 postId , PostingWidget * widget , QString * error)
-71	src/NgPost.cpp	NgPost::saveConfig()
+71	src/NgPost.cpp	NgPost::saveConfig( bool silent)
 6	src/NgPost.cpp	NgPost::sectionsText( QString const & text)
 8	src/NgPost.cpp	NgPost::setDelFilesAfterPosted( bool delFiles)
 23	src/NgPost.cpp	NgPost::setNzbName( const QFileInfo & fileInfo)
@@ -824,6 +824,7 @@
 38	src/hmi/MainWindow.cpp	MainWindow::_downloadUpdate( UpdateChecker * uc)
 21	src/hmi/MainWindow.cpp	MainWindow::_fillTabContextMenu( QMenu & menu , int tabIndex)
 28	src/hmi/MainWindow.cpp	MainWindow::_fitHistoryColumns( bool toContents)
+21	src/hmi/MainWindow.cpp	MainWindow::_fitPostingControls()
 7	src/hmi/MainWindow.cpp	MainWindow::_getPostWidget( int tabIndex) const
 9	src/hmi/MainWindow.cpp	MainWindow::_getPostWidgetIndex( PostingWidget * postWidget) const
 41	src/hmi/MainWindow.cpp	MainWindow::_initLogBoxToggle()
@@ -860,7 +861,7 @@
 4	src/hmi/MainWindow.cpp	MainWindow::_onToggleLogBox()
 8	src/hmi/MainWindow.cpp	MainWindow::_postingWidgets() const
 129	src/hmi/MainWindow.cpp	MainWindow::_refreshHistoryViews( bool rewindEmptyPage)
-18	src/hmi/MainWindow.cpp	MainWindow::_refreshPostingControls()
+16	src/hmi/MainWindow.cpp	MainWindow::_refreshPostingControls()
 14	src/hmi/MainWindow.cpp	MainWindow::_repositionZoomPopup()
 17	src/hmi/MainWindow.cpp	MainWindow::_resetHistoryColumns()
 21	src/hmi/MainWindow.cpp	MainWindow::_restoreHistoryColumns()
@@ -963,6 +964,7 @@
 10	src/hmi/MainWindow.cpp	resizedFont( QFont font , const QFont & sized)
 13	src/hmi/MainWindow.cpp	scaledFont( const QFont & base , qreal scale)
 21	src/hmi/MainWindow.cpp	statusColor( const QString & status)
+14	src/hmi/MainWindow.cpp	tabBarExcessOverCorner( const QTabWidget * tabs , int height)
 4	src/hmi/MainWindow.cpp	widgetWithin( const QWidget * area , const QWidget * widget)
 1	src/hmi/MainWindow.h	MainWindow::autoWidget() const
 1	src/hmi/MainWindow.h	MainWindow::fillTabContextMenuForTest( QMenu & menu , int tabIndex)
