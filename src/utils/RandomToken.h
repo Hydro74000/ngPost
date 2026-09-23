@@ -20,6 +20,7 @@ inline QString fromGenerator(uint length, QRandomGenerator &generator)
     }
     return token;
 }
+/* Flawfinder: ignore (QRandomGenerator::system is Qt CSPRNG, not POSIX system(3)) */
 inline QString secret(uint length) { return fromGenerator(length, *QRandomGenerator::system()); }
 // Public identifiers never consume a deterministic generator used for secrets.
 inline QString publicName(uint length) { return fromGenerator(length, *QRandomGenerator::global()); }

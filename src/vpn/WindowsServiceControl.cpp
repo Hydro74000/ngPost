@@ -77,7 +77,9 @@ bool startDemand(QString const &name, QString *error)
     }
     if (StartServiceW(service.value, 0, nullptr)) return true;
     DWORD const code = GetLastError();
-    return code == ERROR_SERVICE_ALREADY_RUNNING || failure(error, code);
+    if (code == ERROR_SERVICE_ALREADY_RUNNING)
+        return true;
+    return failure(error, code);
 }
 }
 #endif

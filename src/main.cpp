@@ -256,7 +256,7 @@ int main(int argc, char* argv[])
                 // body unexecuted, which is the wanted behaviour for both
                 // EAGAIN (pipe empty) and EOF (write end gone).
                 unsigned char buf[32];
-                ssize_t const n = ::read(static_cast<int>(fd), buf, sizeof(buf));
+                ssize_t const n = ::read(int(fd), buf, sizeof buf); // flawfinder: ignore
                 for (ssize_t i = 0; i < n; ++i)
                     dispatchSignal(static_cast<int>(buf[i]));
             });

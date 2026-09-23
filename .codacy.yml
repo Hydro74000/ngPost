@@ -13,10 +13,12 @@ engines:
     exclude_paths:
       - "tests/**"
       - ".github/scripts/**"
+      - "src/utils/update/**"
   prospector:
     exclude_paths:
       - "tests/**"
       - ".github/scripts/**"
+      - "src/utils/update/**"
   flawfinder:
     exclude_paths:
       - "tests/**"

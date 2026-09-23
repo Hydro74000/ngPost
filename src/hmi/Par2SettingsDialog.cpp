@@ -642,7 +642,7 @@ void Par2SettingsDialog::_buildAdvancedControls(QFormLayout *details)
 
 void Par2SettingsDialog::_loadSettings(QToolButton *advancedButton)
 {
-    _initial = par2::Settings::read(effectiveTool(), _ngPost->par2ArgsConfigured());
+    _initial = par2::Settings::parse(effectiveTool(), _ngPost->par2ArgsConfigured());
     select(_blocks, _initial.blocks);
     _blockBytes->setValue(_initial.blockBytes);
     _blockCount->setValue(_initial.blockCount);

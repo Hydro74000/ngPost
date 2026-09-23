@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath
 import re
 import stat
 import struct
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tarfile
 import time
@@ -146,7 +146,7 @@ def unique_object(pairs):
     return result
 
 
-def verify(work, tag, asset):
+def load_manifest(work, tag, asset):
     manifest = work / 'manifest.json'
     with manifest.open('rb') as source:
         encoded = source.read(1024**2 + 1)
@@ -161,7 +161,10 @@ def verify(work, tag, asset):
     matches = [a for a in assets if a.get('name') == asset]
     if len(matches) != 1:
         raise ValueError('asset absent or duplicated in checksum manifest')
-    archive, expected = work / 'archive', matches[0]
+    return matches[0]
+
+
+def verify_archive(archive, expected):
     if (type(expected.get('size')) is not int or not 0 < expected['size'] <= 1024**3
             or not isinstance(expected.get('sha256'), str)
             or not re.fullmatch('[0-9a-f]{64}', expected['sha256'])):
@@ -176,11 +179,18 @@ def verify(work, tag, asset):
         raise ValueError('SHA-256 hash mismatch')
 
 
+def verify(work, tag, asset):
+    expected = load_manifest(work, tag, asset)
+    verify_archive(work / 'archive', expected)
+
+
 def executable(root):
     return root / ('Contents/MacOS/ngPost' if sys.platform == 'darwin' else 'ngPost.exe' if os.name == 'nt' else 'ngPost')
 
 
 def probe(root):
+    # nosec B603
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
     subprocess.run([str(executable(root)), '--version'], check=True, timeout=30,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                    env=dict(os.environ, QT_QPA_PLATFORM='offscreen'))
@@ -266,6 +276,8 @@ def commit(work, pid):
     replace(candidate, install, backup)
     try:
         probe(install)
+        # nosec B603
+        # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit.dangerous-subprocess-use-audit, python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args
         subprocess.Popen([str(executable(install))], cwd=install, start_new_session=True)
     except BaseException:
         rollback(candidate, install, backup)

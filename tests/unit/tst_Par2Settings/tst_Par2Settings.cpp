@@ -196,7 +196,7 @@ private slots:
         settings.memory = settings.tool == Tool::MultiPar ? 4 : 256;
         if (settings.tool != Tool::Par2cmdline) settings.gpu = true;
         const auto encoded = joinArguments(settings.arguments(12));
-        const auto decoded = Settings::read(settings.tool, encoded);
+        const auto decoded = Settings::parse(settings.tool, encoded);
         QVERIFY2(!decoded.custom, qPrintable(encoded));
         QCOMPARE(decoded.arguments(12), settings.arguments(12));
         QCOMPARE(decoded.exactBlockBytes(), settings.tool == Tool::MultiPar ? 0 : 65536);
@@ -217,7 +217,7 @@ private slots:
                           qMakePair(Tool::Par2cmdline, QString("c -l -n10")),
                           qMakePair(Tool::Par2cmdline, QString("c -s65536 -b2000 -mwrong")),
                           qMakePair(Tool::Par2cmdline, QString("c -r8 -s768000 -q"))}) {
-            const auto settings = Settings::read(pair.first, pair.second);
+            const auto settings = Settings::parse(pair.first, pair.second);
             QVERIFY(settings.custom);
             QCOMPARE(settings.originalArguments, pair.second);
             QVERIFY(!settings.estimate({1000000}, 8).valid);
@@ -266,7 +266,8 @@ private slots:
         // split the sources the way a real "/ls<size>" would.
         QVERIFY(settings.arguments(10).contains("/ls2"));
         QVERIFY(settings.arguments(10).contains("/lr2048"));
-        const auto multiPar = Settings::read(Tool::MultiPar, joinArguments(settings.arguments(10)));
+        const auto multiPar = Settings::parse(Tool::MultiPar,
+                                              joinArguments(settings.arguments(10)));
         QVERIFY(!multiPar.custom);
         QCOMPARE(multiPar.volumeBytes, 2048);
         QCOMPARE(multiPar.arguments(10), settings.arguments(10));
@@ -277,7 +278,8 @@ private slots:
             anyBlocks.blockCount = 3000;
             QVERIFY(anyBlocks.validate().isEmpty());
             QVERIFY(anyBlocks.arguments(10).contains("/lr2048"));
-            const auto back = Settings::read(Tool::MultiPar, joinArguments(anyBlocks.arguments(10)));
+            const auto back = Settings::parse(Tool::MultiPar,
+                                              joinArguments(anyBlocks.arguments(10)));
             QVERIFY(!back.custom);
             QCOMPARE(back.volumeBytes, 2048);
         }
@@ -301,7 +303,7 @@ private slots:
     }
     void multipar_requested_blocks_are_not_a_check_hint()
     {
-        auto settings = Settings::read(Tool::MultiPar, "c /ss1048576 /rr10 /ls2 /lr262144000");
+        auto settings = Settings::parse(Tool::MultiPar, "c /ss1048576 /rr10 /ls2 /lr262144000");
         QVERIFY(!settings.custom);
         QCOMPARE(settings.exactBlockBytes(), 0);
         const auto small = settings.estimate({131072}, 10);

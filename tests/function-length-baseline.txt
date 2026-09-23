@@ -1155,7 +1155,7 @@
 55	src/par2/Par2Settings.cpp	par2::Settings::arguments( uint redundancy) const
 64	src/par2/Par2Settings.cpp	par2::Settings::estimate( const QVector<qint64> & sizes , uint redundancy) const
 6	src/par2/Par2Settings.cpp	par2::Settings::exactBlockBytes() const
-146	src/par2/Par2Settings.cpp	par2::Settings::read( Tool kind , const QString & arguments)
+146	src/par2/Par2Settings.cpp	par2::Settings::parse( Tool kind , const QString & arguments)
 31	src/par2/Par2Settings.cpp	par2::Settings::validate() const
 15	src/par2/Par2Settings.cpp	par2::byteSize( const QString & text)
 8	src/par2/Par2Settings.cpp	par2::detectTool( const QString & path)
@@ -1519,7 +1519,7 @@
 1	src/vpn/WindowsServiceControl.cpp	Handle::~Handle()
 23	src/vpn/WindowsServiceControl.cpp	WindowsServiceControl::query( QString const & name , QString * error)
 13	src/vpn/WindowsServiceControl.cpp	WindowsServiceControl::requestStop( QString const & name , QString * error)
-21	src/vpn/WindowsServiceControl.cpp	WindowsServiceControl::startDemand( QString const & name , QString * error)
+23	src/vpn/WindowsServiceControl.cpp	WindowsServiceControl::startDemand( QString const & name , QString * error)
 5	src/vpn/WindowsServiceControl.cpp	failure( QString * error , DWORD code = GetLastError())
 12	src/vpn/WindowsServiceControl.h	WindowsServiceControl::stopStep( const std :: function<State()> & query , const std :: function<bool()> & request)
 15	src/vpn/WireGuardBackend.cpp	WireGuardBackend::WireGuardBackend( QObject * parent)

@@ -10,6 +10,7 @@
 #include "nntp/NntpFile.h"
 #include "nntp/Nntp.h"
 #include "utils/Yenc.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <sstream>
@@ -168,13 +169,12 @@ void NntpArticle::yEncBody(const char data[])
     // overwrite at once (make_unique_for_overwrite is C++20).
     _body.reset(new char[capacity]);
     char *ptr = _body.get();
-    std::memcpy(ptr, head, static_cast<size_t>(headLen));
+    std::copy_n(head, static_cast<size_t>(headLen), ptr);
     ptr += headLen;
     // The body is assembled piece by piece and never read as a C string.
-    // NOLINTNEXTLINE(bugprone-not-null-terminated-result)
-    std::memcpy(ptr, filename.data(), filename.size());
+    std::copy_n(filename.data(), filename.size(), ptr);
     ptr += filename.size();
-    std::memcpy(ptr, ypart, static_cast<size_t>(ypartLen));
+    std::copy_n(ypart, static_cast<size_t>(ypartLen), ptr);
     ptr += ypartLen;
 
     quint32      crc32   = 0xFFFFFFFF;

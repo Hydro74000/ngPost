@@ -70,5 +70,7 @@ ENV XDG_CONFIG_HOME=/config
 VOLUME ["/config", "/data"]
 WORKDIR /data
 
+USER 1000:1000
+
 ENTRYPOINT ["ngPost"]
 CMD ["--help"]

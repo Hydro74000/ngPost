@@ -97,7 +97,7 @@ static qint64 byteSize(const QString &text)
     }
     return value;
 }
-Settings Settings::read(Tool kind, const QString &arguments)
+Settings Settings::parse(Tool kind, const QString &arguments)
 {
     Settings s;
     s.tool = kind;

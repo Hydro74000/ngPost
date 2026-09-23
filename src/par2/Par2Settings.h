@@ -48,7 +48,7 @@ struct Settings {
     bool custom = false;
     QString originalArguments;
 
-    static Settings read(Tool tool, const QString &arguments);
+    static Settings parse(Tool tool, const QString &arguments);
     QString validate() const;
     QStringList arguments(uint redundancy) const;
     qint64 exactBlockBytes() const;

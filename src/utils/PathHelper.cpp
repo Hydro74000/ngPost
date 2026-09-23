@@ -754,26 +754,25 @@ SecretsHardeningResult hardenConfigSecrets()
         // Reading the mode back is what separates "ngPost had to fix this" from
         // "it was already private".
 #ifdef Q_OS_WIN
-        // Except on NTFS, where Qt reports the group and other bits as set
-        // whatever the DACL actually says. The question cannot be answered
-        // here, so the DACL is applied every time and only a failure is worth a
-        // word: answering "yes" unconditionally would greet the user with a
-        // repair notice on every single launch.
-        bool const wasOpen = false;
+        if (!restrictToOwner(path)) {
+            result.unrepairable << QStringLiteral("%1: %2").arg(
+                path,
+                QStringLiteral("ngPost cannot restrict it to you here; move the "
+                               "configuration onto a filesystem that carries ownership"));
+        }
 #else
-        bool const wasOpen = isReadableBeyondOwner(info);
-        if (!wasOpen)
+        if (!isReadableBeyondOwner(info))
             continue;
-#endif
 
         if (!restrictToOwner(path)) {
             result.unrepairable << QStringLiteral("%1: %2").arg(
                     path,
                     QStringLiteral("ngPost cannot restrict it to you here; move the "
                                    "configuration onto a filesystem that carries ownership"));
-        } else if (wasOpen) {
+        } else {
             result.repaired << path;
         }
+#endif
     }
 
     return result;
