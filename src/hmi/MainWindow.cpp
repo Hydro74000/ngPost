@@ -56,6 +56,7 @@
 #include <QScrollArea>
 #include <QShortcut>
 #include <QKeySequence>
+#include <QSlider>
 #include <QSplitter>
 #include <QTableWidget>
 #include <QTabWidget>
@@ -246,6 +247,7 @@ MainWindow::MainWindow(QWidget *parent) :
     _ui->postSplitter->setStretchFactor(1, 1);
     _ui->postSplitter->setCollapsible(0, false);
     _initLogBoxToggle();
+    _initZoomControl();
     _ui->progressBar->setRange(0, 100);
     updateProgressBar(0, 0, "");
 
@@ -349,10 +351,10 @@ void MainWindow::init(NgPost *ngPost)
     // started.
     _startupTab = readStartupTab();
     _applyStartupTab();
+    if (_ngPost && _ngPost->uiZoom() != 100)
+        applyUiZoom(_ngPost->uiZoom(), false);
 
     _ui->goCmdButton->hide();
-//    connect(_ui->goCmdButton, &QAbstractButton::clicked, _ngPost, &NgPost::onGoCMD, Qt::QueuedConnection);
-
     updateProgressBar(0, 0);
 }
 
@@ -727,6 +729,8 @@ void MainWindow::_retranslate()
     _ui->postingBox->setTitle(tr("Parameters"));
     _ui->logBox->setTitle(tr("Posting Log"));
     _updateLogToggleBtn();
+    if (_zoomBtn && _ngPost)
+        _zoomBtn->setToolTip(tr("UI Zoom: %1% (Click to adjust)").arg(_ngPost->uiZoom()));
 
     tabBar->setTabText(kQuickPostTab, QString("%1 #1").arg(_ngPost->quickJobName()));
     tabBar->setTabToolTip(kQuickPostTab, tr("Default %1").arg(_ngPost->quickJobName()));
@@ -3463,6 +3467,197 @@ void MainWindow::_onPostSplitterMoved(int pos, int index)
     _saveLogBoxState();
 }
 
+void MainWindow::_initZoomControl()
+{
+    _baseFont = font();
+
+    _zoomBtn = new QToolButton(statusBar());
+    _zoomBtn->setObjectName(QStringLiteral("zoomBtn"));
+    _zoomBtn->setIcon(QIcon(QStringLiteral(":/icons/zoom.svg")));
+    _zoomBtn->setIconSize(QSize(16, 16));
+    _zoomBtn->setText(QStringLiteral("100%"));
+    _zoomBtn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    _zoomBtn->setCursor(Qt::PointingHandCursor);
+    _zoomBtn->setFocusPolicy(Qt::NoFocus);
+    _zoomBtn->setStyleSheet(QStringLiteral("QToolButton#zoomBtn {"
+                                           "  border: none;"
+                                           "  background: transparent;"
+                                           "  padding: 2px 6px;"
+                                           "  margin: 0px;"
+                                           "}"
+                                           "QToolButton#zoomBtn:hover {"
+                                           "  background: rgba(128, 128, 128, 0.25);"
+                                           "  border-radius: 3px;"
+                                           "}"
+                                           "QToolButton#zoomBtn:pressed {"
+                                           "  background: rgba(128, 128, 128, 0.4);"
+                                           "}"));
+    _zoomBtn->setToolTip(tr("UI Zoom: %1% (Click to adjust)").arg(100));
+    statusBar()->addPermanentWidget(_zoomBtn);
+    connect(_zoomBtn, &QToolButton::clicked, this, &MainWindow::_toggleZoomPopup);
+
+    _createZoomPopup();
+}
+
+void MainWindow::_createZoomPopup()
+{
+    _zoomPopup = new QFrame(this, Qt::Tool | Qt::FramelessWindowHint);
+    _zoomPopup->setObjectName(QStringLiteral("zoomPopup"));
+    _zoomPopup->setStyleSheet(
+        QStringLiteral("QFrame#zoomPopup {"
+                       "  background-color: #2b2b2b;"
+                       "  border: 1px solid #555555;"
+                       "  border-radius: 6px;"
+                       "}"
+                       "QLabel { color: #e0e0e0; }"
+                       "QPushButton#zoomResetBtn {"
+                       "  border: 1px solid #555555;"
+                       "  border-radius: 3px;"
+                       "  background-color: #3a3a3a;"
+                       "  color: #e0e0e0;"
+                       "  padding: 1px 6px;"
+                       "  font-size: 11px;"
+                       "}"
+                       "QPushButton#zoomResetBtn:hover { background-color: #4a4a4a; }"
+                       "QToolButton#zoomStepBtn {"
+                       "  border: 1px solid #555555;"
+                       "  border-radius: 3px;"
+                       "  background-color: #3a3a3a;"
+                       "  color: #e0e0e0;"
+                       "  font-weight: bold;"
+                       "}"
+                       "QToolButton#zoomStepBtn:hover { background-color: #4a4a4a; }"));
+
+    auto *popupLayout = new QVBoxLayout(_zoomPopup);
+    popupLayout->setContentsMargins(10, 8, 10, 8);
+    popupLayout->setSpacing(6);
+
+    auto *topRow = new QHBoxLayout;
+    topRow->setSpacing(8);
+    auto *titleLabel = new QLabel(tr("UI Zoom"), _zoomPopup);
+    QFont boldFont = titleLabel->font();
+    boldFont.setBold(true);
+    titleLabel->setFont(boldFont);
+
+    _zoomValueLabel = new QLabel(QStringLiteral("100%"), _zoomPopup);
+    _zoomValueLabel->setObjectName(QStringLiteral("zoomValueLabel"));
+
+    auto *resetBtn = new QPushButton(QStringLiteral("100%"), _zoomPopup);
+    resetBtn->setObjectName(QStringLiteral("zoomResetBtn"));
+    resetBtn->setToolTip(tr("Reset zoom to 100%"));
+    resetBtn->setCursor(Qt::PointingHandCursor);
+
+    topRow->addWidget(titleLabel);
+    topRow->addStretch();
+    topRow->addWidget(_zoomValueLabel);
+    topRow->addWidget(resetBtn);
+    popupLayout->addLayout(topRow);
+
+    auto *sliderRow = new QHBoxLayout;
+    sliderRow->setSpacing(6);
+
+    auto *outBtn = new QToolButton(_zoomPopup);
+    outBtn->setObjectName(QStringLiteral("zoomStepBtn"));
+    outBtn->setText(QStringLiteral("-"));
+    outBtn->setToolTip(tr("Zoom out (-5%)"));
+    outBtn->setFixedSize(22, 22);
+    outBtn->setCursor(Qt::PointingHandCursor);
+
+    _zoomSlider = new QSlider(Qt::Horizontal, _zoomPopup);
+    _zoomSlider->setObjectName(QStringLiteral("zoomSlider"));
+    _zoomSlider->setRange(80, 150);
+    _zoomSlider->setSingleStep(5);
+    _zoomSlider->setPageStep(10);
+    _zoomSlider->setTickInterval(10);
+    _zoomSlider->setTickPosition(QSlider::TicksBelow);
+    _zoomSlider->setValue(100);
+    _zoomSlider->setFixedWidth(160);
+
+    auto *inBtn = new QToolButton(_zoomPopup);
+    inBtn->setObjectName(QStringLiteral("zoomStepBtn"));
+    inBtn->setText(QStringLiteral("+"));
+    inBtn->setToolTip(tr("Zoom in (+5%)"));
+    inBtn->setFixedSize(22, 22);
+    inBtn->setCursor(Qt::PointingHandCursor);
+
+    sliderRow->addWidget(outBtn);
+    sliderRow->addWidget(_zoomSlider);
+    sliderRow->addWidget(inBtn);
+    popupLayout->addLayout(sliderRow);
+
+    connect(outBtn, &QToolButton::clicked, this, [this]() {
+        _zoomSlider->setValue(qMax(_zoomSlider->minimum(), _zoomSlider->value() - 5));
+    });
+    connect(inBtn, &QToolButton::clicked, this, [this]() {
+        _zoomSlider->setValue(qMin(_zoomSlider->maximum(), _zoomSlider->value() + 5));
+    });
+    connect(resetBtn, &QPushButton::clicked, this, [this]() { _zoomSlider->setValue(100); });
+    connect(_zoomSlider, &QSlider::valueChanged, this, [this](int value) {
+        applyUiZoom(value, true);
+    });
+}
+
+void MainWindow::_toggleZoomPopup()
+{
+    if (!_zoomPopup || !_zoomBtn)
+        return;
+    if (_zoomPopup->isVisible()) {
+        _zoomPopup->hide();
+        return;
+    }
+    _zoomPopup->adjustSize();
+    const QPoint globalPos = _zoomBtn->mapToGlobal(QPoint(0, 0));
+    const int popupWidth = _zoomPopup->sizeHint().width();
+    const int popupHeight = _zoomPopup->sizeHint().height();
+    const int x = qMax(0, globalPos.x() + _zoomBtn->width() - popupWidth);
+    const int y = qMax(0, globalPos.y() - popupHeight - 2);
+    _zoomPopup->move(x, y);
+    _zoomPopup->show();
+}
+
+void MainWindow::applyUiZoom(int percent, bool userInteractive)
+{
+    percent = qBound(80, percent, 150);
+    if (_ngPost)
+        _ngPost->setUiZoom(static_cast<uint>(percent));
+
+    const qreal scale = percent / 100.0;
+    QFont f = _baseFont;
+    if (_baseFont.pointSizeF() > 0)
+        f.setPointSizeF(_baseFont.pointSizeF() * scale);
+    else if (_baseFont.pixelSize() > 0)
+        f.setPixelSize(qRound(_baseFont.pixelSize() * scale));
+    else
+        f.setPointSize(qMax(6, qRound(10 * scale)));
+
+    setFont(f);
+    QApplication::setFont(f);
+
+    if (_zoomValueLabel)
+        _zoomValueLabel->setText(QString("%1%").arg(percent));
+    if (_zoomBtn) {
+        _zoomBtn->setText(QString("%1%").arg(percent));
+        _zoomBtn->setToolTip(tr("UI Zoom: %1% (Click to adjust)").arg(percent));
+    }
+    if (_zoomSlider && _zoomSlider->value() != percent) {
+        QSignalBlocker blocker(_zoomSlider);
+        _zoomSlider->setValue(percent);
+    }
+
+    if (userInteractive) {
+        if (!_zoomSaveTimer) {
+            _zoomSaveTimer = new QTimer(this);
+            _zoomSaveTimer->setSingleShot(true);
+            _zoomSaveTimer->setInterval(500);
+            connect(_zoomSaveTimer, &QTimer::timeout, this, [this]() {
+                if (_ngPost)
+                    _ngPost->saveConfig();
+            });
+        }
+        _zoomSaveTimer->start();
+    }
+}
+
 void MainWindow::_configureWaylandSplitters()
 {
     if (!QGuiApplication::platformName().startsWith(QLatin1String("wayland")))
@@ -3523,8 +3718,8 @@ const QString MainWindow::sTabWidgetStyle = "\
             border-bottom-color: palette(window);\
             border-top-left-radius: 4px;\
             border-top-right-radius: 4px;\
-            min-width: 10ex;\
-            padding: 0.35em 0.8em;\
+            min-width: 8ex;\
+            padding: 2px;\
         }\
         QTabBar::tab:selected, QTabBar::tab:hover {\
             background: palette(window);\

@@ -28,6 +28,7 @@
 #include <QTextCharFormat>
 #include <QMainWindow>
 #include <QFileInfoList>
+#include <QFont>
 #include <QSet>
 #include <QUrl>
 class NgPost;
@@ -44,6 +45,7 @@ class QLabel;
 class QLineEdit;
 class QMenu;
 class QPushButton;
+class QSlider;
 class QToolButton;
 class QShowEvent;
 class QTableWidget;
@@ -250,6 +252,11 @@ public:
     inline AutoPostWidget *autoWidget() const;
     void closeTab(PostingWidget *postWidget);
 
+    QToolButton *zoomButton() const { return _zoomBtn; }
+    QWidget *zoomPopup() const { return _zoomPopup; }
+    QSlider *zoomSlider() const { return _zoomSlider; }
+    void applyUiZoom(int percent, bool userInteractive = false);
+
 
     static const QColor  sPostingColor;
     static const QString sPostingIcon;
@@ -425,10 +432,21 @@ private:
     void _onPostSplitterMoved(int pos, int index);
     void _saveLogBoxState() const;
 
+    void _initZoomControl();
+    void _createZoomPopup();
+    void _toggleZoomPopup();
+
     QToolButton *_logToggleBtn = nullptr;
     int _lastLogBoxWidth = 250;
     bool _logBoxCollapsed = true;
     bool _logBoxStateRestored = false;
+
+    QToolButton *_zoomBtn = nullptr;
+    QWidget *_zoomPopup = nullptr;
+    QSlider *_zoomSlider = nullptr;
+    QLabel *_zoomValueLabel = nullptr;
+    QTimer *_zoomSaveTimer = nullptr;
+    QFont _baseFont;
 
 
     static const QString sGroupBoxStyle;

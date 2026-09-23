@@ -715,7 +715,7 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3342"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3350"/>
         <source>VPN: disabled</source>
         <translation>VPN: uitgeschakeld</translation>
     </message>
@@ -874,7 +874,7 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
         <translation>go command line (close the GUI and continue in the shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1306"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1310"/>
         <source>on</source>
         <translation>aan</translation>
     </message>
@@ -910,32 +910,32 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1112"/>
+        <location line="+1116"/>
         <location line="+213"/>
         <source>Password</source>
         <translation>Wachtwoord</translation>
     </message>
     <message>
-        <location line="-1209"/>
-        <location line="+409"/>
+        <location line="-1212"/>
+        <location line="+412"/>
         <location line="+1806"/>
         <source>Default %1</source>
         <translation>Standaard %1</translation>
     </message>
     <message>
-        <location line="-2223"/>
-        <location line="+421"/>
+        <location line="-2226"/>
+        <location line="+424"/>
         <source>Post history, statistics and resume center</source>
         <translation>Postgeschiedenis, statistieken en hervattingscentrum</translation>
     </message>
     <message>
-        <location line="-412"/>
-        <location line="+416"/>
+        <location line="-415"/>
+        <location line="+419"/>
         <source>New</source>
         <translation>Nieuw</translation>
     </message>
     <message>
-        <location line="-359"/>
+        <location line="-362"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>gemiddelde snelheid</translation>
@@ -992,7 +992,7 @@ Sluit die andere ngPost om de VPN hier te gebruiken. Draait er geen, dan kunt u 
         <translation>VPN</translation>
     </message>
     <message>
-        <location line="+224"/>
+        <location line="+223"/>
         <source>close while still posting?</source>
         <translation>sluiten terwijl je nog post?</translation>
     </message>
@@ -1004,7 +1004,7 @@ Are you sure you want to quit?</source>
 Weet je zeker dat je wilt stoppen?</translation>
     </message>
     <message>
-        <location line="+66"/>
+        <location line="+68"/>
         <source>Immediate speed (avg on %1 sec) - (nb Articles uploaded / total number of Articles) - avg speed</source>
         <translation>Directe snelheid (gem.%1 sec.) - (nb Geuploade artikelen / totaal aantal artikelen) - gem. Snelheid</translation>
     </message>
@@ -1020,13 +1020,13 @@ Weet je zeker dat je wilt stoppen?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+593"/>
+        <location line="+595"/>
         <location line="+213"/>
         <source>Files</source>
         <translation>Bestanden</translation>
     </message>
     <message>
-        <location line="-805"/>
+        <location line="-807"/>
         <source>Parameters</source>
         <translation>Parameters</translation>
     </message>
@@ -1036,7 +1036,7 @@ Weet je zeker dat je wilt stoppen?</translation>
         <translation>Posts logboek</translation>
     </message>
     <message>
-        <location line="+72"/>
+        <location line="+74"/>
         <source>Quick Tabs Menu</source>
         <translation>Quick menu tabbladen</translation>
     </message>
@@ -1105,12 +1105,19 @@ The job stays in the queue.</source>
 De taak blijft in de wachtrij.</translation>
     </message>
     <message>
-        <location line="-621"/>
+        <location line="-624"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>Deze instellingen konden niet worden verwijderd. Zie het VPN-logboek voor details.</translation>
     </message>
     <message>
-        <location line="+635"/>
+        <location line="+302"/>
+        <location line="+2762"/>
+        <location line="+145"/>
+        <source>UI Zoom: %1% (Click to adjust)</source>
+        <translation>UI-zoom: %1% (Klik om aan te passen)</translation>
+    </message>
+    <message>
+        <location line="-2571"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>De in ngPost geconfigureerde VPN lijkt al te draaien; mogelijk gebruikt een andere ngPost hem. Zie de VPN-instellingen.</translation>
     </message>
@@ -1730,7 +1737,7 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>VPN: mislukt</translation>
     </message>
     <message>
-        <location line="+60"/>
+        <location line="+58"/>
         <location line="+1"/>
         <source>Open Posting Log</source>
         <translation>Postlogboek openen</translation>
@@ -1742,7 +1749,27 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Postlogboek sluiten</translation>
     </message>
     <message>
-        <location line="-2121"/>
+        <location line="+120"/>
+        <source>UI Zoom</source>
+        <translation>UI-zoom</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Reset zoom to 100%</source>
+        <translation>Zoom herstellen naar 100%</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Zoom out (-5%)</source>
+        <translation>Uitzoomen (-5%)</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>Zoom in (+5%)</source>
+        <translation>Inzoomen (+5%)</translation>
+    </message>
+    <message>
+        <location line="-2281"/>
         <location line="+168"/>
         <source>All statuses</source>
         <translation>Alle statussen</translation>
@@ -1873,8 +1900,8 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Item verwijderen</translation>
     </message>
     <message>
-        <location line="-1405"/>
-        <location line="+421"/>
+        <location line="-1408"/>
+        <location line="+424"/>
         <location line="+538"/>
         <location line="+168"/>
         <source>History</source>
@@ -2054,13 +2081,13 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Kolombreedtes herstellen</translation>
     </message>
     <message>
-        <location line="-1732"/>
-        <location line="+425"/>
+        <location line="-1735"/>
+        <location line="+426"/>
         <source>PAR2 Settings…</source>
         <translation>PAR2-instellingen…</translation>
     </message>
     <message>
-        <location line="+1740"/>
+        <location line="+1742"/>
         <source>Post all tabs</source>
         <translation>Alle tabbladen posten</translation>
     </message>
@@ -2103,7 +2130,7 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Quick Post</translation>
     </message>
     <message>
-        <location line="+164"/>
+        <location line="+165"/>
         <source>Help: display syntax</source>
         <translation>Help: syntax weergeven</translation>
     </message>
@@ -2290,12 +2317,12 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+5760"/>
+        <location line="+5769"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Verwijder de root (bovenliggende) map bij het comprimeren van mappen met RAR</translation>
     </message>
     <message>
-        <location line="-5757"/>
+        <location line="-5766"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP-server met de indeling (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2524,7 +2551,7 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
         <translation>Posting geannuleerd door gebruiker.</translation>
     </message>
     <message>
-        <location line="+4290"/>
+        <location line="+4296"/>
         <source>VPN warning</source>
         <translation>VPN-waarschuwing</translation>
     </message>
@@ -2557,7 +2584,7 @@ Instelling: Knop &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route
         <translation>Annuleren</translation>
     </message>
     <message>
-        <location line="-2656"/>
+        <location line="-2662"/>
         <source>Full debug logs are ON
 </source>
         <translation>Volledige foutopsporings logboeken zijn AAN
@@ -2587,12 +2614,12 @@ Dat is niet het geval voor &apos;%1&apos; dat mappen bevat: %2</translation>
     </message>
     <message>
         <location line="+154"/>
-        <location line="+1136"/>
+        <location line="+1142"/>
         <source>Generate new random poster for each post</source>
         <translation>Genereer een nieuwe willekeurige poster voor elk post</translation>
     </message>
     <message>
-        <location line="-1100"/>
+        <location line="-1106"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>Je moet een getal opgeven voor het aantal nieuwe pogingen om een ​​artikel te posten (optie -r)</translation>
     </message>
@@ -2660,26 +2687,26 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Niets te doen ...</translation>
     </message>
     <message>
-        <location line="+1429"/>
+        <location line="+1435"/>
         <source>The config file &apos;%1&apos; is not readable...</source>
         <translation>Het configuratie bestand %1  is niet leesbaar ...</translation>
     </message>
     <message>
-        <location line="-905"/>
+        <location line="-909"/>
         <source>the nzbPath &apos;%1&apos; is not writable...
 </source>
         <translation>het nzb Pad &apos;%1&apos; heeft geen schrijfrechten...
 </translation>
     </message>
     <message>
-        <location line="-2232"/>
+        <location line="-2234"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Niet-ondersteund protocol voor NZB_UPLOAD_URL (%1). Je kunt alleen:%2 gebruiken
 </translation>
     </message>
     <message>
-        <location line="+2378"/>
+        <location line="+2384"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost begint met loggen: %1</translation>
     </message>
@@ -2704,7 +2731,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Fout bij het parseren van Proxy Socks5-parameters. De syntaxis moet zijn:%1</translation>
     </message>
     <message>
-        <location line="-2479"/>
+        <location line="-2485"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>het historie bestand %1  mag geen directory zijn...
@@ -2719,7 +2746,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
 </translation>
     </message>
     <message>
-        <location line="+2551"/>
+        <location line="+2557"/>
         <source>should be a directory!...</source>
         <translation>moet een directory zijn! ...</translation>
     </message>
@@ -2754,7 +2781,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Verkeerde trefwoorden voor PACK: %1. Het moet een subset zijn van (%2)</translation>
     </message>
     <message>
-        <location line="-2642"/>
+        <location line="-2648"/>
         <source>date</source>
         <translation>datum</translation>
     </message>
@@ -3049,12 +3076,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <location line="+4"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+4171"/>
+        <location line="+4177"/>
         <source>Warning: %1</source>
         <translation>Waarschuwing: %1</translation>
     </message>
     <message>
-        <location line="-4386"/>
+        <location line="-4392"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>Bevestiging vereist. Voer opnieuw uit met --yes om het posten te hervatten.</translation>
     </message>
@@ -3200,7 +3227,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>--par2_path kiest %1 in plaats van %2: de par2-argumenten uit uw configuratie worden voor deze run genegeerd en %1 gebruikt zijn eigen standaardwaarden. De configuratie blijft ongewijzigd.</translation>
     </message>
     <message>
-        <location line="+682"/>
+        <location line="+684"/>
         <source>Commented out or deleted in &apos;%1&apos; while ngPost was running, so it stops using them: %2.</source>
         <translation>Uitgecommentarieerd of verwijderd in &apos;%1&apos; terwijl ngPost liep, dus ngPost gebruikt ze niet meer: %2.</translation>
     </message>
@@ -3215,7 +3242,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>De par2-argumenten in uw configuratie zijn voor %1 geschreven, dus %2 draait deze keer met zijn eigen standaardargumenten. De regel blijft in de configuratie staan.</translation>
     </message>
     <message>
-        <location line="+1564"/>
+        <location line="+1568"/>
         <source>## the three lines below are for Windows, Linux and macOS, in that order;</source>
         <translation>## de drie regels hieronder zijn voor Windows, Linux en macOS, in die volgorde;</translation>
     </message>
@@ -3230,7 +3257,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>## alles na de = is het commando, ook een notitie tussen haakjes.</translation>
     </message>
     <message>
-        <location line="+311"/>
+        <location line="+184"/>
+        <source>## User interface zoom percentage (80 to 150, default 100)</source>
+        <translation>## Zoompercentage van gebruikersinterface (80 tot 150, standaard 100)</translation>
+    </message>
+    <message>
+        <location line="+130"/>
         <source>## the first line below is for rar, the second for 7-zip:</source>
         <translation>## de eerste regel hieronder is voor rar, de tweede voor 7-zip:</translation>
     </message>
@@ -3260,7 +3292,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>## Alleen de redundantie per post wordt vervangen. Weer uitcommentariëren keert terug.</translation>
     </message>
     <message>
-        <location line="-4707"/>
+        <location line="-4716"/>
         <location line="+1424"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>Het overnemen van de configuratiemap is mislukt; ngPost is gestopt voordat de nieuwe map werd gebruikt, zodat het de volgende keer veilig opnieuw kan proberen.</translation>
@@ -3312,7 +3344,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
     </message>
     <message>
         <location line="+96"/>
-        <location line="+1097"/>
+        <location line="+1103"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE moet een positief geheel getal zijn</translation>
     </message>
@@ -3368,7 +3400,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>moet een positief aantal bytes zijn!...</translation>
     </message>
     <message>
-        <location line="-693"/>
+        <location line="-697"/>
         <source>## Added to your configuration file, kept here</source>
         <translation>## Toegevoegd aan uw configuratiebestand, hier bewaard</translation>
     </message>
@@ -3398,7 +3430,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Weggelaten bij dit opslaan van &apos;%1&apos;, omdat een [server]-sectie ze nu bevat: %2.</translation>
     </message>
     <message>
-        <location line="+985"/>
+        <location line="+989"/>
         <source>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</source>
         <translation>VPN: het oude VPN_CONFIG_PATH is overgezet naar het profiel &apos;Default&apos;</translation>
     </message>
@@ -3877,7 +3909,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## je kunt verschillende post-commando&apos;s gebruiken door verschillende NZB_POST_CMD te definiëren</translation>
     </message>
     <message>
-        <location line="+171"/>
+        <location line="+174"/>
         <source>## tunnel selected ngPost connections through an embedded VPN</source>
         <translation>## geselecteerde ngPost-verbindingen door een ingebouwde VPN leiden</translation>
     </message>
@@ -3942,7 +3974,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation></translation>
     </message>
     <message>
-        <location line="-163"/>
+        <location line="-166"/>
         <source>## nzb files are normally all created in nzbPath</source>
         <translation>## nzb-bestanden worden normaal gesproken allemaal gemaakt in het nzb pad</translation>
     </message>
@@ -3973,7 +4005,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>Configuratie: PAR2_ARGS_CUSTOM is voor een ander gereedschap dan %1 geschreven, dus de par2-stap zou mislukken. Zet die regel in commentaar of schrijf ze voor %1.</translation>
     </message>
     <message>
-        <location line="-918"/>
+        <location line="-922"/>
         <source>Configuration: PAR2_TOOL = %1 is not installed here; ngPost uses %2 for this run: %3. The configuration keeps PAR2_TOOL = %1.</source>
         <translation>Configuratie: PAR2_TOOL = %1 is hier niet geïnstalleerd; ngPost gebruikt %2 voor deze run: %3. De configuratie houdt PAR2_TOOL = %1.</translation>
     </message>
@@ -3983,7 +4015,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>Configuratie: PAR2_TOOL = %1: geen uitvoerbaar bestand gevonden. Installeer %1, kies een ander PAR2_TOOL of stel PAR2_SOURCE = custom en PAR2_PATH naar het uitvoerbare bestand in (PAR2-instellingen in de interface).</translation>
     </message>
     <message>
-        <location line="+1318"/>
+        <location line="+1322"/>
         <source>Restricted &apos;%1&apos; to your account: it holds your credentials and was readable by other users of this machine</source>
         <translation>&apos;%1&apos; is beperkt tot uw account: het bevat uw inloggegevens en was leesbaar voor andere gebruikers van deze machine</translation>
     </message>
@@ -4143,7 +4175,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## (intern) tijdstempel van de laatste updatecontrole, epoch-seconden — automatisch beheerd</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+13"/>
         <source>## the VPN affects ngPost only; the rest of the system is unchanged</source>
         <translation>## de VPN beïnvloedt alleen ngPost; de rest van het systeem is ongewijzigd</translation>
     </message>
@@ -4361,7 +4393,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>Fout: kan standaard configuratie bestand niet schrijven: %1</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1401"/>
+        <location filename="../NgPost.h" line="+1405"/>
         <source>PACKing auto using: %1</source>
         <translation>Automatisch inpakken met: %1</translation>
     </message>
@@ -4421,7 +4453,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>Als je ngPost in je eigen taal wilt vertalen, neem dan contact met me op via Matthieu.Bruel@gmail.com</translation>
     </message>
     <message>
-        <location filename="../NgPost.cpp" line="-5986"/>
+        <location filename="../NgPost.cpp" line="-5995"/>
         <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
         <translation>hernoem de invoerbestanden met een willekeurige naam vóór het comprimeren, zodat het archief de oorspronkelijke naam niet bevat (te gebruiken met --compress)</translation>
     </message>
@@ -4433,7 +4465,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
 </translation>
     </message>
     <message>
-        <location line="+2752"/>
+        <location line="+2758"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation>## &apos;filename&apos; hernoemt de invoerbestanden willekeurig vóór het comprimeren, zodat</translation>
     </message>
@@ -4443,8 +4475,8 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## het archief geen oorspronkelijke naam bevat. Beide kunnen tegelijk.</translation>
     </message>
     <message>
-        <location line="-2514"/>
-        <location line="+1228"/>
+        <location line="-2520"/>
+        <location line="+1234"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX moet een positief geheel getal van maximaal 2147483647 zijn.</translation>
     </message>
@@ -4454,7 +4486,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>PAR2_TOOL moet auto, parpar, par2cmdline of multipar zijn.</translation>
     </message>
     <message>
-        <location line="+1050"/>
+        <location line="+1053"/>
         <location line="+39"/>
         <source>## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.</source>
         <translation>## Automatische paden gebruiken het gekozen hulpmiddel uit de huidige bundel of het systeem. Aangepaste paden moeten naar een uitvoerbaar bestand verwijzen.</translation>
@@ -6991,14 +7023,6 @@ Sommige Usenet-indexen vragen erom.</translation>
         <location line="+140"/>
         <source>Global (%1 %)</source>
         <translation>Globaal (%1 %)</translation>
-    </message>
-    <message>
-        <source>Archive name copied to clipboard.</source>
-        <translation type="vanished">Archiefnaam naar klembord gekopieerd.</translation>
-    </message>
-    <message>
-        <source>Password copied to clipboard.</source>
-        <translation type="vanished">Wachtwoord naar het klembord gekopieerd.</translation>
     </message>
     <message>
         <location line="+69"/>

@@ -36,7 +36,7 @@
 4	src/FoldersMonitorForNewFiles.h	FoldersMonitorForNewFiles::writeLockWaitMsForTest( ushort maxRetries , ulong sleepMs)
 148	src/NgPost.cpp	NgPost::NgPost( int & argc , char * argv [ ])
 28	src/NgPost.cpp	NgPost::_addMeta( const QString & keyValue , MetaScope scope)
-53	src/NgPost.cpp	NgPost::_adoptConfigValue( QString const & key , QString const & value)
+55	src/NgPost.cpp	NgPost::_adoptConfigValue( QString const & key , QString const & value)
 28	src/NgPost.cpp	NgPost::_applyCliConfigOverrides( const QCommandLineParser & parser)
 34	src/NgPost.cpp	NgPost::_applyConfigVpnProfiles( ConfigParseState & state)
 39	src/NgPost.cpp	NgPost::_applyPar2Fallback( bool announce)
@@ -45,6 +45,7 @@
 35	src/NgPost.cpp	NgPost::_baseJobOptions() const
 71	src/NgPost.cpp	NgPost::_collectCliInputFiles( const QCommandLineParser & parser , QList<QFileInfo> & filesToUpload , QStringList & rawInputPaths)
 30	src/NgPost.cpp	NgPost::_confirmMasterSwitchWithoutVpnProfileIfNeeded()
+8	src/NgPost.cpp	NgPost::_confirmPostingAdmission()
 59	src/NgPost.cpp	NgPost::_connectVpnRecoverySignals()
 17	src/NgPost.cpp	NgPost::_discardUnstartedJob( PostingJob * job)
 40	src/NgPost.cpp	NgPost::_dumpParams() const
@@ -56,7 +57,7 @@
 14	src/NgPost.cpp	NgPost::_exportProtectedPaths( const PostHistoryStore :: PostInfoRecord & record , const QString & templatePath) const
 25	src/NgPost.cpp	NgPost::_finishPosting()
 139	src/NgPost.cpp	NgPost::_handleHistoryCommand( QCommandLineParser & parser , bool * startEventLoop)
-55	src/NgPost.cpp	NgPost::_initVpnManager()
+50	src/NgPost.cpp	NgPost::_initVpnManager()
 17	src/NgPost.cpp	NgPost::_isHistoryCommand( QCommandLineParser & parser) const
 13	src/NgPost.cpp	NgPost::_isVpnOverrideOption( QCommandLineOption const & option)
 45	src/NgPost.cpp	NgPost::_loadCliConfig( const QCommandLineParser & parser)
@@ -83,7 +84,7 @@
 72	src/NgPost.cpp	NgPost::_parseConfig( const QString & configPath , bool isDefaultConfig)
 42	src/NgPost.cpp	NgPost::_parseConfigArchiveKey( const QString & opt , QString val , ConfigParseState & state , QString & err)
 45	src/NgPost.cpp	NgPost::_parseConfigArticleKey( const QString & opt , QString val)
-34	src/NgPost.cpp	NgPost::_parseConfigDisplayKey( const QString & opt , QString val)
+38	src/NgPost.cpp	NgPost::_parseConfigDisplayKey( const QString & opt , QString val)
 20	src/NgPost.cpp	NgPost::_parseConfigHistoryKey( const QString & opt , const QString & val , QString & err)
 58	src/NgPost.cpp	NgPost::_parseConfigIdentityKey( const QString & opt , QString val , QString & err)
 36	src/NgPost.cpp	NgPost::_parseConfigKey( const QString & opt , const QString & val , ConfigParseState & state , QString & err)
@@ -112,6 +113,7 @@
 8	src/NgPost.cpp	NgPost::_requestExit( ERROR_CODE code , bool waitForActiveJob)
 6	src/NgPost.cpp	NgPost::_resetShutdownCompletion()
 59	src/NgPost.cpp	NgPost::_resolveConfigTools( const ConfigParseState & state)
+35	src/NgPost.cpp	NgPost::_resumeActiveJob()
 73	src/NgPost.cpp	NgPost::_resumePostFromHistory( const QString & ids , bool dryRun , bool assumeYes)
 7	src/NgPost.cpp	NgPost::_retainVpnForJob( PostingJob * job)
 23	src/NgPost.cpp	NgPost::_scanConfigLanguage( QFile & file)
@@ -122,6 +124,7 @@
 79	src/NgPost.cpp	NgPost::_startCliNzbCheck( const QCommandLineParser & parser)
 63	src/NgPost.cpp	NgPost::_startCliPosting( const QCommandLineParser & parser , bool isMonitoring , const QList<QFileInfo> & filesToUpload , const QStringList & rawInputPaths)
 10	src/NgPost.cpp	NgPost::_startMonitoring( const QString & folderPath)
+61	src/NgPost.cpp	NgPost::_startNextPostingJob()
 46	src/NgPost.cpp	NgPost::_startShutdown()
 13	src/NgPost.cpp	NgPost::_stopMonitoring()
 48	src/NgPost.cpp	NgPost::_syntax( char * appName)
@@ -134,12 +137,13 @@
 69	src/NgPost.cpp	NgPost::_writeConfigPar2( QTextStream & stream)
 31	src/NgPost.cpp	NgPost::_writeConfigPostCommands( QTextStream & stream)
 41	src/NgPost.cpp	NgPost::_writeConfigPostInfo( QTextStream & stream)
-61	src/NgPost.cpp	NgPost::_writeConfigPosting( QTextStream & stream)
+64	src/NgPost.cpp	NgPost::_writeConfigPosting( QTextStream & stream)
 30	src/NgPost.cpp	NgPost::_writeConfigServers( QTextStream & stream)
 41	src/NgPost.cpp	NgPost::_writeConfigTransfer( QTextStream & stream)
 14	src/NgPost.cpp	NgPost::_writeConfigVpn( QTextStream & stream)
 18	src/NgPost.cpp	NgPost::_writeConfigVpnProfiles( QTextStream & stream)
 5	src/NgPost.cpp	NgPost::addMonitoringFolder( const QString & dirPath)
+14	src/NgPost.cpp	NgPost::cancelAllPostingJobs()
 8	src/NgPost.cpp	NgPost::changeLanguage( const QString & lang)
 11	src/NgPost.cpp	NgPost::checkForNewVersion()
 10	src/NgPost.cpp	NgPost::checkSupportSSL()
@@ -162,9 +166,9 @@
 6	src/NgPost.cpp	NgPost::onErrorConnecting( const QString & err)
 4	src/NgPost.cpp	NgPost::onLog( const QString & msg , bool newline)
 21	src/NgPost.cpp	NgPost::onNetworkAccessibleChanged( QNetworkAccessManager :: NetworkAccessibility accessible)
-49	src/NgPost.cpp	NgPost::onNewFileToProcess( const QFileInfo & fileInfo)
+48	src/NgPost.cpp	NgPost::onNewFileToProcess( const QFileInfo & fileInfo)
 35	src/NgPost.cpp	NgPost::onPackingDone()
-134	src/NgPost.cpp	NgPost::onPostingJobFinished()
+80	src/NgPost.cpp	NgPost::onPostingJobFinished()
 12	src/NgPost.cpp	NgPost::onPostingJobStarted()
 51	src/NgPost.cpp	NgPost::onRefreshprogressbarBar()
 16	src/NgPost.cpp	NgPost::onShutdownProcError( QProcess :: ProcessError error)
@@ -173,7 +177,7 @@
 6	src/NgPost.cpp	NgPost::onShutdownProcReadyReadStandardOutput()
 128	src/NgPost.cpp	NgPost::parseCommandLine( int argc , char * argv [ ])
 127	src/NgPost.cpp	NgPost::parseDefaultConfig()
-11	src/NgPost.cpp	NgPost::pause() const
+10	src/NgPost.cpp	NgPost::pause()
 14	src/NgPost.cpp	NgPost::postInfoTemplatePath() const
 1	src/NgPost.cpp	NgPost::ramAvailable() const
 4	src/NgPost.cpp	NgPost::randomPass( uint length) const
@@ -181,7 +185,7 @@
 6	src/NgPost.cpp	NgPost::regenerateNzbGui( qint64 postId , const QString & outPath , bool includePassword)
 5	src/NgPost.cpp	NgPost::reportNzbCheckSslUnavailable()
 15	src/NgPost.cpp	NgPost::requestShutdownRecheck()
-36	src/NgPost.cpp	NgPost::resume()
+10	src/NgPost.cpp	NgPost::resume()
 64	src/NgPost.cpp	NgPost::resumePostGui( qint64 postId , PostingWidget * widget , QString * error)
 71	src/NgPost.cpp	NgPost::saveConfig()
 6	src/NgPost.cpp	NgPost::sectionsText( QString const & text)
@@ -264,12 +268,14 @@
 5	src/NgPost.h	NgPost::setPostInfoOutput( const QString & pattern)
 5	src/NgPost.h	NgPost::setPostInfoTemplate( const QString & path)
 4	src/NgPost.h	NgPost::setSessionPostInfoTemplates( const QStringList & paths)
+1	src/NgPost.h	NgPost::setUiZoom( uint zoom)
 1	src/NgPost.h	NgPost::shutdownInProgressForTest() const
 1	src/NgPost.h	NgPost::shutdownRecheckCountForTest() const
 1	src/NgPost.h	NgPost::shutdownStartCountForTest() const
 4	src/NgPost.h	NgPost::space()
 1	src/NgPost.h	NgPost::stdoutIsData() const
 4	src/NgPost.h	NgPost::tryResumePostWhenConnectionLost() const
+1	src/NgPost.h	NgPost::uiZoom() const
 1	src/NgPost.h	NgPost::updateChecker() const
 4	src/NgPost.h	NgPost::useMultiPar() const
 4	src/NgPost.h	NgPost::useParPar() const
@@ -426,7 +432,7 @@
 5	src/Poster.h	Poster::startThreads()
 4	src/Poster.h	Poster::unlockQueue()
 135	src/PostingJob.cpp	PostingJob::PostingJob( NgPost * ngPost , const PostingJobOptions & options , PostingWidget * postWidget , QObject * parent)
-11	src/PostingJob.cpp	PostingJob::_abortBeforeTransfer( bool keepResumeResumable)
+10	src/PostingJob.cpp	PostingJob::_abortBeforeTransfer( bool keepResumeResumable)
 63	src/PostingJob.cpp	PostingJob::_buildFinalPostInfoData()
 17	src/PostingJob.cpp	PostingJob::_canCompress( bool checkTemporaryPath) const
 30	src/PostingJob.cpp	PostingJob::_canGenPar2( bool checkTemporaryPath) const
@@ -445,6 +451,7 @@
 19	src/PostingJob.cpp	PostingJob::_delOriginalFiles()
 13	src/PostingJob.cpp	PostingJob::_dirSize( const QString & path)
 4	src/PostingJob.cpp	PostingJob::_error( const QString & error) const
+16	src/PostingJob.cpp	PostingJob::_finishIfCanceled()
 130	src/PostingJob.cpp	PostingJob::_finishPosting()
 10	src/PostingJob.cpp	PostingJob::_flushHistoryService()
 175	src/PostingJob.cpp	PostingJob::_initPosting()
@@ -460,13 +467,14 @@
 20	src/PostingJob.cpp	PostingJob::_resolveNfoSource()
 18	src/PostingJob.cpp	PostingJob::_restoreObfuscatedFileNames()
 31	src/PostingJob.cpp	PostingJob::_startPosterThreads( int nbPosters , int nbCon)
+10	src/PostingJob.cpp	PostingJob::_terminateExternalProcess()
 7	src/PostingJob.cpp	PostingJob::_unrestoredOriginals( QMap<QString,QString> const & stillObfuscated)
 4	src/PostingJob.cpp	PostingJob::_warn( const QString & warning) const
 30	src/PostingJob.cpp	PostingJob::_writeNzbHeader()
 51	src/PostingJob.cpp	PostingJob::_writePostInfoFile()
 7	src/PostingJob.cpp	PostingJob::buildPar2ArgsForTest( const QString & configuredArgs , bool useParPar , bool useMultiPar , uint redundancy)
 14	src/PostingJob.cpp	PostingJob::nbArticlesUnknown() const
-49	src/PostingJob.cpp	PostingJob::onCompressionFinished( int exitCode)
+48	src/PostingJob.cpp	PostingJob::onCompressionFinished( int exitCode)
 56	src/PostingJob.cpp	PostingJob::onDisconnectedConnection( NntpConnection * con)
 16	src/PostingJob.cpp	PostingJob::onExtProcError( QProcess :: ProcessError error)
 16	src/PostingJob.cpp	PostingJob::onExtProcReadyReadStandardError()
@@ -478,7 +486,7 @@
 10	src/PostingJob.cpp	PostingJob::onNntpFileStartPosting()
 12	src/PostingJob.cpp	PostingJob::onResumeTriggered()
 89	src/PostingJob.cpp	PostingJob::onStartPosting( bool isActiveJob)
-12	src/PostingJob.cpp	PostingJob::onStopPosting()
+9	src/PostingJob.cpp	PostingJob::onStopPosting()
 21	src/PostingJob.cpp	PostingJob::pause( PauseReason reason)
 11	src/PostingJob.cpp	PostingJob::postInfoData() const
 13	src/PostingJob.cpp	PostingJob::recordHistoryArticleFailed( NntpArticle * article , const QString & reason)
@@ -795,18 +803,23 @@
 63	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryStats()
 66	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTab()
 51	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTable( QSplitter * histSplitter)
+32	src/hmi/MainWindow.cpp	MainWindow::_buildPostingControls()
 21	src/hmi/MainWindow.cpp	MainWindow::_configureWaylandSplitters()
 66	src/hmi/MainWindow.cpp	MainWindow::_connectHistoryControls()
 12	src/hmi/MainWindow.cpp	MainWindow::_connectPostingWidget( PostingWidget * post)
+99	src/hmi/MainWindow.cpp	MainWindow::_createZoomPopup()
 21	src/hmi/MainWindow.cpp	MainWindow::_fillTabContextMenu( QMenu & menu , int tabIndex)
 28	src/hmi/MainWindow.cpp	MainWindow::_fitHistoryColumns( bool toContents)
 7	src/hmi/MainWindow.cpp	MainWindow::_getPostWidget( int tabIndex) const
-10	src/hmi/MainWindow.cpp	MainWindow::_getPostWidgetIndex( PostingWidget * postWidget) const
+9	src/hmi/MainWindow.cpp	MainWindow::_getPostWidgetIndex( PostingWidget * postWidget) const
 41	src/hmi/MainWindow.cpp	MainWindow::_initLogBoxToggle()
 82	src/hmi/MainWindow.cpp	MainWindow::_initPostingBox()
 19	src/hmi/MainWindow.cpp	MainWindow::_initServerBox()
+32	src/hmi/MainWindow.cpp	MainWindow::_initZoomControl()
 67	src/hmi/MainWindow.cpp	MainWindow::_insertBoundedLogText( const QString & text , bool startNewBlock , const QTextCharFormat & format) const
 4	src/hmi/MainWindow.cpp	MainWindow::_isLogBoxCollapsed() const
+10	src/hmi/MainWindow.cpp	MainWindow::_isPostingQueueRunning() const
+11	src/hmi/MainWindow.cpp	MainWindow::_nextQuickJobNumber()
 63	src/hmi/MainWindow.cpp	MainWindow::_onHistoryContextMenu( const QPoint & pos)
 14	src/hmi/MainWindow.cpp	MainWindow::_onHistoryCopyPassword()
 44	src/hmi/MainWindow.cpp	MainWindow::_onHistoryDeleteEntry()
@@ -830,24 +843,31 @@
 42	src/hmi/MainWindow.cpp	MainWindow::_onResumeSelectionChanged()
 13	src/hmi/MainWindow.cpp	MainWindow::_onServerFieldEdited()
 126	src/hmi/MainWindow.cpp	MainWindow::_onStatsRefresh()
+4	src/hmi/MainWindow.cpp	MainWindow::_onToggleLogBox()
 8	src/hmi/MainWindow.cpp	MainWindow::_postingWidgets() const
 129	src/hmi/MainWindow.cpp	MainWindow::_refreshHistoryViews( bool rewindEmptyPage)
+18	src/hmi/MainWindow.cpp	MainWindow::_refreshPostingControls()
 17	src/hmi/MainWindow.cpp	MainWindow::_resetHistoryColumns()
 21	src/hmi/MainWindow.cpp	MainWindow::_restoreHistoryColumns()
+49	src/hmi/MainWindow.cpp	MainWindow::_retranslate()
 120	src/hmi/MainWindow.cpp	MainWindow::_retranslateHistoryTab()
 9	src/hmi/MainWindow.cpp	MainWindow::_saveHistoryColumns()
+8	src/hmi/MainWindow.cpp	MainWindow::_saveLogBoxState() const
 10	src/hmi/MainWindow.cpp	MainWindow::_serverRow( QObject * delButton)
 20	src/hmi/MainWindow.cpp	MainWindow::_setLogBoxCollapsed( bool collapsed , bool saveSetting)
 67	src/hmi/MainWindow.cpp	MainWindow::_showHistoryDetails( const PostHistoryStore :: PostDetails & details)
 38	src/hmi/MainWindow.cpp	MainWindow::_showUnattributedVpnDecision()
 35	src/hmi/MainWindow.cpp	MainWindow::_startResumePost( qint64 postId , bool askConfirmation)
 4	src/hmi/MainWindow.cpp	MainWindow::_startupTabBar() const
+13	src/hmi/MainWindow.cpp	MainWindow::_submitPreparedTabs()
+17	src/hmi/MainWindow.cpp	MainWindow::_toggleZoomPopup()
 33	src/hmi/MainWindow.cpp	MainWindow::_trimLogPane() const
-22	src/hmi/MainWindow.cpp	MainWindow::addNewQuickTab( int lastTabIdx , const QFileInfoList & files)
+9	src/hmi/MainWindow.cpp	MainWindow::_updateLogToggleBtn()
+20	src/hmi/MainWindow.cpp	MainWindow::addNewQuickTab( int lastTabIdx , const QFileInfoList & files)
+42	src/hmi/MainWindow.cpp	MainWindow::applyUiZoom( int percent , bool userInteractive)
 4	src/hmi/MainWindow.cpp	MainWindow::buildHistoryTabForTest()
-# changeEvent: +2 lines to reapply the Wayland splitter fix after a style change.
 13	src/hmi/MainWindow.cpp	MainWindow::changeEvent( QEvent * event)
-14	src/hmi/MainWindow.cpp	MainWindow::clearJobTab( QWidget * postWidget)
+10	src/hmi/MainWindow.cpp	MainWindow::clearJobTab( QWidget * postWidget)
 63	src/hmi/MainWindow.cpp	MainWindow::closeEvent( QCloseEvent * event)
 26	src/hmi/MainWindow.cpp	MainWindow::closeTab( PostingWidget * postWidget)
 5	src/hmi/MainWindow.cpp	MainWindow::dragEnterEvent( QDragEnterEvent * e)
@@ -855,18 +875,18 @@
 17	src/hmi/MainWindow.cpp	MainWindow::eventFilter( QObject * obj , QEvent * event)
 4	src/hmi/MainWindow.cpp	MainWindow::fixedArchivePassword() const
 4	src/hmi/MainWindow.cpp	MainWindow::hasAutoCompress() const
-12	src/hmi/MainWindow.cpp	MainWindow::hasFinishedPosts() const
+11	src/hmi/MainWindow.cpp	MainWindow::hasFinishedPosts() const
 9	src/hmi/MainWindow.cpp	MainWindow::hasUnsubmittedPosts() const
-71	src/hmi/MainWindow.cpp	MainWindow::init( NgPost * ngPost)
+70	src/hmi/MainWindow.cpp	MainWindow::init( NgPost * ngPost)
 4	src/hmi/MainWindow.cpp	MainWindow::isDarkMode() const
 8	src/hmi/MainWindow.cpp	MainWindow::log( const QString & aMsg , bool newline) const
 4	src/hmi/MainWindow.cpp	MainWindow::logBlockCountForTest() const
-11	src/hmi/MainWindow.cpp	MainWindow::logError( const QString & error) const
+10	src/hmi/MainWindow.cpp	MainWindow::logError( const QString & error) const
 4	src/hmi/MainWindow.cpp	MainWindow::logMaxBlockCharactersForTest() const
 4	src/hmi/MainWindow.cpp	MainWindow::onAddServer()
 10	src/hmi/MainWindow.cpp	MainWindow::onAutoCompressToggled( bool checked)
-10	src/hmi/MainWindow.cpp	MainWindow::onCloseAllFinishedQuickTabs()
-25	src/hmi/MainWindow.cpp	MainWindow::onCloseJob( int index)
+9	src/hmi/MainWindow.cpp	MainWindow::onCloseAllFinishedQuickTabs()
+24	src/hmi/MainWindow.cpp	MainWindow::onCloseJob( int index)
 13	src/hmi/MainWindow.cpp	MainWindow::onCompressionSettingsClicked()
 16	src/hmi/MainWindow.cpp	MainWindow::onDebugToggled( bool checked)
 5	src/hmi/MainWindow.cpp	MainWindow::onDebugValue( int value)
@@ -879,7 +899,7 @@
 8	src/hmi/MainWindow.cpp	MainWindow::onObfucateToggled( bool checked)
 9	src/hmi/MainWindow.cpp	MainWindow::onPar2Settings()
 10	src/hmi/MainWindow.cpp	MainWindow::onPauseClicked()
-19	src/hmi/MainWindow.cpp	MainWindow::onPostAllTabs()
+10	src/hmi/MainWindow.cpp	MainWindow::onPostAllTabs()
 9	src/hmi/MainWindow.cpp	MainWindow::onRarPassUpdated( const QString & fixedPass)
 5	src/hmi/MainWindow.cpp	MainWindow::onSaveConfig()
 5	src/hmi/MainWindow.cpp	MainWindow::onSetProgressBarRange( int nbArticles)
@@ -894,14 +914,13 @@
 4	src/hmi/MainWindow.cpp	MainWindow::pendingIcon( bool dark)
 4	src/hmi/MainWindow.cpp	MainWindow::pendingIcon() const
 4	src/hmi/MainWindow.cpp	MainWindow::pendingIconPath( bool dark)
-4	src/hmi/MainWindow.cpp	MainWindow::setJobLabel( int jobNumber)
-7	src/hmi/MainWindow.cpp	MainWindow::setPauseIcon( bool pause)
+12	src/hmi/MainWindow.cpp	MainWindow::refreshJobLabel()
 12	src/hmi/MainWindow.cpp	MainWindow::setTab( QWidget * postWidget)
 10	src/hmi/MainWindow.cpp	MainWindow::showEvent( QShowEvent * event)
 4	src/hmi/MainWindow.cpp	MainWindow::toBeImplemented()
 6	src/hmi/MainWindow.cpp	MainWindow::updateAutoPostingParams()
 26	src/hmi/MainWindow.cpp	MainWindow::updateConfigFromUi()
-16	src/hmi/MainWindow.cpp	MainWindow::updateJobTab( QWidget * postWidget , const QColor & color , const QIcon & icon , const QString & tooltip)
+10	src/hmi/MainWindow.cpp	MainWindow::updateJobTab( QWidget * postWidget , const QColor & color , const QIcon & icon , const QString & tooltip)
 41	src/hmi/MainWindow.cpp	MainWindow::updateParams()
 13	src/hmi/MainWindow.cpp	MainWindow::updatePostAllButton()
 24	src/hmi/MainWindow.cpp	MainWindow::updateProgressBar( uint nbArticlesTotal , uint nbArticlesUploaded , const QString & avgSpeed , const QString & immediateSpeed)
@@ -916,11 +935,18 @@
 1	src/hmi/MainWindow.h	MainWindow::autoWidget() const
 1	src/hmi/MainWindow.h	MainWindow::fillTabContextMenuForTest( QMenu & menu , int tabIndex)
 1	src/hmi/MainWindow.h	MainWindow::fitHistoryColumnsForTest( bool toContents)
+1	src/hmi/MainWindow.h	MainWindow::isLogBoxCollapsedForTest() const
 1	src/hmi/MainWindow.h	MainWindow::logBlockCapForTest() const
+1	src/hmi/MainWindow.h	MainWindow::logToggleBtnForTest() const
 1	src/hmi/MainWindow.h	MainWindow::resumePostForTest( qint64 id)
 1	src/hmi/MainWindow.h	MainWindow::resumeTableForTest() const
 1	src/hmi/MainWindow.h	MainWindow::setLogBlockCapForTest( int blocks)
+1	src/hmi/MainWindow.h	MainWindow::setLogBoxCollapsedForTest( bool collapsed)
 1	src/hmi/MainWindow.h	MainWindow::startupTabForTest() const
+1	src/hmi/MainWindow.h	MainWindow::toggleLogBoxForTest()
+1	src/hmi/MainWindow.h	MainWindow::zoomButton() const
+1	src/hmi/MainWindow.h	MainWindow::zoomPopup() const
+1	src/hmi/MainWindow.h	MainWindow::zoomSlider() const
 77	src/hmi/Par2SettingsDialog.cpp	Par2SettingsDialog::Par2SettingsDialog( NgPost * ngPost , const QFileInfoList & files , bool beforeCompression , bool percentageOverride , QWidget * parent)
 46	src/hmi/Par2SettingsDialog.cpp	Par2SettingsDialog::_buildAdvancedControls( QFormLayout * details)
 50	src/hmi/Par2SettingsDialog.cpp	Par2SettingsDialog::_buildRecoveryControls( QFormLayout * form)
@@ -983,10 +1009,13 @@
 27	src/hmi/PostingWidget.cpp	PostingWidget::PostingWidget( NgPost * ngPost , MainWindow * hmi , uint jobNumber)
 13	src/hmi/PostingWidget.cpp	PostingWidget::_buildFilesList( QFileInfoList & files , bool & hasFolder)
 32	src/hmi/PostingWidget.cpp	PostingWidget::_buildPostInfoRow()
-22	src/hmi/PostingWidget.cpp	PostingWidget::_copyToClipboard( QAction * action , QLineEdit * edit , const QString & statusMsg)
+10	src/hmi/PostingWidget.cpp	PostingWidget::_confirmNzbOverwrite( const QString & nzbPath)
+19	src/hmi/PostingWidget.cpp	PostingWidget::_copyToClipboard( QAction * action , QLineEdit * edit)
 9	src/hmi/PostingWidget.cpp	PostingWidget::_fileAlreadyInList( const QString & fileName , int currentNbFiles) const
+4	src/hmi/PostingWidget.cpp	PostingWidget::_hasPreparedFiles() const
 40	src/hmi/PostingWidget.cpp	PostingWidget::_postInfoPreview() const
-40	src/hmi/PostingWidget.cpp	PostingWidget::_setupCopyActions()
+14	src/hmi/PostingWidget.cpp	PostingWidget::_restoreAfterPreparationFailure()
+38	src/hmi/PostingWidget.cpp	PostingWidget::_setupCopyActions()
 16	src/hmi/PostingWidget.cpp	PostingWidget::addPath( const QString & path , int currentNbFiles , int isDir)
 21	src/hmi/PostingWidget.cpp	PostingWidget::attachResumeJob( PostingJob * job , const QFileInfoList & files , bool hasStarted)
 4	src/hmi/PostingWidget.cpp	PostingWidget::canSubmit() const
@@ -1012,6 +1041,7 @@
 12	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFilesClicked()
 12	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFolderClicked()
 90	src/hmi/PostingWidget.cpp	PostingWidget::postFiles( bool updateMainParams)
+13	src/hmi/PostingWidget.cpp	PostingWidget::postingTextColor() const
 7	src/hmi/PostingWidget.cpp	PostingWidget::previewFiles() const
 8	src/hmi/PostingWidget.cpp	PostingWidget::refreshPar2Default()
 12	src/hmi/PostingWidget.cpp	PostingWidget::refreshPostingState()
@@ -1027,6 +1057,7 @@
 30	src/hmi/PostingWidget.cpp	PostingWidget::udatePostingParams()
 4	src/hmi/PostingWidget.cpp	PostingWidget::writesPostInfoFile() const
 9	src/hmi/PostingWidget.cpp	PostingWidget::~PostingWidget()
+1	src/hmi/PostingWidget.h	PostingWidget::displayNumber() const
 1	src/hmi/PostingWidget.h	PostingWidget::hmi() const
 1	src/hmi/PostingWidget.h	PostingWidget::isPosting() const
 1	src/hmi/PostingWidget.h	PostingWidget::isPostingFinished() const
@@ -1104,7 +1135,7 @@
 12	src/nntp/NntpArticle.cpp	NntpArticle::str() const
 10	src/nntp/NntpArticle.cpp	NntpArticle::tryResend()
 8	src/nntp/NntpArticle.cpp	NntpArticle::write( NntpConnection * con , const std :: string & idSignature)
-78	src/nntp/NntpArticle.cpp	NntpArticle::yEncBody( const char data [ ])
+77	src/nntp/NntpArticle.cpp	NntpArticle::yEncBody( const char data [ ])
 5	src/nntp/NntpArticle.cpp	NntpArticle::yEncWorstCaseSize( qint64 nbBytes)
 4	src/nntp/NntpArticle.cpp	NntpArticle::~NntpArticle()
 5	src/nntp/NntpArticle.cpp	articleRandomEngine()
@@ -1239,7 +1270,7 @@
 63	src/utils/PathHelper.cpp	PathHelper::copyFileAtomically( const QString & from , const QString & to , QString * error)
 46	src/utils/PathHelper.cpp	PathHelper::copyMigrationAssets( ConfigDirMigrationResult & state , const QString & legacy , const QString & target)
 17	src/utils/PathHelper.cpp	PathHelper::genericConfigRoot()
-56	src/utils/PathHelper.cpp	PathHelper::hardenConfigSecrets()
+55	src/utils/PathHelper.cpp	PathHelper::hardenConfigSecrets()
 14	src/utils/PathHelper.cpp	PathHelper::hasHistoryBundle( const QString & dir)
 4	src/utils/PathHelper.cpp	PathHelper::historyDbFileName()
 20	src/utils/PathHelper.cpp	PathHelper::historySetting( const QByteArray & content)

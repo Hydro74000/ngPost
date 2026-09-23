@@ -723,7 +723,7 @@ A diferencia de la casilla por post, esta elección se guarda.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+3342"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3350"/>
         <source>VPN: disabled</source>
         <translation>VPN: desactivado</translation>
     </message>
@@ -872,7 +872,7 @@ A diferencia de la casilla por post, esta elección se guarda.</translation>
         <translation>ir a línea de comandos (cerrar el GUI y continuar en el shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-1305"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1309"/>
         <source>Host (name or IP)</source>
         <translation>Host (nombre o IP)</translation>
     </message>
@@ -903,32 +903,32 @@ A diferencia de la casilla por post, esta elección se guarda.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1112"/>
+        <location line="+1116"/>
         <location line="+213"/>
         <source>Password</source>
         <translation>Contraseña</translation>
     </message>
     <message>
-        <location line="-1209"/>
-        <location line="+409"/>
+        <location line="-1212"/>
+        <location line="+412"/>
         <location line="+1806"/>
         <source>Default %1</source>
         <translation>Por Defecto %1</translation>
     </message>
     <message>
-        <location line="-2223"/>
-        <location line="+421"/>
+        <location line="-2226"/>
+        <location line="+424"/>
         <source>Post history, statistics and resume center</source>
         <translation>Historial de publicaciones, estadísticas y centro de reanudación</translation>
     </message>
     <message>
-        <location line="-412"/>
-        <location line="+416"/>
+        <location line="-415"/>
+        <location line="+419"/>
         <source>New</source>
         <translation>Nuevo</translation>
     </message>
     <message>
-        <location line="-359"/>
+        <location line="-362"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>velocidad media</translation>
@@ -985,7 +985,7 @@ Cierre ese otro ngPost para usar la VPN aquí. Si no hay ninguno en ejecución, 
         <translation>VPN</translation>
     </message>
     <message>
-        <location line="+291"/>
+        <location line="+292"/>
         <source>Immediate speed (avg on %1 sec) - (nb Articles uploaded / total number of Articles) - avg speed</source>
         <translation>Velocidad instantánea (avg on %1 sec) - (Núm Artículos subidos / número total de artículos) - velocidad media</translation>
     </message>
@@ -1001,13 +1001,13 @@ Cierre ese otro ngPost para usar la VPN aquí. Si no hay ninguno en ejecución, 
     </message>
     <message>
         <location line="+1"/>
-        <location line="+593"/>
+        <location line="+595"/>
         <location line="+213"/>
         <source>Files</source>
         <translation>Ficheros</translation>
     </message>
     <message>
-        <location line="-805"/>
+        <location line="-807"/>
         <source>Parameters</source>
         <translation>Parámetros</translation>
     </message>
@@ -1017,7 +1017,7 @@ Cierre ese otro ngPost para usar la VPN aquí. Si no hay ninguno en ejecución, 
         <translation>Log de Publicación</translation>
     </message>
     <message>
-        <location line="+202"/>
+        <location line="+204"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
         <translation>&lt;h3&gt;Nueva versión disponible: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Actual: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;Ver versión en GitHub&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
@@ -1070,12 +1070,19 @@ The job stays in the queue.</source>
 El trabajo permanece en la cola.</translation>
     </message>
     <message>
-        <location line="-621"/>
+        <location line="-624"/>
         <source>These settings could not be removed. See the VPN log for details.</source>
         <translation>No se han podido eliminar estos ajustes. Consulte el registro de la VPN para más detalles.</translation>
     </message>
     <message>
-        <location line="+635"/>
+        <location line="+302"/>
+        <location line="+2762"/>
+        <location line="+145"/>
+        <source>UI Zoom: %1% (Click to adjust)</source>
+        <translation>Zoom de interfaz: %1% (Clic para ajustar)</translation>
+    </message>
+    <message>
+        <location line="-2571"/>
         <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
         <translation>La VPN configurada en ngPost parece estar ya en funcionamiento; es posible que otro ngPost la esté usando. Consulte los ajustes de la VPN.</translation>
     </message>
@@ -1678,7 +1685,7 @@ Esto elimina también todos los registros de archivos y artículos asociados.</t
         <translation>VPN: fallido</translation>
     </message>
     <message>
-        <location line="+60"/>
+        <location line="+58"/>
         <location line="+1"/>
         <source>Open Posting Log</source>
         <translation>Abrir registro de publicaciones</translation>
@@ -1690,7 +1697,27 @@ Esto elimina también todos los registros de archivos y artículos asociados.</t
         <translation>Cerrar registro de publicaciones</translation>
     </message>
     <message>
-        <location line="-2762"/>
+        <location line="+120"/>
+        <source>UI Zoom</source>
+        <translation>Zoom de interfaz</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Reset zoom to 100%</source>
+        <translation>Restablecer zoom al 100%</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Zoom out (-5%)</source>
+        <translation>Alejar (-5%)</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>Zoom in (+5%)</source>
+        <translation>Acercar (+5%)</translation>
+    </message>
+    <message>
+        <location line="-2926"/>
         <source>close while still posting?</source>
         <translation>¿cerrar mientras se sigue publicando?</translation>
     </message>
@@ -1707,7 +1734,7 @@ Are you sure you want to quit?</source>
 ¿Estás seguro de que quieres dejarlo?</translation>
     </message>
     <message>
-        <location line="+146"/>
+        <location line="+150"/>
         <source>Quick Tabs Menu</source>
         <translation>Menú de Pestañas Rápidas</translation>
     </message>
@@ -1871,8 +1898,8 @@ Are you sure you want to quit?</source>
         <translation>Eliminar entrada</translation>
     </message>
     <message>
-        <location line="-1405"/>
-        <location line="+421"/>
+        <location line="-1408"/>
+        <location line="+424"/>
         <location line="+538"/>
         <location line="+168"/>
         <source>History</source>
@@ -2052,13 +2079,13 @@ Are you sure you want to quit?</source>
         <translation>Restablecer el ancho de las columnas</translation>
     </message>
     <message>
-        <location line="-1732"/>
-        <location line="+425"/>
+        <location line="-1735"/>
+        <location line="+426"/>
         <source>PAR2 Settings…</source>
         <translation>Ajustes PAR2…</translation>
     </message>
     <message>
-        <location line="+1740"/>
+        <location line="+1742"/>
         <source>Post all tabs</source>
         <translation>Publicar todas las pestañas</translation>
     </message>
@@ -2091,7 +2118,7 @@ Are you sure you want to quit?</source>
 <context>
     <name>NgPost</name>
     <message>
-        <location filename="../NgPost.cpp" line="+236"/>
+        <location filename="../NgPost.cpp" line="+237"/>
         <source>Help: display syntax</source>
         <translation>Ayuda: sintaxis de la pantalla</translation>
     </message>
@@ -2237,12 +2264,12 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+5760"/>
+        <location line="+5769"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Eliminar la carpeta raíz al comprimir con RAR</translation>
     </message>
     <message>
-        <location line="-5757"/>
+        <location line="-5766"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>El servidor NNTP sigue el formato (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2425,7 +2452,7 @@ Para listar las opciones disponibles use: %2 --help
         <translation>Publicación cancelada por el usuario.</translation>
     </message>
     <message>
-        <location line="+4290"/>
+        <location line="+4296"/>
         <source>VPN warning</source>
         <translation>Advertencia VPN</translation>
     </message>
@@ -2458,7 +2485,7 @@ Ajuste: Botón &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route a
         <translation>Cancelar</translation>
     </message>
     <message>
-        <location line="-2656"/>
+        <location line="-2662"/>
         <source>Full debug logs are ON
 </source>
         <translation>Logs completos de depuración están ON
@@ -2755,12 +2782,12 @@ Ajuste: Botón &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route a
         <location line="+4"/>
         <location line="+265"/>
         <location line="+18"/>
-        <location line="+4171"/>
+        <location line="+4177"/>
         <source>Warning: %1</source>
         <translation>Aviso: %1</translation>
     </message>
     <message>
-        <location line="-4386"/>
+        <location line="-4392"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>Se necesita confirmación. Vuelva a ejecutar con --yes para reanudar la publicación.</translation>
     </message>
@@ -2871,7 +2898,7 @@ Ajuste: Botón &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route a
         <translation>--par2_path elige %1 en lugar de %2: los argumentos par2 de su configuración se ignoran en esta ejecución y %1 usa sus propios valores por defecto. La configuración no se modifica.</translation>
     </message>
     <message>
-        <location line="+682"/>
+        <location line="+684"/>
         <source>Commented out or deleted in &apos;%1&apos; while ngPost was running, so it stops using them: %2.</source>
         <translation>Comentado o eliminado en «%1» mientras ngPost estaba en marcha, así que deja de usarlos: %2.</translation>
     </message>
@@ -2886,7 +2913,7 @@ Ajuste: Botón &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route a
         <translation>Los argumentos par2 de su configuración están escritos para %1, así que %2 se ejecuta esta vez con sus argumentos por defecto. La línea se conserva en la configuración.</translation>
     </message>
     <message>
-        <location line="+1564"/>
+        <location line="+1568"/>
         <source>## the three lines below are for Windows, Linux and macOS, in that order;</source>
         <translation>## las tres líneas siguientes son para Windows, Linux y macOS, en ese orden;</translation>
     </message>
@@ -2901,7 +2928,12 @@ Ajuste: Botón &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route a
         <translation>## todo lo que sigue al = es el comando, incluida una nota entre paréntesis.</translation>
     </message>
     <message>
-        <location line="+311"/>
+        <location line="+184"/>
+        <source>## User interface zoom percentage (80 to 150, default 100)</source>
+        <translation>## Porcentaje de zoom de la interfaz (80 a 150, por defecto 100)</translation>
+    </message>
+    <message>
+        <location line="+130"/>
         <source>## the first line below is for rar, the second for 7-zip:</source>
         <translation>## la primera línea de abajo es para rar, la segunda para 7-zip:</translation>
     </message>
@@ -2931,7 +2963,7 @@ Ajuste: Botón &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route a
         <translation>## publicación. Vuelva a comentarla para regresar a los campos de Ajustes PAR2.</translation>
     </message>
     <message>
-        <location line="-4707"/>
+        <location line="-4716"/>
         <location line="+1424"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>Error al adoptar la carpeta de configuración; ngPost se detuvo antes de usar la nueva carpeta para poder volver a intentarlo de forma segura la próxima vez.</translation>
@@ -3075,12 +3107,12 @@ No es el caso de &apos;%1&apos; que contiene carpetas: %2</translation>
     </message>
     <message>
         <location line="+74"/>
-        <location line="+1136"/>
+        <location line="+1142"/>
         <source>Generate new random poster for each post</source>
         <translation>Generar un nuevo publicador aleatorio para cada publicación</translation>
     </message>
     <message>
-        <location line="-1100"/>
+        <location line="-1106"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>Debería dar un número entero no registrado para el número de reintentos de publicación de un artículo (opción -r)</translation>
     </message>
@@ -3148,7 +3180,7 @@ O bien usa --par2_pct o establece PAR2_PCT o PAR2_ARGS en el fichero de configur
         <translation>Nada que hacer...</translation>
     </message>
     <message>
-        <location line="+324"/>
+        <location line="+326"/>
         <source>## Added to your configuration file, kept here</source>
         <translation>## Añadido a su archivo de configuración, conservado aquí</translation>
     </message>
@@ -3178,19 +3210,19 @@ O bien usa --par2_pct o establece PAR2_PCT o PAR2_ARGS en el fichero de configur
         <translation>Descartado al guardar «%1», porque ahora los contiene una sección [server]: %2.</translation>
     </message>
     <message>
-        <location line="+998"/>
+        <location line="+1002"/>
         <source>The config file &apos;%1&apos; is not readable...</source>
         <translation>El fichero de configuración &apos;%1&apos; no se puede leer...</translation>
     </message>
     <message>
-        <location line="-905"/>
+        <location line="-909"/>
         <source>the nzbPath &apos;%1&apos; is not writable...
 </source>
         <translation>el nzbPath &apos;%1&apos; no es escribible...
 </translation>
     </message>
     <message>
-        <location line="+77"/>
+        <location line="+81"/>
         <source>Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5.</source>
         <translation>Advertencia: VPN_LEASE_WAIT_MINUTES debe estar entre 0 y 1440; se usará 5.</translation>
     </message>
@@ -3447,14 +3479,14 @@ No se modificó ni eliminó ningún archivo de origen existente. Es posible que 
         <translation>## dado a un comando posterior; __rarPass__ en los argumentos sigue funcionando</translation>
     </message>
     <message>
-        <location line="-3832"/>
+        <location line="-3838"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Protocolo no soportado para NZB_UPLOAD_URL (%1). Sólo puedes usar: %2
 </translation>
     </message>
     <message>
-        <location line="+2378"/>
+        <location line="+2384"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost empieza el registro: %1</translation>
     </message>
@@ -3479,7 +3511,7 @@ No se modificó ni eliminó ningún archivo de origen existente. Es posible que 
         <translation>Error al analizar los parámetros de Proxy Socks5. La sintaxis debería ser: %1</translation>
     </message>
     <message>
-        <location line="-2479"/>
+        <location line="-2485"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>el historial del publicación &apos;%1&apos; no puede ser un directorio...
@@ -3494,7 +3526,7 @@ No se modificó ni eliminó ningún archivo de origen existente. Es posible que 
 </translation>
     </message>
     <message>
-        <location line="+2551"/>
+        <location line="+2557"/>
         <source>should be a directory!...</source>
         <translation>debería ser un directorio!...</translation>
     </message>
@@ -3529,7 +3561,7 @@ No se modificó ni eliminó ningún archivo de origen existente. Es posible que 
         <translation>Palabras clave incorrectas para PACK: %1. Debería ser un subgrupo de (%2)</translation>
     </message>
     <message>
-        <location line="-2642"/>
+        <location line="-2648"/>
         <source>date</source>
         <translation>fecha</translation>
     </message>
@@ -3585,7 +3617,7 @@ No se modificó ni eliminó ningún archivo de origen existente. Es posible que 
     </message>
     <message>
         <location line="+881"/>
-        <location line="+1097"/>
+        <location line="+1103"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE debe ser un número entero positivo</translation>
     </message>
@@ -3809,7 +3841,7 @@ Su archivo de configuración activo es:
         <translation>## (interno) marca de tiempo de la última comprobación de actualización, segundos epoch — gestionado automáticamente</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+13"/>
         <source>## the VPN affects ngPost only; the rest of the system is unchanged</source>
         <translation>## la VPN afecta solo a ngPost; el resto del sistema no cambia</translation>
     </message>
@@ -3884,12 +3916,12 @@ Su archivo de configuración activo es:
         <translation></translation>
     </message>
     <message>
-        <location line="-784"/>
+        <location line="-787"/>
         <source>for compression and par2 support</source>
         <translation>para la compresión y el soporte de par2</translation>
     </message>
     <message>
-        <location line="-1048"/>
+        <location line="-1052"/>
         <source>Configuration: PAR2_TOOL = %1 is not installed here; ngPost uses %2 for this run: %3. The configuration keeps PAR2_TOOL = %1.</source>
         <translation>Configuración: PAR2_TOOL = %1 no está instalado aquí; ngPost usa %2 en esta ejecución: %3. La configuración conserva PAR2_TOOL = %1.</translation>
     </message>
@@ -3899,7 +3931,7 @@ Su archivo de configuración activo es:
         <translation>Configuración: PAR2_TOOL = %1: no se encontró ningún ejecutable. Instale %1, seleccione otro PAR2_TOOL o establezca PAR2_SOURCE = custom y PAR2_PATH a su ejecutable (Ajustes PAR2 en la interfaz).</translation>
     </message>
     <message>
-        <location line="+1035"/>
+        <location line="+1039"/>
         <source>automated posting (scanning and/or monitoring)</source>
         <translation>publicación automatizada (escaneado y/o monitorizando)</translation>
     </message>
@@ -4084,7 +4116,7 @@ Su archivo de configuración activo es:
         <translation>## Si esta opción está activada, el correo electrónico será ignorado</translation>
     </message>
     <message>
-        <location line="+48"/>
+        <location line="+51"/>
         <source>## tunnel selected ngPost connections through an embedded VPN</source>
         <translation>## enrutar las conexiones de ngPost seleccionadas a través de una VPN integrada</translation>
     </message>
@@ -4104,7 +4136,7 @@ Su archivo de configuración activo es:
         <translation>## Tiempo de espera (segundos) antes de intentar retomar un Post automáticamente en caso de pérdida de red (min: %1)</translation>
     </message>
     <message>
-        <location line="-70"/>
+        <location line="-73"/>
         <source>## uncomment the next line to limit the number of threads,  (by default it&apos;ll use the number of cores)</source>
         <translation>## descomente la siguiente línea para limitar el número de hilos, (por defecto usará el número de núcleos)</translation>
     </message>
@@ -4159,7 +4191,7 @@ Su archivo de configuración activo es:
         <translation>## cerrar las pestañas de Publicación Rápida cuando se envíe con éxito (para el GUI)</translation>
     </message>
     <message>
-        <location line="+44"/>
+        <location line="+47"/>
         <source>## By default, ngPost tries to resume a Post if the network is down.</source>
         <translation>## Por defecto, ngPost intenta retomar un Post si se cae la red.</translation>
     </message>
@@ -4347,7 +4379,7 @@ Su archivo de configuración activo es:
         <translation>Error: No se pudo escribir el fichero de configuración por defecto: %1</translation>
     </message>
     <message>
-        <location line="-6193"/>
+        <location line="-6203"/>
         <source>Auto Posting</source>
         <translation>Publicación Automática</translation>
     </message>
@@ -4357,7 +4389,7 @@ Su archivo de configuración activo es:
         <translation>Publicación Rápida</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1401"/>
+        <location filename="../NgPost.h" line="+1405"/>
         <source>PACKing auto using: %1</source>
         <translation>Empaquetado automático usando: %1</translation>
     </message>
@@ -4417,7 +4449,7 @@ Su archivo de configuración activo es:
         <translation>Si desea traducir ngPost a su idioma, es fácil, por favor contácteme en Matthieu.Bruel@gmail.com</translation>
     </message>
     <message>
-        <location filename="../NgPost.cpp" line="+206"/>
+        <location filename="../NgPost.cpp" line="+207"/>
         <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
         <translation>renombra los archivos de entrada con un nombre aleatorio antes de comprimirlos, para que el archivo no conserve el nombre original (usar con --compress)</translation>
     </message>
@@ -4429,7 +4461,7 @@ Su archivo de configuración activo es:
 </translation>
     </message>
     <message>
-        <location line="+2752"/>
+        <location line="+2758"/>
         <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
         <translation>## &apos;filename&apos; renombra los archivos de entrada con un nombre aleatorio antes de</translation>
     </message>
@@ -4439,8 +4471,8 @@ Su archivo de configuración activo es:
         <translation>## comprimirlos, así el archivo no conserva ningún nombre original. Ambos a la vez.</translation>
     </message>
     <message>
-        <location line="-2514"/>
-        <location line="+1228"/>
+        <location line="-2520"/>
+        <location line="+1234"/>
         <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
         <translation>RAR_MAX debe ser un entero positivo no mayor que 2147483647.</translation>
     </message>
@@ -4450,7 +4482,7 @@ Su archivo de configuración activo es:
         <translation>PAR2_TOOL debe ser auto, parpar, par2cmdline o multipar.</translation>
     </message>
     <message>
-        <location line="+1050"/>
+        <location line="+1053"/>
         <location line="+39"/>
         <source>## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.</source>
         <translation>## Las rutas automáticas usan la herramienta seleccionada del paquete actual o del sistema. Las rutas personalizadas deben apuntar a un ejecutable.</translation>
@@ -6987,14 +7019,6 @@ Algunos índices de Usenet lo piden.</translation>
         <location line="-35"/>
         <source>Global (%1 %)</source>
         <translation>Global (%1 %)</translation>
-    </message>
-    <message>
-        <source>Archive name copied to clipboard.</source>
-        <translation type="vanished">Nombre del archivo copiado al portapapeles.</translation>
-    </message>
-    <message>
-        <source>Password copied to clipboard.</source>
-        <translation type="vanished">Contraseña copiada al portapapeles.</translation>
     </message>
     <message>
         <location line="+69"/>

@@ -197,6 +197,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 
     {Opt::CHECK_FOR_UPDATES, "check_for_updates"},
     {Opt::LAST_UPDATE_CHECK, "last_update_check"},
+    {Opt::UI_ZOOM, "ui_zoom"},
 
     {Opt::VPN_AUTO_CONNECT,        "vpn_auto_connect"},
     {Opt::VPN_BACKEND,             "vpn_backend"},
@@ -4011,6 +4012,8 @@ bool NgPost::_adoptConfigValue(QString const &key, QString const &value)
         return number(_rarSize);
     else if (key == sOptionNames[Opt::LENGTH_PASS])
         return number(_lengthPassDefault);
+    else if (key == sOptionNames[Opt::UI_ZOOM])
+        return number(_uiZoom);
     else if (key == sOptionNames[Opt::PAR2_PCT]) {
         uint percentage = 0;
         if (!number(percentage))
@@ -4292,6 +4295,10 @@ bool NgPost::_parseConfigDisplayKey(const QString &opt, QString val)
         _checkForUpdates = (val == "true" || val == "on" || val == "1");
     } else if (opt == sOptionNames[Opt::LAST_UPDATE_CHECK]) {
         _lastUpdateCheckEpoch = val.toLongLong();
+    } else if (opt == sOptionNames[Opt::UI_ZOOM]) {
+        int const nb = val.toInt(&ok);
+        if (ok && nb >= 50 && nb <= 250)
+            _uiZoom = static_cast<uint>(nb);
     } else
         return false;
     return true;
@@ -5934,6 +5941,9 @@ void NgPost::_writeConfigPosting(QTextStream &stream)
            << "CHECK_FOR_UPDATES = " << (_checkForUpdates ? "true" : "false") << "\n"
            << tr("## (internal) last update check timestamp, epoch seconds \xe2\x80\x94 managed automatically") << "\n"
            << "LAST_UPDATE_CHECK = " << _lastUpdateCheckEpoch << "\n"
+           << "\n"
+           << tr("## User interface zoom percentage (80 to 150, default 100)") << "\n"
+           << "UI_ZOOM = " << _uiZoom << "\n"
            << "\n";
     // clang-format on
 }

@@ -51,7 +51,7 @@
 tst_CliParser                 68  Linux
 tst_FoldersMonitor            10  Linux
 tst_GoldenNzb                  4  Linux
-tst_MainWindow               194  Linux
+tst_MainWindow               195  Linux
 tst_MockNntp                   8  Linux
 tst_NntpFile                  29  Linux
 tst_OpenVpnConfigPolicy       74  Linux

@@ -425,6 +425,7 @@ private slots:
     void log_box_auto_opens_on_error_and_persists_state();
     void posting_panes_remain_resizable();
     void log_box_restores_width_after_restart();
+    void ui_zoom_control_adjusts_font_and_persists_setting();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -7179,4 +7180,58 @@ void TestMainWindow::log_box_restores_width_after_restart()
     auto *splitter2 = window2->findChild<QSplitter *>("postSplitter");
     QVERIFY(splitter2);
     QVERIFY(qAbs(splitter2->sizes().at(1) - 420) < 10);
+}
+
+void TestMainWindow::ui_zoom_control_adjusts_font_and_persists_setting()
+{
+    HomeSandbox sandbox;
+    MainWindow window;
+    window.show();
+    QCoreApplication::processEvents();
+    QToolButton *zoomBtn = window.zoomButton();
+    QVERIFY(zoomBtn);
+    QCOMPARE(zoomBtn->text(), QStringLiteral("100%"));
+
+    QWidget *popup = window.zoomPopup();
+    QVERIFY(popup);
+    QVERIFY(!popup->isVisible());
+
+    // Toggle popup open
+    zoomBtn->click();
+    QCoreApplication::processEvents();
+    QVERIFY(popup->isVisible());
+
+    QSlider *slider = window.zoomSlider();
+    QVERIFY(slider);
+    QCOMPARE(slider->value(), 100);
+
+    // Change zoom via slider
+    slider->setValue(125);
+    QCoreApplication::processEvents();
+    QCOMPARE(zoomBtn->text(), QStringLiteral("125%"));
+
+    // Reset button
+    auto *resetBtn = popup->findChild<QPushButton *>(QStringLiteral("zoomResetBtn"));
+    QVERIFY(resetBtn);
+    resetBtn->click();
+    QCoreApplication::processEvents();
+    QCOMPARE(slider->value(), 100);
+    QCOMPARE(zoomBtn->text(), QStringLiteral("100%"));
+
+    // Toggle popup closed
+    zoomBtn->click();
+    QCoreApplication::processEvents();
+    QVERIFY(!popup->isVisible());
+
+    // Test persistence when booted with an existing UI_ZOOM config
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    MainWindow *booted = bootWindow(ngPost, "GROUPS = alt.binaries.test\nUI_ZOOM = 130\n", &error);
+    QVERIFY2(booted, qPrintable(error));
+    QCOMPARE(ngPost.uiZoom(), 130u);
+    QCOMPARE(booted->zoomButton()->text(), QStringLiteral("130%"));
+    QCOMPARE(booted->zoomSlider()->value(), 130);
 }

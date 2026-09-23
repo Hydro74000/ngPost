@@ -191,6 +191,7 @@ public:
         NZBCHECK,
         CHECK_FOR_UPDATES,
         LAST_UPDATE_CHECK,
+        UI_ZOOM,
         VPN_AUTO_CONNECT,
         VPN_BACKEND,        //!< legacy, kept for migration only
         VPN_CONFIG_PATH,    //!< legacy, kept for migration only
@@ -449,6 +450,7 @@ private:
     bool _autoCloseTabs;
     bool _checkForUpdates;
     qint64 _lastUpdateCheckEpoch;
+    uint _uiZoom = 100;
     bool _rarNoRootFolder;
     bool _keepNfoExtension; //!< when obfuscating file names, keep the .nfo extension visible
     bool _copyNfoWithNzb;   //!< copy the .nfo from the original files next to the generated nzb
@@ -840,6 +842,8 @@ public:
     inline bool useParPar() const;
     inline bool useMultiPar() const;
     uint par2DefaultPercentage() const { return _par2PctDefault; }
+    uint uiZoom() const { return _uiZoom; }
+    void setUiZoom(uint zoom) { _uiZoom = zoom; }
     inline bool lastPostingStartCanceled() const;
 
     inline void enableAutoPacking(bool enable = true);
