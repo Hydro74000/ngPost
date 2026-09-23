@@ -7,6 +7,11 @@ on:
       - master
   workflow_dispatch:
     inputs:
+      updates_only:
+        description: "Validate update paths, release packages and GUI only; publication is refused."
+        required: false
+        default: false
+        type: boolean
       version:
         description: "Release version (e.g., v1.2.3). Leave empty for a build-only (no release) run."
         required: false
@@ -43,12 +48,15 @@ jobs:
   test-update:
     uses: ./.github/workflows/update-tests.yml
   test-unit:
+    if: ${{ !inputs.updates_only }}
     uses: ./.github/workflows/unit-tests.yml
   test-integration:
+    if: ${{ !inputs.updates_only }}
     uses: ./.github/workflows/integration-tests.yml
   test-gui:
     uses: ./.github/workflows/gui-tests.yml
   test-vpn:
+    if: ${{ !inputs.updates_only }}
     uses: ./.github/workflows/vpn-e2e.yml
   release-metadata:
     name: Prepare Release Metadata
@@ -66,10 +74,17 @@ jobs:
       - name: Compute release identity
         id: metadata
         env:
+          UPDATES_ONLY: ${{ inputs.updates_only || false }}
+          PUBLISH_REQUESTED: ${{ inputs.publish || false }}
           RELEASE_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
           PRERELEASE_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
         run: |
           set -euo pipefail
+
+          if [ "$UPDATES_ONLY" = true ] && [ "$PUBLISH_REQUESTED" = true ]; then
+            echo "Update-only validation cannot publish a release." >&2
+            exit 1
+          fi
 
           if [ -n "$RELEASE_INPUT" ]; then
             tag="$RELEASE_INPUT"

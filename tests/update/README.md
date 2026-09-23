@@ -14,6 +14,13 @@ also a required dependency of `Build and Release`. Its tests run sequentially:
   application exit and restart. Only HTTP transport is substituted, with the
   production HTTPS URLs. No live release needs publishing to exercise this path.
 
+For a complete update rehearsal without publishing, dispatch `Build and Release`
+with `updates_only=true`, `publish=false` and the prospective stable version
+(e.g. `v5.6`). This runs the native update tests, GUI tests and all package builds,
+including legacy and Setup upgrades. Unrelated posting/VPN/full unit suites are
+omitted in this explicit rehearsal mode. The workflow refuses publication in
+that mode; ordinary release runs retain every existing prerequisite.
+
 Each release archive must also pass `check_release_package.py` on its own OS
 before artifact upload. This uses the actual archive and the production manifest
 writer, starts the packaged GUI, waits for its exit, swaps the installation,
