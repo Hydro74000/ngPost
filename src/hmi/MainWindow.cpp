@@ -1012,9 +1012,11 @@ void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes,
     if (!uc)
         return;
 
+    if (!uc->canInstallAutomatically()) {
+        _showManualUpdate(tag, releasePage);
+        return;
+    }
     const auto shutdownHold = _ngPost->holdShutdown();
-    const bool automatic = uc->canInstallAutomatically() && !_ngPost->hasPostingJobs()
-        && !hasUnsubmittedPosts();
     QString notesPreview = notes.left(800);
     if (notes.size() > 800)
         notesPreview += "...";
@@ -1032,20 +1034,32 @@ void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes,
     box.setTextFormat(Qt::RichText);
     box.setTextInteractionFlags(Qt::TextBrowserInteraction);
     box.setText(body);
-    QPushButton *install = box.addButton(automatic ? tr("Install and Restart")
-                                                   : tr("View release on GitHub"),
-                                         QMessageBox::AcceptRole);
+    QPushButton *install = box.addButton(tr("Install and Restart"), QMessageBox::AcceptRole);
     box.addButton(tr("Later"), QMessageBox::RejectRole);
     box.setDefaultButton(install);
     box.exec();
     if (box.clickedButton() != install)
         return;
 
-    if (!automatic) {
-        QDesktopServices::openUrl(releasePage);
-        return;
-    }
     _downloadUpdate(uc);
+}
+
+void MainWindow::_showManualUpdate(const QString &tag, const QUrl &releasePage)
+{
+    auto *label = statusBar()->findChild<QLabel *>(QStringLiteral("updateAvailableLabel"));
+    if (!label) {
+        label = new QLabel(statusBar());
+        label->setObjectName(QStringLiteral("updateAvailableLabel"));
+        label->setTextFormat(Qt::RichText);
+        label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+        label->setOpenExternalLinks(true);
+        statusBar()->addPermanentWidget(label);
+    }
+    const QString text = tr("Update available: %1").arg(tag);
+    label->setText(QStringLiteral("<a href=\"%1\" style=\"color: #ff5252;\">%2</a>")
+                       .arg(releasePage.toString().toHtmlEscaped(), text.toHtmlEscaped()));
+    label->setToolTip(releasePage.toString());
+    label->show();
 }
 
 void MainWindow::_downloadUpdate(UpdateChecker *uc)
@@ -1054,7 +1068,7 @@ void MainWindow::_downloadUpdate(UpdateChecker *uc)
     auto progressHold = std::make_shared<decltype(_ngPost->holdShutdown())>(
         _ngPost->holdShutdown());
     connect(progress, &QObject::destroyed, this, [progressHold] {});
-    progress->setWindowModality(Qt::ApplicationModal);
+    progress->setWindowModality(Qt::WindowModal);
     progress->setAttribute(Qt::WA_DeleteOnClose);
     progress->setAutoClose(false);
     progress->setAutoReset(false);

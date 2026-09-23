@@ -600,8 +600,8 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
 <context>
     <name>MainWindow</name>
     <message>
-        <source>View release on GitHub</source>
-        <translation>在 GitHub 上查看发行版</translation>
+        <source>Update available: %1</source>
+        <translation>有可用更新：%1</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>

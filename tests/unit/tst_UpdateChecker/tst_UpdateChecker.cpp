@@ -200,6 +200,14 @@ private slots:
         uninstall.close();
         QVERIFY(
             !UpdateChecker::isReplaceableInstallation(directory)); // Inno Setup owns this directory
+        QVERIFY(uninstall.remove());
+        for (const auto &name : { "ngPost.pro", "ngPost_core.pri", "Makefile", ".git" }) {
+            QFile source(directory + "/" + name);
+            QVERIFY(source.open(QIODevice::WriteOnly));
+            source.close();
+            QVERIFY(!UpdateChecker::isReplaceableInstallation(directory));
+            QVERIFY(source.remove());
+        }
     }
     void checksum_verifier_is_embedded_in_every_build() {
         QFile file(QStringLiteral(":/update/install_update.py"));

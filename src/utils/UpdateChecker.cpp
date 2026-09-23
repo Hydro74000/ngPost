@@ -65,6 +65,15 @@ bool UpdateChecker::isReplaceableInstallation(const QString &directory)
     const QFileInfo info(directory);
     const QString path = info.canonicalFilePath();
     const QFileInfo marker(directory + QStringLiteral("/.ngpost-installation"));
+    // The legacy updater overlaid ZIP/TAR contents even on source builds.
+    // Such a build can carry a copied marker without being a disposable package.
+    const QStringList buildFiles{ QStringLiteral("ngPost.pro"),
+                                  QStringLiteral("ngPost_core.pri"),
+                                  QStringLiteral("Makefile"),
+                                  QStringLiteral(".git") };
+    for (const auto &name : buildFiles)
+        if (QFileInfo::exists(directory + QLatin1Char('/') + name))
+            return false;
     // Inno Setup owns its uninstall database and optional components. A ZIP
     // directory swap would discard both; keep these installs on Setup.
     return !info.isSymLink() && !path.isEmpty() && marker.isFile() && !marker.isSymLink()

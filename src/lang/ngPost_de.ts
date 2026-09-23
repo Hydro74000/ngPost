@@ -601,8 +601,8 @@ Geben Sie eine ganze Zahl in MiB zwischen 0 und 1000000 ein (0 deaktiviert die A
 <context>
     <name>MainWindow</name>
     <message>
-        <source>View release on GitHub</source>
-        <translation>Release auf GitHub ansehen</translation>
+        <source>Update available: %1</source>
+        <translation>Update verfügbar: %1</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>

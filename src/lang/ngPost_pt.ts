@@ -600,8 +600,8 @@ Introduza um número inteiro de MiB entre 0 e 1000000 (0 desativa a divisão ape
 <context>
     <name>MainWindow</name>
     <message>
-        <source>View release on GitHub</source>
-        <translation>Ver a versão no GitHub</translation>
+        <source>Update available: %1</source>
+        <translation>Atualização disponível: %1</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>

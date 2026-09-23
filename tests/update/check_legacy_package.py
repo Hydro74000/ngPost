@@ -29,7 +29,8 @@ def running(binary):
     output = subprocess.check_output(['ps', '-axo', 'pid=,args='], text=True)
     return [int(line.strip().split(None, 1)[0]) for line in output.splitlines()
             if len(line.strip().split(None, 1)) == 2
-            and line.strip().split(None, 1)[1] == str(binary)]
+            and (line.strip().split(None, 1)[1] == str(binary)
+                 or line.strip().split(None, 1)[1].startswith(str(binary) + ' '))]
 
 
 def check(archive, client):

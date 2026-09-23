@@ -34,10 +34,10 @@ the NNTP streaming pipeline and SQLite history store.
   * Release archives are exercised by the current installer and the unmodified
     5.5.1 updater before publication; Windows Setup also validates a real upgrade.
   * Fixed Windows update failure when flushing the transaction journal.
-  * AppImage builds now announce new versions. Source builds, AppImages and
-    Setup-managed installs offer the release page for their appropriate update path.
-  * Update dialogs hold automatic shutdown; automatic replacement is not offered
-    while posting jobs or unsubmitted posts are present.
+  * Source builds, AppImages and Setup-managed installs announce updates in red
+    in the status bar, with a clickable version-specific release link. Portable
+    installations keep their existing Install and Restart popup.
+  * Update dialogs hold automatic shutdown during the update interaction.
 - Sequential Multi-Tab Posting & Global Queue Controls:
   * "Post all" button added to submit all prepared Quick Post tabs sequentially
     into a managed posting queue (_pendingJobs).

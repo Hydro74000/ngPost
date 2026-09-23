@@ -602,8 +602,8 @@ Voer een geheel aantal MiB tussen 0 en 1000000 in (0 schakelt splitsen alleen ui
 <context>
     <name>MainWindow</name>
     <message>
-        <source>View release on GitHub</source>
-        <translation>Release op GitHub bekijken</translation>
+        <source>Update available: %1</source>
+        <translation>Update beschikbaar: %1</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>

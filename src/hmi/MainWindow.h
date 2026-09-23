@@ -84,6 +84,7 @@ private:
     void _buildPostingControls();
     void _retranslate();
     void _submitPreparedTabs();
+    void _showManualUpdate(const QString &tag, const QUrl &releasePage);
     void _downloadUpdate(UpdateChecker *checker);
     bool _isPostingQueueRunning() const;
     uint _nextQuickJobNumber();

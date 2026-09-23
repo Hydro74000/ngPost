@@ -591,8 +591,8 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
 <context>
     <name>MainWindow</name>
     <message>
-        <source>View release on GitHub</source>
-        <translation>View release on GitHub</translation>
+        <source>Update available: %1</source>
+        <translation>Update available: %1</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>

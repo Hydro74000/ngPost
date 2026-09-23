@@ -593,8 +593,8 @@ Indiquez un nombre entier de Mio entre 0 et 1000000 (0 désactive le découpage 
 <context>
     <name>MainWindow</name>
     <message>
-        <source>View release on GitHub</source>
-        <translation>Voir la version sur GitHub</translation>
+        <source>Update available: %1</source>
+        <translation>Mise à jour disponible : %1</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>

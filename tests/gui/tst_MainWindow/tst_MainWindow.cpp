@@ -27,6 +27,7 @@
 #include <QStyle>
 #include <QStyleFactory>
 #include <QStatusBar>
+#include <QDesktopServices>
 
 #include "hmi/CheckBoxCenterWidget.h"
 #include "hmi/PostInfoDialog.h"
@@ -85,11 +86,22 @@
 
 using ngpost::tests::HomeSandbox;
 
+class UpdateLinkReceiver : public QObject
+{
+    Q_OBJECT
+public:
+    QUrl url;
+public slots:
+    void open(const QUrl &value) { url = value; }
+};
+
 class TestMainWindow : public QObject
 {
     Q_OBJECT
 
 private slots:
+    void manual_update_uses_red_status_link_data();
+    void manual_update_uses_red_status_link();
     void legacy_bundle_paths_become_automatic();
     void tool_paths_keep_custom_choices_and_report_missing_tools();
     //! A PAR2_PATH or RAR_PATH written before *_SOURCE existed, and gone since,
@@ -1490,6 +1502,74 @@ QString itemName(QLayoutItem *item)
 }
 
 } // namespace
+
+void TestMainWindow::manual_update_uses_red_status_link_data()
+{
+    QTest::addColumn<bool>("appimage");
+    QTest::addColumn<QString>("tag");
+    QTest::newRow("source-stable") << false << QString("v5.6");
+    QTest::newRow("appimage-stable") << true << QString("v5.6");
+    QTest::newRow("appimage-unstable") << true << QString("v5.6-unstable.20260923.200.abcdef0");
+}
+
+void TestMainWindow::manual_update_uses_red_status_link()
+{
+    QFETCH(bool, appimage);
+    QFETCH(QString, tag);
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              "GROUPS = alt.binaries.test\nCHECK_FOR_UPDATES = false\n",
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    const auto previous = qgetenv("APPIMAGE");
+    const auto restoreEnvironment = qScopeGuard([previous] {
+        if (previous.isNull())
+            qunsetenv("APPIMAGE");
+        else
+            qputenv("APPIMAGE", previous);
+    });
+    if (appimage)
+        qputenv("APPIMAGE", "/tmp/ngPost.AppImage");
+    else
+        qunsetenv("APPIMAGE");
+    bool popup = false;
+    QTimer dismissUnexpectedPopup;
+    connect(&dismissUnexpectedPopup, &QTimer::timeout, window, [&popup] {
+        if (auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
+            popup = true;
+            box->reject();
+        }
+    });
+    dismissUnexpectedPopup.start(10);
+    const QUrl release("https://github.com/Hydro74000/ngPost/releases/tag/" + tag);
+    window->onNewVersionAvailable(tag, "notes", release);
+    QVERIFY(!popup);
+    auto *label = window->statusBar()->findChild<QLabel *>("updateAvailableLabel");
+    QVERIFY(label);
+    QVERIFY(label->text().contains(tag));
+    QVERIFY(label->text().contains("color: #ff5252"));
+    QVERIFY(label->text().contains(release.toString()));
+    QVERIFY(label->openExternalLinks());
+    UpdateLinkReceiver receiver;
+    QDesktopServices::setUrlHandler("https", &receiver, "open");
+    const auto restoreHandler = qScopeGuard([] { QDesktopServices::unsetUrlHandler("https"); });
+    window->show();
+    QCoreApplication::processEvents();
+    QTest::mouseClick(label, Qt::LeftButton, Qt::NoModifier, label->rect().center());
+    QCOMPARE(receiver.url, release);
+    // A later check updates the existing status item, without accumulating labels.
+    const QString nextTag = tag + ".1";
+    const QUrl nextRelease("https://github.com/Hydro74000/ngPost/releases/tag/" + nextTag);
+    window->onNewVersionAvailable(nextTag, "", nextRelease);
+    QCOMPARE(window->statusBar()->findChildren<QLabel *>("updateAvailableLabel").size(), 1);
+    QVERIFY(label->text().contains(nextRelease.toString()));
+    QVERIFY(!popup);
+}
 
 void TestMainWindow::posting_tab_lines_are_in_the_new_order()
 {

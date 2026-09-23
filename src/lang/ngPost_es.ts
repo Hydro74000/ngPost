@@ -600,8 +600,8 @@ Introduzca un número entero de MiB entre 0 y 1000000 (0 desactiva la división 
 <context>
     <name>MainWindow</name>
     <message>
-        <source>View release on GitHub</source>
-        <translation>Ver la versión en GitHub</translation>
+        <source>Update available: %1</source>
+        <translation>Actualización disponible: %1</translation>
     </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>

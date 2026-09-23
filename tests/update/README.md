@@ -40,9 +40,9 @@ because Inno Setup writes the production AppId to the registry.
 | Linux x86_64 portable tar.gz, system Qt | In-app | Owned, writable installation; Python 3.9+ |
 | Windows x86_64 portable ZIP, bundled Qt | In-app | Owned, writable installation; Python 3.9+ |
 | macOS bundled .app ZIP | In-app | Owned, writable bundle; Python 3.9+ |
-| Windows Setup | In-app, release page | Run the new Setup; retains installer state |
-| Linux AppImage | In-app, release page | Download replacement / external AppImage updater; existing AppImage smoke and zsync metadata checks remain release gates |
-| Source builds, unbundled macOS executable, system-managed directories | In-app, release page (GUI) | Rebuild or use the package manager; no directory replacement |
+| Windows Setup | Red status-bar release link | Run the new Setup; retains installer state |
+| Linux AppImage | Red status-bar release link | Download replacement / external AppImage updater; existing AppImage smoke and zsync metadata checks remain release gates |
+| Source/build trees (including legacy copied markers), unbundled macOS executable, system-managed directories | Red status-bar release link (GUI) | Rebuild or use the package manager; no directory replacement |
 | Headless / Docker | No interactive updater | Rebuild / pull container using the existing container CI |
 
 No update is offered to a stable build for a prerelease. Stable supersedes an
