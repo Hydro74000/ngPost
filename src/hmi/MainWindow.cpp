@@ -636,7 +636,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     // same size/position (saveGeometry also captures the maximized state).
     QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
     guiSettings.setValue(kMainWindowGeometryKey, saveGeometry());
-
+    guiSettings.sync();
     // A column dragged in the last half second: its width has not been written
     // yet, and closing must not be what loses it.
     if (_historyColumnsSaveTimer && _historyColumnsSaveTimer->isActive())
@@ -3440,6 +3440,7 @@ void MainWindow::_saveLogBoxState() const
     guiSettings.setValue(kLogBoxCollapsedKey, _isLogBoxCollapsed());
     if (_lastLogBoxWidth >= 80)
         guiSettings.setValue(kLogBoxWidthKey, _lastLogBoxWidth);
+    guiSettings.sync();
 }
 
 void MainWindow::_onToggleLogBox()
@@ -3450,7 +3451,7 @@ void MainWindow::_onToggleLogBox()
 void MainWindow::_onPostSplitterMoved(int pos, int index)
 {
     Q_UNUSED(pos);
-    if (index != 1)
+    if (index != 1 || !_logBoxStateRestored)
         return;
     const int width = _ui->postSplitter->sizes().value(1);
     _logBoxCollapsed = width == 0;
@@ -3466,18 +3467,18 @@ void MainWindow::_configureWaylandSplitters()
 {
     if (!QGuiApplication::platformName().startsWith(QLatin1String("wayland")))
         return;
-    // Breeze's extended splitter hit area calls grabMouse(), unsupported for
-    // normal Wayland windows. Keep its painting, but use Qt's native handles.
-    // The proxy is owned by the style: detach its filters without deleting it.
     const auto handles = findChildren<QSplitterHandle *>();
     for (auto *proxy : findChildren<QWidget *>(QString(), Qt::FindDirectChildrenOnly)) {
-        if (!proxy->inherits("Breeze::SplitterProxy"))
+        if (proxy == centralWidget() || proxy == menuBar() || proxy == statusBar())
+            continue;
+        const QString name = QString::fromLatin1(proxy->metaObject()->className());
+        if (!name.endsWith(QLatin1String("SplitterProxy")) && !proxy->inherits("Breeze::SplitterProxy"))
             continue;
         removeEventFilter(proxy);
         for (auto *handle : handles) {
             handle->removeEventFilter(proxy);
-            auto *splitter = handle->splitter();
-            splitter->setHandleWidth(qMax(6, splitter->handleWidth()));
+            if (auto *splitter = handle->splitter())
+                splitter->setHandleWidth(qMax(6, splitter->handleWidth()));
         }
         proxy->hide();
     }
