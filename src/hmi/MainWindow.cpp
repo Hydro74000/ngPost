@@ -71,7 +71,6 @@
 #include <QToolButton>
 #include <QSizePolicy>
 #include <QSettings>
-#include <QResizeEvent>
 #include <QShowEvent>
 #include <QStatusBar>
 #include <QtCharts/QAbstractAxis>
@@ -697,6 +696,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
 void MainWindow::changeEvent(QEvent *event)
 {
     QMainWindow::changeEvent(event);
+    if (event->type() == QEvent::StyleChange)
+        QTimer::singleShot(0, this, &MainWindow::_configureWaylandSplitters);
     if (!_ngPost || !_postAllButton) return;
     if (event->type() == QEvent::LanguageChange) _retranslate();
     if (event->type() == QEvent::PaletteChange) {
@@ -3357,11 +3358,13 @@ void MainWindow::onVpnStateChanged(VpnManager::State newState)
 
 void MainWindow::_initLogBoxToggle()
 {
-    _logToggleBtn = new QToolButton(_ui->postSplitter);
+    // A direct QWidget child of QSplitter becomes another pane. Reserve a
+    // narrow strip beside the tabs so the button also survives hiding logBox.
+    _logToggleBtn = new QToolButton(_ui->fileBox);
     _logToggleBtn->setObjectName(QStringLiteral("logToggleBtn"));
     _logToggleBtn->setFixedSize(14, 38);
     _logToggleBtn->setCursor(Qt::PointingHandCursor);
-    _logToggleBtn->setFocusPolicy(Qt::NoFocus);
+    _logToggleBtn->setFocusPolicy(Qt::StrongFocus);
     _logToggleBtn->setStyleSheet(QStringLiteral("QToolButton#logToggleBtn {"
                                                 "  border: none;"
                                                 "  background: transparent;"
@@ -3378,25 +3381,26 @@ void MainWindow::_initLogBoxToggle()
 
     connect(_logToggleBtn, &QToolButton::clicked, this, &MainWindow::_onToggleLogBox);
     connect(_ui->postSplitter, &QSplitter::splitterMoved, this, &MainWindow::_onPostSplitterMoved);
-    connect(_ui->vSplitter, &QSplitter::splitterMoved, this, &MainWindow::_updateLogToggleBtnGeometry);
+    _ui->verticalLayout_3->removeWidget(_ui->postTabWidget);
+    auto *layout = new QHBoxLayout;
+    layout->setSpacing(0);
+    layout->addWidget(_ui->postTabWidget, 1);
+    layout->addWidget(_logToggleBtn, 0, Qt::AlignVCenter);
+    _ui->verticalLayout_3->addLayout(layout);
 
     QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
-    const bool collapsed = guiSettings.value(kLogBoxCollapsedKey, true).toBool();
+    _logBoxCollapsed = guiSettings.value(kLogBoxCollapsedKey, true).toBool();
     _lastLogBoxWidth = guiSettings.value(kLogBoxWidthKey, 250).toInt();
     if (_lastLogBoxWidth < 80)
         _lastLogBoxWidth = 250;
 
-    _setLogBoxCollapsed(collapsed, false);
+    _ui->logBox->setVisible(!_logBoxCollapsed);
+    _updateLogToggleBtn();
 }
 
 bool MainWindow::_isLogBoxCollapsed() const
 {
-    if (!_ui || !_ui->postSplitter || !_ui->logBox)
-        return false;
-    if (_ui->logBox->isHidden())
-        return true;
-    const QList<int> s = _ui->postSplitter->sizes();
-    return s.size() >= 2 && s.at(1) <= 0;
+    return _logBoxCollapsed;
 }
 
 void MainWindow::_updateLogToggleBtn()
@@ -3409,56 +3413,23 @@ void MainWindow::_updateLogToggleBtn()
     _logToggleBtn->setAccessibleName(collapsed ? tr("Open Posting Log") : tr("Close Posting Log"));
 }
 
-void MainWindow::_updateLogToggleBtnGeometry()
-{
-    if (!_logToggleBtn || !_ui || !_ui->postSplitter)
-        return;
-
-    const int totalW = _ui->postSplitter->width();
-    const int totalH = _ui->postSplitter->height();
-    if (totalW <= 0 || totalH <= 0)
-        return;
-
-    constexpr int kBtnW = 14;
-    constexpr int kBtnH = 38;
-    const int y = qMax(0, (totalH - kBtnH) / 2);
-
-    int x = 0;
-    if (_isLogBoxCollapsed()) {
-        x = qMax(0, totalW - kBtnW);
-    } else {
-        QSplitterHandle *handle = _ui->postSplitter->handle(1);
-        if (handle && handle->isVisible())
-            x = handle->x() + (handle->width() - kBtnW) / 2;
-        else
-            x = _ui->fileBox->width() + (_ui->postSplitter->handleWidth() - kBtnW) / 2;
-    }
-    _logToggleBtn->setGeometry(x, y, kBtnW, kBtnH);
-    _logToggleBtn->raise();
-}
-
 void MainWindow::_setLogBoxCollapsed(bool collapsed, bool saveSetting)
 {
-    if (collapsed) {
-        if (!_ui->logBox->isHidden() && _ui->logBox->width() >= 80)
-            _lastLogBoxWidth = _ui->logBox->width();
-        _ui->logBox->hide();
-        const int total = _ui->postSplitter->width();
-        if (total > 0)
-            _ui->postSplitter->setSizes({ total, 0 });
-    } else {
-        _ui->logBox->show();
-        const int total = _ui->postSplitter->width();
-        int w = _lastLogBoxWidth;
-        if (w < 80)
-            w = (total > 0) ? qMax(200, total / 4) : 250;
-        if (total > 0 && w >= total - 100)
-            w = qMax(100, total / 4);
-        if (total > 0)
-            _ui->postSplitter->setSizes({ qMax(0, total - w), w });
+    if (_logBoxStateRestored) {
+        const int currentWidth = _ui->postSplitter->sizes().value(1);
+        if (collapsed && !_logBoxCollapsed && currentWidth > 0)
+            _lastLogBoxWidth = currentWidth;
+        // Hiding releases the log's minimum width on smaller screens. The
+        // toggle belongs to fileBox and remains available beside the tabs.
+        _ui->logBox->setVisible(!collapsed);
+        const int total = _ui->postSplitter->width()
+            - (collapsed ? 0 : _ui->postSplitter->handleWidth());
+        const int available = qMax(1, total - _ui->fileBox->minimumSizeHint().width());
+        const int width = collapsed ? 0 : qMin(_lastLogBoxWidth, available);
+        _ui->postSplitter->setSizes({ qMax(1, total - width), width });
     }
+    _logBoxCollapsed = collapsed;
     _updateLogToggleBtn();
-    _updateLogToggleBtnGeometry();
     if (saveSetting)
         _saveLogBoxState();
 }
@@ -3479,30 +3450,48 @@ void MainWindow::_onToggleLogBox()
 void MainWindow::_onPostSplitterMoved(int pos, int index)
 {
     Q_UNUSED(pos);
-    if (index == 1) {
-        if (!_ui->logBox->isHidden()) {
-            const int w = _ui->postSplitter->sizes().value(1, 0);
-            if (w < 30) {
-                _setLogBoxCollapsed(true, true);
-            } else {
-                _lastLogBoxWidth = w;
-                _saveLogBoxState();
-                _updateLogToggleBtnGeometry();
-            }
-        }
-    }
+    if (index != 1)
+        return;
+    const int width = _ui->postSplitter->sizes().value(1);
+    _logBoxCollapsed = width == 0;
+    if (_logBoxCollapsed)
+        _ui->logBox->hide();
+    if (width > 0)
+        _lastLogBoxWidth = width;
+    _updateLogToggleBtn();
+    _saveLogBoxState();
 }
 
-void MainWindow::resizeEvent(QResizeEvent *event)
+void MainWindow::_configureWaylandSplitters()
 {
-    QMainWindow::resizeEvent(event);
-    _updateLogToggleBtnGeometry();
+    if (!QGuiApplication::platformName().startsWith(QLatin1String("wayland")))
+        return;
+    // Breeze's extended splitter hit area calls grabMouse(), unsupported for
+    // normal Wayland windows. Keep its painting, but use Qt's native handles.
+    // The proxy is owned by the style: detach its filters without deleting it.
+    const auto handles = findChildren<QSplitterHandle *>();
+    for (auto *proxy : findChildren<QWidget *>(QString(), Qt::FindDirectChildrenOnly)) {
+        if (!proxy->inherits("Breeze::SplitterProxy"))
+            continue;
+        removeEventFilter(proxy);
+        for (auto *handle : handles) {
+            handle->removeEventFilter(proxy);
+            auto *splitter = handle->splitter();
+            splitter->setHandleWidth(qMax(6, splitter->handleWidth()));
+        }
+        proxy->hide();
+    }
 }
 
 void MainWindow::showEvent(QShowEvent *event)
 {
     QMainWindow::showEvent(event);
-    _updateLogToggleBtnGeometry();
+    _configureWaylandSplitters();
+    if (!_logBoxStateRestored) {
+        // Restore once the window has its actual layout, not Designer's placeholder geometry.
+        _logBoxStateRestored = true;
+        _setLogBoxCollapsed(_logBoxCollapsed, false);
+    }
 }
 
 

@@ -23,6 +23,9 @@
 #include <QClipboard>
 #include <QCheckBox>
 #include <QToolButton>
+#include <QSplitter>
+#include <QStyle>
+#include <QStyleFactory>
 #include <QStatusBar>
 
 #include "hmi/CheckBoxCenterWidget.h"
@@ -420,6 +423,8 @@ private slots:
     void canceled_job_ignores_queued_file_notifications();
     void post_splitter_log_toggle_button_collapses_and_restores();
     void log_box_auto_opens_on_error_and_persists_state();
+    void posting_panes_remain_resizable();
+    void log_box_restores_width_after_restart();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -6981,19 +6986,34 @@ void TestMainWindow::post_splitter_log_toggle_button_collapses_and_restores()
 
     QToolButton *btn = window->logToggleBtnForTest();
     QVERIFY(btn);
+    auto *splitter = window->findChild<QSplitter *>("postSplitter");
+    QVERIFY(splitter);
+    QCOMPARE(splitter->count(), 2);
+    QVERIFY(btn->isVisible());
+    QCOMPARE(window->childAt(btn->mapTo(window, btn->rect().center())), btn);
     // Collapsed by default on fresh boot
     QVERIFY(window->isLogBoxCollapsedForTest());
     QCOMPARE(btn->arrowType(), Qt::LeftArrow);
     QCOMPARE(btn->toolTip(), MainWindow::tr("Open Posting Log"));
 
-    btn->click();
+    QTest::mouseClick(window->windowHandle(),
+                      Qt::LeftButton,
+                      Qt::NoModifier,
+                      btn->mapTo(window, btn->rect().center()));
     QCoreApplication::processEvents();
+    QVERIFY(btn->isVisible());
+    QCOMPARE(window->childAt(btn->mapTo(window, btn->rect().center())), btn);
     QVERIFY(!window->isLogBoxCollapsedForTest());
     QCOMPARE(btn->arrowType(), Qt::RightArrow);
     QCOMPARE(btn->toolTip(), MainWindow::tr("Close Posting Log"));
 
-    btn->click();
+    QTest::mouseClick(window->windowHandle(),
+                      Qt::LeftButton,
+                      Qt::NoModifier,
+                      btn->mapTo(window, btn->rect().center()));
     QCoreApplication::processEvents();
+    QVERIFY(btn->isVisible());
+    QCOMPARE(window->childAt(btn->mapTo(window, btn->rect().center())), btn);
     QVERIFY(window->isLogBoxCollapsedForTest());
     QCOMPARE(btn->arrowType(), Qt::LeftArrow);
     QCOMPARE(btn->toolTip(), MainWindow::tr("Open Posting Log"));
@@ -7039,4 +7059,124 @@ void TestMainWindow::log_box_auto_opens_on_error_and_persists_state()
     window3->show();
     QCoreApplication::processEvents();
     QVERIFY(window3->isLogBoxCollapsedForTest());
+}
+
+void TestMainWindow::posting_panes_remain_resizable()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 3, 0)
+    QTest::failOnWarning("This plugin supports grabbing the mouse only for popup windows");
+#endif
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    window->resize(2000, 1100);
+    window->show();
+    QCoreApplication::processEvents();
+
+    auto *vertical = window->findChild<QSplitter *>("vSplitter");
+    auto *posting = window->findChild<QSplitter *>("postSplitter");
+    QVERIFY(vertical);
+    QVERIFY(posting);
+    QCOMPARE(posting->count(), 2);
+    QVERIFY(posting->maximumHeight() > 1000);
+    QVERIFY(vertical->sizes().at(0) < vertical->sizes().at(1));
+    const auto drag = [window](QSplitterHandle *handle, const QPoint &delta) {
+        const QPoint point = handle->orientation() == Qt::Horizontal
+            ? QPoint(handle->width() / 2, 10)
+            : QPoint(10, handle->height() / 2);
+        const QPoint start = handle->mapTo(window, point);
+        QTest::mousePress(window->windowHandle(), Qt::LeftButton, Qt::NoModifier, start);
+        QTest::mouseMove(window->windowHandle(), start + delta);
+        QTest::mouseRelease(window->windowHandle(), Qt::LeftButton, Qt::NoModifier, start + delta);
+        QCoreApplication::processEvents();
+    };
+    const int originalHeight = vertical->sizes().at(0);
+    drag(vertical->handle(1), QPoint(0, 80));
+    QVERIFY(vertical->sizes().at(0) > originalHeight + 40);
+    // Reload the active style: KDE reinstalls its splitter input filters.
+    const QString styleName = QApplication::style()->objectName();
+    auto *reloadedStyle = QStyleFactory::create(styleName);
+    QVERIFY(reloadedStyle);
+    QApplication::setStyle(reloadedStyle);
+    QCoreApplication::processEvents();
+    QCOMPARE(QApplication::style()->objectName(), styleName);
+    drag(vertical->handle(1), QPoint(0, -80));
+    QVERIFY(qAbs(vertical->sizes().at(0) - originalHeight) < 10);
+
+    window->logToggleBtnForTest()->click();
+    QCoreApplication::processEvents();
+    const int originalWidth = posting->sizes().at(1);
+    drag(posting->handle(1), QPoint(-80, 0));
+    QVERIFY(posting->sizes().at(1) > originalWidth + 40);
+    const int expandedWidth = posting->sizes().at(1);
+    window->logToggleBtnForTest()->click();
+    window->resize(2100, 1200);
+    QCoreApplication::processEvents();
+    auto *button = window->logToggleBtnForTest();
+    QVERIFY(button->isVisible());
+    QCOMPARE(window->childAt(button->mapTo(window, button->rect().center())), button);
+    QTest::mouseClick(window->windowHandle(),
+                      Qt::LeftButton,
+                      Qt::NoModifier,
+                      button->mapTo(window, button->rect().center()));
+    QCoreApplication::processEvents();
+    QVERIFY(qAbs(posting->sizes().at(1) - expandedWidth) < 10);
+    const int openMinimumWidth = window->minimumSizeHint().width();
+    drag(posting->handle(1), QPoint(posting->sizes().at(1) + posting->handleWidth() / 2, 0));
+    QVERIFY(window->isLogBoxCollapsedForTest());
+    QCOMPARE(button->arrowType(), Qt::LeftArrow);
+    QVERIFY(button->isVisible());
+    QVERIFY(window->minimumSizeHint().width() < openMinimumWidth);
+    window->resize(window->minimumSizeHint());
+    QCoreApplication::processEvents();
+    QCOMPARE(window->childAt(button->mapTo(window, button->rect().center())), button);
+    QTest::mouseClick(window->windowHandle(),
+                      Qt::LeftButton,
+                      Qt::NoModifier,
+                      button->mapTo(window, button->rect().center()));
+    QCoreApplication::processEvents();
+    QVERIFY(!window->isLogBoxCollapsedForTest());
+    QVERIFY(posting->sizes().at(1) > 0);
+}
+
+void TestMainWindow::log_box_restores_width_after_restart()
+{
+    HomeSandbox sandbox;
+    QDir().mkpath(PathHelper::configDir());
+    QSettings settings(PathHelper::configDir() + "/ngPost_gui.ini", QSettings::IniFormat);
+    settings.setValue("MainWindow/logBoxCollapsed", true);
+    settings.setValue("MainWindow/logBoxWidth", 420);
+    settings.sync();
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    window->resize(2000, 1100);
+    window->show();
+    QCoreApplication::processEvents();
+    auto *splitter = window->findChild<QSplitter *>("postSplitter");
+    QVERIFY(splitter);
+    QVERIFY(window->isLogBoxCollapsedForTest());
+    window->logToggleBtnForTest()->click();
+    QCoreApplication::processEvents();
+    QVERIFY(qAbs(splitter->sizes().at(1) - 420) < 10);
+
+    NgPost ngPost2(argc, argv);
+    auto *window2 = bootWindow(ngPost2, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window2, qPrintable(error));
+    window2->resize(2000, 1100);
+    window2->show();
+    QCoreApplication::processEvents();
+    QVERIFY(!window2->isLogBoxCollapsedForTest());
+    auto *splitter2 = window2->findChild<QSplitter *>("postSplitter");
+    QVERIFY(splitter2);
+    QVERIFY(qAbs(splitter2->sizes().at(1) - 420) < 10);
 }

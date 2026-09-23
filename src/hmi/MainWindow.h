@@ -45,7 +45,6 @@ class QLineEdit;
 class QMenu;
 class QPushButton;
 class QToolButton;
-class QResizeEvent;
 class QShowEvent;
 class QTableWidget;
 class QTabWidget;
@@ -276,8 +275,7 @@ protected:
     void dropEvent(QDropEvent *e) override;
 
     void closeEvent(QCloseEvent *event) override;
-    void changeEvent(QEvent* event) override;
-    void resizeEvent(QResizeEvent *event) override;
+    void changeEvent(QEvent *event) override;
     void showEvent(QShowEvent *event) override;
 
 public slots:
@@ -418,9 +416,9 @@ private:
     void _fillTabContextMenu(QMenu &menu, int tabIndex);
     void _applyStartupTab();
 
+    void _configureWaylandSplitters();
     void _initLogBoxToggle();
     void _updateLogToggleBtn();
-    void _updateLogToggleBtnGeometry();
     bool _isLogBoxCollapsed() const;
     void _setLogBoxCollapsed(bool collapsed, bool saveSetting = true);
     void _onToggleLogBox();
@@ -429,6 +427,8 @@ private:
 
     QToolButton *_logToggleBtn = nullptr;
     int _lastLogBoxWidth = 250;
+    bool _logBoxCollapsed = true;
+    bool _logBoxStateRestored = false;
 
 
     static const QString sGroupBoxStyle;

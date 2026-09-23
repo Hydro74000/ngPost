@@ -795,15 +795,18 @@
 63	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryStats()
 66	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTab()
 51	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTable( QSplitter * histSplitter)
+20	src/hmi/MainWindow.cpp	MainWindow::_configureWaylandSplitters()
 66	src/hmi/MainWindow.cpp	MainWindow::_connectHistoryControls()
 12	src/hmi/MainWindow.cpp	MainWindow::_connectPostingWidget( PostingWidget * post)
 21	src/hmi/MainWindow.cpp	MainWindow::_fillTabContextMenu( QMenu & menu , int tabIndex)
 28	src/hmi/MainWindow.cpp	MainWindow::_fitHistoryColumns( bool toContents)
 7	src/hmi/MainWindow.cpp	MainWindow::_getPostWidget( int tabIndex) const
 10	src/hmi/MainWindow.cpp	MainWindow::_getPostWidgetIndex( PostingWidget * postWidget) const
+41	src/hmi/MainWindow.cpp	MainWindow::_initLogBoxToggle()
 82	src/hmi/MainWindow.cpp	MainWindow::_initPostingBox()
 19	src/hmi/MainWindow.cpp	MainWindow::_initServerBox()
 67	src/hmi/MainWindow.cpp	MainWindow::_insertBoundedLogText( const QString & text , bool startNewBlock , const QTextCharFormat & format) const
+4	src/hmi/MainWindow.cpp	MainWindow::_isLogBoxCollapsed() const
 63	src/hmi/MainWindow.cpp	MainWindow::_onHistoryContextMenu( const QPoint & pos)
 14	src/hmi/MainWindow.cpp	MainWindow::_onHistoryCopyPassword()
 44	src/hmi/MainWindow.cpp	MainWindow::_onHistoryDeleteEntry()
@@ -818,6 +821,7 @@
 36	src/hmi/MainWindow.cpp	MainWindow::_onHistoryRegenNzb()
 6	src/hmi/MainWindow.cpp	MainWindow::_onHistoryResumePost()
 32	src/hmi/MainWindow.cpp	MainWindow::_onHistoryRowSelected( int row)
+14	src/hmi/MainWindow.cpp	MainWindow::_onPostSplitterMoved( int pos , int index)
 23	src/hmi/MainWindow.cpp	MainWindow::_onResumeAbandon()
 23	src/hmi/MainWindow.cpp	MainWindow::_onResumeDeleteEntries()
 10	src/hmi/MainWindow.cpp	MainWindow::_onResumeIgnore()
@@ -833,6 +837,7 @@
 120	src/hmi/MainWindow.cpp	MainWindow::_retranslateHistoryTab()
 9	src/hmi/MainWindow.cpp	MainWindow::_saveHistoryColumns()
 10	src/hmi/MainWindow.cpp	MainWindow::_serverRow( QObject * delButton)
+20	src/hmi/MainWindow.cpp	MainWindow::_setLogBoxCollapsed( bool collapsed , bool saveSetting)
 67	src/hmi/MainWindow.cpp	MainWindow::_showHistoryDetails( const PostHistoryStore :: PostDetails & details)
 38	src/hmi/MainWindow.cpp	MainWindow::_showUnattributedVpnDecision()
 35	src/hmi/MainWindow.cpp	MainWindow::_startResumePost( qint64 postId , bool askConfirmation)
@@ -840,7 +845,8 @@
 33	src/hmi/MainWindow.cpp	MainWindow::_trimLogPane() const
 22	src/hmi/MainWindow.cpp	MainWindow::addNewQuickTab( int lastTabIdx , const QFileInfoList & files)
 4	src/hmi/MainWindow.cpp	MainWindow::buildHistoryTabForTest()
-11	src/hmi/MainWindow.cpp	MainWindow::changeEvent( QEvent * event)
+# changeEvent: +2 lines to reapply the Wayland splitter fix after a style change.
+13	src/hmi/MainWindow.cpp	MainWindow::changeEvent( QEvent * event)
 14	src/hmi/MainWindow.cpp	MainWindow::clearJobTab( QWidget * postWidget)
 63	src/hmi/MainWindow.cpp	MainWindow::closeEvent( QCloseEvent * event)
 26	src/hmi/MainWindow.cpp	MainWindow::closeTab( PostingWidget * postWidget)
@@ -891,6 +897,7 @@
 4	src/hmi/MainWindow.cpp	MainWindow::setJobLabel( int jobNumber)
 7	src/hmi/MainWindow.cpp	MainWindow::setPauseIcon( bool pause)
 12	src/hmi/MainWindow.cpp	MainWindow::setTab( QWidget * postWidget)
+10	src/hmi/MainWindow.cpp	MainWindow::showEvent( QShowEvent * event)
 4	src/hmi/MainWindow.cpp	MainWindow::toBeImplemented()
 6	src/hmi/MainWindow.cpp	MainWindow::updateAutoPostingParams()
 26	src/hmi/MainWindow.cpp	MainWindow::updateConfigFromUi()
