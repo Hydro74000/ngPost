@@ -3523,8 +3523,8 @@ const QString MainWindow::sTabWidgetStyle = "\
             border-bottom-color: palette(window);\
             border-top-left-radius: 4px;\
             border-top-right-radius: 4px;\
-            min-width: 8ex;\
-            padding: 2px;\
+            min-width: 10ex;\
+            padding: 0.35em 0.8em;\
         }\
         QTabBar::tab:selected, QTabBar::tab:hover {\
             background: palette(window);\
