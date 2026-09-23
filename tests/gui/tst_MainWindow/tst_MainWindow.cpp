@@ -7074,7 +7074,7 @@ void TestMainWindow::posting_panes_remain_resizable()
     QString error;
     auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
     QVERIFY2(window, qPrintable(error));
-    window->resize(1800, 950);
+    window->resize(2500, 950);
     window->show();
     QCoreApplication::processEvents();
 
@@ -7115,7 +7115,7 @@ void TestMainWindow::posting_panes_remain_resizable()
     QVERIFY(posting->sizes().at(1) > originalWidth + 40);
     const int expandedWidth = posting->sizes().at(1);
     window->logToggleBtnForTest()->click();
-    window->resize(1900, 1000);
+    window->resize(2500, 1000);
     QCoreApplication::processEvents();
     auto *button = window->logToggleBtnForTest();
     QVERIFY(button->isVisible());
@@ -7159,7 +7159,7 @@ void TestMainWindow::log_box_restores_width_after_restart()
     QString error;
     auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
     QVERIFY2(window, qPrintable(error));
-    window->resize(1800, 950);
+    window->resize(2500, 950);
     window->show();
     QCoreApplication::processEvents();
     auto *splitter = window->findChild<QSplitter *>("postSplitter");
@@ -7172,7 +7172,7 @@ void TestMainWindow::log_box_restores_width_after_restart()
     NgPost ngPost2(argc, argv);
     auto *window2 = bootWindow(ngPost2, "GROUPS = alt.binaries.test\n", &error);
     QVERIFY2(window2, qPrintable(error));
-    window2->resize(1800, 950);
+    window2->resize(2500, 950);
     window2->show();
     QCoreApplication::processEvents();
     QVERIFY(!window2->isLogBoxCollapsedForTest());
