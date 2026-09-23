@@ -3472,7 +3472,8 @@ void MainWindow::_configureWaylandSplitters()
         if (proxy == centralWidget() || proxy == menuBar() || proxy == statusBar())
             continue;
         const QString name = QString::fromLatin1(proxy->metaObject()->className());
-        if (!name.endsWith(QLatin1String("SplitterProxy")) && !proxy->inherits("Breeze::SplitterProxy"))
+        if (!name.endsWith(QLatin1String("SplitterProxy"))
+            && !proxy->inherits("Breeze::SplitterProxy"))
             continue;
         removeEventFilter(proxy);
         for (auto *handle : handles) {

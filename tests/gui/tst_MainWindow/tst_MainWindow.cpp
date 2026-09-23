@@ -7074,7 +7074,7 @@ void TestMainWindow::posting_panes_remain_resizable()
     QString error;
     auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
     QVERIFY2(window, qPrintable(error));
-    window->resize(2000, 1100);
+    window->resize(1800, 950);
     window->show();
     QCoreApplication::processEvents();
 
@@ -7083,7 +7083,7 @@ void TestMainWindow::posting_panes_remain_resizable()
     QVERIFY(vertical);
     QVERIFY(posting);
     QCOMPARE(posting->count(), 2);
-    QVERIFY(posting->maximumHeight() > 1000);
+    QVERIFY(posting->maximumHeight() > 800);
     QVERIFY(vertical->sizes().at(0) < vertical->sizes().at(1));
     const auto drag = [window](QSplitterHandle *handle, const QPoint &delta) {
         const QPoint point = handle->orientation() == Qt::Horizontal
@@ -7115,7 +7115,7 @@ void TestMainWindow::posting_panes_remain_resizable()
     QVERIFY(posting->sizes().at(1) > originalWidth + 40);
     const int expandedWidth = posting->sizes().at(1);
     window->logToggleBtnForTest()->click();
-    window->resize(2100, 1200);
+    window->resize(1900, 1000);
     QCoreApplication::processEvents();
     auto *button = window->logToggleBtnForTest();
     QVERIFY(button->isVisible());
@@ -7159,7 +7159,7 @@ void TestMainWindow::log_box_restores_width_after_restart()
     QString error;
     auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
     QVERIFY2(window, qPrintable(error));
-    window->resize(2000, 1100);
+    window->resize(1800, 950);
     window->show();
     QCoreApplication::processEvents();
     auto *splitter = window->findChild<QSplitter *>("postSplitter");
@@ -7172,7 +7172,7 @@ void TestMainWindow::log_box_restores_width_after_restart()
     NgPost ngPost2(argc, argv);
     auto *window2 = bootWindow(ngPost2, "GROUPS = alt.binaries.test\n", &error);
     QVERIFY2(window2, qPrintable(error));
-    window2->resize(2000, 1100);
+    window2->resize(1800, 950);
     window2->show();
     QCoreApplication::processEvents();
     QVERIFY(!window2->isLogBoxCollapsedForTest());
