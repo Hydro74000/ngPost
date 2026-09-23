@@ -41,7 +41,8 @@ the NNTP streaming pipeline and SQLite history store.
   * Update dialogs hold automatic shutdown during the update interaction.
 - Sequential Multi-Tab Posting & Global Queue Controls:
   * "Post all" button added to submit all prepared Quick Post tabs sequentially
-    into a managed posting queue (_pendingJobs).
+    into a managed posting queue (_pendingJobs), automatically focusing the first
+    submitting tab.
   * Global Pause, Resume, and Stop controls added in the header to safely pause
     or cancel running and queued tasks across all tabs.
   * Harmonized control styling with compact 16x16 circular action icons (stop,
@@ -83,9 +84,10 @@ the NNTP streaming pipeline and SQLite history store.
   * Comprehensive interface scaling from 80% to 150%: dynamically scales typography,
     buttons, inputs, spinboxes, headers, and table row heights across all tabs.
   * Debounced persistence in ngPost.conf (UI_ZOOM) restoring user zoom preference across
-    sessions.
+    sessions, saved silently without cluttering the activity log.
   * Proportional tab dimensions and padding (em/ex metrics) adapting gracefully to
-    custom font scaling and High-DPI screens.
+    custom font scaling and High-DPI screens, with tab bar height and scroll buttons
+    dynamically matching corner posting controls.
 - Inline Clipboard Copy Actions:
   * Quick-copy buttons with animated tooltips added to generated NZB name and
     archive password fields.
@@ -331,9 +333,26 @@ sécurité VPN et de l'isolation des identifiants.
 
 --- Nouveautés et suppressions ---
 
+- Validation et fiabilité de la mise à jour intégrée :
+  * Les tests natifs sous Linux, Windows et macOS couvrent désormais la notification,
+    la vérification du téléchargement, le passage de témoin entre processus (handoff),
+    le remplacement des fichiers, le redémarrage et la restauration (rollback).
+  * Les archives de publication sont testées avec le programme d'installation actuel
+    ainsi qu'avec l'ancien outil 5.5.1 non modifié avant publication ; l'installeur
+    Windows valide également une mise à niveau réelle.
+  * Correction des échecs de mise à jour sous Windows lors du vidage du journal de
+    transaction ou de l'héritage du dossier d'installation comme répertoire de travail
+    de l'installeur détaché.
+  * Les versions compilées depuis les sources, les paquets AppImage et les installations
+    gérées par l'installeur annoncent les mises à jour en rouge dans la barre d'état, avec
+    un lien cliquable vers la release correspondante. Les installations portables conservent
+    leur boîte de dialogue d'installation et de redémarrage.
+  * Les dialogues de mise à jour suspendent l'extinction automatique du système durant
+    l'interaction utilisateur.
 - Envoi séquentiel multi-onglets & contrôles globaux de file :
   * Ajout du bouton « Poster tout » pour soumettre séquentiellement l'ensemble des
-    onglets « Post rapide » préparés dans une file d'attente gérée (_pendingJobs).
+    onglets « Post rapide » préparés dans une file d'attente gérée (_pendingJobs),
+    en donnant automatiquement le focus au premier onglet soumis.
   * Ajout de commandes globales Pause, Reprise et Stop dans l'en-tête permettant
     de suspendre ou d'interrompre l'ensemble des posts actifs et en attente.
   * Harmonisation visuelle des contrôles avec des icônes circulaires compactes 16x16
@@ -378,9 +397,11 @@ sécurité VPN et de l'isolation des identifiants.
     taille des polices, boutons, champs de saisie, spinboxes, en-têtes et hauteur des lignes
     de tableaux sur l'ensemble des onglets.
   * Mémorisation temporisée dans ngPost.conf (UI_ZOOM) restituant le niveau de zoom choisi
-    à chaque démarrage.
+    à chaque démarrage, enregistrée silencieusement sans polluer le journal d'activité.
   * Dimensions et marges des onglets dimensionnées proportionnellement aux métriques de police
-    (unités em/ex) pour un rendu net et homogène sur les écrans haute densité (HiDPI).
+    (unités em/ex) pour un rendu net et homogène sur les écrans haute densité (HiDPI), avec
+    alignement dynamique de la hauteur de la barre et des boutons de défilement sur les
+    contrôles d'envoi.
 - Boutons de copie rapide dans le presse-papiers :
   * Boutons de copie inline avec infobulle et confirmation visuelle pour le nom du
     fichier NZB et le mot de passe de l'archive.
