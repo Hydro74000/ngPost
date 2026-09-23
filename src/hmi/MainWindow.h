@@ -47,6 +47,8 @@ class QMenu;
 class QPushButton;
 class QSlider;
 class QToolButton;
+class QFrame;
+class QResizeEvent;
 class QShowEvent;
 class QTableWidget;
 class QTabWidget;
@@ -253,7 +255,7 @@ public:
     void closeTab(PostingWidget *postWidget);
 
     QToolButton *zoomButton() const { return _zoomBtn; }
-    QWidget *zoomPopup() const { return _zoomPopup; }
+    QFrame *zoomPopup() const { return _zoomPopup; }
     QSlider *zoomSlider() const { return _zoomSlider; }
     void applyUiZoom(int percent, bool userInteractive = false);
 
@@ -284,6 +286,7 @@ protected:
     void closeEvent(QCloseEvent *event) override;
     void changeEvent(QEvent *event) override;
     void showEvent(QShowEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 public slots:
     void onSetProgressBarRange(int nbArticles);
@@ -435,6 +438,9 @@ private:
     void _initZoomControl();
     void _createZoomPopup();
     void _toggleZoomPopup();
+    void _repositionZoomPopup();
+    void _scaleWidgetChildren(QWidget *parent, qreal scale, const QFont &font);
+    void _scaleTables(int rowHeight);
 
     QToolButton *_logToggleBtn = nullptr;
     int _lastLogBoxWidth = 250;
@@ -442,7 +448,7 @@ private:
     bool _logBoxStateRestored = false;
 
     QToolButton *_zoomBtn = nullptr;
-    QWidget *_zoomPopup = nullptr;
+    QFrame *_zoomPopup = nullptr;
     QSlider *_zoomSlider = nullptr;
     QLabel *_zoomValueLabel = nullptr;
     QTimer *_zoomSaveTimer = nullptr;

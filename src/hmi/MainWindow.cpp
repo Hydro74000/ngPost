@@ -595,9 +595,34 @@ bool MainWindow::hasAutoCompress() const
     return _ui->autoCompressCB->isChecked();
 }
 
+#include <QGraphicsDropShadowEffect>
 #include <QKeyEvent>
+#include <QMouseEvent>
+#include <QResizeEvent>
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
+    if (_zoomPopup && _zoomPopup->isVisible()) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            auto *mouseEvent = static_cast<QMouseEvent *>(event);
+            QWidget *clickedWidget = QApplication::widgetAt(mouseEvent->globalPosition().toPoint());
+            const bool insidePopup = (clickedWidget == _zoomPopup)
+                || (_zoomPopup && _zoomPopup->isAncestorOf(clickedWidget));
+            const bool insideBtn = (clickedWidget == _zoomBtn)
+                || (_zoomBtn && _zoomBtn->isAncestorOf(clickedWidget));
+            if (!insidePopup && !insideBtn) {
+                _zoomPopup->hide();
+                qApp->removeEventFilter(this);
+            }
+        } else if (event->type() == QEvent::KeyPress) {
+            auto *keyEvent = static_cast<QKeyEvent *>(event);
+            if (keyEvent->key() == Qt::Key_Escape) {
+                _zoomPopup->hide();
+                qApp->removeEventFilter(this);
+                return true;
+            }
+        }
+    }
+
     if (event->type() == QEvent::Resize && _historyTable && obj == _historyTable->viewport())
         _fitHistoryColumns(false);
 
@@ -612,6 +637,13 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
             postWidget->handleKeyEvent(keyEvent);
     }
     return QObject::eventFilter(obj, event);
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    if (_zoomPopup && _zoomPopup->isVisible())
+        _repositionZoomPopup();
 }
 
 #include <QMimeData>
@@ -2060,6 +2092,8 @@ PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &f
         lastTabIdx = _ui->postTabWidget->count() -1;
     PostingWidget *newPostingWidget = new PostingWidget(_ngPost, this, _nextQuickJobNumber());
     newPostingWidget->init();
+    if (_ngPost && _ngPost->uiZoom() != 100)
+        _scaleWidgetChildren(newPostingWidget, _ngPost->uiZoom() / 100.0, font());
     _connectPostingWidget(newPostingWidget);
     QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(newPostingWidget->displayNumber());
     _ui->postTabWidget->insertTab(lastTabIdx,
@@ -3501,32 +3535,25 @@ void MainWindow::_initZoomControl()
 
 void MainWindow::_createZoomPopup()
 {
-    _zoomPopup = new QFrame(this, Qt::Tool | Qt::FramelessWindowHint);
+    _zoomPopup = new QFrame(this);
     _zoomPopup->setObjectName(QStringLiteral("zoomPopup"));
-    _zoomPopup->setStyleSheet(
-        QStringLiteral("QFrame#zoomPopup {"
-                       "  background-color: #2b2b2b;"
-                       "  border: 1px solid #555555;"
-                       "  border-radius: 6px;"
-                       "}"
-                       "QLabel { color: #e0e0e0; }"
-                       "QPushButton#zoomResetBtn {"
-                       "  border: 1px solid #555555;"
-                       "  border-radius: 3px;"
-                       "  background-color: #3a3a3a;"
-                       "  color: #e0e0e0;"
-                       "  padding: 1px 6px;"
-                       "  font-size: 11px;"
-                       "}"
-                       "QPushButton#zoomResetBtn:hover { background-color: #4a4a4a; }"
-                       "QToolButton#zoomStepBtn {"
-                       "  border: 1px solid #555555;"
-                       "  border-radius: 3px;"
-                       "  background-color: #3a3a3a;"
-                       "  color: #e0e0e0;"
-                       "  font-weight: bold;"
-                       "}"
-                       "QToolButton#zoomStepBtn:hover { background-color: #4a4a4a; }"));
+    _zoomPopup->setStyleSheet(QStringLiteral(
+        "QFrame#zoomPopup { background-color: #2b2b2b; border: 1px solid #555555; border-radius: "
+        "6px; }\n"
+        "QLabel { color: #e0e0e0; }\n"
+        "QPushButton#zoomResetBtn { border: 1px solid #555555; border-radius: 3px; "
+        "background-color: #3a3a3a; color: #e0e0e0; padding: 1px 6px; font-size: 11px; }\n"
+        "QPushButton#zoomResetBtn:hover { background-color: #4a4a4a; }\n"
+        "QToolButton#zoomStepBtn { border: 1px solid #555555; border-radius: 3px; "
+        "background-color: #3a3a3a; color: #e0e0e0; font-weight: bold; }\n"
+        "QToolButton#zoomStepBtn:hover { background-color: #4a4a4a; }"));
+
+    auto *shadow = new QGraphicsDropShadowEffect(_zoomPopup);
+    shadow->setBlurRadius(12);
+    shadow->setColor(QColor(0, 0, 0, 160));
+    shadow->setOffset(0, 2);
+    _zoomPopup->setGraphicsEffect(shadow);
+    _zoomPopup->hide();
 
     auto *popupLayout = new QVBoxLayout(_zoomPopup);
     popupLayout->setContentsMargins(10, 8, 10, 8);
@@ -3597,22 +3624,93 @@ void MainWindow::_createZoomPopup()
     });
 }
 
+void MainWindow::_repositionZoomPopup()
+{
+    if (!_zoomPopup || !_zoomBtn)
+        return;
+    _zoomPopup->adjustSize();
+    const QPoint btnPos = _zoomBtn->mapTo(this, QPoint(0, 0));
+    const int popupWidth = _zoomPopup->sizeHint().width();
+    const int popupHeight = _zoomPopup->sizeHint().height();
+    const int x = qBound(4,
+                         btnPos.x() + _zoomBtn->width() - popupWidth,
+                         qMax(4, width() - popupWidth - 4));
+    const int y = qBound(4, btnPos.y() - popupHeight - 4, qMax(4, height() - popupHeight - 4));
+    _zoomPopup->setGeometry(x, y, popupWidth, popupHeight);
+}
+
 void MainWindow::_toggleZoomPopup()
 {
     if (!_zoomPopup || !_zoomBtn)
         return;
     if (_zoomPopup->isVisible()) {
         _zoomPopup->hide();
+        qApp->removeEventFilter(this);
         return;
     }
-    _zoomPopup->adjustSize();
-    const QPoint globalPos = _zoomBtn->mapToGlobal(QPoint(0, 0));
-    const int popupWidth = _zoomPopup->sizeHint().width();
-    const int popupHeight = _zoomPopup->sizeHint().height();
-    const int x = qMax(0, globalPos.x() + _zoomBtn->width() - popupWidth);
-    const int y = qMax(0, globalPos.y() - popupHeight - 2);
-    _zoomPopup->move(x, y);
+    _repositionZoomPopup();
+    _zoomPopup->raise();
     _zoomPopup->show();
+    qApp->installEventFilter(this);
+}
+
+void MainWindow::_scaleWidgetChildren(QWidget *parent, qreal scale, const QFont &font)
+{
+    Q_UNUSED(font);
+    if (!parent)
+        return;
+
+    const int iconBtnSize = qRound(24 * scale);
+    const int iconSize = qRound(16 * scale);
+
+    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("genCompressName"))) {
+        btn->setFixedSize(iconBtnSize, iconBtnSize);
+        btn->setIconSize(QSize(iconSize, iconSize));
+    }
+    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("genPass"))) {
+        btn->setFixedSize(iconBtnSize, iconBtnSize);
+        btn->setIconSize(QSize(iconSize, iconSize));
+    }
+    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("nzbFileButton")))
+        btn->setMaximumWidth(qRound(30 * scale));
+
+    for (auto *sb : parent->findChildren<QSpinBox *>(QStringLiteral("nameLengthSB")))
+        sb->setMaximumWidth(qRound(60 * scale));
+    for (auto *sb : parent->findChildren<QSpinBox *>(QStringLiteral("passLengthSB")))
+        sb->setMaximumWidth(qRound(60 * scale));
+    for (auto *sb : parent->findChildren<QSpinBox *>(QStringLiteral("redundancySB")))
+        sb->setMaximumWidth(qRound(70 * scale));
+
+    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("addFilesBtn")))
+        btn->setIconSize(QSize(iconSize, iconSize));
+    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("removeFilesBtn")))
+        btn->setIconSize(QSize(iconSize, iconSize));
+    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("addFolderBtn")))
+        btn->setIconSize(QSize(iconSize, iconSize));
+}
+
+void MainWindow::_scaleTables(int rowHeight)
+{
+    if (_ui->serversTable) {
+        _ui->serversTable->verticalHeader()->setDefaultSectionSize(rowHeight);
+        for (int r = 0; r < _ui->serversTable->rowCount(); ++r)
+            _ui->serversTable->setRowHeight(r, rowHeight);
+    }
+    if (_historyTable) {
+        _historyTable->verticalHeader()->setDefaultSectionSize(rowHeight);
+        for (int r = 0; r < _historyTable->rowCount(); ++r)
+            _historyTable->setRowHeight(r, rowHeight);
+    }
+    if (_resumeTable) {
+        _resumeTable->verticalHeader()->setDefaultSectionSize(rowHeight);
+        for (int r = 0; r < _resumeTable->rowCount(); ++r)
+            _resumeTable->setRowHeight(r, rowHeight);
+    }
+    if (_statsTopTable) {
+        _statsTopTable->verticalHeader()->setDefaultSectionSize(rowHeight);
+        for (int r = 0; r < _statsTopTable->rowCount(); ++r)
+            _statsTopTable->setRowHeight(r, rowHeight);
+    }
 }
 
 void MainWindow::applyUiZoom(int percent, bool userInteractive)
@@ -3625,6 +3723,8 @@ void MainWindow::applyUiZoom(int percent, bool userInteractive)
     QFont f = _baseFont;
     if (_baseFont.pointSizeF() > 0)
         f.setPointSizeF(_baseFont.pointSizeF() * scale);
+    else if (_baseFont.pointSize() > 0)
+        f.setPointSize(qRound(_baseFont.pointSize() * scale));
     else if (_baseFont.pixelSize() > 0)
         f.setPixelSize(qRound(_baseFont.pixelSize() * scale));
     else
@@ -3632,6 +3732,49 @@ void MainWindow::applyUiZoom(int percent, bool userInteractive)
 
     setFont(f);
     QApplication::setFont(f);
+
+    const auto allWidgets = findChildren<QWidget *>();
+    for (QWidget *w : allWidgets) {
+        if (w == _zoomPopup || (_zoomPopup && _zoomPopup->isAncestorOf(w)))
+            continue;
+        QFont wf = w->font();
+        if (f.pointSizeF() > 0)
+            wf.setPointSizeF(f.pointSizeF());
+        else if (f.pixelSize() > 0)
+            wf.setPixelSize(f.pixelSize());
+        else
+            wf.setPointSize(f.pointSize());
+        w->setFont(wf);
+    }
+
+    if (_ui->postTabWidget && _ui->postTabWidget->tabBar()) {
+        _ui->postTabWidget->tabBar()->setFont(f);
+        _ui->postTabWidget->tabBar()->setIconSize(QSize(qRound(16 * scale), qRound(16 * scale)));
+        _ui->postTabWidget->tabBar()->updateGeometry();
+        _ui->postTabWidget->tabBar()->update();
+        _ui->postTabWidget->updateGeometry();
+    }
+
+    const int rowHeight = qMax(26, QFontMetrics(f).height() + 10);
+    _scaleTables(rowHeight);
+
+    const int iconBtnSize = qRound(24 * scale);
+    const int iconSize = qRound(16 * scale);
+
+    if (_ui->genPoster) {
+        _ui->genPoster->setFixedSize(iconBtnSize, iconBtnSize);
+        _ui->genPoster->setIconSize(QSize(iconSize, iconSize));
+    }
+    if (_ui->nzbPathButton)
+        _ui->nzbPathButton->setMaximumWidth(qRound(30 * scale));
+    if (_ui->articleSizeEdit)
+        _ui->articleSizeEdit->setMaximumWidth(qRound(80 * scale));
+    if (_zoomBtn)
+        _zoomBtn->setIconSize(QSize(iconSize, iconSize));
+    if (_logToggleBtn)
+        _logToggleBtn->setIconSize(QSize(iconSize, iconSize));
+
+    _scaleWidgetChildren(this, scale, f);
 
     if (_zoomValueLabel)
         _zoomValueLabel->setText(QString("%1%").arg(percent));
@@ -3643,6 +3786,9 @@ void MainWindow::applyUiZoom(int percent, bool userInteractive)
         QSignalBlocker blocker(_zoomSlider);
         _zoomSlider->setValue(percent);
     }
+
+    if (_zoomPopup && _zoomPopup->isVisible())
+        _repositionZoomPopup();
 
     if (userInteractive) {
         if (!_zoomSaveTimer) {
@@ -3692,14 +3838,14 @@ void MainWindow::showEvent(QShowEvent *event)
 }
 
 
-const QString MainWindow::sGroupBoxStyle =  "\
+const QString MainWindow::sGroupBoxStyle = "\
         QGroupBox {\
-        font: bold; \
         border: 1px solid palette(mid);\
         border-radius: 6px;\
         margin-top: 6px;\
         }\
         QGroupBox::title {\
+        font-weight: bold;\
         subcontrol-origin:  margin;\
         left: 7px;\
         padding: 0 5px 0 5px;\

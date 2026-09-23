@@ -807,7 +807,7 @@
 21	src/hmi/MainWindow.cpp	MainWindow::_configureWaylandSplitters()
 66	src/hmi/MainWindow.cpp	MainWindow::_connectHistoryControls()
 12	src/hmi/MainWindow.cpp	MainWindow::_connectPostingWidget( PostingWidget * post)
-99	src/hmi/MainWindow.cpp	MainWindow::_createZoomPopup()
+90	src/hmi/MainWindow.cpp	MainWindow::_createZoomPopup()
 21	src/hmi/MainWindow.cpp	MainWindow::_fillTabContextMenu( QMenu & menu , int tabIndex)
 28	src/hmi/MainWindow.cpp	MainWindow::_fitHistoryColumns( bool toContents)
 7	src/hmi/MainWindow.cpp	MainWindow::_getPostWidget( int tabIndex) const
@@ -815,7 +815,7 @@
 41	src/hmi/MainWindow.cpp	MainWindow::_initLogBoxToggle()
 82	src/hmi/MainWindow.cpp	MainWindow::_initPostingBox()
 19	src/hmi/MainWindow.cpp	MainWindow::_initServerBox()
-32	src/hmi/MainWindow.cpp	MainWindow::_initZoomControl()
+31	src/hmi/MainWindow.cpp	MainWindow::_initZoomControl()
 67	src/hmi/MainWindow.cpp	MainWindow::_insertBoundedLogText( const QString & text , bool startNewBlock , const QTextCharFormat & format) const
 4	src/hmi/MainWindow.cpp	MainWindow::_isLogBoxCollapsed() const
 10	src/hmi/MainWindow.cpp	MainWindow::_isPostingQueueRunning() const
@@ -847,12 +847,15 @@
 8	src/hmi/MainWindow.cpp	MainWindow::_postingWidgets() const
 129	src/hmi/MainWindow.cpp	MainWindow::_refreshHistoryViews( bool rewindEmptyPage)
 18	src/hmi/MainWindow.cpp	MainWindow::_refreshPostingControls()
+14	src/hmi/MainWindow.cpp	MainWindow::_repositionZoomPopup()
 17	src/hmi/MainWindow.cpp	MainWindow::_resetHistoryColumns()
 21	src/hmi/MainWindow.cpp	MainWindow::_restoreHistoryColumns()
 49	src/hmi/MainWindow.cpp	MainWindow::_retranslate()
 120	src/hmi/MainWindow.cpp	MainWindow::_retranslateHistoryTab()
 9	src/hmi/MainWindow.cpp	MainWindow::_saveHistoryColumns()
 8	src/hmi/MainWindow.cpp	MainWindow::_saveLogBoxState() const
+23	src/hmi/MainWindow.cpp	MainWindow::_scaleTables( int rowHeight)
+34	src/hmi/MainWindow.cpp	MainWindow::_scaleWidgetChildren( QWidget * parent , qreal scale , const QFont & font)
 10	src/hmi/MainWindow.cpp	MainWindow::_serverRow( QObject * delButton)
 20	src/hmi/MainWindow.cpp	MainWindow::_setLogBoxCollapsed( bool collapsed , bool saveSetting)
 67	src/hmi/MainWindow.cpp	MainWindow::_showHistoryDetails( const PostHistoryStore :: PostDetails & details)
@@ -860,11 +863,11 @@
 35	src/hmi/MainWindow.cpp	MainWindow::_startResumePost( qint64 postId , bool askConfirmation)
 4	src/hmi/MainWindow.cpp	MainWindow::_startupTabBar() const
 13	src/hmi/MainWindow.cpp	MainWindow::_submitPreparedTabs()
-17	src/hmi/MainWindow.cpp	MainWindow::_toggleZoomPopup()
+14	src/hmi/MainWindow.cpp	MainWindow::_toggleZoomPopup()
 33	src/hmi/MainWindow.cpp	MainWindow::_trimLogPane() const
 9	src/hmi/MainWindow.cpp	MainWindow::_updateLogToggleBtn()
-20	src/hmi/MainWindow.cpp	MainWindow::addNewQuickTab( int lastTabIdx , const QFileInfoList & files)
-42	src/hmi/MainWindow.cpp	MainWindow::applyUiZoom( int percent , bool userInteractive)
+22	src/hmi/MainWindow.cpp	MainWindow::addNewQuickTab( int lastTabIdx , const QFileInfoList & files)
+90	src/hmi/MainWindow.cpp	MainWindow::applyUiZoom( int percent , bool userInteractive)
 4	src/hmi/MainWindow.cpp	MainWindow::buildHistoryTabForTest()
 13	src/hmi/MainWindow.cpp	MainWindow::changeEvent( QEvent * event)
 10	src/hmi/MainWindow.cpp	MainWindow::clearJobTab( QWidget * postWidget)
@@ -872,7 +875,7 @@
 26	src/hmi/MainWindow.cpp	MainWindow::closeTab( PostingWidget * postWidget)
 5	src/hmi/MainWindow.cpp	MainWindow::dragEnterEvent( QDragEnterEvent * e)
 8	src/hmi/MainWindow.cpp	MainWindow::dropEvent( QDropEvent * e)
-17	src/hmi/MainWindow.cpp	MainWindow::eventFilter( QObject * obj , QEvent * event)
+39	src/hmi/MainWindow.cpp	MainWindow::eventFilter( QObject * obj , QEvent * event)
 4	src/hmi/MainWindow.cpp	MainWindow::fixedArchivePassword() const
 4	src/hmi/MainWindow.cpp	MainWindow::hasAutoCompress() const
 11	src/hmi/MainWindow.cpp	MainWindow::hasFinishedPosts() const
@@ -915,6 +918,7 @@
 4	src/hmi/MainWindow.cpp	MainWindow::pendingIcon() const
 4	src/hmi/MainWindow.cpp	MainWindow::pendingIconPath( bool dark)
 12	src/hmi/MainWindow.cpp	MainWindow::refreshJobLabel()
+6	src/hmi/MainWindow.cpp	MainWindow::resizeEvent( QResizeEvent * event)
 12	src/hmi/MainWindow.cpp	MainWindow::setTab( QWidget * postWidget)
 10	src/hmi/MainWindow.cpp	MainWindow::showEvent( QShowEvent * event)
 4	src/hmi/MainWindow.cpp	MainWindow::toBeImplemented()

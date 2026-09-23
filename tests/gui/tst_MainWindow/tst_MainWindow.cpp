@@ -7200,6 +7200,26 @@ void TestMainWindow::ui_zoom_control_adjusts_font_and_persists_setting()
     zoomBtn->click();
     QCoreApplication::processEvents();
     QVERIFY(popup->isVisible());
+    QCOMPARE(popup->parent(), &window);
+    QVERIFY(popup->y() <= zoomBtn->y());
+
+    // Test dismissal by clicking outside
+    QTest::mouseClick(&window, Qt::LeftButton, Qt::NoModifier, QPoint(10, 10));
+    QCoreApplication::processEvents();
+    QVERIFY(!popup->isVisible());
+
+    // Reopen and test dismissal via Escape
+    zoomBtn->click();
+    QCoreApplication::processEvents();
+    QVERIFY(popup->isVisible());
+    QTest::keyClick(&window, Qt::Key_Escape);
+    QCoreApplication::processEvents();
+    QVERIFY(!popup->isVisible());
+
+    // Open again to test slider and scaling
+    zoomBtn->click();
+    QCoreApplication::processEvents();
+    QVERIFY(popup->isVisible());
 
     QSlider *slider = window.zoomSlider();
     QVERIFY(slider);
@@ -7209,6 +7229,9 @@ void TestMainWindow::ui_zoom_control_adjusts_font_and_persists_setting()
     slider->setValue(125);
     QCoreApplication::processEvents();
     QCOMPARE(zoomBtn->text(), QStringLiteral("125%"));
+    auto *serversTable = window.findChild<QTableWidget *>("serversTable");
+    QVERIFY(serversTable);
+    QVERIFY(serversTable->verticalHeader()->defaultSectionSize() >= 26);
 
     // Reset button
     auto *resetBtn = popup->findChild<QPushButton *>(QStringLiteral("zoomResetBtn"));
@@ -7234,4 +7257,5 @@ void TestMainWindow::ui_zoom_control_adjusts_font_and_persists_setting()
     QCOMPARE(ngPost.uiZoom(), 130u);
     QCOMPARE(booted->zoomButton()->text(), QStringLiteral("130%"));
     QCOMPARE(booted->zoomSlider()->value(), 130);
+    delete booted;
 }
