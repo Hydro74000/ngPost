@@ -2120,6 +2120,18 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <source>Cancel all active and queued posts</source>
         <translation>Alle actieve en wachtende posts annuleren</translation>
     </message>
+    <message>
+        <source>Close all tabs</source>
+        <translation>Alle tabbladen sluiten</translation>
+    </message>
+    <message>
+        <source>Close every Quick Post tab and empty Quick Post #1</source>
+        <translation>Alle Quick Post-tabbladen sluiten en Quick Post #1 leegmaken</translation>
+    </message>
+    <message>
+        <source>Are you sure? All tabs will be lost.</source>
+        <translation>Weet u het zeker? Alle tabbladen gaan verloren.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6723,6 +6735,10 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
         <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
         <translation>Archiefvolumegrootte verhoogd van %1 MiB naar %2 MiB voor een limiet van %3 volumes.</translation>
     </message>
+    <message>
+        <source>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</source>
+        <translation>De geposte bestanden worden niet verwijderd: %1 artikel(en) mislukt of onbevestigd. Hervat de post vanuit de geschiedenis zodra het probleem is opgelost.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -7037,6 +7053,10 @@ Sommige Usenet-indexen vragen erom.</translation>
         <location line="+6"/>
         <source>Copied!</source>
         <translation>Gekopieerd!</translation>
+    </message>
+    <message>
+        <source>Could not remove the archives of the stopped post: %1</source>
+        <translation>De archieven van de gestopte post konden niet worden verwijderd: %1</translation>
     </message>
 </context>
 <context>

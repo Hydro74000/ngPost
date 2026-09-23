@@ -2119,6 +2119,18 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
         <source>Cancel all active and queued posts</source>
         <translation>Alle aktiven und wartenden Posts abbrechen</translation>
     </message>
+    <message>
+        <source>Close all tabs</source>
+        <translation>Alle Tabs schließen</translation>
+    </message>
+    <message>
+        <source>Close every Quick Post tab and empty Quick Post #1</source>
+        <translation>Alle Quick-Post-Tabs schließen und Quick Post #1 leeren</translation>
+    </message>
+    <message>
+        <source>Are you sure? All tabs will be lost.</source>
+        <translation>Sind Sie sicher? Alle Tabs gehen verloren.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6719,6 +6731,10 @@ Setzen Sie PAR2_SOURCE = custom und korrigieren Sie PAR2_PATH in der Konfigurati
         <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
         <translation>Archiv-Volumegröße von %1 MiB auf %2 MiB erhöht, um die Grenze von %3 Volumes einzuhalten.</translation>
     </message>
+    <message>
+        <source>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</source>
+        <translation>Die geposteten Dateien werden nicht gelöscht: %1 Artikel sind fehlgeschlagen oder unbestätigt. Setzen Sie den Post nach Behebung des Problems im Verlauf fort.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -7032,6 +7048,10 @@ Manche Usenet-Indexe verlangen eine.</translation>
         <location line="+6"/>
         <source>Copied!</source>
         <translation>Kopiert!</translation>
+    </message>
+    <message>
+        <source>Could not remove the archives of the stopped post: %1</source>
+        <translation>Die Archive des gestoppten Posts konnten nicht entfernt werden: %1</translation>
     </message>
 </context>
 <context>

@@ -2118,6 +2118,18 @@ Are you sure you want to quit?</source>
         <source>Cancel all active and queued posts</source>
         <translation>Cancelar todas las publicaciones activas y en espera</translation>
     </message>
+    <message>
+        <source>Close all tabs</source>
+        <translation>Cerrar todas las pestañas</translation>
+    </message>
+    <message>
+        <source>Close every Quick Post tab and empty Quick Post #1</source>
+        <translation>Cerrar todas las pestañas de Publicación Rápida y vaciar la Publicación Rápida #1</translation>
+    </message>
+    <message>
+        <source>Are you sure? All tabs will be lost.</source>
+        <translation>¿Está seguro? Se perderán todas las pestañas.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6719,6 +6731,10 @@ Establezca PAR2_SOURCE = custom y corrija PAR2_PATH en la configuración (Ajuste
         <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
         <translation>Tamaño del volumen aumentado de %1 MiB a %2 MiB para un límite de %3 volúmenes.</translation>
     </message>
+    <message>
+        <source>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</source>
+        <translation>No se eliminan los archivos publicados: %1 artículo(s) fallaron o no están confirmados. Reanude la publicación desde el historial una vez resuelto el problema.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -7033,6 +7049,10 @@ Algunos índices de Usenet lo piden.</translation>
         <location line="+6"/>
         <source>Copied!</source>
         <translation>¡Copiado!</translation>
+    </message>
+    <message>
+        <source>Could not remove the archives of the stopped post: %1</source>
+        <translation>No se pudieron eliminar los archivos comprimidos de la publicación detenida: %1</translation>
     </message>
 </context>
 <context>

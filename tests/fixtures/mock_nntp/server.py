@@ -115,6 +115,10 @@ class Session:
             return True
         return False
 
+    def rejects(self, body: bytes) -> bool:
+        part = self.opts.reject_part
+        return part > 0 and f"=ybegin part={part} ".encode() in body
+
     async def serve(self) -> None:
         self.log(f"connect (require_auth={self.opts.require_auth})")
 
@@ -206,6 +210,12 @@ class Session:
                         while True:
                             await asyncio.sleep(3600)
                     body = await self.read_until_dot()
+                    if self.rejects(body):
+                        # A definitive refusal, retried by the client until
+                        # its budget runs out; nothing is stored.
+                        self.log(f"rejecting part {self.opts.reject_part} with 441 (test injection)")
+                        await self.write_line(b"441 posting failed")
+                        continue
                     msgid = self._extract_msgid(body)
                     self._dump_article(msgid, body)
                     if self.drop_post_reply():
@@ -361,6 +371,8 @@ def main(argv: list[str]) -> int:
                    help="Accept and dump an article, then close without its final 235/240 reply")
     p.add_argument("--drop-before-post-reply-count", type=int, default=0,
                    help="Drop the first N final replies, then allow successful retries")
+    p.add_argument("--reject-part", type=int, default=0,
+                   help="Reply 441 to every POST of yEnc part N, of any file (0 = never)")
     p.add_argument("--stall-article", action="store_true",
                    help="Accept POST, then never read the article nor reply")
     p.add_argument("--slow-mode-ms", type=int, default=0,

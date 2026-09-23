@@ -2106,6 +2106,18 @@ Are you sure you want to quit?</source>
         <source>Cancel all active and queued posts</source>
         <translation>Cancel all active and queued posts</translation>
     </message>
+    <message>
+        <source>Close all tabs</source>
+        <translation>Close all tabs</translation>
+    </message>
+    <message>
+        <source>Close every Quick Post tab and empty Quick Post #1</source>
+        <translation>Close every Quick Post tab and empty Quick Post #1</translation>
+    </message>
+    <message>
+        <source>Are you sure? All tabs will be lost.</source>
+        <translation>Are you sure? All tabs will be lost.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6685,6 +6697,10 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
         <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
         <translation>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</translation>
     </message>
+    <message>
+        <source>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</source>
+        <translation>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -6998,6 +7014,10 @@ Some Usenet indexes ask for one.</translation>
         <location line="+6"/>
         <source>Copied!</source>
         <translation>Copied!</translation>
+    </message>
+    <message>
+        <source>Could not remove the archives of the stopped post: %1</source>
+        <translation>Could not remove the archives of the stopped post: %1</translation>
     </message>
 </context>
 <context>

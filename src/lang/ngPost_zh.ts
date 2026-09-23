@@ -2119,6 +2119,18 @@ This also removes all associated file and article records.</source>
         <source>Cancel all active and queued posts</source>
         <translation>取消所有正在进行和排队的发布</translation>
     </message>
+    <message>
+        <source>Close all tabs</source>
+        <translation>关闭所有标签页</translation>
+    </message>
+    <message>
+        <source>Close every Quick Post tab and empty Quick Post #1</source>
+        <translation>关闭所有快速发布标签页并清空快速发布 #1</translation>
+    </message>
+    <message>
+        <source>Are you sure? All tabs will be lost.</source>
+        <translation>确定吗？所有标签页都将丢失。</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6719,6 +6731,10 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
         <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
         <translation>为满足 %3 个分卷的限制，归档分卷大小从 %1 MiB 增至 %2 MiB。</translation>
     </message>
+    <message>
+        <source>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</source>
+        <translation>未删除已发布的文件：%1 篇文章失败或未确认。问题解决后请从历史记录中续传该贴。</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -7033,6 +7049,10 @@ Some Usenet indexes ask for one.</source>
         <location line="+6"/>
         <source>Copied!</source>
         <translation>已复制！</translation>
+    </message>
+    <message>
+        <source>Could not remove the archives of the stopped post: %1</source>
+        <translation>无法删除已停止发布的压缩包：%1</translation>
     </message>
 </context>
 <context>

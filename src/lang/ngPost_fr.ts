@@ -2109,6 +2109,18 @@ Are you sure you want to quit?</source>
         <source>Cancel all active and queued posts</source>
         <translation>Annuler tous les envois actifs et en attente</translation>
     </message>
+    <message>
+        <source>Close all tabs</source>
+        <translation>Fermer tous les onglets</translation>
+    </message>
+    <message>
+        <source>Close every Quick Post tab and empty Quick Post #1</source>
+        <translation>Fermer tous les onglets de Post Rapide et vider le Post Rapide #1</translation>
+    </message>
+    <message>
+        <source>Are you sure? All tabs will be lost.</source>
+        <translation>Êtes-vous sûr ? Tous les onglets seront perdus.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6709,6 +6721,10 @@ Définissez PAR2_SOURCE = custom et corrigez PAR2_PATH dans la configuration (Pa
         <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
         <translation>Taille des volumes augmentée de %1 Mio à %2 Mio pour une limite de %3 volumes.</translation>
     </message>
+    <message>
+        <source>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</source>
+        <translation>Les fichiers postés ne sont pas supprimés : %1 article(s) en échec ou non confirmé(s). Reprenez le post depuis l'historique une fois le problème résolu.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -7022,6 +7038,10 @@ Certains index Usenet en demandent un.</translation>
         <location line="+6"/>
         <source>Copied!</source>
         <translation>Copié !</translation>
+    </message>
+    <message>
+        <source>Could not remove the archives of the stopped post: %1</source>
+        <translation>Impossible de supprimer les archives du post arrêté : %1</translation>
     </message>
 </context>
 <context>

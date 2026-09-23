@@ -26,6 +26,7 @@ class NgPost;
 class NntpFile;
 class MainWindow;
 class PostingJob;
+struct PostingJobOptions;
 #include "postinfo/PostInfoData.h"
 
 #include <QFileInfoList>
@@ -59,9 +60,26 @@ private:
     PostingJob        *_postingJob;
     STATE              _state;
     bool               _postingFinished;
-    bool _retryablePreparationFailure = false;
-    void _restoreAfterPreparationFailure();
+    //! A finished post this tab may submit again from scratch: its preparation
+    //! failed before any transfer, or the user stopped it.
+    bool _resubmittable = false;
+    //! What a stopped post leaves behind until this tab posts again: the NZB
+    //! it may have written, its history row and its temporary archives.
+    struct StoppedAttempt
+    {
+        qint64 historyPostId = 0;
+        QString nzbPath;
+        QString archiveFolder;
+    };
+    StoppedAttempt _stoppedAttempt;
+    void _armResubmission();
+    void _supersedeStoppedAttempt();
+    void _fillJobOptions(PostingJobOptions &options,
+                         const QString &nzbPath,
+                         const QFileInfoList &files) const;
     bool _hasPreparedFiles() const;
+    bool _isStoppedAttemptNzb(const QString &nzbPath) const;
+    bool _stoppedAttemptIsReplaceable() const;
 
     // Post info file, per post. One discreet checkbox on the tab; everything
     // else lives in a dialog, because a posting tab is about posting.
@@ -118,6 +136,8 @@ public:
 
     void postFiles(bool updateMainParams);
     bool canSubmit() const;
+    //! Nothing listed, nothing posted: what a new tab looks like.
+    bool isBlank() const;
     QFileInfoList previewFiles() const;
     void refreshPar2Default();
     //! Shows the global PAR2 redundancy as \a box's special value, and widens

@@ -1931,8 +1931,24 @@ void PostingJob::_finishPosting()
         if (!_nfoSrcToCopy.isEmpty())
             _copyNfoNextToNzb();
         if (MB_LoadAtomic(_delFilesAfterPost))
-            _delOriginalFiles();
+            _delOriginalFilesOfCompletePost();
     }
+}
+
+void PostingJob::_delOriginalFilesOfCompletePost()
+{
+    // A file with a failed article is neither pending nor in _filesFailed: it
+    // is finished, its NZB entry is skipped, and _postFinished comes true all
+    // the same. Deleting on _postFinished alone removed the only complete copy
+    // of what the post was missing. Generated archives are not concerned: the
+    // temporary folder keeps its own rules, see _cleanCompressDir().
+    if (!hasPostFinishedSuccessfully() || nbArticlesUnknown() > 0) {
+        _error(tr("Not deleting the posted files: %1 article(s) failed or are unconfirmed. "
+                  "Resume the post from the history once the problem is solved.")
+                   .arg(_nbArticlesFailed + nbArticlesUnknown()));
+        return;
+    }
+    _delOriginalFiles();
 }
 
 void PostingJob::_closeNzb()

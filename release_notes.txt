@@ -155,6 +155,19 @@ the NNTP streaming pipeline and SQLite history store.
     detected as new files and re-posted.
   * Guarded --rm_posted against deleting original source files if their obfuscated
     counterparts failed to restore.
+  * --rm_posted and the Auto tab's "delete once posted" no longer delete the
+    sources of a post with failed or unconfirmed articles (behaviour inherited
+    from v4.1): the files stay in place for a resume from the history. Temporary
+    archives keep their own rules.
+- Stop All and Close All Tabs:
+  * The Stop button is shown only while a post is in progress. Otherwise a
+    "Close all tabs" cross takes its place: after a confirmation, it closes every
+    Quick Post tab and empties Quick Post #1; new tabs are numbered from #2 again.
+  * Stopped tabs can be posted again from scratch with "Post all tabs" or their
+    own button: the user's sources are restored, the NZB the stop left behind is
+    replaced without a question, the stopped post's temporary archives are
+    removed, and its history entry is closed. A stopped post resumed from the
+    History tab in the meantime is left untouched.
   * Used kernel rename calls to prevent silent cross-filesystem file copies (EXDEV).
 - Safe Auto-Shutdown Guarding (holdShutdown()):
   * Auto-shutdown is strictly gated: only triggers if at least one article was
@@ -472,6 +485,21 @@ sécurité VPN et de l'isolation des identifiants.
     était détectée comme un nouveau fichier et ré-uploadée.
   * Protection de l'option --rm_posted : interdiction stricte de supprimer un
     fichier source si son nom d'origine offusqué n'a pas pu être restauré.
+  * --rm_posted et l'option « supprimer une fois posté » de l'onglet Auto ne
+    suppriment plus les sources d'un post ayant des articles échoués ou non
+    confirmés (comportement hérité de la v4.1) : les fichiers restent en place
+    pour permettre une reprise depuis l'historique. Les archives temporaires
+    conservent leurs propres règles.
+- Arrêt et fermeture de tous les onglets :
+  * Le bouton Stop n'est affiché que pendant qu'un post est en cours. Hors transfert,
+    une croix « Fermer tous les onglets » prend sa place : après confirmation,
+    elle ferme tous les onglets de post rapide et vide l'onglet #1 ; la numérotation
+    repart ensuite de #2.
+  * Les onglets arrêtés peuvent être relancés de zéro avec « Poster tout » ou leur
+    propre bouton : les sources de l'utilisateur sont restaurées, le fichier NZB
+    laissé par l'arrêt est écrasé sans redemander confirmation, les archives temporaires
+    du post arrêté sont supprimées et son entrée dans l'historique est fermée. Un post
+    arrêté repris entre-temps depuis l'Historique n'est pas modifié.
   * Utilisation d'appels de renommage atomiques au niveau du noyau pour empêcher
     les copies complètes silencieuses lors de déplacements entre partitions (EXDEV).
 - Sécurisation de l'extinction automatique du PC (holdShutdown()) :

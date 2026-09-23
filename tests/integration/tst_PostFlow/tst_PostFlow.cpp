@@ -224,6 +224,10 @@ private slots:
     //! A transport loss after the article body but before 240 is ambiguous,
     //! even when automatic resume is disabled: preserve it as unknown.
     void no_resume_transport_loss_is_unknown_and_nonzero();
+    //! --rm_posted deletes the sources of a complete post only: an article the
+    //! server refused leaves them in place, the complete control run does not.
+    void rm_posted_keeps_sources_of_an_incomplete_post_data();
+    void rm_posted_keeps_sources_of_an_incomplete_post();
 
     //! Resuming only the second file of a multi-file post must preserve the
     //! original history row/ordinal instead of overwriting file #1.
@@ -1626,5 +1630,76 @@ void TestPostFlow::parity_tool_that_writes_nothing_stops_the_post()
     QVERIFY2(out.contains("wrote no par2 file"), qPrintable(out));
     QVERIFY2(mock.receivedArticles().isEmpty(), "nothing may be posted without its par2");
     QVERIFY(input.exists());
+#endif
+}
+
+void TestPostFlow::rm_posted_keeps_sources_of_an_incomplete_post_data()
+{
+    QTest::addColumn<bool>("refused");
+    QTest::newRow("article refused") << true;
+    QTest::newRow("complete post") << false;
+}
+
+void TestPostFlow::rm_posted_keeps_sources_of_an_incomplete_post()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("Uses a shell script to stand in for the parity engine");
+#else
+    QFETCH(bool, refused);
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start(refused ? QStringList{ "--reject-part", "2" } : QStringList{}));
+    const auto root = sandbox.rootPath();
+    QVERIFY(writeFakeTool(root + "/par2",
+                          "#!/bin/sh\n"
+                          "for a in \"$@\"; do case \"$a\" in *.par2) t=\"$a\";; esac; done\n"
+                          "head -c 100 /dev/zero > \"$t\"\n"
+                          "exit 0\n"));
+
+    // --auto with parity only posts each file of the folder as it is: the file
+    // --rm_posted deletes is then the user's only copy.
+    const QString watched = root + QStringLiteral("/watched");
+    QVERIFY(QDir().mkpath(watched));
+    QFile input(watched + QStringLiteral("/source.bin"));
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    QCOMPARE(input.write(QByteArray(4096, 's')), qint64(4096));
+    input.close();
+
+    QFile config(root + "/rm_posted.conf");
+    QVERIFY(config.open(QIODevice::WriteOnly));
+    config.write(("TMP_DIR = " + root + "\nnzbPath = " + root
+                  + "\nPAR2_TOOL = par2cmdline\nPAR2_SOURCE = custom\nPAR2_PATH = " + root
+                  + "/par2\nPAR2_PCT = 10\n")
+                     .toUtf8());
+    config.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config.fileName(),
+                                 "--post_db",
+                                 root + "/history.sqlite",
+                                 "-S",
+                                 QString("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port()),
+                                 "--auto",
+                                 watched,
+                                 "--gen_par2",
+                                 "--rm_posted",
+                                 "-a",
+                                 "1024",
+                                 "-r",
+                                 "0",
+                                 "-g",
+                                 "alt.binaries.test" },
+                               root,
+                               out,
+                               30000);
+    if (refused) {
+        QVERIFY2(code > 0, qPrintable(out));
+        QVERIFY2(out.contains("Not deleting the posted files"), qPrintable(out));
+        QVERIFY2(input.exists(), qPrintable(out));
+    } else {
+        QVERIFY2(code == 0, qPrintable(out));
+        QVERIFY2(!input.exists(), qPrintable(out));
+    }
 #endif
 }

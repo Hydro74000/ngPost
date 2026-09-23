@@ -2118,6 +2118,18 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <source>Cancel all active and queued posts</source>
         <translation>Cancelar todas as postagens ativas e na fila</translation>
     </message>
+    <message>
+        <source>Close all tabs</source>
+        <translation>Fechar todas as abas</translation>
+    </message>
+    <message>
+        <source>Close every Quick Post tab and empty Quick Post #1</source>
+        <translation>Fechar todas as abas de Postagem Rápida e esvaziar a Postagem Rápida #1</translation>
+    </message>
+    <message>
+        <source>Are you sure? All tabs will be lost.</source>
+        <translation>Tem certeza? Todas as abas serão perdidas.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -6718,6 +6730,10 @@ Defina PAR2_SOURCE = custom e corrija PAR2_PATH na configuração (Configuraçõ
         <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
         <translation>Tamanho do volume aumentado de %1 MiB para %2 MiB para um limite de %3 volumes.</translation>
     </message>
+    <message>
+        <source>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</source>
+        <translation>Os arquivos postados não serão excluídos: %1 artigo(s) falharam ou não foram confirmados. Retome a postagem pelo histórico quando o problema for resolvido.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -7032,6 +7048,10 @@ Alguns índices Usenet pedem um.</translation>
         <location line="+6"/>
         <source>Copied!</source>
         <translation>Copiado!</translation>
+    </message>
+    <message>
+        <source>Could not remove the archives of the stopped post: %1</source>
+        <translation>Não foi possível remover os arquivos compactados da postagem interrompida: %1</translation>
     </message>
 </context>
 <context>

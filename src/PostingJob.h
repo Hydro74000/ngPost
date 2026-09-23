@@ -24,6 +24,7 @@
 #include "utils/Macros.h"
 
 #include <QDateTime>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QFileInfoList>
@@ -318,6 +319,9 @@ public:
 
     inline const QString &nzbFilePath() const;
     inline const QString &originalDirectory() const;
+    //! Temporary folder this job created for its archives or parity, empty
+    //! when it made none. _createArchiveFolder() refuses an existing one.
+    inline QString archiveFolder() const;
 
     inline static QString humanSize(double size);
 
@@ -413,6 +417,8 @@ private:
     NntpArticle *_readNextArticleIntoBufferPtr(const QString &threadName, char **bufferPtr);
 
     void _delOriginalFiles();
+    //! _delOriginalFiles() once every article is confirmed, a refusal otherwise.
+    void _delOriginalFilesOfCompletePost();
 
     //! Original paths whose obfuscated source never made it back to its real
     //! name, and which _delOriginalFiles() must therefore leave alone.
@@ -714,6 +720,11 @@ bool PostingJob::isPaused() const
 const QString &PostingJob::nzbFilePath() const
 {
     return _nzbFilePath;
+}
+
+QString PostingJob::archiveFolder() const
+{
+    return _compressDir ? _compressDir->absolutePath() : QString();
 }
 
 const QString& PostingJob::originalDirectory() const

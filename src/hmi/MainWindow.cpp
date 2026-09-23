@@ -2588,23 +2588,30 @@ void MainWindow::_buildPostingControls()
 
     // Move the existing global pause control next to Post All Tabs.
     layout->addWidget(_ui->pauseButton);
+    _ui->pauseButton->setIconSize(_postAllButton->iconSize());
 
-    _stopAllButton = new QPushButton(controls);
-    _stopAllButton->setObjectName(QStringLiteral("stopAllTabsButton"));
-    _stopAllButton->setIcon(QIcon(":/icons/stop.png"));
-    layout->addWidget(_stopAllButton);
-
-    const QSize iconSize = _postAllButton->iconSize();
-    _ui->pauseButton->setIconSize(iconSize);
-    _stopAllButton->setIconSize(iconSize);
+    // One of the two is shown at a time, see _refreshStopOrCloseAll().
+    _stopAllButton = _addPostingControl(layout, "stopAllTabsButton", ":/icons/stop.png");
+    _closeAllButton = _addPostingControl(layout, "closeAllTabsButton", ":/icons/closeAll.png");
 
     _ui->postTabWidget->setCornerWidget(controls, Qt::TopRightCorner);
     connect(_stopAllButton, &QPushButton::clicked, _ngPost, &NgPost::cancelAllPostingJobs);
+    connect(_closeAllButton, &QPushButton::clicked, this, &MainWindow::onCloseAllTabs);
     connect(_ngPost, &NgPost::postingStateChanged, this, &MainWindow::updatePostAllButton);
     connect(_ngPost, &NgPost::postingStateChanged, this, &MainWindow::refreshJobLabel);
     connect(_postAllButton, &QPushButton::clicked, this, &MainWindow::onPostAllTabs);
     connect(_ui->postTabWidget, &QTabWidget::currentChanged, this, &MainWindow::updatePostAllButton);
     updatePostAllButton();
+}
+
+QPushButton *MainWindow::_addPostingControl(QHBoxLayout *layout, const char *name, const char *icon)
+{
+    auto *button = new QPushButton(layout->parentWidget());
+    button->setObjectName(QLatin1String(name));
+    button->setIcon(QIcon(QLatin1String(icon)));
+    button->setIconSize(_postAllButton->iconSize());
+    layout->addWidget(button);
+    return button;
 }
 
 void MainWindow::updatePostAllButton()
@@ -2765,11 +2772,11 @@ void MainWindow::_fitPostingControls()
 {
     if (!_postAllButton)
         return;
-    // Pause and Stop are squares as tall as Post all tabs, and the tabs beside
+    // Pause and Stop (or Close all) are squares as tall as Post all tabs, and the tabs beside
     // them take that height too: with them the tab bar and its scroll arrows.
     const int buttonHeight = _postAllButton->sizeHint().height();
-    _ui->pauseButton->setFixedSize(buttonHeight, buttonHeight);
-    _stopAllButton->setFixedSize(buttonHeight, buttonHeight);
+    for (auto *button : { _ui->pauseButton, _stopAllButton, _closeAllButton })
+        button->setFixedSize(buttonHeight, buttonHeight);
 
     // What the tabs have beyond the buttons reaches down over the top line of
     // the pane.
@@ -2792,12 +2799,50 @@ void MainWindow::_refreshPostingControls()
     _ui->pauseButton->setIcon(QIcon(paused ? ":/icons/play.png" : ":/icons/pause.png"));
     _ui->pauseButton->setToolTip(paused ? tr("Resume all tabs") : tr("Pause all tabs"));
     _ui->pauseButton->setAccessibleName(_ui->pauseButton->toolTip());
-    _stopAllButton->setEnabled(enabled);
+    _refreshStopOrCloseAll();
+    for (auto *post : _postingWidgets())
+        post->refreshPostingState();
+}
+
+void MainWindow::_refreshStopOrCloseAll()
+{
+    // Stop is there while a post is in progress, greyed until the cancellation
+    // it started is over. Otherwise the same place closes the tabs: a stopped
+    // tab can be posted again or thrown away, never left stranded.
+    const bool posting = _ngPost->hasPostingJobs();
+    _stopAllButton->setVisible(posting);
+    _stopAllButton->setEnabled(posting && !_ngPost->_cancelingAll);
     _stopAllButton->setIcon(QIcon(":/icons/stop.png"));
     _stopAllButton->setAccessibleName(tr("Stop all tabs"));
     _stopAllButton->setToolTip(tr("Cancel all active and queued posts"));
+    _closeAllButton->setVisible(!posting);
+    _closeAllButton->setEnabled(!posting && _hasTabsToReset());
+    _closeAllButton->setAccessibleName(tr("Close all tabs"));
+    _closeAllButton->setToolTip(tr("Close every Quick Post tab and empty Quick Post #1"));
+}
+
+bool MainWindow::_hasTabsToReset() const
+{
+    return _postingWidgets().size() > 1 || (_quickJobTab && !_quickJobTab->isBlank());
+}
+
+void MainWindow::onCloseAllTabs()
+{
+    const auto shutdownHold = _ngPost->holdShutdown();
+    if (QMessageBox::question(this,
+                              tr("Close all tabs"),
+                              tr("Are you sure? All tabs will be lost."),
+                              QMessageBox::Yes | QMessageBox::No,
+                              QMessageBox::No)
+        != QMessageBox::Yes)
+        return;
+    // The question ran an event loop, long enough for an Auto post to start:
+    // a tab that is posting is left alone, whatever was answered.
     for (auto *post : _postingWidgets())
-        post->refreshPostingState();
+        if (!post->isPosting())
+            closeTab(post); // the default tab is emptied, the others deleted
+    _ui->postTabWidget->setCurrentWidget(_quickJobTab);
+    updatePostAllButton();
 }
 
 void MainWindow::onPauseClicked()

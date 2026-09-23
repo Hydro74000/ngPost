@@ -179,6 +179,14 @@ private slots:
     void post_all_tabs_submits_only_prepared_posts();
     void global_cancel_preserves_history_and_resume_data();
     void global_cancel_preserves_history_and_resume();
+    //! Stopped tabs can be posted again from scratch with Post all tabs,
+    //! without an overwrite question for their own NZB, and replace the
+    //! stopped posts in the history.
+    void stop_then_post_all_restarts_stopped_tabs_data();
+    void stop_then_post_all_restarts_stopped_tabs();
+    //! Stop only while a post is in progress; otherwise a confirmed cross
+    //! closes every Quick Post tab and empties #1.
+    void close_all_tabs_resets_to_quick_post_one();
     void global_post_controls_translations();
     void global_cancel_during_confirmation();
     void global_pause_holds_pending_and_new_posts_data();
@@ -6473,7 +6481,8 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
     QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs() && first->isPostingFinished()
                                  && queued->isPostingFinished(),
                              10000);
-    QVERIFY(!first->canSubmit() && !queued->canSubmit());
+    // A stop leaves both ready to be posted again from scratch.
+    QVERIFY(first->canSubmit() && queued->canSubmit());
     QCOMPARE(activeFinished.count(), 1);
     QCOMPARE(pendingFinished.count(), 1);
     QVERIFY(history->flush(&error));
@@ -6554,6 +6563,180 @@ void TestMainWindow::global_cancel_preserves_history_and_resume()
     QCOMPARE(nzb.readAll().count("<segment "), expectedArticles);
     QVERIFY(QMetaObject::invokeMethod(window, "_onHistoryRefresh", Qt::DirectConnection));
     QTRY_COMPARE(window->resumeTableForTest()->rowCount(), 0);
+}
+
+void TestMainWindow::stop_then_post_all_restarts_stopped_tabs_data()
+{
+    QTest::addColumn<bool>("compressed");
+    QTest::newRow("source files") << false;
+    QTest::newRow("generated archive") << true;
+}
+
+void TestMainWindow::stop_then_post_all_restarts_stopped_tabs()
+{
+    QFETCH(bool, compressed);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "60" }));
+    const QString root = sandbox.rootPath();
+    const QString helper = root + "/ngpost-recording-restart"
+#ifdef Q_OS_WIN
+        + ".exe"
+#endif
+        ;
+    QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), helper));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    // ARTICLE_SIZE lands in a static that every later test of this process
+    // reads: put the original back, whichever way this test ends.
+    const qint64 articleSize = NgPost::articleSize();
+    const auto restoreArticleSize = qScopeGuard([&ngPost, articleSize] {
+        QFile conf(PathHelper::configFilePath());
+        if (conf.open(QIODevice::WriteOnly | QIODevice::Text))
+            conf.write("ARTICLE_SIZE = " + QByteArray::number(articleSize) + "\n");
+        conf.close();
+        ngPost.parseDefaultConfig();
+    });
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              shutdownTestConfig(root, mock.port())
+                                  + QString(
+                                        "ARTICLE_SIZE = 1024\nTMP_DIR = %1\nRAR_SOURCE = custom\n"
+                                        "RAR_PATH = %2\n")
+                                        .arg(root, helper),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *all = window->findChild<QPushButton *>("postAllTabsButton");
+    auto *stop = window->findChild<QPushButton *>("stopAllTabsButton");
+    auto *close = window->findChild<QPushButton *>("closeAllTabsButton");
+    QVERIFY(all && stop && close);
+    const QList<PostingWidget *> posts{ qobject_cast<PostingWidget *>(tabs->widget(2)),
+                                        window->addNewQuickTab(0) };
+    QList<QFileInfoList> sources;
+    for (auto *post : posts) {
+        QFile source(root + QString("/restart%1.bin").arg(post->jobNumber()));
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        QCOMPARE(source.write(QByteArray(16384, 'r')), qint64(16384));
+        source.close();
+        post->addPath(source.fileName(), 0);
+        sources << post->previewFiles();
+        post->findChild<QCheckBox *>("compressCB")->setChecked(compressed);
+        post->findChild<QCheckBox *>("par2CB")->setChecked(false);
+        post->findChild<QLineEdit *>("compressNameEdit")
+            ->setText(QString("restart-%1").arg(post->jobNumber()));
+    }
+
+    all->click();
+    QVERIFY(!stop->isHidden() && close->isHidden());
+    QTRY_VERIFY_WITH_TIMEOUT(!mock.receivedArticles().isEmpty(), 10000);
+    stop->click();
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs(), 10000);
+    QVERIFY(stop->isHidden() && !close->isHidden() && close->isEnabled());
+    QVERIFY(all->isEnabled());
+    for (int i = 0; i < posts.size(); ++i) {
+        QVERIFY(posts[i]->canSubmit());
+        // Packing had replaced the list with the archive: the sources are back.
+        QCOMPARE(posts[i]->previewFiles(), sources[i]);
+        QCOMPARE(posts[i]->findChild<QPushButton *>("postButton")->text(),
+                 QString("Start Quick Post #%1").arg(posts[i]->displayNumber()));
+    }
+    QVERIFY(ngPost.historyService()->flush(&error));
+    QCOMPARE(ngPost.historyService()->listPosts({}, &error).size(), 2);
+    if (compressed) // kept for a resume until the tab posts again
+        QVERIFY(QFileInfo::exists(root + "/restart-1"));
+    QVERIFY(QFileInfo::exists(posts.first()->findChild<QLineEdit *>("nzbFileEdit")->text()));
+
+    // The NZB the stop left is the tab's own: posting again asks nothing.
+    QStringList questions;
+    QTimer answer;
+    connect(&answer, &QTimer::timeout, window, [&questions] {
+        if (auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
+            questions << box->text();
+            box->done(QMessageBox::No);
+        }
+    });
+    answer.start(5);
+    all->click();
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs() && !posts[0]->canSubmit()
+                                 && !posts[1]->canSubmit(),
+                             20000);
+    answer.stop();
+    QVERIFY2(questions.isEmpty(), qPrintable(questions.join('\n')));
+    QVERIFY(!all->isEnabled());
+    QVERIFY(ngPost.historyService()->flush(&error));
+    const auto history = ngPost.historyService()->listPosts({}, &error);
+    QCOMPARE(history.size(), 4);
+    QMap<QString, int> statuses;
+    for (const auto &post : history)
+        ++statuses[post.status];
+    QCOMPARE(statuses.value("success"), 2);
+    QCOMPARE(statuses.value("cancelled"), 2);
+    QVERIFY2(
+        !window->findChild<QTextBrowser *>("logBrowser")->toPlainText().contains("already exists"),
+        "the stopped post's archives blocked the new compression");
+    for (const auto &source : sources)
+        QVERIFY(source.first().exists());
+}
+
+void TestMainWindow::close_all_tabs_resets_to_quick_post_one()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "60" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *stop = window->findChild<QPushButton *>("stopAllTabsButton");
+    auto *close = window->findChild<QPushButton *>("closeAllTabsButton");
+    QVERIFY(stop && close);
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
+    // Nothing to close yet: the cross holds Stop's place, greyed.
+    QVERIFY(stop->isHidden() && !close->isHidden() && !close->isEnabled());
+    QCOMPARE(close->size(), stop->size());
+    QCOMPARE(close->iconSize(), stop->iconSize());
+    QCOMPARE(close->accessibleName(), QString("Close all tabs"));
+    QVERIFY(addShutdownTestFile(first, sandbox.rootPath() + "/1.bin"));
+    QVERIFY(close->isEnabled());
+    auto *second = window->addNewQuickTab(0);
+    window->addNewQuickTab(0);
+    QVERIFY(addShutdownTestFile(second, sandbox.rootPath() + "/2.bin"));
+    // While a post is in progress, Stop is back and the cross is gone.
+    second->onPostFiles();
+    QVERIFY(!stop->isHidden() && stop->isEnabled() && close->isHidden());
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs() && second->isPostingFinished(), 10000);
+    QVERIFY(stop->isHidden() && !close->isHidden() && close->isEnabled());
+
+    QString asked;
+    const auto answerWith = [&](QMessageBox::StandardButton button) {
+        QTimer::singleShot(0, window, [&asked, button] {
+            if (auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
+                asked = box->text();
+                box->button(button)->click(); // question() reads the clicked button
+            }
+        });
+    };
+    answerWith(QMessageBox::No);
+    close->click();
+    QCOMPARE(asked, QString("Are you sure? All tabs will be lost."));
+    QCOMPARE(tabs->count(), 6);
+    QVERIFY(!first->isBlank());
+
+    answerWith(QMessageBox::Yes);
+    close->click();
+    QCOMPARE(tabs->count(), 4); // History, Auto, Quick Post #1 and New
+    QCOMPARE(tabs->currentWidget(), first);
+    QVERIFY(first->isBlank());
+    QVERIFY(!close->isEnabled());
+    // Numbering starts over from #1.
+    QCOMPARE(window->addNewQuickTab(0)->jobNumber(), 2u);
 }
 
 void TestMainWindow::auto_posts_can_retry_preparation_failures_data()

@@ -39,6 +39,7 @@ class PostingWidget;
 class AutoPostWidget;
 class QCheckBox;
 class QComboBox;
+class QHBoxLayout;
 class QVBoxLayout;
 class QSplitter;
 class QDateEdit;
@@ -80,9 +81,14 @@ private:
     AutoPostWidget *_autoPostTab;
     QPushButton *_postAllButton = nullptr;
     QPushButton *_stopAllButton = nullptr;
+    //! Takes Stop's place while no post is in progress.
+    QPushButton *_closeAllButton = nullptr;
     void _refreshPostingControls();
+    void _refreshStopOrCloseAll();
+    bool _hasTabsToReset() const;
     void _fitPostingControls();
     void _buildPostingControls();
+    QPushButton *_addPostingControl(QHBoxLayout *layout, const char *name, const char *icon);
     void _retranslate();
     void _submitPreparedTabs();
     void _showManualUpdate(const QString &tag, const QUrl &releasePage);
@@ -323,6 +329,8 @@ private slots:
 
     void onSaveConfig();
     void onPostAllTabs();
+    //! Closes every Quick Post tab and empties #1, once the user confirms.
+    void onCloseAllTabs();
     void onPar2Settings();
     void updatePostAllButton();
 

@@ -26,6 +26,7 @@
 #include "MainWindow.h"
 #include "NgPost.h"
 #include "PostingJob.h"
+#include "history/PostHistoryService.h"
 #include "nntp/NntpFile.h"
 
 #include <QCheckBox>
@@ -49,6 +50,8 @@
 #include <QStatusBar>
 #include <QTimer>
 #include <QToolTip>
+
+#include <utility>
 
 
 PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber)
@@ -143,7 +146,7 @@ void PostingWidget::onPostingJobDone()
     else
         _hmi->clearJobTab(this);
 
-    _restoreAfterPreparationFailure();
+    _armResubmission();
     disconnect(_postingJob);
     _postingJob = nullptr; //!< we don't own it, NgPost will delete it
     _postingFinished = true;
@@ -157,22 +160,58 @@ bool PostingWidget::canSubmit() const
 
 bool PostingWidget::_hasPreparedFiles() const
 {
-    return (!_postingFinished || _retryablePreparationFailure) && _ui->filesList->count() > 0;
+    return (!_postingFinished || _resubmittable) && _ui->filesList->count() > 0;
 }
 
-void PostingWidget::_restoreAfterPreparationFailure()
+bool PostingWidget::isBlank() const
 {
-    // A fresh submission is safe only before any transfer started. Cancellations
-    // and history resumes keep their existing terminal/resume semantics.
-    _retryablePreparationFailure = !_postingJob->startedAtWall().isValid()
-        && !_postingJob->cancelRequested() && !_postingJob->isResumeFromHistory();
-    if (!_retryablePreparationFailure || _postingJob->inputPaths().isEmpty())
+    return _state == STATE::IDLE && !_postingJob && !_postingFinished
+        && _ui->filesList->count() == 0;
+}
+
+void PostingWidget::_armResubmission()
+{
+    // A fresh submission is safe before any transfer started, and after a stop:
+    // the post then starts over from scratch. A history resume keeps its resume
+    // semantics; the History tab is where it is resumed again.
+    bool const stopped = _postingJob->cancelRequested();
+    _resubmittable = !_postingJob->isResumeFromHistory()
+        && (stopped || !_postingJob->startedAtWall().isValid());
+    if (!_resubmittable)
+        return;
+    if (stopped) {
+        _stoppedAttempt = { _postingJob->historyPostId(),
+                            QFileInfo(_postingJob->nzbFilePath()).absoluteFilePath(),
+                            _postingJob->archiveFolder() };
+        // Ready to post again, not done: no OK/KO mark for what was cut short.
+        _hmi->clearJobTab(this);
+    }
+    if (_postingJob->inputPaths().isEmpty())
         return;
     // Packing may have replaced the list with temporary archives. Restore the
     // user's sources without regenerating the NZB name, password or metadata.
     _ui->filesList->clear2();
     for (const QString &path : _postingJob->inputPaths())
         _ui->filesList->addPath(path, QFileInfo(path).isDir());
+}
+
+void PostingWidget::_supersedeStoppedAttempt()
+{
+    // Posting a stopped post again from scratch replaces it. Its archives were
+    // kept for a resume and would make the new compression refuse the same
+    // folder; they are ngPost's own output, created by that job alone, and the
+    // sources they came from are untouched. Its history row is closed, since
+    // the NZB it may have written is about to be overwritten.
+    bool const replaceable = _stoppedAttemptIsReplaceable();
+    StoppedAttempt const stopped = std::exchange(_stoppedAttempt, {});
+    if (!replaceable)
+        return;
+    if (!stopped.archiveFolder.isEmpty() && QFileInfo::exists(stopped.archiveFolder)
+        && !QDir(stopped.archiveFolder).removeRecursively())
+        _hmi->logError(
+            tr("Could not remove the archives of the stopped post: %1").arg(stopped.archiveFolder));
+    if (stopped.historyPostId && _ngPost->historyService())
+        _ngPost->historyService()->setPostAbandoned(stopped.historyPostId);
 }
 
 QFileInfoList PostingWidget::previewFiles() const
@@ -229,30 +268,14 @@ void PostingWidget::postFiles(bool updateMainParams)
         if (!nzbPath.endsWith(".nzb"))
             nzbPath += ".nzb";
         if (!_confirmNzbOverwrite(nzbPath)) return;
+        // Before the job exists: an active one may compress at once.
+        _supersedeStoppedAttempt();
 
         _postingFinished = false;
+        _resubmittable = false;
         _state = STATE::POSTING;
         emit submissionEligibilityChanged();
-        options.nzbFilePath       = nzbPath;
-        options.files             = files;
-        // in the GUI the list holds exactly what the user dropped, folders included
-        options.inputPaths.reserve(files.size());
-        for (QFileInfo const &file : files)
-            options.inputPaths << file.absoluteFilePath();
-        // the GUI already asked about overwriting, and never deletes the sources
-        options.overwriteNzb      = true;
-        options.delFilesAfterPost = false;
-        // per post, deliberately not copied into the NgPost globals
-        // The fields belong to the post info feature as a whole: with the box
-        // unticked there is no sheet, and nothing to publish in the nzb either.
-        // Leaving them in would publish through a box the user just turned off.
-        options.writePostInfoFile = writesPostInfoFile();
-        if (options.writePostInfoFile)
-        {
-            options.meta             = _postInfoMeta;
-            options.postInfoTemplate = _postInfoTemplate;
-            options.postInfoOutput   = _postInfoOutput;
-        }
+        _fillJobOptions(options, nzbPath, files);
 
         _postingJob = new PostingJob(_ngPost, options, this);
 
@@ -280,13 +303,71 @@ void PostingWidget::postFiles(bool updateMainParams)
 }
 
 
+void PostingWidget::_fillJobOptions(PostingJobOptions &options,
+                                    const QString &nzbPath,
+                                    const QFileInfoList &files) const
+{
+    options.nzbFilePath = nzbPath;
+    options.files = files;
+    // in the GUI the list holds exactly what the user dropped, folders included
+    options.inputPaths.reserve(files.size());
+    for (QFileInfo const &file : files)
+        options.inputPaths << file.absoluteFilePath();
+    // the GUI already asked about overwriting, and never deletes the sources
+    options.overwriteNzb = true;
+    options.delFilesAfterPost = false;
+    // per post, deliberately not copied into the NgPost globals
+    // The fields belong to the post info feature as a whole: with the box
+    // unticked there is no sheet, and nothing to publish in the nzb either.
+    // Leaving them in would publish through a box the user just turned off.
+    options.writePostInfoFile = writesPostInfoFile();
+    if (options.writePostInfoFile) {
+        options.meta = _postInfoMeta;
+        options.postInfoTemplate = _postInfoTemplate;
+        options.postInfoOutput = _postInfoOutput;
+    }
+}
+
+bool PostingWidget::_stoppedAttemptIsReplaceable() const
+{
+    // Only while it is still the post this tab stopped. The History tab may
+    // have resumed it since, or be resuming it from these very archives: its
+    // NZB, archives and history row then belong to that resume.
+    qint64 const id = _stoppedAttempt.historyPostId;
+    if (!id)
+        return true;
+    QList<PostingJob *> jobs(_ngPost->_pendingJobs.cbegin(), _ngPost->_pendingJobs.cend());
+    jobs << _ngPost->_activeJob;
+    for (PostingJob const *job : jobs)
+        if (job && job->historyPostId() == id)
+            return false;
+    PostHistoryService::ResumeRow row;
+    if (auto *history = _ngPost->historyService())
+        history->checkResume(id, &row); // fills the row even when not resumable
+    return row.status != QLatin1String("success") && row.status != QLatin1String("posting");
+}
+
+bool PostingWidget::_isStoppedAttemptNzb(const QString &nzbPath) const
+{
+    // Written by the stopped post of this very tab, or already there when the
+    // user agreed to replace it for that post: asking again is noise.
+    return !_stoppedAttempt.nzbPath.isEmpty()
+        && QFileInfo(nzbPath).absoluteFilePath() == _stoppedAttempt.nzbPath
+        && _stoppedAttemptIsReplaceable();
+}
+
 bool PostingWidget::_confirmNzbOverwrite(const QString &nzbPath)
 {
     const quint64 generation = _ngPost->_postingCancelGeneration;
-    if (QFileInfo::exists(nzbPath)
-        && QMessageBox::question(nullptr, tr("Overwrite existing nzb file?"),
-                                 tr("The nzb file '%1' already exists.\nWould you like to overwrite it ?").arg(nzbPath),
-                                 QMessageBox::Yes, QMessageBox::No) != QMessageBox::Yes)
+    if (QFileInfo::exists(nzbPath) && !_isStoppedAttemptNzb(nzbPath)
+        && QMessageBox::question(
+               nullptr,
+               tr("Overwrite existing nzb file?"),
+               tr("The nzb file '%1' already exists.\nWould you like to overwrite it ?")
+                   .arg(nzbPath),
+               QMessageBox::Yes,
+               QMessageBox::No)
+            != QMessageBox::Yes)
         return false;
     return generation == _ngPost->_postingCancelGeneration;
 }
@@ -350,13 +431,13 @@ void PostingWidget::onClearFilesClicked()
     _postInfoOutput.clear();
     _ui->nzbFileEdit->clear();
     _ui->compressNameEdit->clear();
+    // A new post: the stopped one stays resumable from the History tab.
+    _stoppedAttempt = {};
     if (_hmi->hasAutoCompress())
     {
         onGenCompressName();
         onGenNzbPassword();
     }
-    else
-        _ui->compressNameEdit->clear();
 
     _hmi->clearJobTab(this);
 }
