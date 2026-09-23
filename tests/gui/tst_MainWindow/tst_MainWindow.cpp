@@ -5778,6 +5778,12 @@ void TestMainWindow::global_cancel_during_confirmation()
     QByteArray arg0("tst_MainWindow");
     char *argv[] = { arg0.data(), nullptr };
     NgPost ngPost(argc, argv);
+    // The stopped jobs are deleteLater()'d from inside the confirmation's modal
+    // loop, and the QTRY_VERIFY below can pass without running the event loop
+    // again. QTest would then delete them once this function has returned, and
+    // ~PostingJob would read the ngPost this frame no longer holds.
+    const auto deleteStoppedJobs = qScopeGuard(
+        [] { QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete); });
     QString error;
     auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &error);
     QVERIFY2(window, qPrintable(error));

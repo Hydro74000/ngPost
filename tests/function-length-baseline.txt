@@ -850,7 +850,7 @@
 23	src/hmi/MainWindow.cpp	MainWindow::_onResumePurge()
 42	src/hmi/MainWindow.cpp	MainWindow::_onResumeSelectionChanged()
 13	src/hmi/MainWindow.cpp	MainWindow::_onServerFieldEdited()
-126	src/hmi/MainWindow.cpp	MainWindow::_onStatsRefresh()
+122	src/hmi/MainWindow.cpp	MainWindow::_onStatsRefresh()
 4	src/hmi/MainWindow.cpp	MainWindow::_onToggleLogBox()
 8	src/hmi/MainWindow.cpp	MainWindow::_postingWidgets() const
 129	src/hmi/MainWindow.cpp	MainWindow::_refreshHistoryViews( bool rewindEmptyPage)
@@ -945,6 +945,7 @@
 6	src/hmi/MainWindow.cpp	ZoomPopupDismisser::ZoomPopupDismisser( QWidget * popup , QWidget * button)
 13	src/hmi/MainWindow.cpp	ZoomPopupDismisser::_dismissOutside( QWidget * receiver , const QMouseEvent * event)
 15	src/hmi/MainWindow.cpp	ZoomPopupDismisser::eventFilter( QObject * obj , QEvent * event)
+8	src/hmi/MainWindow.cpp	clearChart( QChart * chart)
 4	src/hmi/MainWindow.cpp	guiSettingsFilePath()
 10	src/hmi/MainWindow.cpp	histHumanSize( qint64 bytes)
 28	src/hmi/MainWindow.cpp	insertBoundedLogRun( QTextCursor & cursor , const QString & text , qsizetype pos , qsizetype runEnd , const QTextCharFormat & format)

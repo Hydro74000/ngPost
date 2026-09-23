@@ -1352,6 +1352,19 @@ static QColor statusColor(const QString &status)
     return qApp->palette().color(QPalette::WindowText);
 }
 
+//! Empties \a chart before it is filled again. removeAllSeries() deletes the
+//! series, but removeAxis() only hands each axis back, parentless: without the
+//! deleteLater() every refresh would leak them. Later, not now, because the
+//! chart drops the axis' graphics item with a deleteLater() of its own.
+static void clearChart(QChart *chart)
+{
+    chart->removeAllSeries();
+    for (QAbstractAxis *axis : chart->axes()) {
+        chart->removeAxis(axis);
+        axis->deleteLater();
+    }
+}
+
 } // namespace
 
 void MainWindow::_retranslateHistoryTab()
@@ -3113,9 +3126,7 @@ void MainWindow::_onStatsRefresh()
     }
 
     if (_statsTimelineChart) {
-        _statsTimelineChart->removeAllSeries();
-        for (QAbstractAxis *ax : _statsTimelineChart->axes())
-            _statsTimelineChart->removeAxis(ax);
+        clearChart(_statsTimelineChart);
 
         auto *volSet  = new QBarSet(tr("Volume (MB)"), _statsTimelineChart);
         auto *failSet = new QBarSet(tr("Failed"), _statsTimelineChart);
@@ -3146,9 +3157,7 @@ void MainWindow::_onStatsRefresh()
     }
 
     if (_statsGroupChart) {
-        _statsGroupChart->removeAllSeries();
-        for (QAbstractAxis *ax : _statsGroupChart->axes())
-            _statsGroupChart->removeAxis(ax);
+        clearChart(_statsGroupChart);
 
         auto *set = new QBarSet(tr("Posts"), _statsGroupChart);
         set->setColor(QColor(Qt::darkBlue));

@@ -14,12 +14,13 @@
 ####################################################
 
 ngPost v5.6 is a major feature, security, resilience, and performance release.
-It introduces sequential multi-tab posting with global queue controls, a guided
-PAR2 configuration dialog supporting modern parity engines (ParPar, MultiPar,
-par2j), deep NZB post verification with redundancy analysis, external configuration
-merging, an official headless build and Docker container, comprehensive VPN and
-credential security hardening, yEnc 1.3 compliance, and significant performance
-optimizations across the NNTP streaming pipeline and SQLite history store.
+It introduces sequential multi-tab posting with global queue controls, an interactive
+UI zoom level controller with dynamic interface scaling, a guided PAR2 configuration
+dialog supporting modern parity engines (ParPar, MultiPar, par2j), deep NZB post
+verification with redundancy analysis, external configuration merging, an official
+headless build and Docker container, comprehensive VPN and credential security
+hardening, yEnc 1.3 compliance, and significant performance optimizations across
+the NNTP streaming pipeline and SQLite history store.
 
 ====================================================
 1. FUNCTIONAL CHANGES (Partie fonctionnelle)
@@ -63,6 +64,17 @@ optimizations across the NNTP streaming pipeline and SQLite history store.
 - Pinned Startup Tab:
   * Ability to designate the default tab to display on startup via the tab bar
     context menu, highlighted with a bold tab title (StartupTabBar).
+- Interactive UI Zoom Level Control:
+  * Discrete status bar affordance featuring a seamless magnifying glass icon and
+    real-time zoom percentage badge (e.g. 100%).
+  * Clicking the icon toggles a compact popup slider anchored directly above the
+    status bar, with quick-reset to 100% and automatic dismissal on click-outside or Escape.
+  * Comprehensive interface scaling from 80% to 150%: dynamically scales typography,
+    buttons, inputs, spinboxes, headers, and table row heights across all tabs.
+  * Debounced persistence in ngPost.conf (UI_ZOOM) restoring user zoom preference across
+    sessions.
+  * Proportional tab dimensions and padding (em/ex metrics) adapting gracefully to
+    custom font scaling and High-DPI screens.
 - Inline Clipboard Copy Actions:
   * Quick-copy buttons with animated tooltips added to generated NZB name and
     archive password fields.
@@ -77,6 +89,8 @@ optimizations across the NNTP streaming pipeline and SQLite history store.
   * Official minimal container image based on Debian trixie-slim published to
     ghcr.io, running as an unprivileged user (1000:1000) with a read-only root,
     bundled with 7-Zip and par2cmdline.
+  * Pre-created /config and /data mount points owned by 1000:1000 so named or
+    anonymous volumes inherit unprivileged ownership out of the box.
   * Upgrading from the 5.5.x image, which ran as root: the files it wrote in the
     mounted config/ and data/ folders belong to root. Run
     `chown -R <uid>:<gid> config data` once, for the user the container runs as
@@ -250,7 +264,11 @@ optimizations across the NNTP streaming pipeline and SQLite history store.
   * Log block insertion bounded to 2,048 characters to prevent layout freezes.
 - Code Modernization & Architecture:
   * Major modularization of monolithic classes (NgPost, PostingJob, MainWindow,
-    NntpConnection) into focused components.
+    NntpConnection, VpnManager, Par2Settings, NzbCheck, NzbHistoryRegenerator)
+    into focused, cohesive components.
+  * Decomposed monolithic routines across PAR2 settings validation, VPN profile
+    enforcement, Windows security audits, and NZB recovery into discrete helpers
+    conforming to the <= 100-line function complexity gate.
   * Replaced raw buffer pointers with std::unique_ptr<char[]> in NntpArticle.
 - Complete Internationalization (i18n):
   * Full translation updates and 100% catalog completion across all seven
@@ -271,6 +289,7 @@ optimizations across the NNTP streaming pipeline and SQLite history store.
   * Bounded socket read buffer size during network signal processing to preserve
     Qt event loop responsiveness.
 - Memory Leaks & Undefined Behavior:
+  * Fixed QChart axis memory leak during statistics chart refresh.
   * Fixed QTranslator memory leak on application exit.
   * Cleaned up file list model connections in PostingWidget destructor.
   * Resolved integer overflow under UBSan in yEnc test suite.
@@ -287,8 +306,9 @@ Notes de version (Français) :
 ngPost v5.6 est une version majeure combinant de nouvelles fonctionnalités, un
 durcissement complet de la sécurité, une meilleure résilience des transferts et
 des optimisations substantielles de performances. Elle introduit notamment la file
-d'attente séquentielle multi-onglets avec contrôles globaux, un dialogue guidé de
-configuration PAR2 supportant les moteurs modernes (ParPar, MultiPar, par2j), une
+d'attente séquentielle multi-onglets avec contrôles globaux, un réglage interactif
+du niveau de zoom de l'interface avec mise à l'échelle dynamique, un dialogue guidé
+de configuration PAR2 supportant les moteurs modernes (ParPar, MultiPar, par2j), une
 vérification approfondie de l'intégrité des NZB avec calcul de réparabilité, la
 fusion intelligente de la configuration, un binaire headless officiel et son
 image Docker, la conformité yEnc 1.3, ainsi qu'une révision complète de la
@@ -337,6 +357,19 @@ sécurité VPN et de l'isolation des identifiants.
 - Épinglage de l'onglet de démarrage :
   * Possibilité de définir l'onglet ouvert par défaut au démarrage via le menu
     contextuel, mis en évidence par un intitulé en gras (StartupTabBar).
+- Réglage interactif du niveau de zoom de l'interface (UI Zoom) :
+  * Intégration discrète dans la barre d'état avec icône loupe sans contour et badge
+    affichant le pourcentage de zoom en temps réel (ex. 100 %).
+  * Clic sur l'icône ouvrant une fenêtre popup avec curseur (slider) aux dimensions
+    adaptées, ancrée directement au-dessus de la loupe, avec réinitialisation rapide à 100 %.
+  * Fermeture intuitive automatique au clic en dehors de la popup ou par la touche Échap.
+  * Mise à l'échelle complète de l'interface de 80 % à 150 % : adapte dynamiquement la
+    taille des polices, boutons, champs de saisie, spinboxes, en-têtes et hauteur des lignes
+    de tableaux sur l'ensemble des onglets.
+  * Mémorisation temporisée dans ngPost.conf (UI_ZOOM) restituant le niveau de zoom choisi
+    à chaque démarrage.
+  * Dimensions et marges des onglets dimensionnées proportionnellement aux métriques de police
+    (unités em/ex) pour un rendu net et homogène sur les écrans haute densité (HiDPI).
 - Boutons de copie rapide dans le presse-papiers :
   * Boutons de copie inline avec infobulle et confirmation visuelle pour le nom du
     fichier NZB et le mot de passe de l'archive.
@@ -351,6 +384,8 @@ sécurité VPN et de l'isolation des identifiants.
   * Image Docker officielle basée sur Debian trixie-slim publiée sur ghcr.io,
     exécutée sous utilisateur non-privilégié (1000:1000) avec système de fichiers
     root en lecture seule, incluant 7-Zip et par2cmdline.
+  * Pré-création des dossiers /config et /data avec propriétaire 1000:1000 dans l'image
+    pour un fonctionnement immédiat avec les volumes nommés sans conflit de permissions.
   * Mise à jour depuis l'image 5.5.x, qui tournait en root : les fichiers qu'elle a
     écrits dans les dossiers montés config/ et data/ appartiennent à root. Lancez
     une fois `chown -R <uid>:<gid> config data`, pour l'utilisateur du conteneur
@@ -538,7 +573,11 @@ sécurité VPN et de l'isolation des identifiants.
     de l'interface Qt.
 - Refactoring architectural & modernisation C++ :
   * Découpage et modularisation de plusieurs classes volumineuses (NgPost, PostingJob,
-    MainWindow, NntpConnection) en composants spécialisés.
+    MainWindow, NntpConnection, VpnManager, Par2Settings, NzbCheck, NzbHistoryRegenerator)
+    en composants spécialisés.
+  * Décomposition systématique des routines complexes de validation PAR2, de politiques
+    VPN, de sécurité Windows et de récupération NZB pour satisfaire la règle de complexité
+    cyclomatique et de longueur de fonction (<= 100 lignes).
   * Remplacement des pointeurs bruts par std::unique_ptr<char[]> dans NntpArticle.
 - Internationalisation (i18n) complète :
   * Synchronisation et complétion à 100 % des catalogues de traduction pour les
@@ -559,6 +598,7 @@ sécurité VPN et de l'isolation des identifiants.
   * Limitation de la taille du tampon de lecture lors du traitement des signaux
     réseau pour préserver la réactivité de la boucle d'événements.
 - Fuites de mémoire et stabilité :
+  * Élimination de la fuite mémoire des axes QChart lors du rafraîchissement des statistiques.
   * Libération propre des instances QTranslator à l'arrêt d'ngPost.
   * Déconnexion sécurisée du modèle de fichiers dans le destructeur de PostingWidget.
   * Correction d'un dépassement d'entier signé sous UBSan dans tst_Yenc.
