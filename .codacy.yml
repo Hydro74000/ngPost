@@ -1,0 +1,26 @@
+---
+engines:
+  duplication:
+    exclude_paths:
+      - "tests/**"
+      - "src/resources/**"
+      - "src/lang/**"
+  lizard:
+    exclude_paths:
+      - "tests/**"
+      - ".github/scripts/**"
+  bandit:
+    exclude_paths:
+      - "tests/**"
+      - ".github/scripts/**"
+  prospector:
+    exclude_paths:
+      - "tests/**"
+      - ".github/scripts/**"
+  flawfinder:
+    exclude_paths:
+      - "tests/**"
+exclude_paths:
+  - "tests/**"
+  - ".github/scripts/**"
+  - "templates/**"
