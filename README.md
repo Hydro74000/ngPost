@@ -15,7 +15,7 @@
 This application is a high-speed command line and GUI Usenet poster for binaries, designed for secure and efficient data posting. Developed with C++17 and [Qt 6.8.2](https://www.qt.io/blog/qt-6.8.2-released), it features file compression, par2 file generation, and a posting queue for managing multiple uploads. The tool automates tasks by scanning folders and posting files, with options for executing commands post-upload and shutting down the computer upon completion.
 
 
-![ngPost_v5.6](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.6.png?raw=true)
+![ngPost v5.6 multi-tab posting in progress](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.6_posting.png?raw=true)
 
 # Getting Started
 
@@ -134,6 +134,8 @@ startup** to choose the tab ngPost opens on.
 
 ### Quick Post
 
+![Quick Post](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.6.png?raw=true)
+
 Add files or folders to the list by:
 - clicking **Select Files** or **Select Folder**,
 - right-clicking the list, which opens the file selector,
@@ -192,6 +194,8 @@ in the main window:
 ## VPN Tunnel Support
 
 ngPost can route selected NNTP servers through an embedded VPN tunnel without changing the system default route. In the GUI, click **VPN...**:
+
+![VPN Settings](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.6_vpn.png?raw=true)
 
 1. **Setup** (Linux, once): **Install...** installs the privileged helper.
 2. **Profiles**: **New...**, choose the **OpenVPN** or **WireGuard** backend, select the configuration file (`.ovpn` or `.conf`) and, for OpenVPN, optional credentials. Then pick the **Active profile**.
@@ -258,6 +262,8 @@ post, the temporary archives and par2 files must still exist; for uncompressed
 files, path, size and modification time must still match.
 
 ### GUI — History, Statistics and Resume Center
+ 
+![History](https://github.com/Hydro74000/ngPost/blob/master/pics/ngPost_v5.6_history_fr.png?raw=true)
 
 The **History** tab gives full access to the posting database from the GUI:
 

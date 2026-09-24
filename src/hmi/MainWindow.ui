@@ -379,7 +379,7 @@ Unlike the per post box, this choice is saved.</string>
            <item>
             <widget class="QCheckBox" name="checkForUpdatesCB">
              <property name="toolTip">
-              <string>Check once a day for a new ngPost release on GitHub</string>
+              <string>Check GitHub for a new ngPost release at each start</string>
              </property>
              <property name="text">
               <string>Check for updates</string>

@@ -119,7 +119,7 @@ private slots:
         QFETCH(bool, prerelease);
         QFETCH(bool, offered);
         FakeUpdateNetwork network;
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         QSignalSpy available(&checker, &UpdateChecker::newVersionAvailable);
         const auto name = checker.assetNameForCurrentOS(tag);
         const QString url = "https://github.com/Hydro74000/ngPost/releases/download/" + tag + "/"
@@ -154,7 +154,7 @@ private slots:
     {
         QFETCH(QString, url);
         FakeUpdateNetwork network;
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         QSignalSpy available(&checker, &UpdateChecker::newVersionAvailable);
         QJsonObject release{ { "tag_name", "v99.0" },
                              { "assets",
@@ -174,7 +174,7 @@ private slots:
         const auto previous = qgetenv("APPIMAGE");
         qputenv("APPIMAGE", "/tmp/ngPost.AppImage");
         FakeUpdateNetwork network;
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         checker.checkLatestRelease();
         const bool requested = network.last != nullptr;
         const bool automatic = checker.canInstallAutomatically();
@@ -218,7 +218,7 @@ private slots:
     }
     void canceled_download_cannot_corrupt_a_retry() {
         FakeUpdateNetwork network;
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         checker._work.reset(new QTemporaryDir);
         QVERIFY(checker._work->isValid());
         QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
@@ -243,7 +243,7 @@ private slots:
     }
     void download_limit_aborts_without_completing() {
         FakeUpdateNetwork network;
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         checker._work.reset(new QTemporaryDir);
         bool completed = false;
         QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
@@ -257,7 +257,7 @@ private slots:
         QTemporaryDir work;
         const QString path = work.path();
         {
-            UpdateChecker checker(nullptr, nullptr);
+            UpdateChecker checker(nullptr);
             checker._work.reset(new QTemporaryDir(path + "/transaction-XXXXXX"));
             checker._work->setAutoRemove(false);
             checker._handoff = true;
@@ -271,7 +271,7 @@ private slots:
     //! polls for it (install_update.py). Dropping it is the whole job of
     //! cancelDownload(); nothing is reported because nothing went wrong.
     void cancel_writes_the_marker_the_detached_installer_polls_for() {
-        UpdateChecker checker(nullptr, nullptr);
+        UpdateChecker checker(nullptr);
         checker._work.reset(new QTemporaryDir);
         QVERIFY(checker._work->isValid());
         QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
@@ -288,7 +288,7 @@ private slots:
     //! Removing the work folder is what makes the write fail on every
     //! platform, and as any user -- a chmod would not stop root.
     void unwritable_marker_is_reported_once_the_installer_is_detached() {
-        UpdateChecker checker(nullptr, nullptr);
+        UpdateChecker checker(nullptr);
         checker._work.reset(new QTemporaryDir);
         QVERIFY(checker._work->isValid());
         QVERIFY(QDir().rmdir(checker._work->path()));
@@ -304,7 +304,7 @@ private slots:
     //! Before startDetached() there is no process to call off, so the same
     //! failed write is not worth a word: the download was aborted in-process.
     void unwritable_marker_is_silent_while_nothing_is_detached() {
-        UpdateChecker checker(nullptr, nullptr);
+        UpdateChecker checker(nullptr);
         checker._work.reset(new QTemporaryDir);
         QVERIFY(QDir().rmdir(checker._work->path()));
         QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
@@ -320,7 +320,7 @@ private slots:
     //! failed marker write warn about an installer that is not running, which
     //! is how a warning the user must trust becomes one they learn to ignore.
     void a_retry_does_not_inherit_the_previous_detached_state() {
-        UpdateChecker checker(nullptr, nullptr);
+        UpdateChecker checker(nullptr);
         checker._work.reset(new QTemporaryDir);
         QVERIFY(checker._work->isValid());
         QVERIFY(QDir().rmdir(checker._work->path())); // the marker write will fail
@@ -368,6 +368,16 @@ private slots:
     //! A stable install gets exactly the verdict the previous implementation
     //! gave, over every plausible pair of released versions.
     void a_stable_install_keeps_the_answers_it_had();
+
+    //! Every start checks, but the install popup comes back once a day at
+    //! most: the status-bar link covers the starts in between.
+    void install_popup_comes_back_once_a_day_data();
+    void install_popup_comes_back_once_a_day();
+
+    //! The plain-text release notes read as Markdown with real headings.
+    void release_notes_titles_become_headings();
+    void release_notes_code_blocks_stay_verbatim();
+    void release_notes_leave_the_title_and_hashes_to_github();
 };
 
 void TestUpdateChecker::stable_releases_order_by_number()
@@ -466,6 +476,82 @@ void TestUpdateChecker::a_stable_install_keeps_the_answers_it_had()
     }
 }
 
+void TestUpdateChecker::install_popup_comes_back_once_a_day_data()
+{
+    QTest::addColumn<qint64>("secondsSincePrompt");
+    QTest::addColumn<bool>("due");
+    QTest::newRow("never-prompted") << qint64(-1) << true;
+    QTest::newRow("a-minute-ago") << qint64(60) << false;
+    QTest::newRow("almost-a-day-ago") << qint64(24 * 3600 - 1) << false;
+    QTest::newRow("a-day-ago") << qint64(24 * 3600) << true;
+    QTest::newRow("days-ago") << qint64(3 * 24 * 3600) << true;
+    QTest::newRow("clock-set-back") << qint64(-3600) << true;
+}
+
+void TestUpdateChecker::install_popup_comes_back_once_a_day()
+{
+    QFETCH(qint64, secondsSincePrompt);
+    QFETCH(bool, due);
+    const qint64 now = 1790240360;
+    // -1 stands for the key missing from ngPost_gui.ini, which reads as 0.
+    const qint64 last = secondsSincePrompt == -1 ? 0 : now - secondsSincePrompt;
+    QCOMPARE(UpdateChecker::isPromptDue(last, now), due);
+}
+
+void TestUpdateChecker::release_notes_titles_become_headings()
+{
+    // The shape the release workflow publishes: Markdown around release_notes.txt.
+    const QString body = QStringLiteral("## Detailed release notes\r\n\r\n"
+                                        "Intro.\r\n\r\n"
+                                        "=====================\r\n"
+                                        "1. FUNCTIONAL CHANGES\r\n"
+                                        "=====================\r\n\r\n"
+                                        "--- Bug Fixes (Corrections) ---\r\n\r\n"
+                                        "- Item:\r\n"
+                                        "  * detail\r\n\r\n"
+                                        "=====================\r\n"
+                                        "Notes de version :\r\n");
+    QCOMPARE(UpdateChecker::releaseNotesMarkdown(body).split(QLatin1Char('\n')),
+             QStringList({ "## Detailed release notes",
+                           "",
+                           "Intro.",
+                           "",
+                           "",
+                           "### 1. FUNCTIONAL CHANGES",
+                           "",
+                           "",
+                           "",
+                           "#### Bug Fixes (Corrections)",
+                           "",
+                           "",
+                           "- Item:",
+                           "  * detail",
+                           "",
+                           "",
+                           "### Notes de version :",
+                           "",
+                           "" })); // the blank after the title, then the final line break
+}
+
+void TestUpdateChecker::release_notes_code_blocks_stay_verbatim()
+{
+    const QString body = QStringLiteral("```text\n=====\nTITLE\n=====\n--- x ---\n```\n"
+                                        "--- After ---");
+    QCOMPARE(UpdateChecker::releaseNotesMarkdown(body),
+             QStringLiteral("```text\n=====\nTITLE\n=====\n--- x ---\n```\n"
+                            "\n#### After\n"));
+}
+
+void TestUpdateChecker::release_notes_leave_the_title_and_hashes_to_github()
+{
+    const QString body = QStringLiteral("# Release v1.1\n## Commits since v1\n\n- fix (abc)\n"
+                                        "## SHA-256 integrity checks\n\nPackages...\n\n"
+                                        "```text\n## not a heading  ngPost.tar.gz\n```\n"
+                                        "## After\n\nkept");
+    QCOMPARE(UpdateChecker::releaseNotesMarkdown(body),
+             QStringLiteral("## Commits since v1\n\n- fix (abc)\n## After\n\nkept"));
+}
+
 // Run the real C++ download / Python preparation / detached handoff in a
 // disposable installation. Only the HTTP transport is substituted; trusted
 // production URLs, payload limits, resources and installer processes are real.
@@ -484,7 +570,7 @@ int main(int argc, char **argv)
                 return 3;
             network.responses.insert(it.key(), payload.readAll());
         }
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         QObject::connect(&checker,
                          &UpdateChecker::newVersionAvailable,
                          &checker,

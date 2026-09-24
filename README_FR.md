@@ -20,7 +20,7 @@ Voici la liste des principales fonctionnalités et atouts de ngPost:
   - multi-langues (Français, Allemand, Anglais, Chinois, Espagnol, Néerlandais, Portugais)
   - ...
 
-![ngPost_v5.6](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_fr.png)
+![ngPost v5.6 en cours de transfert multi-onglets](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_posting_fr.png)
 
 
 [Les versions pour chacun des OS sont disponibles ici](https://github.com/Hydro74000/ngPost/releases), pour Linux 64 bits, Windows 64 bits et macOS. Aucun paquet Raspbian récent n'est actuellement produit.
@@ -160,6 +160,8 @@ L'onglet **Nouveau** permet de créer d'autres Post Rapides.<br />
 
 L'onglet **Historique** regroupe trois sous-onglets :
 
+![Historique ngPost v5.6](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_history_fr.png)
+
 **Sous-onglet Historique** (recherche, filtres, détail)
 - Recherche par nom, chemin NZB ou nom d'archive.
 - Filtres : statut, présence d'un mot de passe, présence d'erreurs, plage de dates, newsgroup.
@@ -185,6 +187,8 @@ La reprise repose sur la base SQLite : les articles confirmés par le serveur so
 #### le tunnel VPN intégré (Linux et Windows):
 
 Le bouton **VPN...** ouvre les paramètres du tunnel VPN. Cette fonctionnalité est disponible sous Linux et Windows et permet de faire passer seulement les connexions NNTP de ngPost par un tunnel OpenVPN ou WireGuard, sans modifier la route par défaut du système et sans impacter les autres applications.<br/>
+
+![Configuration VPN](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_vpn_fr.png)
 
 La première utilisation nécessite l'installation du helper privilégié via **Install**. L'installation passe par `pkexec`/Polkit, installe les scripts dans `/var/lib/ngpost` et crée une règle Polkit limitée à l'utilisateur courant et au helper VPN de ngPost. Une fois installé, les boutons **Connect** et **Disconnect** ne redemandent plus le mot de passe.<br/>
 
@@ -221,6 +225,8 @@ useVpn = true
 
 
 #### le Post Rapide:
+ 
+![ngPost v5.6 - Post Rapide au repos](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_fr.png)
 
 C'est assez intuitif... Ajoutez des fichiers / dossiers dans la liste en:
   - cliquant sur les boutons **Choisir Fichiers** ou **Choisir Dossier**

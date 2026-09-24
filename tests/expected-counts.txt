@@ -51,7 +51,7 @@
 tst_CliParser                 68  Linux
 tst_FoldersMonitor            10  Linux
 tst_GoldenNzb                  4  Linux
-tst_MainWindow               203  Linux
+tst_MainWindow               206  Linux
 tst_MockNntp                   8  Linux
 tst_NntpFile                  29  Linux
 tst_OpenVpnConfigPolicy       74  Linux
@@ -62,7 +62,7 @@ tst_PostHistory               48  Linux
 tst_PostInfoTemplate          36  Linux
 tst_RandomToken                3  Linux
 tst_SecretMasker              22  Linux
-tst_UpdateChecker             35  Linux
+tst_UpdateChecker             44  Linux
 tst_VpnDnsResolver             8  Linux
 tst_VpnE2E_WireGuard           7  Linux
 tst_VpnProfile                62  Linux
@@ -83,7 +83,7 @@ tst_Yenc                      30  Linux
 tst_CliParser                 63  Darwin
 tst_FoldersMonitor            10  Darwin
 tst_GoldenNzb                  4  Darwin
-tst_MainWindow               157  Darwin
+tst_MainWindow               160  Darwin
 tst_MockNntp                   8  Darwin
 tst_NntpFile                  29  Darwin
 tst_OpenVpnConfigPolicy       74  Darwin
@@ -94,7 +94,7 @@ tst_PostHistory               48  Darwin
 tst_PostInfoTemplate          36  Darwin
 tst_RandomToken                3  Darwin
 tst_SecretMasker              22  Darwin
-tst_UpdateChecker             35  Darwin
+tst_UpdateChecker             44  Darwin
 tst_VpnDnsResolver             8  Darwin
 tst_VpnProfile                61  Darwin
 tst_VpnSocketBinder            8  Darwin
@@ -112,7 +112,7 @@ tst_Yenc                      30  Darwin
 tst_CliParser                 65  Windows
 tst_FoldersMonitor            10  Windows
 tst_GoldenNzb                  4  Windows
-tst_MainWindow               181  Windows
+tst_MainWindow               184  Windows
 tst_MockNntp                   8  Windows
 tst_NntpFile                  29  Windows
 tst_OpenVpnConfigPolicy       74  Windows
@@ -123,7 +123,7 @@ tst_PostHistory               48  Windows
 tst_PostInfoTemplate          34  Windows
 tst_RandomToken                3  Windows
 tst_SecretMasker              22  Windows
-tst_UpdateChecker             35  Windows
+tst_UpdateChecker             44  Windows
 tst_VpnDnsResolver             8  Windows
 tst_VpnProfile                62  Windows
 tst_VpnSocketBinder            8  Windows

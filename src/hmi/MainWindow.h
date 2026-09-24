@@ -43,6 +43,7 @@ class QHBoxLayout;
 class QVBoxLayout;
 class QSplitter;
 class QDateEdit;
+class QDialog;
 class QLabel;
 class QLineEdit;
 class QMenu;
@@ -92,6 +93,8 @@ private:
     void _retranslate();
     void _submitPreparedTabs();
     void _showManualUpdate(const QString &tag, const QUrl &releasePage);
+    QDialog *_createUpdateDialog(const QString &tag, const QString &notes, const QUrl &releasePage);
+    void _addReleaseNotes(QDialog *dialog, const QString &notes);
     void _downloadUpdate(UpdateChecker *checker);
     bool _isPostingQueueRunning() const;
     uint _nextQuickJobNumber();
@@ -227,6 +230,10 @@ public:
     bool isLogBoxCollapsedForTest() const { return _isLogBoxCollapsed(); }
     void toggleLogBoxForTest() { _onToggleLogBox(); }
     void setLogBoxCollapsedForTest(bool collapsed) { _setLogBoxCollapsed(collapsed, true); }
+    QDialog *createUpdateDialogForTest(const QString &tag, const QString &notes, const QUrl &page)
+    {
+        return _createUpdateDialog(tag, notes, page);
+    }
 #endif
 
     void updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded, const QString &avgSpeed = "0 B/s"

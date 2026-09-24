@@ -606,6 +606,14 @@ Voer een geheel aantal MiB tussen 0 en 1000000 in (0 schakelt splitsen alleen ui
         <translation>Update beschikbaar: %1</translation>
     </message>
     <message>
+        <source>Show release notes</source>
+        <translation>Release-opmerkingen tonen</translation>
+    </message>
+    <message>
+        <source>Hide release notes</source>
+        <translation>Release-opmerkingen verbergen</translation>
+    </message>
+    <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
         <translation>Voeg een server toe (je kunt er zoveel gebruiken als je wilt)</translation>
@@ -684,8 +692,8 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+20"/>
-        <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation>Eenmaal per dag controleren op een nieuwe ngPost-versie op GitHub</translation>
+        <source>Check GitHub for a new ngPost release at each start</source>
+        <translation>Bij elke start op GitHub controleren op een nieuwe ngPost-versie</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -4182,13 +4190,8 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     </message>
     <message>
         <location line="+3"/>
-        <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation>## eenmaal per dag controleren op een nieuwe ngPost-versie op GitHub (Hydro74000/ngPost)</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation>## (intern) tijdstempel van de laatste updatecontrole, epoch-seconden — automatisch beheerd</translation>
+        <source>## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start</source>
+        <translation>## bij elke start van de GUI op GitHub (Hydro74000/ngPost) controleren op een nieuwe ngPost-versie</translation>
     </message>
     <message>
         <location line="+13"/>

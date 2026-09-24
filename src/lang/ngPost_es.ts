@@ -604,6 +604,14 @@ Introduzca un número entero de MiB entre 0 y 1000000 (0 desactiva la división 
         <translation>Actualización disponible: %1</translation>
     </message>
     <message>
+        <source>Show release notes</source>
+        <translation>Mostrar las notas de la versión</translation>
+    </message>
+    <message>
+        <source>Hide release notes</source>
+        <translation>Ocultar las notas de la versión</translation>
+    </message>
+    <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
         <translation>Añade un servidor (puedes usar tantos como quieras)</translation>
@@ -692,8 +700,8 @@ A diferencia de la casilla por post, esta elección se guarda.</translation>
     </message>
     <message>
         <location line="+20"/>
-        <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation>Comprobar una vez al día si hay una nueva versión de ngPost en GitHub</translation>
+        <source>Check GitHub for a new ngPost release at each start</source>
+        <translation>Comprobar en cada inicio si hay una nueva versión de ngPost en GitHub</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -3848,13 +3856,8 @@ Su archivo de configuración activo es:
     </message>
     <message>
         <location line="+60"/>
-        <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation>## comprobar una vez al día si hay una nueva versión de ngPost en GitHub (Hydro74000/ngPost)</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation>## (interno) marca de tiempo de la última comprobación de actualización, segundos epoch — gestionado automáticamente</translation>
+        <source>## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start</source>
+        <translation>## comprobar en GitHub (Hydro74000/ngPost) si hay una nueva versión de ngPost en cada inicio de la GUI</translation>
     </message>
     <message>
         <location line="+13"/>

@@ -449,7 +449,6 @@ private:
     bool _removeAccentsOnNzbFileName;
     bool _autoCloseTabs;
     bool _checkForUpdates;
-    qint64 _lastUpdateCheckEpoch;
     uint _uiZoom = 100;
     bool _rarNoRootFolder;
     bool _keepNfoExtension; //!< when obfuscating file names, keep the .nfo extension visible

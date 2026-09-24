@@ -16,7 +16,6 @@
 #include <memory>
 #include <functional>
 
-class NgPost;
 class QNetworkAccessManager;
 class QNetworkReply;
 class QProcess;
@@ -27,7 +26,7 @@ class UpdateChecker : public QObject
 {
     Q_OBJECT
 public:
-    explicit UpdateChecker(NgPost *ngPost, QNetworkAccessManager *netMgr, QObject *parent = nullptr);
+    explicit UpdateChecker(QNetworkAccessManager *netMgr, QObject *parent = nullptr);
     ~UpdateChecker() override;
 
     void checkLatestRelease();
@@ -37,6 +36,18 @@ public:
     static bool isReplaceableInstallation(const QString &directory);
     bool canInstallAutomatically() const;
     static bool isTrustedDownloadUrl(const QUrl &url);
+
+    //! The install popup interrupts, so it comes back once a day at most; in
+    //! between, the status-bar link keeps the update visible. A last prompt in
+    //! the future (the clock was set back) never silences it.
+    static bool isPromptDue(qint64 lastPromptEpoch, qint64 nowEpoch);
+
+    //! A release body as Markdown fit for display. Its release notes are
+    //! release_notes.txt, plain text: "=====" banners around section titles and
+    //! "--- Title ---" subsections, which Markdown would render as stray "="
+    //! runs and titles lost in the text. Both become headings. The leading
+    //! title and the SHA-256 section are left to the release page.
+    static QString releaseNotesMarkdown(const QString &body);
 
     //! True when \a candidate supersedes \a current, both given as release
     //! tags. Numbers first; on a tie a stable release beats a pre-release of
@@ -90,7 +101,6 @@ private:
                            const QString &error,
                            const std::function<void()> &done);
     void prepareInstall();
-    void recordCheck();
     void failDownload(const QString &message);
 
     //! Drops the "cancelled" marker the detached installer polls for. False
@@ -103,9 +113,8 @@ private:
     static const QString sReleaseListApiUrl;
     static const QString sRepoOwner;
     static const QString sRepoName;
-    static const qint64  sCheckIntervalSeconds = 86400; // once per day
+    static constexpr qint64 sPromptIntervalSeconds = 24 * 3600;
 
-    NgPost                *_ngPost;
     QNetworkAccessManager *_netMgr;
     QNetworkReply         *_reply;
     QPointer<QNetworkReply> _downloadReply;

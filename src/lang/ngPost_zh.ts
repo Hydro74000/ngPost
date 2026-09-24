@@ -604,6 +604,14 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
         <translation>有可用更新：%1</translation>
     </message>
     <message>
+        <source>Show release notes</source>
+        <translation>显示版本说明</translation>
+    </message>
+    <message>
+        <source>Hide release notes</source>
+        <translation>隐藏版本说明</translation>
+    </message>
+    <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
         <translation>添加服务器（您可以使用多个服务器）</translation>
@@ -682,8 +690,8 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+20"/>
-        <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation>每天一次检查 GitHub 上的 ngPost 新版本</translation>
+        <source>Check GitHub for a new ngPost release at each start</source>
+        <translation>每次启动时检查 GitHub 上的 ngPost 新版本</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -4143,13 +4151,8 @@ Your active configuration file is:
     </message>
     <message>
         <location line="+3"/>
-        <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation>## 每天一次检查 GitHub 上的 ngPost 新版本 (Hydro74000/ngPost)</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation>## （内部）上次更新检查时间戳，纪元秒 — 自动管理</translation>
+        <source>## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start</source>
+        <translation>## 每次启动图形界面时检查 GitHub 上的 ngPost 新版本 (Hydro74000/ngPost)</translation>
     </message>
     <message>
         <location line="+3"/>
