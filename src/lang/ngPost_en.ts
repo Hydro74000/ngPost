@@ -2126,6 +2126,10 @@ Are you sure you want to quit?</source>
         <source>Are you sure? All tabs will be lost.</source>
         <translation>Are you sure? All tabs will be lost.</translation>
     </message>
+    <message>
+        <source>New %1 (%2)</source>
+        <translation>New %1 (%2)</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

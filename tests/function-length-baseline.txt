@@ -820,7 +820,7 @@
 63	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryStats()
 66	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTab()
 51	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTable( QSplitter * histSplitter)
-29	src/hmi/MainWindow.cpp	MainWindow::_buildPostingControls()
+40	src/hmi/MainWindow.cpp	MainWindow::_buildPostingControls()
 21	src/hmi/MainWindow.cpp	MainWindow::_configureWaylandSplitters()
 66	src/hmi/MainWindow.cpp	MainWindow::_connectHistoryControls()
 12	src/hmi/MainWindow.cpp	MainWindow::_connectPostingWidget( PostingWidget * post)
@@ -872,8 +872,9 @@
 14	src/hmi/MainWindow.cpp	MainWindow::_repositionZoomPopup()
 17	src/hmi/MainWindow.cpp	MainWindow::_resetHistoryColumns()
 21	src/hmi/MainWindow.cpp	MainWindow::_restoreHistoryColumns()
-49	src/hmi/MainWindow.cpp	MainWindow::_retranslate()
+46	src/hmi/MainWindow.cpp	MainWindow::_retranslate()
 120	src/hmi/MainWindow.cpp	MainWindow::_retranslateHistoryTab()
+10	src/hmi/MainWindow.cpp	MainWindow::_retranslateNewQuickTab()
 9	src/hmi/MainWindow.cpp	MainWindow::_saveHistoryColumns()
 8	src/hmi/MainWindow.cpp	MainWindow::_saveLogBoxState() const
 23	src/hmi/MainWindow.cpp	MainWindow::_scaleTables( int rowHeight)
@@ -886,27 +887,27 @@
 18	src/hmi/MainWindow.cpp	MainWindow::_showManualUpdate( const QString & tag , const QUrl & releasePage)
 38	src/hmi/MainWindow.cpp	MainWindow::_showUnattributedVpnDecision()
 16	src/hmi/MainWindow.cpp	MainWindow::_showZoomLevel( int percent)
-35	src/hmi/MainWindow.cpp	MainWindow::_startResumePost( qint64 postId , bool askConfirmation)
+34	src/hmi/MainWindow.cpp	MainWindow::_startResumePost( qint64 postId , bool askConfirmation)
 4	src/hmi/MainWindow.cpp	MainWindow::_startupTabBar() const
 17	src/hmi/MainWindow.cpp	MainWindow::_submitPreparedTabs()
 12	src/hmi/MainWindow.cpp	MainWindow::_toggleZoomPopup()
 33	src/hmi/MainWindow.cpp	MainWindow::_trimLogPane() const
 9	src/hmi/MainWindow.cpp	MainWindow::_updateLogToggleBtn()
-22	src/hmi/MainWindow.cpp	MainWindow::addNewQuickTab( int lastTabIdx , const QFileInfoList & files)
+19	src/hmi/MainWindow.cpp	MainWindow::addNewQuickTab( const QFileInfoList & files)
 15	src/hmi/MainWindow.cpp	MainWindow::applyUiZoom( int percent , bool userInteractive)
 4	src/hmi/MainWindow.cpp	MainWindow::buildHistoryTabForTest()
 13	src/hmi/MainWindow.cpp	MainWindow::changeEvent( QEvent * event)
 10	src/hmi/MainWindow.cpp	MainWindow::clearJobTab( QWidget * postWidget)
 63	src/hmi/MainWindow.cpp	MainWindow::closeEvent( QCloseEvent * event)
-26	src/hmi/MainWindow.cpp	MainWindow::closeTab( PostingWidget * postWidget)
+21	src/hmi/MainWindow.cpp	MainWindow::closeTab( PostingWidget * postWidget)
 5	src/hmi/MainWindow.cpp	MainWindow::dragEnterEvent( QDragEnterEvent * e)
 8	src/hmi/MainWindow.cpp	MainWindow::dropEvent( QDropEvent * e)
 17	src/hmi/MainWindow.cpp	MainWindow::eventFilter( QObject * obj , QEvent * event)
 4	src/hmi/MainWindow.cpp	MainWindow::fixedArchivePassword() const
 4	src/hmi/MainWindow.cpp	MainWindow::hasAutoCompress() const
-11	src/hmi/MainWindow.cpp	MainWindow::hasFinishedPosts() const
+10	src/hmi/MainWindow.cpp	MainWindow::hasFinishedPosts() const
 9	src/hmi/MainWindow.cpp	MainWindow::hasUnsubmittedPosts() const
-70	src/hmi/MainWindow.cpp	MainWindow::init( NgPost * ngPost)
+68	src/hmi/MainWindow.cpp	MainWindow::init( NgPost * ngPost)
 4	src/hmi/MainWindow.cpp	MainWindow::isDarkMode() const
 8	src/hmi/MainWindow.cpp	MainWindow::log( const QString & aMsg , bool newline) const
 4	src/hmi/MainWindow.cpp	MainWindow::logBlockCountForTest() const
@@ -916,14 +917,14 @@
 10	src/hmi/MainWindow.cpp	MainWindow::onAutoCompressToggled( bool checked)
 9	src/hmi/MainWindow.cpp	MainWindow::onCloseAllFinishedQuickTabs()
 18	src/hmi/MainWindow.cpp	MainWindow::onCloseAllTabs()
-24	src/hmi/MainWindow.cpp	MainWindow::onCloseJob( int index)
+20	src/hmi/MainWindow.cpp	MainWindow::onCloseJob( int index)
 13	src/hmi/MainWindow.cpp	MainWindow::onCompressionSettingsClicked()
 16	src/hmi/MainWindow.cpp	MainWindow::onDebugToggled( bool checked)
 5	src/hmi/MainWindow.cpp	MainWindow::onDebugValue( int value)
 17	src/hmi/MainWindow.cpp	MainWindow::onDelServer()
 4	src/hmi/MainWindow.cpp	MainWindow::onGenPoster()
-7	src/hmi/MainWindow.cpp	MainWindow::onJobTabClicked( int index)
 5	src/hmi/MainWindow.cpp	MainWindow::onLangChanged( const QString & lang)
+5	src/hmi/MainWindow.cpp	MainWindow::onNewQuickTab()
 19	src/hmi/MainWindow.cpp	MainWindow::onNewVersionAvailable( const QString & tag , const QString & notes , const QUrl & releasePage)
 11	src/hmi/MainWindow.cpp	MainWindow::onNzbPathClicked()
 8	src/hmi/MainWindow.cpp	MainWindow::onObfucateToggled( bool checked)
@@ -1134,6 +1135,7 @@
 10	src/hmi/SignedListWidget.cpp	SignedListWidget::removeItemWidget2( QListWidgetItem * item)
 9	src/hmi/SignedListWidget.cpp	SignedListWidget::resizeEvent( QResizeEvent * e)
 5	src/hmi/SignedListWidget.cpp	SignedListWidget::setSignature( const QString & str)
+18	src/hmi/StartupTabBar.cpp	StartupTabBar::minimumTabSizeHint( int index) const
 29	src/hmi/StartupTabBar.cpp	StartupTabBar::paintEvent( QPaintEvent *)
 10	src/hmi/StartupTabBar.cpp	StartupTabBar::setStartupTab( int index)
 14	src/hmi/StartupTabBar.cpp	StartupTabBar::tabSizeHint( int index) const

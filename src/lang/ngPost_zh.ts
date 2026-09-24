@@ -2139,6 +2139,10 @@ This also removes all associated file and article records.</source>
         <source>Are you sure? All tabs will be lost.</source>
         <translation>确定吗？所有标签页都将丢失。</translation>
     </message>
+    <message>
+        <source>New %1 (%2)</source>
+        <translation>新建%1 (%2)</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

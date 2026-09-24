@@ -2140,6 +2140,10 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <source>Are you sure? All tabs will be lost.</source>
         <translation>Weet u het zeker? Alle tabbladen gaan verloren.</translation>
     </message>
+    <message>
+        <source>New %1 (%2)</source>
+        <translation>Nieuwe %1 (%2)</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

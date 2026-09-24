@@ -127,7 +127,12 @@ the NNTP streaming pipeline and SQLite history store.
 
 - Main Tab Ergonomics & Navigation:
   * Logical tab ordering: History (tab 0), Folder Monitoring (tab 1), Quick
-    Post (tab 2+), and trailing "+" tab.
+    Post (tab 2+).
+  * The "+" that opens a new Quick Post tab is now a fixed button left of "Post
+    all tabs" (shortcut Ctrl+T) instead of a trailing tab that scrolled out of
+    sight once many tabs were open.
+  * A full tab bar first shortens Quick Post titles from the left, always keeping
+    their "#N", before showing scroll arrows; History and Auto keep their title.
   * Monotonic Quick Post numbering (Post #1, Post #2, ...): tab closing never
     reuses active IDs while tasks are running; counter resets only when idle.
   * Progress header label decoupled from active tab view: continuously displays

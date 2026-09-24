@@ -144,7 +144,7 @@ Press the Scan button and remove what you don't want to post ;)\n\
         if (nfo.isFile())
             postFiles << nfo;
 
-        PostingWidget *quickPostWidget = _hmi->addNewQuickTab(0, postFiles);
+        PostingWidget *quickPostWidget = _hmi->addNewQuickTab(postFiles);
         quickPostWidget->init();
         quickPostWidget->setPar2PercentageOverride(_ui->redundancySB->value());
         // One choice for the whole run: every post it launches gets it.

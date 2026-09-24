@@ -37,6 +37,7 @@ struct NntpServerParams;
 class NntpFile;
 class PostingWidget;
 class AutoPostWidget;
+class QAction;
 class QCheckBox;
 class QComboBox;
 class QHBoxLayout;
@@ -80,6 +81,8 @@ private:
     STATE           _state;
     PostingWidget  *_quickJobTab;
     AutoPostWidget *_autoPostTab;
+    //! The "+" next to Post All, and its Ctrl+T.
+    QAction *_newQuickTabAction = nullptr;
     QPushButton *_postAllButton = nullptr;
     QPushButton *_stopAllButton = nullptr;
     //! Takes Stop's place while no post is in progress.
@@ -89,6 +92,7 @@ private:
     bool _hasTabsToReset() const;
     void _fitPostingControls();
     void _buildPostingControls();
+    void _retranslateNewQuickTab();
     QPushButton *_addPostingControl(QHBoxLayout *layout, const char *name, const char *icon);
     void _retranslate();
     void _submitPreparedTabs();
@@ -249,7 +253,8 @@ public:
 
     QString fixedArchivePassword() const;
 
-    PostingWidget *addNewQuickTab(int lastTabIdx, const QFileInfoList &files = QFileInfoList());
+    //! Appends a Quick Post tab holding \a files, without selecting it.
+    PostingWidget *addNewQuickTab(const QFileInfoList &files = QFileInfoList());
 
     void setTab(QWidget *postWidget);
     void clearJobTab(QWidget *postWidget);
@@ -341,7 +346,7 @@ private slots:
     void onPar2Settings();
     void updatePostAllButton();
 
-    void onJobTabClicked(int index);
+    void onNewQuickTab();
     void onCloseJob(int index);
 
     void toBeImplemented();

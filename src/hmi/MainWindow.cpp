@@ -38,6 +38,7 @@
 
 #include <QCoreApplication>
 #include <QAbstractScrollArea>
+#include <QAction>
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QCheckBox>
@@ -349,7 +350,9 @@ void MainWindow::init(NgPost *ngPost)
 
     QTabBar *tabBar = _ui->postTabWidget->tabBar();
     tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
-    tabBar->setElideMode(Qt::TextElideMode::ElideNone);
+    // Once the bar is full, quick post tabs lose the start of their title before
+    // scroll arrows show up, never their "#N" (see StartupTabBar).
+    tabBar->setElideMode(Qt::TextElideMode::ElideLeft);
     tabBar->setIconSize({18, 18});
 
     _ui->postTabWidget->clear();
@@ -365,11 +368,7 @@ void MainWindow::init(NgPost *ngPost)
                                QIcon(":/icons/quick.svg"),
                                QString("%1 #1").arg(_ngPost->quickJobName()));
     tabBar->setTabToolTip(kQuickPostTab, tr("Default %1").arg(_ngPost->quickJobName()));
-    _ui->postTabWidget->addTab(new QWidget(_ui->postTabWidget), QIcon(":/icons/plus.png"), tr("New"));
-    tabBar->setTabToolTip(3, QString("Create a new %1").arg(_ngPost->quickJobName()));
 
-//    connect(_ui->postTabWidget,           &QTabWidget::currentChanged, this, &MainWindow::onJobTabClicked);
-    connect(tabBar, &QTabBar::tabBarClicked,              this, &MainWindow::onJobTabClicked);
     connect(tabBar, &QWidget::customContextMenuRequested, this, &MainWindow::onTabContextMenu);
     connect(tabBar, &QTabBar::tabCloseRequested,          this, &MainWindow::onCloseJob);
     _ui->postTabWidget->setTabsClosable(true);
@@ -842,7 +841,6 @@ void MainWindow::_retranslate()
 {
     QStringList serverTableHeader;
     QTabBar *tabBar = _ui->postTabWidget->tabBar();
-    const int lastTabIdx = tabBar->count() - 1;
     qDebug() << "MainWindow::changeEvent";
     _ui->retranslateUi(this);
     if (_par2SettingsButton) _par2SettingsButton->setText(tr("PAR2 Settings…"));
@@ -866,11 +864,10 @@ void MainWindow::_retranslate()
     tabBar->setTabToolTip(kAutoPostTab, _ngPost->folderMonitoringName());
     tabBar->setTabText(kHistoryTab, tr("History"));
     tabBar->setTabToolTip(kHistoryTab, tr("Post history, statistics and resume center"));
-    for (int i = 3 ; i < lastTabIdx; ++i)
+    for (int i = kNbFixedTabs; i < tabBar->count(); ++i)
         if (auto *post = _getPostWidget(i))
             tabBar->setTabText(i, QString("%1 #%2").arg(_ngPost->quickJobName()).arg(post->displayNumber()));
-    tabBar->setTabText(lastTabIdx, tr("New"));
-    tabBar->setTabToolTip(lastTabIdx, QString("Create a new %1").arg(_ngPost->quickJobName()));
+    _retranslateNewQuickTab();
 
     refreshJobLabel();
 
@@ -881,7 +878,7 @@ void MainWindow::_retranslate()
 
     _quickJobTab->retranslate();
     _autoPostTab->retranslate();
-    for (int i = kNbFixedTabs; i < _ui->postTabWidget->count() - 1; ++i)
+    for (int i = kNbFixedTabs; i < _ui->postTabWidget->count(); ++i)
         if (PostingWidget *postWidget = _getPostWidget(i))
             postWidget->retranslate();
     _retranslateHistoryTab();
@@ -1022,9 +1019,8 @@ void MainWindow::_connectPostingWidget(PostingWidget *post)
 
 bool MainWindow::hasFinishedPosts() const
 {
-    // Closable post tabs live after the fixed tabs and before "New", so the
-    // last of them is count() - 2: onCloseAllFinishedQuickTabs() starts there.
-    for (int idx = kNbFixedTabs; idx < _ui->postTabWidget->count() - 1; ++idx) {
+    // Closable post tabs are the ones after the fixed tabs.
+    for (int idx = kNbFixedTabs; idx < _ui->postTabWidget->count(); ++idx) {
         PostingWidget *postWidget = _getPostWidget(idx);
         if (postWidget && postWidget->isPostingFinished())
             return true;
@@ -1035,7 +1031,7 @@ bool MainWindow::hasFinishedPosts() const
 void MainWindow::onCloseAllFinishedQuickTabs()
 {
     // go backwards as we may delete the current tab ;)
-    for (int idx = _ui->postTabWidget->count() - 2; idx >= kNbFixedTabs; --idx) {
+    for (int idx = _ui->postTabWidget->count() - 1; idx >= kNbFixedTabs; --idx) {
         PostingWidget *postWidget = _getPostWidget(idx);
         if (postWidget && postWidget->isPostingFinished())
             onCloseJob(idx);
@@ -2317,21 +2313,18 @@ uint MainWindow::_nextQuickJobNumber()
     return ++_highestQuickJobNumber;
 }
 
-PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &files)
+PostingWidget *MainWindow::addNewQuickTab(const QFileInfoList &files)
 {
-    if (!lastTabIdx)
-        lastTabIdx = _ui->postTabWidget->count() -1;
     PostingWidget *newPostingWidget = new PostingWidget(_ngPost, this, _nextQuickJobNumber());
     newPostingWidget->init();
     if (_ngPost->uiZoom() != 100)
         _scaleWidgetChildren(newPostingWidget, _ngPost->uiZoom() / 100.0);
     _connectPostingWidget(newPostingWidget);
     QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(newPostingWidget->displayNumber());
-    _ui->postTabWidget->insertTab(lastTabIdx,
-                                  newPostingWidget ,
-                                  QIcon(":/icons/quick.svg"),
-                                  tabName);
-    _ui->postTabWidget->setTabToolTip(lastTabIdx, tabName);
+    const int index = _ui->postTabWidget->addTab(newPostingWidget,
+                                                 QIcon(":/icons/quick.svg"),
+                                                 tabName);
+    _ui->postTabWidget->setTabToolTip(index, tabName);
 
     for (const QFileInfo &file : files)
         newPostingWidget->addPath(file.absoluteFilePath(), 0, file.isDir());
@@ -2357,8 +2350,7 @@ bool MainWindow::_startResumePost(qint64 postId, bool askConfirmation)
             return false;
     }
 
-    const int lastTabIdx = _ui->postTabWidget->count() - 1;
-    PostingWidget *widget = addNewQuickTab(lastTabIdx);
+    PostingWidget *widget = addNewQuickTab();
     _ui->postTabWidget->setCurrentWidget(widget);
 
     QString err;
@@ -2378,7 +2370,7 @@ bool MainWindow::_startResumePost(qint64 postId, bool askConfirmation)
 
 void MainWindow::setTab(QWidget *postWidget)
 {
-    int nbJob = _ui->postTabWidget->count() -1;
+    int nbJob = _ui->postTabWidget->count();
     for (int i = 0 ; i < nbJob ; ++i)
     {
         if (_ui->postTabWidget->widget(i) == postWidget)
@@ -2568,7 +2560,7 @@ int MainWindow::_serverRow(QObject *delButton)
 
 PostingWidget *MainWindow::_getPostWidget(int tabIndex) const
 {
-    if (tabIndex >= kNbFixedTabs && tabIndex < _ui->postTabWidget->count() - 1)
+    if (tabIndex >= kNbFixedTabs && tabIndex < _ui->postTabWidget->count())
         return qobject_cast<PostingWidget*>(_ui->postTabWidget->widget(tabIndex));
     else
         return nullptr;
@@ -2576,7 +2568,7 @@ PostingWidget *MainWindow::_getPostWidget(int tabIndex) const
 
 int MainWindow::_getPostWidgetIndex(PostingWidget *postWidget) const
 {
-    int nbJob = _ui->postTabWidget->count() -1;
+    int nbJob = _ui->postTabWidget->count();
     for (int i = kNbFixedTabs; i < nbJob; ++i) {
         if (_ui->postTabWidget->widget(i) == postWidget)
             return i;
@@ -2689,6 +2681,16 @@ void MainWindow::_buildPostingControls()
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(4);
 
+    // Outside the tab bar, so neither a full bar nor its scrolling can hide it.
+    _newQuickTabAction = new QAction(QIcon(":/icons/plus.png"), tr("New"), this);
+    _newQuickTabAction->setShortcut(QKeySequence::AddTab);
+    auto *newQuickTabButton = new QToolButton(controls);
+    newQuickTabButton->setObjectName(QStringLiteral("newQuickTabButton"));
+    newQuickTabButton->setDefaultAction(_newQuickTabAction);
+    layout->addWidget(newQuickTabButton);
+    connect(_newQuickTabAction, &QAction::triggered, this, &MainWindow::onNewQuickTab);
+    _retranslateNewQuickTab();
+
     _postAllButton = new QPushButton(controls);
     _postAllButton->setObjectName(QStringLiteral("postAllTabsButton"));
     _postAllButton->setIcon(QIcon(":/icons/ngPost.png"));
@@ -2697,6 +2699,7 @@ void MainWindow::_buildPostingControls()
     // Move the existing global pause control next to Post All Tabs.
     layout->addWidget(_ui->pauseButton);
     _ui->pauseButton->setIconSize(_postAllButton->iconSize());
+    newQuickTabButton->setIconSize(_postAllButton->iconSize());
 
     // One of the two is shown at a time, see _refreshStopOrCloseAll().
     _stopAllButton = _addPostingControl(layout, "stopAllTabsButton", ":/icons/stop.png");
@@ -2710,6 +2713,17 @@ void MainWindow::_buildPostingControls()
     connect(_postAllButton, &QPushButton::clicked, this, &MainWindow::onPostAllTabs);
     connect(_ui->postTabWidget, &QTabWidget::currentChanged, this, &MainWindow::updatePostAllButton);
     updatePostAllButton();
+}
+
+void MainWindow::_retranslateNewQuickTab()
+{
+    if (!_newQuickTabAction)
+        return;
+    _newQuickTabAction->setText(tr("New"));
+    _newQuickTabAction->setToolTip(
+        tr("New %1 (%2)")
+            .arg(_ngPost->quickJobName(),
+                 _newQuickTabAction->shortcut().toString(QKeySequence::NativeText)));
 }
 
 QPushButton *MainWindow::_addPostingControl(QHBoxLayout *layout, const char *name, const char *icon)
@@ -2771,19 +2785,16 @@ void MainWindow::onSaveConfig()
     _ngPost->saveConfig();
 }
 
-void MainWindow::onJobTabClicked(int index)
+void MainWindow::onNewQuickTab()
 {
-    int nbJob = _ui->postTabWidget->count() -1;
-    qDebug() << "Click on tab: " << index << ", count: " << nbJob;
-    if (index == nbJob) // click on the last tab
-        addNewQuickTab(nbJob);
+    // Selecting it is also what scrolls a full tab bar to it.
+    _ui->postTabWidget->setCurrentWidget(addNewQuickTab());
 }
 
 void MainWindow::onCloseJob(int index)
 {
-    int nbJob = _ui->postTabWidget->count() -1;
-    qDebug() << "onCloseJob on tab: " << index << ", count: " << nbJob;
-    if (index >= kNbFixedTabs && index < nbJob) {
+    qDebug() << "onCloseJob on tab: " << index << ", count: " << _ui->postTabWidget->count();
+    if (index >= kNbFixedTabs) {
         PostingWidget *postWidget = _getPostWidget(index);
         if (!postWidget)
             return;
@@ -2797,9 +2808,6 @@ void MainWindow::onCloseJob(int index)
         {
             _ui->postTabWidget->removeTab(index);
             delete postWidget;
-
-            if (index == nbJob - 1)
-                _ui->postTabWidget->setCurrentIndex(_ui->postTabWidget->count() - 2);
         }
     }
 }
@@ -2820,14 +2828,9 @@ void MainWindow::closeTab(PostingWidget *postWidget)
     }
 
     int index = _getPostWidgetIndex(postWidget);
-    if (index)
-    {
-        int nbJob = _ui->postTabWidget->count() -1;
+    if (index) {
         _ui->postTabWidget->removeTab(index);
         delete postWidget;
-
-        if (index == nbJob - 1)
-            _ui->postTabWidget->setCurrentIndex(_ui->postTabWidget->count() - 2);
     }
 }
 

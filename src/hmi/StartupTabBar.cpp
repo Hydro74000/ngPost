@@ -79,6 +79,25 @@ QSize StartupTabBar::tabSizeHint(int index) const
     return size;
 }
 
+QSize StartupTabBar::minimumTabSizeHint(int index) const
+{
+    QSize size = tabSizeHint(index);
+    QString const text = tabText(index);
+    qsizetype const number = text.lastIndexOf(QLatin1Char('#'));
+    if (number <= 0)
+        return size;
+
+    // What is left once elided from the left (see the ElideLeft MainWindow
+    // gives the bar), measured bold like tabSizeHint() does.
+    QFont bold = font();
+    bold.setBold(true);
+    QFontMetrics const metrics(bold);
+    QString const shortest = QChar(0x2026) + text.mid(number);
+    size.setWidth(size.width() - metrics.horizontalAdvance(text)
+                  + metrics.horizontalAdvance(shortest));
+    return size;
+}
+
 StartupTabWidget::StartupTabWidget(QWidget *parent) : QTabWidget(parent)
 {
     // Same setup QTabWidget gives its own bar: the object name is what the

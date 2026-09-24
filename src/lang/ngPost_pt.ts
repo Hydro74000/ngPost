@@ -2138,6 +2138,10 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <source>Are you sure? All tabs will be lost.</source>
         <translation>Tem certeza? Todas as abas serão perdidas.</translation>
     </message>
+    <message>
+        <source>New %1 (%2)</source>
+        <translation>Nova %1 (%2)</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

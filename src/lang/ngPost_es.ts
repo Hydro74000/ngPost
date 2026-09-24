@@ -2138,6 +2138,10 @@ Are you sure you want to quit?</source>
         <source>Are you sure? All tabs will be lost.</source>
         <translation>¿Está seguro? Se perderán todas las pestañas.</translation>
     </message>
+    <message>
+        <source>New %1 (%2)</source>
+        <translation>Nueva %1 (%2)</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

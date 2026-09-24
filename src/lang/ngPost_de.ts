@@ -2139,6 +2139,10 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
         <source>Are you sure? All tabs will be lost.</source>
         <translation>Sind Sie sicher? Alle Tabs gehen verloren.</translation>
     </message>
+    <message>
+        <source>New %1 (%2)</source>
+        <translation>Neuer %1 (%2)</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

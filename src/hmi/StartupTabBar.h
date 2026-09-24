@@ -48,6 +48,11 @@ public:
 protected:
     void  paintEvent(QPaintEvent *event) override;
     QSize tabSizeHint(int index) const override;
+    //! How far a full bar may shrink a tab before scrolling: down to "…#N" for
+    //! a title ending with a number, not at all for the others. Qt's own floor
+    //! is three letters and an ellipsis, which leaves every quick post tab
+    //! looking the same.
+    QSize minimumTabSizeHint(int index) const override;
 
 private:
     int _startupTab = -1;
