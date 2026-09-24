@@ -831,8 +831,7 @@ void MainWindow::_retranslate()
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
     _ui->uploadLbl->setToolTip(tr("Immediate speed (avg on %1 sec) - (nb Articles uploaded / total number of Articles) - avg speed").arg(NgPost::immediateSpeedDuration()));
 #endif
-    _ui->shutdownCB->setToolTip(tr("Shutdown computer when all the current Posts are done (with command: %1)").arg(
-                                    _ngPost->_shutdownCmd));
+    _ui->shutdownCB->setToolTip(tr("Shutdown the computer once all the posts are done"));
 
     _ui->serverBox->setTitle(tr("Servers"));
     _ui->fileBox->setTitle(tr("Files"));

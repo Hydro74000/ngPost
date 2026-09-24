@@ -995,8 +995,8 @@ Cierre ese otro ngPost para usar la VPN aquí. Si no hay ninguno en ejecución, 
     </message>
     <message>
         <location line="+2"/>
-        <source>Shutdown computer when all the current Posts are done (with command: %1)</source>
-        <translation>Apagar el ordenador cuando todas las publicaciones actuales estén terminadas (con el comando: %1)</translation>
+        <source>Shutdown the computer once all the posts are done</source>
+        <translation>Apagar el ordenador una vez terminadas todas las publicaciones</translation>
     </message>
     <message>
         <location line="+3"/>

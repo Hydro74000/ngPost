@@ -1012,8 +1012,8 @@ Are you sure you want to quit?</source>
     </message>
     <message>
         <location line="+2"/>
-        <source>Shutdown computer when all the current Posts are done (with command: %1)</source>
-        <translation>完成所有当前发布后关闭计算机（使用命令: %1）</translation>
+        <source>Shutdown the computer once all the posts are done</source>
+        <translation>所有发布完成后关闭计算机</translation>
     </message>
     <message>
         <location line="+3"/>

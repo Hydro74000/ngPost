@@ -988,8 +988,8 @@ Fermez cet autre ngPost pour utiliser le VPN ici. Si aucun ne tourne, vous pouve
     </message>
     <message>
         <location line="+2"/>
-        <source>Shutdown computer when all the current Posts are done (with command: %1)</source>
-        <translation>Éteindre l&apos;ordinateur une fois tous les posts finis? (post en cours et ceux en attente) La commande utilisée est: %1</translation>
+        <source>Shutdown the computer once all the posts are done</source>
+        <translation>Éteindre l&apos;ordinateur une fois tous les posts terminés</translation>
     </message>
     <message>
         <location line="+3"/>

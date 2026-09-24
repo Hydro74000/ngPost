@@ -1012,8 +1012,8 @@ Tem certeza que deseja sair?</translation>
     </message>
     <message>
         <location line="+2"/>
-        <source>Shutdown computer when all the current Posts are done (with command: %1)</source>
-        <translation>Desligar o computador quando todas as Postagens atuais terminarem (com comando: %1)</translation>
+        <source>Shutdown the computer once all the posts are done</source>
+        <translation>Desligar o computador assim que todas as postagens terminarem</translation>
     </message>
     <message>
         <location line="+3"/>

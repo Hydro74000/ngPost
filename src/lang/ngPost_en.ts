@@ -985,7 +985,7 @@ Close that other ngPost to use the VPN here. If none is running, you can remove 
     </message>
     <message>
         <location line="+2"/>
-        <source>Shutdown computer when all the current Posts are done (with command: %1)</source>
+        <source>Shutdown the computer once all the posts are done</source>
         <translation></translation>
     </message>
     <message>

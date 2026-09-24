@@ -1014,8 +1014,8 @@ Weet je zeker dat je wilt stoppen?</translation>
     </message>
     <message>
         <location line="+2"/>
-        <source>Shutdown computer when all the current Posts are done (with command: %1)</source>
-        <translation>Computer afsluiten wanneer alle huidige posts  zijn voltooid (met opdracht:%1)</translation>
+        <source>Shutdown the computer once all the posts are done</source>
+        <translation>Computer afsluiten zodra alle posts zijn voltooid</translation>
     </message>
     <message>
         <location line="+3"/>
