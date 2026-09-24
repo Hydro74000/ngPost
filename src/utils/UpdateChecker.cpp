@@ -7,7 +7,6 @@
 #include "UpdateChecker.h"
 
 #include <QCoreApplication>
-#include <QDateTime>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -34,12 +33,11 @@ const QString UpdateChecker::sReleaseListApiUrl =
         QStringLiteral("https://api.github.com/repos/%1/%2/releases?per_page=20")
         .arg(UpdateChecker::sRepoOwner, UpdateChecker::sRepoName);
 
-UpdateChecker::UpdateChecker(NgPost *ngPost, QNetworkAccessManager *netMgr, QObject *parent)
-    : QObject(parent),
-      _ngPost(ngPost),
-      _netMgr(netMgr),
-      _reply(nullptr),
-      _assetSize(0)
+UpdateChecker::UpdateChecker(QNetworkAccessManager *netMgr, QObject *parent)
+    : QObject(parent)
+    , _netMgr(netMgr)
+    , _reply(nullptr)
+    , _assetSize(0)
 {}
 
 bool UpdateChecker::isAppImage()
@@ -242,7 +240,6 @@ void UpdateChecker::onReleaseInfoReceived()
     }
 
     const QJsonObject root = selectRelease(doc, buildTag());
-    recordCheck();
     if (root.isEmpty())
         return;
     _latestTag        = root.value("tag_name").toString();
@@ -299,14 +296,6 @@ QJsonObject UpdateChecker::selectRelease(const QJsonDocument &document, const QS
             best = release;
     }
     return best;
-}
-
-void UpdateChecker::recordCheck()
-{
-    if (_ngPost) {
-        _ngPost->_lastUpdateCheckEpoch = QDateTime::currentSecsSinceEpoch();
-        _ngPost->saveConfig();
-    }
 }
 
 QString UpdateChecker::assetNameForCurrentOS(const QString &tag) const

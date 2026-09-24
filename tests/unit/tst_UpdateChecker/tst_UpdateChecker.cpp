@@ -119,7 +119,7 @@ private slots:
         QFETCH(bool, prerelease);
         QFETCH(bool, offered);
         FakeUpdateNetwork network;
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         QSignalSpy available(&checker, &UpdateChecker::newVersionAvailable);
         const auto name = checker.assetNameForCurrentOS(tag);
         const QString url = "https://github.com/Hydro74000/ngPost/releases/download/" + tag + "/"
@@ -154,7 +154,7 @@ private slots:
     {
         QFETCH(QString, url);
         FakeUpdateNetwork network;
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         QSignalSpy available(&checker, &UpdateChecker::newVersionAvailable);
         QJsonObject release{ { "tag_name", "v99.0" },
                              { "assets",
@@ -174,7 +174,7 @@ private slots:
         const auto previous = qgetenv("APPIMAGE");
         qputenv("APPIMAGE", "/tmp/ngPost.AppImage");
         FakeUpdateNetwork network;
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         checker.checkLatestRelease();
         const bool requested = network.last != nullptr;
         const bool automatic = checker.canInstallAutomatically();
@@ -218,7 +218,7 @@ private slots:
     }
     void canceled_download_cannot_corrupt_a_retry() {
         FakeUpdateNetwork network;
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         checker._work.reset(new QTemporaryDir);
         QVERIFY(checker._work->isValid());
         QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
@@ -243,7 +243,7 @@ private slots:
     }
     void download_limit_aborts_without_completing() {
         FakeUpdateNetwork network;
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         checker._work.reset(new QTemporaryDir);
         bool completed = false;
         QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
@@ -257,7 +257,7 @@ private slots:
         QTemporaryDir work;
         const QString path = work.path();
         {
-            UpdateChecker checker(nullptr, nullptr);
+            UpdateChecker checker(nullptr);
             checker._work.reset(new QTemporaryDir(path + "/transaction-XXXXXX"));
             checker._work->setAutoRemove(false);
             checker._handoff = true;
@@ -271,7 +271,7 @@ private slots:
     //! polls for it (install_update.py). Dropping it is the whole job of
     //! cancelDownload(); nothing is reported because nothing went wrong.
     void cancel_writes_the_marker_the_detached_installer_polls_for() {
-        UpdateChecker checker(nullptr, nullptr);
+        UpdateChecker checker(nullptr);
         checker._work.reset(new QTemporaryDir);
         QVERIFY(checker._work->isValid());
         QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
@@ -288,7 +288,7 @@ private slots:
     //! Removing the work folder is what makes the write fail on every
     //! platform, and as any user -- a chmod would not stop root.
     void unwritable_marker_is_reported_once_the_installer_is_detached() {
-        UpdateChecker checker(nullptr, nullptr);
+        UpdateChecker checker(nullptr);
         checker._work.reset(new QTemporaryDir);
         QVERIFY(checker._work->isValid());
         QVERIFY(QDir().rmdir(checker._work->path()));
@@ -304,7 +304,7 @@ private slots:
     //! Before startDetached() there is no process to call off, so the same
     //! failed write is not worth a word: the download was aborted in-process.
     void unwritable_marker_is_silent_while_nothing_is_detached() {
-        UpdateChecker checker(nullptr, nullptr);
+        UpdateChecker checker(nullptr);
         checker._work.reset(new QTemporaryDir);
         QVERIFY(QDir().rmdir(checker._work->path()));
         QSignalSpy errors(&checker, &UpdateChecker::downloadFailed);
@@ -320,7 +320,7 @@ private slots:
     //! failed marker write warn about an installer that is not running, which
     //! is how a warning the user must trust becomes one they learn to ignore.
     void a_retry_does_not_inherit_the_previous_detached_state() {
-        UpdateChecker checker(nullptr, nullptr);
+        UpdateChecker checker(nullptr);
         checker._work.reset(new QTemporaryDir);
         QVERIFY(checker._work->isValid());
         QVERIFY(QDir().rmdir(checker._work->path())); // the marker write will fail
@@ -484,7 +484,7 @@ int main(int argc, char **argv)
                 return 3;
             network.responses.insert(it.key(), payload.readAll());
         }
-        UpdateChecker checker(nullptr, &network);
+        UpdateChecker checker(&network);
         QObject::connect(&checker,
                          &UpdateChecker::newVersionAvailable,
                          &checker,

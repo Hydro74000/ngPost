@@ -368,6 +368,8 @@ const QMap<NgPost::GROUP_POLICY, QString> NgPost::sGroupPolicies = {
 #if __DEBUG__ && QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
 #include <QNetworkConfigurationManager>
 #endif
+// Predates .clang-format, which would rewrap the whole list around any edit.
+// clang-format off
 NgPost::NgPost(int &argc, char *argv[]):
     QObject (), CmdOrGuiApp(argc, argv),
     _cout(stdout),
@@ -425,7 +427,6 @@ NgPost::NgPost(int &argc, char *argv[]):
     _removeAccentsOnNzbFileName(false),
     _autoCloseTabs(false),
     _checkForUpdates(true),
-    _lastUpdateCheckEpoch(0),
     _rarNoRootFolder(false),
     _keepNfoExtension(false),
     _copyNfoWithNzb(false),
@@ -449,6 +450,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _vpnManager(nullptr),
     _lastPostingStartCanceled(false),
     _logFile(nullptr), _logStream(nullptr)
+// clang-format on
 {
     QThread::currentThread()->setObjectName(sMainThreadName);
 
@@ -463,7 +465,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     connect(this, &NgPost::log,   this, &NgPost::onLog,   Qt::QueuedConnection);
     connect(this, &NgPost::error, this, &NgPost::onError, Qt::QueuedConnection);
 
-    _updateChecker = new UpdateChecker(this, &_netMgr, this);
+    _updateChecker = new UpdateChecker(&_netMgr, this);
 
     _postCmdRunner = new PostCmdRunner(_netMgr, this);
     connect(_postCmdRunner,
@@ -1442,7 +1444,7 @@ int NgPost::startHMI()
     connect(_updateChecker, &UpdateChecker::newVersionAvailable,
             _hmi,           &MainWindow::onNewVersionAvailable);
 
-    // run after parseDefaultConfig so CHECK_FOR_UPDATES + LAST_UPDATE_CHECK are loaded
+    // run after parseDefaultConfig so CHECK_FOR_UPDATES is loaded
     checkForNewVersion();
 
     return _app->exec();
@@ -1646,9 +1648,9 @@ void NgPost::checkForNewVersion()
 {
     if (!_checkForUpdates)
         return;
-    const qint64 now = QDateTime::currentSecsSinceEpoch();
-    if (_lastUpdateCheckEpoch > 0 && (now - _lastUpdateCheckEpoch) < 86400)
-        return; // once per day
+    // Every GUI start, asynchronously. A daily cadence missed any release
+    // published after the last check, and forgot the one it had announced on
+    // the next start. GitHub's anonymous quota is per client IP, not per app.
     _updateChecker->checkLatestRelease();
 }
 
@@ -4292,7 +4294,7 @@ bool NgPost::_parseConfigDisplayKey(const QString &opt, QString val)
         val = val.toLower();
         _checkForUpdates = (val == "true" || val == "on" || val == "1");
     } else if (opt == sOptionNames[Opt::LAST_UPDATE_CHECK]) {
-        _lastUpdateCheckEpoch = val.toLongLong();
+        // Retired with the daily check; known, so the next save drops the line.
     } else if (opt == sOptionNames[Opt::UI_ZOOM]) {
         int const nb = val.toInt(&ok);
         if (ok && nb >= 80 && nb <= 150) // the range the zoom slider offers
@@ -5935,10 +5937,8 @@ void NgPost::_writeConfigPosting(QTextStream &stream)
            << tr("## close Quick Post Tabs when posted successfully (for the GUI)") << "\n"
            << (_autoCloseTabs  ? "" : "#") << "AUTO_CLOSE_TABS = true\n"
            << "\n"
-           << tr("## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)") << "\n"
+           << tr("## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start") << "\n"
            << "CHECK_FOR_UPDATES = " << (_checkForUpdates ? "true" : "false") << "\n"
-           << tr("## (internal) last update check timestamp, epoch seconds \xe2\x80\x94 managed automatically") << "\n"
-           << "LAST_UPDATE_CHECK = " << _lastUpdateCheckEpoch << "\n"
            << "\n"
            << tr("## User interface zoom percentage (80 to 150, default 100)") << "\n"
            << "UI_ZOOM = " << _uiZoom << "\n"

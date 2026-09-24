@@ -682,8 +682,8 @@ Ao contrário da caixa por post, esta escolha é guardada.</translation>
     </message>
     <message>
         <location line="+20"/>
-        <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation>Verificar uma vez por dia se há uma nova versão do ngPost no GitHub</translation>
+        <source>Check GitHub for a new ngPost release at each start</source>
+        <translation>Verificar a cada início se há uma nova versão do ngPost no GitHub</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -4142,13 +4142,8 @@ O seu ficheiro de configuração activo é:
     </message>
     <message>
         <location line="+3"/>
-        <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation>## verificar uma vez por dia se há uma nova versão do ngPost no GitHub (Hydro74000/ngPost)</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation>## (interno) timestamp da última verificação de atualização, segundos epoch — gerido automaticamente</translation>
+        <source>## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start</source>
+        <translation>## verificar no GitHub (Hydro74000/ngPost) se há uma nova versão do ngPost a cada início da GUI</translation>
     </message>
     <message>
         <location line="+3"/>

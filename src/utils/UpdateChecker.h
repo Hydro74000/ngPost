@@ -16,7 +16,6 @@
 #include <memory>
 #include <functional>
 
-class NgPost;
 class QNetworkAccessManager;
 class QNetworkReply;
 class QProcess;
@@ -27,7 +26,7 @@ class UpdateChecker : public QObject
 {
     Q_OBJECT
 public:
-    explicit UpdateChecker(NgPost *ngPost, QNetworkAccessManager *netMgr, QObject *parent = nullptr);
+    explicit UpdateChecker(QNetworkAccessManager *netMgr, QObject *parent = nullptr);
     ~UpdateChecker() override;
 
     void checkLatestRelease();
@@ -90,7 +89,6 @@ private:
                            const QString &error,
                            const std::function<void()> &done);
     void prepareInstall();
-    void recordCheck();
     void failDownload(const QString &message);
 
     //! Drops the "cancelled" marker the detached installer polls for. False
@@ -103,9 +101,7 @@ private:
     static const QString sReleaseListApiUrl;
     static const QString sRepoOwner;
     static const QString sRepoName;
-    static const qint64  sCheckIntervalSeconds = 86400; // once per day
 
-    NgPost                *_ngPost;
     QNetworkAccessManager *_netMgr;
     QNetworkReply         *_reply;
     QPointer<QNetworkReply> _downloadReply;

@@ -38,6 +38,10 @@ the NNTP streaming pipeline and SQLite history store.
   * Source builds, AppImages and Setup-managed installs announce updates in red
     in the status bar, with a clickable version-specific release link. Portable
     installations keep their existing Install and Restart popup.
+  * The release check now runs asynchronously at every GUI start instead of once
+    a day, so a release published after the last check is no longer missed and a
+    known update stays visible across restarts. LAST_UPDATE_CHECK is retired
+    and dropped from ngPost.conf on the next save.
   * Update dialogs hold automatic shutdown during the update interaction.
 - Sequential Multi-Tab Posting & Global Queue Controls:
   * "Post all" button added to submit all prepared Quick Post tabs sequentially

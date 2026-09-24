@@ -682,8 +682,8 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+20"/>
-        <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation>每天一次检查 GitHub 上的 ngPost 新版本</translation>
+        <source>Check GitHub for a new ngPost release at each start</source>
+        <translation>每次启动时检查 GitHub 上的 ngPost 新版本</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -4143,13 +4143,8 @@ Your active configuration file is:
     </message>
     <message>
         <location line="+3"/>
-        <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation>## 每天一次检查 GitHub 上的 ngPost 新版本 (Hydro74000/ngPost)</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation>## （内部）上次更新检查时间戳，纪元秒 — 自动管理</translation>
+        <source>## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start</source>
+        <translation>## 每次启动图形界面时检查 GitHub 上的 ngPost 新版本 (Hydro74000/ngPost)</translation>
     </message>
     <message>
         <location line="+3"/>

@@ -121,6 +121,8 @@ private slots:
     //! A save writes what ngPost holds in memory: an edit made in the file
     //! meanwhile must be kept aside instead of vanishing.
     void an_external_edit_is_merged_into_the_next_save();
+    //! LAST_UPDATE_CHECK paced the retired daily check: the next save drops it.
+    void a_retired_update_timestamp_is_dropped_on_save();
     void an_external_edit_ngPost_cannot_take_now_stays_in_the_file();
     //! The parser reads a setting wherever it stands, below the [server] blocks
     //! included -- where appending a line puts it. The merge must read it there too.
@@ -4113,6 +4115,30 @@ void TestMainWindow::an_external_edit_is_merged_into_the_next_save()
                  ->toPlainText()
                  .contains("so it stops using them: par2_args_custom"),
              "the log must say the line was turned off");
+}
+
+void TestMainWindow::a_retired_update_timestamp_is_dropped_on_save()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    // Written by 5.5.1 and the first 5.6 unstables to pace a daily check.
+    auto *window = bootWindow(ngPost,
+                              "GROUPS = alt.binaries.test\nLAST_UPDATE_CHECK = 1790196378\n",
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    ngPost.saveConfig();
+
+    QFile file(PathHelper::configFilePath());
+    QVERIFY(file.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QString saved = QString::fromUtf8(file.readAll());
+    // Gone, not kept aside as a line the user added.
+    QVERIFY2(!saved.contains("LAST_UPDATE_CHECK", Qt::CaseInsensitive), qPrintable(saved));
+    QVERIFY2(!saved.contains("## Added to your configuration file"), qPrintable(saved));
+    QVERIFY2(saved.contains("CHECK_FOR_UPDATES = true\n"), qPrintable(saved));
 }
 
 void TestMainWindow::an_external_edit_ngPost_cannot_take_now_stays_in_the_file()

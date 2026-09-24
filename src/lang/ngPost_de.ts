@@ -704,8 +704,8 @@ Anders als das Kästchen pro Post wird diese Wahl gespeichert.</translation>
     </message>
     <message>
         <location line="+20"/>
-        <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation>Einmal täglich nach einem neuen ngPost-Release auf GitHub suchen</translation>
+        <source>Check GitHub for a new ngPost release at each start</source>
+        <translation>Bei jedem Start auf GitHub nach einem neuen ngPost-Release suchen</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -4173,13 +4173,8 @@ Ihre aktive Konfigurationsdatei ist:
     </message>
     <message>
         <location line="+12"/>
-        <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation>## einmal täglich nach einem neuen ngPost-Release auf GitHub suchen (Hydro74000/ngPost)</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation>## (intern) Zeitstempel der letzten Update-Prüfung, Epochensekunden — wird automatisch verwaltet</translation>
+        <source>## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start</source>
+        <translation>## bei jedem Start der GUI auf GitHub (Hydro74000/ngPost) nach einem neuen ngPost-Release suchen</translation>
     </message>
     <message>
         <location line="+13"/>

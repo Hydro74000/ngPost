@@ -672,8 +672,8 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+20"/>
-        <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation>Check once a day for a new ngPost release on GitHub</translation>
+        <source>Check GitHub for a new ngPost release at each start</source>
+        <translation>Check GitHub for a new ngPost release at each start</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -3890,13 +3890,8 @@ One thing does change for such a script: the old configuration file has no POST_
     </message>
     <message>
         <location line="+96"/>
-        <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation>## (internal) last update check timestamp, epoch seconds — managed automatically</translation>
+        <source>## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start</source>
+        <translation>## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start</translation>
     </message>
     <message>
         <location line="+13"/>
