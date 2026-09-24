@@ -2139,8 +2139,8 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>Tem certeza? Todas as abas serão perdidas.</translation>
     </message>
     <message>
-        <source>New %1 (%2)</source>
-        <translation>Nova %1 (%2)</translation>
+        <source>New tab (%1)</source>
+        <translation>Nova aba (%1)</translation>
     </message>
 </context>
 <context>
@@ -7139,6 +7139,21 @@ Alguns índices Usenet pedem um.</translation>
         <location line="+3"/>
         <source>post can be resumed</source>
         <translation>o post pode ser retomado</translation>
+    </message>
+</context>
+<context>
+    <name>StartupTabBar</name>
+    <message>
+        <source>Scroll left
+%1click: back to the first tab</source>
+        <translation>Rolar para a esquerda
+%1clique: voltar à primeira aba</translation>
+    </message>
+    <message>
+        <source>Scroll right
+%1click: on to the last tab</source>
+        <translation>Rolar para a direita
+%1clique: ir para a última aba</translation>
     </message>
 </context>
 <context>

@@ -217,6 +217,12 @@ private slots:
     //! A full bar shrinks the quick post tabs before it scrolls, down to
     //! "…#N" and no further; History and Auto keep their whole title.
     void full_tab_bar_shrinks_quick_posts_but_keeps_their_number();
+    //! plus.png is dark grey: on a dark palette the "+" is repainted in the
+    //! button text colour, or it reads as disabled.
+    void new_quick_tab_icon_is_light_on_a_dark_palette();
+    //! A Ctrl+click on a scroll arrow runs the bar to that end without
+    //! changing the current tab; the arrows' tooltips say so.
+    void tab_scroll_arrows_ctrl_click_run_to_either_end();
     void tabs_match_posting_controls_height();
     void progress_label_tracks_the_running_post_data();
     void progress_label_tracks_the_running_post();
@@ -5669,15 +5675,23 @@ void TestMainWindow::shutdown_waits_during_input_dialogs()
         } else
             dialog->done(QMessageBox::No);
     });
-    // Bound failures: a missed completion must fail instead of hanging CI.
+    // Bound failures: a missed completion must fail instead of hanging CI. A
+    // Windows runner once got here with sawDialog false: say which half was
+    // missing, the dialog or the end of the post behind it.
     QTimer timeout;
+    QString timedOut;
     timeout.setSingleShot(true);
-    connect(&timeout, &QTimer::timeout, window, [] {
-        if (auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget()))
+    connect(&timeout, &QTimer::timeout, window, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        timedOut = QString("timed out: modal dialog %1, first post finished %2, posting %3")
+                       .arg(dialog ? dialog->metaObject()->className() : "none")
+                       .arg(first->isPostingFinished())
+                       .arg(first->isPosting());
+        if (dialog)
             dialog->reject();
     });
     answer.start(5);
-    timeout.start(15000);
+    timeout.start(30000);
     first->postFiles(true);
     if (dialogKind == "history")
         QVERIFY(!window->resumePostForTest(1));
@@ -5697,7 +5711,8 @@ void TestMainWindow::shutdown_waits_during_input_dialogs()
                                           Qt::DirectConnection));
     answer.stop();
     timeout.stop();
-    QVERIFY(sawDialog);
+    QVERIFY2(sawDialog,
+             qPrintable(timedOut.isEmpty() ? QString("the dialog closed unanswered") : timedOut));
     QVERIFY2(blocked, "Shutdown started while waiting for user input");
     if (selectInput) {
         QVERIFY(empty->canSubmit());
@@ -7099,8 +7114,10 @@ void TestMainWindow::new_quick_tab_button_stays_visible_and_answers_ctrl_t()
     auto *add = window->findChild<QToolButton *>("newQuickTabButton");
     QVERIFY(tabs && add);
     QVERIFY(tabs->cornerWidget(Qt::TopRightCorner)->isAncestorOf(add));
-    QVERIFY(add->toolTip().contains(
-        QKeySequence(QKeySequence::AddTab).toString(QKeySequence::NativeText)));
+    // Ctrl+T itself: QKeySequence::AddTab is Ctrl+Shift+N under KDE.
+    const QKeySequence ctrlT(Qt::CTRL | Qt::Key_T);
+    QCOMPARE(add->defaultAction()->shortcut(), ctrlT);
+    QVERIFY(add->toolTip().contains(ctrlT.toString(QKeySequence::NativeText)));
     for (int i = 0; i < 20; ++i)
         window->addNewQuickTab();
     window->resize(900, 800);
@@ -7128,7 +7145,7 @@ void TestMainWindow::new_quick_tab_button_stays_visible_and_answers_ctrl_t()
     QTRY_VERIFY(bar->rect().contains(bar->tabRect(bar->currentIndex())));
 
     tabs->setCurrentIndex(0);
-    QTest::keySequence(window, QKeySequence(QKeySequence::AddTab));
+    QTest::keySequence(window, ctrlT);
     QCOMPARE(tabs->count(), 25);
     auto *typed = qobject_cast<PostingWidget *>(tabs->currentWidget());
     QVERIFY(typed && typed != clicked);
@@ -7177,6 +7194,99 @@ void TestMainWindow::full_tab_bar_shrinks_quick_posts_but_keeps_their_number()
                                 .arg(bar->tabRect(index).width())
                                 .arg(least)));
     }
+}
+
+namespace
+{
+//! Mean lightness of the visible pixels of \a icon.
+int iconLightness(const QIcon &icon)
+{
+    const QImage image = icon.pixmap(32, 32).toImage();
+    qint64 sum = 0, count = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x)
+            if (const QColor pixel = image.pixelColor(x, y); pixel.alpha() > 128) {
+                sum += pixel.lightness();
+                ++count;
+            }
+    return count ? int(sum / count) : -1;
+}
+} // namespace
+
+void TestMainWindow::new_quick_tab_icon_is_light_on_a_dark_palette()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *add = window->findChild<QToolButton *>("newQuickTabButton");
+    QVERIFY(add);
+
+    QPalette light = window->palette();
+    light.setColor(QPalette::Window, QColor(0xEF, 0xEF, 0xEF));
+    light.setColor(QPalette::ButtonText, Qt::black);
+    window->setPalette(light);
+    QVERIFY(iconLightness(add->icon()) < 128);
+
+    QPalette dark = light;
+    dark.setColor(QPalette::Window, QColor(0x2A, 0x2A, 0x2A));
+    dark.setColor(QPalette::ButtonText, QColor(0xF0, 0xF0, 0xF0));
+    window->setPalette(dark);
+    QVERIFY(iconLightness(add->icon()) > 200);
+
+    window->setPalette(light);
+    QVERIFY(iconLightness(add->icon()) < 128);
+}
+
+void TestMainWindow::tab_scroll_arrows_ctrl_click_run_to_either_end()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    QTabBar *bar = tabs->tabBar();
+    auto *left = bar->findChild<QToolButton *>("ScrollLeftButton");
+    auto *right = bar->findChild<QToolButton *>("ScrollRightButton");
+    QVERIFY(left && right);
+    const QString ctrl = QKeySequence(Qt::CTRL).toString(QKeySequence::NativeText);
+    QVERIFY(left->toolTip().contains(ctrl));
+    QVERIFY(right->toolTip().contains(ctrl));
+    ngPost.changeLanguage("fr");
+    QCoreApplication::processEvents();
+    QVERIFY(left->toolTip().contains(QString("%1clic").arg(ctrl)));
+    ngPost.changeLanguage("en");
+
+    for (int i = 0; i < 20; ++i)
+        window->addNewQuickTab();
+    window->resize(900, 800);
+    window->show();
+    tabs->setCurrentIndex(12);
+    QCoreApplication::processEvents();
+    const int last = tabs->count() - 1;
+    QVERIFY(left->isEnabled() && right->isEnabled());
+
+    QTest::mouseClick(right, Qt::LeftButton, Qt::ControlModifier);
+    QVERIFY(!right->isEnabled());
+    QVERIFY(bar->rect().contains(bar->tabRect(last)));
+    QCOMPARE(tabs->currentIndex(), 12);
+
+    QTest::mouseClick(left, Qt::LeftButton, Qt::ControlModifier);
+    QVERIFY(!left->isEnabled());
+    QVERIFY(bar->tabRect(0).left() >= 0);
+    QCOMPARE(tabs->currentIndex(), 12);
+
+    // A plain click still scrolls one step at a time.
+    QTest::mouseClick(right, Qt::LeftButton);
+    QVERIFY(left->isEnabled() && right->isEnabled());
 }
 
 void TestMainWindow::tabs_match_posting_controls_height()

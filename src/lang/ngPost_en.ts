@@ -2127,8 +2127,8 @@ Are you sure you want to quit?</source>
         <translation>Are you sure? All tabs will be lost.</translation>
     </message>
     <message>
-        <source>New %1 (%2)</source>
-        <translation>New %1 (%2)</translation>
+        <source>New tab (%1)</source>
+        <translation>New tab (%1)</translation>
     </message>
 </context>
 <context>
@@ -7105,6 +7105,21 @@ Some Usenet indexes ask for one.</translation>
         <location line="+3"/>
         <source>post can be resumed</source>
         <translation>post can be resumed</translation>
+    </message>
+</context>
+<context>
+    <name>StartupTabBar</name>
+    <message>
+        <source>Scroll left
+%1click: back to the first tab</source>
+        <translation>Scroll left
+%1click: back to the first tab</translation>
+    </message>
+    <message>
+        <source>Scroll right
+%1click: on to the last tab</source>
+        <translation>Scroll right
+%1click: on to the last tab</translation>
     </message>
 </context>
 <context>

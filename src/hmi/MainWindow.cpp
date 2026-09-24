@@ -832,6 +832,7 @@ void MainWindow::changeEvent(QEvent *event)
     if (event->type() == QEvent::LanguageChange) _retranslate();
     if (event->type() == QEvent::PaletteChange) {
         _refreshPostingControls();
+        _refreshNewQuickTab();
         if (_autoPostTab)
             _autoPostTab->refreshPendingColors();
     }
@@ -867,7 +868,7 @@ void MainWindow::_retranslate()
     for (int i = kNbFixedTabs; i < tabBar->count(); ++i)
         if (auto *post = _getPostWidget(i))
             tabBar->setTabText(i, QString("%1 #%2").arg(_ngPost->quickJobName()).arg(post->displayNumber()));
-    _retranslateNewQuickTab();
+    _refreshNewQuickTab();
 
     refreshJobLabel();
 
@@ -1140,7 +1141,7 @@ void MainWindow::_addReleaseNotes(QDialog *dialog, const QString &notes)
     dialog->layout()->addWidget(toggle);
     dialog->layout()->addWidget(browser);
 
-    const auto fold = [this, dialog, toggle, browser, metrics](bool open) {
+    const auto fold = [dialog, toggle, browser, metrics](bool open) {
         toggle->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
         toggle->setText(open ? tr("Hide release notes") : tr("Show release notes"));
         const QPoint centre = dialog->frameGeometry().center();
@@ -2682,14 +2683,15 @@ void MainWindow::_buildPostingControls()
     layout->setSpacing(4);
 
     // Outside the tab bar, so neither a full bar nor its scrolling can hide it.
-    _newQuickTabAction = new QAction(QIcon(":/icons/plus.png"), tr("New"), this);
-    _newQuickTabAction->setShortcut(QKeySequence::AddTab);
+    _newQuickTabAction = new QAction(tr("New"), this);
+    // Not QKeySequence::AddTab: under KDE its first binding is Ctrl+Shift+N.
+    _newQuickTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     auto *newQuickTabButton = new QToolButton(controls);
     newQuickTabButton->setObjectName(QStringLiteral("newQuickTabButton"));
     newQuickTabButton->setDefaultAction(_newQuickTabAction);
     layout->addWidget(newQuickTabButton);
     connect(_newQuickTabAction, &QAction::triggered, this, &MainWindow::onNewQuickTab);
-    _retranslateNewQuickTab();
+    _refreshNewQuickTab();
 
     _postAllButton = new QPushButton(controls);
     _postAllButton->setObjectName(QStringLiteral("postAllTabsButton"));
@@ -2715,15 +2717,23 @@ void MainWindow::_buildPostingControls()
     updatePostAllButton();
 }
 
-void MainWindow::_retranslateNewQuickTab()
+void MainWindow::_refreshNewQuickTab()
 {
     if (!_newQuickTabAction)
         return;
     _newQuickTabAction->setText(tr("New"));
     _newQuickTabAction->setToolTip(
-        tr("New %1 (%2)")
-            .arg(_ngPost->quickJobName(),
-                 _newQuickTabAction->shortcut().toString(QKeySequence::NativeText)));
+        tr("New tab (%1)").arg(_newQuickTabAction->shortcut().toString(QKeySequence::NativeText)));
+
+    // plus.png is dark grey: on a dark palette it reads as a disabled button,
+    // so it is painted in the button text colour there.
+    QPixmap plus(QStringLiteral(":/icons/plus.png"));
+    if (isDarkMode()) {
+        QPainter painter(&plus);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        painter.fillRect(plus.rect(), palette().color(QPalette::ButtonText));
+    }
+    _newQuickTabAction->setIcon(QIcon(plus));
 }
 
 QPushButton *MainWindow::_addPostingControl(QHBoxLayout *layout, const char *name, const char *icon)

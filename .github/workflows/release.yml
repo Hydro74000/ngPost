@@ -1276,7 +1276,25 @@ jobs:
               echo "- Previous release: none found"
             fi
             echo
-            echo "## Detailed release notes"
+            if [ "$CHANNEL" = "unstable" ] && [ -n "$range" ]; then
+              # An unstable build leads with its own increment; the cumulative
+              # notes of the version in preparation follow, for installs that
+              # are several builds behind.
+              echo "## What's new since ${previous_tag}"
+              echo
+              delta="$(python3 .github/scripts/release-notes-delta.py --previous "$previous_tag")"
+              if [ -n "$delta" ]; then
+                printf '%s\n' "$delta"
+              else
+                echo "No release-note entry since ${previous_tag}: see the commits below."
+              fi
+              echo
+              echo "## Cumulative release notes"
+              echo
+              echo "Everything this version brings so far, for installs several builds behind."
+            else
+              echo "## Detailed release notes"
+            fi
             echo
             awk '
               tolower($0) ~ /^### +.*release:/ {

@@ -23,6 +23,8 @@
 #include <QTabBar>
 #include <QTabWidget>
 
+class QToolButton;
+
 //! Tab bar that writes one title in bold: the tab the user picked to be
 //! opened at startup (tab context menu, "Open this tab on startup").
 //!
@@ -32,12 +34,14 @@
 //! has a border of its own without ever asking the base style. What is left
 //! is to run the paint loop here: the style still draws each tab, we only
 //! choose the font it draws each one with.
+//!
+//! A Ctrl+click on one of the scroll arrows runs the bar to that end.
 class StartupTabBar : public QTabBar
 {
     Q_OBJECT
 
 public:
-    explicit StartupTabBar(QWidget *parent = nullptr) : QTabBar(parent) {}
+    explicit StartupTabBar(QWidget *parent = nullptr);
 
     //! Index of the tab written in bold, -1 when no tab is pinned.
     int  startupTab() const { return _startupTab; }
@@ -45,7 +49,13 @@ public:
     //! Move the bold to \a index (-1 to remove it) and repaint.
     void setStartupTab(int index);
 
+    //! Scroll the bar to its first tab, or to its last one when \a toEnd;
+    //! the current tab stays the same.
+    void scrollToEnd(bool toEnd);
+
 protected:
+    void changeEvent(QEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
     void  paintEvent(QPaintEvent *event) override;
     QSize tabSizeHint(int index) const override;
     //! How far a full bar may shrink a tab before scrolling: down to "…#N" for
@@ -55,7 +65,12 @@ protected:
     QSize minimumTabSizeHint(int index) const override;
 
 private:
+    void _retranslate();
+
     int _startupTab = -1;
+    //! QTabBar's own scroll arrows, found by the names Qt gives them.
+    QToolButton *_scrollLeft = nullptr;
+    QToolButton *_scrollRight = nullptr;
 };
 
 //! The tab widget holding a StartupTabBar. QTabWidget::setTabBar() is

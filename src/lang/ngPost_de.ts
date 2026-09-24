@@ -2140,8 +2140,8 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
         <translation>Sind Sie sicher? Alle Tabs gehen verloren.</translation>
     </message>
     <message>
-        <source>New %1 (%2)</source>
-        <translation>Neuer %1 (%2)</translation>
+        <source>New tab (%1)</source>
+        <translation>Neuer Tab (%1)</translation>
     </message>
 </context>
 <context>
@@ -7139,6 +7139,21 @@ Manche Usenet-Indexe verlangen eine.</translation>
         <location line="+3"/>
         <source>post can be resumed</source>
         <translation>Post kann wiederaufgenommen werden</translation>
+    </message>
+</context>
+<context>
+    <name>StartupTabBar</name>
+    <message>
+        <source>Scroll left
+%1click: back to the first tab</source>
+        <translation>Nach links blättern
+%1Klick: zurück zum ersten Tab</translation>
+    </message>
+    <message>
+        <source>Scroll right
+%1click: on to the last tab</source>
+        <translation>Nach rechts blättern
+%1Klick: weiter zum letzten Tab</translation>
     </message>
 </context>
 <context>

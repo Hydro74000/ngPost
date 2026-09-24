@@ -92,7 +92,8 @@ private:
     bool _hasTabsToReset() const;
     void _fitPostingControls();
     void _buildPostingControls();
-    void _retranslateNewQuickTab();
+    //! Text, tooltip and icon of the "+": language and palette changes.
+    void _refreshNewQuickTab();
     QPushButton *_addPostingControl(QHBoxLayout *layout, const char *name, const char *icon);
     void _retranslate();
     void _submitPreparedTabs();

@@ -2130,8 +2130,8 @@ Are you sure you want to quit?</source>
         <translation>Êtes-vous sûr ? Tous les onglets seront perdus.</translation>
     </message>
     <message>
-        <source>New %1 (%2)</source>
-        <translation>Nouveau %1 (%2)</translation>
+        <source>New tab (%1)</source>
+        <translation>Nouvel onglet (%1)</translation>
     </message>
 </context>
 <context>
@@ -7129,6 +7129,21 @@ Certains index Usenet en demandent un.</translation>
         <location line="+3"/>
         <source>post can be resumed</source>
         <translation>le post peut être repris</translation>
+    </message>
+</context>
+<context>
+    <name>StartupTabBar</name>
+    <message>
+        <source>Scroll left
+%1click: back to the first tab</source>
+        <translation>Défiler vers la gauche
+%1clic : revenir au premier onglet</translation>
+    </message>
+    <message>
+        <source>Scroll right
+%1click: on to the last tab</source>
+        <translation>Défiler vers la droite
+%1clic : aller au dernier onglet</translation>
     </message>
 </context>
 <context>

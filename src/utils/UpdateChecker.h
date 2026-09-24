@@ -113,7 +113,7 @@ private:
     static const QString sReleaseListApiUrl;
     static const QString sRepoOwner;
     static const QString sRepoName;
-    static constexpr qint64 sPromptIntervalSeconds = 24 * 3600;
+    static constexpr qint64 sPromptIntervalSeconds = qint64(24) * 3600;
 
     QNetworkAccessManager *_netMgr;
     QNetworkReply         *_reply;

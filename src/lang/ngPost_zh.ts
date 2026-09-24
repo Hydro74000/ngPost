@@ -2140,8 +2140,8 @@ This also removes all associated file and article records.</source>
         <translation>确定吗？所有标签页都将丢失。</translation>
     </message>
     <message>
-        <source>New %1 (%2)</source>
-        <translation>新建%1 (%2)</translation>
+        <source>New tab (%1)</source>
+        <translation>新建标签页 (%1)</translation>
     </message>
 </context>
 <context>
@@ -7140,6 +7140,21 @@ Some Usenet indexes ask for one.</source>
         <location line="+3"/>
         <source>post can be resumed</source>
         <translation>帖子可以恢复</translation>
+    </message>
+</context>
+<context>
+    <name>StartupTabBar</name>
+    <message>
+        <source>Scroll left
+%1click: back to the first tab</source>
+        <translation>向左滚动
+%1单击：回到第一个标签页</translation>
+    </message>
+    <message>
+        <source>Scroll right
+%1click: on to the last tab</source>
+        <translation>向右滚动
+%1单击：跳到最后一个标签页</translation>
     </message>
 </context>
 <context>

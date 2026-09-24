@@ -820,7 +820,7 @@
 63	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryStats()
 66	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTab()
 51	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTable( QSplitter * histSplitter)
-40	src/hmi/MainWindow.cpp	MainWindow::_buildPostingControls()
+41	src/hmi/MainWindow.cpp	MainWindow::_buildPostingControls()
 21	src/hmi/MainWindow.cpp	MainWindow::_configureWaylandSplitters()
 66	src/hmi/MainWindow.cpp	MainWindow::_connectHistoryControls()
 12	src/hmi/MainWindow.cpp	MainWindow::_connectPostingWidget( PostingWidget * post)
@@ -867,6 +867,7 @@
 4	src/hmi/MainWindow.cpp	MainWindow::_onToggleLogBox()
 8	src/hmi/MainWindow.cpp	MainWindow::_postingWidgets() const
 129	src/hmi/MainWindow.cpp	MainWindow::_refreshHistoryViews( bool rewindEmptyPage)
+18	src/hmi/MainWindow.cpp	MainWindow::_refreshNewQuickTab()
 13	src/hmi/MainWindow.cpp	MainWindow::_refreshPostingControls()
 16	src/hmi/MainWindow.cpp	MainWindow::_refreshStopOrCloseAll()
 14	src/hmi/MainWindow.cpp	MainWindow::_repositionZoomPopup()
@@ -874,7 +875,6 @@
 21	src/hmi/MainWindow.cpp	MainWindow::_restoreHistoryColumns()
 46	src/hmi/MainWindow.cpp	MainWindow::_retranslate()
 120	src/hmi/MainWindow.cpp	MainWindow::_retranslateHistoryTab()
-10	src/hmi/MainWindow.cpp	MainWindow::_retranslateNewQuickTab()
 9	src/hmi/MainWindow.cpp	MainWindow::_saveHistoryColumns()
 8	src/hmi/MainWindow.cpp	MainWindow::_saveLogBoxState() const
 23	src/hmi/MainWindow.cpp	MainWindow::_scaleTables( int rowHeight)
@@ -896,7 +896,7 @@
 19	src/hmi/MainWindow.cpp	MainWindow::addNewQuickTab( const QFileInfoList & files)
 15	src/hmi/MainWindow.cpp	MainWindow::applyUiZoom( int percent , bool userInteractive)
 4	src/hmi/MainWindow.cpp	MainWindow::buildHistoryTabForTest()
-13	src/hmi/MainWindow.cpp	MainWindow::changeEvent( QEvent * event)
+14	src/hmi/MainWindow.cpp	MainWindow::changeEvent( QEvent * event)
 10	src/hmi/MainWindow.cpp	MainWindow::clearJobTab( QWidget * postWidget)
 63	src/hmi/MainWindow.cpp	MainWindow::closeEvent( QCloseEvent * event)
 21	src/hmi/MainWindow.cpp	MainWindow::closeTab( PostingWidget * postWidget)
@@ -1135,13 +1135,17 @@
 10	src/hmi/SignedListWidget.cpp	SignedListWidget::removeItemWidget2( QListWidgetItem * item)
 9	src/hmi/SignedListWidget.cpp	SignedListWidget::resizeEvent( QResizeEvent * e)
 5	src/hmi/SignedListWidget.cpp	SignedListWidget::setSignature( const QString & str)
+13	src/hmi/StartupTabBar.cpp	StartupTabBar::StartupTabBar( QWidget * parent)
+9	src/hmi/StartupTabBar.cpp	StartupTabBar::_retranslate()
+6	src/hmi/StartupTabBar.cpp	StartupTabBar::changeEvent( QEvent * event)
+12	src/hmi/StartupTabBar.cpp	StartupTabBar::eventFilter( QObject * watched , QEvent * event)
 18	src/hmi/StartupTabBar.cpp	StartupTabBar::minimumTabSizeHint( int index) const
 29	src/hmi/StartupTabBar.cpp	StartupTabBar::paintEvent( QPaintEvent *)
+8	src/hmi/StartupTabBar.cpp	StartupTabBar::scrollToEnd( bool toEnd)
 10	src/hmi/StartupTabBar.cpp	StartupTabBar::setStartupTab( int index)
 14	src/hmi/StartupTabBar.cpp	StartupTabBar::tabSizeHint( int index) const
 9	src/hmi/StartupTabBar.cpp	StartupTabWidget::StartupTabWidget( QWidget * parent)
 4	src/hmi/StartupTabBar.cpp	StartupTabWidget::startupTabBar() const
-1	src/hmi/StartupTabBar.h	StartupTabBar::StartupTabBar( QWidget * parent = nullptr)
 1	src/hmi/StartupTabBar.h	StartupTabBar::startupTab() const
 35	src/hmi/VpnProfileEditDialog.cpp	VpnProfileEditDialog::VpnProfileEditDialog( VpnManager * manager , QString const & oldName , VpnProfile const & edit , QWidget * parent)
 20	src/hmi/VpnProfileEditDialog.cpp	VpnProfileEditDialog::_loadCredentialsFromKeychain()

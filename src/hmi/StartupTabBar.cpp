@@ -19,9 +19,27 @@
 
 #include "StartupTabBar.h"
 
+#include <QEvent>
 #include <QFontMetrics>
+#include <QKeySequence>
+#include <QMouseEvent>
 #include <QStyleOption>
 #include <QStylePainter>
+#include <QToolButton>
+
+StartupTabBar::StartupTabBar(QWidget *parent)
+    : QTabBar(parent)
+{
+    // QTabBar makes its arrows in its constructor and never replaces them.
+    _scrollLeft = findChild<QToolButton *>(QStringLiteral("ScrollLeftButton"),
+                                           Qt::FindDirectChildrenOnly);
+    _scrollRight = findChild<QToolButton *>(QStringLiteral("ScrollRightButton"),
+                                            Qt::FindDirectChildrenOnly);
+    for (QToolButton *arrow : { _scrollLeft, _scrollRight })
+        if (arrow)
+            arrow->installEventFilter(this);
+    _retranslate();
+}
 
 void StartupTabBar::setStartupTab(int index)
 {
@@ -32,6 +50,45 @@ void StartupTabBar::setStartupTab(int index)
     // moves and nothing has to be laid out again: a repaint is the whole
     // refresh.
     update();
+}
+
+void StartupTabBar::scrollToEnd(bool toEnd)
+{
+    // Each click scrolls one tab further, and Qt disables the arrow once the
+    // bar has reached that end.
+    QToolButton *arrow = toEnd ? _scrollRight : _scrollLeft;
+    for (int i = 0; arrow && arrow->isEnabled() && i < count(); ++i)
+        arrow->click();
+}
+
+void StartupTabBar::changeEvent(QEvent *event)
+{
+    QTabBar::changeEvent(event);
+    if (event->type() == QEvent::LanguageChange)
+        _retranslate();
+}
+
+bool StartupTabBar::eventFilter(QObject *watched, QEvent *event)
+{
+    const bool arrow = watched && (watched == _scrollLeft || watched == _scrollRight);
+    if (arrow && event->type() == QEvent::MouseButtonPress) {
+        const auto *mouse = static_cast<QMouseEvent *>(event);
+        if (mouse->button() == Qt::LeftButton && mouse->modifiers() & Qt::ControlModifier) {
+            scrollToEnd(watched == _scrollRight);
+            return true; // the arrow never goes down, so no plain click follows
+        }
+    }
+    return QTabBar::eventFilter(watched, event);
+}
+
+void StartupTabBar::_retranslate()
+{
+    // "Ctrl+" here, "⌘" on macOS, where Qt::ControlModifier is Command.
+    const QString ctrl = QKeySequence(Qt::CTRL).toString(QKeySequence::NativeText);
+    if (_scrollLeft)
+        _scrollLeft->setToolTip(tr("Scroll left\n%1click: back to the first tab").arg(ctrl));
+    if (_scrollRight)
+        _scrollRight->setToolTip(tr("Scroll right\n%1click: on to the last tab").arg(ctrl));
 }
 
 void StartupTabBar::paintEvent(QPaintEvent *)

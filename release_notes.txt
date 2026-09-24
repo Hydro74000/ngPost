@@ -130,7 +130,8 @@ the NNTP streaming pipeline and SQLite history store.
     Post (tab 2+).
   * The "+" that opens a new Quick Post tab is now a fixed button left of "Post
     all tabs" (shortcut Ctrl+T) instead of a trailing tab that scrolled out of
-    sight once many tabs were open.
+    sight once many tabs were open. It keeps a light icon in dark mode.
+  * Ctrl+click on the tab bar scroll arrows jumps to the first or the last tab.
   * A full tab bar first shortens Quick Post titles from the left, always keeping
     their "#N", before showing scroll arrows; History and Auto keep their title.
   * Monotonic Quick Post numbering (Post #1, Post #2, ...): tab closing never
@@ -376,6 +377,16 @@ sécurité VPN et de l'isolation des identifiants.
     leur boîte de dialogue d'installation et de redémarrage.
   * Les dialogues de mise à jour suspendent l'extinction automatique du système durant
     l'interaction utilisateur.
+  * La recherche de mise à jour s'exécute désormais en arrière-plan à chaque démarrage
+    de l'interface graphique, et non plus une fois par jour : une version publiée après
+    la dernière vérification n'est plus manquée et une mise à jour connue reste visible
+    d'un démarrage à l'autre. LAST_UPDATE_CHECK est abandonné et retiré de ngPost.conf
+    à la sauvegarde suivante. La fenêtre « Installer et redémarrer » n'apparaît toujours
+    qu'une fois par jour au plus ; les autres démarrages, ainsi qu'une fenêtre fermée
+    avec « Plus tard », affichent le lien rouge, à gauche du niveau de zoom.
+  * La fenêtre « Installer et redémarrer » contient l'intégralité des notes de version,
+    repliées sous un lien qui les déplie (en agrandissant la fenêtre) dans une zone
+    défilante avec titres et listes, sous le lien vers la page de la release.
 - Envoi séquentiel multi-onglets & contrôles globaux de file :
   * Ajout du bouton « Poster tout » pour soumettre séquentiellement l'ensemble des
     onglets « Post rapide » préparés dans une file d'attente gérée (_pendingJobs),
@@ -459,7 +470,16 @@ sécurité VPN et de l'isolation des identifiants.
 
 - Ergonomie et navigation dans les onglets :
   * Disposition logique : Historique (0), Surveillance de dossiers (1), Post
-    rapide (2+) et bouton « + » en fin de barre.
+    rapide (2+).
+  * Le « + » qui ouvre un nouvel onglet de post rapide est désormais un bouton fixe à
+    gauche de « Poster tous les onglets » (raccourci Ctrl+T), et non plus un onglet en
+    fin de barre qui sortait du champ dès que les onglets étaient nombreux. Son icône
+    reste claire en mode sombre.
+  * Ctrl+clic sur les flèches de défilement de la barre d'onglets saute au premier ou
+    au dernier onglet.
+  * Une barre d'onglets pleine raccourcit d'abord les titres des posts rapides par la
+    gauche, en gardant toujours leur « #N », avant d'afficher les flèches de
+    défilement ; Historique et Post Auto gardent leur titre.
   * Numérotation strictement monotone des onglets de post rapide (Post #1, #2, ...) :
     aucun numéro actif n'est réutilisé pendant l'exécution ; remise à 1 uniquement
     lorsque la file est totalement inactive.

@@ -2139,8 +2139,8 @@ Are you sure you want to quit?</source>
         <translation>¿Está seguro? Se perderán todas las pestañas.</translation>
     </message>
     <message>
-        <source>New %1 (%2)</source>
-        <translation>Nueva %1 (%2)</translation>
+        <source>New tab (%1)</source>
+        <translation>Nueva pestaña (%1)</translation>
     </message>
 </context>
 <context>
@@ -7140,6 +7140,21 @@ Algunos índices de Usenet lo piden.</translation>
         <location line="+3"/>
         <source>post can be resumed</source>
         <translation>el post puede reanudarse</translation>
+    </message>
+</context>
+<context>
+    <name>StartupTabBar</name>
+    <message>
+        <source>Scroll left
+%1click: back to the first tab</source>
+        <translation>Desplazar a la izquierda
+%1clic: volver a la primera pestaña</translation>
+    </message>
+    <message>
+        <source>Scroll right
+%1click: on to the last tab</source>
+        <translation>Desplazar a la derecha
+%1clic: ir a la última pestaña</translation>
     </message>
 </context>
 <context>
