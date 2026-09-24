@@ -17,8 +17,11 @@
 
 #include <QtTest>
 #include <csignal>
+#include <memory>
+#include <QDialog>
 #include <QTextBlock>
 #include <QTextBrowser>
+#include <QTextList>
 #include <QApplication>
 #include <QClipboard>
 #include <QCheckBox>
@@ -59,6 +62,7 @@
 #include <QTextStream>
 
 #include "hmi/MainWindow.h"
+#include "utils/UpdateChecker.h"
 #include "hmi/PostingWidget.h"
 #include "nntp/NntpFile.h"
 #include "hmi/StartupTabBar.h"
@@ -121,6 +125,10 @@ private slots:
     //! A save writes what ngPost holds in memory: an edit made in the file
     //! meanwhile must be kept aside instead of vanishing.
     void an_external_edit_is_merged_into_the_next_save();
+    //! The install popup carries the whole release notes, readable and
+    //! scrolling, or at least the link to the release page.
+    void update_popup_shows_the_whole_release_notes();
+    void update_popup_without_notes_links_the_release();
     //! LAST_UPDATE_CHECK paced the retired daily check: the next save drops it.
     void a_retired_update_timestamp_is_dropped_on_save();
     void an_external_edit_ngPost_cannot_take_now_stays_in_the_file();
@@ -1572,6 +1580,14 @@ void TestMainWindow::manual_update_uses_red_status_link()
     const auto restoreHandler = qScopeGuard([] { QDesktopServices::unsetUrlHandler("https"); });
     window->show();
     QCoreApplication::processEvents();
+    // The zoom control stays the rightmost item, the link just left of it.
+    auto *zoom = window->statusBar()->findChild<QToolButton *>("zoomBtn");
+    QVERIFY(zoom);
+    QVERIFY2(label->geometry().right() < zoom->geometry().left(),
+             qPrintable(QString("link %1..%2, zoom from %3")
+                            .arg(label->geometry().left())
+                            .arg(label->geometry().right())
+                            .arg(zoom->geometry().left())));
     QTest::mouseClick(label, Qt::LeftButton, Qt::NoModifier, label->rect().center());
     QCOMPARE(receiver.url, release);
     // A later check updates the existing status item, without accumulating labels.
@@ -4115,6 +4131,104 @@ void TestMainWindow::an_external_edit_is_merged_into_the_next_save()
                  ->toPlainText()
                  .contains("so it stops using them: par2_args_custom"),
              "the log must say the line was turned off");
+}
+
+void TestMainWindow::update_popup_shows_the_whole_release_notes()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    // Far past the 800 characters the popup used to cut at.
+    QString notes = "# Release v99.0\n\n=====\n1. FUNCTIONAL CHANGES\n=====\n\n"
+                    "--- Improvements ---\n\n<b>raw html</b>\n\n";
+    for (int i = 0; i < 80; ++i)
+        notes += QString("- Change %1:\n  * with a detail\n").arg(i);
+    notes += "\nLast line.";
+    const QUrl release("https://github.com/Hydro74000/ngPost/releases/tag/v99.0");
+    const std::unique_ptr<QDialog> dialog(
+        window->createUpdateDialogForTest("v99.0", notes, release));
+
+    auto *header = dialog->findChild<QLabel *>("updateHeader");
+    QVERIFY(header);
+    QVERIFY(header->text().contains(release.toString()));
+    QVERIFY(header->text().contains(UpdateChecker::stripVersionPrefix(UpdateChecker::buildTag())));
+    auto *browser = dialog->findChild<QTextBrowser *>("updateNotesBrowser");
+    QVERIFY(browser);
+    const QString text = browser->toPlainText();
+    QVERIFY2(text.contains("Last line."), "the notes must not be cut");
+    QVERIFY2(text.contains("<b>raw html</b>"), "raw HTML must stay text");
+    QVERIFY2(!text.contains("====="), qPrintable(text.left(300)));
+    // Rendered, not dumped: headings and nested lists, no Markdown markers.
+    QVERIFY(!text.contains("Release v99.0")); // the header names it already
+    QVERIFY(!text.contains("--- Improvements ---"));
+    QTextBlock block = browser->document()->begin();
+    int headings = 0, nested = 0;
+    for (; block.isValid(); block = block.next()) {
+        headings += block.blockFormat().headingLevel() > 0 ? 1 : 0;
+        nested += block.textList() && block.textList()->format().indent() > 1 ? 1 : 0;
+    }
+    QCOMPARE(headings, 2);
+    QVERIFY(nested >= 80);
+    QVERIFY(!browser->openLinks()); // only web links open, and outside the pane
+    QCOMPARE(browser->frameShape(), QFrame::NoFrame);
+    auto *buttons = dialog->findChild<QDialogButtonBox *>();
+    QVERIFY(buttons);
+    QCOMPARE(buttons->buttons().size(), 2);
+
+    // Folded at first, under a link that unfolds them and grows the popup,
+    // then turns around to fold them back and shrink it.
+    auto *toggle = dialog->findChild<QToolButton *>("updateNotesToggle");
+    QVERIFY(toggle);
+    dialog->show();
+    QCoreApplication::processEvents();
+    QVERIFY(browser->isHidden());
+    QCOMPARE(toggle->arrowType(), Qt::RightArrow);
+    QCOMPARE(toggle->text(), QString("Show release notes"));
+    const int folded = dialog->height();
+    const QPoint foldedCentre = dialog->geometry().center();
+    toggle->click();
+    QCoreApplication::processEvents();
+    QVERIFY(browser->isVisible());
+    QCOMPARE(toggle->arrowType(), Qt::DownArrow);
+    QCOMPARE(toggle->text(), QString("Hide release notes"));
+    const int unfolded = dialog->height();
+    QVERIFY2(unfolded > folded, qPrintable(QString("%1 -> %2").arg(folded).arg(unfolded)));
+    QVERIFY2(browser->verticalScrollBar()->maximum() > 0, "long notes must scroll");
+    QCOMPARE(browser->verticalScrollBar()->value(), 0); // from their top
+    toggle->click();
+    QCoreApplication::processEvents();
+    QVERIFY(browser->isHidden());
+    QCOMPARE(toggle->arrowType(), Qt::RightArrow);
+    QVERIFY2(dialog->height() < unfolded,
+             qPrintable(QString("%1 -> %2").arg(unfolded).arg(dialog->height())));
+    // Grown and shrunk about its centre: folded again, it is back in place.
+    QVERIFY((dialog->geometry().center() - foldedCentre).manhattanLength() <= 2);
+}
+
+void TestMainWindow::update_popup_without_notes_links_the_release()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    const QUrl release("https://github.com/Hydro74000/ngPost/releases/tag/v99.0");
+    const std::unique_ptr<QDialog> dialog(
+        window->createUpdateDialogForTest("v99.0", " \n", release));
+    QVERIFY(!dialog->findChild<QTextBrowser *>("updateNotesBrowser"));
+    QVERIFY(!dialog->findChild<QToolButton *>("updateNotesToggle"));
+    auto *header = dialog->findChild<QLabel *>("updateHeader");
+    QVERIFY(header);
+    QVERIFY(header->text().contains(QString("href=\"%1\"").arg(release.toString())));
+    QVERIFY(header->openExternalLinks());
 }
 
 void TestMainWindow::a_retired_update_timestamp_is_dropped_on_save()

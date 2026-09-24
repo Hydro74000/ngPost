@@ -606,6 +606,14 @@ Voer een geheel aantal MiB tussen 0 en 1000000 in (0 schakelt splitsen alleen ui
         <translation>Update beschikbaar: %1</translation>
     </message>
     <message>
+        <source>Show release notes</source>
+        <translation>Release-opmerkingen tonen</translation>
+    </message>
+    <message>
+        <source>Hide release notes</source>
+        <translation>Release-opmerkingen verbergen</translation>
+    </message>
+    <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
         <translation>Voeg een server toe (je kunt er zoveel gebruiken als je wilt)</translation>

@@ -43,7 +43,10 @@
 #include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
+#include <QDateTime>
 #include <QDebug>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFrame>
@@ -67,6 +70,8 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QScreen>
+#include <QTextBrowser>
+#include <QTextDocument>
 #include <QMessageBox>
 #include <QMenu>
 #include <QPushButton>
@@ -103,6 +108,20 @@ QString guiSettingsFilePath()
 const QString kMainWindowGeometryKey = QStringLiteral("MainWindow/geometry");
 const QString kLogBoxCollapsedKey = QStringLiteral("MainWindow/logBoxCollapsed");
 const QString kLogBoxWidthKey = QStringLiteral("MainWindow/logBoxWidth");
+const QString kUpdatePromptKey = QStringLiteral("MainWindow/lastUpdatePrompt");
+
+//! Stamps the install popup in ngPost_gui.ini when one is due, so the once a
+//! day holds across restarts now that every start checks for a release.
+bool claimUpdatePrompt()
+{
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    if (!UpdateChecker::isPromptDue(guiSettings.value(kUpdatePromptKey).toLongLong(), now))
+        return false;
+    guiSettings.setValue(kUpdatePromptKey, now);
+    guiSettings.sync();
+    return true;
+}
 
 //! What one line of the log pane actually costs, laid out in a live
 //! QTextBrowser: about 7 KB. Measured rather than guessed -- 120 000 typical
@@ -1036,36 +1055,125 @@ void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes,
     if (!uc)
         return;
 
-    if (!uc->canInstallAutomatically()) {
+    if (!uc->canInstallAutomatically() || !claimUpdatePrompt()) {
         _showManualUpdate(tag, releasePage);
         return;
     }
     const auto shutdownHold = _ngPost->holdShutdown();
-    QString notesPreview = notes.left(800);
-    if (notes.size() > 800)
-        notesPreview += "...";
-    notesPreview.replace('<', "&lt;").replace('>', "&gt;").replace('\n', "<br/>");
-
-    QString body = tr("<h3>New version available: <b>ngPost %1</b></h3>"
-                      "<p>Current: v%2</p>"
-                      "<p><a href=\"%3\">View release on GitHub</a></p>")
-                       .arg(tag, NgPost::sVersion, releasePage.toString());
-    if (!notesPreview.isEmpty())
-        body += "<hr/><div style='font-size:small'>" + notesPreview + "</div>";
-
-    QMessageBox box(this);
-    box.setWindowTitle(tr("New version available"));
-    box.setTextFormat(Qt::RichText);
-    box.setTextInteractionFlags(Qt::TextBrowserInteraction);
-    box.setText(body);
-    QPushButton *install = box.addButton(tr("Install and Restart"), QMessageBox::AcceptRole);
-    box.addButton(tr("Later"), QMessageBox::RejectRole);
-    box.setDefaultButton(install);
-    box.exec();
-    if (box.clickedButton() != install)
+    const std::unique_ptr<QDialog> dialog(_createUpdateDialog(tag, notes, releasePage));
+    if (dialog->exec() != QDialog::Accepted) {
+        _showManualUpdate(tag, releasePage); // stays visible after "Later"
         return;
+    }
 
     _downloadUpdate(uc);
+}
+
+//! The install popup: a link to the release page -- all a release published
+//! without notes offers -- and the release notes in full, folded at first.
+QDialog *MainWindow::_createUpdateDialog(const QString &tag,
+                                         const QString &notes,
+                                         const QUrl &releasePage)
+{
+    auto *dialog = new QDialog(this);
+    dialog->setObjectName(QStringLiteral("updateDialog"));
+    dialog->setWindowTitle(tr("New version available"));
+    dialog->setMinimumWidth(QFontMetrics(font()).averageCharWidth() * 60);
+    auto *layout = new QVBoxLayout(dialog);
+    auto *header = new QLabel(tr("<h3>New version available: <b>ngPost %1</b></h3>"
+                                 "<p>Current: v%2</p>"
+                                 "<p><a href=\"%3\">View release on GitHub</a></p>")
+                                  .arg(tag,
+                                       UpdateChecker::stripVersionPrefix(UpdateChecker::buildTag()),
+                                       releasePage.toString()),
+                              dialog);
+    header->setObjectName(QStringLiteral("updateHeader"));
+    header->setTextFormat(Qt::RichText);
+    header->setWordWrap(true);
+    header->setOpenExternalLinks(true);
+    layout->addWidget(header);
+    if (!notes.trimmed().isEmpty())
+        _addReleaseNotes(dialog, notes);
+
+    auto *buttons = new QDialogButtonBox(dialog);
+    buttons->addButton(tr("Install and Restart"), QDialogButtonBox::AcceptRole)->setDefault(true);
+    buttons->addButton(tr("Later"), QDialogButtonBox::RejectRole);
+    connect(buttons, &QDialogButtonBox::accepted, dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    dialog->adjustSize();
+    return dialog;
+}
+
+//! The release notes, folded under a link at first so the popup stays small.
+//! Unfolding grows it to a screenful of notes; folding shrinks it back.
+void MainWindow::_addReleaseNotes(QDialog *dialog, const QString &notes)
+{
+    const QFontMetrics metrics(font());
+    // A link like the one above it -- its colour, underlined -- with an arrow the
+    // style draws: fonts disagree on the shape and size of the arrow glyphs.
+    auto *toggle = new QToolButton(dialog);
+    toggle->setObjectName(QStringLiteral("updateNotesToggle"));
+    toggle->setAutoRaise(true);
+    toggle->setCursor(Qt::PointingHandCursor);
+    toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    toggle->setIconSize(QSize(metrics.height(), metrics.height()) * 2 / 3);
+    QPalette palette = toggle->palette();
+    palette.setColor(QPalette::ButtonText, palette.color(QPalette::Link));
+    toggle->setPalette(palette);
+    QFont underlined = toggle->font();
+    underlined.setUnderline(true);
+    toggle->setFont(underlined);
+    auto *browser = new QTextBrowser(dialog);
+    browser->setObjectName(QStringLiteral("updateNotesBrowser"));
+    // As plain as the popup around it: no frame, no background of its own.
+    browser->setFrameShape(QFrame::NoFrame);
+    browser->setStyleSheet(QStringLiteral("QTextBrowser { background: transparent; }"));
+    // Raw HTML stays text, and only web links open: a relative one would
+    // otherwise load a local file into the pane.
+    browser->document()->setMarkdown(UpdateChecker::releaseNotesMarkdown(notes),
+                                     QTextDocument::MarkdownFeatures(
+                                         QTextDocument::MarkdownDialectGitHub
+                                         | QTextDocument::MarkdownNoHTML));
+    browser->moveCursor(QTextCursor::Start); // open on the top of the notes
+    browser->setOpenLinks(false);
+    connect(browser, &QTextBrowser::anchorClicked, browser, [](const QUrl &url) {
+        if (url.scheme() == QLatin1String("https"))
+            QDesktopServices::openUrl(url);
+    });
+    browser->setMinimumHeight(metrics.lineSpacing() * 12);
+    dialog->layout()->addWidget(toggle);
+    dialog->layout()->addWidget(browser);
+
+    const auto fold = [this, dialog, toggle, browser, metrics](bool open) {
+        toggle->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
+        toggle->setText(open ? tr("Hide release notes") : tr("Show release notes"));
+        const QPoint centre = dialog->frameGeometry().center();
+        browser->setVisible(open);
+        if (!dialog->isVisible())
+            return; // folded from the start: sized by its builder, placed by Qt
+        const QRect area = dialog->screen() ? dialog->screen()->availableGeometry() : QRect();
+        if (open) {
+            // A screenful of notes, within the screen the popup is on.
+            QSize size(metrics.averageCharWidth() * 100, metrics.lineSpacing() * 36);
+            if (area.isValid())
+                size = size.boundedTo(area.size() * 0.8);
+            dialog->resize(size.expandedTo(dialog->minimumSizeHint()));
+        } else {
+            dialog->adjustSize();
+        }
+        // Grow and shrink about its centre, so folding puts it back in place,
+        // without leaving the screen.
+        QRect frame = dialog->frameGeometry();
+        frame.moveCenter(centre);
+        if (area.isValid())
+            frame.moveTopLeft({ qBound(area.left(), frame.left(), area.right() - frame.width()),
+                                qBound(area.top(), frame.top(), area.bottom() - frame.height()) });
+        dialog->move(frame.topLeft());
+    };
+    // Not checkable: a checked button is filled in by some styles (Windows 11).
+    connect(toggle, &QToolButton::clicked, dialog, [fold, browser] { fold(browser->isHidden()); });
+    fold(false);
 }
 
 void MainWindow::_showManualUpdate(const QString &tag, const QUrl &releasePage)
@@ -1077,7 +1185,8 @@ void MainWindow::_showManualUpdate(const QString &tag, const QUrl &releasePage)
         label->setTextFormat(Qt::RichText);
         label->setTextInteractionFlags(Qt::TextBrowserInteraction);
         label->setOpenExternalLinks(true);
-        statusBar()->addPermanentWidget(label);
+        // Left of the zoom control, which stays the rightmost item.
+        statusBar()->insertPermanentWidget(0, label);
     }
     const QString text = tr("Update available: %1").arg(tag);
     label->setText(QStringLiteral("<a href=\"%1\" style=\"color: #ff5252;\">%2</a>")

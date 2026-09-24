@@ -368,6 +368,16 @@ private slots:
     //! A stable install gets exactly the verdict the previous implementation
     //! gave, over every plausible pair of released versions.
     void a_stable_install_keeps_the_answers_it_had();
+
+    //! Every start checks, but the install popup comes back once a day at
+    //! most: the status-bar link covers the starts in between.
+    void install_popup_comes_back_once_a_day_data();
+    void install_popup_comes_back_once_a_day();
+
+    //! The plain-text release notes read as Markdown with real headings.
+    void release_notes_titles_become_headings();
+    void release_notes_code_blocks_stay_verbatim();
+    void release_notes_leave_the_title_and_hashes_to_github();
 };
 
 void TestUpdateChecker::stable_releases_order_by_number()
@@ -464,6 +474,82 @@ void TestUpdateChecker::a_stable_install_keeps_the_answers_it_had()
             }
         }
     }
+}
+
+void TestUpdateChecker::install_popup_comes_back_once_a_day_data()
+{
+    QTest::addColumn<qint64>("secondsSincePrompt");
+    QTest::addColumn<bool>("due");
+    QTest::newRow("never-prompted") << qint64(-1) << true;
+    QTest::newRow("a-minute-ago") << qint64(60) << false;
+    QTest::newRow("almost-a-day-ago") << qint64(24 * 3600 - 1) << false;
+    QTest::newRow("a-day-ago") << qint64(24 * 3600) << true;
+    QTest::newRow("days-ago") << qint64(3 * 24 * 3600) << true;
+    QTest::newRow("clock-set-back") << qint64(-3600) << true;
+}
+
+void TestUpdateChecker::install_popup_comes_back_once_a_day()
+{
+    QFETCH(qint64, secondsSincePrompt);
+    QFETCH(bool, due);
+    const qint64 now = 1790240360;
+    // -1 stands for the key missing from ngPost_gui.ini, which reads as 0.
+    const qint64 last = secondsSincePrompt == -1 ? 0 : now - secondsSincePrompt;
+    QCOMPARE(UpdateChecker::isPromptDue(last, now), due);
+}
+
+void TestUpdateChecker::release_notes_titles_become_headings()
+{
+    // The shape the release workflow publishes: Markdown around release_notes.txt.
+    const QString body = QStringLiteral("## Detailed release notes\r\n\r\n"
+                                        "Intro.\r\n\r\n"
+                                        "=====================\r\n"
+                                        "1. FUNCTIONAL CHANGES\r\n"
+                                        "=====================\r\n\r\n"
+                                        "--- Bug Fixes (Corrections) ---\r\n\r\n"
+                                        "- Item:\r\n"
+                                        "  * detail\r\n\r\n"
+                                        "=====================\r\n"
+                                        "Notes de version :\r\n");
+    QCOMPARE(UpdateChecker::releaseNotesMarkdown(body).split(QLatin1Char('\n')),
+             QStringList({ "## Detailed release notes",
+                           "",
+                           "Intro.",
+                           "",
+                           "",
+                           "### 1. FUNCTIONAL CHANGES",
+                           "",
+                           "",
+                           "",
+                           "#### Bug Fixes (Corrections)",
+                           "",
+                           "",
+                           "- Item:",
+                           "  * detail",
+                           "",
+                           "",
+                           "### Notes de version :",
+                           "",
+                           "" })); // the blank after the title, then the final line break
+}
+
+void TestUpdateChecker::release_notes_code_blocks_stay_verbatim()
+{
+    const QString body = QStringLiteral("```text\n=====\nTITLE\n=====\n--- x ---\n```\n"
+                                        "--- After ---");
+    QCOMPARE(UpdateChecker::releaseNotesMarkdown(body),
+             QStringLiteral("```text\n=====\nTITLE\n=====\n--- x ---\n```\n"
+                            "\n#### After\n"));
+}
+
+void TestUpdateChecker::release_notes_leave_the_title_and_hashes_to_github()
+{
+    const QString body = QStringLiteral("# Release v1.1\n## Commits since v1\n\n- fix (abc)\n"
+                                        "## SHA-256 integrity checks\n\nPackages...\n\n"
+                                        "```text\n## not a heading  ngPost.tar.gz\n```\n"
+                                        "## After\n\nkept");
+    QCOMPARE(UpdateChecker::releaseNotesMarkdown(body),
+             QStringLiteral("## Commits since v1\n\n- fix (abc)\n## After\n\nkept"));
 }
 
 // Run the real C++ download / Python preparation / detached handoff in a

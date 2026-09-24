@@ -37,6 +37,18 @@ public:
     bool canInstallAutomatically() const;
     static bool isTrustedDownloadUrl(const QUrl &url);
 
+    //! The install popup interrupts, so it comes back once a day at most; in
+    //! between, the status-bar link keeps the update visible. A last prompt in
+    //! the future (the clock was set back) never silences it.
+    static bool isPromptDue(qint64 lastPromptEpoch, qint64 nowEpoch);
+
+    //! A release body as Markdown fit for display. Its release notes are
+    //! release_notes.txt, plain text: "=====" banners around section titles and
+    //! "--- Title ---" subsections, which Markdown would render as stray "="
+    //! runs and titles lost in the text. Both become headings. The leading
+    //! title and the SHA-256 section are left to the release page.
+    static QString releaseNotesMarkdown(const QString &body);
+
     //! True when \a candidate supersedes \a current, both given as release
     //! tags. Numbers first; on a tie a stable release beats a pre-release of
     //! the same number ("v5.5" over "v5.5-unstable.20260824.107.abc"), and two
@@ -101,6 +113,7 @@ private:
     static const QString sReleaseListApiUrl;
     static const QString sRepoOwner;
     static const QString sRepoName;
+    static constexpr qint64 sPromptIntervalSeconds = 24 * 3600;
 
     QNetworkAccessManager *_netMgr;
     QNetworkReply         *_reply;

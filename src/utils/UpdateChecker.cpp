@@ -151,6 +151,51 @@ int compareDotted(const QString &a, const QString &b, bool numericOnly)
 }
 } // namespace
 
+bool UpdateChecker::isPromptDue(qint64 lastPromptEpoch, qint64 nowEpoch)
+{
+    return lastPromptEpoch <= 0 || lastPromptEpoch > nowEpoch
+        || nowEpoch - lastPromptEpoch >= sPromptIntervalSeconds;
+}
+
+QString UpdateChecker::releaseNotesMarkdown(const QString &body)
+{
+    static const QRegularExpression banner(QStringLiteral("^={5,}\\s*$"));
+    static const QRegularExpression section(QStringLiteral("^-{3}\\s+(.+?)\\s+-{3}\\s*$"));
+    static const QRegularExpression heading(QStringLiteral("^#{1,2}\\s"));
+    const QStringList lines = QString(body)
+                                  .replace(QStringLiteral("\r\n"), QStringLiteral("\n"))
+                                  .split(QLatin1Char('\n'));
+    QStringList markdown;
+    bool code = false, hashes = false;
+    for (int i = 0; i < lines.size(); ++i) {
+        const QString &line = lines.at(i);
+        const bool fence = line.startsWith(QStringLiteral("```"));
+        // The installer checks the SHA-256 section itself, and its long hash
+        // lines would scroll the pane sideways: that one stays on GitHub.
+        if (!code && heading.match(line).hasMatch())
+            hashes = line.startsWith(QStringLiteral("## SHA-256"));
+        if (fence || code) {
+            code ^= fence;
+            if (!hashes)
+                markdown << line;
+        } else if (hashes || (i == 0 && line.startsWith(QStringLiteral("# ")))) {
+            continue; // the release title: the popup's header already names it
+        } else if (banner.match(line).hasMatch()) {
+            // A title under a banner, closed by a second one or not.
+            const QString title = i + 1 < lines.size() ? lines.at(i + 1).trimmed() : QString();
+            if (!title.isEmpty() && !banner.match(title).hasMatch()) {
+                markdown << QString() << QStringLiteral("### ") + title << QString();
+                i += i + 2 < lines.size() && banner.match(lines.at(i + 2)).hasMatch() ? 2 : 1;
+            }
+        } else if (const auto match = section.match(line); match.hasMatch()) {
+            markdown << QString() << QStringLiteral("#### ") + match.captured(1) << QString();
+        } else {
+            markdown << line;
+        }
+    }
+    return markdown.join(QLatin1Char('\n'));
+}
+
 bool UpdateChecker::isPreRelease(const QString &tag)
 {
     return stripVersionPrefix(tag).contains(QLatin1Char('-'));

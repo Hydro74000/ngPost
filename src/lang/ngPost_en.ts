@@ -595,6 +595,14 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
         <translation>Update available: %1</translation>
     </message>
     <message>
+        <source>Show release notes</source>
+        <translation>Show release notes</translation>
+    </message>
+    <message>
+        <source>Hide release notes</source>
+        <translation>Hide release notes</translation>
+    </message>
+    <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
         <translation></translation>

@@ -41,7 +41,12 @@ the NNTP streaming pipeline and SQLite history store.
   * The release check now runs asynchronously at every GUI start instead of once
     a day, so a release published after the last check is no longer missed and a
     known update stays visible across restarts. LAST_UPDATE_CHECK is retired
-    and dropped from ngPost.conf on the next save.
+    and dropped from ngPost.conf on the next save. The Install and Restart popup
+    still appears at most once a day; the other starts, and a popup dismissed
+    with Later, show the red link, left of the zoom level.
+  * The Install and Restart popup carries the whole release notes, folded under a
+    link that unfolds them (growing the popup) into a scrolling pane with headings
+    and lists, below the link to the release page.
   * Update dialogs hold automatic shutdown during the update interaction.
 - Sequential Multi-Tab Posting & Global Queue Controls:
   * "Post all" button added to submit all prepared Quick Post tabs sequentially

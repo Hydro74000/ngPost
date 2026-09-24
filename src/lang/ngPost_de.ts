@@ -605,6 +605,14 @@ Geben Sie eine ganze Zahl in MiB zwischen 0 und 1000000 ein (0 deaktiviert die A
         <translation>Update verfügbar: %1</translation>
     </message>
     <message>
+        <source>Show release notes</source>
+        <translation>Versionshinweise anzeigen</translation>
+    </message>
+    <message>
+        <source>Hide release notes</source>
+        <translation>Versionshinweise ausblenden</translation>
+    </message>
+    <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
         <translation>Fügen Sie einen Server hinzu (Sie können so viele hinzufügen, wie Sie wollen)</translation>

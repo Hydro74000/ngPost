@@ -604,6 +604,14 @@ Introduzca un número entero de MiB entre 0 y 1000000 (0 desactiva la división 
         <translation>Actualización disponible: %1</translation>
     </message>
     <message>
+        <source>Show release notes</source>
+        <translation>Mostrar las notas de la versión</translation>
+    </message>
+    <message>
+        <source>Hide release notes</source>
+        <translation>Ocultar las notas de la versión</translation>
+    </message>
+    <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
         <translation>Añade un servidor (puedes usar tantos como quieras)</translation>

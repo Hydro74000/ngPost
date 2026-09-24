@@ -597,6 +597,14 @@ Indiquez un nombre entier de Mio entre 0 et 1000000 (0 désactive le découpage 
         <translation>Mise à jour disponible : %1</translation>
     </message>
     <message>
+        <source>Show release notes</source>
+        <translation>Afficher les notes de version</translation>
+    </message>
+    <message>
+        <source>Hide release notes</source>
+        <translation>Masquer les notes de version</translation>
+    </message>
+    <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
         <translation>Ajouter un serveur (vous pouvez en ajouter autant que vous voulez)</translation>
