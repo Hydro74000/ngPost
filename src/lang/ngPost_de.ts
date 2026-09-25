@@ -2143,6 +2143,16 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
         <source>New tab (%1)</source>
         <translation>Neuer Tab (%1)</translation>
     </message>
+    <message>
+        <source>Change the NZB path of the tabs?</source>
+        <translation>NZB-Pfad der Tabs ändern?</translation>
+    </message>
+    <message>
+        <source>Tabs waiting to be posted: %1.
+Write their NZB file to %2 instead of their current folder?</source>
+        <translation>Tabs, die auf das Posten warten: %1.
+Ihre NZB-Datei in %2 statt im bisherigen Ordner speichern?</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

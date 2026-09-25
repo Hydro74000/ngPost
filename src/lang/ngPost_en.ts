@@ -2130,6 +2130,16 @@ Are you sure you want to quit?</source>
         <source>New tab (%1)</source>
         <translation>New tab (%1)</translation>
     </message>
+    <message>
+        <source>Change the NZB path of the tabs?</source>
+        <translation>Change the NZB path of the tabs?</translation>
+    </message>
+    <message>
+        <source>Tabs waiting to be posted: %1.
+Write their NZB file to %2 instead of their current folder?</source>
+        <translation>Tabs waiting to be posted: %1.
+Write their NZB file to %2 instead of their current folder?</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

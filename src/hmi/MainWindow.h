@@ -107,6 +107,9 @@ private:
     int _progressJobNumber = 1;
     QPushButton *_par2SettingsButton = nullptr;
     bool _submittingAll = false;
+    //! NZB destination path the prepared tabs were last offered to follow.
+    QString _offeredNzbPath;
+    void _offerNzbPathToTabs();
 
     //! Tab opened when ngPost starts: 0 history, 1 folder monitoring,
     //! 2 quick post, and -1 when the user never picked one -- which is the quick

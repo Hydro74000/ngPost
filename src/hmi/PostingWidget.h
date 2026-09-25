@@ -136,6 +136,9 @@ public:
 
     void postFiles(bool updateMainParams);
     bool canSubmit() const;
+    //! Folder of this post's nzb file, empty while it has none.
+    QString nzbFolder() const;
+    void setNzbFolder(const QString &folder);
     //! Nothing listed, nothing posted: what a new tab looks like.
     bool isBlank() const;
     QFileInfoList previewFiles() const;

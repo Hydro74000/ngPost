@@ -1350,7 +1350,9 @@ void MainWindow::_initPostingBox()
     _ui->threadSB->setValue(_ngPost->_nbThreads);
 
     _ui->nzbPathEdit->setText(_ngPost->_nzbPath);
+    _offeredNzbPath = QFileInfo(_ngPost->_nzbPath).absoluteFilePath();
     connect(_ui->nzbPathButton, &QAbstractButton::clicked, this, &MainWindow::onNzbPathClicked);
+    connect(_ui->nzbPathEdit, &QLineEdit::returnPressed, this, &MainWindow::_offerNzbPathToTabs);
 }
 
 void MainWindow::updateServers()
@@ -2791,8 +2793,44 @@ void MainWindow::_submitPreparedTabs()
 
 void MainWindow::onSaveConfig()
 {
+    _offerNzbPathToTabs();
     updateServers();
     _ngPost->saveConfig();
+}
+
+void MainWindow::_offerNzbPathToTabs()
+{
+    // Only a folder updateParams() will take, and once per new path: saving
+    // again, or Enter pressed twice, must not ask the same question again.
+    QFileInfo const folder(_ui->nzbPathEdit->text());
+    if (!folder.isDir() || !folder.isWritable() || folder.absoluteFilePath() == _offeredNzbPath)
+        return;
+    QString const path = folder.absoluteFilePath();
+    _offeredNzbPath = path;
+
+    // Prepared tabs only: a queued, running, paused or finished post keeps
+    // the nzb it was started with.
+    QList<QPointer<PostingWidget>> posts;
+    for (auto *post : _postingWidgets())
+        if (post->canSubmit() && !post->nzbFolder().isEmpty() && post->nzbFolder() != path)
+            posts << post;
+    if (posts.isEmpty())
+        return;
+
+    const auto shutdownHold = _ngPost->holdShutdown();
+    if (QMessageBox::question(this,
+                              tr("Change the NZB path of the tabs?"),
+                              tr("Tabs waiting to be posted: %1.\n"
+                                 "Write their NZB file to %2 instead of their current folder?")
+                                  .arg(posts.size())
+                                  .arg(QDir::toNativeSeparators(path)),
+                              QMessageBox::Yes,
+                              QMessageBox::No)
+        != QMessageBox::Yes)
+        return;
+    for (const auto &post : posts)
+        if (post && post->canSubmit())
+            post->setNzbFolder(path);
 }
 
 void MainWindow::onNewQuickTab()

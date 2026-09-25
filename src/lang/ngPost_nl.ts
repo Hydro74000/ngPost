@@ -2144,6 +2144,16 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <source>New tab (%1)</source>
         <translation>Nieuw tabblad (%1)</translation>
     </message>
+    <message>
+        <source>Change the NZB path of the tabs?</source>
+        <translation>NZB-pad van de tabbladen wijzigen?</translation>
+    </message>
+    <message>
+        <source>Tabs waiting to be posted: %1.
+Write their NZB file to %2 instead of their current folder?</source>
+        <translation>Tabbladen die wachten om gepost te worden: %1.
+Hun NZB-bestand naar %2 schrijven in plaats van hun huidige map?</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

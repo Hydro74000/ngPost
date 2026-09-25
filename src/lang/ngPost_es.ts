@@ -2142,6 +2142,16 @@ Are you sure you want to quit?</source>
         <source>New tab (%1)</source>
         <translation>Nueva pestaña (%1)</translation>
     </message>
+    <message>
+        <source>Change the NZB path of the tabs?</source>
+        <translation>¿Cambiar la ruta NZB de las pestañas?</translation>
+    </message>
+    <message>
+        <source>Tabs waiting to be posted: %1.
+Write their NZB file to %2 instead of their current folder?</source>
+        <translation>Pestañas pendientes de publicar: %1.
+¿Escribir su archivo NZB en %2 en lugar de su carpeta actual?</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

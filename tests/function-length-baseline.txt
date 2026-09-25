@@ -834,13 +834,14 @@
 9	src/hmi/MainWindow.cpp	MainWindow::_getPostWidgetIndex( PostingWidget * postWidget) const
 4	src/hmi/MainWindow.cpp	MainWindow::_hasTabsToReset() const
 41	src/hmi/MainWindow.cpp	MainWindow::_initLogBoxToggle()
-82	src/hmi/MainWindow.cpp	MainWindow::_initPostingBox()
+84	src/hmi/MainWindow.cpp	MainWindow::_initPostingBox()
 19	src/hmi/MainWindow.cpp	MainWindow::_initServerBox()
 31	src/hmi/MainWindow.cpp	MainWindow::_initZoomControl()
 37	src/hmi/MainWindow.cpp	MainWindow::_insertBoundedLogText( const QString & text , bool startNewBlock , const QTextCharFormat & format) const
 4	src/hmi/MainWindow.cpp	MainWindow::_isLogBoxCollapsed() const
 10	src/hmi/MainWindow.cpp	MainWindow::_isPostingQueueRunning() const
 11	src/hmi/MainWindow.cpp	MainWindow::_nextQuickJobNumber()
+34	src/hmi/MainWindow.cpp	MainWindow::_offerNzbPathToTabs()
 63	src/hmi/MainWindow.cpp	MainWindow::_onHistoryContextMenu( const QPoint & pos)
 14	src/hmi/MainWindow.cpp	MainWindow::_onHistoryCopyPassword()
 44	src/hmi/MainWindow.cpp	MainWindow::_onHistoryDeleteEntry()
@@ -932,7 +933,7 @@
 10	src/hmi/MainWindow.cpp	MainWindow::onPauseClicked()
 10	src/hmi/MainWindow.cpp	MainWindow::onPostAllTabs()
 9	src/hmi/MainWindow.cpp	MainWindow::onRarPassUpdated( const QString & fixedPass)
-5	src/hmi/MainWindow.cpp	MainWindow::onSaveConfig()
+6	src/hmi/MainWindow.cpp	MainWindow::onSaveConfig()
 5	src/hmi/MainWindow.cpp	MainWindow::onSetProgressBarRange( int nbArticles)
 19	src/hmi/MainWindow.cpp	MainWindow::onShutdownToggled( bool checked)
 10	src/hmi/MainWindow.cpp	MainWindow::onTabContextMenu( const QPoint & point)
@@ -1083,6 +1084,7 @@
 56	src/hmi/PostingWidget.cpp	PostingWidget::init()
 5	src/hmi/PostingWidget.cpp	PostingWidget::isBlank() const
 9	src/hmi/PostingWidget.cpp	PostingWidget::loadObfuscationLengths( QSpinBox * nameLength , QSpinBox * passLength , const NgPost * ngPost)
+5	src/hmi/PostingWidget.cpp	PostingWidget::nzbFolder() const
 6	src/hmi/PostingWidget.cpp	PostingWidget::onArchiveFileNames( const QStringList & paths)
 5	src/hmi/PostingWidget.cpp	PostingWidget::onArticlesNumber( int nbArticles)
 21	src/hmi/PostingWidget.cpp	PostingWidget::onClearFilesClicked()
@@ -1099,7 +1101,7 @@
 22	src/hmi/PostingWidget.cpp	PostingWidget::onPostingJobDone()
 12	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFilesClicked()
 12	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFolderClicked()
-74	src/hmi/PostingWidget.cpp	PostingWidget::postFiles( bool updateMainParams)
+75	src/hmi/PostingWidget.cpp	PostingWidget::postFiles( bool updateMainParams)
 13	src/hmi/PostingWidget.cpp	PostingWidget::postingTextColor() const
 7	src/hmi/PostingWidget.cpp	PostingWidget::previewFiles() const
 6	src/hmi/PostingWidget.cpp	PostingWidget::refreshPar2Default()
@@ -1108,13 +1110,14 @@
 18	src/hmi/PostingWidget.cpp	PostingWidget::retranslate()
 10	src/hmi/PostingWidget.cpp	PostingWidget::retranslatePostInfoTexts()
 6	src/hmi/PostingWidget.cpp	PostingWidget::setIDLE()
+6	src/hmi/PostingWidget.cpp	PostingWidget::setNzbFolder( const QString & folder)
 5	src/hmi/PostingWidget.cpp	PostingWidget::setNzbPassword( const QString & pass)
 36	src/hmi/PostingWidget.cpp	PostingWidget::setPackingAuto( bool enabled , const QStringList & keys)
 4	src/hmi/PostingWidget.cpp	PostingWidget::setPar2PercentageOverride( int percentage)
 11	src/hmi/PostingWidget.cpp	PostingWidget::setPostInfo( bool enabled , const QString & templateOverride , const QString & outputOverride , const QMap<QString,MetaValue> & meta)
 7	src/hmi/PostingWidget.cpp	PostingWidget::setPosting()
 6	src/hmi/PostingWidget.cpp	PostingWidget::showPar2Default( QSpinBox * box , uint percentage)
-30	src/hmi/PostingWidget.cpp	PostingWidget::udatePostingParams()
+28	src/hmi/PostingWidget.cpp	PostingWidget::udatePostingParams()
 4	src/hmi/PostingWidget.cpp	PostingWidget::writesPostInfoFile() const
 9	src/hmi/PostingWidget.cpp	PostingWidget::~PostingWidget()
 1	src/hmi/PostingWidget.h	PostingWidget::displayNumber() const

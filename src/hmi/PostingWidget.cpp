@@ -158,6 +158,19 @@ bool PostingWidget::canSubmit() const
     return _state == STATE::IDLE && !_postingJob && _hasPreparedFiles();
 }
 
+QString PostingWidget::nzbFolder() const
+{
+    QString const nzb = _ui->nzbFileEdit->text();
+    return nzb.isEmpty() ? QString() : QFileInfo(nzb).absolutePath();
+}
+
+void PostingWidget::setNzbFolder(const QString &folder)
+{
+    QString const nzb = _ui->nzbFileEdit->text();
+    if (!nzb.isEmpty())
+        _ui->nzbFileEdit->setText(QDir(folder).filePath(QFileInfo(nzb).fileName()));
+}
+
 bool PostingWidget::_hasPreparedFiles() const
 {
     return (!_postingFinished || _resubmittable) && _ui->filesList->count() > 0;
@@ -264,7 +277,8 @@ void PostingWidget::postFiles(bool updateMainParams)
         PostingJobOptions options = _ngPost->_baseJobOptions();
 
         // check if the nzb file name already exist
-        QString nzbPath = _ngPost->nzbPath();
+        QString nzbPath = nzbFolder().isEmpty() ? _ngPost->nzbPath()
+                                                : QDir(nzbFolder()).filePath(_ngPost->_nzbName);
         if (!nzbPath.endsWith(".nzb"))
             nzbPath += ".nzb";
         if (!_confirmNzbOverwrite(nzbPath)) return;
@@ -679,13 +693,11 @@ void PostingWidget::genNameAndPassword(bool genName, bool genPass, bool doPar2)
 
 void PostingWidget::udatePostingParams()
 {
+    // Only the name: the folder of this post's nzb is not the configured one.
+    // Written into NgPost it would be saved as NZB_PATH, and taken by the
+    // other tabs and the Auto Posting.
     if (!_ui->nzbFileEdit->text().isEmpty())
-    {
-        QFileInfo nzb(_ui->nzbFileEdit->text());
-        if (!nzb.absolutePath().isEmpty())
-            _ngPost->_nzbPath = nzb.absolutePath();
-        _ngPost->setNzbName(nzb);
-    }
+        _ngPost->setNzbName(QFileInfo(_ui->nzbFileEdit->text()));
 
     // fetch compression settings. The compression paths and the volume size are
     // NOT read here any more: they are configuration, they live in the

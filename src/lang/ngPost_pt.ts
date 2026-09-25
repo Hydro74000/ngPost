@@ -2142,6 +2142,16 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <source>New tab (%1)</source>
         <translation>Nova aba (%1)</translation>
     </message>
+    <message>
+        <source>Change the NZB path of the tabs?</source>
+        <translation>Alterar o caminho NZB das abas?</translation>
+    </message>
+    <message>
+        <source>Tabs waiting to be posted: %1.
+Write their NZB file to %2 instead of their current folder?</source>
+        <translation>Abas aguardando publicação: %1.
+Gravar o arquivo NZB delas em %2 em vez da pasta atual?</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

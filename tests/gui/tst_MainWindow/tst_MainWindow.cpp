@@ -194,6 +194,10 @@ private slots:
     //! stopped posts in the history.
     void stop_then_post_all_restarts_stopped_tabs_data();
     void stop_then_post_all_restarts_stopped_tabs();
+    //! A new NZB destination path, confirmed by Enter or a save, offers once
+    //! to move the prepared tabs' nzb files there; No leaves them alone.
+    void nzb_path_change_offers_to_move_prepared_tabs_data();
+    void nzb_path_change_offers_to_move_prepared_tabs();
     //! Stop only while a post is in progress; otherwise a confirmed cross
     //! closes every Quick Post tab and empties #1.
     void close_all_tabs_resets_to_quick_post_one();
@@ -6846,6 +6850,82 @@ void TestMainWindow::stop_then_post_all_restarts_stopped_tabs()
         "the stopped post's archives blocked the new compression");
     for (const auto &source : sources)
         QVERIFY(source.first().exists());
+}
+
+void TestMainWindow::nzb_path_change_offers_to_move_prepared_tabs_data()
+{
+    QTest::addColumn<bool>("accept");
+    QTest::newRow("yes") << true;
+    QTest::newRow("no") << false;
+}
+
+void TestMainWindow::nzb_path_change_offers_to_move_prepared_tabs()
+{
+    QFETCH(bool, accept);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString root = QDir(sandbox.rootPath()).absolutePath();
+    QVERIFY(QDir(root).mkpath("mine") && QDir(root).mkpath("moved"));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    const QList<PostingWidget *> posts{ qobject_cast<PostingWidget *>(tabs->widget(2)),
+                                        window->addNewQuickTab() };
+    auto *blank = window->addNewQuickTab();
+    for (auto *post : posts)
+        QVERIFY(addShutdownTestFile(post, root + QString("/tab%1.bin").arg(post->jobNumber())));
+    auto *custom = posts[1]->findChild<QLineEdit *>("nzbFileEdit");
+    custom->setText(root + "/mine/" + QFileInfo(custom->text()).fileName());
+    QCOMPARE(posts[0]->nzbFolder(), root);
+
+    QStringList questions;
+    QTimer answer;
+    connect(&answer, &QTimer::timeout, window, [&questions, accept] {
+        if (auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
+            questions << box->text();
+            box->button(accept ? QMessageBox::Yes : QMessageBox::No)->click();
+        }
+    });
+    answer.start(5);
+
+    // Typing asks nothing: only Enter or a save confirm the new path.
+    auto *path = window->findChild<QLineEdit *>("nzbPathEdit");
+    path->setText(root + "/moved");
+    QTest::qWait(50);
+    QVERIFY(questions.isEmpty());
+    QTest::keyClick(path, Qt::Key_Return);
+    QTRY_COMPARE(questions.size(), 1);
+    QVERIFY2(questions.first().contains("posted: 2."), qPrintable(questions.first()));
+    const QString moved = root + "/moved";
+    QCOMPARE(posts[0]->nzbFolder(), accept ? moved : root);
+    QCOMPARE(posts[1]->nzbFolder(), accept ? moved : root + "/mine");
+    QVERIFY(blank->nzbFolder().isEmpty());
+
+    // Asked once per path; the save keeps the configured one whatever the tab.
+    tabs->setCurrentWidget(posts[1]);
+    window->findChild<QPushButton *>("saveButton")->click();
+    QTest::qWait(50);
+    QCOMPARE(questions.size(), 1);
+    QFile conf(PathHelper::configFilePath());
+    QVERIFY(conf.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QRegularExpression saved("^nzbPath\\s*=\\s*" + QRegularExpression::escape(moved) + "$",
+                                   QRegularExpression::MultilineOption);
+    QVERIFY2(saved.match(QString::fromUtf8(conf.readAll())).hasMatch(),
+             "a tab's nzb folder was saved as NZB_PATH");
+    conf.close();
+
+    // A save confirms a new path too.
+    path->setText(root);
+    window->findChild<QPushButton *>("saveButton")->click();
+    QTRY_COMPARE(questions.size(), 2);
+    answer.stop();
+    QCOMPARE(posts[0]->nzbFolder(), root);
 }
 
 void TestMainWindow::close_all_tabs_resets_to_quick_post_one()

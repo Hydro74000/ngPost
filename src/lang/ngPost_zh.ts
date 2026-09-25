@@ -2143,6 +2143,16 @@ This also removes all associated file and article records.</source>
         <source>New tab (%1)</source>
         <translation>新建标签页 (%1)</translation>
     </message>
+    <message>
+        <source>Change the NZB path of the tabs?</source>
+        <translation>更改标签页的 NZB 路径？</translation>
+    </message>
+    <message>
+        <source>Tabs waiting to be posted: %1.
+Write their NZB file to %2 instead of their current folder?</source>
+        <translation>等待发布的标签页：%1。
+将它们的 NZB 文件写入 %2，而不是当前文件夹？</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>

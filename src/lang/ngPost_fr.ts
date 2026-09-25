@@ -2133,6 +2133,16 @@ Are you sure you want to quit?</source>
         <source>New tab (%1)</source>
         <translation>Nouvel onglet (%1)</translation>
     </message>
+    <message>
+        <source>Change the NZB path of the tabs?</source>
+        <translation>Changer le chemin NZB des onglets ?</translation>
+    </message>
+    <message>
+        <source>Tabs waiting to be posted: %1.
+Write their NZB file to %2 instead of their current folder?</source>
+        <translation>Onglets en attente de post : %1.
+Écrire leur fichier NZB dans %2 au lieu de leur dossier actuel ?</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
