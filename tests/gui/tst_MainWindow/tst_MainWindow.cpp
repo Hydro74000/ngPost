@@ -207,6 +207,10 @@ private slots:
     void global_cancel_during_confirmation();
     void global_pause_holds_pending_and_new_posts_data();
     void global_pause_holds_pending_and_new_posts();
+    //! A queue restarting without a pre-packed post (resume, VPN connected)
+    //! packs the next post during the upload, never beside the active packing.
+    void resumed_queue_packs_one_post_at_a_time_data();
+    void resumed_queue_packs_one_post_at_a_time();
     void quick_post_numbers_icons_and_palette();
     void quick_post_numbering_lifecycle_and_reset();
     void quick_post_numbering_with_backend_queue_data();
@@ -6276,6 +6280,93 @@ void TestMainWindow::global_pause_holds_pending_and_new_posts()
     QCOMPARE(mock.receivedArticles().size(), cancelPending ? 0 : 2);
     QVERIFY(!pause->isEnabled() && !stop->isEnabled());
     QVERIFY(!ngPost.isPaused());
+}
+
+void TestMainWindow::resumed_queue_packs_one_post_at_a_time_data()
+{
+    QTest::addColumn<bool>("parity");
+    QTest::newRow("compression") << false;
+    QTest::newRow("parity") << true;
+}
+
+void TestMainWindow::resumed_queue_packs_one_post_at_a_time()
+{
+    QFETCH(bool, parity);
+    HomeSandbox sandbox;
+    QStringList helpers;
+    for (const char *name : { "first", "second" }) {
+        helpers << sandbox.rootPath() + "/ngpost-controlled-" + name
+#ifdef Q_OS_WIN
+                + ".exe"
+#endif
+            ;
+        QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), helpers.last()));
+    }
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "50" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              shutdownTestConfig(sandbox.rootPath(), mock.port())
+                                  + "PREPARE_PACKING = true\n",
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *pause = window->findChild<QPushButton *>("pauseButton");
+    auto *blocker = qobject_cast<PostingWidget *>(tabs->widget(2));
+    QVERIFY(addShutdownTestFile(blocker, sandbox.rootPath() + "/blocker.bin"));
+    blocker->onPostFiles();
+    pause->click();
+    QList<PostingWidget *> posts;
+    QList<QPointer<PostingJob>> jobs;
+    for (int i = 0; i < helpers.size(); ++i) {
+        auto *post = window->addNewQuickTab();
+        QVERIFY(addShutdownTestFile(post, sandbox.rootPath() + QString("/source%1.bin").arg(i)));
+        PostingJobOptions options;
+        options.files = post->previewFiles();
+        options.nzbFilePath = sandbox.rootPath() + QString("/packed%1.nzb").arg(i);
+        options.tmpPath = sandbox.rootPath();
+        options.rarName = QString("packed%1").arg(i);
+        options.rarPath = helpers.at(i);
+        options.rarTool = "rar";
+        options.doCompress = !parity;
+        options.doPar2 = parity;
+        options.par2Tool = par2::Tool::Par2cmdline;
+        options.par2Path = helpers.at(i);
+        options.par2Arguments = "c -r10";
+        auto *job = new PostingJob(&ngPost, options, post);
+        post->attachResumeJob(job, options.files, false);
+        QVERIFY(!ngPost.startPostingJob(job));
+        posts << post;
+        jobs << job;
+    }
+    bool preparedDuringUpload = false;
+    connect(jobs.last(),
+            &PostingJob::startPosting,
+            window,
+            [first = jobs.first(), &preparedDuringUpload](bool isActive) {
+        preparedDuringUpload = !isActive && first && first->isPacked() && first->hasPostStarted()
+            && !first->hasPostFinished();
+    });
+    // Cancel the running post: the paused queue now restarts with nothing pre-packed.
+    blocker->onPostFiles();
+    QTRY_VERIFY(blocker->isPostingFinished() && !ngPost.isPosting());
+    pause->click();
+    QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(helpers.at(0) + ".started"), 10000);
+    QTest::qWait(1000);
+    QVERIFY2(!QFile::exists(helpers.at(1) + ".started"),
+             "The next post was compressed at the same time as the active one");
+    QVERIFY(QFile(helpers.at(0) + ".release").open(QIODevice::WriteOnly));
+    QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(helpers.at(1) + ".started"), 10000);
+    QVERIFY2(preparedDuringUpload, "The next packing must start during the active upload");
+    QVERIFY(QFile(helpers.at(1) + ".release").open(QIODevice::WriteOnly));
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs(), 20000);
+    for (auto *post : posts)
+        QVERIFY(post->isPostingFinished());
+    QCOMPARE(mock.receivedArticles().size(), parity ? 4 : 2);
 }
 
 void TestMainWindow::quick_post_numbers_icons_and_palette()

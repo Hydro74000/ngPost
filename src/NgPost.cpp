@@ -2372,15 +2372,15 @@ void NgPost::_startNextPostingJob()
         }
         else if (_packingJob == nullptr)
         {
-            // Recovery path: the previous active job was cancelled
-            // while still mid-packing, so _prepareNextPacking() had
-            // not yet pre-packed the now-dequeued job. Start it
-            // normally (its own packing happens as part of postFiles)
-            // and schedule pre-pack of whatever comes after.
+            // Nothing was pre-packed: the previous active job was cancelled
+            // mid-packing, or the queue waited for the VPN or a resume.
+            // Start normally; a job that packs pre-packs the next one from
+            // onPackingDone(): two packings must never run at once.
             if (debugFull())
                 _log(tr("Recovering: starting next job that wasn't pre-packed"));
             emit _activeJob->startPosting(true);
-            _prepareNextPacking();
+            if (!_activeJob->hasPacking())
+                _prepareNextPacking();
         }
         else
             _error("next active job different to the packing one..."); // should never happen...

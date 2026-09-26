@@ -189,6 +189,10 @@ the NNTP streaming pipeline and SQLite history store.
     (stopped ones included); No leaves them as they are. Saving no longer records
     the NZB folder of the tab on screen as NZB_PATH.
   * Used kernel rename calls to prevent silent cross-filesystem file copies (EXDEV).
+- One Packing at a Time (PREPARE_PACKING):
+  * Posts queued by "Post all tabs" while the VPN was connecting, or while the
+    queue was paused, had the first two compressed at the same time. The next
+    post is again packed only while the current one uploads.
 - Safe Auto-Shutdown Guarding (holdShutdown()):
   * Auto-shutdown is strictly gated: only triggers if at least one article was
     successfully uploaded since the option was armed.
@@ -546,6 +550,11 @@ sécurité VPN et de l'isolation des identifiants.
     L'enregistrement n'inscrit plus comme NZB_PATH le dossier NZB de l'onglet affiché.
   * Utilisation d'appels de renommage atomiques au niveau du noyau pour empêcher
     les copies complètes silencieuses lors de déplacements entre partitions (EXDEV).
+- Une seule préparation à la fois (PREPARE_PACKING) :
+  * Les posts mis en file par « Poster tous les onglets » pendant la connexion du
+    VPN, ou pendant une pause de la file, voyaient les deux premiers compressés en
+    même temps. Le post suivant n'est de nouveau préparé que pendant l'envoi du
+    post en cours.
 - Sécurisation de l'extinction automatique du PC (holdShutdown()) :
   * Extinction conditionnée à l'envoi effectif d'au moins un article depuis
     l'armement de l'option.
