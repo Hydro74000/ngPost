@@ -83,6 +83,7 @@ private:
     AutoPostWidget *_autoPostTab;
     //! The "+" next to Post All, and its Ctrl+T.
     QAction *_newQuickTabAction = nullptr;
+    QToolButton *_newQuickTabButton = nullptr;
     QPushButton *_postAllButton = nullptr;
     QPushButton *_stopAllButton = nullptr;
     //! Takes Stop's place while no post is in progress.

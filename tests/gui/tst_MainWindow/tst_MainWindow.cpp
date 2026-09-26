@@ -7441,7 +7441,8 @@ void TestMainWindow::tabs_match_posting_controls_height()
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
     auto *all = window->findChild<QPushButton *>("postAllTabsButton");
     auto *pause = window->findChild<QPushButton *>("pauseButton");
-    QVERIFY(tabs && all && pause);
+    auto *add = window->findChild<QToolButton *>("newQuickTabButton");
+    QVERIFY(tabs && all && pause && add);
     // Enough tabs for the scroll arrows to show.
     for (int i = 0; i < 20; ++i)
         window->addNewQuickTab();
@@ -7460,6 +7461,9 @@ void TestMainWindow::tabs_match_posting_controls_height()
         QTRY_COMPARE(controls->y(), bar->y());
         QCOMPARE(all->height(), height);
         QCOMPARE(pause->height(), height);
+        // The "+" is a tool button: left to its own size hint it stood smaller and higher.
+        QCOMPARE(add->size(), pause->size());
+        QCOMPARE(add->y(), pause->y());
         QVERIFY(bar->height() >= height);
         QCOMPARE(bar->tabRect(0).height(), bar->height());
         int visibleScrollers = 0;

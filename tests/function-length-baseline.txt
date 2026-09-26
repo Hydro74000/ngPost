@@ -829,7 +829,7 @@
 38	src/hmi/MainWindow.cpp	MainWindow::_downloadUpdate( UpdateChecker * uc)
 21	src/hmi/MainWindow.cpp	MainWindow::_fillTabContextMenu( QMenu & menu , int tabIndex)
 28	src/hmi/MainWindow.cpp	MainWindow::_fitHistoryColumns( bool toContents)
-21	src/hmi/MainWindow.cpp	MainWindow::_fitPostingControls()
+23	src/hmi/MainWindow.cpp	MainWindow::_fitPostingControls()
 7	src/hmi/MainWindow.cpp	MainWindow::_getPostWidget( int tabIndex) const
 9	src/hmi/MainWindow.cpp	MainWindow::_getPostWidgetIndex( PostingWidget * postWidget) const
 4	src/hmi/MainWindow.cpp	MainWindow::_hasTabsToReset() const

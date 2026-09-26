@@ -2689,10 +2689,10 @@ void MainWindow::_buildPostingControls()
     _newQuickTabAction = new QAction(tr("New"), this);
     // Not QKeySequence::AddTab: under KDE its first binding is Ctrl+Shift+N.
     _newQuickTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
-    auto *newQuickTabButton = new QToolButton(controls);
-    newQuickTabButton->setObjectName(QStringLiteral("newQuickTabButton"));
-    newQuickTabButton->setDefaultAction(_newQuickTabAction);
-    layout->addWidget(newQuickTabButton);
+    _newQuickTabButton = new QToolButton(controls);
+    _newQuickTabButton->setObjectName(QStringLiteral("newQuickTabButton"));
+    _newQuickTabButton->setDefaultAction(_newQuickTabAction);
+    layout->addWidget(_newQuickTabButton);
     connect(_newQuickTabAction, &QAction::triggered, this, &MainWindow::onNewQuickTab);
     _refreshNewQuickTab();
 
@@ -2704,7 +2704,7 @@ void MainWindow::_buildPostingControls()
     // Move the existing global pause control next to Post All Tabs.
     layout->addWidget(_ui->pauseButton);
     _ui->pauseButton->setIconSize(_postAllButton->iconSize());
-    newQuickTabButton->setIconSize(_postAllButton->iconSize());
+    _newQuickTabButton->setIconSize(_postAllButton->iconSize());
 
     // One of the two is shown at a time, see _refreshStopOrCloseAll().
     _stopAllButton = _addPostingControl(layout, "stopAllTabsButton", QIcon());
@@ -2929,9 +2929,11 @@ void MainWindow::_fitPostingControls()
 {
     if (!_postAllButton)
         return;
-    // Pause and Stop (or Close all) are squares as tall as Post all tabs, and the tabs beside
-    // them take that height too: with them the tab bar and its scroll arrows.
+    // "+", Pause and Stop (or Close all) are squares as tall as Post all tabs, and the tabs
+    // beside them take that height too: with them the tab bar and its scroll arrows.
+    // The "+" is a tool button, whose own size hint is a size smaller.
     const int buttonHeight = _postAllButton->sizeHint().height();
+    _newQuickTabButton->setFixedSize(buttonHeight, buttonHeight);
     for (auto *button : { _ui->pauseButton, _stopAllButton, _closeAllButton })
         button->setFixedSize(buttonHeight, buttonHeight);
 
