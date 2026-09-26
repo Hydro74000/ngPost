@@ -54,8 +54,9 @@ the NNTP streaming pipeline and SQLite history store.
     submitting tab.
   * Global Pause, Resume, and Stop controls added in the header to safely pause
     or cancel running and queued tasks across all tabs.
-  * Harmonized control styling with compact 16x16 circular action icons (stop,
-    pause, play).
+  * Harmonized control styling with compact 16x16 circular action icons,
+    colour-coded: green "+" and Resume, yellow Pause, red Stop. They switch to
+    lighter shades on a dark theme and keep a readable contrast on both.
 - Guided PAR2 Configuration Dialog (Par2SettingsDialog):
   * Dedicated modal dialog accessible from the Options menu or posting tabs.
   * Extended parity engine support: par2cmdline, ParPar (with automatic OpenCL
@@ -130,7 +131,7 @@ the NNTP streaming pipeline and SQLite history store.
     Post (tab 2+).
   * The "+" that opens a new Quick Post tab is now a fixed button left of "Post
     all tabs" (shortcut Ctrl+T) instead of a trailing tab that scrolled out of
-    sight once many tabs were open. It keeps a light icon in dark mode.
+    sight once many tabs were open.
   * Ctrl+click on the tab bar scroll arrows jumps to the first or the last tab.
   * A full tab bar first shortens Quick Post titles from the left, always keeping
     their "#N", before showing scroll arrows; History and Auto keep their title.
@@ -397,8 +398,10 @@ sécurité VPN et de l'isolation des identifiants.
     en donnant automatiquement le focus au premier onglet soumis.
   * Ajout de commandes globales Pause, Reprise et Stop dans l'en-tête permettant
     de suspendre ou d'interrompre l'ensemble des posts actifs et en attente.
-  * Harmonisation visuelle des contrôles avec des icônes circulaires compactes 16x16
-    (stop, pause, lecture).
+  * Harmonisation visuelle des contrôles avec des icônes circulaires compactes 16x16,
+    codées par couleur : « + » et Reprise en vert, Pause en jaune, Stop en rouge.
+    Elles passent à des teintes plus claires en thème sombre et restent bien
+    contrastées dans les deux thèmes.
 - Boîte de dialogue guidée des paramètres PAR2 (Par2SettingsDialog) :
   * Nouveau dialogue dédié accessible depuis le menu Options ou les onglets de post.
   * Prise en charge élargie des moteurs : par2cmdline, ParPar (avec détection
@@ -477,8 +480,7 @@ sécurité VPN et de l'isolation des identifiants.
     rapide (2+).
   * Le « + » qui ouvre un nouvel onglet de post rapide est désormais un bouton fixe à
     gauche de « Poster tous les onglets » (raccourci Ctrl+T), et non plus un onglet en
-    fin de barre qui sortait du champ dès que les onglets étaient nombreux. Son icône
-    reste claire en mode sombre.
+    fin de barre qui sortait du champ dès que les onglets étaient nombreux.
   * Ctrl+clic sur les flèches de défilement de la barre d'onglets saute au premier ou
     au dernier onglet.
   * Une barre d'onglets pleine raccourcit d'abord les titres des posts rapides par la

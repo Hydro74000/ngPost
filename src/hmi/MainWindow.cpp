@@ -26,6 +26,7 @@
 #include "PostingWidget.h"
 #include "AutoPostWidget.h"
 #include "StartupTabBar.h"
+#include "PostingControlIcon.h"
 #include "NgPost.h"
 #include "PostingJob.h"
 #include "CompressionSettingsDialog.h"
@@ -2706,8 +2707,10 @@ void MainWindow::_buildPostingControls()
     newQuickTabButton->setIconSize(_postAllButton->iconSize());
 
     // One of the two is shown at a time, see _refreshStopOrCloseAll().
-    _stopAllButton = _addPostingControl(layout, "stopAllTabsButton", ":/icons/stop.png");
-    _closeAllButton = _addPostingControl(layout, "closeAllTabsButton", ":/icons/closeAll.png");
+    _stopAllButton = _addPostingControl(layout, "stopAllTabsButton", QIcon());
+    _closeAllButton = _addPostingControl(layout,
+                                         "closeAllTabsButton",
+                                         QIcon(QStringLiteral(":/icons/closeAll.png")));
 
     _ui->postTabWidget->setCornerWidget(controls, Qt::TopRightCorner);
     connect(_stopAllButton, &QPushButton::clicked, _ngPost, &NgPost::cancelAllPostingJobs);
@@ -2727,22 +2730,17 @@ void MainWindow::_refreshNewQuickTab()
     _newQuickTabAction->setToolTip(
         tr("New tab (%1)").arg(_newQuickTabAction->shortcut().toString(QKeySequence::NativeText)));
 
-    // plus.png is dark grey: on a dark palette it reads as a disabled button,
-    // so it is painted in the button text colour there.
-    QPixmap plus(QStringLiteral(":/icons/plus.png"));
-    if (isDarkMode()) {
-        QPainter painter(&plus);
-        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-        painter.fillRect(plus.rect(), palette().color(QPalette::ButtonText));
-    }
-    _newQuickTabAction->setIcon(QIcon(plus));
+    _newQuickTabAction->setIcon(
+        PostingControlIcon::icon(PostingControlIcon::Glyph::NewTab, isDarkMode()));
 }
 
-QPushButton *MainWindow::_addPostingControl(QHBoxLayout *layout, const char *name, const char *icon)
+QPushButton *MainWindow::_addPostingControl(QHBoxLayout *layout,
+                                            const char *name,
+                                            const QIcon &icon)
 {
     auto *button = new QPushButton(layout->parentWidget());
     button->setObjectName(QLatin1String(name));
-    button->setIcon(QIcon(QLatin1String(icon)));
+    button->setIcon(icon);
     button->setIconSize(_postAllButton->iconSize());
     layout->addWidget(button);
     return button;
@@ -2955,7 +2953,9 @@ void MainWindow::_refreshPostingControls()
     const bool enabled = _ngPost->hasPostingJobs() && !_ngPost->_cancelingAll;
     const bool paused = _ngPost->isPaused();
     _ui->pauseButton->setEnabled(enabled);
-    _ui->pauseButton->setIcon(QIcon(paused ? ":/icons/play.png" : ":/icons/pause.png"));
+    _ui->pauseButton->setIcon(PostingControlIcon::icon(paused ? PostingControlIcon::Glyph::Resume
+                                                              : PostingControlIcon::Glyph::Pause,
+                                                       isDarkMode()));
     _ui->pauseButton->setToolTip(paused ? tr("Resume all tabs") : tr("Pause all tabs"));
     _ui->pauseButton->setAccessibleName(_ui->pauseButton->toolTip());
     _refreshStopOrCloseAll();
@@ -2971,7 +2971,8 @@ void MainWindow::_refreshStopOrCloseAll()
     const bool posting = _ngPost->hasPostingJobs();
     _stopAllButton->setVisible(posting);
     _stopAllButton->setEnabled(posting && !_ngPost->_cancelingAll);
-    _stopAllButton->setIcon(QIcon(":/icons/stop.png"));
+    _stopAllButton->setIcon(
+        PostingControlIcon::icon(PostingControlIcon::Glyph::Stop, isDarkMode()));
     _stopAllButton->setAccessibleName(tr("Stop all tabs"));
     _stopAllButton->setToolTip(tr("Cancel all active and queued posts"));
     _closeAllButton->setVisible(!posting);

@@ -94,7 +94,7 @@ private:
     void _buildPostingControls();
     //! Text, tooltip and icon of the "+": language and palette changes.
     void _refreshNewQuickTab();
-    QPushButton *_addPostingControl(QHBoxLayout *layout, const char *name, const char *icon);
+    QPushButton *_addPostingControl(QHBoxLayout *layout, const char *name, const QIcon &icon);
     void _retranslate();
     void _submitPreparedTabs();
     void _showManualUpdate(const QString &tag, const QUrl &releasePage);

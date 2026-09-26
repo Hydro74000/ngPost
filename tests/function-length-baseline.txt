@@ -807,7 +807,7 @@
 5	src/hmi/ExternalToolPathWidget.cpp	ExternalToolPathWidget::setTool( const QString & tool)
 1	src/hmi/ExternalToolPathWidget.h	ExternalToolPathWidget::editor() const
 68	src/hmi/MainWindow.cpp	MainWindow::MainWindow( QWidget * parent)
-9	src/hmi/MainWindow.cpp	MainWindow::_addPostingControl( QHBoxLayout * layout , const char * name , const char * icon)
+11	src/hmi/MainWindow.cpp	MainWindow::_addPostingControl( QHBoxLayout * layout , const char * name , const QIcon & icon)
 68	src/hmi/MainWindow.cpp	MainWindow::_addReleaseNotes( QDialog * dialog , const QString & notes)
 99	src/hmi/MainWindow.cpp	MainWindow::_addServer( NntpServerParams * serverParam)
 12	src/hmi/MainWindow.cpp	MainWindow::_applyLogCapacity( int debugLevel)
@@ -820,7 +820,7 @@
 63	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryStats()
 66	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTab()
 51	src/hmi/MainWindow.cpp	MainWindow::_buildHistoryTable( QSplitter * histSplitter)
-41	src/hmi/MainWindow.cpp	MainWindow::_buildPostingControls()
+43	src/hmi/MainWindow.cpp	MainWindow::_buildPostingControls()
 21	src/hmi/MainWindow.cpp	MainWindow::_configureWaylandSplitters()
 66	src/hmi/MainWindow.cpp	MainWindow::_connectHistoryControls()
 12	src/hmi/MainWindow.cpp	MainWindow::_connectPostingWidget( PostingWidget * post)
@@ -868,9 +868,9 @@
 4	src/hmi/MainWindow.cpp	MainWindow::_onToggleLogBox()
 8	src/hmi/MainWindow.cpp	MainWindow::_postingWidgets() const
 129	src/hmi/MainWindow.cpp	MainWindow::_refreshHistoryViews( bool rewindEmptyPage)
-18	src/hmi/MainWindow.cpp	MainWindow::_refreshNewQuickTab()
-13	src/hmi/MainWindow.cpp	MainWindow::_refreshPostingControls()
-16	src/hmi/MainWindow.cpp	MainWindow::_refreshStopOrCloseAll()
+11	src/hmi/MainWindow.cpp	MainWindow::_refreshNewQuickTab()
+15	src/hmi/MainWindow.cpp	MainWindow::_refreshPostingControls()
+17	src/hmi/MainWindow.cpp	MainWindow::_refreshStopOrCloseAll()
 14	src/hmi/MainWindow.cpp	MainWindow::_repositionZoomPopup()
 17	src/hmi/MainWindow.cpp	MainWindow::_resetHistoryColumns()
 21	src/hmi/MainWindow.cpp	MainWindow::_restoreHistoryColumns()
@@ -1060,6 +1060,9 @@
 7	src/hmi/PostInfoDialog.cpp	PostInfoDialog::templateOverride() const
 4	src/hmi/PostInfoDialog.cpp	cellName( char const * role , int row)
 1	src/hmi/PostInfoDialog.h	PostInfoDialog::sessionTemplates() const
+13	src/hmi/PostingControlIcon.cpp	PostingControlIcon::colors( Glyph glyph , bool dark)
+18	src/hmi/PostingControlIcon.cpp	PostingControlIcon::drawGlyph( QPainter & painter , Glyph glyph)
+22	src/hmi/PostingControlIcon.cpp	PostingControlIcon::icon( Glyph glyph , bool dark)
 27	src/hmi/PostingWidget.cpp	PostingWidget::PostingWidget( NgPost * ngPost , MainWindow * hmi , uint jobNumber)
 25	src/hmi/PostingWidget.cpp	PostingWidget::_armResubmission()
 13	src/hmi/PostingWidget.cpp	PostingWidget::_buildFilesList( QFileInfoList & files , bool & hasFolder)

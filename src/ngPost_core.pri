@@ -228,6 +228,7 @@ SOURCES += \
     $$PWD/hmi/ExternalToolPathWidget.cpp \
     $$PWD/hmi/Par2SettingsDialog.cpp \
     $$PWD/hmi/PostInfoDialog.cpp \
+    $$PWD/hmi/PostingControlIcon.cpp \
     $$PWD/hmi/PostingWidget.cpp \
     $$PWD/hmi/SignedListWidget.cpp \
     $$PWD/hmi/StartupTabBar.cpp \
@@ -243,6 +244,7 @@ HEADERS += \
     $$PWD/hmi/Par2SettingsDialog.h \
     $$PWD/hmi/DependentControl.h \
     $$PWD/hmi/PostInfoDialog.h \
+    $$PWD/hmi/PostingControlIcon.h \
     $$PWD/hmi/PostingWidget.h \
     $$PWD/hmi/SignedListWidget.h \
     $$PWD/hmi/StartupTabBar.h \

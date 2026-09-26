@@ -17,6 +17,7 @@
 
 #include <QtTest>
 #include <csignal>
+#include <cmath>
 #include <memory>
 #include <QDialog>
 #include <QTextBlock>
@@ -66,6 +67,7 @@
 #include "hmi/PostingWidget.h"
 #include "nntp/NntpFile.h"
 #include "hmi/StartupTabBar.h"
+#include "hmi/PostingControlIcon.h"
 #include "hmi/AutoPostWidget.h"
 #include "hmi/CheckBoxCenterWidget.h"
 #include "hmi/CompressionSettingsDialog.h"
@@ -221,9 +223,12 @@ private slots:
     //! A full bar shrinks the quick post tabs before it scrolls, down to
     //! "…#N" and no further; History and Auto keep their whole title.
     void full_tab_bar_shrinks_quick_posts_but_keeps_their_number();
-    //! plus.png is dark grey: on a dark palette the "+" is repainted in the
-    //! button text colour, or it reads as disabled.
-    void new_quick_tab_icon_is_light_on_a_dark_palette();
+    //! The "+", Pause and Stop icons are coloured discs drawn in a lighter
+    //! shade on a dark palette, and redrawn when the palette changes.
+    void posting_control_icons_follow_the_palette();
+    //! Their colours keep the WCAG contrasts, glyph on disc and disc (or rim)
+    //! on light and dark buttons, and stay green, yellow and red.
+    void posting_control_icons_keep_their_contrast();
     //! A Ctrl+click on a scroll arrow runs the bar to that end without
     //! changing the current tab; the arrows' tooltips say so.
     void tab_scroll_arrows_ctrl_click_run_to_either_end();
@@ -5894,7 +5899,9 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     QCOMPARE(pause->height(), all->sizeHint().height());
     QCOMPARE(pause->width(), pause->height());
     QCOMPARE(stop->icon().pixmap(stop->iconSize()).toImage(),
-             QIcon(":/icons/stop.png").pixmap(stop->iconSize()).toImage());
+             PostingControlIcon::icon(PostingControlIcon::Glyph::Stop, dark)
+                 .pixmap(stop->iconSize())
+                 .toImage());
     auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
     auto *second = window->addNewQuickTab();
     auto *third = window->addNewQuickTab();
@@ -5930,7 +5937,9 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     QVERIFY(ngPost.isPaused());
     QCOMPARE(pause->toolTip(), QString("Resume all tabs"));
     QCOMPARE(pause->icon().pixmap(pause->iconSize()).toImage(),
-             QIcon(":/icons/play.png").pixmap(pause->iconSize()).toImage());
+             PostingControlIcon::icon(PostingControlIcon::Glyph::Resume, dark)
+                 .pixmap(pause->iconSize())
+                 .toImage());
     QVERIFY(textIsRendered(dark ? QColor(Qt::yellow) : QColor(160, 110, 0)));
     for (auto *post : posts)
         QCOMPARE(tabs->tabBar()->tabTextColor(tabs->indexOf(post)),
@@ -5950,7 +5959,9 @@ void TestMainWindow::global_post_controls_pause_resume_and_cancel()
     QVERIFY(ngPost.isPosting());
     QCOMPARE(pause->toolTip(), QString("Pause all tabs"));
     QCOMPARE(pause->icon().pixmap(pause->iconSize()).toImage(),
-             QIcon(":/icons/pause.png").pixmap(pause->iconSize()).toImage());
+             PostingControlIcon::icon(PostingControlIcon::Glyph::Pause, dark)
+                 .pixmap(pause->iconSize())
+                 .toImage());
     QTRY_VERIFY_WITH_TIMEOUT(!mock.receivedArticles().isEmpty(), 10000);
     pause->click();
     QVERIFY(ngPost.isPaused());
@@ -7278,23 +7289,31 @@ void TestMainWindow::full_tab_bar_shrinks_quick_posts_but_keeps_their_number()
 
 namespace
 {
-//! Mean lightness of the visible pixels of \a icon.
-int iconLightness(const QIcon &icon)
+QImage iconImage(const QIcon &icon)
 {
-    const QImage image = icon.pixmap(32, 32).toImage();
-    qint64 sum = 0, count = 0;
-    for (int y = 0; y < image.height(); ++y)
-        for (int x = 0; x < image.width(); ++x)
-            if (const QColor pixel = image.pixelColor(x, y); pixel.alpha() > 128) {
-                sum += pixel.lightness();
-                ++count;
-            }
-    return count ? int(sum / count) : -1;
+    return icon.pixmap(32, 32).toImage();
+}
+
+//! WCAG relative luminance.
+double luminance(const QColor &color)
+{
+    const auto channel = [](double c) {
+        return c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * channel(color.redF()) + 0.7152 * channel(color.greenF())
+        + 0.0722 * channel(color.blueF());
+}
+
+double contrast(const QColor &a, const QColor &b)
+{
+    const double la = luminance(a), lb = luminance(b);
+    return (qMax(la, lb) + 0.05) / (qMin(la, lb) + 0.05);
 }
 } // namespace
 
-void TestMainWindow::new_quick_tab_icon_is_light_on_a_dark_palette()
+void TestMainWindow::posting_control_icons_follow_the_palette()
 {
+    using PostingControlIcon::Glyph;
     HomeSandbox sandbox;
     int argc = 1;
     QByteArray arg0("tst_MainWindow");
@@ -7304,22 +7323,58 @@ void TestMainWindow::new_quick_tab_icon_is_light_on_a_dark_palette()
     auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
     QVERIFY2(window, qPrintable(error));
     auto *add = window->findChild<QToolButton *>("newQuickTabButton");
-    QVERIFY(add);
+    auto *pause = window->findChild<QPushButton *>("pauseButton");
+    auto *stop = window->findChild<QPushButton *>("stopAllTabsButton");
+    QVERIFY(add && pause && stop);
+    QVERIFY(iconImage(PostingControlIcon::icon(Glyph::NewTab, false))
+            != iconImage(PostingControlIcon::icon(Glyph::NewTab, true)));
 
     QPalette light = window->palette();
     light.setColor(QPalette::Window, QColor(0xEF, 0xEF, 0xEF));
-    light.setColor(QPalette::ButtonText, Qt::black);
-    window->setPalette(light);
-    QVERIFY(iconLightness(add->icon()) < 128);
-
     QPalette dark = light;
     dark.setColor(QPalette::Window, QColor(0x2A, 0x2A, 0x2A));
-    dark.setColor(QPalette::ButtonText, QColor(0xF0, 0xF0, 0xF0));
-    window->setPalette(dark);
-    QVERIFY(iconLightness(add->icon()) > 200);
+    for (const bool isDark : { false, true, false }) {
+        window->setPalette(isDark ? dark : light);
+        QCOMPARE(window->isDarkMode(), isDark);
+        QCOMPARE(iconImage(add->icon()),
+                 iconImage(PostingControlIcon::icon(Glyph::NewTab, isDark)));
+        QCOMPARE(iconImage(pause->icon()),
+                 iconImage(PostingControlIcon::icon(Glyph::Pause, isDark)));
+        QCOMPARE(iconImage(stop->icon()), iconImage(PostingControlIcon::icon(Glyph::Stop, isDark)));
+    }
+}
 
-    window->setPalette(light);
-    QVERIFY(iconLightness(add->icon()) < 128);
+void TestMainWindow::posting_control_icons_keep_their_contrast()
+{
+    using PostingControlIcon::Glyph;
+    // Button backgrounds of the usual light and dark styles (Fusion, Breeze, Windows).
+    const QList<QColor> lightButtons{ Qt::white,
+                                      QColor(0xEF, 0xEF, 0xEF),
+                                      QColor(0xE0, 0xE0, 0xE0) };
+    const QList<QColor> darkButtons{ QColor(0x1E, 0x1E, 0x1E),
+                                     QColor(0x2A, 0x2A, 0x2A),
+                                     QColor(0x31, 0x36, 0x3B),
+                                     QColor(0x3C, 0x3C, 0x3C) };
+    const auto isGreen = [](int hue) { return hue >= 90 && hue <= 150; };
+    const auto isYellow = [](int hue) { return hue >= 35 && hue <= 60; };
+    const auto isRed = [](int hue) { return hue <= 10 || hue >= 350; };
+    const QList<std::pair<Glyph, bool (*)(int)>> glyphs{ { Glyph::NewTab, isGreen },
+                                                         { Glyph::Resume, isGreen },
+                                                         { Glyph::Pause, isYellow },
+                                                         { Glyph::Stop, isRed } };
+    for (const bool dark : { false, true }) {
+        for (const auto &[glyph, hasHue] : glyphs) {
+            const PostingControlIcon::Colors colors = PostingControlIcon::colors(glyph, dark);
+            const QString what = QString("glyph %1, %2 palette")
+                                     .arg(static_cast<int>(glyph))
+                                     .arg(dark ? "dark" : "light");
+            QVERIFY2(hasHue(colors.disc.hsvHue()), qPrintable(what));
+            QVERIFY2(contrast(colors.glyph, colors.disc) >= 4.5, qPrintable(what));
+            for (const QColor &button : dark ? darkButtons : lightButtons)
+                QVERIFY2(contrast(colors.rim, button) >= 3.0,
+                         qPrintable(QString("%1 on %2").arg(what, button.name())));
+        }
+    }
 }
 
 void TestMainWindow::tab_scroll_arrows_ctrl_click_run_to_either_end()
