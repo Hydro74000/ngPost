@@ -2162,6 +2162,10 @@ Gravar o arquivo NZB delas em %2 em vez da pasta atual?</translation>
 <context>
     <name>NgPost</name>
     <message>
+        <source>Update check failed: %1</source>
+        <translation>Falha ao verificar atualizações: %1</translation>
+    </message>
+    <message>
         <location filename="../NgPost.cpp" line="+71"/>
         <source>Auto Posting</source>
         <translation>Postadem Automática</translation>

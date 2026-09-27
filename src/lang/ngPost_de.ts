@@ -2163,6 +2163,10 @@ Ihre NZB-Datei in %2 statt im bisherigen Ordner speichern?</translation>
 <context>
     <name>NgPost</name>
     <message>
+        <source>Update check failed: %1</source>
+        <translation>Suche nach Updates fehlgeschlagen: %1</translation>
+    </message>
+    <message>
         <location filename="../NgPost.cpp" line="+237"/>
         <source>Help: display syntax</source>
         <translation>Hilfe: Syntax anzeigen</translation>

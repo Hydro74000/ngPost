@@ -193,7 +193,7 @@
 23	src/NgPost.cpp	NgPost::setNzbName( const QFileInfo & fileInfo)
 5	src/NgPost.cpp	NgPost::setShutdownWhenDone( bool enabled)
 19	src/NgPost.cpp	NgPost::splitMetaPair( const QString & keyValue , QString * key , QString * value)
-48	src/NgPost.cpp	NgPost::startHMI()
+53	src/NgPost.cpp	NgPost::startHMI()
 72	src/NgPost.cpp	NgPost::startPostingJob( PostingJob * job)
 5	src/NgPost.cpp	NgPost::stopActivePostingForResume()
 5	src/NgPost.cpp	NgPost::stopIgnoringMonitorPath( const QString & absolutePath)
@@ -1416,12 +1416,13 @@
 6	src/utils/UpdateChecker.cpp	UpdateChecker::UpdateChecker( QNetworkAccessManager * netMgr , QObject * parent)
 19	src/utils/UpdateChecker.cpp	UpdateChecker::_completeDownload( QNetworkReply * reply , const QString & name , qint64 written , qint64 cap , const QString & error , const std :: function<void()> & done)
 19	src/utils/UpdateChecker.cpp	UpdateChecker::_drainDownload( QNetworkReply * reply , qint64 cap , qint64 * written , QString * error)
+5	src/utils/UpdateChecker.cpp	UpdateChecker::_failCheck( const QString & reason)
 24	src/utils/UpdateChecker.cpp	UpdateChecker::_markCancelledForInstaller()
 10	src/utils/UpdateChecker.cpp	UpdateChecker::assetNameForCurrentOS( const QString & tag) const
 8	src/utils/UpdateChecker.cpp	UpdateChecker::buildTag()
 11	src/utils/UpdateChecker.cpp	UpdateChecker::canInstallAutomatically() const
 32	src/utils/UpdateChecker.cpp	UpdateChecker::cancelDownload()
-30	src/utils/UpdateChecker.cpp	UpdateChecker::checkLatestRelease()
+31	src/utils/UpdateChecker.cpp	UpdateChecker::checkLatestRelease()
 43	src/utils/UpdateChecker.cpp	UpdateChecker::downloadFile( const QUrl & url , const QString & name , qint64 cap , const std :: function<void()> & done)
 18	src/utils/UpdateChecker.cpp	UpdateChecker::failDownload( const QString & message)
 12	src/utils/UpdateChecker.cpp	UpdateChecker::installationDirectory()

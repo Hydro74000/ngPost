@@ -142,6 +142,54 @@ private slots:
             QCOMPARE(checker._assetSize, 123);
         }
     }
+    //! Twenty releases with full notes weigh over 1 MB: the old bound dropped
+    //! such a list on the floor, and unstable builds never saw a successor.
+    void a_release_list_over_one_megabyte_is_read()
+    {
+        FakeUpdateNetwork network;
+        UpdateChecker checker(&network);
+        QSignalSpy available(&checker, &UpdateChecker::newVersionAvailable);
+        QSignalSpy failed(&checker, &UpdateChecker::checkFailed);
+        QJsonArray releases;
+        for (int i = 0; i < 20; ++i)
+            releases.append(QJsonObject{ { "tag_name", QString("v99.%1").arg(20 - i) },
+                                         { "body", QString(70 * 1024, QChar('n')) } });
+        const QByteArray list = QJsonDocument(releases).toJson(QJsonDocument::Compact);
+        QVERIFY(list.size() > 1024 * 1024);
+        checker.checkLatestRelease();
+        QVERIFY(network.last);
+        for (qsizetype at = 0; at < list.size(); at += 65536)
+            network.last->deliver(list.mid(at, 65536));
+        network.last->finish();
+        QCOMPARE(failed.size(), 0);
+        QCOMPARE(available.size(), 1);
+        QCOMPARE(available.first().first().toString(), QString("v99.20"));
+    }
+    //! A check that fails says so, rather than returning without a word.
+    void an_oversized_or_invalid_reply_is_reported()
+    {
+        FakeUpdateNetwork network;
+        UpdateChecker checker(&network);
+        QSignalSpy available(&checker, &UpdateChecker::newVersionAvailable);
+        QSignalSpy failed(&checker, &UpdateChecker::checkFailed);
+        checker.checkLatestRelease();
+        QVERIFY(network.last);
+        auto *oversized = network.last;
+        for (int i = 0; i < 200 && !oversized->aborted; ++i)
+            oversized->deliver(QByteArray(65536, ' '));
+        QVERIFY(oversized->aborted);
+        QCOMPARE(failed.size(), 1);
+        QVERIFY2(failed.first().first().toString().contains("bytes"),
+                 qPrintable(failed.first().first().toString()));
+
+        checker.checkLatestRelease();
+        QVERIFY(network.last != oversized);
+        network.last->deliver("not json");
+        network.last->finish();
+        QCOMPARE(failed.size(), 2);
+        QVERIFY(failed.last().first().toString().contains("JSON"));
+        QCOMPARE(available.size(), 0);
+    }
     void missing_or_untrusted_asset_keeps_manual_notification_data()
     {
         QTest::addColumn<QString>("url");

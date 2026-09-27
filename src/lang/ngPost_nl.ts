@@ -2164,6 +2164,10 @@ Hun NZB-bestand naar %2 schrijven in plaats van hun huidige map?</translation>
 <context>
     <name>NgPost</name>
     <message>
+        <source>Update check failed: %1</source>
+        <translation>Controle op updates mislukt: %1</translation>
+    </message>
+    <message>
         <location filename="../NgPost.cpp" line="+71"/>
         <source>Auto Posting</source>
         <translation>Auto Posting</translation>

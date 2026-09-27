@@ -2162,6 +2162,10 @@ Write their NZB file to %2 instead of their current folder?</source>
 <context>
     <name>NgPost</name>
     <message>
+        <source>Update check failed: %1</source>
+        <translation>Error al buscar actualizaciones: %1</translation>
+    </message>
+    <message>
         <location filename="../NgPost.cpp" line="+237"/>
         <source>Help: display syntax</source>
         <translation>Ayuda: sintaxis de la pantalla</translation>

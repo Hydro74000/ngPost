@@ -1443,6 +1443,11 @@ int NgPost::startHMI()
 
     connect(_updateChecker, &UpdateChecker::newVersionAvailable,
             _hmi,           &MainWindow::onNewVersionAvailable);
+    // In the log pane only when debugging: an offline start is not worth a line.
+    connect(_updateChecker, &UpdateChecker::checkFailed, this, [this](const QString &reason) {
+        if (debugMode())
+            _log(tr("Update check failed: %1").arg(reason));
+    });
 
     // run after parseDefaultConfig so CHECK_FOR_UPDATES is loaded
     checkForNewVersion();

@@ -49,6 +49,10 @@ the NNTP streaming pipeline and SQLite history store.
     link that unfolds them (growing the popup) into a scrolling pane with headings
     and lists, below the link to the release page.
   * Update dialogs hold automatic shutdown during the update interaction.
+  * Unstable builds see newer releases again: the release list, twenty releases
+    with their full notes, outgrew the 1 MB bound of the check, which then failed
+    without a word. The bound is now 8 MB for a list of ten, and a failed check
+    is reported (in the log pane in debug mode).
 - Sequential Multi-Tab Posting & Global Queue Controls:
   * "Post all" button added to submit all prepared Quick Post tabs sequentially
     into a managed posting queue (_pendingJobs), automatically focusing the first
@@ -389,6 +393,10 @@ sécurité VPN et de l'isolation des identifiants.
     ouvre la page de la release dans le navigateur au lieu d'installer et redémarrer.
   * Les dialogues de mise à jour suspendent l'extinction automatique du système durant
     l'interaction utilisateur.
+  * Les versions unstable voient de nouveau les releases plus récentes : la liste des
+    releases, vingt avec leurs notes complètes, dépassait la limite de 1 Mo de la
+    vérification, qui échouait alors sans rien dire. La limite passe à 8 Mo pour une
+    liste de dix, et un échec de vérification est signalé (dans le log en mode debug).
   * La recherche de mise à jour s'exécute désormais en arrière-plan à chaque démarrage
     de l'interface graphique, et non plus une fois par jour : une version publiée après
     la dernière vérification n'est plus manquée et une mise à jour connue reste visible

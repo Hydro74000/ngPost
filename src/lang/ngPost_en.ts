@@ -2150,6 +2150,10 @@ Write their NZB file to %2 instead of their current folder?</translation>
 <context>
     <name>NgPost</name>
     <message>
+        <source>Update check failed: %1</source>
+        <translation>Update check failed: %1</translation>
+    </message>
+    <message>
         <location filename="../NgPost.cpp" line="+237"/>
         <source>Help: display syntax</source>
         <translation></translation>

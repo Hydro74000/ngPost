@@ -75,6 +75,8 @@ signals:
     void downloadProgress(qint64 received, qint64 total);
     void downloadFailed(const QString &msg);
     void installStarting();
+    //! The release check did not complete (network, oversized or invalid reply).
+    void checkFailed(const QString &reason);
 
 public slots:
     void startDownloadAndInstall();
@@ -102,6 +104,7 @@ private:
                            const std::function<void()> &done);
     void prepareInstall();
     void failDownload(const QString &message);
+    void _failCheck(const QString &reason);
 
     //! Drops the "cancelled" marker the detached installer polls for. False
     //! when it could not be written, which is the only case where a cancelled
@@ -114,6 +117,10 @@ private:
     static const QString sRepoOwner;
     static const QString sRepoName;
     static constexpr qint64 sPromptIntervalSeconds = qint64(24) * 3600;
+    //! Bound on a release check reply. A release weighs ~70 KB of JSON, its
+    //! notes and assets; 1 MB no longer held a list of 20 and every unstable
+    //! build stopped seeing its successors, silently.
+    static constexpr qint64 sMaxReleaseInfoBytes = qint64(8) * 1024 * 1024;
 
     QNetworkAccessManager *_netMgr;
     QNetworkReply         *_reply;

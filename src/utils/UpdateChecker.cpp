@@ -30,7 +30,7 @@ const QString UpdateChecker::sReleaseApiUrl =
         QStringLiteral("https://api.github.com/repos/%1/%2/releases/latest")
         .arg(UpdateChecker::sRepoOwner, UpdateChecker::sRepoName);
 const QString UpdateChecker::sReleaseListApiUrl =
-        QStringLiteral("https://api.github.com/repos/%1/%2/releases?per_page=20")
+    QStringLiteral("https://api.github.com/repos/%1/%2/releases?per_page=10")
         .arg(UpdateChecker::sRepoOwner, UpdateChecker::sRepoName);
 
 UpdateChecker::UpdateChecker(QNetworkAccessManager *netMgr, QObject *parent)
@@ -251,7 +251,8 @@ void UpdateChecker::checkLatestRelease()
     connect(reply, &QIODevice::readyRead, this, [reply] {
         QByteArray body = reply->property("boundedBody").toByteArray();
         const QByteArray chunk = reply->read(65536);
-        if (body.size() + chunk.size() > qsizetype(1024) * 1024) {
+        if (body.size() + chunk.size() > sMaxReleaseInfoBytes) {
+            reply->setProperty("oversized", true);
             reply->abort();
             return;
         }
@@ -267,20 +268,20 @@ void UpdateChecker::onReleaseInfoReceived()
     reply->deleteLater();
     _reply = nullptr;
 
-    if (reply->error() != QNetworkReply::NoError)
-    {
-        qDebug() << "[UpdateChecker] release info request failed:" << reply->errorString();
+    const QByteArray body = reply->property("boundedBody").toByteArray() + reply->readAll();
+    if (reply->property("oversized").toBool() || body.size() > sMaxReleaseInfoBytes) {
+        _failCheck(QStringLiteral("reply over %1 bytes").arg(sMaxReleaseInfoBytes));
         return;
     }
-
-    const QByteArray body = reply->property("boundedBody").toByteArray() + reply->readAll();
-    if (body.size() > qsizetype(1024) * 1024)
+    if (reply->error() != QNetworkReply::NoError) {
+        _failCheck(reply->errorString());
         return;
+    }
     QJsonParseError err;
     const QJsonDocument doc = QJsonDocument::fromJson(body, &err);
     if (err.error != QJsonParseError::NoError || (!doc.isObject() && !doc.isArray()))
     {
-        qDebug() << "[UpdateChecker] invalid JSON from GitHub:" << err.errorString();
+        _failCheck(QStringLiteral("invalid JSON from GitHub: %1").arg(err.errorString()));
         return;
     }
 
@@ -319,6 +320,14 @@ void UpdateChecker::onReleaseInfoReceived()
     }
 
     emit newVersionAvailable(_latestTag, _releaseNotes, _releasePageUrl);
+}
+
+//! qWarning, not qDebug: release builds define QT_NO_DEBUG_OUTPUT, and a check
+//! that fails on every start must leave a trace somewhere.
+void UpdateChecker::_failCheck(const QString &reason)
+{
+    qWarning().noquote() << QStringLiteral("[UpdateChecker] release check failed: %1").arg(reason);
+    emit checkFailed(reason);
 }
 
 QJsonObject UpdateChecker::selectRelease(const QJsonDocument &document, const QString &current)
