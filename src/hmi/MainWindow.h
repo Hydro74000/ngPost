@@ -98,8 +98,15 @@ private:
     QPushButton *_addPostingControl(QHBoxLayout *layout, const char *name, const QIcon &icon);
     void _retranslate();
     void _submitPreparedTabs();
-    void _showManualUpdate(const QString &tag, const QUrl &releasePage);
-    QDialog *_createUpdateDialog(const QString &tag, const QString &notes, const QUrl &releasePage);
+    //! The release announced last: the status-bar link reopens its popup.
+    QString _updateTag, _updateNotes;
+    QUrl _updateReleasePage;
+    void _showUpdateLink();
+    void _promptUpdate();
+    QDialog *_createUpdateDialog(const QString &tag,
+                                 const QString &notes,
+                                 const QUrl &releasePage,
+                                 bool install);
     void _addReleaseNotes(QDialog *dialog, const QString &notes);
     void _downloadUpdate(UpdateChecker *checker);
     bool _isPostingQueueRunning() const;
@@ -239,9 +246,12 @@ public:
     bool isLogBoxCollapsedForTest() const { return _isLogBoxCollapsed(); }
     void toggleLogBoxForTest() { _onToggleLogBox(); }
     void setLogBoxCollapsedForTest(bool collapsed) { _setLogBoxCollapsed(collapsed, true); }
-    QDialog *createUpdateDialogForTest(const QString &tag, const QString &notes, const QUrl &page)
+    QDialog *createUpdateDialogForTest(const QString &tag,
+                                       const QString &notes,
+                                       const QUrl &page,
+                                       bool install = true)
     {
-        return _createUpdateDialog(tag, notes, page);
+        return _createUpdateDialog(tag, notes, page, install);
     }
 #endif
 

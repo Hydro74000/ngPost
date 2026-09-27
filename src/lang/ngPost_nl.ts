@@ -1079,6 +1079,10 @@ Weet je zeker dat je wilt stoppen?</translation>
         <translation>Installeren en herstarten</translation>
     </message>
     <message>
+        <source>Open Release Page</source>
+        <translation>Releasepagina openen</translation>
+    </message>
+    <message>
         <location line="+1"/>
         <source>Later</source>
         <translation>Later</translation>

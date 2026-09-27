@@ -1044,6 +1044,10 @@ Cierre ese otro ngPost para usar la VPN aquí. Si no hay ninguno en ejecución, 
         <translation>Instalar y reiniciar</translation>
     </message>
     <message>
+        <source>Open Release Page</source>
+        <translation>Abrir página de la versión</translation>
+    </message>
+    <message>
         <location line="+1"/>
         <source>Later</source>
         <translation>Más tarde</translation>

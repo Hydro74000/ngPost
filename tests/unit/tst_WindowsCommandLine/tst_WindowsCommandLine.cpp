@@ -3,6 +3,19 @@
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <shellapi.h>
+
+// A PowerShell run takes about a second, but a busy CI runner can stall one
+// far longer; wait generously and, when it still hangs, show what it printed.
+static bool powershellFinished(QProcess &process)
+{
+    if (process.waitForFinished(60000))
+        return true;
+    process.kill();
+    process.waitForFinished(5000);
+    qWarning().noquote() << "PowerShell timed out. stdout:" << process.readAllStandardOutput()
+                         << "stderr:" << process.readAllStandardError();
+    return false;
+}
 #endif
 
 class TestWindowsCommandLine : public QObject {
@@ -56,7 +69,7 @@ private slots:
         QProcess process;
         process.start(exe, {"-NoProfile", "-NonInteractive", "-Command", stub +
             WindowsCommandLine::elevatedPowerShellCommand(exe, {"-NoProfile", "-File", "unused.ps1"})});
-        QVERIFY(process.waitForFinished(15000));
+        QVERIFY(powershellFinished(process));
         QCOMPARE(process.exitStatus(), QProcess::NormalExit);
         QCOMPARE(process.exitCode(), expected);
 #else
@@ -82,8 +95,12 @@ private slots:
         QString const command = QString("$ErrorActionPreference='Stop'; $p=Start-Process -FilePath %1 -Wait -PassThru -ArgumentList %2; exit $p.ExitCode")
             .arg(WindowsCommandLine::powershellLiteral(exe), WindowsCommandLine::powershellLiteral(arguments));
         QProcess process;
-        process.start(exe, {"-NoProfile", "-Command", command});
-        QVERIFY(process.waitForFinished(15000));
+        process.start(exe, { "-NoProfile", "-NonInteractive", "-Command", command });
+        bool const finished = powershellFinished(process);
+        QVERIFY2(finished,
+                 QFile::exists(output)
+                     ? "the -File script ran but Start-Process -Wait never returned"
+                     : "the -File script never ran");
         QCOMPARE(process.exitCode(), 0);
         QFile result(output);
         QVERIFY(result.open(QIODevice::ReadOnly));

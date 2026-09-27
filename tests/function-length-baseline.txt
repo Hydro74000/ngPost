@@ -824,7 +824,7 @@
 21	src/hmi/MainWindow.cpp	MainWindow::_configureWaylandSplitters()
 66	src/hmi/MainWindow.cpp	MainWindow::_connectHistoryControls()
 12	src/hmi/MainWindow.cpp	MainWindow::_connectPostingWidget( PostingWidget * post)
-33	src/hmi/MainWindow.cpp	MainWindow::_createUpdateDialog( const QString & tag , const QString & notes , const QUrl & releasePage)
+37	src/hmi/MainWindow.cpp	MainWindow::_createUpdateDialog( const QString & tag , const QString & notes , const QUrl & releasePage , bool install)
 90	src/hmi/MainWindow.cpp	MainWindow::_createZoomPopup()
 38	src/hmi/MainWindow.cpp	MainWindow::_downloadUpdate( UpdateChecker * uc)
 21	src/hmi/MainWindow.cpp	MainWindow::_fillTabContextMenu( QMenu & menu , int tabIndex)
@@ -867,6 +867,7 @@
 122	src/hmi/MainWindow.cpp	MainWindow::_onStatsRefresh()
 4	src/hmi/MainWindow.cpp	MainWindow::_onToggleLogBox()
 8	src/hmi/MainWindow.cpp	MainWindow::_postingWidgets() const
+17	src/hmi/MainWindow.cpp	MainWindow::_promptUpdate()
 129	src/hmi/MainWindow.cpp	MainWindow::_refreshHistoryViews( bool rewindEmptyPage)
 11	src/hmi/MainWindow.cpp	MainWindow::_refreshNewQuickTab()
 15	src/hmi/MainWindow.cpp	MainWindow::_refreshPostingControls()
@@ -885,8 +886,8 @@
 10	src/hmi/MainWindow.cpp	MainWindow::_serverRow( QObject * delButton)
 20	src/hmi/MainWindow.cpp	MainWindow::_setLogBoxCollapsed( bool collapsed , bool saveSetting)
 67	src/hmi/MainWindow.cpp	MainWindow::_showHistoryDetails( const PostHistoryStore :: PostDetails & details)
-18	src/hmi/MainWindow.cpp	MainWindow::_showManualUpdate( const QString & tag , const QUrl & releasePage)
 38	src/hmi/MainWindow.cpp	MainWindow::_showUnattributedVpnDecision()
+17	src/hmi/MainWindow.cpp	MainWindow::_showUpdateLink()
 16	src/hmi/MainWindow.cpp	MainWindow::_showZoomLevel( int percent)
 34	src/hmi/MainWindow.cpp	MainWindow::_startResumePost( qint64 postId , bool askConfirmation)
 4	src/hmi/MainWindow.cpp	MainWindow::_startupTabBar() const
@@ -926,7 +927,7 @@
 4	src/hmi/MainWindow.cpp	MainWindow::onGenPoster()
 5	src/hmi/MainWindow.cpp	MainWindow::onLangChanged( const QString & lang)
 5	src/hmi/MainWindow.cpp	MainWindow::onNewQuickTab()
-19	src/hmi/MainWindow.cpp	MainWindow::onNewVersionAvailable( const QString & tag , const QString & notes , const QUrl & releasePage)
+13	src/hmi/MainWindow.cpp	MainWindow::onNewVersionAvailable( const QString & tag , const QString & notes , const QUrl & releasePage)
 11	src/hmi/MainWindow.cpp	MainWindow::onNzbPathClicked()
 8	src/hmi/MainWindow.cpp	MainWindow::onObfucateToggled( bool checked)
 9	src/hmi/MainWindow.cpp	MainWindow::onPar2Settings()
@@ -978,7 +979,7 @@
 14	src/hmi/MainWindow.cpp	tabBarExcessOverCorner( const QTabWidget * tabs , int height)
 4	src/hmi/MainWindow.cpp	widgetWithin( const QWidget * area , const QWidget * widget)
 1	src/hmi/MainWindow.h	MainWindow::autoWidget() const
-4	src/hmi/MainWindow.h	MainWindow::createUpdateDialogForTest( const QString & tag , const QString & notes , const QUrl & page)
+7	src/hmi/MainWindow.h	MainWindow::createUpdateDialogForTest( const QString & tag , const QString & notes , const QUrl & page , bool install = true)
 1	src/hmi/MainWindow.h	MainWindow::fillTabContextMenuForTest( QMenu & menu , int tabIndex)
 1	src/hmi/MainWindow.h	MainWindow::fitHistoryColumnsForTest( bool toContents)
 1	src/hmi/MainWindow.h	MainWindow::isLogBoxCollapsedForTest() const

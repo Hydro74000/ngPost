@@ -1048,29 +1048,44 @@ void MainWindow::onSetProgressBarRange(int nbArticles)
 
 void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes, const QUrl &releasePage)
 {
-    UpdateChecker *uc = _ngPost->updateChecker();
-    if (!uc)
+    if (!_ngPost->updateChecker())
         return;
-
-    if (!uc->canInstallAutomatically() || !claimUpdatePrompt()) {
-        _showManualUpdate(tag, releasePage);
-        return;
-    }
-    const auto shutdownHold = _ngPost->holdShutdown();
-    const std::unique_ptr<QDialog> dialog(_createUpdateDialog(tag, notes, releasePage));
-    if (dialog->exec() != QDialog::Accepted) {
-        _showManualUpdate(tag, releasePage); // stays visible after "Later"
-        return;
-    }
-
-    _downloadUpdate(uc);
+    _updateTag = tag;
+    _updateNotes = notes;
+    _updateReleasePage = releasePage;
+    // Between two popups, and after "Later", the status-bar link keeps the
+    // update visible and reopens the popup.
+    _showUpdateLink();
+    if (claimUpdatePrompt())
+        _promptUpdate();
 }
 
-//! The install popup: a link to the release page -- all a release published
+//! Where ngPost cannot replace itself (AppImage, source build, Setup install),
+//! the popup is the same, but its button opens the release page instead.
+void MainWindow::_promptUpdate()
+{
+    UpdateChecker *uc = _ngPost->updateChecker();
+    if (!uc || _updateTag.isEmpty())
+        return;
+    const bool install = uc->canInstallAutomatically();
+    const QUrl releasePage = _updateReleasePage;
+    const auto shutdownHold = _ngPost->holdShutdown();
+    const std::unique_ptr<QDialog> dialog(
+        _createUpdateDialog(_updateTag, _updateNotes, releasePage, install));
+    if (dialog->exec() != QDialog::Accepted)
+        return;
+    if (install)
+        _downloadUpdate(uc);
+    else
+        QDesktopServices::openUrl(releasePage);
+}
+
+//! The update popup: a link to the release page -- all a release published
 //! without notes offers -- and the release notes in full, folded at first.
 QDialog *MainWindow::_createUpdateDialog(const QString &tag,
                                          const QString &notes,
-                                         const QUrl &releasePage)
+                                         const QUrl &releasePage,
+                                         bool install)
 {
     auto *dialog = new QDialog(this);
     dialog->setObjectName(QStringLiteral("updateDialog"));
@@ -1093,7 +1108,10 @@ QDialog *MainWindow::_createUpdateDialog(const QString &tag,
         _addReleaseNotes(dialog, notes);
 
     auto *buttons = new QDialogButtonBox(dialog);
-    buttons->addButton(tr("Install and Restart"), QDialogButtonBox::AcceptRole)->setDefault(true);
+    buttons
+        ->addButton(install ? tr("Install and Restart") : tr("Open Release Page"),
+                    QDialogButtonBox::AcceptRole)
+        ->setDefault(true);
     buttons->addButton(tr("Later"), QDialogButtonBox::RejectRole);
     connect(buttons, &QDialogButtonBox::accepted, dialog, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
@@ -1173,7 +1191,7 @@ void MainWindow::_addReleaseNotes(QDialog *dialog, const QString &notes)
     fold(false);
 }
 
-void MainWindow::_showManualUpdate(const QString &tag, const QUrl &releasePage)
+void MainWindow::_showUpdateLink()
 {
     auto *label = statusBar()->findChild<QLabel *>(QStringLiteral("updateAvailableLabel"));
     if (!label) {
@@ -1181,14 +1199,13 @@ void MainWindow::_showManualUpdate(const QString &tag, const QUrl &releasePage)
         label->setObjectName(QStringLiteral("updateAvailableLabel"));
         label->setTextFormat(Qt::RichText);
         label->setTextInteractionFlags(Qt::TextBrowserInteraction);
-        label->setOpenExternalLinks(true);
+        connect(label, &QLabel::linkActivated, this, &MainWindow::_promptUpdate);
         // Left of the zoom control, which stays the rightmost item.
         statusBar()->insertPermanentWidget(0, label);
     }
-    const QString text = tr("Update available: %1").arg(tag);
+    const QString text = tr("Update available: %1").arg(_updateTag);
     label->setText(QStringLiteral("<a href=\"%1\" style=\"color: #ff5252;\">%2</a>")
-                       .arg(releasePage.toString().toHtmlEscaped(), text.toHtmlEscaped()));
-    label->setToolTip(releasePage.toString());
+                       .arg(_updateReleasePage.toString().toHtmlEscaped(), text.toHtmlEscaped()));
     label->show();
 }
 

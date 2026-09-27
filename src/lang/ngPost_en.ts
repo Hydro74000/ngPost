@@ -1034,6 +1034,10 @@ Close that other ngPost to use the VPN here. If none is running, you can remove 
         <translation>Install and Restart</translation>
     </message>
     <message>
+        <source>Open Release Page</source>
+        <translation>Open Release Page</translation>
+    </message>
+    <message>
         <location line="+1"/>
         <source>Later</source>
         <translation>Later</translation>

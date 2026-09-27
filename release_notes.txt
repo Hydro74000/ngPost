@@ -35,16 +35,17 @@ the NNTP streaming pipeline and SQLite history store.
     5.5.1 updater before publication; Windows Setup also validates a real upgrade.
   * Fixed Windows update failures when flushing the transaction journal or
     inheriting the installation directory as the updater process working directory.
-  * Source builds, AppImages and Setup-managed installs announce updates in red
-    in the status bar, with a clickable version-specific release link. Portable
-    installations keep their existing Install and Restart popup.
+  * Every installation shows the update popup with its release notes. Where
+    ngPost cannot replace itself (source builds, AppImages, Setup-managed
+    installs), its button opens the release page in the browser instead of
+    installing and restarting.
   * The release check now runs asynchronously at every GUI start instead of once
     a day, so a release published after the last check is no longer missed and a
     known update stays visible across restarts. LAST_UPDATE_CHECK is retired
-    and dropped from ngPost.conf on the next save. The Install and Restart popup
-    still appears at most once a day; the other starts, and a popup dismissed
-    with Later, show the red link, left of the zoom level.
-  * The Install and Restart popup carries the whole release notes, folded under a
+    and dropped from ngPost.conf on the next save. The update popup still
+    appears at most once a day; in between, and after Later, a red link left of
+    the zoom level keeps the update visible and reopens the popup.
+  * The update popup carries the whole release notes, folded under a
     link that unfolds them (growing the popup) into a scrolling pane with headings
     and lists, below the link to the release page.
   * Update dialogs hold automatic shutdown during the update interaction.
@@ -380,20 +381,20 @@ sécurité VPN et de l'isolation des identifiants.
   * Correction des échecs de mise à jour sous Windows lors du vidage du journal de
     transaction ou de l'héritage du dossier d'installation comme répertoire de travail
     de l'installeur détaché.
-  * Les versions compilées depuis les sources, les paquets AppImage et les installations
-    gérées par l'installeur annoncent les mises à jour en rouge dans la barre d'état, avec
-    un lien cliquable vers la release correspondante. Les installations portables conservent
-    leur boîte de dialogue d'installation et de redémarrage.
+  * Toutes les installations affichent la fenêtre de mise à jour avec ses notes de
+    version. Là où ngPost ne peut pas se remplacer lui-même (versions compilées depuis
+    les sources, paquets AppImage, installations gérées par l'installeur), son bouton
+    ouvre la page de la release dans le navigateur au lieu d'installer et redémarrer.
   * Les dialogues de mise à jour suspendent l'extinction automatique du système durant
     l'interaction utilisateur.
   * La recherche de mise à jour s'exécute désormais en arrière-plan à chaque démarrage
     de l'interface graphique, et non plus une fois par jour : une version publiée après
     la dernière vérification n'est plus manquée et une mise à jour connue reste visible
     d'un démarrage à l'autre. LAST_UPDATE_CHECK est abandonné et retiré de ngPost.conf
-    à la sauvegarde suivante. La fenêtre « Installer et redémarrer » n'apparaît toujours
-    qu'une fois par jour au plus ; les autres démarrages, ainsi qu'une fenêtre fermée
-    avec « Plus tard », affichent le lien rouge, à gauche du niveau de zoom.
-  * La fenêtre « Installer et redémarrer » contient l'intégralité des notes de version,
+    à la sauvegarde suivante. La fenêtre de mise à jour n'apparaît toujours qu'une fois
+    par jour au plus ; entre-temps, et après « Plus tard », un lien rouge à gauche du
+    niveau de zoom garde la mise à jour visible et rouvre la fenêtre.
+  * La fenêtre de mise à jour contient l'intégralité des notes de version,
     repliées sous un lien qui les déplie (en agrandissant la fenêtre) dans une zone
     défilante avec titres et listes, sous le lien vers la page de la release.
 - Envoi séquentiel multi-onglets & contrôles globaux de file :

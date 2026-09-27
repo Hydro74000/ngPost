@@ -1077,6 +1077,10 @@ Are you sure you want to quit?</source>
         <translation>安装并重启</translation>
     </message>
     <message>
+        <source>Open Release Page</source>
+        <translation>打开版本页面</translation>
+    </message>
+    <message>
         <location line="+1"/>
         <source>Later</source>
         <translation>稍后</translation>

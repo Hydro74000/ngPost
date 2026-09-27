@@ -1037,6 +1037,10 @@ Fermez cet autre ngPost pour utiliser le VPN ici. Si aucun ne tourne, vous pouve
         <translation>Installer et redémarrer</translation>
     </message>
     <message>
+        <source>Open Release Page</source>
+        <translation>Ouvrir la page de la release</translation>
+    </message>
+    <message>
         <location line="+1"/>
         <source>Later</source>
         <translation>Plus tard</translation>

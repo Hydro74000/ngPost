@@ -1045,6 +1045,10 @@ Schließen Sie das andere ngPost, um das VPN hier zu verwenden. Läuft keines, k
         <translation>Installieren und neu starten</translation>
     </message>
     <message>
+        <source>Open Release Page</source>
+        <translation>Release-Seite öffnen</translation>
+    </message>
+    <message>
         <location line="+1"/>
         <source>Later</source>
         <translation>Später</translation>

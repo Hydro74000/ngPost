@@ -1077,6 +1077,10 @@ Tem certeza que deseja sair?</translation>
         <translation>Instalar e reiniciar</translation>
     </message>
     <message>
+        <source>Open Release Page</source>
+        <translation>Abrir página da versão</translation>
+    </message>
+    <message>
         <location line="+1"/>
         <source>Later</source>
         <translation>Mais tarde</translation>

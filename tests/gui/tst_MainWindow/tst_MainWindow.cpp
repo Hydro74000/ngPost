@@ -106,8 +106,8 @@ class TestMainWindow : public QObject
     Q_OBJECT
 
 private slots:
-    void manual_update_uses_red_status_link_data();
-    void manual_update_uses_red_status_link();
+    void manual_update_popup_opens_the_release_page_data();
+    void manual_update_popup_opens_the_release_page();
     void legacy_bundle_paths_become_automatic();
     void tool_paths_keep_custom_choices_and_report_missing_tools();
     //! A PAR2_PATH or RAR_PATH written before *_SOURCE existed, and gone since,
@@ -1549,7 +1549,7 @@ QString itemName(QLayoutItem *item)
 
 } // namespace
 
-void TestMainWindow::manual_update_uses_red_status_link_data()
+void TestMainWindow::manual_update_popup_opens_the_release_page_data()
 {
     QTest::addColumn<bool>("appimage");
     QTest::addColumn<QString>("tag");
@@ -1558,7 +1558,7 @@ void TestMainWindow::manual_update_uses_red_status_link_data()
     QTest::newRow("appimage-unstable") << true << QString("v5.6-unstable.20260923.200.abcdef0");
 }
 
-void TestMainWindow::manual_update_uses_red_status_link()
+void TestMainWindow::manual_update_popup_opens_the_release_page()
 {
     QFETCH(bool, appimage);
     QFETCH(QString, tag);
@@ -1583,27 +1583,58 @@ void TestMainWindow::manual_update_uses_red_status_link()
         qputenv("APPIMAGE", "/tmp/ngPost.AppImage");
     else
         qunsetenv("APPIMAGE");
-    bool popup = false;
-    QTimer dismissUnexpectedPopup;
-    connect(&dismissUnexpectedPopup, &QTimer::timeout, window, [&popup] {
-        if (auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget())) {
-            popup = true;
+    QVERIFY(!ngPost.updateChecker()->canInstallAutomatically());
+    UpdateLinkReceiver receiver;
+    QDesktopServices::setUrlHandler("https", &receiver, "open");
+    const auto restoreHandler = qScopeGuard([] { QDesktopServices::unsetUrlHandler("https"); });
+
+    // Answers each update popup once, with its main button or "Later".
+    int popups = 0;
+    bool acceptPopup = true, otherPopup = false;
+    QString popupHeader, popupButton;
+    QTimer answerPopup;
+    connect(&answerPopup, &QTimer::timeout, window, [&] {
+        QWidget *modal = QApplication::activeModalWidget();
+        if (auto *box = qobject_cast<QMessageBox *>(modal)) {
+            otherPopup = true;
             box->reject();
+            return;
         }
+        auto *dialog = qobject_cast<QDialog *>(modal);
+        if (!dialog || dialog->objectName() != "updateDialog"
+            || dialog->property("answered").toBool())
+            return;
+        dialog->setProperty("answered", true);
+        ++popups;
+        auto *header = dialog->findChild<QLabel *>("updateHeader");
+        popupHeader = header ? header->text() : QString();
+        auto *buttons = dialog->findChild<QDialogButtonBox *>();
+        QPushButton *main = nullptr;
+        for (QAbstractButton *button : buttons ? buttons->buttons() : QList<QAbstractButton *>())
+            if (buttons->buttonRole(button) == QDialogButtonBox::AcceptRole)
+                main = qobject_cast<QPushButton *>(button);
+        popupButton = main ? main->text() : QString();
+        if (acceptPopup && main)
+            main->click();
+        else
+            dialog->reject();
     });
-    dismissUnexpectedPopup.start(10);
+    answerPopup.start(10);
+
+    // The first announcement of the day: the popup, whose button opens the
+    // release page since this installation cannot replace itself.
     const QUrl release("https://github.com/Hydro74000/ngPost/releases/tag/" + tag);
     window->onNewVersionAvailable(tag, "notes", release);
-    QVERIFY(!popup);
+    QCOMPARE(popups, 1);
+    QVERIFY(popupHeader.contains(tag));
+    QCOMPARE(popupButton, QString("Open Release Page"));
+    QCOMPARE(receiver.url, release);
+
     auto *label = window->statusBar()->findChild<QLabel *>("updateAvailableLabel");
     QVERIFY(label);
     QVERIFY(label->text().contains(tag));
     QVERIFY(label->text().contains("color: #ff5252"));
-    QVERIFY(label->text().contains(release.toString()));
-    QVERIFY(label->openExternalLinks());
-    UpdateLinkReceiver receiver;
-    QDesktopServices::setUrlHandler("https", &receiver, "open");
-    const auto restoreHandler = qScopeGuard([] { QDesktopServices::unsetUrlHandler("https"); });
+    QVERIFY(!label->openExternalLinks());
     window->show();
     QCoreApplication::processEvents();
     // The zoom control stays the rightmost item, the link just left of it.
@@ -1614,15 +1645,29 @@ void TestMainWindow::manual_update_uses_red_status_link()
                             .arg(label->geometry().left())
                             .arg(label->geometry().right())
                             .arg(zoom->geometry().left())));
-    QTest::mouseClick(label, Qt::LeftButton, Qt::NoModifier, label->rect().center());
-    QCOMPARE(receiver.url, release);
-    // A later check updates the existing status item, without accumulating labels.
+
+    // A later check the same day updates the status item, without a popup
+    // and without accumulating labels.
     const QString nextTag = tag + ".1";
     const QUrl nextRelease("https://github.com/Hydro74000/ngPost/releases/tag/" + nextTag);
     window->onNewVersionAvailable(nextTag, "", nextRelease);
+    QCOMPARE(popups, 1);
     QCOMPARE(window->statusBar()->findChildren<QLabel *>("updateAvailableLabel").size(), 1);
-    QVERIFY(label->text().contains(nextRelease.toString()));
-    QVERIFY(!popup);
+    QVERIFY(label->text().contains(nextTag));
+
+    // The link reopens the popup, of the release it names; "Later" opens nothing.
+    receiver.url.clear();
+    acceptPopup = false;
+    QTest::mouseClick(label, Qt::LeftButton, Qt::NoModifier, label->rect().center());
+    QCOMPARE(popups, 2);
+    QVERIFY(popupHeader.contains(nextTag));
+    QVERIFY(receiver.url.isEmpty());
+    // And again, this time to the release page.
+    acceptPopup = true;
+    QTest::mouseClick(label, Qt::LeftButton, Qt::NoModifier, label->rect().center());
+    QCOMPARE(popups, 3);
+    QCOMPARE(receiver.url, nextRelease);
+    QVERIFY(!otherPopup);
 }
 
 void TestMainWindow::posting_tab_lines_are_in_the_new_order()
@@ -4208,6 +4253,7 @@ void TestMainWindow::update_popup_shows_the_whole_release_notes()
     auto *buttons = dialog->findChild<QDialogButtonBox *>();
     QVERIFY(buttons);
     QCOMPARE(buttons->buttons().size(), 2);
+    QCOMPARE(buttons->buttons().constFirst()->text(), QString("Install and Restart"));
 
     // Folded at first, under a link that unfolds them and grows the popup,
     // then turns around to fold them back and shrink it.
