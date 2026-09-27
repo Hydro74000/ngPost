@@ -2145,8 +2145,10 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Weet u het zeker? Alle tabbladen gaan verloren.</translation>
     </message>
     <message>
-        <source>New tab (%1)</source>
-        <translation>Nieuw tabblad (%1)</translation>
+        <source>New tab (%1)
+or double-click the empty part of the tab bar</source>
+        <translation>Nieuw tabblad (%1)
+of dubbelklik op het lege deel van de tabbalk</translation>
     </message>
     <message>
         <source>Change the NZB path of the tabs?</source>

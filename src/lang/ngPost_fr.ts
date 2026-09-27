@@ -2134,8 +2134,10 @@ Are you sure you want to quit?</source>
         <translation>Êtes-vous sûr ? Tous les onglets seront perdus.</translation>
     </message>
     <message>
-        <source>New tab (%1)</source>
-        <translation>Nouvel onglet (%1)</translation>
+        <source>New tab (%1)
+or double-click the empty part of the tab bar</source>
+        <translation>Nouvel onglet (%1)
+ou double-clic sur la partie vide de la barre d&apos;onglets</translation>
     </message>
     <message>
         <source>Change the NZB path of the tabs?</source>

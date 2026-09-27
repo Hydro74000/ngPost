@@ -2143,8 +2143,10 @@ Isto remove também todos os registos de ficheiros e artigos associados.</transl
         <translation>Tem certeza? Todas as abas serão perdidas.</translation>
     </message>
     <message>
-        <source>New tab (%1)</source>
-        <translation>Nova aba (%1)</translation>
+        <source>New tab (%1)
+or double-click the empty part of the tab bar</source>
+        <translation>Nova aba (%1)
+ou clique duplo na parte vazia da barra de abas</translation>
     </message>
     <message>
         <source>Change the NZB path of the tabs?</source>

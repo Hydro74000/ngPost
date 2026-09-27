@@ -2144,8 +2144,10 @@ Sind Sie sicher, dass Sie beenden möchten?</translation>
         <translation>Sind Sie sicher? Alle Tabs gehen verloren.</translation>
     </message>
     <message>
-        <source>New tab (%1)</source>
-        <translation>Neuer Tab (%1)</translation>
+        <source>New tab (%1)
+or double-click the empty part of the tab bar</source>
+        <translation>Neuer Tab (%1)
+oder Doppelklick auf den leeren Teil der Tableiste</translation>
     </message>
     <message>
         <source>Change the NZB path of the tabs?</source>

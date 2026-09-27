@@ -233,9 +233,13 @@ private slots:
     //! Their colours keep the WCAG contrasts, glyph on disc and disc (or rim)
     //! on light and dark buttons, and stay green, yellow and red.
     void posting_control_icons_keep_their_contrast();
-    //! A Ctrl+click on a scroll arrow runs the bar to that end without
-    //! changing the current tab; the arrows' tooltips say so.
+    //! A Ctrl+click on one of the scroll arrows runs the bar to that end.
     void tab_scroll_arrows_ctrl_click_run_to_either_end();
+    //! A double click on the empty part of the tab strip opens a quick post
+    //! tab and selects it, like "+"; one on a tab or on the pane does not.
+    void double_click_on_the_empty_tab_strip_opens_a_tab();
+    //! Inside the bar, only a double click where no tab stands counts.
+    void startup_tab_bar_reports_double_clicks_off_its_tabs();
     void tabs_match_posting_controls_height();
     void progress_label_tracks_the_running_post_data();
     void progress_label_tracks_the_running_post();
@@ -7559,6 +7563,69 @@ void TestMainWindow::tab_scroll_arrows_ctrl_click_run_to_either_end()
     // A plain click still scrolls one step at a time.
     QTest::mouseClick(right, Qt::LeftButton);
     QVERIFY(left->isEnabled() && right->isEnabled());
+}
+
+void TestMainWindow::double_click_on_the_empty_tab_strip_opens_a_tab()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    auto *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    QTabBar *bar = tabs->tabBar();
+    QVERIFY(QString(window->findChild<QToolButton *>("newQuickTabButton")->toolTip())
+                .contains("double-click"));
+    window->resize(1400, 800);
+    window->show();
+    QCoreApplication::processEvents();
+    tabs->setCurrentIndex(0);
+
+    // On a tab: nothing new, and that tab is not closed or changed either.
+    QTest::mouseDClick(bar, Qt::LeftButton, { }, bar->tabRect(1).center());
+    QCOMPARE(tabs->count(), 3);
+
+    // Beside the three tabs, before the corner widget: the tab widget itself.
+    const QRect strip = bar->geometry();
+    const QPoint empty(strip.right() + 30, strip.center().y());
+    QVERIFY(empty.x() < tabs->cornerWidget(Qt::TopRightCorner)->geometry().left());
+    QCOMPARE(tabs->childAt(empty), nullptr);
+    QTest::mouseDClick(tabs, Qt::LeftButton, { }, empty);
+    QCOMPARE(tabs->count(), 4);
+    auto *added = qobject_cast<PostingWidget *>(tabs->currentWidget());
+    QVERIFY(added);
+    QCOMPARE(added->jobNumber(), 2u);
+
+    // Not with the right button, and not below the strip.
+    QTest::mouseDClick(tabs, Qt::RightButton, { }, empty);
+    QTest::mouseDClick(tabs, Qt::LeftButton, { }, QPoint(empty.x(), strip.bottom() + 3));
+    QCOMPARE(tabs->count(), 4);
+}
+
+void TestMainWindow::startup_tab_bar_reports_double_clicks_off_its_tabs()
+{
+    StartupTabBar bar;
+    bar.addTab("History");
+    bar.addTab("Quick Post #1");
+    bar.setExpanding(false);
+    bar.resize(bar.tabRect(1).right() + 200, bar.sizeHint().height());
+    bar.show();
+    QSignalSpy spy(&bar, &StartupTabBar::emptyAreaDoubleClicked);
+    QSignalSpy onTab(&bar, &QTabBar::tabBarDoubleClicked);
+
+    QTest::mouseDClick(&bar, Qt::LeftButton, { }, bar.tabRect(0).center());
+    QCOMPARE(spy.count(), 0);
+    QCOMPARE(onTab.count(), 1);
+
+    const QPoint empty(bar.tabRect(1).right() + 100, bar.height() / 2);
+    QCOMPARE(bar.tabAt(empty), -1);
+    QTest::mouseDClick(&bar, Qt::RightButton, { }, empty);
+    QCOMPARE(spy.count(), 0);
+    QTest::mouseDClick(&bar, Qt::LeftButton, { }, empty);
+    QCOMPARE(spy.count(), 1);
 }
 
 void TestMainWindow::tabs_match_posting_controls_height()

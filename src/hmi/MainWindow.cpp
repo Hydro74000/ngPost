@@ -372,6 +372,10 @@ void MainWindow::init(NgPost *ngPost)
 
     connect(tabBar, &QWidget::customContextMenuRequested, this, &MainWindow::onTabContextMenu);
     connect(tabBar, &QTabBar::tabCloseRequested,          this, &MainWindow::onCloseJob);
+    connect(_ui->postTabWidget,
+            &StartupTabWidget::emptyStripDoubleClicked,
+            this,
+            &MainWindow::onNewQuickTab);
     _ui->postTabWidget->setTabsClosable(true);
     _buildPostingControls();
     _ui->postTabWidget->installEventFilter(this);
@@ -2745,7 +2749,8 @@ void MainWindow::_refreshNewQuickTab()
         return;
     _newQuickTabAction->setText(tr("New"));
     _newQuickTabAction->setToolTip(
-        tr("New tab (%1)").arg(_newQuickTabAction->shortcut().toString(QKeySequence::NativeText)));
+        tr("New tab (%1)\nor double-click the empty part of the tab bar")
+            .arg(_newQuickTabAction->shortcut().toString(QKeySequence::NativeText)));
 
     _newQuickTabAction->setIcon(
         PostingControlIcon::icon(PostingControlIcon::Glyph::NewTab, isDarkMode()));

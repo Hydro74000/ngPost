@@ -2144,8 +2144,10 @@ This also removes all associated file and article records.</source>
         <translation>确定吗？所有标签页都将丢失。</translation>
     </message>
     <message>
-        <source>New tab (%1)</source>
-        <translation>新建标签页 (%1)</translation>
+        <source>New tab (%1)
+or double-click the empty part of the tab bar</source>
+        <translation>新建标签页 (%1)
+或双击标签栏的空白处</translation>
     </message>
     <message>
         <source>Change the NZB path of the tabs?</source>

@@ -36,6 +36,7 @@ class QToolButton;
 //! choose the font it draws each one with.
 //!
 //! A Ctrl+click on one of the scroll arrows runs the bar to that end.
+//! A double click on the bar where no tab stands emits emptyAreaDoubleClicked().
 class StartupTabBar : public QTabBar
 {
     Q_OBJECT
@@ -53,9 +54,13 @@ public:
     //! the current tab stays the same.
     void scrollToEnd(bool toEnd);
 
+signals:
+    void emptyAreaDoubleClicked();
+
 protected:
     void changeEvent(QEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
     void  paintEvent(QPaintEvent *event) override;
     QSize tabSizeHint(int index) const override;
     //! How far a full bar may shrink a tab before scrolling: down to "…#N" for
@@ -77,6 +82,9 @@ private:
 //! protected and wants to be called before the first tab is added, so the bar
 //! is installed here in the constructor: MainWindow.ui promotes its
 //! postTabWidget to this class.
+//!
+//! A double click on the empty part of the tab strip, in the bar or beside it,
+//! emits emptyStripDoubleClicked(): the browser gesture for a new tab.
 class StartupTabWidget : public QTabWidget
 {
     Q_OBJECT
@@ -85,6 +93,12 @@ public:
     explicit StartupTabWidget(QWidget *parent = nullptr);
 
     StartupTabBar *startupTabBar() const;
+
+signals:
+    void emptyStripDoubleClicked();
+
+protected:
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
 };
 
 #endif // STARTUPTABBAR_H

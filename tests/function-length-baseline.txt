@@ -869,7 +869,7 @@
 8	src/hmi/MainWindow.cpp	MainWindow::_postingWidgets() const
 17	src/hmi/MainWindow.cpp	MainWindow::_promptUpdate()
 129	src/hmi/MainWindow.cpp	MainWindow::_refreshHistoryViews( bool rewindEmptyPage)
-11	src/hmi/MainWindow.cpp	MainWindow::_refreshNewQuickTab()
+12	src/hmi/MainWindow.cpp	MainWindow::_refreshNewQuickTab()
 15	src/hmi/MainWindow.cpp	MainWindow::_refreshPostingControls()
 17	src/hmi/MainWindow.cpp	MainWindow::_refreshStopOrCloseAll()
 14	src/hmi/MainWindow.cpp	MainWindow::_repositionZoomPopup()
@@ -909,7 +909,7 @@
 4	src/hmi/MainWindow.cpp	MainWindow::hasAutoCompress() const
 10	src/hmi/MainWindow.cpp	MainWindow::hasFinishedPosts() const
 9	src/hmi/MainWindow.cpp	MainWindow::hasUnsubmittedPosts() const
-68	src/hmi/MainWindow.cpp	MainWindow::init( NgPost * ngPost)
+72	src/hmi/MainWindow.cpp	MainWindow::init( NgPost * ngPost)
 4	src/hmi/MainWindow.cpp	MainWindow::isDarkMode() const
 8	src/hmi/MainWindow.cpp	MainWindow::log( const QString & aMsg , bool newline) const
 4	src/hmi/MainWindow.cpp	MainWindow::logBlockCountForTest() const
@@ -1147,11 +1147,13 @@
 6	src/hmi/StartupTabBar.cpp	StartupTabBar::changeEvent( QEvent * event)
 12	src/hmi/StartupTabBar.cpp	StartupTabBar::eventFilter( QObject * watched , QEvent * event)
 18	src/hmi/StartupTabBar.cpp	StartupTabBar::minimumTabSizeHint( int index) const
+9	src/hmi/StartupTabBar.cpp	StartupTabBar::mouseDoubleClickEvent( QMouseEvent * event)
 29	src/hmi/StartupTabBar.cpp	StartupTabBar::paintEvent( QPaintEvent *)
 8	src/hmi/StartupTabBar.cpp	StartupTabBar::scrollToEnd( bool toEnd)
 10	src/hmi/StartupTabBar.cpp	StartupTabBar::setStartupTab( int index)
 14	src/hmi/StartupTabBar.cpp	StartupTabBar::tabSizeHint( int index) const
-9	src/hmi/StartupTabBar.cpp	StartupTabWidget::StartupTabWidget( QWidget * parent)
+13	src/hmi/StartupTabBar.cpp	StartupTabWidget::StartupTabWidget( QWidget * parent)
+13	src/hmi/StartupTabBar.cpp	StartupTabWidget::mouseDoubleClickEvent( QMouseEvent * event)
 4	src/hmi/StartupTabBar.cpp	StartupTabWidget::startupTabBar() const
 1	src/hmi/StartupTabBar.h	StartupTabBar::startupTab() const
 35	src/hmi/VpnProfileEditDialog.cpp	VpnProfileEditDialog::VpnProfileEditDialog( VpnManager * manager , QString const & oldName , VpnProfile const & edit , QWidget * parent)

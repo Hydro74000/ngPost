@@ -134,6 +134,8 @@ the NNTP streaming pipeline and SQLite history store.
     all tabs" (shortcut Ctrl+T) instead of a trailing tab that scrolled out of
     sight once many tabs were open.
   * Ctrl+click on the tab bar scroll arrows jumps to the first or the last tab.
+  * Double-clicking the empty part of the tab bar opens a new Quick Post tab, as
+    in a web browser.
   * A full tab bar first shortens Quick Post titles from the left, always keeping
     their "#N", before showing scroll arrows; History and Auto keep their title.
   * Monotonic Quick Post numbering (Post #1, Post #2, ...): tab closing never
@@ -488,6 +490,8 @@ sécurité VPN et de l'isolation des identifiants.
     fin de barre qui sortait du champ dès que les onglets étaient nombreux.
   * Ctrl+clic sur les flèches de défilement de la barre d'onglets saute au premier ou
     au dernier onglet.
+  * Un double-clic sur la partie vide de la barre d'onglets ouvre un nouvel onglet de
+    post rapide, comme dans un navigateur web.
   * Une barre d'onglets pleine raccourcit d'abord les titres des posts rapides par la
     gauche, en gardant toujours leur « #N », avant d'afficher les flèches de
     défilement ; Historique et Post Auto gardent leur titre.

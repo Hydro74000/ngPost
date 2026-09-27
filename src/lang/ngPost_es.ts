@@ -2143,8 +2143,10 @@ Are you sure you want to quit?</source>
         <translation>¿Está seguro? Se perderán todas las pestañas.</translation>
     </message>
     <message>
-        <source>New tab (%1)</source>
-        <translation>Nueva pestaña (%1)</translation>
+        <source>New tab (%1)
+or double-click the empty part of the tab bar</source>
+        <translation>Nueva pestaña (%1)
+o doble clic en la parte vacía de la barra de pestañas</translation>
     </message>
     <message>
         <source>Change the NZB path of the tabs?</source>

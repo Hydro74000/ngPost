@@ -2131,8 +2131,10 @@ Are you sure you want to quit?</source>
         <translation>Are you sure? All tabs will be lost.</translation>
     </message>
     <message>
-        <source>New tab (%1)</source>
-        <translation>New tab (%1)</translation>
+        <source>New tab (%1)
+or double-click the empty part of the tab bar</source>
+        <translation>New tab (%1)
+or double-click the empty part of the tab bar</translation>
     </message>
     <message>
         <source>Change the NZB path of the tabs?</source>

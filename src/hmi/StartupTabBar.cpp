@@ -81,6 +81,16 @@ bool StartupTabBar::eventFilter(QObject *watched, QEvent *event)
     return QTabBar::eventFilter(watched, event);
 }
 
+void StartupTabBar::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    // The arrows are child widgets: their double clicks never get here.
+    if (event->button() == Qt::LeftButton && tabAt(event->position().toPoint()) < 0) {
+        emit emptyAreaDoubleClicked();
+        return;
+    }
+    QTabBar::mouseDoubleClickEvent(event);
+}
+
 void StartupTabBar::_retranslate()
 {
     // "Ctrl+" here, "⌘" on macOS, where Qt::ControlModifier is Command.
@@ -163,6 +173,24 @@ StartupTabWidget::StartupTabWidget(QWidget *parent) : QTabWidget(parent)
     bar->setObjectName(QStringLiteral("qt_tabwidget_tabbar"));
     bar->setDrawBase(false);
     setTabBar(bar);
+    connect(bar,
+            &StartupTabBar::emptyAreaDoubleClicked,
+            this,
+            &StartupTabWidget::emptyStripDoubleClicked);
+}
+
+void StartupTabWidget::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    // Until it is full, the bar is only as wide as its tabs: the rest of its
+    // row, up to the corner widget, belongs to the tab widget itself. Below
+    // that row stands the pane, which is not part of the strip.
+    const QRect bar = tabBar()->geometry();
+    const int y = qRound(event->position().y());
+    if (event->button() == Qt::LeftButton && y >= bar.top() && y <= bar.bottom()) {
+        emit emptyStripDoubleClicked();
+        return;
+    }
+    QTabWidget::mouseDoubleClickEvent(event);
 }
 
 StartupTabBar *StartupTabWidget::startupTabBar() const
