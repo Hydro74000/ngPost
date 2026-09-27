@@ -7585,7 +7585,7 @@ void TestMainWindow::double_click_on_the_empty_tab_strip_opens_a_tab()
     tabs->setCurrentIndex(0);
 
     // On a tab: nothing new, and that tab is not closed or changed either.
-    QTest::mouseDClick(bar, Qt::LeftButton, { }, bar->tabRect(1).center());
+    QTest::mouseDClick(bar, Qt::LeftButton, {}, bar->tabRect(1).center());
     QCOMPARE(tabs->count(), 3);
 
     // Beside the three tabs, before the corner widget: the tab widget itself.
@@ -7593,15 +7593,15 @@ void TestMainWindow::double_click_on_the_empty_tab_strip_opens_a_tab()
     const QPoint empty(strip.right() + 30, strip.center().y());
     QVERIFY(empty.x() < tabs->cornerWidget(Qt::TopRightCorner)->geometry().left());
     QCOMPARE(tabs->childAt(empty), nullptr);
-    QTest::mouseDClick(tabs, Qt::LeftButton, { }, empty);
+    QTest::mouseDClick(tabs, Qt::LeftButton, {}, empty);
     QCOMPARE(tabs->count(), 4);
     auto *added = qobject_cast<PostingWidget *>(tabs->currentWidget());
     QVERIFY(added);
     QCOMPARE(added->jobNumber(), 2u);
 
     // Not with the right button, and not below the strip.
-    QTest::mouseDClick(tabs, Qt::RightButton, { }, empty);
-    QTest::mouseDClick(tabs, Qt::LeftButton, { }, QPoint(empty.x(), strip.bottom() + 3));
+    QTest::mouseDClick(tabs, Qt::RightButton, {}, empty);
+    QTest::mouseDClick(tabs, Qt::LeftButton, {}, QPoint(empty.x(), strip.bottom() + 3));
     QCOMPARE(tabs->count(), 4);
 }
 
@@ -7616,15 +7616,15 @@ void TestMainWindow::startup_tab_bar_reports_double_clicks_off_its_tabs()
     QSignalSpy spy(&bar, &StartupTabBar::emptyAreaDoubleClicked);
     QSignalSpy onTab(&bar, &QTabBar::tabBarDoubleClicked);
 
-    QTest::mouseDClick(&bar, Qt::LeftButton, { }, bar.tabRect(0).center());
+    QTest::mouseDClick(&bar, Qt::LeftButton, {}, bar.tabRect(0).center());
     QCOMPARE(spy.count(), 0);
     QCOMPARE(onTab.count(), 1);
 
     const QPoint empty(bar.tabRect(1).right() + 100, bar.height() / 2);
     QCOMPARE(bar.tabAt(empty), -1);
-    QTest::mouseDClick(&bar, Qt::RightButton, { }, empty);
+    QTest::mouseDClick(&bar, Qt::RightButton, {}, empty);
     QCOMPARE(spy.count(), 0);
-    QTest::mouseDClick(&bar, Qt::LeftButton, { }, empty);
+    QTest::mouseDClick(&bar, Qt::LeftButton, {}, empty);
     QCOMPARE(spy.count(), 1);
 }
 
