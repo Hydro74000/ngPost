@@ -72,7 +72,7 @@ private:
         QString archiveFolder;
     };
     StoppedAttempt _stoppedAttempt;
-    void _armResubmission();
+    void _armResubmission(const PostingJob *job);
     void _supersedeStoppedAttempt();
     void _fillJobOptions(PostingJobOptions &options,
                          const QString &nzbPath,

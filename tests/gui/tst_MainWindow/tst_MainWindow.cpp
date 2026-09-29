@@ -205,6 +205,10 @@ private slots:
     void close_all_tabs_resets_to_quick_post_one();
     void global_post_controls_translations();
     void global_cancel_during_confirmation();
+    //! Restoring the sources of a stopped post refreshes every tab: the
+    //! stopped one must not read as queued again.
+    void stopped_post_tab_icon_data();
+    void stopped_post_tab_icon();
     void global_pause_holds_pending_and_new_posts_data();
     void global_pause_holds_pending_and_new_posts();
     //! A queue restarting without a pre-packed post (resume, VPN connected)
@@ -6094,6 +6098,52 @@ void TestMainWindow::global_post_controls_translations()
     }
     ngPost.cancelAllPostingJobs();
     QTRY_VERIFY(!ngPost.hasPostingJobs());
+}
+
+void TestMainWindow::stopped_post_tab_icon_data()
+{
+    QTest::addColumn<bool>("withPending");
+    QTest::newRow("alone") << false;
+    QTest::newRow("with a queued tab") << true;
+}
+
+void TestMainWindow::stopped_post_tab_icon()
+{
+    QFETCH(bool, withPending);
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "300" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &err);
+    QVERIFY2(window, qPrintable(err));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(2));
+    auto *second = withPending ? window->addNewQuickTab() : nullptr;
+    for (auto *post : { first, second }) {
+        if (!post)
+            continue;
+        const QString path = sandbox.rootPath() + QString("/big%1.bin").arg(post->jobNumber());
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(QByteArray(4 * 1024 * 1024, 'a'));
+        file.close();
+        post->addPath(path, 0);
+        post->onPostFiles();
+    }
+    QTRY_VERIFY_WITH_TIMEOUT(!mock.receivedArticles().isEmpty(), 10000);
+    const auto iconImage = [](const QIcon &icon) { return icon.pixmap(16, 16).toImage(); };
+    const int idx = tabs->indexOf(first);
+    QCOMPARE(iconImage(tabs->tabIcon(idx)), iconImage(QIcon(MainWindow::sPostingIcon)));
+    first->findChild<QPushButton *>("postButton")->click();
+    QTRY_VERIFY_WITH_TIMEOUT(first->isPostingFinished(), 10000);
+    QCoreApplication::processEvents();
+    QCOMPARE(iconImage(tabs->tabIcon(idx)), iconImage(QIcon(":/icons/quick.svg")));
+    ngPost.cancelAllPostingJobs();
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs(), 10000);
 }
 
 void TestMainWindow::global_cancel_during_confirmation()

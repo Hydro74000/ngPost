@@ -136,20 +136,22 @@ void PostingWidget::onPostingJobDone()
     if (!_postingJob)
         return;
 
-    if (_postingJob->nbArticlesTotal() > 0)
-    {
-        if (_postingJob->nbArticlesFailed() > 0)
+    // Detached before the tab is decorated: restoring the sources refreshes
+    // every tab, and one still holding a job that is no longer the active one
+    // gets the queued icon back. We don't own it, NgPost will delete it.
+    PostingJob *job = std::exchange(_postingJob, nullptr);
+    disconnect(job);
+    _postingFinished = true;
+
+    if (job->nbArticlesTotal() > 0) {
+        if (job->nbArticlesFailed() > 0)
             _hmi->updateJobTab(this, _hmi->sDoneKOColor, QIcon(_hmi->sDoneKOIcon));
         else
             _hmi->updateJobTab(this, _hmi->sDoneOKColor, QIcon(_hmi->sDoneOKIcon));
-    }
-    else
+    } else
         _hmi->clearJobTab(this);
 
-    _armResubmission();
-    disconnect(_postingJob);
-    _postingJob = nullptr; //!< we don't own it, NgPost will delete it
-    _postingFinished = true;
+    _armResubmission(job);
     setIDLE();
 }
 
@@ -182,29 +184,28 @@ bool PostingWidget::isBlank() const
         && _ui->filesList->count() == 0;
 }
 
-void PostingWidget::_armResubmission()
+void PostingWidget::_armResubmission(const PostingJob *job)
 {
     // A fresh submission is safe before any transfer started, and after a stop:
     // the post then starts over from scratch. A history resume keeps its resume
     // semantics; the History tab is where it is resumed again.
-    bool const stopped = _postingJob->cancelRequested();
-    _resubmittable = !_postingJob->isResumeFromHistory()
-        && (stopped || !_postingJob->startedAtWall().isValid());
+    bool const stopped = job->cancelRequested();
+    _resubmittable = !job->isResumeFromHistory() && (stopped || !job->startedAtWall().isValid());
     if (!_resubmittable)
         return;
     if (stopped) {
-        _stoppedAttempt = { _postingJob->historyPostId(),
-                            QFileInfo(_postingJob->nzbFilePath()).absoluteFilePath(),
-                            _postingJob->archiveFolder() };
+        _stoppedAttempt = { job->historyPostId(),
+                            QFileInfo(job->nzbFilePath()).absoluteFilePath(),
+                            job->archiveFolder() };
         // Ready to post again, not done: no OK/KO mark for what was cut short.
         _hmi->clearJobTab(this);
     }
-    if (_postingJob->inputPaths().isEmpty())
+    if (job->inputPaths().isEmpty())
         return;
     // Packing may have replaced the list with temporary archives. Restore the
     // user's sources without regenerating the NZB name, password or metadata.
     _ui->filesList->clear2();
-    for (const QString &path : _postingJob->inputPaths())
+    for (const QString &path : job->inputPaths())
         _ui->filesList->addPath(path, QFileInfo(path).isDir());
 }
 
