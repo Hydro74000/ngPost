@@ -154,7 +154,7 @@ QString sidString(PSID sid)
 //! reparse attribute. Only name-surrogate tags redirect into an unchecked tree.
 bool reparsePointIsSafe(QString const &path, QString const &nativePath, QString *detail)
 {
-    WIN32_FIND_DATAW data{ };
+    WIN32_FIND_DATAW data{};
     HANDLE const search = FindFirstFileW(reinterpret_cast<LPCWSTR>(nativePath.utf16()), &data);
     if (search == INVALID_HANDLE_VALUE) {
         if (detail)

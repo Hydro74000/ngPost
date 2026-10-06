@@ -275,7 +275,7 @@ QString Par2SettingsDialog::_gpuScanError() const
     if (_gpuScan == GpuScan::None)
         return tr("No OpenCL device was found: ParPar would fail and abort the post. "
                   "Disable GPU acceleration or install an OpenCL driver.");
-    return { };
+    return {};
 }
 //! The reason Save is refused, the last applicable one winning; empty when allowed.
 QString Par2SettingsDialog::_controlsError(const par2::Settings &s,

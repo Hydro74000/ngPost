@@ -13,6 +13,8 @@
 # (the first push of a branch) or a commit missing from the clone (a force
 # push), only the last commit is checked: the merge base with master would drag
 # in every line devel wrote before this file existed.
+# A release PR can also have a base from before the formatting rules existed.
+# In that case, start at their introduction, preserving the same legacy policy.
 #
 # CLANG_FORMAT and GIT_CLANG_FORMAT override the tool names.
 
@@ -32,6 +34,14 @@ if [[ -z $base || $base =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}" 2>/de
     else
         echo "check-format: no base commit to compare with; nothing checked."
         exit 0
+    fi
+fi
+
+if ! git cat-file -e "$base:.clang-format" 2>/dev/null; then
+    style_base=$(git log --format=%H --diff-filter=A HEAD -- .clang-format | tail -n 1)
+    if [[ -n $style_base ]]; then
+        echo "check-format: base predates .clang-format; checking changes since its introduction."
+        base=$style_base
     fi
 fi
 

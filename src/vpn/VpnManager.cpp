@@ -1299,7 +1299,7 @@ void VpnManager::_resumeAfterConfirmedStop()
     if (!_currentBackend || _currentBackend->isRunning())
         return;
     auto resume = std::move(_pendingBackendCleanup);
-    _pendingBackendCleanup = { };
+    _pendingBackendCleanup = {};
     _clearTunnelIdentity();
     _cancelAutoDisconnect();
     _destroyBackend();

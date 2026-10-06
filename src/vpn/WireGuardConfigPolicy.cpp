@@ -128,7 +128,7 @@ Verdict readSectionHeader(QString const &line, int lineNumber, Section &section)
             QCoreApplication::translate("WireGuardConfigPolicy",
                                         "only [Interface] and [Peer] sections are allowed"));
     }
-    return Verdict{ };
+    return Verdict{};
 }
 
 Verdict inspectKeyLine(QString const &line, Section section, int lineNumber)
@@ -191,7 +191,7 @@ Verdict inspectKeyLine(QString const &line, Section section, int lineNumber)
                             : QCoreApplication::translate(
                                   "WireGuardConfigPolicy",
                                   "this profile carries a key ngPost has not reviewed"));
-    return Verdict{ };
+    return Verdict{};
 }
 } // namespace
 

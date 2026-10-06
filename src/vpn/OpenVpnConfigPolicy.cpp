@@ -354,7 +354,7 @@ Verdict checkArguments(QString const &directive,
                           QStringLiteral("only a plain file name next to the profile is "
                                          "accepted here, or an inline <block>"));
     }
-    return { };
+    return {};
 }
 
 //! The walk over a profile, one line at a time. Each step answers with the
@@ -370,11 +370,11 @@ public:
             _kept << line;
             if (line.compare(QStringLiteral("</%1>").arg(_openBlob), Qt::CaseInsensitive) == 0)
                 _openBlob.clear();
-            return { };
+            return {};
         }
 
         if (line.isEmpty() || line.startsWith(QLatin1Char('#')) || line.startsWith(QLatin1Char(';')))
-            return { };
+            return {};
 
         if (line.startsWith(QLatin1Char('<')))
             return _blockTag(line, lineNumber);
@@ -418,7 +418,7 @@ private:
             if (name == QLatin1String("connection") && _inConnection) {
                 _inConnection = false;
                 _kept << line;
-                return { };
+                return {};
             }
             return reject(Outcome::Malformed,
                           safeLabel(name),
@@ -433,7 +433,7 @@ private:
                               QStringLiteral("connection blocks cannot be nested"));
             _inConnection = true;
             _kept << line;
-            return { };
+            return {};
         }
         if (!inlineBlobSet().contains(name))
             return reject(Outcome::UnknownDirective,
@@ -443,14 +443,14 @@ private:
         _openBlob = name;
         _blobLine = lineNumber;
         _kept << line;
-        return { };
+        return {};
     }
 
     Verdict _directive(QString const &line, int lineNumber)
     {
         QStringList const tokens = tokenize(line);
         if (tokens.isEmpty())
-            return { };
+            return {};
 
         QString directive = tokens.first();
         while (directive.startsWith(QLatin1String("--")))
@@ -463,7 +463,7 @@ private:
 
         // Recognised, and deliberately not carried into the generated config.
         if (droppedSet().contains(directive))
-            return { };
+            return {};
 
         bool const fileBearing = fileBearingSet().contains(directive);
         if (!fileBearing && !allowedSet().contains(directive))

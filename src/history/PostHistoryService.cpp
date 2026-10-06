@@ -929,7 +929,7 @@ void PostHistoryService::enqueueArticlePosted(qint64 fileId,
                                               qint64 bytes,
                                               qint64 bodyBytes)
 {
-    _enqueueArticleEvent(ArticleKind::Posted, fileId, part, msgId, { }, pos, bytes, bodyBytes);
+    _enqueueArticleEvent(ArticleKind::Posted, fileId, part, msgId, {}, pos, bytes, bodyBytes);
 }
 
 void PostHistoryService::enqueueArticleFailed(qint64 fileId,

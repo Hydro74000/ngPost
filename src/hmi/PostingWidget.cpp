@@ -282,7 +282,8 @@ void PostingWidget::postFiles(bool updateMainParams)
                                                 : QDir(nzbFolder()).filePath(_ngPost->_nzbName);
         if (!nzbPath.endsWith(".nzb"))
             nzbPath += ".nzb";
-        if (!_confirmNzbOverwrite(nzbPath)) return;
+        if (!_confirmNzbOverwrite(nzbPath))
+            return;
         // Before the job exists: an active one may compress at once.
         _supersedeStoppedAttempt();
 
@@ -979,11 +980,13 @@ QColor PostingWidget::postingTextColor() const
     const bool stopping = submitted && _postingJob->cancelRequested();
     const bool active = submitted && _ngPost->_activeJob == _postingJob;
     const bool paused = submitted && !stopping
-                        && (_ngPost->_queuePaused || _postingJob->isPaused());
+        && (_ngPost->_queuePaused || _postingJob->isPaused());
     const QPalette theme = _hmi->palette();
     const bool dark = theme.color(QPalette::Window).lightness() < 128;
-    if (paused) return dark ? QColor(Qt::yellow) : QColor(160, 110, 0);
-    if (active && !stopping) return dark ? QColor(0x4c, 0xff, 0x4c) : QColor(Qt::darkGreen);
+    if (paused)
+        return dark ? QColor(Qt::yellow) : QColor(160, 110, 0);
+    if (active && !stopping)
+        return dark ? QColor(0x4c, 0xff, 0x4c) : QColor(Qt::darkGreen);
     return dark ? QColor(Qt::white) : theme.color(QPalette::WindowText);
 }
 

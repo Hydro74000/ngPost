@@ -408,7 +408,7 @@ static QString blockError(const Settings &s)
         return QCoreApplication::translate("Par2Settings", "Block size must be a multiple of 4 bytes, below 2 GiB.");
     if (s.blocks == Blocks::Count && (s.blockCount < 1 || s.blockCount > 32768))
         return QCoreApplication::translate("Par2Settings", "The source block count must be between 1 and 32768.");
-    return { };
+    return {};
 }
 static QString volumeError(const Settings &s)
 {
@@ -419,7 +419,7 @@ static QString volumeError(const Settings &s)
         return QCoreApplication::translate("Par2Settings", "Choose a positive volume size below the tool's limit.");
     if (s.volumes == Volumes::Count && (s.volumeCount < 1 || s.volumeCount > 65535))
         return QCoreApplication::translate("Par2Settings", "The recovery volume count must be between 1 and 65535.");
-    return { };
+    return {};
 }
 static QString par2cmdlineError(const Settings &s)
 {
@@ -431,7 +431,7 @@ static QString par2cmdlineError(const Settings &s)
         || s.distribution == Distribution::Decimal
         || (s.volumes == Volumes::LargestInput && s.distribution == Distribution::Uniform))
         return QCoreApplication::translate("Par2Settings", "This combination is not supported by par2cmdline.");
-    return { };
+    return {};
 }
 static QString multiParError(const Settings &s)
 {
@@ -442,7 +442,7 @@ static QString multiParError(const Settings &s)
         || (s.volumes == Volumes::Count && s.distribution != Distribution::Equal
             && s.distribution != Distribution::Automatic))
         return QCoreApplication::translate("Par2Settings", "MultiPar supports a volume count only with equal distribution.");
-    return { };
+    return {};
 }
 static QString toolError(const Settings &s)
 {
@@ -453,7 +453,7 @@ static QString toolError(const Settings &s)
                                            "Decimal distribution requires MultiPar.");
     if (s.tool == Tool::MultiPar)
         return multiParError(s);
-    return { };
+    return {};
 }
 static QString resourceError(const Settings &s)
 {
@@ -465,14 +465,14 @@ static QString resourceError(const Settings &s)
 QString Settings::validate() const
 {
     if (custom)
-        return { };
+        return {};
     // The first failing check wins, in the order the dialog reports them.
     for (auto check : { blockError, volumeError, toolError, resourceError }) {
         const QString error = check(*this);
         if (!error.isEmpty())
             return error;
     }
-    return { };
+    return {};
 }
 static void appendMultiParArguments(const Settings &s, QStringList &args)
 {

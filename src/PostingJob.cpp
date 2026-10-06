@@ -425,7 +425,6 @@ void PostingJob::_connectJobSignals()
             _ngPost,
             &NgPost::onPostingJobFinished,
             Qt::QueuedConnection);
-
 }
 
 #ifdef __USE_HMI__
@@ -798,7 +797,8 @@ void PostingJob::onImmediateSpeedComputation()
 
 void PostingJob::onStartPosting(bool isActiveJob)
 {
-    if (_finishIfCanceled()) return;
+    if (_finishIfCanceled())
+        return;
     _isActiveJob = isActiveJob;
 #ifdef __DEBUG__
     qDebug() << "[MB_TRACE][Issue#82][PostingJob::onStartPosting] job: " << this
@@ -889,7 +889,8 @@ void PostingJob::onStartPosting(bool isActiveJob)
 #include "Poster.h"
 void PostingJob::_postFiles()
 {
-    if (_finishIfCanceled()) return;
+    if (_finishIfCanceled())
+        return;
     _postStarted = true;
 #ifdef __USE_HMI__
     if (_postWidget) // in case we were in Pending mode
@@ -1113,7 +1114,8 @@ void PostingJob::_startPosterThreads(int nbPosters, int nbCon)
 void PostingJob::onStopPosting()
 {
     _cancelRequested = true;
-    if (_finishedAtWall.isValid()) return;
+    if (_finishedAtWall.isValid())
+        return;
     if (_extProc && _extProc->state() != QProcess::NotRunning)
         _terminateExternalProcess();
     else
@@ -1127,14 +1129,17 @@ void PostingJob::_terminateExternalProcess()
     // Windows console tools and POSIX tools ignoring SIGTERM need a kill.
     // Keep the event loop responsive while giving the tool time to exit.
     QTimer::singleShot(1000, _extProc, [process = _extProc] {
-        if (process->state() != QProcess::NotRunning) process->kill();
+        if (process->state() != QProcess::NotRunning)
+            process->kill();
     });
 }
 
 bool PostingJob::_finishIfCanceled()
 {
-    if (!_cancelRequested) return false;
-    if (_finishedAtWall.isValid()) return true;
+    if (!_cancelRequested)
+        return false;
+    if (_finishedAtWall.isValid())
+        return true;
     _cleanExtProc();
     _restoreObfuscatedFileNames();
     // An unstarted retry must preserve the previous outcome and counters.
@@ -1143,7 +1148,8 @@ bool PostingJob::_finishIfCanceled()
     else
         _finishPosting();
     // After transfer starts, the generated files are the sources for resume.
-    if (!_postStarted) _cleanCompressDir();
+    if (!_postStarted)
+        _cleanCompressDir();
     emit postingFinished();
     return true;
 }
@@ -2428,7 +2434,8 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
 
 void PostingJob::onCompressionFinished(int exitCode)
 {
-    if (_finishIfCanceled()) return;
+    if (_finishIfCanceled())
+        return;
     if (_ngPost->debugMode())
         _log(tr("=> rar exit code: %1\n").arg(exitCode));
     else
@@ -2582,7 +2589,8 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
 
 void PostingJob::onGenPar2Finished(int exitCode)
 {
-    if (_finishIfCanceled()) return;
+    if (_finishIfCanceled())
+        return;
     if (_ngPost->debugMode())
         _log(tr("=> par2 exit code: %1\n").arg(exitCode));
     else
