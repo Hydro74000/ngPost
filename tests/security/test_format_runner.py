@@ -61,11 +61,16 @@ sys.exit(int(os.environ.get('NGPOST_FORMAT_FIXTURE_STATUS', '0')))
         self.git('commit', '-q', '-m', message)
         return self.git('rev-parse', 'HEAD')
 
-    def run_fixture(self, base=None, status=0):
+    def run_fixture(self, base=None, status=0, github_actions=False):
         env = dict(os.environ,
                    CLANG_FORMAT=str(self.clang_format),
                    GIT_CLANG_FORMAT=str(self.git_clang_format),
                    NGPOST_FORMAT_FIXTURE_STATUS=str(status))
+        # The runner reports through annotations on GitHub Actions: keep the
+        # local mode unless a test asks for it, whatever the host CI is.
+        env.pop('GITHUB_ACTIONS', None)
+        if github_actions:
+            env['GITHUB_ACTIONS'] = 'true'
         return subprocess.run(['bash', str(self.runner), *([] if base is None else [base])],
                               cwd=self.root, env=env, capture_output=True, text=True)
 
@@ -84,6 +89,14 @@ sys.exit(int(os.environ.get('NGPOST_FORMAT_FIXTURE_STATUS', '0')))
         result = self.run_fixture(self.legacy)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('changed lines do not follow .clang-format', result.stderr)
+
+    def test_github_actions_reports_an_error_annotation(self):
+        self.source.write_text('// BAD legacy formatting\n// BAD new formatting\n')
+        self.commit('Add unformatted code')
+        result = self.run_fixture(self.legacy, github_actions=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('::error title=clang-format::changed lines do not follow .clang-format',
+                      result.stdout)
 
     def test_edits_to_legacy_code_still_fail(self):
         self.source.write_text('// BAD edited legacy formatting\n')
