@@ -23,24 +23,41 @@
 
 #include "vpn/VpnManager.h"
 #include "history/PostHistoryStore.h"
+#include "utils/LogTimestamp.h"
 
+#include <QTextCharFormat>
 #include <QMainWindow>
 #include <QFileInfoList>
+#include <QFont>
 #include <QSet>
 #include <QUrl>
 class NgPost;
+class UpdateChecker;
 struct NntpServerParams;
 class NntpFile;
 class PostingWidget;
 class AutoPostWidget;
+class QAction;
 class QCheckBox;
 class QComboBox;
+class QHBoxLayout;
+class QVBoxLayout;
+class QSplitter;
 class QDateEdit;
+class QDialog;
 class QLabel;
 class QLineEdit;
+class QMenu;
 class QPushButton;
+class QSlider;
+class QToolButton;
+class QFrame;
+class QResizeEvent;
+class QShowEvent;
 class QTableWidget;
 class QTabWidget;
+class QTimer;
+class StartupTabBar;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 class QChart;
 #else
@@ -64,6 +81,69 @@ private:
     STATE           _state;
     PostingWidget  *_quickJobTab;
     AutoPostWidget *_autoPostTab;
+    //! The "+" next to Post All, and its Ctrl+T.
+    QAction *_newQuickTabAction = nullptr;
+    QToolButton *_newQuickTabButton = nullptr;
+    QPushButton *_postAllButton = nullptr;
+    QPushButton *_stopAllButton = nullptr;
+    //! Takes Stop's place while no post is in progress.
+    QPushButton *_closeAllButton = nullptr;
+    void _refreshPostingControls();
+    void _refreshStopOrCloseAll();
+    bool _hasTabsToReset() const;
+    void _fitPostingControls();
+    void _buildPostingControls();
+    //! Text, tooltip and icon of the "+": language and palette changes.
+    void _refreshNewQuickTab();
+    QPushButton *_addPostingControl(QHBoxLayout *layout, const char *name, const QIcon &icon);
+    void _retranslate();
+    void _submitPreparedTabs();
+    //! The release announced last: the status-bar link reopens its popup.
+    QString _updateTag, _updateNotes;
+    QUrl _updateReleasePage;
+    void _showUpdateLink();
+    void _promptUpdate();
+    QDialog *_createUpdateDialog(const QString &tag,
+                                 const QString &notes,
+                                 const QUrl &releasePage,
+                                 bool install);
+    void _addReleaseNotes(QDialog *dialog, const QString &notes);
+    void _downloadUpdate(UpdateChecker *checker);
+    bool _isPostingQueueRunning() const;
+    uint _nextQuickJobNumber();
+    uint _highestQuickJobNumber = 1;
+    int _progressJobNumber = 1;
+    QPushButton *_par2SettingsButton = nullptr;
+    bool _submittingAll = false;
+    //! NZB destination path the prepared tabs were last offered to follow.
+    QString _offeredNzbPath;
+    void _offerNzbPathToTabs();
+
+    //! Tab opened when ngPost starts: 0 history, 1 folder monitoring,
+    //! 2 quick post, and -1 when the user never picked one -- which is the quick
+    //! post tab, without a setting written anywhere.
+    int             _startupTab;
+
+    //! An unattributed VPN state seen at startup. Recorded rather than shown
+    //! in a modal: nothing is broken, ngPost still runs and still posts to
+    //! every server that does not need the VPN. The decision only matters
+    //! when the user goes to the VPN settings, so it is offered there.
+    struct PendingUnattributedVpn
+    {
+        bool    detected = false;
+        bool    legacyOwnerActive = false;
+        QString diagnostic;
+    };
+    PendingUnattributedVpn _unattributedVpn;
+
+    //! Lines the log pane currently keeps. Derived from a memory budget that
+    //! grows with the debug level; see _applyLogCapacity().
+    int             _logBlockCap;
+    mutable LogTimestamp _logTimestamp;
+    mutable bool _logEntryComplete = true;
+    //! Characters the pane may keep. Bounds the case the block count cannot:
+    //! a pane whose blocks all reached kLogMaxBlockCharacters.
+    int             _logCharacterCap;
 
     static const bool sDefaultServerSSL   = true;
     static const int  sDefaultConnections = 5;
@@ -109,6 +189,15 @@ private:
     int           _historyPageOffset  = 0;
     int           _historyRefreshGeneration = 0;
 
+    //! The user dragged a history column: ngPost stops sizing them.
+    bool          _historyColumnsResizedByUser = false;
+    //! Set while _fitHistoryColumns() resizes, so its own sections do not read
+    //! as a drag.
+    bool          _resizingHistoryColumns      = false;
+    //! Debounces the write of the column widths: a drag fires one signal per
+    //! pixel, the settings are written once it stops.
+    QTimer       *_historyColumnsSaveTimer     = nullptr;
+
     // Additional history tab widgets needed for retranslation
     QLabel       *_bannerLabel        = nullptr;
     QPushButton  *_bannerResumeBtn    = nullptr;
@@ -136,8 +225,34 @@ public:
     ~MainWindow() override;
 
     void init(NgPost *ngPost);
+    //! Index of the "Use VPN" column in sServerListHeaders. Named rather than
+    //! written as a literal 4 because the column is hidden wholesale where
+    //! there is no VPN, and an off-by-one there would quietly hide the user's
+    //! password column instead. Shared with the test that checks the hiding.
+    static constexpr int kServerUseVpnColumn = 4;
+
 #ifdef NGPOST_TESTING
     QWidget *buildHistoryTabForTest();
+    bool resumePostForTest(qint64 id) { return _startResumePost(id, true); }
+    QTableWidget *resumeTableForTest() const { return _resumeTable; }
+    void     fitHistoryColumnsForTest(bool toContents) { _fitHistoryColumns(toContents); }
+    int      startupTabForTest() const { return _startupTab; }
+    int      logBlockCapForTest() const { return _logBlockCap; }
+    int      logBlockCountForTest() const;
+    int      logMaxBlockCharactersForTest() const;
+    void     setLogBlockCapForTest(int blocks) { _logBlockCap = blocks; }
+    void     fillTabContextMenuForTest(QMenu &menu, int tabIndex) { _fillTabContextMenu(menu, tabIndex); }
+    QToolButton *logToggleBtnForTest() const { return _logToggleBtn; }
+    bool isLogBoxCollapsedForTest() const { return _isLogBoxCollapsed(); }
+    void toggleLogBoxForTest() { _onToggleLogBox(); }
+    void setLogBoxCollapsedForTest(bool collapsed) { _setLogBoxCollapsed(collapsed, true); }
+    QDialog *createUpdateDialogForTest(const QString &tag,
+                                       const QString &notes,
+                                       const QUrl &page,
+                                       bool install = true)
+    {
+        return _createUpdateDialog(tag, notes, page, install);
+    }
 #endif
 
     void updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded, const QString &avgSpeed = "0 B/s"
@@ -153,13 +268,14 @@ public:
 
     QString fixedArchivePassword() const;
 
-    PostingWidget *addNewQuickTab(int lastTabIdx, const QFileInfoList &files = QFileInfoList());
+    //! Appends a Quick Post tab holding \a files, without selecting it.
+    PostingWidget *addNewQuickTab(const QFileInfoList &files = QFileInfoList());
 
     void setTab(QWidget *postWidget);
     void clearJobTab(QWidget *postWidget);
     void updateJobTab(QWidget *postWidget, const QColor &color, const QIcon &icon, const QString &tooltip = "");
 
-    void setJobLabel(int jobNumber);
+    void refreshJobLabel();
 
     void log(const QString &aMsg, bool newline = true) const; //!< log function for QString
     void logError(const QString &error) const; //!< log function for QString
@@ -169,21 +285,35 @@ public:
 
 
     bool hasFinishedPosts() const;
+    //! Prepared posts that have not yet entered NgPost's queue.
+    bool hasUnsubmittedPosts() const;
 
     inline AutoPostWidget *autoWidget() const;
     void closeTab(PostingWidget *postWidget);
 
-    void setPauseIcon(bool pause);
+    QToolButton *zoomButton() const { return _zoomBtn; }
+    QFrame *zoomPopup() const { return _zoomPopup; }
+    QSlider *zoomSlider() const { return _zoomSlider; }
+    void applyUiZoom(int percent, bool userInteractive = false);
+
 
     static const QColor  sPostingColor;
     static const QString sPostingIcon;
     static const QColor  sPendingColor;
     static const QString sPendingIcon;
+    static const QString sPendingLightIcon;
     static const QColor  sDoneOKColor;
     static const QString sDoneOKIcon;
     static const QColor  sDoneKOColor;
     static const QString sDoneKOIcon;
     static const QColor  sArticlesFailedColor;
+
+    bool isDarkMode() const;
+    QColor pendingColor() const;
+    QIcon pendingIcon() const;
+    static QColor pendingColor(bool dark);
+    static QIcon pendingIcon(bool dark);
+    static QString pendingIconPath(bool dark);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -191,7 +321,9 @@ protected:
     void dropEvent(QDropEvent *e) override;
 
     void closeEvent(QCloseEvent *event) override;
-    void changeEvent(QEvent* event) override;
+    void changeEvent(QEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 public slots:
     void onSetProgressBarRange(int nbArticles);
@@ -207,6 +339,10 @@ private slots:
     void onTabContextMenu(const QPoint &point);
     void onCloseAllFinishedQuickTabs();
 
+    //! Tab context menu: pin \a tabIndex as the tab to open at startup, or
+    //! unpin it when it already is the one.
+    void onToggleStartupTab(int tabIndex);
+
 
 
     void onGenPoster();
@@ -219,8 +355,13 @@ private slots:
     void onDebugValue(int value);
 
     void onSaveConfig();
+    void onPostAllTabs();
+    //! Closes every Quick Post tab and empties #1, once the user confirms.
+    void onCloseAllTabs();
+    void onPar2Settings();
+    void updatePostAllButton();
 
-    void onJobTabClicked(int index);
+    void onNewQuickTab();
     void onCloseJob(int index);
 
     void toBeImplemented();
@@ -257,6 +398,12 @@ private slots:
     void _onResumeDeleteEntries();
 
     void _onHistoryContextMenu(const QPoint &pos);
+    //! Right click on the history header: offers to hand the column widths
+    //! back to ngPost.
+    void _onHistoryHeaderContextMenu(const QPoint &pos);
+    //! Forget the widths the user set, here and in the settings, and size the
+    //! columns again.
+    void _resetHistoryColumns();
 
     //! Phase 5d/6: a per-row server field (checkbox or text field) changed.
     //! Persist immediately so adding, editing or toggling a server survives
@@ -264,11 +411,45 @@ private slots:
     void _onServerFieldEdited();
 
 private:
+    //! Re-derive the block limit of the log pane from \a debugLevel. Called
+    //! at construction, once NgPost is known, and whenever the debug level
+    //! changes.
+    bool _showUnattributedVpnDecision();
+
+    void _applyLogCapacity(int debugLevel);
+
+    //! Insert a stream fragment without allowing one QTextDocument block to
+    //! grow large enough to make layout stall.
+    //! Append \a text to the log pane, never letting one block grow past
+    //! kLogMaxBlockCharacters. \a startNewBlock reproduces the paragraph break
+    //! QTextEdit::append() would make.
+    void _insertBoundedLogText(const QString &text, bool startNewBlock,
+                               const QTextCharFormat &format = QTextCharFormat()) const;
+
+    //! Drop the oldest lines once the pane is a whole slice over its budget.
+    void _trimLogPane() const;
+
     void _initServerBox();
+    //! Hide every VPN affordance where the platform has no VPN integration.
+    void _applyVpnPlatformVisibility();
     void _initPostingBox();
+    void _buildHistoryFilters(QWidget *histTab, QVBoxLayout *histLayout);
+    void _buildHistoryTable(QSplitter *histSplitter);
+    void _buildHistoryDetail(QSplitter *histSplitter);
+    void _buildHistoryStats();
+    void _buildHistoryResume();
+    void _connectHistoryControls();
     QWidget *_buildHistoryTab();
     void     _retranslateHistoryTab();
     void _refreshHistoryViews(bool rewindEmptyPage = true);
+    //! Size the history columns to their content (\a toContents) and hand the
+    //! name column the room the others leave. Does nothing once the user has
+    //! resized a column themselves.
+    void _fitHistoryColumns(bool toContents);
+    //! Column widths kept from the last run, and their write back. Restoring
+    //! any leaves them to the user: _fitHistoryColumns() then stands aside.
+    void _restoreHistoryColumns();
+    void _saveHistoryColumns();
     void _showHistoryDetails(const PostHistoryStore::PostDetails &details);
     bool _startResumePost(qint64 postId, bool askConfirmation = true);
 
@@ -276,6 +457,45 @@ private:
     int  _serverRow(QObject *delButton);
     PostingWidget *_getPostWidget(int tabIndex) const;
     int _getPostWidgetIndex(PostingWidget *postWidget) const;
+    //! Every posting tab, the default one included, in visual order.
+    QList<PostingWidget *> _postingWidgets() const;
+    void _connectPostingWidget(PostingWidget *post);
+
+    StartupTabBar *_startupTabBar() const;
+    void _fillTabContextMenu(QMenu &menu, int tabIndex);
+    void _applyStartupTab();
+
+    void _configureWaylandSplitters();
+    void _initLogBoxToggle();
+    void _updateLogToggleBtn();
+    bool _isLogBoxCollapsed() const;
+    void _setLogBoxCollapsed(bool collapsed, bool saveSetting = true);
+    void _onToggleLogBox();
+    void _onPostSplitterMoved(int pos, int index);
+    void _saveLogBoxState() const;
+
+    void _initZoomControl();
+    void _createZoomPopup();
+    void _toggleZoomPopup();
+    void _repositionZoomPopup();
+    void _applyZoomFont(const QFont &f, qreal scale);
+    void _scaleZoomedControls(qreal scale);
+    void _showZoomLevel(int percent);
+    void _scheduleZoomSave();
+    void _scaleWidgetChildren(QWidget *parent, qreal scale);
+    void _scaleTables(int rowHeight);
+
+    QToolButton *_logToggleBtn = nullptr;
+    int _lastLogBoxWidth = 250;
+    bool _logBoxCollapsed = true;
+    bool _logBoxStateRestored = false;
+
+    QToolButton *_zoomBtn = nullptr;
+    QFrame *_zoomPopup = nullptr;
+    QSlider *_zoomSlider = nullptr;
+    QLabel *_zoomValueLabel = nullptr;
+    QTimer *_zoomSaveTimer = nullptr;
+    QFont _baseFont;
 
 
     static const QString sGroupBoxStyle;

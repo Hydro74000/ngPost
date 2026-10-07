@@ -91,7 +91,7 @@
     </message>
     <message>
         <location line="+12"/>
-        <location filename="../hmi/AutoPostWidget.cpp" line="+311"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="+314"/>
         <source>generate a random name for the archive</source>
         <translation>genereer een willekeurige naam voor het archief</translation>
     </message>
@@ -177,7 +177,7 @@
         <translation>Genereer Posts</translation>
     </message>
     <message>
-        <location filename="../hmi/AutoPostWidget.cpp" line="-92"/>
+        <location filename="../hmi/AutoPostWidget.cpp" line="-93"/>
         <source>You can&apos;t use auto posting without compression on folders... (%1)</source>
         <translation>U kunt automatisch posten niet gebruiken zonder compressie op mappen... (%1)</translation>
     </message>
@@ -196,7 +196,7 @@ Druk op de Scan-knop en verwijder wat je niet wilt posten;)
 (Om bestanden te verwijderen, selecteer in de lijst en druk op DEL of BackSpace)</translation>
     </message>
     <message>
-        <location line="+43"/>
+        <location line="+44"/>
         <source>Select a Folder</source>
         <translation>Selecteer een Map</translation>
     </message>
@@ -280,22 +280,22 @@ Bestanden worden definitief verwijderd...</translation>
     </message>
     <message>
         <location line="+18"/>
-        <location line="+16"/>
+        <location line="+18"/>
         <source>requires: %1</source>
         <translation>vereist: %1</translation>
     </message>
     <message>
-        <location line="+42"/>
+        <location line="-1"/>
+        <source>Using the PAR2 arguments of the configuration: %1</source>
+        <translation>PAR2-argumenten uit de configuratie worden gebruikt: %1</translation>
+    </message>
+    <message>
+        <location line="+43"/>
         <source>Select one or more files</source>
         <translation>Selecteer 1 of meer bestanden</translation>
     </message>
     <message>
-        <location line="-43"/>
-        <source>Using PAR2_ARGS from config file: %1</source>
-        <translation>PAR2_ARGS gebruiken vanuit configuratiebestand:%1</translation>
-    </message>
-    <message>
-        <location line="+126"/>
+        <location line="+84"/>
         <source>You can use the &lt;b&gt;Monitor Mode&lt;/b&gt;</source>
         <translation>Je kunt de &lt;b&gt; Monitor modus &lt;/b&gt; gebruiken</translation>
     </message>
@@ -354,6 +354,11 @@ Bestanden worden definitief verwijderd...</translation>
         <source>Post info defaults saved: model %1, written to %2</source>
         <translation>Standaardwaarden opgeslagen: model %1, geschreven naar %2</translation>
     </message>
+    <message>
+        <location line="+7"/>
+        <source>Global (%1 %)</source>
+        <translation>Globaal (%1 %)</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -384,32 +389,11 @@ Bestanden worden definitief verwijderd...</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location line="+34"/>
         <source>...</source>
         <translation>...</translation>
     </message>
     <message>
-        <location line="-25"/>
-        <source>RAR Path: </source>
-        <translation>RAR pad: </translation>
-    </message>
-    <message>
-        <location line="+9"/>
-        <source>full path of the rar executable</source>
-        <translation>volledig pad van het rar programma (exe)</translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>select rar executable</source>
-        <translation>selecteer rar programma</translation>
-    </message>
-    <message>
-        <location line="+12"/>
-        <source>Vol size (MB):</source>
-        <translation>Volumegrootte (MB):</translation>
-    </message>
-    <message>
-        <location line="+15"/>
+        <location line="+24"/>
         <source>to split the rar archive in several volumes (0 to don&apos;t split)</source>
         <translation>om het rar-archief in verschillende delen te splitsen (0 om niet te splitsen)</translation>
     </message>
@@ -419,12 +403,7 @@ Bestanden worden definitief verwijderd...</translation>
         <translation>het aantal delen begrenzen: ngPost verhoogt de volumegrootte in plaats van meer delen te maken (config RAR_MAX)</translation>
     </message>
     <message>
-        <location line="+3"/>
-        <source>Limit RAR Number</source>
-        <translation>Beperk aantal RAR</translation>
-    </message>
-    <message>
-        <location line="+22"/>
+        <location line="+32"/>
         <source>Archives and par2 are deleted once the post succeeds.
 Ticked, they are left in the compression path folder instead.
 This is the default every new post starts with; each post can still decide otherwise (config KEEP_RAR).</source>
@@ -438,7 +417,7 @@ Dit is de standaard waarmee elke nieuwe post begint; elke post kan alsnog anders
         <translation>De archieven op schijf bewaren</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+16"/>
         <source>Archive password</source>
         <translation>Archiefwachtwoord</translation>
     </message>
@@ -468,19 +447,131 @@ Dit is de standaard waarmee elke nieuwe post begint; elke post kan alsnog anders
         <translation>genereer willekeurige wachtwoord</translation>
     </message>
     <message>
-        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+95"/>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="+207"/>
         <source>Select a Folder</source>
         <translation>Selecteer een Map</translation>
     </message>
     <message>
-        <location line="+12"/>
-        <source>Select rar executable</source>
-        <translation>Selecteer rar programma</translation>
+        <location filename="../hmi/CompressionSettingsDialog.ui" line="-117"/>
+        <source>Volume size (MiB):</source>
+        <translation>Volumegrootte (MiB):</translation>
     </message>
     <message>
-        <location line="+10"/>
-        <source>the selected file is not executable...</source>
-        <translation>het geselecteerde bestand is niet uitvoerbaar ...</translation>
+        <location line="+25"/>
+        <source>Limit the number of volumes to</source>
+        <translation>Aantal volumes beperken tot</translation>
+    </message>
+    <message>
+        <location filename="../hmi/CompressionSettingsDialog.cpp" line="-75"/>
+        <source>Volume size</source>
+        <translation>Volumegrootte</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>&quot;%1&quot; is not a valid volume size, so nothing was saved.
+
+Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only when the volume limit is off).</source>
+        <translation>“%1” is geen geldige volumegrootte; er is niets opgeslagen.
+
+Voer een geheel aantal MiB tussen 0 en 1000000 in (0 schakelt splitsen alleen uit als de volumelimiet uitstaat).</translation>
+    </message>
+    <message>
+        <location line="+58"/>
+        <source>The volume size is calculated automatically from the source size and the volume limit.</source>
+        <translation>De volumegrootte wordt automatisch berekend uit de brongrootte en de volumelimiet.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>The archive is not split into volumes.</source>
+        <translation>Het archief wordt niet opgesplitst in volumes.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>If necessary, ngPost increases the volume size to meet this limit. The volume limit then takes priority over the size entered.</source>
+        <translation>Indien nodig vergroot ngPost de volumes om deze limiet te halen. De volumelimiet krijgt dan voorrang op de ingevoerde grootte.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>The requested volume size is kept; the last volume may be smaller.</source>
+        <translation>De gewenste grootte blijft behouden; het laatste volume kan kleiner zijn.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>1 MiB = 1,048,576 bytes. The calculation uses the source size, with rounding.</source>
+        <translation>1 MiB = 1.048.576 bytes. De berekening gebruikt de brongrootte, met afronding.</translation>
+    </message>
+    <message>
+        <location line="-96"/>
+        <source>Save</source>
+        <translation>Opslaan</translation>
+    </message>
+    <message>
+        <location line="-58"/>
+        <source>Tool:</source>
+        <translation>Hulpmiddel:</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Path:</source>
+        <translation>Pad:</translation>
+    </message>
+    <message>
+        <location line="+54"/>
+        <source>Cancel</source>
+        <translation>Annuleren</translation>
+    </message>
+</context>
+<context>
+    <name>ExternalToolPathWidget</name>
+    <message>
+        <location filename="../hmi/ExternalToolPathWidget.cpp" line="+25"/>
+        <source>Automatic (recommended)</source>
+        <translation>Automatisch (aanbevolen)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Custom…</source>
+        <translation>Aangepast…</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Browse…</source>
+        <translation>Bladeren…</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Show path</source>
+        <translation>Pad tonen</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Select executable</source>
+        <translation>Uitvoerbaar bestand kiezen</translation>
+    </message>
+    <message>
+        <location line="+49"/>
+        <source>Executable unavailable. Choose an executable file or use Automatic.</source>
+        <translation>Uitvoerbaar bestand niet beschikbaar. Kies een uitvoerbaar bestand of de modus Automatisch.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>This tool is not included or installed. Install it, choose another tool, or set a custom path. Posts requiring it cannot start.</source>
+        <translation>Dit hulpmiddel is niet meegeleverd of geïnstalleerd. Installeer het, kies een ander hulpmiddel of stel een aangepast pad in. Posts die het nodig hebben, kunnen niet starten.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Included with ngPost · ready</source>
+        <translation>Meegeleverd met ngPost · gereed</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Found on this computer · ready</source>
+        <translation>Gevonden op deze computer · gereed</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Custom executable · ready</source>
+        <translation>Aangepast uitvoerbaar bestand · gereed</translation>
     </message>
 </context>
 <context>
@@ -510,6 +601,18 @@ Dit is de standaard waarmee elke nieuwe post begint; elke post kan alsnog anders
 </context>
 <context>
     <name>MainWindow</name>
+    <message>
+        <source>Update available: %1</source>
+        <translation>Update beschikbaar: %1</translation>
+    </message>
+    <message>
+        <source>Show release notes</source>
+        <translation>Release-opmerkingen tonen</translation>
+    </message>
+    <message>
+        <source>Hide release notes</source>
+        <translation>Release-opmerkingen verbergen</translation>
+    </message>
     <message>
         <location filename="../hmi/MainWindow.ui" line="+57"/>
         <source>Add a server (you can use as many as you want)</source>
@@ -589,8 +692,8 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+20"/>
-        <source>Check once a day for a new ngPost release on GitHub</source>
-        <translation>Eenmaal per dag controleren op een nieuwe ngPost-versie op GitHub</translation>
+        <source>Check GitHub for a new ngPost release at each start</source>
+        <translation>Bij elke start op GitHub controleren op een nieuwe ngPost-versie</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -624,7 +727,7 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="+2575"/>
+        <location filename="../hmi/MainWindow.cpp" line="+3350"/>
         <source>VPN: disabled</source>
         <translation>VPN: uitgeschakeld</translation>
     </message>
@@ -767,8 +870,8 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/MainWindow.cpp" line="-1717"/>
-        <location line="+159"/>
+        <location filename="../hmi/MainWindow.cpp" line="-2039"/>
+        <location line="+199"/>
         <source>Clear</source>
         <translation>Legen</translation>
     </message>
@@ -783,7 +886,7 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
         <translation>go command line (close the GUI and continue in the shell)</translation>
     </message>
     <message>
-        <location filename="../hmi/MainWindow.cpp" line="-909"/>
+        <location filename="../hmi/MainWindow.cpp" line="-1310"/>
         <source>on</source>
         <translation>aan</translation>
     </message>
@@ -819,37 +922,89 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+755"/>
-        <location line="+173"/>
+        <location line="+1116"/>
+        <location line="+213"/>
         <source>Password</source>
         <translation>Wachtwoord</translation>
     </message>
     <message>
-        <location line="-844"/>
-        <location line="+210"/>
+        <location line="-1212"/>
+        <location line="+412"/>
+        <location line="+1806"/>
         <source>Default %1</source>
         <translation>Standaard %1</translation>
     </message>
     <message>
-        <location line="-206"/>
-        <location line="+210"/>
+        <location line="-2226"/>
+        <location line="+424"/>
         <source>Post history, statistics and resume center</source>
         <translation>Postgeschiedenis, statistieken en hervattingscentrum</translation>
     </message>
     <message>
-        <location line="-209"/>
-        <location line="+213"/>
+        <location line="-415"/>
+        <location line="+419"/>
         <source>New</source>
         <translation>Nieuw</translation>
     </message>
     <message>
-        <location line="-162"/>
+        <location line="-362"/>
         <location line="+7"/>
         <source>avg speed</source>
         <translation>gemiddelde snelheid</translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+17"/>
+        <source>The VPN configured in ngPost already seems to be running.
+
+Another ngPost is using it, most likely an older version.
+
+Close that other ngPost to use the VPN here.</source>
+        <translation>De in ngPost geconfigureerde VPN lijkt al te draaien.
+
+Een andere ngPost gebruikt hem, waarschijnlijk een oudere versie.
+
+Sluit die andere ngPost om de VPN hier te gebruiken.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The VPN configured in ngPost already seems to be running.
+
+Another ngPost may be using it.
+
+Close that other ngPost to use the VPN here. If none is running, you can remove these leftover settings.</source>
+        <translation>De in ngPost geconfigureerde VPN lijkt al te draaien.
+
+Mogelijk gebruikt een andere ngPost hem.
+
+Sluit die andere ngPost om de VPN hier te gebruiken. Draait er geen, dan kunt u deze achtergebleven instellingen verwijderen.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>The VPN seems to be already in use</source>
+        <translation>De VPN lijkt al in gebruik te zijn</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Close</source>
+        <translation>Sluiten</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Remove leftover settings...</source>
+        <translation>Achtergebleven instellingen verwijderen...</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Another ngPost is using them.</source>
+        <translation>Een andere ngPost gebruikt ze.</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>VPN</source>
+        <translation>VPN</translation>
+    </message>
+    <message>
+        <location line="+223"/>
         <source>close while still posting?</source>
         <translation>sluiten terwijl je nog post?</translation>
     </message>
@@ -861,14 +1016,14 @@ Are you sure you want to quit?</source>
 Weet je zeker dat je wilt stoppen?</translation>
     </message>
     <message>
-        <location line="+56"/>
+        <location line="+68"/>
         <source>Immediate speed (avg on %1 sec) - (nb Articles uploaded / total number of Articles) - avg speed</source>
         <translation>Directe snelheid (gem.%1 sec.) - (nb Geuploade artikelen / totaal aantal artikelen) - gem. Snelheid</translation>
     </message>
     <message>
         <location line="+2"/>
-        <source>Shutdown computer when all the current Posts are done (with command: %1)</source>
-        <translation>Computer afsluiten wanneer alle huidige posts  zijn voltooid (met opdracht:%1)</translation>
+        <source>Shutdown the computer once all the posts are done</source>
+        <translation>Computer afsluiten zodra alle posts zijn voltooid</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -877,13 +1032,13 @@ Weet je zeker dat je wilt stoppen?</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+466"/>
-        <location line="+173"/>
+        <location line="+595"/>
+        <location line="+213"/>
         <source>Files</source>
         <translation>Bestanden</translation>
     </message>
     <message>
-        <location line="-638"/>
+        <location line="-807"/>
         <source>Parameters</source>
         <translation>Parameters</translation>
     </message>
@@ -893,18 +1048,23 @@ Weet je zeker dat je wilt stoppen?</translation>
         <translation>Posts logboek</translation>
     </message>
     <message>
-        <location line="+81"/>
+        <location line="+74"/>
         <source>Quick Tabs Menu</source>
         <translation>Quick menu tabbladen</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+11"/>
+        <source>Open this tab on startup</source>
+        <translation>Dit tabblad openen bij het opstarten</translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <location line="+2"/>
         <source>Close All finished Tabs</source>
         <translation>Sluit alle voltooide tabbladen</translation>
     </message>
     <message>
-        <location line="+45"/>
+        <location line="+108"/>
         <source>&lt;h3&gt;New version available: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Current: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;View release on GitHub&lt;/a&gt;&lt;/p&gt;</source>
         <translation>&lt;h3&gt;Nieuwe versie beschikbaar: &lt;b&gt;ngPost %1&lt;/b&gt;&lt;/h3&gt;&lt;p&gt;Huidig: v%2&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;%3&quot;&gt;Release bekijken op GitHub&lt;/a&gt;&lt;/p&gt;</translation>
     </message>
@@ -917,6 +1077,10 @@ Weet je zeker dat je wilt stoppen?</translation>
         <location line="+4"/>
         <source>Install and Restart</source>
         <translation>Installeren en herstarten</translation>
+    </message>
+    <message>
+        <source>Open Release Page</source>
+        <translation>Releasepagina openen</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -934,12 +1098,12 @@ Weet je zeker dat je wilt stoppen?</translation>
         <translation>Annuleren</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+25"/>
         <source>Update failed</source>
         <translation>Update mislukt</translation>
     </message>
     <message>
-        <location line="+59"/>
+        <location line="+76"/>
         <source>VPN required</source>
         <translation>VPN vereist</translation>
     </message>
@@ -957,119 +1121,166 @@ The job stays in the queue.</source>
 De taak blijft in de wachtrij.</translation>
     </message>
     <message>
-        <location line="+201"/>
+        <location line="-624"/>
+        <source>These settings could not be removed. See the VPN log for details.</source>
+        <translation>Deze instellingen konden niet worden verwijderd. Zie het VPN-logboek voor details.</translation>
+    </message>
+    <message>
+        <location line="+302"/>
+        <location line="+2762"/>
+        <location line="+145"/>
+        <source>UI Zoom: %1% (Click to adjust)</source>
+        <translation>UI-zoom: %1% (Klik om aan te passen)</translation>
+    </message>
+    <message>
+        <location line="-2571"/>
+        <source>The VPN configured in ngPost already seems to be running; another ngPost may be using it. See VPN settings.</source>
+        <translation>De in ngPost geconfigureerde VPN lijkt al te draaien; mogelijk gebruikt een andere ngPost hem. Zie de VPN-instellingen.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>VPN recovery exhausted</source>
+        <translation>VPN-herstel uitgeput</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>The posting job is paused and preserved for a later resume.</source>
+        <translation>De posttaak is gepauzeerd en bewaard om later te hervatten.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Retry</source>
+        <translation>Opnieuw proberen</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Stop and preserve for resume</source>
+        <translation>Stoppen en bewaren om te hervatten</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>VPN recovery</source>
+        <translation>VPN-herstel</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>The VPN recovery could not be restarted.</source>
+        <translation>Het VPN-herstel kon niet opnieuw worden gestart.</translation>
+    </message>
+    <message>
+        <location line="+202"/>
         <location line="+117"/>
         <source>Open Resume →</source>
         <translation>Hervatting openen →</translation>
     </message>
     <message>
         <location line="-111"/>
-        <location line="+143"/>
+        <location line="+183"/>
         <source>Export CSV…</source>
         <translation>CSV exporteren…</translation>
     </message>
     <message>
-        <location line="-141"/>
-        <location line="+129"/>
+        <location line="-181"/>
+        <location line="+169"/>
         <source>Search name, NZB, archive…</source>
         <translation>Zoek een naam, een NZB, een archief…</translation>
     </message>
     <message>
-        <location line="-116"/>
-        <location line="+157"/>
+        <location line="-156"/>
+        <location line="+197"/>
         <source>Group filter…</source>
         <translation>Groepsfilter…</translation>
     </message>
     <message>
-        <location line="-151"/>
-        <location line="+242"/>
+        <location line="-191"/>
+        <location line="+118"/>
         <source>Previous</source>
         <translation>Vorige</translation>
     </message>
     <message>
-        <location line="-241"/>
-        <location line="+242"/>
+        <location line="-117"/>
+        <location line="+118"/>
         <source>Next</source>
         <translation>Volgende</translation>
     </message>
     <message>
-        <location line="-235"/>
+        <location line="-111"/>
         <location line="+39"/>
         <location line="+7"/>
-        <location line="+127"/>
-        <location line="+127"/>
-        <location line="+23"/>
-        <location line="+772"/>
+        <location line="+167"/>
+        <location line="+149"/>
+        <location line="+26"/>
+        <location line="+1022"/>
         <source>Name</source>
         <translation>Naam</translation>
     </message>
     <message>
-        <location line="-1095"/>
+        <location line="-1410"/>
         <location line="+39"/>
         <location line="+7"/>
-        <location line="+127"/>
-        <location line="+127"/>
-        <location line="+23"/>
-        <location line="+772"/>
+        <location line="+167"/>
+        <location line="+149"/>
+        <location line="+26"/>
+        <location line="+1022"/>
         <source>Status</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location line="-1095"/>
+        <location line="-1410"/>
         <location line="+39"/>
-        <location line="+134"/>
-        <location line="+127"/>
-        <location line="+795"/>
+        <location line="+174"/>
+        <location line="+149"/>
+        <location line="+1048"/>
         <source>Size</source>
         <translation>Grootte</translation>
     </message>
     <message>
-        <location line="-1094"/>
-        <location line="+173"/>
+        <location line="-1409"/>
+        <location line="+213"/>
         <source>Articles</source>
         <translation>Artikelen</translation>
     </message>
     <message>
-        <location line="-173"/>
-        <location line="+173"/>
-        <location line="+1222"/>
+        <location line="-213"/>
+        <location line="+213"/>
+        <location line="+1497"/>
         <source>Failed</source>
         <translation>Mislukt</translation>
     </message>
     <message>
-        <location line="-1395"/>
+        <location line="-1710"/>
         <location line="+38"/>
-        <location line="+135"/>
-        <location line="+126"/>
+        <location line="+175"/>
+        <location line="+148"/>
         <source>Groups</source>
         <translation>Groepen</translation>
     </message>
     <message>
-        <location line="-294"/>
-        <location line="+205"/>
+        <location line="-356"/>
+        <location line="+280"/>
         <source>Regenerate NZB…</source>
         <translation>NZB opnieuw genereren…</translation>
     </message>
     <message>
-        <location line="-204"/>
-        <location line="+205"/>
-        <location line="+1447"/>
+        <location line="-279"/>
+        <location line="+280"/>
+        <location line="+1688"/>
         <source>Export info file…</source>
         <translation>Infobestand exporteren…</translation>
     </message>
     <message>
-        <location line="-1645"/>
-        <location line="+249"/>
+        <location line="-1961"/>
+        <location line="+311"/>
         <source>Period:</source>
         <translation>Periode:</translation>
     </message>
     <message>
-        <location line="+194"/>
+        <location line="+195"/>
         <source>History refresh failed: %1</source>
         <translation>Vernieuwen van de geschiedenis mislukt: %1</translation>
     </message>
     <message>
-        <location line="+49"/>
+        <location line="+48"/>
         <source>No entries</source>
         <translation>Geen items</translation>
     </message>
@@ -1079,7 +1290,7 @@ De taak blijft in de wachtrij.</translation>
         <translation>Items %1-%2</translation>
     </message>
     <message>
-        <location line="+80"/>
+        <location line="+195"/>
         <source>Resume post</source>
         <translation>Post hervatten</translation>
     </message>
@@ -1092,12 +1303,12 @@ Alleen ontbrekende of mislukte artikelen worden opnieuw verzonden.</translation>
     </message>
     <message>
         <location line="+15"/>
-        <location line="+933"/>
+        <location line="+1072"/>
         <source>Resume failed</source>
         <translation>Hervatting mislukt</translation>
     </message>
     <message>
-        <location line="-931"/>
+        <location line="-1070"/>
         <source>This post could not be resumed.</source>
         <translation>Deze post kon niet worden hervat.</translation>
     </message>
@@ -1109,7 +1320,7 @@ Alleen ontbrekende of mislukte artikelen worden opnieuw verzonden.</translation>
 %1</translation>
     </message>
     <message>
-        <location line="+297"/>
+        <location line="+411"/>
         <source>Quick Post is working..</source>
         <translation>Quick Post werkt ..</translation>
     </message>
@@ -1121,7 +1332,7 @@ Alleen ontbrekende of mislukte artikelen worden opnieuw verzonden.</translation>
  Stop het alsjeblieft voordat je het afsluit.</translation>
     </message>
     <message>
-        <location line="+38"/>
+        <location line="+51"/>
         <source>Select a Folder</source>
         <translation>Selecteer een map</translation>
     </message>
@@ -1141,7 +1352,7 @@ Alleen ontbrekende of mislukte artikelen worden opnieuw verzonden.</translation>
         <translation>Weet je zeker dat u de computer wilt uitschakelen?</translation>
     </message>
     <message>
-        <location line="+78"/>
+        <location line="+89"/>
         <source>&lt;i&gt;Could not load details: %1&lt;/i&gt;</source>
         <translation>&lt;i&gt;Details konden niet worden geladen: %1&lt;/i&gt;</translation>
     </message>
@@ -1371,12 +1582,12 @@ Deze post is gemaakt voordat ngPost deze gegevens bijhield, dus het par2-percent
     </message>
     <message>
         <location line="+17"/>
-        <location line="+440"/>
+        <location line="+441"/>
         <source>Password copied to clipboard.</source>
         <translation>Wachtwoord naar het klembord gekopieerd.</translation>
     </message>
     <message>
-        <location line="-432"/>
+        <location line="-433"/>
         <source>Remove the stored password for this post?
 The history entry is kept; only the password value is erased.</source>
         <translation>Het opgeslagen wachtwoord van deze post verwijderen?
@@ -1395,12 +1606,12 @@ Het geschiedenisitem blijft; alleen de wachtwoordwaarde wordt gewist.</translati
     </message>
     <message>
         <location line="+21"/>
-        <location line="+320"/>
+        <location line="+321"/>
         <source>Delete history entries</source>
         <translation>Geschiedenisitems verwijderen</translation>
     </message>
     <message>
-        <location line="-319"/>
+        <location line="-320"/>
         <source>Permanently delete %1 selected post(s) from the history?
 This also removes all associated file and article records.</source>
         <translation>%1 geselecteerde post(s) definitief uit de geschiedenis verwijderen?
@@ -1452,7 +1663,7 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>&lt;span style=&apos;color:darkred&apos;&gt;Niet hervatbaar&lt;/span&gt;</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+19"/>
         <source>Resume post(s)</source>
         <translation>Post(s) hervatten</translation>
     </message>
@@ -1512,7 +1723,7 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Wachtwoord voor &lt;b&gt;%1&lt;/b&gt;:</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+30"/>
         <source>VPN: starting...</source>
         <translation>VPN: bezig met starten...</translation>
     </message>
@@ -1523,6 +1734,16 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     </message>
     <message>
         <location line="+2"/>
+        <source>VPN: in use by another instance</source>
+        <translation>VPN: in gebruik door een andere instantie</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>VPN: reconnecting...</source>
+        <translation>VPN: opnieuw verbinden...</translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>VPN: stopping...</source>
         <translation>VPN: bezig met stoppen...</translation>
     </message>
@@ -1532,317 +1753,422 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>VPN: mislukt</translation>
     </message>
     <message>
-        <location line="-1736"/>
-        <location line="+128"/>
+        <location line="+58"/>
+        <location line="+1"/>
+        <source>Open Posting Log</source>
+        <translation>Postlogboek openen</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <location line="+1"/>
+        <source>Close Posting Log</source>
+        <translation>Postlogboek sluiten</translation>
+    </message>
+    <message>
+        <location line="+120"/>
+        <source>UI Zoom</source>
+        <translation>UI-zoom</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Reset zoom to 100%</source>
+        <translation>Zoom herstellen naar 100%</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Zoom out (-5%)</source>
+        <translation>Uitzoomen (-5%)</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>Zoom in (+5%)</source>
+        <translation>Inzoomen (+5%)</translation>
+    </message>
+    <message>
+        <location line="-2281"/>
+        <location line="+168"/>
         <source>All statuses</source>
         <translation>Alle statussen</translation>
     </message>
     <message>
-        <location line="-125"/>
-        <location line="+133"/>
+        <location line="-165"/>
+        <location line="+173"/>
         <source>Has password</source>
         <translation>Met wachtwoord</translation>
     </message>
     <message>
-        <location line="-142"/>
+        <location line="-182"/>
         <location line="+46"/>
         <location line="+51"/>
-        <location line="+46"/>
-        <location line="+149"/>
-        <location line="+75"/>
+        <location line="+86"/>
+        <location line="+171"/>
+        <location line="+78"/>
         <source>Refresh</source>
         <translation>Vernieuwen</translation>
     </message>
     <message>
-        <location line="-369"/>
-        <location line="+147"/>
+        <location line="-434"/>
+        <location line="+187"/>
         <source>Search:</source>
         <translation>Zoeken:</translation>
     </message>
     <message>
-        <location line="-146"/>
-        <location line="+149"/>
-        <location line="+949"/>
+        <location line="-186"/>
+        <location line="+189"/>
+        <location line="+1224"/>
         <source>Status:</source>
         <translation>Status:</translation>
     </message>
     <message>
-        <location line="-1073"/>
+        <location line="-1388"/>
         <location line="+1"/>
-        <location line="+136"/>
+        <location line="+176"/>
         <location line="+7"/>
         <source>Any date</source>
         <translation>Elke datum</translation>
     </message>
     <message>
-        <location line="-151"/>
-        <location line="+159"/>
+        <location line="-191"/>
+        <location line="+199"/>
         <source>Has errors</source>
         <translation>Met fouten</translation>
     </message>
     <message>
-        <location line="-156"/>
-        <location line="+159"/>
+        <location line="-196"/>
+        <location line="+199"/>
         <source>Clear all filters</source>
         <translation>Alle filters wissen</translation>
     </message>
     <message>
-        <location line="-167"/>
-        <location line="+169"/>
+        <location line="-207"/>
+        <location line="+209"/>
         <source>From:</source>
         <translation>Van:</translation>
     </message>
     <message>
-        <location line="-168"/>
-        <location line="+169"/>
+        <location line="-208"/>
+        <location line="+209"/>
         <source>To:</source>
         <translation>Tot:</translation>
     </message>
     <message>
-        <location line="-168"/>
+        <location line="-208"/>
         <location line="+31"/>
-        <location line="+138"/>
-        <location line="+111"/>
+        <location line="+178"/>
+        <location line="+133"/>
         <source>Group:</source>
         <translation>Groep:</translation>
     </message>
     <message>
-        <location line="-264"/>
+        <location line="-326"/>
         <location line="+39"/>
-        <location line="+134"/>
-        <location line="+127"/>
+        <location line="+174"/>
+        <location line="+149"/>
         <source>Date</source>
         <translation>Datum</translation>
     </message>
     <message>
-        <location line="-300"/>
-        <location line="+173"/>
+        <location line="-362"/>
+        <location line="+213"/>
         <source>Speed</source>
         <translation>Snelheid</translation>
     </message>
     <message>
-        <location line="-172"/>
-        <location line="+173"/>
+        <location line="-212"/>
+        <location line="+213"/>
         <source>NZB path</source>
         <translation>NZB-pad</translation>
     </message>
     <message>
-        <location line="-169"/>
-        <location line="+194"/>
-        <location line="+352"/>
-        <location line="+471"/>
+        <location line="-209"/>
+        <location line="+269"/>
+        <location line="+339"/>
+        <location line="+724"/>
         <source>&lt;i&gt;Select a post to see its details.&lt;/i&gt;</source>
         <translation>&lt;i&gt;Selecteer een post om de details te zien.&lt;/i&gt;</translation>
     </message>
     <message>
-        <location line="-1014"/>
-        <location line="+205"/>
-        <location line="+1454"/>
+        <location line="-1329"/>
+        <location line="+280"/>
+        <location line="+1695"/>
         <source>Copy password</source>
         <translation>Wachtwoord kopiëren</translation>
     </message>
     <message>
-        <location line="-1658"/>
-        <location line="+205"/>
-        <location line="+1043"/>
+        <location line="-1974"/>
+        <location line="+280"/>
+        <location line="+1283"/>
         <source>Purge password</source>
         <translation>Wachtwoord wissen</translation>
     </message>
     <message>
-        <location line="-1247"/>
-        <location line="+205"/>
+        <location line="-1562"/>
+        <location line="+280"/>
         <source>Open NZB location</source>
         <translation>NZB-locatie openen</translation>
     </message>
     <message>
-        <location line="-204"/>
+        <location line="-279"/>
         <location line="+53"/>
-        <location line="+152"/>
-        <location line="+120"/>
+        <location line="+227"/>
+        <location line="+110"/>
         <source>Delete entry</source>
         <translation>Item verwijderen</translation>
     </message>
     <message>
-        <location line="-1003"/>
-        <location line="+210"/>
-        <location line="+412"/>
-        <location line="+292"/>
+        <location line="-1408"/>
+        <location line="+424"/>
+        <location line="+538"/>
+        <location line="+168"/>
         <source>History</source>
         <translation>Geschiedenis</translation>
     </message>
     <message>
-        <location line="-228"/>
-        <location line="+238"/>
+        <location line="-104"/>
+        <location line="+300"/>
         <source>Last 7 days</source>
         <translation>Laatste 7 dagen</translation>
     </message>
     <message>
-        <location line="-237"/>
-        <location line="+237"/>
+        <location line="-299"/>
+        <location line="+299"/>
         <source>Last 30 days</source>
         <translation>Laatste 30 dagen</translation>
     </message>
     <message>
-        <location line="-236"/>
-        <location line="+236"/>
+        <location line="-298"/>
+        <location line="+298"/>
         <source>Last 90 days</source>
         <translation>Laatste 90 dagen</translation>
     </message>
     <message>
-        <location line="-235"/>
-        <location line="+236"/>
+        <location line="-297"/>
+        <location line="+298"/>
         <source>This year</source>
         <translation>Dit jaar</translation>
     </message>
     <message>
-        <location line="-235"/>
-        <location line="+235"/>
+        <location line="-297"/>
+        <location line="+297"/>
         <source>All time</source>
         <translation>Altijd</translation>
     </message>
     <message>
-        <location line="-231"/>
-        <location line="+234"/>
-        <location line="+1118"/>
+        <location line="-293"/>
+        <location line="+296"/>
+        <location line="+1371"/>
         <source>All groups</source>
         <translation>Alle groepen</translation>
     </message>
     <message>
-        <location line="-1344"/>
-        <location line="+248"/>
+        <location line="-1659"/>
+        <location line="+310"/>
         <source>Volume and failures per day</source>
         <translation>Volume en fouten per dag</translation>
     </message>
     <message>
-        <location line="-252"/>
-        <location line="+256"/>
+        <location line="-314"/>
+        <location line="+318"/>
         <source>Timeline</source>
         <translation>Tijdlijn</translation>
     </message>
     <message>
-        <location line="-255"/>
-        <location line="+263"/>
+        <location line="-317"/>
+        <location line="+325"/>
         <source>By group</source>
         <translation>Per groep</translation>
     </message>
     <message>
-        <location line="-262"/>
-        <location line="+273"/>
+        <location line="-324"/>
+        <location line="+335"/>
         <source>Top posts</source>
         <translation>Top posts</translation>
     </message>
     <message>
-        <location line="-270"/>
-        <location line="+255"/>
+        <location line="-332"/>
+        <location line="+317"/>
         <source>Posts by newsgroup</source>
         <translation>Posts per nieuwsgroep</translation>
     </message>
     <message>
-        <location line="-335"/>
-        <location line="+352"/>
+        <location line="-397"/>
+        <location line="+414"/>
         <source>Stats</source>
         <translation>Statistieken</translation>
     </message>
     <message>
-        <location line="-265"/>
-        <location line="+272"/>
-        <location line="+238"/>
-        <location line="+934"/>
+        <location line="-327"/>
+        <location line="+337"/>
+        <location line="+235"/>
+        <location line="+1187"/>
         <source>&lt;i&gt;Select a post to see resume details.&lt;/i&gt;</source>
         <translation>&lt;i&gt;Selecteer een post om de hersteldetails te zien.&lt;/i&gt;</translation>
     </message>
     <message>
-        <location line="-1441"/>
-        <location line="+277"/>
+        <location line="-1756"/>
+        <location line="+342"/>
         <source>Posted</source>
         <translation>Geplaatst</translation>
     </message>
     <message>
-        <location line="-277"/>
-        <location line="+277"/>
+        <location line="-342"/>
+        <location line="+342"/>
         <source>To repost</source>
         <translation>Opnieuw plaatsen</translation>
     </message>
     <message>
-        <location line="-277"/>
-        <location line="+277"/>
+        <location line="-342"/>
+        <location line="+342"/>
         <source>Unknown</source>
         <translation>Onbekend</translation>
     </message>
     <message>
-        <location line="-277"/>
-        <location line="+277"/>
+        <location line="-342"/>
+        <location line="+342"/>
         <source>Reason</source>
         <translation>Reden</translation>
     </message>
     <message>
-        <location line="-271"/>
-        <location line="+281"/>
+        <location line="-336"/>
+        <location line="+346"/>
         <source>Abandon</source>
         <translation>Opgeven</translation>
     </message>
     <message>
-        <location line="-277"/>
-        <location line="+278"/>
-        <location line="+1239"/>
+        <location line="-342"/>
+        <location line="+343"/>
+        <location line="+1490"/>
         <source>Purge resume data</source>
         <translation>Herstelgegevens verwijderen</translation>
     </message>
     <message>
-        <location line="-1513"/>
-        <location line="+275"/>
+        <location line="-1829"/>
+        <location line="+340"/>
         <source>Ignore (session)</source>
         <translation>Negeren (sessie)</translation>
     </message>
     <message>
-        <location line="-378"/>
+        <location line="-443"/>
         <location line="+91"/>
-        <location line="+284"/>
+        <location line="+349"/>
         <location line="+24"/>
-        <location line="+1299"/>
+        <location line="+1550"/>
         <source>Resume</source>
         <translation>Hervattingen</translation>
     </message>
     <message>
-        <location line="-1606"/>
-        <location line="+289"/>
+        <location line="-1922"/>
+        <location line="+354"/>
         <source>Resume posting the selected post(s) from where they stopped</source>
         <translation>Het/de geselecteerde post(s) hervatten waar het/ze gebleven is/zijn</translation>
     </message>
     <message>
-        <location line="-285"/>
-        <location line="+286"/>
+        <location line="-350"/>
+        <location line="+351"/>
         <source>Mark selected post(s) as abandoned (keep history entry)</source>
         <translation>Het/de geselecteerde post(s) als opgegeven markeren (geschiedenisitem bewaren)</translation>
     </message>
     <message>
-        <location line="-282"/>
-        <location line="+283"/>
+        <location line="-347"/>
+        <location line="+348"/>
         <source>Delete the technical resume data for selected post(s)</source>
         <translation>De technische herstelgegevens voor het/de geselecteerde post(s) verwijderen</translation>
     </message>
     <message>
-        <location line="-279"/>
-        <location line="+280"/>
+        <location line="-344"/>
+        <location line="+345"/>
         <source>Hide selected post(s) from this view for this session</source>
         <translation>Het/de geselecteerde post(s) voor deze sessie verbergen</translation>
     </message>
     <message>
-        <location line="-276"/>
-        <location line="+277"/>
+        <location line="-341"/>
+        <location line="+342"/>
         <source>Permanently delete selected post(s) from the history database</source>
         <translation>Het/de geselecteerde post(s) permanent uit de database verwijderen</translation>
     </message>
     <message>
-        <location line="+173"/>
+        <location line="+170"/>
         <source>%1 post(s) can be resumed.</source>
         <translation>%1 post(s) kunnen worden hervat.</translation>
+    </message>
+    <message>
+        <location line="+129"/>
+        <source>Reset column widths</source>
+        <translation>Kolombreedtes herstellen</translation>
+    </message>
+    <message>
+        <location line="-1735"/>
+        <location line="+426"/>
+        <source>PAR2 Settings…</source>
+        <translation>PAR2-instellingen…</translation>
+    </message>
+    <message>
+        <location line="+1742"/>
+        <source>Post all tabs</source>
+        <translation>Alle tabbladen posten</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.</source>
+        <translation>%1 voorbereide posts in tabvolgorde toevoegen. Lege, voltooide, wachtende en actieve posts worden overgeslagen. Minimaal twee posttabbladen vereist.</translation>
+    </message>
+    <message>
+        <location line="+150"/>
+        <source>Pause all tabs</source>
+        <translation>Alle tabbladen pauzeren</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Resume all tabs</source>
+        <translation>Alle tabbladen hervatten</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Stop all tabs</source>
+        <translation>Alle tabbladen stoppen</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Cancel all active and queued posts</source>
+        <translation>Alle actieve en wachtende posts annuleren</translation>
+    </message>
+    <message>
+        <source>Close all tabs</source>
+        <translation>Alle tabbladen sluiten</translation>
+    </message>
+    <message>
+        <source>Close every Quick Post tab and empty Quick Post #1</source>
+        <translation>Alle Quick Post-tabbladen sluiten en Quick Post #1 leegmaken</translation>
+    </message>
+    <message>
+        <source>Are you sure? All tabs will be lost.</source>
+        <translation>Weet u het zeker? Alle tabbladen gaan verloren.</translation>
+    </message>
+    <message>
+        <source>New tab (%1)
+or double-click the empty part of the tab bar</source>
+        <translation>Nieuw tabblad (%1)
+of dubbelklik op het lege deel van de tabbalk</translation>
+    </message>
+    <message>
+        <source>Change the NZB path of the tabs?</source>
+        <translation>NZB-pad van de tabbladen wijzigen?</translation>
+    </message>
+    <message>
+        <source>Tabs waiting to be posted: %1.
+Write their NZB file to %2 instead of their current folder?</source>
+        <translation>Tabbladen die wachten om gepost te worden: %1.
+Hun NZB-bestand naar %2 schrijven in plaats van hun huidige map?</translation>
     </message>
 </context>
 <context>
     <name>NgPost</name>
     <message>
-        <location filename="../NgPost.cpp" line="+67"/>
+        <source>Update check failed: %1</source>
+        <translation>Controle op updates mislukt: %1</translation>
+    </message>
+    <message>
+        <location filename="../NgPost.cpp" line="+71"/>
         <source>Auto Posting</source>
         <translation>Auto Posting</translation>
     </message>
@@ -1852,7 +2178,7 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Quick Post</translation>
     </message>
     <message>
-        <location line="+150"/>
+        <location line="+165"/>
         <source>Help: display syntax</source>
         <translation>Help: syntax weergeven</translation>
     </message>
@@ -1882,7 +2208,27 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Programma taal</translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+2"/>
+        <source>check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, see the report for whether they can be repaired, 2 = missing beyond any repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)</source>
+        <translation>nzb-bestand controleren (of de artikelen op Usenet beschikbaar zijn). Afsluitcode: 0 = alle artikelen aanwezig, 1 = artikelen ontbreken, zie het rapport of ze te herstellen zijn, 2 = verlies buiten elk herstel, 3 = geen oordeel (nzb onleesbaar, geen server ingeschakeld voor controle, of verbindingen mislukt)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>with --check: print a single machine readable JSON report on stdout instead of the human one</source>
+        <translation>met --check: één machineleesbaar JSON-rapport op stdout afdrukken in plaats van het menselijke</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>with --check: verify every article even once the post is provably beyond repair</source>
+        <translation>met --check: elk artikel controleren, ook als bewezen is dat de post niet meer te herstellen is</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>with --check: PAR2 slice size in bytes used to create the post, for the recovery analysis (default: derived from the nzb)</source>
+        <translation>met --check: PAR2-blokgrootte in bytes waarmee de post is gemaakt, voor de herstelanalyse (standaard: afgeleid uit de nzb)</translation>
+    </message>
+    <message>
+        <location line="+21"/>
         <source>parse directory and post every file/folder separately. You must use --compress, should add --gen_par2, --gen_name and --gen_pass</source>
         <translation>check directory en post elk bestand / map afzonderlijk. Je moet --compress gebruiken, moet --gen_par2, --gen_name en --gen_pass toevoegen</translation>
     </message>
@@ -1913,7 +2259,7 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>versleutel de naam van je post (VOORZICHTIG je zult je post niet vinden als je het nzb-bestand verliest)</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+2"/>
         <source>newsgroups where to post the files (coma separated without space)</source>
         <translation>nieuwsgroepen waar de bestanden moeten worden geplaatst (komma gescheiden zonder spatie)</translation>
     </message>
@@ -2019,12 +2365,12 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+4438"/>
+        <location line="+5769"/>
         <source>Remove root (parent) folder when compressing Folders using RAR</source>
         <translation>Verwijder de root (bovenliggende) map bij het comprimeren van mappen met RAR</translation>
     </message>
     <message>
-        <location line="-4435"/>
+        <location line="-5766"/>
         <source>NNTP server following the format (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</source>
         <translation>NNTP-server met de indeling (&lt;user&gt;:&lt;pass&gt;@@@)?&lt;host&gt;:&lt;port&gt;:&lt;nbCons&gt;:(no)?ssl</translation>
     </message>
@@ -2059,7 +2405,17 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>aantal of NNTP verbindingen</translation>
     </message>
     <message>
-        <location line="+1172"/>
+        <location line="+12"/>
+        <source>remove unowned ngPost VPN resources after rechecking them (requires --yes)</source>
+        <translation>eigenaarloze ngPost-VPN-bronnen verwijderen na hercontrole (vereist --yes)</translation>
+    </message>
+    <message>
+        <location line="+265"/>
+        <source>VPN recovery exhausted; the post was preserved for resume.</source>
+        <translation>VPN-herstel uitgeput; de post is bewaard om te hervatten.</translation>
+    </message>
+    <message>
+        <location line="+949"/>
         <source>MONITOR_IGNORE_DIR ON =&gt; Ignoring new incoming folder %1</source>
         <translation>MONITOR_IGNORE_DIR ON =&gt; Negeren van nieuwe inkomende map %1</translation>
     </message>
@@ -2069,7 +2425,7 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>MONITOR_EXTENSIONS ON =&gt; Negeren van nieuw inkomend bestand %1</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+25"/>
         <source>Processing new incoming file: %1</source>
         <translation>Nieuw inkomend bestand verwerken:%1</translation>
     </message>
@@ -2084,17 +2440,32 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>FOUT: kon geen vertaling vinden voor taal %1</translation>
     </message>
     <message>
-        <location line="+108"/>
+        <location line="+41"/>
+        <source>SSL support is unavailable</source>
+        <translation>SSL-ondersteuning is niet beschikbaar</translation>
+    </message>
+    <message>
+        <location line="+151"/>
         <source> =&gt; closing application</source>
         <translation> =&gt; applicatie afsluiten</translation>
     </message>
     <message>
-        <location line="+606"/>
+        <location line="+44"/>
+        <source>The post remains paused until the requested VPN stop completes.</source>
+        <translation>De post blijft gepauzeerd totdat het gevraagde stoppen van de VPN is voltooid.</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>The post remains paused until VPN recovery completes.</source>
+        <translation>De post blijft gepauzeerd totdat het VPN-herstel is voltooid.</translation>
+    </message>
+    <message>
+        <location line="+614"/>
         <source>Network access changed: %1</source>
         <translation>Netwerktoegang gewijzigd: %1</translation>
     </message>
     <message>
-        <location line="+87"/>
+        <location line="+114"/>
         <source>Cancelling monitoring job: %1</source>
         <translation>Monitoren annuleren: %1</translation>
     </message>
@@ -2104,7 +2475,7 @@ Dit verwijdert ook alle bijbehorende bestands- en artikelgegevens.</translation>
         <translation>Monitoring stoppen:%1</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+48"/>
         <source>Error syntax: %1
 To list the available options use: %2 --help
 </source>
@@ -2113,17 +2484,57 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
 </translation>
     </message>
     <message>
-        <location line="+176"/>
+        <location line="+33"/>
+        <source>Error: --vpn-cleanup-unattributed requires --yes because it can interrupt another ngPost tunnel.</source>
+        <translation>Fout: --vpn-cleanup-unattributed vereist --yes omdat het een andere ngPost-tunnel kan onderbreken.</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>VPN resources were not removed.</source>
+        <translation>VPN-bronnen zijn niet verwijderd.</translation>
+    </message>
+    <message>
+        <location line="+242"/>
+        <source>Error: --%1 expects a positive number of bytes</source>
+        <translation>Fout: --%1 verwacht een positief aantal bytes</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>given on the command line</source>
+        <translation>opgegeven op de opdrachtregel</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>from the configuration</source>
+        <translation>uit de configuratie</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>the nzb file could not be read</source>
+        <translation>het nzb-bestand kon niet worden gelezen</translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>no server is enabled for nzb checking: set &apos;nzbCheck = true&apos; on at least one [server] of your configuration</source>
+        <translation>geen enkele server is ingeschakeld voor nzb-controle: zet &apos;nzbCheck = true&apos; bij ten minste één [server] in uw configuratie</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>the servers enabled for nzb checking have no positive connection count</source>
+        <translation>de voor nzb-controle ingeschakelde servers hebben geen positief aantal verbindingen</translation>
+    </message>
+    <message>
+        <location line="+18"/>
         <source>Error syntax: you should provide at least one input file or directory using the option -i, --auto or --monitor</source>
         <translation>Syntax fout :--u moet ten minste één invoerbestand of directory opgeven met de optie -i, --auto of --monitor</translation>
     </message>
     <message>
-        <location line="+83"/>
+        <location line="+93"/>
         <source>Error syntax: --auto only uses folders as argument...</source>
         <translation>Syntax fout:--auto post gebruikt alleen mappen als argument...</translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+36"/>
         <source>Error syntax: --monitor only uses folders as argument...</source>
         <translation>Syntax fout :--monitor gebruikt alleen mappen als argument ...</translation>
     </message>
@@ -2133,7 +2544,7 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
         <translation>start monitoring: </translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+19"/>
         <source>Do article obfuscation (the subject of each Article will be a UUID)
 </source>
         <translatorcomment>nakijken</translatorcomment>
@@ -2141,44 +2552,39 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
 </translation>
     </message>
     <message>
-        <location line="-186"/>
+        <location line="-273"/>
         <source>Extra logs are ON
 </source>
         <translation>Extra logs zijn AAN
 </translation>
     </message>
     <message>
-        <location line="-2304"/>
-        <source>check nzb file (if articles are available on Usenet) cf https://github.com/mbruel/nzbCheck</source>
-        <translation>controleer nzb-bestand (of er artikelen beschikbaar zijn op Usenet) of https://github.com/mbruel/nzbCheck</translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="-2642"/>
         <source>quiet mode (no output on stdout)</source>
         <translation>stille modus (geen output op stdout)</translation>
     </message>
     <message>
-        <location line="+63"/>
+        <location line="+64"/>
         <source>Pack posts using config PACK definition with a subset of (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</source>
         <translation>Verpak berichten met behulp van config PACK-definitie met een subset van (COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2)</translation>
     </message>
     <message>
-        <location line="+1295"/>
+        <location line="+1348"/>
         <source>SSL issue on your system...</source>
         <translation>SSL probleem op uw systeem...</translation>
     </message>
     <message>
-        <location line="+446"/>
+        <location line="+584"/>
         <source>no packing needed for next pending job %1</source>
         <translation>geen verpakking nodig voor de volgende lopende taak %1</translation>
     </message>
     <message>
-        <location line="+89"/>
+        <location line="+121"/>
         <source>start non packing job...</source>
         <translation>start niet-inpakklus...</translation>
     </message>
     <message>
-        <location line="+38"/>
+        <location line="-49"/>
         <source>packing job finished unexpectedly...</source>
         <translation>inpakken klus onverwachts afgebroken...</translation>
     </message>
@@ -2188,12 +2594,12 @@ Gebruik om de beschikbare opties weer te geven: %2 --help
         <translation>Geannuleerde taak in behandeling?</translation>
     </message>
     <message>
-        <location line="-958"/>
+        <location line="-1070"/>
         <source>Posting canceled by user.</source>
         <translation>Posting geannuleerd door gebruiker.</translation>
     </message>
     <message>
-        <location line="+3075"/>
+        <location line="+4296"/>
         <source>VPN warning</source>
         <translation>VPN-waarschuwing</translation>
     </message>
@@ -2226,14 +2632,14 @@ Instelling: Knop &apos;VPN...&apos; -&gt; &apos;Profiles&apos; &amp; &apos;Route
         <translation>Annuleren</translation>
     </message>
     <message>
-        <location line="-1755"/>
+        <location line="-2662"/>
         <source>Full debug logs are ON
 </source>
         <translation>Volledige foutopsporings logboeken zijn AAN
 </translation>
     </message>
     <message>
-        <location line="+120"/>
+        <location line="+198"/>
         <source>Error syntax: --auto only works with --compress or --gen_par2 or --pack with at least the keywords COMPRESS or GEN_PAR2 in PACK config</source>
         <translation>Foutsyntaxis: --auto werkt alleen met --compress of --gen_par2 of --pack met ten minste de trefwoorden COMPRESS of GEN_PAR2 in PACK-configuratie</translation>
     </message>
@@ -2245,40 +2651,40 @@ That&apos;s not the case for &apos;%1&apos; which contains folders: %2</source>
 Dat is niet het geval voor &apos;%1&apos; dat mappen bevat: %2</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+16"/>
         <source>Error syntax: --monitor only works with --compress or with --gen_par2 ONLY IF MONITOR_IGNORE_DIR is enabled in config (--pack can be used)</source>
         <translation>Foutsyntaxis: --monitor werkt alleen met --compress of met --gen_par2 ALLEEN ALS MONITOR_IGNORE_DIR is ingeschakeld in de configuratie (--pack kan worden gebruikt)</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+54"/>
         <source>You should give an integer for the number of threads (option -t)</source>
         <translation>Je moet een heel getal geven voor het aantal threads (optie -t)</translation>
     </message>
     <message>
-        <location line="+139"/>
-        <location line="+738"/>
+        <location line="+154"/>
+        <location line="+1142"/>
         <source>Generate new random poster for each post</source>
         <translation>Genereer een nieuwe willekeurige poster voor elk post</translation>
     </message>
     <message>
-        <location line="-707"/>
+        <location line="-1106"/>
         <source>You should give an unisgned integer for the number of retry for posting an Article (option -r)</source>
         <translation>Je moet een getal opgeven voor het aantal nieuwe pogingen om een ​​artikel te posten (optie -r)</translation>
     </message>
     <message>
-        <location line="+52"/>
+        <location line="+89"/>
         <source>Error: can&apos;t generate par2 if the redundancy percentage is null or PAR2_ARGS is not provided...
 Either use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file.</source>
         <translation>Fout: kan geen par2 genereren als het redundantie percentage nul is of PAR2_ARGS niet is opgegeven ...
 Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.</translation>
     </message>
     <message>
-        <location line="+62"/>
+        <location line="+69"/>
         <source>Syntax error on server details for %1, the format should be: %2</source>
         <translation>Syntaxisfout op server details voor%1, de indeling moet zijn:%2</translation>
     </message>
     <message>
-        <location line="+34"/>
+        <location line="+41"/>
         <source>You should give an integer for the port (option -P)</source>
         <translation>Je moet een heel getal geven voor de poort (optie -P)</translation>
     </message>
@@ -2324,31 +2730,31 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Fout: de invoermap &apos;%1&apos; bevat geen bestanden... (geen recursiviteit zonder --compress)</translation>
     </message>
     <message>
-        <location line="+39"/>
+        <location line="+47"/>
         <source>Nothing to do...</source>
         <translation>Niets te doen ...</translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+1435"/>
         <source>The config file &apos;%1&apos; is not readable...</source>
         <translation>Het configuratie bestand %1  is niet leesbaar ...</translation>
     </message>
     <message>
-        <location line="+112"/>
+        <location line="-909"/>
         <source>the nzbPath &apos;%1&apos; is not writable...
 </source>
         <translation>het nzb Pad &apos;%1&apos; heeft geen schrijfrechten...
 </translation>
     </message>
     <message>
-        <location line="-1557"/>
+        <location line="-2234"/>
         <source>Unsupported protocol for NZB_UPLOAD_URL (%1). You can only use: %2
 </source>
         <translation>Niet-ondersteund protocol voor NZB_UPLOAD_URL (%1). Je kunt alleen:%2 gebruiken
 </translation>
     </message>
     <message>
-        <location line="+1705"/>
+        <location line="+2384"/>
         <source>ngPost starts logging: %1</source>
         <translation>ngPost begint met loggen: %1</translation>
     </message>
@@ -2358,22 +2764,22 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Fout bij openen logbestand: &apos;%1&apos;</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+37"/>
         <source>Group Policy: one group per Post</source>
         <translation>Groepsbeleid: één groep per post</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+4"/>
         <source>Group Policy: one group per File</source>
         <translation>Groepsbeleid: één groep per bestand</translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+67"/>
         <source>Error parsing Proxy Socks5 parameters. The syntax should be: %1</source>
         <translation>Fout bij het parseren van Proxy Socks5-parameters. De syntaxis moet zijn:%1</translation>
     </message>
     <message>
-        <location line="-1807"/>
+        <location line="-2485"/>
         <source>the post history &apos;%1&apos; can&apos;t be a directory...
 </source>
         <translation>het historie bestand %1  mag geen directory zijn...
@@ -2388,52 +2794,52 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
 </translation>
     </message>
     <message>
-        <location line="+1867"/>
+        <location line="+2557"/>
         <source>should be a directory!...</source>
         <translation>moet een directory zijn! ...</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+4"/>
         <source>should be writable!...</source>
         <translation>zou beschrijfbaar moeten zijn! ...</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+5"/>
         <source>Using RAM Storage %1, root: %2, type: %3, size: %4, available: %5</source>
         <translation>RAM-opslag %1 gebruiken, root: %2, typ: %3, grootte: %4, beschikbaar: %5</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+13"/>
         <source>should be a ratio between %1 and %2</source>
         <translation>moet een verhouding zijn tussen%1 en%2</translation>
     </message>
     <message>
-        <location line="+44"/>
+        <location line="+64"/>
         <source>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it.</source>
         <translation>verouderd sleutelwoord AUTO_COMPRESS, je moet in plaats daarvan PACK gebruiken, klik op OPSLAAN om je configuratie bij te werken en ga het controleren.</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+3"/>
         <source>obsolete keyword AUTO_COMPRESS, you should use PACK instead, please refer to the conf example: %1</source>
         <translation>verouderd trefwoord AUTO_COMPRESS, je moet in plaats daarvan PACK gebruiken, raadpleeg het conf-voorbeeld: %1</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+18"/>
         <source>Wrong keywords for PACK: %1. It should be a subset of (%2)</source>
         <translation>Verkeerde trefwoorden voor PACK: %1. Het moet een subset zijn van (%2)</translation>
     </message>
     <message>
-        <location line="-1939"/>
+        <location line="-2648"/>
         <source>date</source>
         <translation>datum</translation>
     </message>
     <message>
-        <location line="-1631"/>
+        <location line="-1805"/>
         <source>use configuration file (default: the per-user ngPost configuration folder)</source>
         <translation>configuratiebestand gebruiken (standaard: de ngPost-configuratiemap van de gebruiker)</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+12"/>
         <source>list structured post history</source>
         <translation>de gestructureerde postgeschiedenis tonen</translation>
     </message>
@@ -2513,7 +2919,7 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>pad van de gestructureerde SQLite-geschiedenisdatabase</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+15"/>
         <source>one of your fields, written in the post info file AND published in the nzb header (typically &quot;password=qwerty42&quot;)</source>
         <translation>een van uw velden, wordt in het infobestand geschreven EN in de nzb-header gepubliceerd (meestal &quot;password=qwerty42&quot;)</translation>
     </message>
@@ -2623,17 +3029,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>het actieve VPN-profiel op naam kiezen (het moet al in de configuratie bestaan)</translation>
     </message>
     <message>
-        <location line="+229"/>
-        <source>VPN could not be established — aborting pending jobs</source>
-        <translation>Het VPN kon niet tot stand komen — wachtende taken worden afgebroken</translation>
-    </message>
-    <message>
-        <location line="+11"/>
+        <location line="+238"/>
         <source>VPN required but unavailable: %1</source>
         <translation>VPN vereist maar niet beschikbaar: %1</translation>
     </message>
     <message>
-        <location line="+170"/>
+        <location line="+196"/>
         <source>History database error: %1</source>
         <translation>Fout van de geschiedenisdatabase: %1</translation>
     </message>
@@ -2723,11 +3124,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <location line="+4"/>
         <location line="+265"/>
         <location line="+18"/>
+        <location line="+4177"/>
         <source>Warning: %1</source>
         <translation>Waarschuwing: %1</translation>
     </message>
     <message>
-        <location line="-215"/>
+        <location line="-4392"/>
         <source>Confirmation required. Re-run with --yes to resume posting.</source>
         <translation>Bevestiging vereist. Voer opnieuw uit met --yes om het posten te hervatten.</translation>
     </message>
@@ -2782,13 +3184,18 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Infobestand geschreven: %1</translation>
     </message>
     <message>
-        <location line="+210"/>
-        <location line="+224"/>
+        <location line="+125"/>
+        <source>%1: %2 connection interruption(s); automatic reconnection attempted. See Debug for details.</source>
+        <translation>%1: %2 verbindingsonderbreking(en); automatisch opnieuw verbinden geprobeerd. Details in de debugmodus.</translation>
+    </message>
+    <message>
+        <location line="+114"/>
+        <location line="+341"/>
         <source>AUTO_INCLUDE_NFO ON =&gt; %1 will be bundled with its sibling, not posted alone</source>
         <translation>AUTO_INCLUDE_NFO ON =&gt; %1 wordt met zijn buur gebundeld, niet los gepost</translation>
     </message>
     <message>
-        <location line="-105"/>
+        <location line="-161"/>
         <source>Waiting for the post commands to finish before exiting...</source>
         <translation>Er wordt gewacht tot de post-commando&apos;s klaar zijn voordat wordt afgesloten...</translation>
     </message>
@@ -2798,7 +3205,17 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Er wordt gewacht tot de post-commando&apos;s klaar zijn...</translation>
     </message>
     <message>
-        <location line="+127"/>
+        <location line="+12"/>
+        <source>Shutdown postponed: waiting for a completed post with at least one successfully sent article (manual cancellations do not count).</source>
+        <translation>Afsluiten uitgesteld: wachten op een voltooide post met minstens één succesvol verzonden artikel (handmatig geannuleerde posts tellen niet mee).</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Shutdown postponed: some posting tabs have not been submitted. Post them, clear them or close them to allow shutdown.</source>
+        <translation>Afsluiten uitgesteld: sommige postingtabbladen zijn nog niet ingediend. Start deze posts, maak de tabbladen leeg of sluit ze om afsluiten toe te staan.</translation>
+    </message>
+    <message>
+        <location line="+159"/>
         <source>AUTO_INCLUDE_NFO ON =&gt; bundling %1 in the post of %2</source>
         <translation>AUTO_INCLUDE_NFO ON =&gt; %1 wordt meegestuurd in de post van %2</translation>
     </message>
@@ -2848,23 +3265,93 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Fout: metadata &apos;%1&apos; wordt zowel publiek (--meta) als privé (--post_meta) opgegeven; kies er één.</translation>
     </message>
     <message>
-        <location line="+240"/>
+        <location line="+293"/>
         <source>Recovering: starting next job that wasn&apos;t pre-packed</source>
         <translation>Herstel: de volgende niet vooraf ingepakte taak wordt gestart</translation>
     </message>
     <message>
-        <location line="-770"/>
-        <location line="+1116"/>
+        <location line="+1071"/>
+        <source>--par2_path selects %1 instead of %2, so the par2 arguments of your configuration are ignored for this run and %1 runs with its own defaults. The configuration is left as it is.</source>
+        <translation>--par2_path kiest %1 in plaats van %2: de par2-argumenten uit uw configuratie worden voor deze run genegeerd en %1 gebruikt zijn eigen standaardwaarden. De configuratie blijft ongewijzigd.</translation>
+    </message>
+    <message>
+        <location line="+684"/>
+        <source>Commented out or deleted in &apos;%1&apos; while ngPost was running, so it stops using them: %2.</source>
+        <translation>Uitgecommentarieerd of verwijderd in &apos;%1&apos; terwijl ngPost liep, dus ngPost gebruikt ze niet meer: %2.</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>The [server] and [vpn_profile] blocks of &apos;%1&apos; were edited by hand, and this save writes the ones ngPost holds instead: those changes are lost. Change servers and VPN profiles in the GUI, or with ngPost closed.</source>
+        <translation>De blokken [server] en [vpn_profile] van &apos;%1&apos; zijn met de hand gewijzigd, en deze opslag schrijft die van ngPost: die wijzigingen zijn verloren. Wijzig servers en VPN-profielen in de interface, of met ngPost gesloten.</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>The par2 arguments of your configuration are written for %1, so %2 runs with its default arguments this time. The line is left in the configuration.</source>
+        <translation>De par2-argumenten in uw configuratie zijn voor %1 geschreven, dus %2 draait deze keer met zijn eigen standaardargumenten. De regel blijft in de configuratie staan.</translation>
+    </message>
+    <message>
+        <location line="+1568"/>
+        <source>## the three lines below are for Windows, Linux and macOS, in that order;</source>
+        <translation>## de drie regels hieronder zijn voor Windows, Linux en macOS, in die volgorde;</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>## the last two need sudo rights without a password. Uncomment one as it is:</source>
+        <translation>## de laatste twee vereisen sudo-rechten zonder wachtwoord. Haal er één ongewijzigd uit commentaar:</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>## anything after the = is the command, including a note in parentheses.</source>
+        <translation>## alles na de = is het commando, ook een notitie tussen haakjes.</translation>
+    </message>
+    <message>
+        <location line="+184"/>
+        <source>## User interface zoom percentage (80 to 150, default 100)</source>
+        <translation>## Zoompercentage van gebruikersinterface (80 tot 150, standaard 100)</translation>
+    </message>
+    <message>
+        <location line="+130"/>
+        <source>## the first line below is for rar, the second for 7-zip:</source>
+        <translation>## de eerste regel hieronder is voor rar, de tweede voor 7-zip:</translation>
+    </message>
+    <message>
+        <location line="+44"/>
+        <source>## The PAR2 Settings window of the GUI owns this line and rewrites it from its fields, so editing it here does not last.</source>
+        <translation>## Het PAR2-instellingenvenster van de interface bezit deze regel en herschrijft ze op basis van zijn velden: ze hier aanpassen houdt geen stand.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>## Your own arguments: uncomment one line below and ngPost runs it instead of</source>
+        <translation>## Uw eigen argumenten: haal hieronder één regel uit commentaar en ngPost gebruikt</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>## Write it for the tool PAR2_TOOL selects: one rejects the switches of another.</source>
+        <translation>## Schrijf ze voor het gereedschap dat PAR2_TOOL kiest: elk weigert de opties van de andere.</translation>
+    </message>
+    <message>
+        <location line="-3"/>
+        <source>## PAR2_ARGS, without ever rewriting it. Only the redundancy of each post is</source>
+        <translation>## ngPost gebruikt ze in plaats van PAR2_ARGS, zonder ze ooit te herschrijven.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>## replaced. Comment it again to go back to the PAR2 Settings fields.</source>
+        <translation>## Alleen de redundantie per post wordt vervangen. Weer uitcommentariëren keert terug.</translation>
+    </message>
+    <message>
+        <location line="-4716"/>
+        <location line="+1424"/>
         <source>Configuration-folder adoption failed; ngPost stopped before using the new folder so it can retry safely next time.</source>
         <translation>Het overnemen van de configuratiemap is mislukt; ngPost is gestopt voordat de nieuwe map werd gebruikt, zodat het de volgende keer veilig opnieuw kan proberen.</translation>
     </message>
     <message>
-        <location line="-2220"/>
+        <location line="-2552"/>
         <source>where to write the post info file (non-secret variables allowed)</source>
         <translation>waar het postinformatiebestand moet worden opgeslagen (niet-geheime variabelen toegestaan)</translation>
     </message>
     <message>
-        <location line="+1967"/>
+        <location line="+2174"/>
         <source>Shutdown process failed (exit code %1).</source>
         <translation>Het afsluitproces is mislukt (afsluitcode %1).</translation>
     </message>
@@ -2874,12 +3361,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Fout in het afsluitproces: %1</translation>
     </message>
     <message>
-        <location line="+340"/>
+        <location line="+539"/>
         <source>Error syntax: --rm_posted option is only available with --auto or --monitor</source>
         <translation>Syntaxfout: de optie --rm_posted bestaat alleen samen met --auto of --monitor</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+25"/>
         <source>Error syntax: --vpn and --no_vpn are mutually exclusive</source>
         <translation>Syntaxfout: --vpn en --no_vpn sluiten elkaar uit</translation>
     </message>
@@ -2889,12 +3376,12 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Syntaxfout: --vpn_profile &apos;%1&apos; komt met geen enkel in de configuratie gedefinieerd profiel overeen</translation>
     </message>
     <message>
-        <location line="+119"/>
+        <location line="+146"/>
         <source>Error: --post_info_output can&apos;t be empty</source>
         <translation>Fout: --post_info_output mag niet leeg zijn</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+34"/>
         <source>Error: --post_cmd_timeout expects a number of seconds (0 = no limit)</source>
         <translation>Fout: --post_cmd_timeout verwacht een aantal seconden (0 = geen limiet)</translation>
     </message>
@@ -2904,44 +3391,104 @@ Gebruik --par2_pct of stel PAR2_PCT of PAR2_ARGS in het configuratiebestand in.<
         <translation>Fout: --nzb_upload_timeout verwacht een aantal seconden (0 = geen limiet)</translation>
     </message>
     <message>
-        <location line="+86"/>
-        <location line="+697"/>
+        <location line="+96"/>
+        <location line="+1103"/>
         <source>ARTICLE_SIZE must be a positive integer</source>
         <translation>ARTICLE_SIZE moet een positief geheel getal zijn</translation>
     </message>
     <message>
-        <location line="+67"/>
+        <location line="-142"/>
+        <source>Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5.</source>
+        <translation>Waarschuwing: VPN_LEASE_WAIT_MINUTES moet tussen 0 en 1440 liggen; 5 wordt gebruikt.</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Warning: VPN_RECOVERY_MAX_ATTEMPTS must be in 0..1000; using 0 (unlimited).</source>
+        <translation>Waarschuwing: VPN_RECOVERY_MAX_ATTEMPTS moet tussen 0 en 1000 liggen; 0 (onbeperkt) wordt gebruikt.</translation>
+    </message>
+    <message>
+        <location line="+193"/>
         <source>POST_INFO_OUTPUT can&apos;t be empty
 </source>
         <translation>POST_INFO_OUTPUT mag niet leeg zijn
 </translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+13"/>
         <source>POST_CMD_TIMEOUT must be a number of seconds (0 = no limit)
 </source>
         <translation>POST_CMD_TIMEOUT moet een aantal seconden zijn (0 = geen limiet)
 </translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+11"/>
         <source>NZB_UPLOAD_TIMEOUT must be a number of seconds (0 = no limit)
 </source>
         <translation>NZB_UPLOAD_TIMEOUT moet een aantal seconden zijn (0 = geen limiet)
 </translation>
     </message>
     <message>
-        <location line="+269"/>
+        <location line="+464"/>
+        <source>RAR_TOOL must be rar or 7zip.</source>
+        <translation>RAR_TOOL moet rar of 7zip zijn.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>RAR_SOURCE must be auto or custom.</source>
+        <translation>RAR_SOURCE moet auto of custom zijn.</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>PAR2_SOURCE must be auto or custom.</source>
+        <translation>PAR2_SOURCE moet auto of custom zijn.</translation>
+    </message>
+    <message>
+        <location line="-284"/>
+        <source>should be a positive number of bytes!...</source>
+        <translation>moet een positief aantal bytes zijn!...</translation>
+    </message>
+    <message>
+        <location line="-697"/>
+        <source>## Added to your configuration file, kept here</source>
+        <translation>## Toegevoegd aan uw configuratiebestand, hier bewaard</translation>
+    </message>
+    <message>
+        <location line="+90"/>
+        <source>&apos;%1&apos; was edited while ngPost was running; taken from your file: %2.</source>
+        <translation>&apos;%1&apos; is gewijzigd terwijl ngPost liep; overgenomen uit uw bestand: %2.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Also edited in &apos;%1&apos; and kept there, but used only after a restart: %2.</source>
+        <translation>Ook gewijzigd in &apos;%1&apos; en daar bewaard, maar pas na een herstart gebruikt: %2.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Kept in &apos;%1&apos; as they are, unused by ngPost: %2.</source>
+        <translation>Onveranderd bewaard in &apos;%1&apos;, niet gebruikt door ngPost: %2.</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Edited both in &apos;%1&apos; and in ngPost, which keeps its own value and drops yours: %2.</source>
+        <translation>Zowel in &apos;%1&apos; als in ngPost gewijzigd; ngPost houdt zijn eigen waarde en laat de uwe vallen: %2.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Dropped by this save of &apos;%1&apos;, because a [server] section holds them now: %2.</source>
+        <translation>Weggelaten bij dit opslaan van &apos;%1&apos;, omdat een [server]-sectie ze nu bevat: %2.</translation>
+    </message>
+    <message>
+        <location line="+989"/>
         <source>VPN: migrated legacy VPN_CONFIG_PATH into profile &apos;Default&apos;</source>
         <translation>VPN: het oude VPN_CONFIG_PATH is overgezet naar het profiel &apos;Default&apos;</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+88"/>
         <source>Syntax: </source>
         <translation>Syntax: </translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+6"/>
         <source>you can provide servers in one string using -S and/or split the parameters for ONE SINGLE server (this will overwrite the configuration file)</source>
         <translation>Je  kunt servers in één string aanbieden met -S en / of de parameters voor ÉÉN ENIGE server splitsen (dit zal het configuratiebestand overschrijven)</translation>
     </message>
@@ -3240,17 +3787,17 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>Migratie mislukt: de oude configuratie &apos;%1&apos; kon niet naar &apos;%2&apos; worden gekopieerd.</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+26"/>
         <source>Using default config file: %1</source>
         <translation>Standaardconfiguratiebestand gebruiken: %1</translation>
     </message>
     <message>
-        <location line="+119"/>
+        <location line="+132"/>
         <source>History: could not remove the canceled post %1: %2</source>
         <translation>Geschiedenis: de geannuleerde post %1 kon niet worden verwijderd: %2</translation>
     </message>
     <message>
-        <location line="+72"/>
+        <location line="+79"/>
         <source># ngPost configuration file</source>
         <translation># ngPost-configuratiebestand</translation>
     </message>
@@ -3260,7 +3807,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## Taal voor de app. Momenteel ondersteund: EN, FR, ES, DE, NL, PT, ZH</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+38"/>
         <source>## here is the list of the available variables</source>
         <translation>## hier is de lijst met beschikbare variabelen</translation>
     </message>
@@ -3275,7 +3822,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>een van uw eigen velden (--post_meta, of --meta om het ook te publiceren)</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+20"/>
         <source>## write a post info file next to the nzb after each post</source>
         <translation>## na elke post een infobestand naast de nzb schrijven</translation>
     </message>
@@ -3350,7 +3897,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## meegegeven aan een post-commando; __rarPass__ in de argumenten werkt nog steeds</translation>
     </message>
     <message>
-        <location line="-80"/>
+        <location line="-98"/>
         <source>## use Proxy (only Socks5 type!)</source>
         <translation>## gebruik Proxy (alleen Socks5-type!)</translation>
     </message>
@@ -3385,22 +3932,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## je zou in plaats daarvan elk script kunnen gebruiken (zoals een mail sturen ...)</translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>#SHUTDOWN_CMD = shutdown /s /f /t 0  (Windows)</source>
-        <translation>#SHUTDOWN_CMD = shutdown /s /f /t 0  (Windows)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>#SHUTDOWN_CMD = sudo -n /sbin/poweroff  (Linux, make sure poweroff has sudo rights without any password or change the command)</source>
-        <translation>#SHUTDOWN_CMD = sudo -n / sbin / poweroff  (Linux, zorg ervoor dat poweroff sudo-rechten heeft zonder wachtwoord of wijzigt de opdracht)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>#SHUTDOWN_CMD = sudo -n shutdown -h now (MacOS, same make sure you&apos;ve sudo rights)</source>
-        <translation>#SHUTDOWN_CMD = sudo -n shutdown -h now (MacOS, zorgt er ook voor dat je sudo-rechten hebt)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
+        <location line="+12"/>
         <source>## upload the nzb to a specific URL</source>
         <translation>## upload de nzb naar een specifieke URL</translation>
     </message>
@@ -3415,7 +3947,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>#NZB_UPLOAD_URL = ftp:// user: pass@url_or_ip:21</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+9"/>
         <source>## execute a command or script at the end of each post (see examples)</source>
         <translation>## voer een commando of script uit aan het einde van elk bericht (zie voorbeelden)</translation>
     </message>
@@ -3425,14 +3957,34 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## je kunt verschillende post-commando&apos;s gebruiken door verschillende NZB_POST_CMD te definiëren</translation>
     </message>
     <message>
-        <location line="+176"/>
+        <location line="+174"/>
+        <source>## tunnel selected ngPost connections through an embedded VPN</source>
+        <translation>## geselecteerde ngPost-verbindingen door een ingebouwde VPN leiden</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>## CLI only: wait for the machine-wide VPN lease (0 fails immediately; range 0..1440)</source>
+        <translation>## alleen CLI: wachten op de machinebrede VPN-reservering (0 mislukt meteen; bereik 0..1440)</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>## VPN recovery attempts (0 = unlimited; range 0..1000)</source>
+        <translation>## VPN-herstelpogingen (0 = onbeperkt; bereik 0..1000)</translation>
+    </message>
+    <message>
+        <location line="+26"/>
+        <source>## disabling auto-resume still preserves unconfirmed articles as unknown</source>
+        <translation>## het uitschakelen van automatisch hervatten bewaart onbevestigde artikelen nog steeds als onbekend</translation>
+    </message>
+    <message>
+        <location line="+10"/>
         <source>## For GUI ONLY, save the logs in a file (to debug potential crashes)</source>
         <translation>## ALLEEN voor GUI, sla de logs op in een bestand (om mogelijke crashes te debuggen)</translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>## ~/ngPost.log on Linux and MacOS, in the executable folder for Windows</source>
-        <translation>## ~/ngPost.log op Linux en MacOS, in de uitvoerbare map voor Windows</translation>
+        <source>## ngPost.log is written in the ngPost configuration folder</source>
+        <translation>## ngPost.log wordt in de configuratiemap van ngPost geschreven</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -3445,7 +3997,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## =&gt; SAVE na een crash het logboek voordat je ngPost opnieuw start</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+16"/>
         <source>## Shortcut for automatic packing for both GUI and CMD using --pack</source>
         <translation>## Snelkoppeling voor automatisch inpakken voor zowel GUI als CMD met --pack</translation>
     </message>
@@ -3470,12 +4022,53 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation></translation>
     </message>
     <message>
-        <location line="-132"/>
+        <location line="-166"/>
         <source>## nzb files are normally all created in nzbPath</source>
         <translation>## nzb-bestanden worden normaal gesproken allemaal gemaakt in het nzb pad</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-902"/>
+        <source>Configuration: %1 is ignored because %2 = auto. Set %2 = custom to use this path.</source>
+        <translation>Configuratie: %1 wordt genegeerd omdat %2 = auto. Stel %2 = custom in om dit pad te gebruiken.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <location line="+31"/>
+        <source>Configuration: %1 = %2 is not an executable file. Posts that need this tool will stop before the transfer.</source>
+        <translation>Configuratie: %1 = %2 is geen uitvoerbaar bestand. Posts die deze tool nodig hebben, worden voor de overdracht gestopt.</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Configuration: %1 = %2 is not an executable file; ngPost uses %3, found automatically, instead.</source>
+        <translation>Configuratie: %1 = %2 is geen uitvoerbaar bestand; ngPost gebruikt in plaats daarvan het automatisch gevonden %3.</translation>
+    </message>
+    <message>
+        <location line="+86"/>
+        <source>Configuration: RAR_TOOL = %1 does not match RAR_PATH = %2; %3 is used.</source>
+        <translation>Configuratie: RAR_TOOL = %1 komt niet overeen met RAR_PATH = %2; %3 wordt gebruikt.</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Configuration: PAR2_ARGS_CUSTOM is written for another tool than %1, so the par2 step would fail. Comment that line out, or write it for %1.</source>
+        <translation>Configuratie: PAR2_ARGS_CUSTOM is voor een ander gereedschap dan %1 geschreven, dus de par2-stap zou mislukken. Zet die regel in commentaar of schrijf ze voor %1.</translation>
+    </message>
+    <message>
+        <location line="-922"/>
+        <source>Configuration: PAR2_TOOL = %1 is not installed here; ngPost uses %2 for this run: %3. The configuration keeps PAR2_TOOL = %1.</source>
+        <translation>Configuratie: PAR2_TOOL = %1 is hier niet geïnstalleerd; ngPost gebruikt %2 voor deze run: %3. De configuratie houdt PAR2_TOOL = %1.</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Configuration: PAR2_TOOL = %1: no executable was found. Install %1, select another PAR2_TOOL, or set PAR2_SOURCE = custom and PAR2_PATH to its executable (PAR2 Settings in the GUI).</source>
+        <translation>Configuratie: PAR2_TOOL = %1: geen uitvoerbaar bestand gevonden. Installeer %1, kies een ander PAR2_TOOL of stel PAR2_SOURCE = custom en PAR2_PATH naar het uitvoerbare bestand in (PAR2-instellingen in de interface).</translation>
+    </message>
+    <message>
+        <location line="+1322"/>
+        <source>Restricted &apos;%1&apos; to your account: it holds your credentials and was readable by other users of this machine</source>
+        <translation>&apos;%1&apos; is beperkt tot uw account: het bevat uw inloggegevens en was leesbaar voor andere gebruikers van deze machine</translation>
+    </message>
+    <message>
+        <location line="+337"/>
         <source>## but using this option, the nzb of each monitoring folder will be stored in their own folder (created in nzbPath)</source>
         <translation>## maar met deze optie wordt de nzb van elke gemonitorde map  opgeslagen in hun eigen map (gemaakt in nzbPath)</translation>
     </message>
@@ -3530,7 +4123,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## Archiefwachtwoorden opslaan in de gestructureerde geschiedenisdatabase</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+11"/>
         <source>## If you give several Groups (comma separated) you&apos;ve 3 policies for posting:</source>
         <translation>## Als je meerdere groepen opgeeft (gescheiden door komma&apos;s), heb je 3 beleidsregels om te posten:</translation>
     </message>
@@ -3610,7 +4203,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## /! \ VOORZICHTIG je zult je post niet terug vinden als je het nzb-bestand kwijtraakt/! \</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+6"/>
         <source>## remove accents and special characters from the nzb file names</source>
         <translation>## verwijder accenten en speciale tekens uit de nzb-bestandsnamen</translation>
     </message>
@@ -3621,26 +4214,16 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     </message>
     <message>
         <location line="+3"/>
-        <source>## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)</source>
-        <translation>## eenmaal per dag controleren op een nieuwe ngPost-versie op GitHub (Hydro74000/ngPost)</translation>
+        <source>## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start</source>
+        <translation>## bij elke start van de GUI op GitHub (Hydro74000/ngPost) controleren op een nieuwe ngPost-versie</translation>
     </message>
     <message>
-        <location line="+2"/>
-        <source>## (internal) last update check timestamp, epoch seconds — managed automatically</source>
-        <translation>## (intern) tijdstempel van de laatste updatecontrole, epoch-seconden — automatisch beheerd</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>## tunnel ngPost connections through an embedded VPN (Linux v1)</source>
-        <translation>## ngPost-verbindingen tunnelen via een ingebouwde VPN (Linux v1)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="+13"/>
         <source>## the VPN affects ngPost only; the rest of the system is unchanged</source>
         <translation>## de VPN beïnvloedt alleen ngPost; de rest van het systeem is ongewijzigd</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+14"/>
         <source>## when obfuscating file names, keep the .nfo extension visible</source>
         <translation>## bij verduistering van bestandsnamen, .nfo extensie zichtbaar houden</translation>
     </message>
@@ -3675,12 +4258,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>##net zolang totdat het netwerk terug is en het bericht correct is voltooid</translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>## you can disable this feature and thus stop a post when you loose the network</source>
-        <translation>## u kunt deze functie uitschakelen en dus een post stoppen wanneer u het netwerk verliest</translation>
-    </message>
-    <message>
-        <location line="+3"/>
+        <location line="+4"/>
         <source>## if there is no activity on a connection it will be closed and restarted</source>
         <translation>## als er geen activiteit is op een verbinding, wordt deze gesloten en opnieuw opgestart</translation>
     </message>
@@ -3695,7 +4273,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## wanneer meerdere berichten in de wachtrij staan, bereidt je het inpakken van de volgende post voor terwijl je de huidige uploadt</translation>
     </message>
     <message>
-        <location line="+34"/>
+        <location line="+40"/>
         <source>## use the same Password for all your Posts using compression</source>
         <translation>## gebruik hetzelfde wachtwoord voor alle rar bestanden die je gaat posten</translation>
     </message>
@@ -3716,12 +4294,11 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     </message>
     <message>
         <location line="+1"/>
-        <location line="+17"/>
         <source>## this is set for Linux environment, Windows users MUST change it</source>
         <translation>## dit is ingesteld voor Linux-omgeving, Windows-gebruikers MOETEN dit wijzigen</translation>
     </message>
     <message>
-        <location line="-13"/>
+        <location line="+4"/>
         <source>## temporary folder with size constraint, typically a tmpfs partition</source>
         <translation>## tijdelijke map met groottebeperking, meestal een tmpfs-partitie</translation>
     </message>
@@ -3751,17 +4328,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## min is 10% om zeker te zijn (dus 1.1), max 2.0</translation>
     </message>
     <message>
-        <location line="+4"/>
-        <source>## RAR or 7zip absolute file path (external application)</source>
-        <translation>## RAR of 7zip absoluut bestandspad (externe applicatie)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## /!\ The file MUST EXIST and BE EXECUTABLE /!\</source>
-        <translation>## /! \ Het bestand MOET BESTAAN en UITVOERBAAR zijn /! \</translation>
-    </message>
-    <message>
-        <location line="+4"/>
+        <location line="+16"/>
         <source>## RAR EXTRA options (the first &apos;a&apos; and &apos;-idp&apos; will be added automatically)</source>
         <translation>## RAR EXTRA opties (de eerste &apos;a&apos; en &apos;-idp&apos; worden automatisch toegevoegd)</translation>
     </message>
@@ -3781,9 +4348,9 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## u kunt het compressieniveau wijzigen, het archief vergrendelen, redundantie toevoegen ...</translation>
     </message>
     <message>
-        <location line="+5"/>
-        <source>## size in MB of the RAR volumes (0 by default meaning NO split)</source>
-        <translation>## grootte in MB van de RAR-volumes (0 betekent standaard GEEN splitsing)</translation>
+        <location line="+6"/>
+        <source>## RAR volume size in MiB (1 MiB = 1048576 bytes; 0 means no split without RAR_MAX)</source>
+        <translation>## grootte van RAR-volumes in MiB (1 MiB = 1048576 bytes; 0 betekent niet splitsen zonder RAR_MAX)</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -3791,62 +4358,52 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## voel je vrij om de waarde te veranderen of om commentaar te geven op de volgende regel als je het archief niet wilt splitsen</translation>
     </message>
     <message>
-        <location line="+3"/>
-        <source>## maximum number of archive volumes</source>
-        <translation>## maximum aantal archiefvolumes</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## we&apos;ll use RAR_SIZE except if it genereates too many volumes</source>
-        <translation>## we gebruiken de RAR_Grootte, behalve als het te veel volumes genereert</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## in that case we&apos;ll update rar_size to be &lt;size of post&gt; / rar_max</source>
-        <translation>## in dat geval updaten we rar_size naar &lt;size of post&gt; / rar_max</translation>
-    </message>
-    <message>
-        <location line="+3"/>
+        <location line="+8"/>
         <source>##  keep rar folder after posting (otherwise it is automatically deleted uppon successful post)</source>
         <translation>## rar map behouden na het posten (anders wordt het automatisch verwijderd bij een succesvolle post)</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+12"/>
         <source>## par2 redundancy percentage (0 by default meaning NO par2 generation)</source>
         <translation>## par2 redundantiepercentage (0 betekent standaard GEEN par2 generatie)</translation>
     </message>
     <message>
-        <location line="+3"/>
-        <source>## par2 (or alternative) absolute file path</source>
-        <translation>## par2 (of alternatief) absoluut bestandspad</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## this is only useful if you compile from source (as par2 is included on Windows and the AppImage)</source>
-        <translation>## dit is alleen handig als je compileert vanaf de bron (zoals par2 is opgenomen in Windows en de AppImage)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## or if you wish to use an alternative to par2 (for exemple Multipar on Windows)</source>
-        <translation>## of als je een alternatief voor par2 wilt gebruiken (bijvoorbeeld Multipar op Windows)</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>## (in that case, you may need to set also PAR2_ARGS)</source>
-        <translation>## (in dat geval moet je mogelijk ook PAR2_ARGS instellen)</translation>
-    </message>
-    <message>
-        <location line="+11"/>
+        <location line="+17"/>
         <source>## fixed parameters for the par2 (or alternative) command</source>
         <translation>## vaste parameters voor de par2 (of alternatieve) opdracht</translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>## you could for exemple use Multipar on Windows</source>
-        <translation>## je zou bijvoorbeeld Multipar op Windows kunnen gebruiken</translation>
+        <location line="+13"/>
+        <source>## the three lines below are for ParPar, par2cmdline and MultiPar, in that</source>
+        <translation>## de drie regels hieronder zijn voor ParPar, par2cmdline en MultiPar, in die</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+2"/>
+        <source>## order. Uncomment one as it is: everything after the = is passed to the</source>
+        <translation>## volgorde. Haal er één ongewijzigd uit commentaar: alles na de = gaat naar het</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>## tool, a note in parentheses included.</source>
+        <translation>## programma, ook een notitie tussen haakjes.</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>## PAR2 slice size in bytes, used by --check to weigh a loss against the</source>
+        <translation>## PAR2-blokgrootte in bytes, waarmee --check een verlies afweegt tegen de</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>## recovery blocks. Without it the check infers one and refuses to declare</source>
+        <translation>## herstelblokken. Zonder deze leidt de controle er een af en weigert ze</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>## a post beyond repair.</source>
+        <translation>## een post als onherstelbaar te verklaren.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
         <source>## length of the random generated archive&apos;s file name</source>
         <translation>## lengte van de willekeurig gegenereerde bestandsnaam van het archief</translation>
     </message>
@@ -3856,24 +4413,30 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>## lengte van het willekeurige wachtwoord</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+30"/>
         <source>## You can add as many server if you have several providers by adding other &quot;server&quot; sections</source>
         <translation>## Je kunt zoveel servers hebben als je wilt en  meerdere providers toevoegen door andere &quot;server&quot; secties toe te voegen</translation>
     </message>
     <message>
-        <location line="+36"/>
+        <location line="+97"/>
+        <source>Warning: &apos;%1&apos; holds your credentials but could not be restricted to you; anyone with an account on this machine may be able to read it</source>
+        <translation>Waarschuwing: &apos;%1&apos; bevat uw inloggegevens maar kon niet tot uw account worden beperkt; iedereen met een account op deze machine kan het mogelijk lezen</translation>
+    </message>
+    <message>
+        <location line="+5"/>
         <source>the config &apos;%1&apos; file has been updated</source>
         <translation>het configuratie bestand %1  is bijgewerkt</translation>
     </message>
     <message>
-        <location line="-7"/>
-        <location line="+4"/>
-        <location line="+6"/>
+        <location line="-54"/>
+        <location line="+24"/>
+        <location line="+12"/>
+        <location line="+5"/>
         <source>Error: Couldn&apos;t write default configuration file: %1</source>
         <translation>Fout: kan standaard configuratie bestand niet schrijven: %1</translation>
     </message>
     <message>
-        <location filename="../NgPost.h" line="+1104"/>
+        <location filename="../NgPost.h" line="+1405"/>
         <source>PACKing auto using: %1</source>
         <translation>Automatisch inpakken met: %1</translation>
     </message>
@@ -3932,11 +4495,65 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <source>If you&apos;d like to translate ngPost in your language, it&apos;s easy, please contact me at Matthieu.Bruel@gmail.com</source>
         <translation>Als je ngPost in je eigen taal wilt vertalen, neem dan contact met me op via Matthieu.Bruel@gmail.com</translation>
     </message>
+    <message>
+        <location filename="../NgPost.cpp" line="-5995"/>
+        <source>rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)</source>
+        <translation>hernoem de invoerbestanden met een willekeurige naam vóór het comprimeren, zodat het archief de oorspronkelijke naam niet bevat (te gebruiken met --compress)</translation>
+    </message>
+    <message>
+        <location line="+2892"/>
+        <source>Do file name obfuscation (the input files are renamed before compression)
+</source>
+        <translation>Bestandsnaamobfuscatie (de invoerbestanden worden hernoemd vóór het comprimeren)
+</translation>
+    </message>
+    <message>
+        <location line="+2758"/>
+        <source>## &apos;filename&apos; renames the input files with a random name before compressing</source>
+        <translation>## &apos;filename&apos; hernoemt de invoerbestanden willekeurig vóór het comprimeren, zodat</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>## them, so the archive carries no original name. Both can be asked at once.</source>
+        <translation>## het archief geen oorspronkelijke naam bevat. Beide kunnen tegelijk.</translation>
+    </message>
+    <message>
+        <location line="-2520"/>
+        <location line="+1234"/>
+        <source>RAR_MAX must be a positive integer no greater than 2147483647.</source>
+        <translation>RAR_MAX moet een positief geheel getal van maximaal 2147483647 zijn.</translation>
+    </message>
+    <message>
+        <location line="+371"/>
+        <source>PAR2_TOOL must be auto, parpar, par2cmdline or multipar.</source>
+        <translation>PAR2_TOOL moet auto, parpar, par2cmdline of multipar zijn.</translation>
+    </message>
+    <message>
+        <location line="+1053"/>
+        <location line="+39"/>
+        <source>## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.</source>
+        <translation>## Automatische paden gebruiken het gekozen hulpmiddel uit de huidige bundel of het systeem. Aangepaste paden moeten naar een uitvoerbaar bestand verwijzen.</translation>
+    </message>
+    <message>
+        <location line="-23"/>
+        <source>## Optional maximum number of archive volumes; commented means no limit.</source>
+        <translation>## Optioneel maximumaantal volumes; een uitgeschakelde regel betekent geen limiet.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>## When enabled, this limit takes priority over RAR_SIZE if a larger volume size is needed.</source>
+        <translation>## Indien ingeschakeld krijgt deze limiet voorrang op RAR_SIZE als grotere volumes nodig zijn.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
+        <translation>## De grootte wordt berekend uit de bronnen met afronding; RAR_SIZE wordt niet herschreven.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
     <message>
-        <location filename="../NntpCheckCon.cpp" line="+77"/>
+        <location filename="../NntpCheckCon.cpp" line="+86"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>Server &apos;%1&apos; moet door het VPN maar de tunnel is niet verbonden</translation>
     </message>
@@ -3946,7 +4563,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>VPN-bind op %1 mislukt: %2 (voor Qt zichtbare lokale adressen: %3)</translation>
     </message>
     <message>
-        <location line="+48"/>
+        <location line="+50"/>
         <source>VPN DNS lookup failed for %1 via %2: %3 — falling back to system DNS</source>
         <translation>VPN-DNS-opzoeking voor %1 via %2 mislukt: %3 — terugval op de DNS van het systeem</translation>
     </message>
@@ -3956,33 +4573,58 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>onbekende fout</translation>
     </message>
     <message>
-        <location line="+38"/>
+        <location line="+54"/>
         <location line="+10"/>
         <source>[Con #%1] Connected</source>
         <translation>[Con #%1] Verbonden</translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+19"/>
+        <source>[Con #%1] %2:%3 stopped answering after %4 s, dropping the connection</source>
+        <translation>[Verb. #%1] %2:%3 reageert niet meer na %4 s, de verbinding wordt verbroken</translation>
+    </message>
+    <message>
+        <location line="+34"/>
+        <source>[Con #%1] reconnecting (attempt %2 of %3)</source>
+        <translation>[Verb. #%1] opnieuw verbinden (poging %2 van %3)</translation>
+    </message>
+    <message>
+        <location line="+34"/>
         <source>[Connection #%1] Error connecting to server %2:%3</source>
         <translation>[Verbinding #%1]  Fout bij verbinden met server %2:%3</translation>
     </message>
     <message>
-        <location line="+22"/>
+        <location line="+16"/>
+        <source>[Connection #%1] The configured user for %2:%3 contains a line break and cannot be sent</source>
+        <translation>[Verbinding #%1] De ingestelde gebruiker voor %2:%3 bevat een regeleinde en kan niet worden verzonden</translation>
+    </message>
+    <message>
+        <location line="+14"/>
         <source>[Connection #%1] Error sending user &apos;%4&apos; to server %2:%3</source>
         <translation>[Verbinding #%1]  Fout bij het verzenden van gebruiker %4  naar server %2:%3</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+13"/>
+        <source>[Connection #%1] The configured password for %2:%3 contains a line break and cannot be sent</source>
+        <translation>[Verbinding #%1] Het ingestelde wachtwoord voor %2:%3 bevat een regeleinde en kan niet worden verzonden</translation>
+    </message>
+    <message>
+        <location line="+12"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
         <translation>[Verbinding #%1] Authenticatiefout bij server %2:%3 met gebruiker &apos;%4&apos;</translation>
     </message>
     <message>
-        <location line="+50"/>
+        <location line="+59"/>
+        <source>[Con #%1] Refusing to send a malformed article id</source>
+        <translation>[Con #%1] Verzenden van een ongeldig artikel-id geweigerd</translation>
+    </message>
+    <message>
+        <location line="+10"/>
         <source>[Con #%1] Checking article %2</source>
         <translation>[Con #%1] Artikel %2 wordt gecontroleerd</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+17"/>
         <source>[Con #%1] No more Article</source>
         <translation>[Con #%1] Geen artikel meer</translation>
     </message>
@@ -3990,7 +4632,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
 <context>
     <name>NntpConnection</name>
     <message>
-        <location filename="../NntpConnection.cpp" line="+132"/>
+        <location filename="../NntpConnection.cpp" line="+143"/>
         <source>Server &apos;%1&apos; must route through the VPN but the tunnel is not connected</source>
         <translation>Server &apos;%1&apos; moet door het VPN maar de tunnel is niet verbonden</translation>
     </message>
@@ -4015,44 +4657,35 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>verbinding afgebroken voor de serverbevestiging</translation>
     </message>
     <message>
-        <location line="+40"/>
-        <source>Article FAIL2: %1 (on %2)</source>
-        <translation>Artikel FAIL2:%1 (op%2)</translation>
-    </message>
-    <message>
-        <location line="+12"/>
+        <location line="+67"/>
         <source>connection closed before server confirmation</source>
         <translation>verbinding gesloten voor de serverbevestiging</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+28"/>
         <source>Connection lost, trying to reconnect! (nb disconnected: %1)</source>
         <translation>Verbinding verbroken, probeer opnieuw verbinding te maken! (nb verbroken: %1)</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+2"/>
+        <source>Remote connection closed</source>
+        <translation>Verbinding op afstand gesloten</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+8"/>
         <source>connection lost before server confirmation</source>
         <translation>verbinding verloren voor de serverbevestiging</translation>
     </message>
     <message>
-        <location line="+10"/>
-        <source>Article FAIL3: %1 (on %2)</source>
-        <translation>Artikel FAIL3:%1 (op%2)</translation>
-    </message>
-    <message>
-        <location line="+8"/>
-        <source>Closing connection, Failed Article: %1</source>
-        <translation>Verbinding verbreken, artikel mislukt:%1</translation>
-    </message>
-    <message>
-        <location line="+98"/>
+        <location line="+125"/>
         <source>Closing Connection due to ERROR on post command: &apos;%2&apos; (%1 skipped)
 </source>
         <translation>Verbinding verbroken vanwege FOUT bij postopdracht: &apos;%2&apos; (%1  overgeslagen)
 </translation>
     </message>
     <message>
-        <location line="+27"/>
+        <location line="+30"/>
         <source>POSTED: %1</source>
         <translation>POSTED: %1</translation>
     </message>
@@ -4062,17 +4695,17 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>Geplaatst artikel: %1 (op%2) %3</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+9"/>
         <source>Error on posting article %1: %2</source>
         <translation>Fout bij het posten van artikel %1: %2</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+7"/>
         <source>ReTry %1 (Error: &apos;%2&apos;)</source>
         <translation>Probeer opnieuw %1 (Fout: &apos;%2&apos;)</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+3"/>
         <source>FAIL posting %1 (Error: &apos;%2&apos;)</source>
         <translation>Probeer opnieuw %1 (Error: &apos;%2&apos;)</translation>
     </message>
@@ -4082,22 +4715,32 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>Artikel FAIL:%1 (op%2) %3</translation>
     </message>
     <message>
-        <location line="+27"/>
+        <location line="+31"/>
         <source>[Connection #%1] Error connecting to server %2:%3</source>
         <translation>[Verbinding #%1]  Fout bij verbinden met server %2:%3</translation>
     </message>
     <message>
-        <location line="+35"/>
+        <location line="+20"/>
+        <source>[Connection #%1] The configured user for %2:%3 contains a line break and cannot be sent</source>
+        <translation>[Verbinding #%1] De ingestelde gebruiker voor %2:%3 bevat een regeleinde en kan niet worden verzonden</translation>
+    </message>
+    <message>
+        <location line="+28"/>
         <source>[Connection #%1] Error sending user &apos;%4&apos; to server %2:%3</source>
         <translation>[Verbinding #%1]  Fout bij het verzenden van gebruiker %4  naar server %2:%3</translation>
     </message>
     <message>
-        <location line="+30"/>
+        <location line="+17"/>
+        <source>[Connection #%1] The configured password for %2:%3 contains a line break and cannot be sent</source>
+        <translation>[Verbinding #%1] Het ingestelde wachtwoord voor %2:%3 bevat een regeleinde en kan niet worden verzonden</translation>
+    </message>
+    <message>
+        <location line="+26"/>
         <source>[Connection #%1] Error authentication to server %2:%3 with user &apos;%4&apos;</source>
         <translation>[Verbinding #%1] Authenticatiefout bij server %2:%3 met gebruiker &apos;%4&apos;</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+37"/>
         <source>start sending article: %1</source>
         <translation>begin met verzenden van artikel:%1</translation>
     </message>
@@ -4105,17 +4748,47 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
 <context>
     <name>NzbCheck</name>
     <message>
-        <location filename="../NzbCheck.cpp" line="+51"/>
+        <location filename="../NzbCheck.cpp" line="+136"/>
+        <source>there is nothing left to rebuild it with</source>
+        <translation>er is niets meer om het mee te herstellen</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>the loss is already beyond what the PAR2 blocks can repair</source>
+        <translation>het verlies overtreft al wat de PAR2-blokken kunnen herstellen</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Stopped after %1 of the %2 article(s) listed in the nzb: %3, so checking the rest would not change the answer. Pass --%4 to check everything anyway.</source>
+        <translation>Gestopt na %1 van de %2 artikelen in de nzb: %3, het controleren van de rest zou het antwoord niet veranderen. Gebruik --%4 om toch alles te controleren.</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>ERROR: check FAILED - not one of the %1 article(s) listed in the nzb could be verified. Every connection was refused or dropped: check the credentials, and whether another program is already using all the connections allowed on the server(s).</source>
+        <translation>FOUT: controle MISLUKT – geen enkel van de %1 artikelen in de nzb kon worden geverifieerd. Elke verbinding werd geweigerd of verbroken: controleer de inloggegevens en of een ander programma al alle op de server(s) toegestane verbindingen gebruikt.</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>ERROR: check INCOMPLETE - only %1 of the %2 article(s) listed in the nzb were verified. Some connections failed (the server&apos;s connection limit may have been reached). The missing-article count below is NOT reliable.</source>
+        <translation>FOUT: controle ONVOLLEDIG – slechts %1 van de %2 artikelen in de nzb zijn geverifieerd. Sommige verbindingen mislukten (mogelijk is de verbindingslimiet van de server bereikt). Het onderstaande aantal ontbrekende artikelen is NIET betrouwbaar.</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>Nb Missing Article(s): at least %1/%2 (stopped early after %3 (%4 sec) using %5 connections on %6 server(s))</source>
+        <translation>Aantal ontbrekende artikelen: minstens %1/%2 (vroegtijdig gestopt na %3 (%4 s) met %5 verbindingen op %6 server(s))</translation>
+    </message>
+    <message>
+        <location line="+2"/>
         <source>Nb Missing Article(s): %1/%2 (check done in %3 (%4 sec) using %5 connections on %6 server(s))</source>
         <translation>Aantal ontbrekende artikel (en): %1/%2 (controle gedaan in %3 (%4 sec) met %5 verbindingen op %6 server (s))</translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+40"/>
         <source> missing: </source>
         <translation> ontbrekend: </translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+139"/>
         <source>The file &apos;%1&apos; has %2 articles in the nzb (expected: %3)</source>
         <translation>Het bestand &apos;%1&apos; bevat %2 artikelen in de nzb (verwacht: %3)</translation>
     </message>
@@ -4125,22 +4798,172 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>-%1 ontbrekende artikel(en) in nzb voor &apos;%2&apos;</translation>
     </message>
     <message>
-        <location line="+28"/>
-        <source>%1 has %2 articles</source>
-        <translation>%1 heeft %2 artikelen</translation>
+        <location line="+40"/>
+        <source>- rejected a malformed article id in &apos;%1&apos; (nzb line %2); it cannot be checked</source>
+        <translation>- ongeldig artikel-id geweigerd in &apos;%1&apos; (nzb-regel %2); het kan niet worden gecontroleerd</translation>
+    </message>
+    <message>
+        <location line="+40"/>
+        <source>%1 has %2 articles (%3 data, %4 par2 in %5 volume(s))</source>
+        <translation>%1 heeft %2 artikelen (%3 data, %4 par2 in %5 volume(s))</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>WARNING: this nzb carries no PAR2 file - nothing can be repaired</source>
+        <translation>WAARSCHUWING: deze nzb bevat geen PAR2-bestand – er kan niets worden hersteld</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>PAR2 recovery blocks: %1</source>
+        <translation>PAR2-herstelblokken: %1</translation>
+    </message>
+    <message>
+        <location line="+73"/>
+        <source>ERROR: check INCONCLUSIVE - %1</source>
+        <translation>FOUT: controle NIET SLUITEND – %1</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>guessed from the article size</source>
+        <translation>afgeleid uit de artikelgrootte</translation>
+    </message>
+    <message>
+        <location line="+240"/>
+        <source>=== Recovery analysis ===</source>
+        <translation>=== Herstelanalyse ===</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>  Data articles: %1 (missing: %2)</source>
+        <translation>  Data-artikelen: %1 (ontbrekend: %2)</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>  PAR2 articles: %1 (missing: %2)</source>
+        <translation>  PAR2-artikelen: %1 (ontbrekend: %2)</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>  No PAR2 file: nothing can be repaired</source>
+        <translation>  Geen PAR2-bestand: er kan niets worden hersteld</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>  Recovery blocks: %1 of %2 still usable</source>
+        <translation>  Herstelblokken: %1 van %2 nog bruikbaar</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Recovery blocks: %1 guaranteed, %2 likely, %3 at best, of %4</source>
+        <translation>  Herstelblokken: %1 gegarandeerd, %2 waarschijnlijk, %3 hooguit, van %4</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>  Redundancy: %1% of the source slices can be rebuilt (%2% when it was posted)</source>
+        <translation>  Redundantie: %1 % van de bronblokken kan worden hersteld (%2 % bij het plaatsen)</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>  Redundancy: %1% of source slices guaranteed, %2% likely, %3% at best (%4% when posted)</source>
+        <translation>  Redundantie: %1 % van de bronblokken gegarandeerd, %2 % waarschijnlijk, %3 % hooguit (%4 % bij het plaatsen)</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>  PAR2 metadata: the conventional base index was verified in full, but STAT cannot prove which packets it contains</source>
+        <translation>  PAR2-metagegevens: de gebruikelijke basisindex is volledig geverifieerd, maar STAT kan niet bewijzen welke pakketten hij bevat</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>  PAR2 metadata: not proven by the nzb. Recovery volumes are not required to repeat the vital packets, even when intact</source>
+        <translation>  PAR2-metagegevens: niet bewezen door de nzb. Herstelvolumes hoeven de vitale pakketten niet te herhalen, zelfs niet wanneer ze intact zijn</translation>
     </message>
     <message>
         <location line="+7"/>
+        <source>  Damaged blocks: at least %1, with no upper bound - the nzb does not provide enough trustworthy file and segment sizes</source>
+        <translation>  Beschadigde blokken: minstens %1, zonder bovengrens – de nzb levert niet genoeg betrouwbare bestands- en segmentgroottes</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Damaged blocks: %1 to %2, depending on article and slice layout (block size: %3 bytes, %4)</source>
+        <translation>  Beschadigde blokken: %1 tot %2, afhankelijk van de artikel- en blokindeling (blokgrootte: %3 bytes, %4)</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>declared</source>
+        <translation>opgegeven</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>  The slice size was inferred, not read, so this analysis will not declare the post dead. Pass --par2_block_size to get a firm answer.</source>
+        <translation>  De blokgrootte is afgeleid, niet gelezen, dus deze analyse verklaart de post niet verloren. Gebruik --par2_block_size voor een sluitend antwoord.</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>  Assumes every non-PAR2 file is covered by the recovery set. A file added after the PAR2 files were built -- a .nfo kept visible, for instance -- is not, and a loss there cannot be repaired.</source>
+        <translation>  Gaat ervan uit dat elk niet-PAR2-bestand door de herstelset wordt gedekt. Een bestand dat is toegevoegd nadat de PAR2-bestanden zijn gemaakt – bijvoorbeeld een zichtbaar gehouden .nfo – valt daarbuiten, en verlies daar is niet te herstellen.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>  Verdict: COMPLETE - no data article is missing</source>
+        <translation>  Oordeel: VOLLEDIG – er ontbreekt geen enkel data-artikel</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>  Warning: %1% of the recovery blocks are gone; the data is intact today but it is less protected than it was</source>
+        <translation>  Waarschuwing: %1 % van de herstelblokken is verdwenen; de data is vandaag intact maar minder beschermd dan voorheen</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Warning: %1% to %2% of the recovery blocks may be gone (%3% likely); the data is intact today but less protected</source>
+        <translation>  Waarschuwing: %1 % tot %2 % van de herstelblokken kan verdwenen zijn (%3 % waarschijnlijk); de data is vandaag intact maar minder beschermd</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>  Verdict: PROBABLY RECOVERABLE - the remaining blocks cover the loss, and the conventional base index is available, but STAT cannot verify its vital packets. Try the repair</source>
+        <translation>  Oordeel: WAARSCHIJNLIJK HERSTELBAAR – de resterende blokken dekken het verlies en de gebruikelijke basisindex is beschikbaar, maar STAT kan de vitale pakketten niet verifiëren. Probeer de reparatie</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>  Verdict: INDETERMINATE - the nzb does not expose enough packet and slice information to prove recovery or failure. Try the repair before re-posting</source>
+        <translation>  Oordeel: ONBEPAALD – de nzb biedt niet genoeg pakket- en blokinformatie om herstel of mislukking te bewijzen. Probeer de reparatie voordat u opnieuw plaatst</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>  Verdict: UNRECOVERABLE - the loss exceeds the remaining blocks even at best. This post has to be re-posted from the source</source>
+        <translation>  Oordeel: ONHERSTELBAAR – het verlies overtreft zelfs in het beste geval de resterende blokken. Deze post moet vanaf de bron opnieuw worden geplaatst</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Verdict: UNRECOVERABLE - data is missing and the nzb carries no PAR2 file to rebuild it with</source>
+        <translation>  Oordeel: ONHERSTELBAAR – er ontbreken gegevens en de nzb bevat geen PAR2-bestand om ze mee te herstellen</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Verdict: UNRECOVERABLE - the PAR2 files carry no recovery block at all, only the index; they can tell you what is broken, not mend it</source>
+        <translation>  Oordeel: ONHERSTELBAAR – de PAR2-bestanden bevatten helemaal geen herstelblok, alleen de index; ze kunnen zeggen wat kapot is, niet het repareren</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>  Verdict: UNRECOVERABLE - data is missing and every PAR2 volume lost every one of its articles</source>
+        <translation>  Oordeel: ONHERSTELBAAR – er ontbreken gegevens en elk PAR2-volume is al zijn artikelen kwijt</translation>
+    </message>
+    <message>
+        <location line="-463"/>
         <source>Error opening nzb file...</source>
         <translation>Fout bij openen nzb-bestand ...</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+20"/>
+        <source>the servers enabled for nzb checking have no positive connection count</source>
+        <translation>de voor nzb-controle ingeschakelde servers hebben geen positief aantal verbindingen</translation>
+    </message>
+    <message>
+        <location line="+28"/>
         <source>Using %1 Connections</source>
         <translation>%1 verbindingen gebruiken</translation>
     </message>
     <message>
-        <location filename="../NzbCheck.h" line="+135"/>
+        <location filename="../NzbCheck.h" line="+406"/>
         <source>+ Missing Article on server: </source>
         <translation>+ Ontbrekend artikel op server: </translation>
     </message>
@@ -4168,17 +4991,17 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>post had een archiefwachtwoord, maar het is niet opgeslagen</translation>
     </message>
     <message>
-        <location line="+22"/>
+        <location line="+39"/>
         <source>could not read the metadata of the post: %1</source>
         <translation>kon de metadata van de post niet lezen: %1</translation>
     </message>
     <message>
-        <location line="+38"/>
+        <location line="+47"/>
         <source>the stored article size is inconsistent with the post history; refusing to rebuild the NZB</source>
         <translation>de opgeslagen artikelgrootte komt niet overeen met de postgeschiedenis; de NZB wordt niet opnieuw opgebouwd</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+81"/>
         <source>file %1 contains unknown articles</source>
         <translation>bestand %1 bevat onbekende artikelen</translation>
     </message>
@@ -4193,12 +5016,17 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>voor bestand %1 ontbreken artikelrecords</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+3"/>
         <source>history for successful file %1 is incomplete; refusing to replace the NZB</source>
         <translation>de geschiedenis van het succesvol verwerkte bestand %1 is onvolledig; de NZB wordt niet vervangen</translation>
     </message>
     <message>
-        <location line="+39"/>
+        <location line="+17"/>
+        <source>file %1 has no confirmed article and is left out of the NZB</source>
+        <translation>bestand %1 heeft geen bevestigd artikel en wordt uit de NZB weggelaten</translation>
+    </message>
+    <message>
+        <location line="-60"/>
         <source>%1 article segment sizes were missing in history and rebuilt from file metadata</source>
         <translation>%1 artikelsegmentgroottes ontbraken in de geschiedenis en zijn opnieuw opgebouwd uit bestandsmetadata</translation>
     </message>
@@ -4206,83 +5034,166 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
 <context>
     <name>OpenVpnBackend</name>
     <message>
-        <location filename="../vpn/OpenVpnBackend.cpp" line="+96"/>
-        <location line="+29"/>
+        <location filename="../vpn/OpenVpnBackend.cpp" line="+165"/>
+        <location line="+42"/>
         <source>Config file not found or unreadable: %1</source>
         <translation>Configuratiebestand niet gevonden of niet leesbaar: %1</translation>
     </message>
     <message>
-        <location line="-22"/>
+        <location line="-25"/>
         <source>Native VPN integration is currently Linux/Windows-only. macOS support is in progress.</source>
         <translation>De ingebouwde VPN-integratie werkt voorlopig alleen op Linux en Windows. macOS-ondersteuning is in de maak.</translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="+40"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found. Install it under /var/lib/ngpost/ or run from the AppImage.</source>
         <translation>Het bevoorrechte hulpscript ngpost-vpn-helper.sh is niet gevonden. Installeer het onder /var/lib/ngpost/ of start vanuit de AppImage.</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+41"/>
         <source>Launching VPN helper: %1 %2</source>
         <translation>VPN-hulpprogramma wordt gestart: %1 %2</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+6"/>
         <source>Failed to start %1/helper</source>
         <translation>Kon %1/helper niet starten</translation>
     </message>
     <message>
-        <location line="+135"/>
+        <location line="+12"/>
+        <source>Failed to send credentials to the VPN helper</source>
+        <translation>Kon de inloggegevens niet naar het VPN-hulpprogramma sturen</translation>
+    </message>
+    <message>
+        <location line="+171"/>
+        <source>Waiting for VPN lease held by ngPost PID %1 (helper %2)</source>
+        <translation>Wachten op de VPN-reservering van ngPost PID %1 (hulpprogramma %2)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>VPN lease is held by ngPost PID %1 (helper %2)</source>
+        <translation>De VPN-reservering is in handen van ngPost PID %1 (hulpprogramma %2)</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>The installed VPN helper is version 1; update it before connecting.</source>
+        <translation>Het geïnstalleerde VPN-hulpprogramma is versie 1; werk het bij voordat u verbinding maakt.</translation>
+    </message>
+    <message>
+        <location line="+13"/>
         <source>Malformed READY from helper: %1</source>
         <translation>Misvormde READY van helper: %1</translation>
     </message>
     <message>
-        <location line="+18"/>
-        <source>helper exited (code %1) before tunnel was ready</source>
-        <translation>helper werd beëindigd (code %1) voordat de tunnel gereed was</translation>
+        <location line="+67"/>
+        <source>VPN helper crashed</source>
+        <translation>VPN-hulpprogramma is vastgelopen</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+1"/>
+        <source>VPN helper exited with code %1</source>
+        <translation>VPN-hulpprogramma afgesloten met code %1</translation>
+    </message>
+    <message>
+        <location line="+174"/>
+        <source>OpenVPN service: starting tunnel via %1 (management on loopback port %2)</source>
+        <translation>OpenVPN-service: tunnel starten via %1 (beheer op loopbackpoort %2)</translation>
+    </message>
+    <message>
+        <location line="+34"/>
+        <source>Could not connect to OpenVPN management on loopback port %1</source>
+        <translation>Kon geen verbinding maken met het OpenVPN-beheer op loopbackpoort %1</translation>
+    </message>
+    <message>
+        <location line="+71"/>
+        <source>Connected to openvpn management socket; authenticating</source>
+        <translation>Verbonden met de openvpn-beheersocket; bezig met verifiëren</translation>
+    </message>
+    <message>
+        <location line="+130"/>
+        <source>OpenVPN process exited</source>
+        <translation>OpenVPN-proces is afgesloten</translation>
+    </message>
+    <message>
+        <location line="-400"/>
         <source>pkexec/helper failed to start (binary missing or denied)</source>
         <translation>pkexec/helper kon niet starten (binair bestand ontbreekt of geweigerd)</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="-426"/>
+        <source>&apos;%1&apos; on line %2: %3</source>
+        <translation>&apos;%1&apos; op regel %2: %3</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>&apos;%1&apos;: %2</source>
+        <translation>&apos;%1&apos;: %2</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>This OpenVPN profile was refused because ngPost starts OpenVPN with system privileges and only hands it directives it has reviewed.
+
+%1
+
+Profile: %2</source>
+        <translation>Dit OpenVPN-profiel is geweigerd omdat ngPost OpenVPN met systeemrechten start en er alleen gecontroleerde directives aan doorgeeft.
+
+%1
+
+Profiel: %2</translation>
+    </message>
+    <message>
+        <location line="+421"/>
         <source>helper process crashed</source>
         <translation>helper-proces is gecrasht</translation>
     </message>
     <message>
-        <location line="+54"/>
+        <location line="+57"/>
         <source>OpenVPN backend already running</source>
         <translation>De OpenVPN-backend draait al</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+17"/>
+        <source>Could not allocate a loopback OpenVPN management port</source>
+        <translation>Kon geen loopback-beheerpoort voor OpenVPN toewijzen</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Could not secure the OpenVPN runtime directory</source>
+        <translation>Kon de OpenVPN-runtimemap niet beveiligen</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Could not create the OpenVPN management password file</source>
+        <translation>Kon het OpenVPN-beheerwachtwoordbestand niet aanmaken</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Could not write the OpenVPN management password file</source>
+        <translation>Kon het OpenVPN-beheerwachtwoordbestand niet schrijven</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Could not secure the OpenVPN management password file</source>
+        <translation>Kon het OpenVPN-beheerwachtwoordbestand niet beveiligen</translation>
+    </message>
+    <message>
+        <location line="+20"/>
         <source>Cannot reach OpenVPNServiceInteractive pipe. Open Services.msc, set &quot;OpenVPN Interactive Service&quot; to Automatic, and start it. If it is not present, re-run the ngPost setup with the OpenVPN Community option.</source>
         <translation>De pipe OpenVPNServiceInteractive is niet bereikbaar. Open Services.msc, zet &quot;OpenVPN Interactive Service&quot; op Automatisch en start hem. Ontbreekt hij, voer dan de ngPost-installatie opnieuw uit met de optie OpenVPN Community.</translation>
     </message>
     <message>
-        <location line="+24"/>
-        <source>OpenVPN service: starting tunnel via %1 (mgmt on 127.0.0.1:7505)</source>
-        <translation>OpenVPN-dienst: tunnel wordt gestart via %1 (beheer op 127.0.0.1:7505)</translation>
-    </message>
-    <message>
-        <location line="+5"/>
+        <location line="+31"/>
         <source>Failed to send startup data to OpenVPN service pipe</source>
         <translation>Kon de startgegevens niet naar de pipe van de OpenVPN-dienst sturen</translation>
     </message>
     <message>
-        <location line="+25"/>
-        <source>Could not connect to openvpn management on 127.0.0.1:7505</source>
-        <translation>Kon niet verbinden met openvpn-beheer op 127.0.0.1:7505</translation>
-    </message>
-    <message>
-        <location line="+36"/>
+        <location line="+64"/>
         <source>OpenVPN service: unparsable response (%1 bytes): %2</source>
         <translation>OpenVPN-dienst: onleesbaar antwoord (%1 bytes): %2</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+8"/>
         <source>OpenVPN service refused start (code 0x%1): %2</source>
         <translation>De OpenVPN-dienst weigerde te starten (code 0x%1): %2</translation>
     </message>
@@ -4291,15 +5202,382 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <source>OpenVPN service spawned openvpn.exe (%1)</source>
         <translation>De OpenVPN-dienst heeft openvpn.exe gestart (%1)</translation>
     </message>
+</context>
+<context>
+    <name>Par2Settings</name>
     <message>
-        <location line="+20"/>
-        <source>Connected to openvpn management socket</source>
-        <translation>Verbonden met de openvpn-beheersocket</translation>
+        <location filename="../par2/Par2Settings.cpp" line="+250"/>
+        <source>Block size must be a multiple of 4 bytes, below 2 GiB.</source>
+        <translation>De blokgrootte moet een veelvoud van 4 bytes zijn en kleiner dan 2 GiB.</translation>
     </message>
     <message>
-        <location line="+95"/>
-        <source>openvpn exited before the tunnel was ready</source>
-        <translation>openvpn is gestopt voordat de tunnel gereed was</translation>
+        <location line="+2"/>
+        <source>The source block count must be between 1 and 32768.</source>
+        <translation>Het aantal bronblokken moet tussen 1 en 32768 liggen.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Choose a positive volume size below the tool&apos;s limit.</source>
+        <translation>Kies een positieve volumegrootte onder de limiet van het hulpmiddel.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>The recovery volume count must be between 1 and 65535.</source>
+        <translation>Het aantal herstelvolumes moet tussen 1 en 65535 liggen.</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>par2cmdline creates at most 31 recovery volumes.</source>
+        <translation>par2cmdline maakt maximaal 31 herstelbestanden.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>This combination is not supported by par2cmdline.</source>
+        <translation>Deze combinatie wordt niet ondersteund door par2cmdline.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Decimal distribution requires MultiPar.</source>
+        <translation>Decimale verdeling vereist MultiPar.</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>MultiPar supports a volume count only with equal distribution.</source>
+        <translation>MultiPar ondersteunt een volumeaantal alleen bij gelijke verdeling.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>CPU or memory setting exceeds the tool&apos;s supported range.</source>
+        <translation>De CPU- of geheugeninstelling valt buiten het ondersteunde bereik.</translation>
+    </message>
+    <message>
+        <location line="-6"/>
+        <source>MultiPar size targets must be below 2 GB (2000000000 bytes). Use custom arguments for limits expressed in blocks.</source>
+        <translation>De gewenste grootte voor MultiPar moet kleiner zijn dan 2 GB (2000000000 bytes). Gebruik aangepaste argumenten voor limieten in blokken.</translation>
+    </message>
+</context>
+<context>
+    <name>Par2SettingsDialog</name>
+    <message>
+        <location filename="../hmi/Par2SettingsDialog.cpp" line="+82"/>
+        <location line="+377"/>
+        <source>indeterminate</source>
+        <translation>onbepaald</translation>
+    </message>
+    <message>
+        <location line="-365"/>
+        <source>PAR2 Settings</source>
+        <translation>PAR2-instellingen</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Global settings for future posts. Each post can override the redundancy percentage; queued posts keep their settings.</source>
+        <translation>Globale instellingen voor toekomstige posts. Elke post kan het redundantiepercentage aanpassen; posts in de wachtrij behouden hun instellingen.</translation>
+    </message>
+    <message>
+        <location line="+398"/>
+        <location line="+39"/>
+        <location line="+15"/>
+        <location line="+37"/>
+        <location line="+16"/>
+        <location line="+3"/>
+        <source>Automatic</source>
+        <translation>Automatisch</translation>
+    </message>
+    <message>
+        <location line="-102"/>
+        <source>Tool:</source>
+        <translation>Hulpmiddel:</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>Default redundancy:</source>
+        <translation>Standaardredundantie:</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Limit to the largest source file</source>
+        <translation>Beperken tot het grootste bronbestand</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Target maximum size</source>
+        <translation>Gewenste maximumgrootte</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Number of recovery volumes</source>
+        <translation>Aantal herstelvolumes</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+62"/>
+        <source>Recovery volumes:</source>
+        <translation>Herstelvolumes:</translation>
+    </message>
+    <message>
+        <location line="-54"/>
+        <source>Target size:</source>
+        <translation>Gewenste grootte:</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Equal</source>
+        <translation>Gelijk</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Uniform</source>
+        <translation>Gelijkmatig</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Powers of two</source>
+        <translation>Machten van twee</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Decimal weights</source>
+        <translation>Decimale gewichten</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Distribution:</source>
+        <translation>Verdeling:</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Sizes are targets for recovery data. PAR2 metadata can make the final files larger. par2cmdline&apos;s native limit follows the largest source file.</source>
+        <translation>De groottes gelden voor herstelgegevens. PAR2-metagegevens kunnen bestanden groter maken. De standaardlimiet van par2cmdline volgt het grootste bronbestand.</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Automatic (default device)</source>
+        <translation>Automatisch (standaardapparaat)</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>OpenCL device:</source>
+        <translation>OpenCL-apparaat:</translation>
+    </message>
+    <message>
+        <location line="-470"/>
+        <source>Advanced</source>
+        <translation>Geavanceerd</translation>
+    </message>
+    <message>
+        <location line="+100"/>
+        <location line="+380"/>
+        <source>Exact block size</source>
+        <translation>Exacte blokgrootte</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Target source block count</source>
+        <translation>Gewenst aantal bronblokken</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Blocks:</source>
+        <translation>Blokken:</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source> bytes</source>
+        <translation> bytes</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Block size:</source>
+        <translation>Blokgrootte:</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Source blocks:</source>
+        <translation>Bronblokken:</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>CPU threads:</source>
+        <translation>CPU-threads:</translation>
+    </message>
+    <message>
+        <location line="-40"/>
+        <source>Enable GPU acceleration</source>
+        <translation>GPU-versnelling inschakelen</translation>
+    </message>
+    <message>
+        <location line="+45"/>
+        <source>Use custom arguments</source>
+        <translation>Aangepaste argumenten gebruiken</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Custom arguments are kept verbatim; changing tools does not translate them. The post&apos;s redundancy overrides recognized redundancy arguments. Output and input paths are supplied by ngPost.</source>
+        <translation>Aangepaste argumenten blijven ongewijzigd; wisselen van hulpmiddel vertaalt ze niet. De redundantie van de post vervangt herkende redundantieargumenten. ngPost voegt invoer- en uitvoerpaden toe.</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Arguments:</source>
+        <translation>Argumenten:</translation>
+    </message>
+    <message>
+        <location line="-501"/>
+        <location line="+268"/>
+        <source>Prepare a post to display an estimate.</source>
+        <translation>Bereid een post voor om een schatting te tonen.</translation>
+    </message>
+    <message>
+        <location line="-2"/>
+        <location line="+334"/>
+        <source>Reading source sizes…</source>
+        <translation>Brongroottes worden gelezen…</translation>
+    </message>
+    <message>
+        <location line="-505"/>
+        <location line="+28"/>
+        <source>This par2cmdline build does not support thread selection.</source>
+        <translation>Deze par2cmdline-build ondersteunt geen keuze van het aantal threads.</translation>
+    </message>
+    <message>
+        <location line="-26"/>
+        <source>Memory (eighths of free RAM):</source>
+        <translation>Geheugen (achtsten van vrij RAM):</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Memory (MiB):</source>
+        <translation>Geheugen (MiB):</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>GPU acceleration is not supported by par2cmdline. Disable it before changing tools.</source>
+        <translation>par2cmdline ondersteunt geen GPU-versnelling. Schakel deze uit voordat u van hulpmiddel wisselt.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>No OpenCL device was found: ParPar would fail and abort the post. Disable GPU acceleration or install an OpenCL driver.</source>
+        <translation>Geen OpenCL-apparaat gevonden: ParPar zou mislukken en de post zou worden afgebroken. Schakel GPU-versnelling uit of installeer een OpenCL-stuurprogramma.</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>The selected executable is unavailable. Select an installed tool or Automatic.</source>
+        <translation>Het geselecteerde programma is niet beschikbaar. Kies een geïnstalleerd hulpmiddel of Automatisch.</translation>
+    </message>
+    <message>
+        <location line="+49"/>
+        <source>Checking executable…</source>
+        <translation>Programma wordt gecontroleerd…</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <location line="+6"/>
+        <location line="+39"/>
+        <location line="+9"/>
+        <location line="+18"/>
+        <source>The executable could not be checked.</source>
+        <translation>Het programma kon niet worden gecontroleerd.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>No OpenCL device is installed on this machine.</source>
+        <translation>Op deze machine is geen OpenCL-apparaat geïnstalleerd.</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>GPU details are available in the device selector tooltip; a device name or platform:device ID can also be entered.</source>
+        <translation>GPU-details staan in de tooltip van de selector; u kunt ook een apparaatnaam of platform:apparaat-ID invoeren.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Estimate unavailable: some source sizes could not be read.</source>
+        <translation>Geen schatting: sommige brongroottes konden niet worden gelezen.</translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>Estimate unavailable: too many source volumes.</source>
+        <translation>Geen schatting: te veel bronvolumes.</translation>
+    </message>
+    <message>
+        <location line="-14"/>
+        <location line="+39"/>
+        <source>Estimate indeterminate for these arguments or block limits.</source>
+        <translation>Schatting onbepaald voor deze argumenten of bloklimieten.</translation>
+    </message>
+    <message>
+        <location line="+72"/>
+        <source>Path:</source>
+        <translation>Pad:</translation>
+    </message>
+    <message>
+        <location line="-79"/>
+        <source>MultiPar stops at 32768 source blocks, and this post would need %1: par2j enlarges the blocks itself, which makes the PAR2 step several times longer. Choose a source block count, or a block size of at least %2.</source>
+        <translation>MultiPar stopt bij 32768 bronblokken en deze post zou er %1 nodig hebben: par2j maakt de blokken zelf groter, waardoor de PAR2-stap meerdere keren langer duurt. Kies een aantal bronblokken of een blokgrootte van minstens %2.</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Estimate before compression (source sizes and rounding):</source>
+        <translation>Schatting vóór compressie (brongroottes en afronding):</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Estimate for the current post:</source>
+        <translation>Schatting voor de huidige post:</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>%1 source blocks of about %2; %3 recovery blocks, about %4.</source>
+        <translation>%1 bronblokken van ongeveer %2; %3 herstelblokken, ongeveer %4.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Recovery volumes: %1; largest recovery data volume: %2 (metadata excluded).</source>
+        <translation>Herstelvolumes: %1; grootste volume herstelgegevens: %2 (zonder metagegevens).</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>This preview uses the global default; the current post has its own redundancy override.</source>
+        <translation>Dit voorbeeld gebruikt de globale standaard; de huidige post heeft een eigen redundantie.</translation>
+    </message>
+    <message>
+        <location line="-312"/>
+        <source>Save</source>
+        <translation>Opslaan</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Cancel</source>
+        <translation>Annuleren</translation>
+    </message>
+    <message>
+        <location line="+437"/>
+        <source>Find OpenCL devices</source>
+        <translation>OpenCL-apparaten zoeken</translation>
+    </message>
+    <message>
+        <location line="-366"/>
+        <source>Requested block size</source>
+        <translation>Gevraagde blokgrootte</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>MultiPar may adjust the requested block size to the source files and block-count limit. It is not saved as PAR2_BLOCK_SIZE.</source>
+        <translation>MultiPar kan de gevraagde blokgrootte aanpassen aan de bronbestanden en het maximale aantal blokken. Deze wordt niet opgeslagen als PAR2_BLOCK_SIZE.</translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>Checking OpenCL devices. Wait for the result or disable GPU acceleration.</source>
+        <translation>OpenCL-apparaten worden gecontroleerd. Wacht op het resultaat of schakel GPU-versnelling uit.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>OpenCL could not be checked. Check the executable and OpenCL runtime, retry detection, or disable GPU acceleration.</source>
+        <translation>OpenCL kon niet worden gecontroleerd. Controleer het programma en de OpenCL-runtime, probeer opnieuw of schakel GPU-versnelling uit.</translation>
+    </message>
+    <message>
+        <location line="+139"/>
+        <source>OpenCL devices are available without a physical GPU. CPU devices such as OpenCLOn12 can be selected.</source>
+        <translation>Er zijn OpenCL-apparaten beschikbaar zonder fysieke GPU. CPU-apparaten zoals OpenCLOn12 kunnen worden geselecteerd.</translation>
     </message>
 </context>
 <context>
@@ -4353,7 +5631,7 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <translation>NZB_UPLOAD_URL is verlopen na %1 s</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+40"/>
         <source>could not restrict the file permissions</source>
         <translation>de bestandsmachtigingen konden niet worden beperkt</translation>
     </message>
@@ -4362,21 +5640,21 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <name>PostInfoDialog</name>
     <message>
         <location filename="../hmi/PostInfoDialog.cpp" line="+72"/>
-        <location line="+591"/>
+        <location line="+472"/>
         <location line="+5"/>
         <location line="+142"/>
         <source>Post information</source>
         <translation>Postinformatie</translation>
     </message>
     <message>
-        <location line="-733"/>
+        <location line="-614"/>
         <source>A post info file describes this post in a text file written next to the nzb.
 You give the model, ngPost fills in the blanks.</source>
         <translation>Een infobestand beschrijft deze post in een tekstbestand naast de nzb.
 U geeft het model, ngPost vult de gaten.</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+727"/>
         <source>Model:</source>
         <translation>Model:</translation>
     </message>
@@ -4408,7 +5686,7 @@ the model offered by default. This post uses it either way.</source>
 het standaard aangeboden model wordt. Deze post gebruikt het hoe dan ook.</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+10"/>
         <source>Write it to:</source>
         <translation>Schrijven naar:</translation>
     </message>
@@ -4425,7 +5703,7 @@ __nzbDir__/__nzbName__.info.txt schrijft het naast de nzb.</translation>
         <translation>Een map kiezen voor het infobestand van deze post</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+20"/>
         <source>The model — the file, line by line</source>
         <translation>Het model — het bestand, regel voor regel</translation>
     </message>
@@ -4437,7 +5715,7 @@ A line starting with # is a comment: it is never written. Changes here only reac
 Een regel die met # begint is een opmerking: die wordt nooit geschreven. Wijzigingen hier bereiken het bestand alleen via « Opslaan als… ».</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+11"/>
         <source>Field</source>
         <translation>Veld</translation>
     </message>
@@ -4462,30 +5740,30 @@ Een regel die met # begint is een opmerking: die wordt nooit geschreven. Wijzigi
         <translation>Voegt een regel in onder de geselecteerde, anders aan het eind.</translation>
     </message>
     <message>
-        <location line="+3"/>
-        <location line="+508"/>
+        <location line="-337"/>
+        <location line="+340"/>
         <source>Save as…</source>
         <translation>Opslaan als…</translation>
     </message>
     <message>
-        <location line="-506"/>
+        <location line="+2"/>
         <source>Writes these lines to a model file of your own.</source>
         <translation>Schrijft deze regels naar een eigen modelbestand.</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+12"/>
         <source>Your fields — the values of this post</source>
         <translation>Uw velden — de waarden van deze post</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+4"/>
         <source>One line per __meta:name__ the model uses. These values belong to this post, not to the model:
 they are never written into the file above. A field always goes into the post info file — tick « Also in NZB » to publish it in the nzb too.</source>
         <translation>Eén regel per __meta:naam__ die het model gebruikt. Deze waarden horen bij deze post, niet bij het model:
 ze worden nooit in het bestand hierboven geschreven. Een veld gaat altijd naar het infobestand — vink « Ook in de NZB » aan om het ook in de nzb te publiceren.</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+11"/>
         <source>Name</source>
         <translation>Naam</translation>
     </message>
@@ -4517,7 +5795,7 @@ Aan: het staat daar EN wordt gepubliceerd in de nzb, die rondgaat.</translation>
         <translation>Voegt een veld van u toe, en de regel die het schrijft.</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="-853"/>
         <source>?  What can I put in a model</source>
         <translation>?  Wat kan ik in een model zetten</translation>
     </message>
@@ -4532,7 +5810,7 @@ Aan: het staat daar EN wordt gepubliceerd in de nzb, die rondgaat.</translation>
         <translation>Geen bestemming: er wordt geen infobestand geschreven.</translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="+31"/>
         <source>Unknown variable in the destination: %1</source>
         <translation>Onbekende variabele in de bestemming: %1</translation>
     </message>
@@ -4578,12 +5856,12 @@ Aan: het staat daar EN wordt gepubliceerd in de nzb, die rondgaat.</translation>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+229"/>
+        <location line="+234"/>
         <source>Text files (*.txt *.tpl);;All files (*)</source>
         <translation>Tekstbestanden (*.txt *.tpl);;Alle bestanden (*)</translation>
     </message>
     <message>
-        <location line="-206"/>
+        <location line="-211"/>
         <source>No model: nothing will be written for this post.</source>
         <translation>Geen model: er wordt niets geschreven voor deze post.</translation>
     </message>
@@ -4594,12 +5872,12 @@ Aan: het staat daar EN wordt gepubliceerd in de nzb, die rondgaat.</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+214"/>
+        <location line="+219"/>
         <source>Model in use: %1</source>
         <translation>Gebruikt model: %1</translation>
     </message>
     <message>
-        <location line="-190"/>
+        <location line="-195"/>
         <source>name of the line</source>
         <translation>naam van de regel</translation>
     </message>
@@ -4639,7 +5917,7 @@ Aan: het staat daar EN wordt gepubliceerd in de nzb, die rondgaat.</translation>
         <translation>(niet geschreven)</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+16"/>
         <source>filled in after the post</source>
         <translation>wordt na de post ingevuld</translation>
     </message>
@@ -4974,14 +6252,14 @@ Het model nu opslaan?</translation>
 <context>
     <name>PostingJob</name>
     <message>
-        <location filename="../PostingJob.cpp" line="+564"/>
+        <location filename="../PostingJob.cpp" line="+768"/>
         <source>Try to resume posting</source>
         <translation>Probeer het posten te hervatten</translation>
     </message>
     <message>
-        <location line="+36"/>
-        <source>&lt;h3&gt;Start Post #%1: %2&lt;/h3&gt;</source>
-        <translation>&lt;h3&gt;Start Post #%1: %2&lt;/h3&gt;</translation>
+        <location line="+44"/>
+        <source>Start Post #%1: %2</source>
+        <translation>Start Post #%1: %2</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -4989,7 +6267,7 @@ Het model nu opslaan?</translation>
         <translation>Start Posten</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+24"/>
         <source>Using TMP_RAM path as temporary folder. Post size: %1</source>
         <translation>Het pad TMP_RAM gebruiken als tijdelijke map. Berichtgrootte:%1</translation>
     </message>
@@ -5009,14 +6287,14 @@ Het model nu opslaan?</translation>
         <translation>Kon TMP_RAM niet gebruiken omdat er niet genoeg ruimte is: %1 beschikbaar voor een par2-volume met TMP_RAM_RATIO van %2</translation>
     </message>
     <message>
-        <location line="+56"/>
-        <location line="+394"/>
+        <location line="+125"/>
+        <location line="+399"/>
         <location line="+8"/>
         <source>Couldn&apos;t copy nfo %1 to %2</source>
         <translation>Kon nfo %1 niet kopiëren naar %2</translation>
     </message>
     <message>
-        <location line="-349"/>
+        <location line="-486"/>
         <source>Error: there are no NntpConnection...</source>
         <translation>Fout: er is geen Nntp-verbinding ...</translation>
     </message>
@@ -5026,22 +6304,22 @@ Het model nu opslaan?</translation>
         <translation>Fout: kan nzb-uitvoer bestand niet maken: %1</translation>
     </message>
     <message>
-        <location line="+45"/>
+        <location line="+20"/>
         <source>History: could not mark post %1 as resuming: %2</source>
         <translation>Geschiedenis: post %1 kon niet als hervattend worden gemarkeerd: %2</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+4"/>
         <source>History: could not record the start of post %1: %2</source>
         <translation>Geschiedenis: de start van post %1 kon niet worden vastgelegd: %2</translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+175"/>
         <source>killing external process...</source>
         <translation>extern proces stoppen...</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+32"/>
         <source>Error: disconnected connection: #%1
 </source>
         <translation>Fout: verbinding verbroken: #%1
@@ -5053,48 +6331,68 @@ Het model nu opslaan?</translation>
         <translation>we verloren alle verbindingen ...</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+12"/>
+        <source>The server refused the credentials %1 times in a row, with no connection accepted in between: the post is stopped. Check the user and password of the server.</source>
+        <translation>De server heeft de inloggegevens %1 keer achter elkaar geweigerd, zonder tussendoor een verbinding te accepteren: het posten wordt gestopt. Controleer de gebruiker en het wachtwoord van de server.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>Sleep for %1 sec before trying to reconnect</source>
         <translation>Even geduld voor %1 sec voordat t opnieuw verbinding  probeert te maken</translation>
     </message>
     <message>
         <location line="+19"/>
-        <location line="+16"/>
+        <location line="+17"/>
         <source>avg. speed</source>
         <translation>gem. snelheid</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+10"/>
         <source>Skipping NZB entry for %1 because it has %2 failed articles</source>
         <translation>NZB-item voor %1 wordt overgeslagen omdat het %2 mislukte artikelen heeft</translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="+29"/>
         <source>[avg. speed: %1] &lt;&lt;&lt;&lt;&lt; %2</source>
         <translation>[gem. snelheid: %1] &lt;&lt;&lt;&lt;&lt; %2</translation>
     </message>
     <message>
-        <location line="+34"/>
+        <location line="+33"/>
         <source>Warning: %1</source>
         <translation>Waarschuwing: %1</translation>
     </message>
     <message>
-        <location line="+39"/>
-        <source>Number of available Nntp Connections: %1</source>
-        <translation>Aantal beschikbare Nntp-verbindingen: %1</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>Number of available Nntp Connections</source>
-        <translation>Aantal beschikbare Nntp-verbindingen</translation>
-    </message>
-    <message>
-        <location line="+53"/>
+        <location line="+101"/>
         <source>Copied nfo file %1 next to the nzb: %2</source>
         <translation>nfo bestand %1 gekopieerd naast de nzb: %2</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+20"/>
+        <source>Couldn&apos;t create the staging folder &apos;%1&apos;: obfuscated files will be renamed where they are</source>
+        <translation>Kon de tussenmap &apos;%1&apos; niet aanmaken: versluierde bestanden worden ter plaatse hernoemd</translation>
+    </message>
+    <message>
+        <location line="+26"/>
+        <source>&apos;%1&apos; cannot be moved into the temporary folder without copying it (they are on different filesystems): renaming it where it is instead</source>
+        <translation>&apos;%1&apos; kan niet naar de tijdelijke map worden verplaatst zonder kopiëren (ze staan op verschillende bestandssystemen): wordt in plaats daarvan ter plaatse hernoemd</translation>
+    </message>
+    <message>
+        <location line="+36"/>
+        <source>Couldn&apos;t restore %1 to its original name %2</source>
+        <translation>Kon %1 niet terugzetten naar de oorspronkelijke naam %2</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>The staging folder &apos;%1&apos; is not empty: some obfuscated files could not be put back</source>
+        <translation>De tussenmap &apos;%1&apos; is niet leeg: sommige versluierde bestanden konden niet worden teruggezet</translation>
+    </message>
+    <message>
+        <location line="+37"/>
+        <source>Not deleting %1: the posted source is still under its obfuscated name</source>
+        <translation>%1 wordt niet verwijderd: de geposte bron heeft nog zijn versluierde naam</translation>
+    </message>
+    <message>
+        <location line="+4"/>
         <source>Deleting posted %1: %2</source>
         <translation>Gepost %1: %2 verwijderen</translation>
     </message>
@@ -5169,12 +6467,59 @@ Het model nu opslaan?</translation>
         <translation>Geschiedenis: kon de grootte van post %1 niet vastleggen: %2</translation>
     </message>
     <message>
-        <location line="+496"/>
+        <location line="+487"/>
+        <source>posted: %1
+failed: %2
+unknown: %3
+</source>
+        <translation>geplaatst: %1
+mislukt: %2
+onbekend: %3
+</translation>
+    </message>
+    <message>
+        <location line="+21"/>
         <source>, archive password: ***</source>
         <translation>, archiefwachtwoord: ***</translation>
     </message>
     <message>
-        <location line="-342"/>
+        <location line="+377"/>
+        <source>The par2 tool ended without an error but wrote no par2 file, so nothing is posted. Its arguments are probably written for another tool: check them against PAR2_TOOL.</source>
+        <translation>Het par2-programma is zonder fout gestopt maar heeft geen par2-bestand geschreven, dus er wordt niets gepost. De argumenten zijn waarschijnlijk voor een ander programma geschreven: controleer ze aan de hand van PAR2_TOOL.</translation>
+    </message>
+    <message>
+        <location line="+61"/>
+        <source>Could not start external tool %1: %2</source>
+        <translation>Kan extern hulpmiddel %1 niet starten: %2</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Some source files are still under their obfuscated name; ngPost will try again when the job ends.</source>
+        <translation>Sommige bronbestanden hebben nog hun verhulde naam; ngPost probeert het opnieuw wanneer de taak eindigt.</translation>
+    </message>
+    <message>
+        <location line="+74"/>
+        <source>Compression tool unavailable: %1. Install the selected tool or choose a path in Compression Settings.</source>
+        <translation>Compressiehulpmiddel niet beschikbaar: %1. Installeer het gekozen hulpmiddel of kies een pad in de compressie-instellingen.</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>ERROR: no PAR2 tool is available for %1, so this post is stopped before the transfer.
+Install it, select another PAR2_TOOL, or set PAR2_SOURCE = custom and PAR2_PATH to its executable in the configuration (PAR2 Settings in the GUI).</source>
+        <translation>FOUT: er is geen PAR2-hulpmiddel beschikbaar voor %1, dus deze post wordt vóór de overdracht gestopt.
+Installeer het, kies een ander PAR2_TOOL of stel PAR2_SOURCE = custom en PAR2_PATH naar het uitvoerbare bestand in de configuratie in (PAR2-instellingen in de interface).</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>ERROR: the PAR2 tool for %1 is not an executable file, so this post is stopped before the transfer:
+    %2
+Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings in the GUI).</source>
+        <translation>FOUT: het PAR2-hulpmiddel voor %1 is geen uitvoerbaar bestand, dus deze post wordt vóór de overdracht gestopt:
+    %2
+Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-instellingen in de interface).</translation>
+    </message>
+    <message>
+        <location line="-896"/>
         <source>History: could not record the outcome of post %1: %2</source>
         <translation>Geschiedenis: kon de uitkomst van post %1 niet vastleggen: %2</translation>
     </message>
@@ -5237,7 +6582,7 @@ Het model nu opslaan?</translation>
 </translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+20"/>
         <source>%1 / %2 articles FAILED to be uploaded (even with %3 retries)...
 </source>
         <translation>%1 / %2 posts kunnen NIET worden geüpload (zelfs met %3 nieuwe pogingen)...
@@ -5256,24 +6601,49 @@ Het model nu opslaan?</translation>
         <translation>bestand: %1, rar-naam:%2</translation>
     </message>
     <message>
-        <location line="+86"/>
+        <location line="+121"/>
         <location line="+3"/>
         <source>postSize: %1 MB =&gt; volSize: %2</source>
         <translation>postSize: %1 MB =&gt; volSize: %2</translation>
     </message>
     <message>
-        <location line="+27"/>
+        <location line="-890"/>
         <source>Couldn&apos;t rename file %1</source>
         <translation>Kan bestand %1  niet hernoemen</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="-924"/>
+        <source>Could not stop the external process before restoring source files</source>
+        <translation>Kon het externe proces niet stoppen voordat de bronbestanden werden hersteld</translation>
+    </message>
+    <message>
+        <location line="+216"/>
+        <source>Could not persist interrupted article state: %1</source>
+        <translation>Kon de staat van het onderbroken artikel niet opslaan: %1</translation>
+    </message>
+    <message>
+        <location line="+585"/>
+        <source>Opening %1 configured NNTP connections…</source>
+        <translation>%1 ingestelde NNTP-verbindingen openen…</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Configured NNTP connections</source>
+        <translation>Ingestelde NNTP-verbindingen</translation>
+    </message>
+    <message>
+        <location line="+897"/>
+        <source>Post interrupted with %1 ambiguous article(s); resume data was preserved.</source>
+        <translation>Post onderbroken met %1 dubbelzinnig(e) artikel(en); hervattingsgegevens zijn bewaard.</translation>
+    </message>
+    <message>
+        <location line="+164"/>
         <location line="+4"/>
         <source>Compressing files</source>
         <translation>Bestanden comprimeren</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+16"/>
         <source>=&gt; rar exit code: %1
 </source>
         <translation>=&gt; rar afsluit code: %1
@@ -5281,6 +6651,11 @@ Het model nu opslaan?</translation>
     </message>
     <message>
         <location line="+16"/>
+        <source>Some source files are still under their obfuscated name; ngPost will try again when the job ends. The post itself is unaffected.</source>
+        <translation>Sommige bronbestanden dragen nog hun versluierde naam; ngPost probeert het opnieuw wanneer de taak eindigt. De post zelf blijft ongemoeid.</translation>
+    </message>
+    <message>
+        <location line="+4"/>
         <source>Error during compression: %1</source>
         <translation>Fout tijdens compressie: %1</translation>
     </message>
@@ -5295,30 +6670,30 @@ Het model nu opslaan?</translation>
         <translation>alleen ParPar laat toe om par2 te genereren voor bestanden uit verschillende mappen... je zou moeten overwegen om het te gebruiken ;)</translation>
     </message>
     <message>
-        <location line="+35"/>
+        <location line="+40"/>
         <location line="+4"/>
         <source>Generating par2</source>
         <translation>Genereer par2</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+13"/>
         <source>=&gt; par2 exit code: %1
 </source>
         <translation>=&gt; par2 afsluit code:%1
 </translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+12"/>
         <source>Error during par2 generation: %1</source>
         <translation>Fout bij het genereren van par2: %1</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+22"/>
         <source>External process deleted.</source>
         <translation>Externe  proces verwijderd.</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+10"/>
         <source>Compressed files deleted.</source>
         <translation>Gecomprimeerde bestanden verwijderd.</translation>
     </message>
@@ -5333,7 +6708,7 @@ Het model nu opslaan?</translation>
         <translation>Kan de tijdelijke map niet maken: &apos;%1&apos; ...</translation>
     </message>
     <message>
-        <location line="+39"/>
+        <location line="+56"/>
         <source>NO_POSSIBLE_COMPRESSION: You must define the temporary directory...</source>
         <translation>GEEN_COMPRESSIE_MOGELIJK: Je moet de tijdelijke directory definiëren ...</translation>
     </message>
@@ -5343,22 +6718,12 @@ Het model nu opslaan?</translation>
         <translation>FOUT: de tijdelijke directory moet een SCHRIJFBARE directory zijn ...</translation>
     </message>
     <message>
-        <location line="+30"/>
-        <source>ERROR: the RAR path is not executable...</source>
-        <translation>FOUT: het RAR-pad is niet uitvoerbaar...</translation>
-    </message>
-    <message>
-        <location line="+16"/>
-        <source>ERROR: par2 is not available...</source>
-        <translation>FOUT: par2 is niet beschikbaar ...</translation>
-    </message>
-    <message>
-        <location line="-1885"/>
+        <location line="-2207"/>
         <source>History: could not create post record: %1</source>
         <translation>Geschiedenis: kon geen postrecord aanmaken: %1</translation>
     </message>
     <message>
-        <location line="+75"/>
+        <location line="+150"/>
         <source>History: could not flush pending article events: %1</source>
         <translation>Geschiedenis: kon de openstaande artikelgebeurtenissen niet wegschrijven: %1</translation>
     </message>
@@ -5373,7 +6738,7 @@ Het model nu opslaan?</translation>
         <translation>Geschiedenis: kon geen bestandsrecord aanmaken: %1</translation>
     </message>
     <message>
-        <location line="+1038"/>
+        <location line="+1262"/>
         <source>Could not regenerate final NZB from history: %1</source>
         <translation>Kon definitieve NZB niet regenereren uit geschiedenis: %1</translation>
     </message>
@@ -5383,9 +6748,23 @@ Het model nu opslaan?</translation>
         <translation>NZB-geschiedeniswaarschuwing: %1</translation>
     </message>
     <message>
-        <location line="-376"/>
+        <location line="-378"/>
         <source>[%1] skipping already posted article %2 from %3</source>
         <translation>[%1] al geplaatst artikel %2 van %3 overgeslagen</translation>
+    </message>
+    <message>
+        <location line="+743"/>
+        <source>RAR_MAX must be greater than zero.</source>
+        <translation>RAR_MAX moet groter zijn dan nul.</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Archive volume size increased from %1 MiB to %2 MiB for a limit of %3 volumes.</source>
+        <translation>Archiefvolumegrootte verhoogd van %1 MiB naar %2 MiB voor een limiet van %3 volumes.</translation>
+    </message>
+    <message>
+        <source>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</source>
+        <translation>De geposte bestanden worden niet verwijderd: %1 artikel(en) mislukt of onbevestigd. Hervat de post vanuit de geschiedenis zodra het probleem is opgelost.</translation>
     </message>
 </context>
 <context>
@@ -5442,13 +6821,13 @@ Het model nu opslaan?</translation>
     </message>
     <message>
         <location line="+115"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+334"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+395"/>
         <source>length of the archive name drawn by the dice button (config LENGTH_NAME)</source>
         <translation>lengte van de archiefnaam die de dobbelsteenknop trekt (configuratie LENGTH_NAME)</translation>
     </message>
     <message>
         <location line="+63"/>
-        <location filename="../hmi/PostingWidget.cpp" line="-64"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-88"/>
         <source>length of the password drawn by the dice button (config LENGTH_PASS)</source>
         <translation>lengte van het wachtwoord dat de dobbelsteenknop trekt (configuratie LENGTH_PASS)</translation>
     </message>
@@ -5479,13 +6858,13 @@ Het model nu opslaan?</translation>
     </message>
     <message>
         <location line="+57"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+72"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+96"/>
         <source>This should be the password of the archive you&apos;re posting</source>
         <translation>Dit moet het wachtwoord zijn van het archief dat je plaatst</translation>
     </message>
     <message>
         <location line="+13"/>
-        <location filename="../hmi/PostingWidget.cpp" line="-75"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-99"/>
         <source>password used in your archive that would also be added in the header of the nzb file</source>
         <translation>wachtwoord van het archief dat ook word toegevoegd in de koptekst van het nzb-bestand</translation>
     </message>
@@ -5502,7 +6881,7 @@ Het model nu opslaan?</translation>
     </message>
     <message>
         <location line="+10"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+61"/>
+        <location filename="../hmi/PostingWidget.cpp" line="+85"/>
         <source>archive name (file name obfuscation)</source>
         <translation>archiefnaam (versleuteld)</translation>
     </message>
@@ -5541,12 +6920,14 @@ Het model nu opslaan?</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../hmi/PostingWidget.cpp" line="+478"/>
-        <source>Post Files</source>
-        <translation>Post Bestanden</translation>
+        <location filename="../hmi/PostingWidget.cpp" line="-332"/>
+        <location line="+836"/>
+        <location line="+10"/>
+        <source>Start Quick Post #%1</source>
+        <translation>Quick Post #%1 starten</translation>
     </message>
     <message>
-        <location filename="../hmi/PostingWidget.cpp" line="-664"/>
+        <location filename="../hmi/PostingWidget.cpp" line="-717"/>
         <source>There are no selected files to post...</source>
         <translation>Er zijn geen geselecteerde bestanden om te posten...</translation>
     </message>
@@ -5561,7 +6942,7 @@ Het model nu opslaan?</translation>
         <translation>Je kunt geen mappen plaatsen zonder compressie te gebruiken ...</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+75"/>
         <source>Overwrite existing nzb file?</source>
         <translation>Bestaand nzb-bestand overschrijven?</translation>
     </message>
@@ -5573,44 +6954,51 @@ Would you like to overwrite it ?</source>
 Wil je het overschrijven?</translation>
     </message>
     <message>
-        <location line="+47"/>
-        <location line="+588"/>
+        <location line="-20"/>
+        <location line="+637"/>
+        <location line="+17"/>
         <location line="+19"/>
         <source>Stop Posting</source>
         <translation>Stop Posten</translation>
     </message>
     <message>
-        <location line="-601"/>
-        <location line="+604"/>
+        <location line="-673"/>
+        <location line="+638"/>
+        <location line="+35"/>
         <source>Cancel Posting</source>
         <translation>Annuleer Posten</translation>
     </message>
     <message>
-        <location line="-563"/>
+        <location line="-620"/>
         <source>Select one or more files to Post</source>
         <translation>Selecteer een of meer bestanden om te posten</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+13"/>
         <source>Select a Folder</source>
         <translation>Selecteer een map</translation>
     </message>
     <message>
-        <location line="-32"/>
+        <location line="-34"/>
         <location line="+1"/>
-        <location line="+65"/>
+        <location line="+89"/>
         <location line="+28"/>
         <location line="+1"/>
         <source>requires: %1</source>
         <translation>vereist: %1</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+5"/>
+        <source>Using the PAR2 arguments of the configuration: %1</source>
+        <translation>PAR2-argumenten uit de configuratie worden gebruikt: %1</translation>
+    </message>
+    <message>
+        <location line="+13"/>
         <source>Create nzb file</source>
         <translation>Maak een nzb-bestand</translation>
     </message>
     <message>
-        <location line="+231"/>
+        <location line="+233"/>
         <source>Create a post info file</source>
         <translation>Een infobestand maken</translation>
     </message>
@@ -5642,12 +7030,19 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>Standaardwaarden opgeslagen: model %1, geschreven naar %2</translation>
     </message>
     <message>
-        <location line="-304"/>
-        <source>Using PAR2_ARGS from config file: %1</source>
-        <translation>PAR2_ARGS gebruiken vanuit  het configuratiebestand:%1</translation>
+        <location line="+72"/>
+        <location line="+182"/>
+        <source>Copy archive name to clipboard</source>
+        <translation>Archiefnaam naar klembord kopiëren</translation>
     </message>
     <message>
-        <location line="+379"/>
+        <location line="-181"/>
+        <location line="+184"/>
+        <source>Copy password to clipboard</source>
+        <translation>Wachtwoord naar klembord kopiëren</translation>
+    </message>
+    <message>
+        <location line="-179"/>
         <source>You can add files or folder by:</source>
         <translation>Je kunt bestanden of mappen toevoegen door:</translation>
     </message>
@@ -5671,11 +7066,30 @@ Sommige Usenet-indexen vragen erom.</translation>
         <source>Bare in mind you can select items in the list and press DEL to remove them</source>
         <translation>Weet dat je items in de lijst kunt selecteren en op DEL kunt drukken om ze te verwijderen</translation>
     </message>
+    <message>
+        <location line="+140"/>
+        <source>Global (%1 %)</source>
+        <translation>Globaal (%1 %)</translation>
+    </message>
+    <message>
+        <location line="+69"/>
+        <source>Nothing to copy</source>
+        <translation>Niets te kopiëren</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Copied!</source>
+        <translation>Gekopieerd!</translation>
+    </message>
+    <message>
+        <source>Could not remove the archives of the stopped post: %1</source>
+        <translation>De archieven van de gestopte post konden niet worden verwijderd: %1</translation>
+    </message>
 </context>
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../history/PostHistoryService.cpp" line="+370"/>
+        <location filename="../history/PostHistoryService.cpp" line="+372"/>
         <source>Could not open file for writing: %1 (%2)</source>
         <translation>Bestand kon niet worden geopend om te schrijven: %1 (%2)</translation>
     </message>
@@ -5753,37 +7167,118 @@ Sommige Usenet-indexen vragen erom.</translation>
     </message>
 </context>
 <context>
-    <name>UpdateChecker</name>
+    <name>StartupTabBar</name>
     <message>
-        <location filename="../utils/UpdateChecker.cpp" line="+295"/>
-        <source>Unable to write to install directory %1. Opening release page instead.</source>
-        <translation>Kan niet schrijven naar installatiemap %1. De release-pagina wordt in plaats daarvan geopend.</translation>
+        <source>Scroll left
+%1click: back to the first tab</source>
+        <translation>Naar links scrollen
+%1klik: terug naar het eerste tabblad</translation>
     </message>
     <message>
-        <location line="+35"/>
-        <source>Cannot write to %1</source>
-        <translation>Kan niet schrijven naar %1</translation>
+        <source>Scroll right
+%1click: on to the last tab</source>
+        <translation>Naar rechts scrollen
+%1klik: door naar het laatste tabblad</translation>
+    </message>
+</context>
+<context>
+    <name>UpdateChecker</name>
+    <message>
+        <location filename="../utils/UpdateChecker.cpp" line="+409"/>
+        <source>No bounded, trusted update asset is available.</source>
+        <translation>Er is geen betrouwbaar updatebestand met begrensde grootte beschikbaar.</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Automatic updates require Python 3.9+. Install this release manually after checking its published SHA-256 hash.</source>
+        <translation>Automatische updates vereisen Python 3.9 of hoger. Installeer deze release handmatig na controle van de gepubliceerde SHA-256-hash.</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>This installation has no package ownership marker. Install a package manually after checking its SHA-256 hash before enabling automatic replacement.</source>
+        <translation>Deze installatie heeft geen pakketeigendomsmarkering. Installeer een pakket handmatig na controle van de SHA-256-hash voordat u automatische vervanging inschakelt.</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>This installation cannot be replaced safely; use its package installer.</source>
+        <translation>Deze installatie kan niet veilig worden vervangen; gebruik het pakketinstallatieprogramma.</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Cannot create a private update directory.</source>
+        <translation>Kan geen privémap voor de update aanmaken.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Cannot stage update verifier.</source>
+        <translation>Kan de updateverificator niet klaarzetten.</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>Cannot write update file.</source>
+        <translation>Kan het updatebestand niet schrijven.</translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>Update exceeds its size limit or could not be written.</source>
+        <translation>De update overschrijdt de groottelimiet of kon niet worden geschreven.</translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>Update canceled, truncated or refused by the server.</source>
+        <translation>Update geannuleerd, afgekapt of geweigerd door de server.</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Cannot start update verifier.</source>
+        <translation>Kan de updateverificator niet starten.</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>SHA-256, extraction or package validation failed: %1</source>
+        <translation>SHA-256, uitpakken of pakketvalidatie mislukt: %1</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Cannot start update transaction.</source>
+        <translation>Kan de updatetransactie niet starten.</translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>Update installer did not become ready. Previous installation retained.</source>
+        <translation>Het updateprogramma werd niet gereed. De vorige installatie blijft behouden.</translation>
+    </message>
+    <message>
+        <location line="-190"/>
+        <source>Could not cancel the update: ngPost failed to signal the installer already running, and it may replace this installation. Check the version after the next start.</source>
+        <translation>De update kon niet worden geannuleerd: ngPost kon het al actieve installatieprogramma geen annuleringssignaal sturen. Het kan deze installatie vervangen. Controleer de versie na de volgende start.</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>The installer already running could not be stopped either, and it may replace this installation.</source>
+        <translation>Ook het al actieve installatieprogramma kon niet worden gestopt en kan deze installatie vervangen.</translation>
     </message>
 </context>
 <context>
     <name>VpnManager</name>
     <message>
-        <location filename="../vpn/VpnManager.cpp" line="+585"/>
+        <location filename="../vpn/VpnManager.cpp" line="+1258"/>
         <source>VPN: failed — %1</source>
         <translation>VPN: mislukt — %1</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="-17"/>
+        <location line="+1"/>
         <source>VPN: tunnel stopped</source>
         <translation>VPN: tunnel gestopt</translation>
     </message>
     <message>
-        <location line="+46"/>
+        <location line="+93"/>
         <source>VPN: backend not supported on this platform yet</source>
         <translation>VPN: backend nog niet ondersteund op dit platform</translation>
     </message>
     <message>
-        <location line="+250"/>
+        <location line="+309"/>
         <source>VPN install: timed out</source>
         <translation>VPN-installatie: time-out</translation>
     </message>
@@ -5793,35 +7288,30 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>VPN: verwijderingsscript niet gevonden op %1</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+18"/>
         <source>VPN uninstall: timed out</source>
         <translation>VPN-verwijdering: time-out</translation>
     </message>
     <message>
-        <location line="+165"/>
-        <source>Startup: cleaned up stale VPN state</source>
-        <translation>Opstarten: verouderde VPN-status opgeruimd</translation>
-    </message>
-    <message>
-        <location line="+75"/>
+        <location line="+556"/>
         <source>The VPN helper is not installed. Open the VPN dialog and click Install.</source>
         <translation>De VPN-helper is niet geïnstalleerd. Open het VPN-venster en klik op Installeren.</translation>
     </message>
     <message>
-        <location line="-1077"/>
+        <location line="-1866"/>
         <location line="+10"/>
-        <location line="+1071"/>
+        <location line="+1861"/>
         <source>No active VPN profile / configuration is selected.</source>
         <translation>Er is geen actief VPN-profiel / VPN-configuratie geselecteerd.</translation>
     </message>
     <message>
-        <location line="-1064"/>
-        <location line="+1069"/>
+        <location line="-1854"/>
+        <location line="+1859"/>
         <source>The VPN configuration file is missing or unreadable: %1</source>
         <translation>Het VPN-configuratiebestand ontbreekt of is niet leesbaar: %1</translation>
     </message>
     <message>
-        <location line="-985"/>
+        <location line="-1774"/>
         <source>Disconnect the active VPN before changing its WireGuard configuration.</source>
         <translation>Verbreek de actieve VPN-verbinding voordat u de WireGuard-configuratie wijzigt.</translation>
     </message>
@@ -5841,7 +7331,12 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>De vervangende WireGuard-service %1 kon niet worden verwijderd nadat de oude service niet kon worden gedeïnstalleerd.</translation>
     </message>
     <message>
-        <location line="+149"/>
+        <location line="+163"/>
+        <source>VPN: previous WireGuard service shutdown is not confirmed.</source>
+        <translation>VPN: het stoppen van de vorige WireGuard-service is niet bevestigd.</translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>VPN: no active profile — nothing to start</source>
         <translation>VPN: geen actief profiel — niets te starten</translation>
     </message>
@@ -5851,12 +7346,12 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>VPN: configuratiebestand ontbreekt voor profiel &apos;%1&apos; (%2)</translation>
     </message>
     <message>
-        <location line="+21"/>
-        <source>VPN: could not create auth file — openvpn will prompt</source>
-        <translation>VPN: kon het authenticatiebestand niet maken — openvpn zal ernaar vragen</translation>
+        <location line="+11"/>
+        <source>The installed VPN helper needs security revision 4. Open VPN settings and reinstall it with administrator authentication before connecting. An old helper&apos;s passwordless authorization remains unsafe until this migration succeeds.</source>
+        <translation>De geïnstalleerde VPN-helper vereist beveiligingsrevisie 4. Open de VPN-instellingen en installeer hem opnieuw met beheerdersauthenticatie voordat u verbinding maakt. De wachtwoordloze autorisatie van een oude helper blijft onveilig totdat deze migratie is geslaagd.</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+66"/>
         <source>VPN: no credentials in keychain for &apos;%1&apos; (relying on .ovpn inline)</source>
         <translation>VPN: geen inloggegevens in de sleutelring voor &apos;%1&apos; (er wordt op de .ovpn vertrouwd)</translation>
     </message>
@@ -5866,7 +7361,7 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>VPN: profiel &apos;%1&apos; wordt verbonden (%2)…</translation>
     </message>
     <message>
-        <location line="+60"/>
+        <location line="+110"/>
         <source>VPN: backend reports ready (%1, %2) — waiting for the address to become bindable</source>
         <translation>VPN: de backend meldt zich gereed (%1, %2) — er wordt gewacht tot het adres bruikbaar is</translation>
     </message>
@@ -5896,7 +7391,7 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>VPN: de backend meldde het tun-IP %1 maar de kernel heeft het nooit aan een interface gebonden (%2 ms gewacht). Zichtbare lokale adressen: %3. Afgebroken om een lekkende bind te vermijden.</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+24"/>
         <source>VPN: connected on %1 (%2), DNS %3</source>
         <translation>VPN: verbonden op %1 (%2), DNS %3</translation>
     </message>
@@ -5906,7 +7401,7 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>VPN: verbonden op %1 (%2) — geen DNS opgevangen, de resolver van het systeem wordt gebruikt</translation>
     </message>
     <message>
-        <location line="+260"/>
+        <location line="+572"/>
         <source>required VPN resource is missing or unreadable: %1</source>
         <translation>een vereiste VPN-bron ontbreekt of is onleesbaar: %1</translation>
     </message>
@@ -5921,7 +7416,7 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>kon de klaargezette VPN-bron niet uitvoerbaar maken: %1</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+46"/>
         <source>VPN backend prerequisites detected (OpenVPN / WireGuard for Windows).</source>
         <translation>Vereisten voor de VPN-backend gevonden (OpenVPN / WireGuard for Windows).</translation>
     </message>
@@ -5936,12 +7431,118 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>VPN: kon geen tijdelijke installatiemap maken</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="-455"/>
+        <location line="+461"/>
         <source>VPN: %1</source>
         <translation>VPN: %1</translation>
     </message>
     <message>
+        <location line="-1376"/>
+        <source>The machine-wide VPN lease security descriptor could not be created (Windows error %1).</source>
+        <translation>De beveiligingsdescriptor voor de machinebrede VPN-reservering kon niet worden aangemaakt (Windows-fout %1).</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>The machine-wide VPN lease could not be opened (Windows error %1).</source>
+        <translation>De machinebrede VPN-reservering kon niet worden geopend (Windows-fout %1).</translation>
+    </message>
+    <message>
         <location line="+8"/>
+        <source>Another ngPost instance owns the machine-wide VPN lease. %1</source>
+        <translation>Een andere ngPost-instantie bezit de machinebrede VPN-reservering. %1</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>The machine-wide VPN lease could not be acquired (Windows error %1).</source>
+        <translation>De machinebrede VPN-reservering kon niet worden verkregen (Windows-fout %1).</translation>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>Could not create or secure the Windows VPN runtime directory: %1</source>
+        <translation>Kon de Windows-VPN-runtimemap niet aanmaken of beveiligen: %1</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Could not publish or secure the Windows VPN owner manifest: %1</source>
+        <translation>Kon het Windows-VPN-eigenaarsmanifest niet publiceren of beveiligen: %1</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Owner metadata is unavailable.</source>
+        <translation>Eigenaarsmetagegevens zijn niet beschikbaar.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Owner metadata is malformed.</source>
+        <translation>Eigenaarsmetagegevens zijn ongeldig.</translation>
+    </message>
+    <message>
+        <location line="+420"/>
+        <source>VPN: could not create the protected OpenVPN authentication file</source>
+        <translation>VPN: kon het beveiligde OpenVPN-authenticatiebestand niet aanmaken</translation>
+    </message>
+    <message>
+        <location line="+264"/>
+        <source>VPN: tunnel health restored</source>
+        <translation>VPN: tunnelconditie hersteld</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>VPN: tunnel health is uncertain — %1</source>
+        <translation>VPN: tunnelconditie is onzeker — %1</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>OpenVPN recovery budget exhausted</source>
+        <translation>Budget voor OpenVPN-herstel uitgeput</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>VPN: OpenVPN is reconnecting internally (attempt %1)</source>
+        <translation>VPN: OpenVPN maakt intern opnieuw verbinding (poging %1)</translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>VPN restart attempt %1 failed: %2</source>
+        <translation>VPN-herstartpoging %1 mislukt: %2</translation>
+    </message>
+    <message>
+        <location line="+42"/>
+        <source>VPN: restart scheduled in %1 second(s)</source>
+        <translation>VPN: herstart gepland over %1 seconde(n)</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>VPN recovery budget exhausted</source>
+        <translation>Budget voor VPN-herstel uitgeput</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>VPN: external restart attempt %1 (recovery attempt %2)</source>
+        <translation>VPN: externe herstartpoging %1 (herstelpoging %2)</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>VPN restart failed</source>
+        <translation>Herstarten van de VPN mislukt</translation>
+    </message>
+    <message>
+        <location line="+61"/>
+        <source>VPN: waiting for confirmed service shutdown…</source>
+        <translation>VPN: wachten op bevestigde stop van de service…</translation>
+    </message>
+    <message>
+        <location line="+380"/>
+        <source>could not stage bundled VPN executable: %1</source>
+        <translation>kon het meegeleverde VPN-uitvoerbestand niet klaarzetten: %1</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>could not secure staged VPN executable: %1</source>
+        <translation>kon het klaargezette VPN-uitvoerbestand niet beveiligen: %1</translation>
+    </message>
+    <message>
+        <location line="+43"/>
         <source>Running VPN install: %1 %2 %3</source>
         <translation>VPN-installatie loopt: %1 %2 %3</translation>
     </message>
@@ -5951,32 +7552,37 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>Verwijder op Windows OpenVPN Community / WireGuard for Windows via &quot;Apps en onderdelen&quot; als u de VPN-ondersteuning helemaal wilt weghalen.</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+19"/>
         <source>Running VPN uninstall: %1 %2</source>
         <translation>VPN-deïnstallatie loopt: %1 %2</translation>
     </message>
     <message>
-        <location line="+81"/>
+        <location line="+88"/>
         <source>install-wg-tunnel.ps1 not found in app bundle</source>
         <translation>install-wg-tunnel.ps1 niet gevonden in het toepassingspakket</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+5"/>
+        <source>Could not determine the caller SID; refusing tunnel installation.</source>
+        <translation>Kon de SID van de aanroeper niet bepalen; tunnelinstallatie geweigerd.</translation>
+    </message>
+    <message>
+        <location line="+102"/>
         <source>WireGuard tunnel install failed (exit %1)</source>
         <translation>Installatie van de WireGuard-tunnel mislukt (exit %1)</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="-24"/>
         <source>WireGuard tunnel service registered.</source>
         <translation>WireGuard-tunneldienst geregistreerd.</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="-38"/>
         <source>uninstall-wg-tunnel.ps1 not found in app bundle</source>
         <translation>uninstall-wg-tunnel.ps1 niet gevonden in het toepassingspakket</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+24"/>
         <source>WireGuard tunnel uninstall failed (exit %1)</source>
         <translation>Deïnstallatie van de WireGuard-tunnel mislukt (exit %1)</translation>
     </message>
@@ -5986,12 +7592,47 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>WireGuard-tunneldienst verwijderd.</translation>
     </message>
     <message>
-        <location line="+94"/>
+        <location line="+172"/>
+        <source>VPN startup preflight could not read %1; no cleanup attempted</source>
+        <translation>De VPN-startcontrole kon %1 niet lezen; geen opruiming geprobeerd</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>VPN startup manifest is malformed; no cleanup attempted</source>
+        <translation>Het VPN-startmanifest is ongeldig; geen opruiming geprobeerd</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>An orphaned VPN session was detected, but the v2 helper is not installed</source>
+        <translation>Er is een verweesde VPN-sessie gedetecteerd, maar het v2-hulpprogramma is niet geïnstalleerd</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>An orphaned VPN session was detected, but the installed helper is version 1; no cleanup attempted</source>
+        <translation>Er is een verweesde VPN-sessie gedetecteerd, maar het geïnstalleerde hulpprogramma is versie 1; geen opruiming geprobeerd</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Startup: cleaned an orphaned VPN v2 session</source>
+        <translation>Opstart: een verweesde VPN-v2-sessie opgeruimd</translation>
+    </message>
+    <message>
+        <location line="+95"/>
+        <source>The installed VPN helper is version 1; no cleanup was attempted.</source>
+        <translation>Het geïnstalleerde VPN-hulpprogramma is versie 1; er is geen opruiming geprobeerd.</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>VPN cleanup timed out</source>
+        <translation>Time-out bij het opruimen van de VPN</translation>
+    </message>
+    <message>
+        <location line="+44"/>
         <source>(unnamed server)</source>
         <translation>(naamloze server)</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+13"/>
         <source>Master switch (VPN_AUTO_CONNECT) is ON but no VPN helper is installed - ignoring the master switch. Per-server &apos;Use VPN&apos; is still enforced.</source>
         <translation>De hoofdschakelaar (VPN_AUTO_CONNECT) staat aan maar er is geen VPN-hulpprogramma geïnstalleerd - de hoofdschakelaar wordt genegeerd. Het &apos;VPN gebruiken&apos; per server geldt nog steeds.</translation>
     </message>
@@ -6001,12 +7642,22 @@ Sommige Usenet-indexen vragen erom.</translation>
         <translation>De hoofdschakelaar (VPN_AUTO_CONNECT) staat aan maar het VPN is niet goed ingesteld (%1) - de hoofdschakelaar wordt genegeerd. Het &apos;VPN gebruiken&apos; per server geldt nog steeds.</translation>
     </message>
     <message>
-        <location line="+38"/>
+        <location line="+34"/>
+        <source>ngPost has no VPN support on this operating system.</source>
+        <translation>ngPost biedt geen VPN-ondersteuning op dit besturingssysteem.</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Another ngPost instance owns the machine-wide VPN lease.</source>
+        <translation>Een andere ngPost-instantie bezit de machinebrede VPN-reservering.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>The last VPN attempt failed. Open the VPN dialog and try again.</source>
         <translation>De laatste VPN-poging is mislukt. Open het VPN-venster en probeer het opnieuw.</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+6"/>
         <source>Use VPN is enabled for NNTP server(s): %1.
 
 The VPN is not correctly configured: %2
@@ -6019,7 +7670,16 @@ Het VPN is niet goed ingesteld: %2
 Open de VPN-opties met de VPN-knop en controleer de instellingen, of bewerk de serverconfiguratie en zet het VPN uit door het vinkje &apos;VPN gebruiken&apos; weg te halen.</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+9"/>
+        <source>Use VPN is enabled for NNTP server(s): %1, but %2
+
+Edit the server configuration and clear its Use VPN setting to post to it without a tunnel.</source>
+        <translation>&apos;VPN gebruiken&apos; is ingeschakeld voor NNTP-server(s): %1, maar %2
+
+Bewerk de serverconfiguratie en schakel &apos;VPN gebruiken&apos; uit om er zonder tunnel naartoe te posten.</translation>
+    </message>
+    <message>
+        <location line="+17"/>
         <source>Auto-starting VPN for incoming job...</source>
         <translation>VPN wordt automatisch gestart voor inkomende taak...</translation>
     </message>
@@ -6029,7 +7689,7 @@ Open de VPN-opties met de VPN-knop en controleer de instellingen, of bewerk de s
         <translation>Kan de VPN niet starten.</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+66"/>
         <source>Queue empty for %1 s — disconnecting VPN</source>
         <translation>Wachtrij al %1 s leeg — VPN wordt verbroken</translation>
     </message>
@@ -6050,6 +7710,16 @@ Open de VPN-opties met de VPN-knop en controleer de instellingen, of bewerk de s
     </message>
     <message>
         <location line="+1"/>
+        <source>VPN lease busy</source>
+        <translation>VPN-reservering bezet</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>reconnecting...</source>
+        <translation>opnieuw verbinden...</translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>stopping...</source>
         <translation>bezig met stoppen...</translation>
     </message>
@@ -6057,6 +7727,62 @@ Open de VPN-opties met de VPN-knop en controleer de instellingen, of bewerk de s
         <location line="+1"/>
         <source>failed</source>
         <translation>mislukt</translation>
+    </message>
+    <message>
+        <location line="-533"/>
+        <source>WireGuard for Windows was not found. Install it, then retry tunnel registration.</source>
+        <translation>WireGuard voor Windows is niet gevonden. Installeer het en probeer de tunnel opnieuw te registreren.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The WireGuard profile could not be read or validated. Re-import a valid profile and retry.</source>
+        <translation>Het WireGuard-profiel kon niet worden gelezen of gevalideerd. Importeer opnieuw een geldig profiel en probeer het nogmaals.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.</source>
+        <translation>De WireGuard-tunnelservice kon niet worden geregistreerd of gestopt. Controleer de WireGuard-installatie en probeer het opnieuw.</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.</source>
+        <translation>De machtigingen van de WireGuard-tunnelservice konden niet worden ingesteld. Vraag een beheerder de servicemachtigingen te controleren en probeer het opnieuw.</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.</source>
+        <translation>De map voor de WireGuard-configuratie is onveilig of ontoegankelijk. Vraag een beheerder de ngPost-map in Windows ProgramData te controleren en deze te verplaatsen als de map niet vertrouwd is. Probeer het daarna opnieuw.</translation>
+    </message>
+    <message>
+        <location line="-75"/>
+        <source>Refusing to run the tunnel installer as administrator: %1. Install ngPost with its setup, or move it somewhere only an administrator can write.</source>
+        <translation>Het installatieprogramma voor de tunnel mag niet als administrator worden uitgevoerd: %1. Installeer ngPost met het installatieprogramma of verplaats het naar een locatie waar alleen administrators kunnen schrijven.</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>Refusing to run the tunnel uninstaller as administrator: %1. Install ngPost with its setup, or move it somewhere only an administrator can write.</source>
+        <translation>Het verwijderprogramma voor de tunnel mag niet als administrator worden uitgevoerd: %1. Installeer ngPost met het installatieprogramma of verplaats het naar een locatie waar alleen administrators kunnen schrijven.</translation>
+    </message>
+    <message>
+        <location line="-35"/>
+        <source>WireGuard profile refused (line %1): %2</source>
+        <translation>WireGuard-profiel geweigerd (regel %1): %2</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>WireGuard profile refused: %1</source>
+        <translation>WireGuard-profiel geweigerd: %1</translation>
+    </message>
+    <message>
+        <location line="+75"/>
+        <source>WireGuard rejected the profile. Check its key values and endpoint, or re-import a valid profile, then retry.</source>
+        <translation>WireGuard heeft het profiel geweigerd. Controleer de sleutelwaarden en het eindpunt of importeer opnieuw een geldig profiel en probeer het nogmaals.</translation>
+    </message>
+    <message>
+        <location line="-30"/>
+        <location line="+33"/>
+        <source>WireGuard operation cancelled: administrator permission was not granted.</source>
+        <translation>WireGuard-bewerking geannuleerd: er is geen administratorbevoegdheid verleend.</translation>
     </message>
 </context>
 <context>
@@ -6367,12 +8093,22 @@ Weigert u, dan wordt het profiel ZONDER inloggegevens opgeslagen. OpenVPN vraagt
         <translation>&lt;a href=&quot;about:licences&quot;&gt;Over de licenties&lt;/a&gt;</translation>
     </message>
     <message>
-        <location filename="../hmi/VpnSettingsDialog.cpp" line="+79"/>
+        <location filename="../hmi/VpnSettingsDialog.cpp" line="+80"/>
         <source>No active VPN profile selected.</source>
         <translation>Geen actief VPN-profiel geselecteerd.</translation>
     </message>
     <message>
-        <location line="+22"/>
+        <location line="+9"/>
+        <source>Disconnect VPN</source>
+        <translation>VPN verbreken</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>A posting job currently depends on this VPN. Disconnecting will pause that job until you resume it manually. Continue?</source>
+        <translation>Er is momenteel een posttaak die van deze VPN afhangt. Bij het verbreken wordt die taak gepauzeerd totdat u hem handmatig hervat. Doorgaan?</translation>
+    </message>
+    <message>
+        <location line="+18"/>
         <source>No profile</source>
         <translation>Geen profiel</translation>
     </message>
@@ -6426,7 +8162,12 @@ Zijn configuratiebestand onder &lt;configDir&gt;/vpn/ en zijn inloggegevens in d
         <translation>VPN-verwijdering mislukt. Zie het log voor details.</translation>
     </message>
     <message>
-        <location line="+57"/>
+        <location line="+59"/>
+        <source>Security update required: reinstall the VPN helper with administrator authentication. Until then the old passwordless helper remains unsafe.</source>
+        <translation>Beveiligingsupdate vereist: installeer de VPN-helper opnieuw met beheerdersauthenticatie. Tot dan blijft de oude wachtwoordloze helper onveilig.</translation>
+    </message>
+    <message>
+        <location line="+6"/>
         <source>VPN tunnel is installed. Connect / Disconnect will not prompt.</source>
         <translation>VPN-tunnel is geïnstalleerd. Verbinden / Verbreken vraagt niet om een wachtwoord.</translation>
     </message>
@@ -6444,52 +8185,72 @@ Zijn configuratiebestand onder &lt;configDir&gt;/vpn/ en zijn inloggegevens in d
 <context>
     <name>WireGuardBackend</name>
     <message>
-        <location filename="../vpn/WireGuardBackend.cpp" line="+133"/>
+        <location filename="../vpn/WireGuardBackend.cpp" line="+164"/>
         <source>Config file not found or unreadable: %1</source>
         <translation>Configuratiebestand niet gevonden of niet leesbaar: %1</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+8"/>
         <source>Privileged helper script ngpost-vpn-helper.sh not found</source>
         <translation>Geprivilegieerd hulpscript ngpost-vpn-helper.sh niet gevonden</translation>
     </message>
     <message>
-        <location line="-24"/>
+        <location line="-28"/>
         <source>Native VPN integration is currently Linux-only. macOS support is in progress.</source>
         <translation>De ingebouwde VPN-integratie werkt voorlopig alleen op Linux. macOS-ondersteuning is in de maak.</translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+62"/>
         <source>Launching VPN helper: %1 %2</source>
         <translation>VPN-hulpprogramma wordt gestart: %1 %2</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+5"/>
         <source>Failed to start %1/helper</source>
         <translation>Kon %1/helper niet starten</translation>
     </message>
     <message>
-        <location line="+74"/>
+        <location line="+109"/>
+        <source>Waiting for VPN lease held by ngPost PID %1 (helper %2)</source>
+        <translation>Wachten op de VPN-reservering van ngPost PID %1 (hulpprogramma %2)</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>VPN lease is held by ngPost PID %1 (helper %2)</source>
+        <translation>De VPN-reservering is in handen van ngPost PID %1 (hulpprogramma %2)</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>The installed VPN helper is version 1; update it before connecting.</source>
+        <translation>Het geïnstalleerde VPN-hulpprogramma is versie 1; werk het bij voordat u verbinding maakt.</translation>
+    </message>
+    <message>
+        <location line="+13"/>
         <source>Malformed READY from helper: %1</source>
         <translation>Misvormde READY van helper: %1</translation>
     </message>
     <message>
-        <location line="+17"/>
-        <source>helper exited (code %1) before tunnel was ready</source>
-        <translation>helper werd beëindigd (code %1) voordat de tunnel gereed was</translation>
+        <location line="+63"/>
+        <source>VPN helper crashed</source>
+        <translation>VPN-hulpprogramma is vastgelopen</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+0"/>
+        <source>VPN helper exited with code %1</source>
+        <translation>VPN-hulpprogramma afgesloten met code %1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>pkexec/helper failed to start</source>
         <translation>pkexec/helper kon niet starten</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+6"/>
         <source>helper process crashed</source>
         <translation>helper-proces is gecrasht</translation>
     </message>
     <message>
-        <location line="+70"/>
+        <location line="+82"/>
         <source>WireGuard config not found: %1</source>
         <translation>WireGuard-configuratie niet gevonden: %1</translation>
     </message>
@@ -6499,24 +8260,85 @@ Zijn configuratiebestand onder &lt;configDir&gt;/vpn/ en zijn inloggegevens in d
         <translation>WireGuard-dienst wordt gestart: %1</translation>
     </message>
     <message>
-        <location line="+6"/>
-        <source>sc start timed out — is the tunnel registered? (re-import the profile)</source>
-        <translation>sc start is verlopen — is de tunnel geregistreerd? (importeer het profiel opnieuw)</translation>
+        <location line="+130"/>
+        <source>WireGuard stop is NOT confirmed (%1). The tunnel may still be active; retaining ownership and retrying.</source>
+        <translation>Het stoppen van WireGuard is NIET bevestigd (%1). De tunnel is mogelijk nog actief; eigendom blijft behouden en er wordt opnieuw geprobeerd.</translation>
     </message>
     <message>
-        <location line="+7"/>
-        <source>sc start failed (exit %1) — make sure the WireGuard tunnel was installed via wireguard.exe /installtunnelservice and that runtime ACL grants you START.</source>
-        <translation>sc start mislukt (exit %1) — controleer of de WireGuard-tunnel via wireguard.exe /installtunnelservice is geïnstalleerd en of de runtime-ACL u START geeft.</translation>
+        <location line="-98"/>
+        <source>WireGuard parent watchdog exited unexpectedly</source>
+        <translation>De WireGuard-ouderbewaker is onverwacht afgesloten</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+22"/>
+        <source>Could not start the WireGuard parent watchdog</source>
+        <translation>De WireGuard-ouderbewaker kon niet worden gestart</translation>
+    </message>
+    <message>
+        <location line="+21"/>
         <source>WireGuard tunnel did not come up within 20s</source>
         <translation>De WireGuard-tunnel kwam niet binnen 20 s omhoog</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+12"/>
         <source>Could not parse local IP from WireGuard config</source>
         <translation>Kon het lokale IP niet uit de WireGuard-configuratie lezen</translation>
+    </message>
+</context>
+<context>
+    <name>WireGuardConfigPolicy</name>
+    <message>
+        <location filename="../vpn/WireGuardConfigPolicy.cpp" line="+195"/>
+        <source>&apos;%1&apos; does not belong to this section</source>
+        <translation>‘%1’ hoort niet in deze sectie</translation>
+    </message>
+    <message>
+        <location line="-9"/>
+        <source>&apos;%1&apos; runs a command when the tunnel goes up or down, which ngPost never needs. Remove that line from the profile.</source>
+        <translation>‘%1’ voert een opdracht uit wanneer de tunnel wordt gestart of gestopt. ngPost heeft dit nooit nodig. Verwijder die regel uit het profiel.</translation>
+    </message>
+    <message>
+        <location line="-8"/>
+        <source>a key appears before any [Interface] or [Peer] section</source>
+        <translation>er staat een sleutel vóór een [Interface]- of [Peer]-sectie</translation>
+    </message>
+    <message>
+        <location line="-17"/>
+        <location line="+6"/>
+        <source>expected a Key = Value line</source>
+        <translation>er werd een regel met de indeling Sleutel = Waarde verwacht</translation>
+    </message>
+    <message>
+        <location line="-25"/>
+        <source>malformed section header</source>
+        <translation>ongeldige sectiekop</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>only [Interface] and [Peer] sections are allowed</source>
+        <translation>alleen de secties [Interface] en [Peer] zijn toegestaan</translation>
+    </message>
+    <message>
+        <location line="+61"/>
+        <location line="+11"/>
+        <source>the WireGuard profile cannot be read</source>
+        <translation>het WireGuard-profiel kan niet worden gelezen</translation>
+    </message>
+    <message>
+        <location line="-107"/>
+        <source>the WireGuard profile contains binary data</source>
+        <translation>het WireGuard-profiel bevat binaire gegevens</translation>
+    </message>
+    <message>
+        <location line="-8"/>
+        <location line="+108"/>
+        <source>the WireGuard profile is larger than a profile ever is</source>
+        <translation>het WireGuard-profiel is ongebruikelijk groot</translation>
+    </message>
+    <message>
+        <location line="-17"/>
+        <source>this profile carries a key ngPost has not reviewed</source>
+        <translation>dit profiel bevat een sleutel die ngPost niet heeft beoordeeld</translation>
     </message>
 </context>
 </TS>

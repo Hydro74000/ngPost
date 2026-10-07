@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
+#include <QDebug>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -20,6 +21,21 @@
 
 namespace
 {
+
+constexpr int kSqliteBusyTimeoutMs = 5000;
+
+#ifdef NGPOST_TESTING
+int sSqliteBusyTimeoutMs = kSqliteBusyTimeoutMs;
+#endif
+
+int sqliteBusyTimeoutMs()
+{
+#ifdef NGPOST_TESTING
+    return sSqliteBusyTimeoutMs;
+#else
+    return kSqliteBusyTimeoutMs;
+#endif
+}
 
 QString nowIso()
 {
@@ -43,27 +59,139 @@ void setError(QString *error, const QSqlDatabase &db)
         *error = db.lastError().text();
 }
 
+//! Restrict the history database to its owner.
+//!
+//! It holds every archive password when HISTORY_STORE_PASSWORDS is on -- which
+//! is the default -- so it is as sensitive as any credential file, yet the
+//! SQLite driver creates it with the process umask, typically world readable.
+//! The -wal and -shm sidecars carry committed rows too, so they get the same
+//! treatment; they only exist once WAL is established, hence the call site.
+//!
+//! Best effort by design: a database on a filesystem with no Unix permissions
+//! (a network share, exFAT, Windows) must keep working. A failure here is
+//! reported to the log, never turned into a history subsystem failure.
+void restrictHistoryDbPermissions(const QString &dbPath)
+{
+    if (dbPath.isEmpty() || dbPath == QStringLiteral(":memory:"))
+        return;
+    const QFileDevice::Permissions ownerOnly =
+        QFileDevice::ReadOwner | QFileDevice::WriteOwner;
+    for (const QString &suffix : { QString(), QStringLiteral("-wal"), QStringLiteral("-shm") }) {
+        const QString path = dbPath + suffix;
+        QFileInfo const info(path);
+        if (!info.exists() || info.permissions() == ownerOnly)
+            continue;
+        if (!QFile::setPermissions(path, ownerOnly)) {
+            qWarning().noquote()
+                << QStringLiteral("[PostHistoryStore] could not restrict '%1' to its owner; "
+                                  "it may be readable by other users of this machine")
+                       .arg(path);
+        }
+    }
+}
+
 QSqlDatabase dbFor(const QString &connectionName, const QString &dbPath, QString *error)
 {
     QSqlDatabase db;
-    bool newConnection = false;
     if (QSqlDatabase::contains(connectionName))
-        db = QSqlDatabase::database(connectionName);
+        db = QSqlDatabase::database(connectionName, false);
     else {
         db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
         db.setDatabaseName(dbPath);
-        newConnection = true;
     }
 
-    if (!db.isOpen() && !db.open()) {
+    const bool openedNow = !db.isOpen();
+    if (openedNow && !db.open()) {
         setError(error, db);
         return db;
     }
 
     QSqlQuery pragma(db);
-    if (newConnection)
-        pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
-    pragma.exec(QStringLiteral("PRAGMA busy_timeout=5000"));
+    // journal_mode needs an exclusive lock when the database is not already
+    // in WAL mode. Give a short-lived reader a chance to finish before the
+    // mode switch, but do not assume that waiting guarantees the switch.
+    const QString busyTimeout = QStringLiteral("PRAGMA busy_timeout=%1").arg(sqliteBusyTimeoutMs());
+    if (!pragma.exec(busyTimeout)) {
+        setError(error, pragma);
+        db.close();
+        return db;
+    }
+
+    if (openedNow) {
+        QString journalMode;
+        QString walFailure;
+        if (pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL")) && pragma.next()) {
+            journalMode = pragma.value(0).toString();
+        } else {
+            walFailure = pragma.lastError().text();
+            if (walFailure.isEmpty())
+                walFailure = QStringLiteral("no journal mode returned");
+        }
+        pragma.finish();
+
+        // Under WAL, NORMAL is the durability the mode is designed around: a
+        // crash or a kill still cannot corrupt the database, only the very
+        // last transactions can be lost on a power cut. The default FULL
+        // fsyncs on every commit, and the article flush commits in batches
+        // while a post runs -- with callers of upsertFile(), deletePost() and
+        // purgePassword() blocking behind that flush. PRAGMA journal_mode may
+        // execute successfully while returning another mode (or fail under a
+        // long-lived reader), so NORMAL is safe only after checking its row.
+        const bool walEnabled =
+            journalMode.compare(QStringLiteral("wal"), Qt::CaseInsensitive) == 0;
+        const QString synchronousMode = walEnabled ? QStringLiteral("NORMAL")
+                                                   : QStringLiteral("FULL");
+        const int expectedSynchronous = walEnabled ? 1 : 2;
+        if (!pragma.exec(QStringLiteral("PRAGMA synchronous=%1").arg(synchronousMode))) {
+            setError(error, pragma);
+            db.close();
+            return db;
+        }
+        if (!pragma.exec(QStringLiteral("PRAGMA synchronous")) || !pragma.next()) {
+            if (error) {
+                const QString sqlError = pragma.lastError().text();
+                *error = sqlError.isEmpty()
+                    ? QStringLiteral("SQLite did not return its synchronous mode")
+                    : sqlError;
+            }
+            db.close();
+            return db;
+        }
+        const int effectiveSynchronous = pragma.value(0).toInt();
+        pragma.finish();
+
+        restrictHistoryDbPermissions(dbPath);
+        // Only a *weaker* setting breaks the durability this code reasons
+        // about. A build that reports EXTRA where FULL was asked is safer, not
+        // broken, and losing the whole history over it would turn a preference
+        // into a hard failure of a subsystem the post does not depend on.
+        if (effectiveSynchronous < expectedSynchronous) {
+            if (error) {
+                *error = QStringLiteral("SQLite synchronous mode is %1, expected at least %2")
+                             .arg(effectiveSynchronous)
+                             .arg(expectedSynchronous);
+            }
+            db.close();
+            return db;
+        }
+        if (effectiveSynchronous != expectedSynchronous) {
+            qWarning().noquote()
+                << QStringLiteral("[PostHistoryStore] SQLite reports synchronous=%1 where %2 "
+                                  "was requested; continuing with the stronger setting")
+                       .arg(effectiveSynchronous)
+                       .arg(expectedSynchronous);
+        }
+
+        if (!walEnabled && dbPath != QStringLiteral(":memory:")) {
+            const QString reason = journalMode.isEmpty()
+                ? walFailure
+                : QStringLiteral("journal_mode=%1").arg(journalMode);
+            qWarning().noquote()
+                << QStringLiteral("[PostHistoryStore] WAL unavailable for '%1' (%2); "
+                                  "using synchronous=FULL")
+                       .arg(dbPath, reason);
+        }
+    }
     pragma.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
     return db;
 }
@@ -198,6 +326,18 @@ PostHistoryStore::~PostHistoryStore()
 {
     closeConnection();
 }
+
+#ifdef NGPOST_TESTING
+void PostHistoryStore::setBusyTimeoutForTest(int milliseconds)
+{
+    sSqliteBusyTimeoutMs = qMax(0, milliseconds);
+}
+
+void PostHistoryStore::resetBusyTimeoutForTest()
+{
+    sSqliteBusyTimeoutMs = kSqliteBusyTimeoutMs;
+}
+#endif
 
 void PostHistoryStore::configure(const QString &dbPath, bool storePasswords)
 {
@@ -340,17 +480,23 @@ bool PostHistoryStore::_execSchema(QString *error)
                        "status TEXT NOT NULL,"
                        "FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,"
                        "UNIQUE(post_id, ordinal))"),
+        // post_articles is WITHOUT ROWID: the rows live in the (file_id, part)
+        // key itself. It is the largest table in the database and every hot
+        // query on it is keyed that way, so a rowid table paid for a full
+        // second copy of the key in an automatic index, plus a hop through
+        // that index to reach the row on each upsert.
         QStringLiteral("CREATE TABLE IF NOT EXISTS post_articles ("
                        "file_id INTEGER NOT NULL,"
                        "part INTEGER NOT NULL,"
                        "pos INTEGER DEFAULT 0,"
                        "bytes INTEGER DEFAULT 0,"
+                       "body_bytes INTEGER DEFAULT 0,"
                        "status TEXT NOT NULL,"
                        "msg_id TEXT,"
                        "error TEXT,"
                        "updated_at TEXT,"
                        "FOREIGN KEY(file_id) REFERENCES post_files(id) ON DELETE CASCADE,"
-                       "PRIMARY KEY(file_id, part))"),
+                       "PRIMARY KEY(file_id, part)) WITHOUT ROWID"),
         QStringLiteral("CREATE TABLE IF NOT EXISTS post_article_attempts ("
                        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                        "file_id INTEGER NOT NULL,"
@@ -495,6 +641,92 @@ bool PostHistoryStore::_migrateSchema(QSqlDatabase &db, QString *error)
                 "ALTER TABLE post_info ADD COLUMN article_size_bytes INTEGER"))) {
             setError(error, q);
             return false;
+        }
+    }
+
+    // v3 -> v4 records the size of the article as posted (yEnc encoded), which
+    // is what an nzb <segment bytes> must advertise. `bytes` keeps meaning the
+    // slice of the source file, because resolveArticleSizeBytes() reconstructs
+    // the configured article size from it. Rows written before this migration
+    // keep body_bytes = 0 and fall back to `bytes`, as they always did.
+    bool hasArticleBodyBytesColumn = false;
+    {
+        QSqlQuery q(db);
+        if (!q.exec(QStringLiteral("PRAGMA table_info(post_articles)"))) {
+            setError(error, q);
+            return false;
+        }
+        while (q.next()) {
+            if (q.value(1).toString() == QStringLiteral("body_bytes")) {
+                hasArticleBodyBytesColumn = true;
+                break;
+            }
+        }
+    }
+    if (!hasArticleBodyBytesColumn) {
+        QSqlQuery q(db);
+        if (!q.exec(QStringLiteral(
+                "ALTER TABLE post_articles ADD COLUMN body_bytes INTEGER DEFAULT 0"))) {
+            setError(error, q);
+            return false;
+        }
+    }
+
+    // v4 -> v5 turns post_articles WITHOUT ROWID, for the reason spelled out
+    // next to its CREATE TABLE. SQLite cannot convert a table in place, so
+    // this is the rebuild its documentation prescribes: create, copy, drop,
+    // rename, recreate the index. It rides the transaction _execSchema()
+    // opened around us, so it commits whole or not at all, and a database
+    // already in that shape is skipped -- which is what makes an interrupted
+    // upgrade safe to re-enter.
+    bool articlesAreWithoutRowId = false;
+    {
+        QSqlQuery q(db);
+        if (!q.exec(QStringLiteral("SELECT sql FROM sqlite_master "
+                                   "WHERE type='table' AND name='post_articles'"))) {
+            setError(error, q);
+            return false;
+        }
+        if (q.next())
+            articlesAreWithoutRowId = q.value(0).toString().contains(
+                    QStringLiteral("WITHOUT ROWID"), Qt::CaseInsensitive);
+    }
+    if (!articlesAreWithoutRowId) {
+        static QStringList const rebuild = {
+            QStringLiteral("CREATE TABLE post_articles_v5 ("
+                           "file_id INTEGER NOT NULL,"
+                           "part INTEGER NOT NULL,"
+                           "pos INTEGER DEFAULT 0,"
+                           "bytes INTEGER DEFAULT 0,"
+                           "body_bytes INTEGER DEFAULT 0,"
+                           "status TEXT NOT NULL,"
+                           "msg_id TEXT,"
+                           "error TEXT,"
+                           "updated_at TEXT,"
+                           "FOREIGN KEY(file_id) REFERENCES post_files(id) ON DELETE CASCADE,"
+                           "PRIMARY KEY(file_id, part)) WITHOUT ROWID"),
+            // The EXISTS clause is not a filter on real data: an article row
+            // whose file is gone is one the foreign key says cannot exist and
+            // that nothing can read, and ON DELETE CASCADE would have taken
+            // it. Copying it would fail the constraint and abort the whole
+            // upgrade, which is a far worse outcome than leaving it behind.
+            QStringLiteral("INSERT INTO post_articles_v5(file_id, part, pos, bytes,"
+                           "body_bytes, status, msg_id, error, updated_at) "
+                           "SELECT a.file_id, a.part, a.pos, a.bytes, a.body_bytes, a.status,"
+                           "a.msg_id, a.error, a.updated_at FROM post_articles a "
+                           "WHERE EXISTS (SELECT 1 FROM post_files f WHERE f.id = a.file_id)"),
+            QStringLiteral("DROP TABLE post_articles"),
+            QStringLiteral("ALTER TABLE post_articles_v5 RENAME TO post_articles"),
+            QStringLiteral("CREATE INDEX IF NOT EXISTS idx_articles_status "
+                           "ON post_articles(status)"),
+        };
+
+        for (QString const &step : rebuild) {
+            QSqlQuery q(db);
+            if (!q.exec(step)) {
+                setError(error, q);
+                return false;
+            }
         }
     }
 
@@ -1317,11 +1549,13 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
 
     if (!prepare(postingArticle,
                  QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
-                                "status, msg_id, error, updated_at)"
-                                "VALUES(?, ?, ?, ?, 'posting', ?, '', ?)"
+                                "status, msg_id, error, updated_at, body_bytes)"
+                                "VALUES(?, ?, ?, ?, 'posting', ?, '', ?, ?)"
                                 "ON CONFLICT(file_id, part) DO UPDATE SET "
                                 "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
                                 "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                "body_bytes=CASE WHEN excluded.body_bytes > 0"
+                                " THEN excluded.body_bytes ELSE body_bytes END,"
                                 "status='posting', msg_id=excluded.msg_id,"
                                 "updated_at=excluded.updated_at "
                                 "WHERE post_articles.status!='posted'"))
@@ -1331,11 +1565,13 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
                                    "VALUES(?, ?, ?, ?, 'posting', ?)"))
         || !prepare(postedArticle,
                     QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
-                                   "status, msg_id, error, updated_at)"
-                                   "VALUES(?, ?, ?, ?, 'posted', ?, '', ?)"
+                                   "status, msg_id, error, updated_at, body_bytes)"
+                                   "VALUES(?, ?, ?, ?, 'posted', ?, '', ?, ?)"
                                    "ON CONFLICT(file_id, part) DO UPDATE SET "
                                    "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
                                    "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                   "body_bytes=CASE WHEN excluded.body_bytes > 0"
+                                   " THEN excluded.body_bytes ELSE body_bytes END,"
                                    "status='posted', msg_id=excluded.msg_id, error='',"
                                    "updated_at=excluded.updated_at"))
         || !prepare(postedAttempt,
@@ -1344,11 +1580,13 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
                                    " AND status='posting'"))
         || !prepare(failedArticle,
                     QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
-                                   "status, msg_id, error, updated_at)"
-                                   "VALUES(?, ?, ?, ?, 'failed', ?, ?, ?)"
+                                   "status, msg_id, error, updated_at, body_bytes)"
+                                   "VALUES(?, ?, ?, ?, 'failed', ?, ?, ?, ?)"
                                    "ON CONFLICT(file_id, part) DO UPDATE SET "
                                    "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
                                    "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                   "body_bytes=CASE WHEN excluded.body_bytes > 0"
+                                   " THEN excluded.body_bytes ELSE body_bytes END,"
                                    "status='failed', msg_id=excluded.msg_id, error=excluded.error,"
                                    "updated_at=excluded.updated_at "
                                    "WHERE post_articles.status!='posted'"))
@@ -1358,11 +1596,13 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
                                    " AND msg_id=? AND status='posting'"))
         || !prepare(unknownArticle,
                     QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
-                                   "status, msg_id, error, updated_at)"
-                                   "VALUES(?, ?, ?, ?, 'unknown', ?, ?, ?)"
+                                   "status, msg_id, error, updated_at, body_bytes)"
+                                   "VALUES(?, ?, ?, ?, 'unknown', ?, ?, ?, ?)"
                                    "ON CONFLICT(file_id, part) DO UPDATE SET "
                                    "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
                                    "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                                   "body_bytes=CASE WHEN excluded.body_bytes > 0"
+                                   " THEN excluded.body_bytes ELSE body_bytes END,"
                                    "status='unknown', msg_id=excluded.msg_id, error=excluded.error,"
                                    "updated_at=excluded.updated_at "
                                    "WHERE post_articles.status!='posted'"))
@@ -1394,6 +1634,7 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
             postingArticle.bindValue(3, storedPayloadBytes(event.bytes));
             postingArticle.bindValue(4, event.msgId);
             postingArticle.bindValue(5, stamp);
+            postingArticle.bindValue(6, storedPayloadBytes(event.bodyBytes));
             if (!execPrepared(postingArticle))
                 return false;
 
@@ -1413,6 +1654,7 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
             postedArticle.bindValue(3, storedPayloadBytes(event.bytes));
             postedArticle.bindValue(4, event.msgId);
             postedArticle.bindValue(5, stamp);
+            postedArticle.bindValue(6, storedPayloadBytes(event.bodyBytes));
             if (!execPrepared(postedArticle))
                 return false;
 
@@ -1432,6 +1674,7 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
             failedArticle.bindValue(4, event.msgId);
             failedArticle.bindValue(5, event.error);
             failedArticle.bindValue(6, stamp);
+            failedArticle.bindValue(7, storedPayloadBytes(event.bodyBytes));
             if (!execPrepared(failedArticle))
                 return false;
 
@@ -1452,6 +1695,7 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
             unknownArticle.bindValue(4, event.msgId);
             unknownArticle.bindValue(5, event.error);
             unknownArticle.bindValue(6, stamp);
+            unknownArticle.bindValue(7, storedPayloadBytes(event.bodyBytes));
             if (!execPrepared(unknownArticle))
                 return false;
 
@@ -2159,6 +2403,7 @@ bool PostHistoryStore::loadPostDetails(qint64 postId, PostDetails *details, QStr
             as.part = valueInt(a, "part");
             as.pos = valueI64(a, "pos");
             as.bytes = valueI64(a, "bytes");
+            as.bodyBytes = valueI64(a, "body_bytes");
             as.msgId = valueString(a, "msg_id");
             as.status = valueString(a, "status");
             details->articlesByFile[fs.id] << as;

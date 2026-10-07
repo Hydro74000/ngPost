@@ -13,6 +13,7 @@
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QRegularExpression>
 #include <QSet>
 #include <QTemporaryDir>
 #include <QTextStream>
@@ -73,11 +74,34 @@ private slots:
     void schema_migrates_v2_and_derives_article_size_safely();
 
     //! A database written by a newer ngPost is refused rather than silently
+    //! post_articles used to be a rowid table with its (file_id, part) key
+    //! duplicated into an automatic index. SQLite cannot convert one in
+    //! place, so v4 -> v5 rebuilds it -- and a rebuild that loses a row, or
+    //! silently leaves the old shape behind, is the way this goes wrong.
+    void schema_migrates_v4_articles_to_without_rowid();
+
     //! used with a schema this version does not understand.
     void schema_refuses_a_newer_database();
 
     //! Corrupt/non-numeric versions are not silently interpreted as v1.
     void schema_refuses_an_invalid_version();
+
+    //! journal_mode pragmas can execute successfully but return a mode other
+    //! than WAL. NORMAL must only be selected from the returned value; an
+    //! in-memory SQLite connection deterministically returns "memory".
+    void non_wal_connection_keeps_full_synchronous();
+
+    //! A normal file connection must exercise the other side of the policy:
+    //! WAL is both selected and paired with NORMAL, on creation and reopen.
+    void file_connection_uses_wal_and_normal_synchronous();
+
+    //! A reader can make the WAL switch fail. That real error path must stay
+    //! in rollback-journal + FULL and emit one release-visible warning.
+    void locked_file_falls_back_to_full_and_warns();
+
+    //! A failed first db.open leaves its Qt connection name registered. When
+    //! opening later succeeds, it must still receive the full pragma policy.
+    void connection_retries_pragmas_after_initial_open_failure();
 
     //! started_at stays NULL until the transfer begins, and a resume never
     //! rewrites the date of the first attempt.
@@ -220,6 +244,27 @@ bool execRawSql(const QString &dbPath,
     }
     QSqlDatabase::removeDatabase(conn);
     return ok;
+}
+
+QStringList connectionsAddedSince(const QSet<QString> &before)
+{
+    QStringList added;
+    for (const QString &name : QSqlDatabase::connectionNames()) {
+        if (!before.contains(name))
+            added << name;
+    }
+    return added;
+}
+
+QVariant connectionPragma(const QString &connectionName, const QString &pragmaSql)
+{
+    QSqlDatabase db = QSqlDatabase::database(connectionName, false);
+    if (!db.isOpen())
+        return {};
+    QSqlQuery pragma(db);
+    if (!pragma.exec(pragmaSql) || !pragma.next())
+        return {};
+    return pragma.value(0);
 }
 
 // Counts the per-attempt audit rows of a post by reading the SQLite file
@@ -1224,6 +1269,121 @@ void TestPostHistory::schema_migrates_v2_and_derives_article_size_safely()
     QCOMPARE(details.articleSizeBytes, static_cast<qint64>(-1));
 }
 
+void TestPostHistory::schema_migrates_v4_articles_to_without_rowid()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath(QStringLiteral("history.sqlite"));
+
+    qint64 fileId = 0;
+    {
+        PostHistoryStore store(dbPath, true);
+        QString err;
+        QVERIFY2(store.initialize(&err), qPrintable(err));
+
+        PostHistoryStore::PostRecord post;
+        post.nzbName = QStringLiteral("rowid.nzb");
+        post.nzbPath = dir.filePath(QStringLiteral("rowid.nzb"));
+        post.from    = QStringLiteral("poster@example.invalid");
+        post.groups  = { QStringLiteral("alt.binaries.test") };
+        const qint64 postId = store.createPost(post, &err);
+        QVERIFY2(postId > 0, qPrintable(err));
+
+        PostHistoryStore::FileRecord file;
+        file.postId        = postId;
+        file.ordinal       = 1;
+        file.originalPath  = dir.filePath(QStringLiteral("payload.bin"));
+        file.postedName    = QStringLiteral("payload.bin");
+        file.sizeBytes     = 12;
+        file.totalArticles = 3;
+        file.groups        = post.groups;
+        fileId             = store.upsertFile(file, &err);
+        QVERIFY2(fileId > 0, qPrintable(err));
+    }
+
+    // Forge the v4 shape: post_articles as a rowid table, carrying rows the
+    // rebuild has to bring across unchanged.
+    QVERIFY(rawSql(dbPath, QStringLiteral("DROP TABLE post_articles")).isNull());
+    QVERIFY(rawSql(dbPath,
+                   QStringLiteral("CREATE TABLE post_articles ("
+                                  "file_id INTEGER NOT NULL,"
+                                  "part INTEGER NOT NULL,"
+                                  "pos INTEGER DEFAULT 0,"
+                                  "bytes INTEGER DEFAULT 0,"
+                                  "body_bytes INTEGER DEFAULT 0,"
+                                  "status TEXT NOT NULL,"
+                                  "msg_id TEXT,"
+                                  "error TEXT,"
+                                  "updated_at TEXT,"
+                                  "FOREIGN KEY(file_id) REFERENCES post_files(id) ON DELETE CASCADE,"
+                                  "PRIMARY KEY(file_id, part))"))
+                .isNull());
+    for (int part = 1; part <= 3; ++part)
+        QVERIFY(rawSql(dbPath,
+                       QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                                      "body_bytes, status, msg_id, error, updated_at) "
+                                      "VALUES(?, ?, ?, ?, ?, 'posted', ?, '', '2026-01-01')"),
+                       { fileId, part, (part - 1) * 4, 4, 5,
+                         QStringLiteral("msg-%1").arg(part) })
+                    .isNull());
+    QVERIFY(rawSql(dbPath,
+                   QStringLiteral("INSERT OR REPLACE INTO schema_meta(key, value) "
+                                  "VALUES('version', '4')"))
+                .isNull());
+    QVERIFY2(!rawSql(dbPath,
+                     QStringLiteral("SELECT sql FROM sqlite_master WHERE type='table' "
+                                    "AND name='post_articles'"))
+                  .toString()
+                  .contains(QStringLiteral("WITHOUT ROWID")),
+             "the forged v4 table should be a rowid table");
+
+    {
+        PostHistoryStore store(dbPath, true);
+        QString err;
+        QVERIFY2(store.initialize(&err), qPrintable(err));
+    }
+
+    QVERIFY2(rawSql(dbPath,
+                    QStringLiteral("SELECT sql FROM sqlite_master WHERE type='table' "
+                                   "AND name='post_articles'"))
+                 .toString()
+                 .contains(QStringLiteral("WITHOUT ROWID")),
+             "post_articles should have been rebuilt WITHOUT ROWID");
+
+    QCOMPARE(rawSql(dbPath, QStringLiteral("SELECT value FROM schema_meta WHERE key='version'"))
+                 .toInt(),
+             PostHistoryStore::kSchemaVersion);
+
+    // Every row came across, values included -- the point of the rebuild is
+    // that it is invisible to the data.
+    QCOMPARE(rawSql(dbPath, QStringLiteral("SELECT COUNT(*) FROM post_articles")).toInt(), 3);
+    QCOMPARE(rawSql(dbPath,
+                    QStringLiteral("SELECT msg_id FROM post_articles WHERE file_id=? AND part=2"),
+                    { fileId })
+                 .toString(),
+             QStringLiteral("msg-2"));
+    QCOMPARE(rawSql(dbPath,
+                    QStringLiteral("SELECT body_bytes FROM post_articles WHERE file_id=? AND part=3"),
+                    { fileId })
+                 .toInt(),
+             5);
+
+    // The index went down with the old table and has to come back.
+    QCOMPARE(rawSql(dbPath,
+                    QStringLiteral("SELECT COUNT(*) FROM sqlite_master WHERE type='index' "
+                                   "AND name='idx_articles_status'"))
+                 .toInt(),
+             1);
+
+    // A second open must be a no-op rather than a second rebuild.
+    {
+        PostHistoryStore store(dbPath, true);
+        QString err;
+        QVERIFY2(store.initialize(&err), qPrintable(err));
+    }
+    QCOMPARE(rawSql(dbPath, QStringLiteral("SELECT COUNT(*) FROM post_articles")).toInt(), 3);
+}
+
 void TestPostHistory::schema_refuses_a_newer_database()
 {
     QTemporaryDir dir;
@@ -1268,6 +1428,138 @@ void TestPostHistory::schema_refuses_an_invalid_version()
     QString error;
     QVERIFY(!store.initialize(&error));
     QVERIFY2(error.contains(QStringLiteral("invalid history schema version")), qPrintable(error));
+}
+
+void TestPostHistory::non_wal_connection_keeps_full_synchronous()
+{
+    const QStringList connectionsBefore = QSqlDatabase::connectionNames();
+    const QSet<QString> before(connectionsBefore.cbegin(), connectionsBefore.cend());
+
+    PostHistoryStore store(QStringLiteral(":memory:"), true);
+    QString error;
+    QVERIFY2(store.initialize(&error), qPrintable(error));
+
+    const QStringList added = connectionsAddedSince(before);
+    QCOMPARE(added.size(), 1);
+
+    QCOMPARE(connectionPragma(added.first(), QStringLiteral("PRAGMA journal_mode"))
+                 .toString().toLower(),
+             QStringLiteral("memory"));
+    QCOMPARE(connectionPragma(added.first(), QStringLiteral("PRAGMA synchronous")).toInt(),
+             2); // SQLITE_SYNC_FULL
+}
+
+void TestPostHistory::file_connection_uses_wal_and_normal_synchronous()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath(QStringLiteral("history.sqlite"));
+
+    for (int opening = 0; opening < 2; ++opening) {
+        const QStringList connectionsBefore = QSqlDatabase::connectionNames();
+        const QSet<QString> before(connectionsBefore.cbegin(), connectionsBefore.cend());
+        {
+            PostHistoryStore store(dbPath, true);
+            QString error;
+            QVERIFY2(store.initialize(&error), qPrintable(error));
+
+            const QStringList added = connectionsAddedSince(before);
+            QCOMPARE(added.size(), 1);
+            QCOMPARE(connectionPragma(added.first(), QStringLiteral("PRAGMA journal_mode"))
+                         .toString().toLower(),
+                     QStringLiteral("wal"));
+            QCOMPARE(connectionPragma(added.first(), QStringLiteral("PRAGMA synchronous")).toInt(),
+                     1); // SQLITE_SYNC_NORMAL
+        }
+    }
+}
+
+void TestPostHistory::locked_file_falls_back_to_full_and_warns()
+{
+    struct BusyTimeoutReset
+    {
+        ~BusyTimeoutReset() { PostHistoryStore::resetBusyTimeoutForTest(); }
+    } reset;
+    PostHistoryStore::setBusyTimeoutForTest(25);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath(QStringLiteral("history.sqlite"));
+    {
+        PostHistoryStore seed(dbPath, true);
+        QString error;
+        QVERIFY2(seed.initialize(&error), qPrintable(error));
+    }
+
+    const QString readerName = QStringLiteral("tst_history_wal_reader");
+    {
+        QSqlDatabase reader = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), readerName);
+        reader.setDatabaseName(dbPath);
+        QVERIFY(reader.open());
+        {
+            QSqlQuery heldRead(reader);
+            QVERIFY(heldRead.exec(QStringLiteral("PRAGMA journal_mode=DELETE")));
+            QVERIFY(heldRead.next());
+            QCOMPARE(heldRead.value(0).toString().toLower(), QStringLiteral("delete"));
+            heldRead.finish();
+
+            QVERIFY(heldRead.exec(QStringLiteral("BEGIN")));
+            QVERIFY(heldRead.exec(QStringLiteral("SELECT COUNT(*) FROM schema_meta")));
+            QVERIFY(heldRead.next());
+
+            const QStringList connectionsBefore = QSqlDatabase::connectionNames();
+            const QSet<QString> before(connectionsBefore.cbegin(), connectionsBefore.cend());
+            QTest::ignoreMessage(
+                QtWarningMsg,
+                QRegularExpression(QStringLiteral(".*PostHistoryStore.*WAL unavailable.*"
+                                                  "synchronous=FULL.*")));
+            {
+                PostHistoryStore contender(dbPath, true);
+                QString error;
+                contender.initialize(&error); // schema commit may also be blocked by the reader
+
+                const QStringList added = connectionsAddedSince(before);
+                QCOMPARE(added.size(), 1);
+                QCOMPARE(connectionPragma(added.first(), QStringLiteral("PRAGMA journal_mode"))
+                             .toString().toLower(),
+                         QStringLiteral("delete"));
+                QCOMPARE(connectionPragma(added.first(), QStringLiteral("PRAGMA synchronous"))
+                             .toInt(),
+                         2); // SQLITE_SYNC_FULL
+            }
+
+            QVERIFY(heldRead.exec(QStringLiteral("ROLLBACK")));
+        }
+        reader.close();
+    }
+    QSqlDatabase::removeDatabase(readerName);
+}
+
+void TestPostHistory::connection_retries_pragmas_after_initial_open_failure()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString dbPath = dir.filePath(QStringLiteral("temporarily-a-directory"));
+    QVERIFY(QDir().mkpath(dbPath));
+
+    const QStringList connectionsBefore = QSqlDatabase::connectionNames();
+    const QSet<QString> before(connectionsBefore.cbegin(), connectionsBefore.cend());
+    PostHistoryStore store(dbPath, true);
+    QString error;
+    QVERIFY(!store.initialize(&error));
+    QVERIFY(!error.isEmpty());
+
+    QVERIFY(QDir(dbPath).removeRecursively());
+    error.clear();
+    QVERIFY2(store.initialize(&error), qPrintable(error));
+
+    const QStringList added = connectionsAddedSince(before);
+    QCOMPARE(added.size(), 1);
+    QCOMPARE(connectionPragma(added.first(), QStringLiteral("PRAGMA journal_mode"))
+                 .toString().toLower(),
+             QStringLiteral("wal"));
+    QCOMPARE(connectionPragma(added.first(), QStringLiteral("PRAGMA synchronous")).toInt(),
+             1); // SQLITE_SYNC_NORMAL
 }
 
 void TestPostHistory::started_at_is_set_by_the_transfer_and_never_rewritten()

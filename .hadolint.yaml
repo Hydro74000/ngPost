@@ -1,0 +1,6 @@
+# hadolint configuration, read by the lint job of .github/workflows/docker.yml.
+ignored:
+  # Pinning apt package versions: Debian replaces a version with every security
+  # update, so a pinned one stops existing and the image stops building. The
+  # weekly run of docker.yml is what catches a change in those packages.
+  - DL3008

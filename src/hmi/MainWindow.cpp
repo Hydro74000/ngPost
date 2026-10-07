@@ -1,3 +1,6 @@
+#include "Par2SettingsDialog.h"
+#include <QPointer>
+#include <QScopedValueRollback>
 //========================================================================
 //
 // Copyright (C) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
@@ -22,7 +25,10 @@
 #include "ui_MainWindow.h"
 #include "PostingWidget.h"
 #include "AutoPostWidget.h"
+#include "StartupTabBar.h"
+#include "PostingControlIcon.h"
 #include "NgPost.h"
+#include "PostingJob.h"
 #include "CompressionSettingsDialog.h"
 #include "VpnSettingsDialog.h"
 #include "history/PostHistoryService.h"
@@ -33,12 +39,16 @@
 
 #include <QCoreApplication>
 #include <QAbstractScrollArea>
+#include <QAction>
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
+#include <QDateTime>
 #include <QDebug>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFrame>
@@ -51,18 +61,26 @@
 #include <QScrollArea>
 #include <QShortcut>
 #include <QKeySequence>
+#include <QSlider>
 #include <QSplitter>
+#include <QStyleOption>
 #include <QTableWidget>
 #include <QTabWidget>
 #include <QTextStream>
+#include <QTextBlock>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QScreen>
+#include <QTextBrowser>
+#include <QTextDocument>
 #include <QMessageBox>
 #include <QMenu>
 #include <QPushButton>
+#include <QToolButton>
 #include <QSizePolicy>
 #include <QSettings>
+#include <QShowEvent>
 #include <QStatusBar>
 #include <QtCharts/QAbstractAxis>
 #include <QtCharts/QBarCategoryAxis>
@@ -90,6 +108,124 @@ QString guiSettingsFilePath()
     return PathHelper::configDir() + QStringLiteral("/ngPost_gui.ini");
 }
 const QString kMainWindowGeometryKey = QStringLiteral("MainWindow/geometry");
+const QString kLogBoxCollapsedKey = QStringLiteral("MainWindow/logBoxCollapsed");
+const QString kLogBoxWidthKey = QStringLiteral("MainWindow/logBoxWidth");
+const QString kUpdatePromptKey = QStringLiteral("MainWindow/lastUpdatePrompt");
+
+//! Stamps the install popup in ngPost_gui.ini when one is due, so the once a
+//! day holds across restarts now that every start checks for a release.
+bool claimUpdatePrompt()
+{
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    if (!UpdateChecker::isPromptDue(guiSettings.value(kUpdatePromptKey).toLongLong(), now))
+        return false;
+    guiSettings.setValue(kUpdatePromptKey, now);
+    guiSettings.sync();
+    return true;
+}
+
+//! What one line of the log pane actually costs, laid out in a live
+//! QTextBrowser: about 7 KB. Measured rather than guessed -- 120 000 typical
+//! debug lines took 877 MB of resident memory, some seventy-five times the
+//! text they contain. The memory is what has to be bounded, so the block count
+//! is derived from a budget rather than picked.
+constexpr int kLogBytesPerBlock = 7000;
+
+//! How many lines are dropped in one go once the pane is over budget.
+//!
+//! QTextDocument::maximumBlockCount would do the trimming for us, but it drops
+//! exactly one block per append, and each of those is a cursor edit and a
+//! relayout: measured at 1 000 lines/s against 16 800 with no trimming at all,
+//! on the GUI thread, fed by the posting threads. Taking a slice at a time
+//! amortises that away -- 15 000 lines/s, and it holds less memory too, 73 MB
+//! against 99 MB after 150 000 lines, because it churns the allocator far
+//! less.
+constexpr int kLogTrimSlice = 1000;
+
+//! QTextDocument lays out one whole block as a unit. A compressor's normal
+//! progress display is an unbroken stream of log("*", false), and a 100k
+//! character block already makes the GUI visibly stall. Split such streams
+//! early enough that layout remains cheap; the normal block budget then
+//! bounds their total lifetime like every other log line.
+constexpr int kLogMaxBlockCharacters = 2048;
+
+//! Measured cost of the two things a document holds: ~8 B per character, and
+//! ~6.2 KB of fixed structure per block (a 100-char line costs ~7 KB in
+//! total, a single 100 001-character block 0.8 MB).
+//!
+//! The block count alone stopped being a bound once blocks could legitimately
+//! reach kLogMaxBlockCharacters: a pane full of maximal blocks costs several
+//! times its stated budget. Charging each character its own cost plus its
+//! share of the block structure gives a cap that holds whatever the shape of
+//! the traffic, and that never binds before the block cap on normal lines.
+constexpr int kLogBytesPerCharacter = 8;
+constexpr int kLogBlockOverheadBytes = 6200;
+constexpr int kLogWorstCaseBytesPerCharacter =
+    kLogBytesPerCharacter + kLogBlockOverheadBytes / kLogMaxBlockCharacters;
+
+//! Characters dropped in one go, for the same amortisation reason as above.
+constexpr int kLogCharacterTrimSlice = 64 * 1024;
+
+//! What the pane may hold, by debug level. With debug off it is a status log
+//! and 20 MB is a few thousand lines, far more than anyone scrolls back
+//! through. With debug on, the posting threads emit several lines per article
+//! and scrollback is the whole reason it was turned on, so the budget grows.
+constexpr int kLogBudgetBytes[] = {
+    20 * 1024 * 1024, // debug off
+    50 * 1024 * 1024, // debug 1
+    100 * 1024 * 1024 // debug 2
+};
+constexpr int kLogMaxDebugLevel = int(sizeof kLogBudgetBytes / sizeof *kLogBudgetBytes) - 1;
+
+//! Stable preference IDs retain the original order: quick=0, auto=1, history=2.
+//! The visual order is reversed; no key means Quick Post.
+const QString kStartupTabKey = QStringLiteral("MainWindow/startupTab");
+constexpr int kHistoryTab = 0;
+constexpr int kAutoPostTab = 1;
+constexpr int kQuickPostTab = 2;
+constexpr int kNbFixedTabs = 3;
+
+//! What sTabWidgetStyle puts around the contents of an unselected tab, the
+//! tallest: a 2px border above and below, and a 2px top margin.
+constexpr int kTabFrameHeight = 2 + 2 + 2;
+
+//! How much taller than a corner widget of \a height the tab bar of \a tabs must
+//! be for the style to give that widget its whole height. Most styles stand it on
+//! the pane, which overlaps the bar (Fusion by 2px); QTabWidget also caps it at
+//! the bar height less PM_TabBarBaseHeight. The style is asked where it would go.
+int tabBarExcessOverCorner(const QTabWidget *tabs, int height)
+{
+    QStyleOptionTabWidgetFrame frame;
+    frame.initFrom(tabs);
+    frame.lineWidth = tabs->style()->pixelMetric(QStyle::PM_DefaultFrameWidth, nullptr, tabs);
+    frame.shape = QTabBar::RoundedNorth;
+    frame.tabBarSize = QSize(tabs->width(), height);
+    frame.rightCornerWidgetSize = QSize(1, height);
+    const QRect corner = tabs->style()->subElementRect(QStyle::SE_TabWidgetRightCorner,
+                                                       &frame,
+                                                       tabs);
+    return qMax(tabs->style()->pixelMetric(QStyle::PM_TabBarBaseHeight, nullptr, tabs),
+                -corner.top());
+}
+
+//! Column widths of the history table, as QHeaderView::saveState() writes
+//! them. Absent as long as the user has not resized a column: ngPost then
+//! computes the widths itself, run after run.
+const QString kHistoryColumnsKey = QStringLiteral("MainWindow/historyColumns");
+
+//! Column of the post name in the history table, the one given the room the
+//! others leave (see MainWindow::_fitHistoryColumns).
+constexpr int kHistoryNameColumn = 1;
+
+//! The pinned tab, or -1 when nothing valid is pinned.
+int readStartupTab()
+{
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    bool      ok    = false;
+    int const index = guiSettings.value(kStartupTabKey, -1).toInt(&ok);
+    return (ok && index >= 0 && index < kNbFixedTabs) ? kNbFixedTabs - 1 - index : -1;
+}
 }
 
 
@@ -97,6 +233,7 @@ const QColor  MainWindow::sPostingColor = QColor(255,162, 0); // gold (#FFA200)
 const QString MainWindow::sPostingIcon  = ":/icons/uploading.png";
 const QColor  MainWindow::sPendingColor = Qt::darkBlue;
 const QString MainWindow::sPendingIcon  = ":/icons/pending.png";
+const QString MainWindow::sPendingLightIcon = ":/icons/pending_light.png";
 const QColor  MainWindow::sDoneOKColor  = Qt::darkGreen;
 const QString MainWindow::sDoneOKIcon   = ":/icons/ok.png";
 const QColor  MainWindow::sDoneKOColor  = Qt::darkRed;
@@ -117,17 +254,27 @@ const QList<const char *> MainWindow::sServerListHeaders = {
 };
 const QVector<int> MainWindow::sServerListSizes   = {30, 200, 50, 30, 60, 100, 150, 150, sDeleteColumnWidth};
 
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     _ui(new Ui::MainWindow),
     _ngPost(nullptr),
     _state(STATE::IDLE),
     _quickJobTab(nullptr),
-    _autoPostTab(nullptr)
+    _autoPostTab(nullptr),
+    _startupTab(-1),
+    _logBlockCap(0),
+    _logCharacterCap(0)
 {
     setAcceptDrops(true);
 
     _ui->setupUi(this);
+
+    // The servers table has a fixed shape, so give it that shape now rather
+    // than in init(). setCellWidget() cannot place anything into a column that
+    // does not exist, and the VPN column has to exist before it can be hidden.
+    _ui->serversTable->setColumnCount(sServerListHeaders.size());
+    _applyVpnPlatformVisibility();
 
     _ui->serverBox->setStyleSheet(sGroupBoxStyle);
     _ui->fileBox->setStyleSheet(sGroupBoxStyle);
@@ -144,8 +291,8 @@ MainWindow::MainWindow(QWidget *parent) :
     _ui->postSplitter->setStretchFactor(0, 3);
     _ui->postSplitter->setStretchFactor(1, 1);
     _ui->postSplitter->setCollapsible(0, false);
-
-
+    _initLogBoxToggle();
+    _initZoomControl();
     _ui->progressBar->setRange(0, 100);
     updateProgressBar(0, 0, "");
 
@@ -161,6 +308,11 @@ MainWindow::MainWindow(QWidget *parent) :
     if (!savedGeometry.isEmpty())
         restoreGeometry(savedGeometry);
 
+    _applyLogCapacity(0);
+    // Nothing can undo an output pane, and the document would otherwise record
+    // an undo step for every line it is handed.
+    _ui->logBrowser->document()->setUndoRedoEnabled(false);
+
     connect(_ui->clearLogButton, &QAbstractButton::clicked, _ui->logBrowser, &QTextEdit::clear);
     connect(_ui->debugBox,       &QAbstractButton::toggled, this,            &MainWindow::onDebugToggled);
     connect(_ui->pauseButton,    &QAbstractButton::clicked, this,            &MainWindow::onPauseClicked);
@@ -174,14 +326,24 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
+    for (auto *post : findChildren<PostingWidget *>())
+        disconnect(post, nullptr, this, nullptr);
+    if (_ui->postTabWidget) disconnect(_ui->postTabWidget, nullptr, this, nullptr);
     delete _ui;
 }
 
 void MainWindow::init(NgPost *ngPost)
 {
     _ngPost = ngPost;
+    _par2SettingsButton = new QPushButton(tr("PAR2 Settings…"), this);
+    _par2SettingsButton->setObjectName(QStringLiteral("par2SettingsButton"));
+    _ui->horizontalLayout_keepNfo->insertWidget(2, _par2SettingsButton);
+    connect(_par2SettingsButton, &QPushButton::clicked, this, &MainWindow::onPar2Settings);
+
+    _applyLogCapacity(_ngPost->debugFull() ? 2 : (_ngPost->debugMode() ? 1 : 0));
 
     _quickJobTab = new PostingWidget(ngPost, this, 1);
+    _connectPostingWidget(_quickJobTab);
     _autoPostTab = new AutoPostWidget(ngPost, this);
 
     _ui->debugBox->setChecked(_ngPost->debugMode());
@@ -189,30 +351,36 @@ void MainWindow::init(NgPost *ngPost)
 
     QTabBar *tabBar = _ui->postTabWidget->tabBar();
     tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
-    tabBar->setElideMode(Qt::TextElideMode::ElideNone);
+    // Once the bar is full, quick post tabs lose the start of their title before
+    // scroll arrows show up, never their "#N" (see StartupTabBar).
+    tabBar->setElideMode(Qt::TextElideMode::ElideLeft);
     tabBar->setIconSize({18, 18});
 
     _ui->postTabWidget->clear();
     _ui->postTabWidget->setUsesScrollButtons(true);
     _ui->postTabWidget->setStyleSheet(sTabWidgetStyle);
-    _ui->postTabWidget->addTab(_quickJobTab, QIcon(":/icons/quick.png"), _ngPost->quickJobName());
-    tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
-    _ui->postTabWidget->addTab(_autoPostTab, QIcon(":/icons/auto.png"), _ngPost->folderMonitoringName());
-    tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
     _ui->postTabWidget->addTab(_buildHistoryTab(), QIcon(":/icons/monitor.png"), tr("History"));
-    tabBar->setTabToolTip(2, tr("Post history, statistics and resume center"));
-    _ui->postTabWidget->addTab(new QWidget(_ui->postTabWidget), QIcon(":/icons/plus.png"), tr("New"));
-    tabBar->setTabToolTip(3, QString("Create a new %1").arg(_ngPost->quickJobName()));
+    tabBar->setTabToolTip(kHistoryTab, tr("Post history, statistics and resume center"));
+    _ui->postTabWidget->addTab(_autoPostTab,
+                               QIcon(":/icons/auto.png"),
+                               _ngPost->folderMonitoringName());
+    tabBar->setTabToolTip(kAutoPostTab, _ngPost->folderMonitoringName());
+    _ui->postTabWidget->addTab(_quickJobTab,
+                               QIcon(":/icons/quick.svg"),
+                               QString("%1 #1").arg(_ngPost->quickJobName()));
+    tabBar->setTabToolTip(kQuickPostTab, tr("Default %1").arg(_ngPost->quickJobName()));
 
-//    connect(_ui->postTabWidget,           &QTabWidget::currentChanged, this, &MainWindow::onJobTabClicked);
-    connect(tabBar, &QTabBar::tabBarClicked,              this, &MainWindow::onJobTabClicked);
     connect(tabBar, &QWidget::customContextMenuRequested, this, &MainWindow::onTabContextMenu);
     connect(tabBar, &QTabBar::tabCloseRequested,          this, &MainWindow::onCloseJob);
+    connect(_ui->postTabWidget,
+            &StartupTabWidget::emptyStripDoubleClicked,
+            this,
+            &MainWindow::onNewQuickTab);
     _ui->postTabWidget->setTabsClosable(true);
+    _buildPostingControls();
     _ui->postTabWidget->installEventFilter(this);
-//    _ui->postTabWidget->setCurrentIndex(1);
 
-    setJobLabel(1);
+    refreshJobLabel();
 
 
     for (const QString &lang : _ngPost->languages())
@@ -225,9 +393,15 @@ void MainWindow::init(NgPost *ngPost)
     _quickJobTab->init();
     _autoPostTab->init();
 
-    _ui->goCmdButton->hide();
-//    connect(_ui->goCmdButton, &QAbstractButton::clicked, _ngPost, &NgPost::onGoCMD, Qt::QueuedConnection);
+    // Every tab is built: open on the one the user pinned from the tab context
+    // menu. Nothing pinned is the quick post tab, where ngPost has always
+    // started.
+    _startupTab = readStartupTab();
+    _applyStartupTab();
+    if (_ngPost->uiZoom() != 100)
+        applyUiZoom(_ngPost->uiZoom(), false);
 
+    _ui->goCmdButton->hide();
     updateProgressBar(0, 0);
 }
 
@@ -239,11 +413,14 @@ QWidget *MainWindow::buildHistoryTabForTest()
 #endif
 
 
-void MainWindow::updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded, const QString &avgSpeed
-                                   #ifdef __COMPUTE_IMMEDIATE_SPEED__
-                                       , const QString &immediateSpeed
-                                   #endif
-                                   )
+void MainWindow::updateProgressBar(uint nbArticlesTotal,
+                                   uint nbArticlesUploaded,
+                                   const QString &avgSpeed
+#ifdef __COMPUTE_IMMEDIATE_SPEED__
+                                   ,
+                                   const QString &immediateSpeed
+#endif
+)
 {
 //    qDebug() << "[MainWindow::updateProgressBar] _nbArticlesUploaded: " << nbArticlesUploaded;
     _ui->progressBar->setValue(static_cast<int>(nbArticlesUploaded));
@@ -265,20 +442,203 @@ void MainWindow::updateProgressBar(uint nbArticlesTotal, uint nbArticlesUploaded
 }
 
 
+//! Ask what to do about a VPN state ngPost did not create. Returns false when
+//! the user cancelled, so the caller can stop rather than open the settings on
+//! top of an unanswered question.
+bool MainWindow::_showUnattributedVpnDecision()
+{
+    VpnManager *vpn = _ngPost->vpnManager();
+    if (!vpn)
+        return true;
+
+    QString const message =
+        _unattributedVpn.legacyOwnerActive
+            ? tr("The VPN configured in ngPost already seems to be running.\n\n"
+                 "Another ngPost is using it, most likely an older version.\n\n"
+                 "Close that other ngPost to use the VPN here.")
+            : tr("The VPN configured in ngPost already seems to be running.\n\n"
+                 "Another ngPost may be using it.\n\n"
+                 "Close that other ngPost to use the VPN here. If none is running, "
+                 "you can remove these leftover settings.");
+
+    QMessageBox box(QMessageBox::Information, tr("The VPN seems to be already in use"),
+                    message, QMessageBox::NoButton, this);
+    box.setDetailedText(_unattributedVpn.diagnostic);
+    QPushButton *close = box.addButton(tr("Close"), QMessageBox::RejectRole);
+    QPushButton *remove = box.addButton(tr("Remove leftover settings..."),
+                                        QMessageBox::DestructiveRole);
+    remove->setEnabled(!_unattributedVpn.legacyOwnerActive);
+    if (_unattributedVpn.legacyOwnerActive)
+        remove->setToolTip(tr("Another ngPost is using them."));
+    box.setDefaultButton(close);
+    box.exec();
+
+    if (box.clickedButton() == remove) {
+        if (vpn->cleanupUnattributed(true))
+            _unattributedVpn = {};
+        else
+            QMessageBox::warning(this, tr("VPN"),
+                                 tr("These settings could not be removed. "
+                                    "See the VPN log for details."));
+    }
+    return true;
+}
+
+void MainWindow::_applyLogCapacity(int debugLevel)
+{
+    const int level      = qBound(0, debugLevel, kLogMaxDebugLevel);
+    const int blocks     = kLogBudgetBytes[level] / kLogBytesPerBlock;
+    const int characters = kLogBudgetBytes[level] / kLogWorstCaseBytesPerCharacter;
+    _logCharacterCap     = qMax(_logCharacterCap, characters);
+
+    // Only ever raised within a session. Losing the trace you just captured
+    // because you switched debug back off in order to read it would be a poor
+    // trade.
+    _logBlockCap = qMax(_logBlockCap, blocks);
+}
+
+#ifdef NGPOST_TESTING
+int MainWindow::logBlockCountForTest() const
+{
+    return _ui->logBrowser->document()->blockCount();
+}
+
+int MainWindow::logMaxBlockCharactersForTest() const
+{
+    return kLogMaxBlockCharacters;
+}
+#endif
+
+namespace
+{
+bool isLogLineBreak(QChar ch)
+{
+    return ch == QLatin1Char('\r') || ch == QLatin1Char('\n')
+        || ch.category() == QChar::Separator_Line || ch.category() == QChar::Separator_Paragraph;
+}
+
+//! Inserts text[pos, runEnd), which holds no line break, in blocks of at most
+//! kLogMaxBlockCharacters.
+void insertBoundedLogRun(QTextCursor &cursor,
+                         const QString &text,
+                         qsizetype pos,
+                         qsizetype runEnd,
+                         const QTextCharFormat &format)
+{
+    while (pos < runEnd) {
+        const int currentLength = qMax(0, cursor.block().length() - 1);
+        if (currentLength >= kLogMaxBlockCharacters) {
+            cursor.insertBlock();
+            continue;
+        }
+
+        qsizetype take = qMin<qsizetype>(kLogMaxBlockCharacters - currentLength, runEnd - pos);
+        // The limit is expressed in UTF-16 units, but never split a
+        // surrogate pair merely because it straddles the boundary.
+        if (pos + take < runEnd && text.at(pos + take - 1).isHighSurrogate()
+            && text.at(pos + take).isLowSurrogate()) {
+            if (take == 1) {
+                cursor.insertBlock();
+                continue;
+            }
+            --take;
+        }
+        cursor.insertText(text.mid(pos, take), format);
+        pos += take;
+    }
+}
+}
+
+void MainWindow::_insertBoundedLogText(const QString &text, bool startNewBlock,
+                                       const QTextCharFormat &format) const
+{
+    QTextCursor cursor = _ui->logBrowser->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    // QTextEdit::append() starts a paragraph of its own, but it also inserts
+    // the whole string as one block however long it is -- which is the case
+    // the per-block cap exists to prevent. Reproduce its paragraph break here
+    // and let the same bounded insertion handle every caller.
+    if (startNewBlock && !_ui->logBrowser->document()->isEmpty())
+        cursor.insertBlock();
+    cursor.setCharFormat(format);
+
+    qsizetype pos = 0;
+    while (pos < text.size()) {
+        const QChar ch = text.at(pos);
+        if (isLogLineBreak(ch)) {
+            // QTextDocument treats CRLF as one paragraph boundary. Normalise
+            // every supported separator to the same explicit block operation.
+            if (ch == QLatin1Char('\r') && pos + 1 < text.size()
+                && text.at(pos + 1) == QLatin1Char('\n'))
+                ++pos;
+            cursor.insertBlock();
+            ++pos;
+            continue;
+        }
+
+        qsizetype runEnd = pos + 1;
+        while (runEnd < text.size() && !isLogLineBreak(text.at(runEnd)))
+            ++runEnd;
+        insertBoundedLogRun(cursor, text, pos, runEnd, format);
+        pos = runEnd;
+    }
+
+    _ui->logBrowser->setTextCursor(cursor);
+    _ui->logBrowser->ensureCursorVisible();
+}
+
+void MainWindow::_trimLogPane() const
+{
+    QTextDocument *doc = _ui->logBrowser->document();
+    const bool tooManyBlocks = doc->blockCount() > _logBlockCap + kLogTrimSlice;
+    const bool tooManyCharacters =
+        doc->characterCount() > _logCharacterCap + kLogCharacterTrimSlice;
+    if (!tooManyBlocks && !tooManyCharacters)
+        return;
+
+    // Blocks are the unit either way: dropping whole ones keeps the pane
+    // readable, and with kLogMaxBlockCharacters bounding each of them the
+    // character axis converges in a handful of blocks.
+    int drop = tooManyBlocks ? doc->blockCount() - _logBlockCap : 0;
+    if (tooManyCharacters) {
+        qint64 excess = qint64(doc->characterCount()) - _logCharacterCap;
+        QTextBlock block = doc->firstBlock();
+        int byCharacters = 0;
+        while (block.isValid() && excess > 0 && byCharacters < doc->blockCount() - 1) {
+            excess -= block.length();
+            ++byCharacters;
+            block = block.next();
+        }
+        drop = qMax(drop, byCharacters);
+    }
+    drop = qBound(0, drop, doc->blockCount() - 1);
+    if (drop <= 0)
+        return;
+
+    QTextCursor cursor(doc);
+    cursor.movePosition(QTextCursor::Start);
+    cursor.movePosition(QTextCursor::NextBlock, QTextCursor::KeepAnchor, drop);
+    cursor.removeSelectedText();
+}
+
 void MainWindow::log(const QString &aMsg, bool newline) const
 {
-    if (newline)
-        _ui->logBrowser->append(aMsg);
-    else
-    {
-        _ui->logBrowser->insertPlainText(aMsg);
-        _ui->logBrowser->moveCursor(QTextCursor::End);
-    }
+    const bool newBlock = newline || _logEntryComplete;
+    _insertBoundedLogText(_logTimestamp.format(aMsg, newBlock), newBlock);
+    if (!aMsg.isEmpty() || newline)
+        _logEntryComplete = newline;
+    _trimLogPane();
 }
 
 void MainWindow::logError(const QString &error) const
 {
-    _ui->logBrowser->append(QString("<font color='red'>%1</font><br/>\n").arg(error));
+    if (_isLogBoxCollapsed())
+        const_cast<MainWindow *>(this)->_setLogBoxCollapsed(false);
+    QTextCharFormat red;
+    red.setForeground(QBrush(QColor(Qt::red)));
+    _insertBoundedLogText(_logTimestamp.format(error, true), true, red);
+    _logEntryComplete = true;
+    _trimLogPane();
 }
 
 bool MainWindow::useFixedPassword() const
@@ -295,20 +655,99 @@ bool MainWindow::hasAutoCompress() const
     return _ui->autoCompressCB->isChecked();
 }
 
+#include <QGraphicsDropShadowEffect>
 #include <QKeyEvent>
+#include <QMouseEvent>
+#include <QResizeEvent>
+namespace
+{
+bool widgetWithin(const QWidget *area, const QWidget *widget)
+{
+    return area && widget && (widget == area || area->isAncestorOf(widget));
+}
+
+//! Closes the zoom popup on Escape or on a press outside it and its button. It
+//! filters the whole application only while the popup shows, and on its own:
+//! MainWindow::eventFilter must keep seeing just the objects it watches.
+class ZoomPopupDismisser : public QObject
+{
+public:
+    //! Owned by \a popup, on which makeDismissable() installs it.
+    ZoomPopupDismisser(QWidget *popup, QWidget *button)
+        : QObject(popup)
+        , _popup(popup)
+        , _button(button)
+    {
+    }
+
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override
+    {
+        if (obj == _popup && event->type() == QEvent::Show)
+            qApp->installEventFilter(this);
+        else if (obj == _popup && event->type() == QEvent::Hide)
+            qApp->removeEventFilter(this);
+        else if (event->type() == QEvent::MouseButtonPress && obj->isWidgetType())
+            _dismissOutside(static_cast<QWidget *>(obj), static_cast<QMouseEvent *>(event));
+        else if (event->type() == QEvent::KeyPress && _popup->isVisible()
+                 && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Escape) {
+            _popup->hide();
+            return true;
+        }
+        return false;
+    }
+
+private:
+    void _dismissOutside(QWidget *receiver, const QMouseEvent *event)
+    {
+        // The press travels up to the parents a widget ignores it for, its
+        // position mapped at each step: look up what lies under it every time
+        // rather than trusting the receiver, and never use global coordinates,
+        // which Wayland does not provide.
+        QWidget *pressed = receiver->childAt(event->position().toPoint());
+        if (!pressed)
+            pressed = receiver;
+        if (_popup->isVisible() && !widgetWithin(_popup, pressed)
+            && !widgetWithin(_button, pressed))
+            _popup->hide();
+    }
+
+    QWidget *const _popup;
+    QWidget *const _button;
+};
+
+//! Hides \a popup until it is asked for, then closes it on Escape or on a
+//! press outside it and \a button.
+void makeDismissable(QWidget *popup, QWidget *button)
+{
+    popup->hide();
+    popup->installEventFilter(new ZoomPopupDismisser(popup, button));
+}
+}
+
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
+    if (event->type() == QEvent::Resize && _historyTable && obj == _historyTable->viewport())
+        _fitHistoryColumns(false);
+
     if (event->type() == QEvent::KeyPress && obj == _ui->postTabWidget)
     {
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
         qDebug() << "[MainWindow] getting key event: " << keyEvent->key();
         int currentTabIdx = _ui->postTabWidget->currentIndex();
-        if (currentTabIdx == 1)
+        if (currentTabIdx == kAutoPostTab)
             static_cast<AutoPostWidget*>(_ui->postTabWidget->currentWidget())->handleKeyEvent(keyEvent);
         else if (PostingWidget *postWidget = _getPostWidget(currentTabIdx))
             postWidget->handleKeyEvent(keyEvent);
     }
     return QObject::eventFilter(obj, event);
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    if (_zoomPopup && _zoomPopup->isVisible())
+        _repositionZoomPopup();
 }
 
 #include <QMimeData>
@@ -321,7 +760,7 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 void MainWindow::dropEvent(QDropEvent *e)
 {
     int currentTabIdx = _ui->postTabWidget->currentIndex();
-    if (currentTabIdx == 1)
+    if (currentTabIdx == kAutoPostTab)
         _autoPostTab->handleDropEvent(e);
     else if (PostingWidget *postWidget = qobject_cast<PostingWidget*>(_ui->postTabWidget->currentWidget()))
         postWidget->handleDropEvent(e);
@@ -330,10 +769,19 @@ void MainWindow::dropEvent(QDropEvent *e)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    const auto shutdownHold = _ngPost->holdShutdown();
     // Persist the current window geometry so the next run reopens at the
     // same size/position (saveGeometry also captures the maximized state).
     QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
     guiSettings.setValue(kMainWindowGeometryKey, saveGeometry());
+    guiSettings.sync();
+    // A column dragged in the last half second: its width has not been written
+    // yet, and closing must not be what loses it.
+    if (_historyColumnsSaveTimer && _historyColumnsSaveTimer->isActive())
+    {
+        _historyColumnsSaveTimer->stop();
+        _saveHistoryColumns();
+    }
 
     if (_ngPost->hasPostingJobs())
     {
@@ -369,7 +817,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
     // orphan tunnel that gets detected as "stale state" on next launch.
     if (VpnManager *vpn = _ngPost->vpnManager()) {
         if (vpn->state() == VpnManager::State::Connected
-            || vpn->state() == VpnManager::State::Starting) {
+            || vpn->state() == VpnManager::State::Starting
+            || vpn->state() == VpnManager::State::Reconnecting) {
             vpn->stop();
             // Spin the event loop briefly so the helper's stdin closure is
             // processed and its trap can run cleanup.
@@ -384,62 +833,72 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::changeEvent(QEvent *event)
 {
-    if(event)
-    {
-        QStringList serverTableHeader;
-        QTabBar *tabBar = _ui->postTabWidget->tabBar();
-        int lastTabIdx = tabBar->count() - 1;
-        switch(event->type()) {
-        // this event is send if a translator is loaded
-        case QEvent::LanguageChange:
-            qDebug() << "MainWindow::changeEvent";
-            _ui->retranslateUi(this);
-#ifdef __COMPUTE_IMMEDIATE_SPEED__
-            _ui->uploadLbl->setToolTip(tr("Immediate speed (avg on %1 sec) - (nb Articles uploaded / total number of Articles) - avg speed").arg(NgPost::immediateSpeedDuration()));
-#endif
-            _ui->shutdownCB->setToolTip(tr("Shutdown computer when all the current Posts are done (with command: %1)").arg(
-                                            _ngPost->_shutdownCmd));
-
-            _ui->serverBox->setTitle(tr("Servers"));
-            _ui->fileBox->setTitle(tr("Files"));
-            _ui->postingBox->setTitle(tr("Parameters"));
-            _ui->logBox->setTitle(tr("Posting Log"));
-
-            tabBar->setTabText(0, _ngPost->quickJobName());
-            tabBar->setTabToolTip(0, tr("Default %1").arg(_ngPost->quickJobName()));
-            tabBar->setTabText(1, _ngPost->folderMonitoringName());
-            tabBar->setTabToolTip(1, _ngPost->folderMonitoringName());
-            tabBar->setTabText(2, tr("History"));
-            tabBar->setTabToolTip(2, tr("Post history, statistics and resume center"));
-            for (int i = 3 ; i < lastTabIdx; ++i)
-                if (_getPostWidget(i))
-                    tabBar->setTabText(i, _ngPost->quickJobName());
-            tabBar->setTabText(lastTabIdx, tr("New"));
-            tabBar->setTabToolTip(lastTabIdx, QString("Create a new %1").arg(_ngPost->quickJobName()));
-
-            setJobLabel(_ui->postTabWidget->currentIndex());
-
-            for (const char *header : sServerListHeaders)
-                serverTableHeader << tr(header);
-            _ui->serversTable->setHorizontalHeaderLabels(serverTableHeader);
-
-
-            _quickJobTab->retranslate();
-            _autoPostTab->retranslate();
-            for (int i = 2 ; i < _ui->postTabWidget->count() - 1; ++i)
-                if (PostingWidget *postWidget = _getPostWidget(i))
-                    postWidget->retranslate();
-            _retranslateHistoryTab();
-            break;
-
-            // this event is send, if the system, language changes
-        default:
-            break;
-        }
-    }
     QMainWindow::changeEvent(event);
+    if (event->type() == QEvent::StyleChange)
+        QTimer::singleShot(0, this, &MainWindow::_configureWaylandSplitters);
+    if (!_ngPost || !_postAllButton)
+        return;
+    if (event->type() == QEvent::LanguageChange)
+        _retranslate();
+    if (event->type() == QEvent::PaletteChange) {
+        _refreshPostingControls();
+        _refreshNewQuickTab();
+        if (_autoPostTab)
+            _autoPostTab->refreshPendingColors();
+    }
 }
 
+void MainWindow::_retranslate()
+{
+    QStringList serverTableHeader;
+    QTabBar *tabBar = _ui->postTabWidget->tabBar();
+    qDebug() << "MainWindow::changeEvent";
+    _ui->retranslateUi(this);
+    if (_par2SettingsButton)
+        _par2SettingsButton->setText(tr("PAR2 Settings…"));
+    updatePostAllButton();
+#ifdef __COMPUTE_IMMEDIATE_SPEED__
+    _ui->uploadLbl->setToolTip(tr("Immediate speed (avg on %1 sec) - (nb Articles uploaded / total "
+                                  "number of Articles) - avg speed")
+                                   .arg(NgPost::immediateSpeedDuration()));
+#endif
+    _ui->shutdownCB->setToolTip(tr("Shutdown the computer once all the posts are done"));
+
+    _ui->serverBox->setTitle(tr("Servers"));
+    _ui->fileBox->setTitle(tr("Files"));
+    _ui->postingBox->setTitle(tr("Parameters"));
+    _ui->logBox->setTitle(tr("Posting Log"));
+    _updateLogToggleBtn();
+    if (_zoomBtn)
+        _zoomBtn->setToolTip(tr("UI Zoom: %1% (Click to adjust)").arg(_ngPost->uiZoom()));
+
+    tabBar->setTabText(kQuickPostTab, QString("%1 #1").arg(_ngPost->quickJobName()));
+    tabBar->setTabToolTip(kQuickPostTab, tr("Default %1").arg(_ngPost->quickJobName()));
+    tabBar->setTabText(kAutoPostTab, _ngPost->folderMonitoringName());
+    tabBar->setTabToolTip(kAutoPostTab, _ngPost->folderMonitoringName());
+    tabBar->setTabText(kHistoryTab, tr("History"));
+    tabBar->setTabToolTip(kHistoryTab, tr("Post history, statistics and resume center"));
+    for (int i = kNbFixedTabs; i < tabBar->count(); ++i)
+        if (auto *post = _getPostWidget(i))
+            tabBar->setTabText(
+                i,
+                QString("%1 #%2").arg(_ngPost->quickJobName()).arg(post->displayNumber()));
+    _refreshNewQuickTab();
+
+    refreshJobLabel();
+
+    for (const char *header : sServerListHeaders)
+        serverTableHeader << tr(header);
+    _ui->serversTable->setHorizontalHeaderLabels(serverTableHeader);
+
+
+    _quickJobTab->retranslate();
+    _autoPostTab->retranslate();
+    for (int i = kNbFixedTabs; i < _ui->postTabWidget->count(); ++i)
+        if (PostingWidget *postWidget = _getPostWidget(i))
+            postWidget->retranslate();
+    _retranslateHistoryTab();
+}
 
 
 #include "CheckBoxCenterWidget.h"
@@ -481,23 +940,101 @@ void MainWindow::onTabContextMenu(const QPoint &point)
     if (point.isNull())
         return;
 
-//    QTabBar *tabBar = _ui->postTabWidget->tabBar();
-//    int tabIndex = tabBar->tabAt(point);
-//    PostingWidget *currentPostWidget = _getPostWidget(tabIndex);
     QMenu menu(tr("Quick Tabs Menu"), this);
+    _fillTabContextMenu(menu, _ui->postTabWidget->tabBar()->tabAt(point));
+    menu.exec(QCursor::pos());
+}
+
+void MainWindow::_fillTabContextMenu(QMenu &menu, int tabIndex)
+{
+    // Only the three fixed tabs can be the startup one: the quick post tabs
+    // after them are created on the fly and gone by the next launch.
+    if (tabIndex >= 0 && tabIndex < kNbFixedTabs)
+    {
+        QAction *startupAction = menu.addAction(tr("Open this tab on startup"));
+        startupAction->setCheckable(true);
+        startupAction->setChecked(_startupTab == tabIndex);
+        connect(startupAction, &QAction::triggered,
+                this, [this, tabIndex]() { onToggleStartupTab(tabIndex); });
+        menu.addSeparator();
+    }
+
 #if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
     QAction *action = menu.addAction(QIcon(":/icons/clear.png"), tr("Close All finished Tabs"), this, &MainWindow::onCloseAllFinishedQuickTabs);
 #else
     QAction *action = menu.addAction(QIcon(":/icons/clear.png"), tr("Close All finished Tabs"), this, SLOT(onCloseAllFinishedQuickTabs));
 #endif
     action->setEnabled(hasFinishedPosts());
-    menu.exec(QCursor::pos());
+}
+
+StartupTabBar *MainWindow::_startupTabBar() const
+{
+    return _ui->postTabWidget->startupTabBar();
+}
+
+void MainWindow::_applyStartupTab()
+{
+    _startupTabBar()->setStartupTab(_startupTab);
+    _ui->postTabWidget->setCurrentIndex(_startupTab < 0 ? kQuickPostTab : _startupTab);
+}
+
+void MainWindow::onToggleStartupTab(int tabIndex)
+{
+    if (tabIndex < 0 || tabIndex >= kNbFixedTabs)
+        return;
+
+    // Picking the tab that already opens at startup takes the setting away:
+    // back to nothing chosen, which is the quick post tab again.
+    _startupTab = (_startupTab == tabIndex) ? -1 : tabIndex;
+
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    if (_startupTab < 0)
+        guiSettings.remove(kStartupTabKey);
+    else
+        guiSettings.setValue(kStartupTabKey, kNbFixedTabs - 1 - _startupTab);
+    guiSettings.sync(); // saved now, not when ngPost is closed
+
+    // The bold moves at once; the tick is read from _startupTab the next time
+    // the menu is opened, so it follows on its own.
+    _startupTabBar()->setStartupTab(_startupTab);
+}
+
+bool MainWindow::hasUnsubmittedPosts() const
+{
+    // Post All needs no flag here: while one of its dialogs is open, that tab
+    // and the ones after it are still submittable.
+    for (const auto *post : _postingWidgets())
+        if (post->canSubmit())
+            return true;
+    return false;
+}
+
+QList<PostingWidget *> MainWindow::_postingWidgets() const
+{
+    QList<PostingWidget *> posts;
+    for (int i = 0; i < _ui->postTabWidget->count(); ++i)
+        if (auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->widget(i)))
+            posts << post;
+    return posts;
+}
+
+void MainWindow::_connectPostingWidget(PostingWidget *post)
+{
+    // Re-evaluate after the tab or list change has settled, including the
+    // default tab being emptied and tabs removed by either close path.
+    // ~MainWindow() disconnects every PostingWidget from this first.
+    const auto changed = [this] {
+        updatePostAllButton();
+        _ngPost->requestShutdownRecheck();
+    };
+    connect(post, &PostingWidget::submissionEligibilityChanged, this, changed);
+    connect(post, &QObject::destroyed, this, changed);
 }
 
 bool MainWindow::hasFinishedPosts() const
 {
-    for (int idx = 2 ; idx < _ui->postTabWidget->count() - 2 ; ++idx)
-    {
+    // Closable post tabs are the ones after the fixed tabs.
+    for (int idx = kNbFixedTabs; idx < _ui->postTabWidget->count(); ++idx) {
         PostingWidget *postWidget = _getPostWidget(idx);
         if (postWidget && postWidget->isPostingFinished())
             return true;
@@ -508,8 +1045,7 @@ bool MainWindow::hasFinishedPosts() const
 void MainWindow::onCloseAllFinishedQuickTabs()
 {
     // go backwards as we may delete the current tab ;)
-    for (int idx = _ui->postTabWidget->count() - 2 ; idx > 1  ; --idx)
-    {
+    for (int idx = _ui->postTabWidget->count() - 1; idx >= kNbFixedTabs; --idx) {
         PostingWidget *postWidget = _getPostWidget(idx);
         if (postWidget && postWidget->isPostingFinished())
             onCloseJob(idx);
@@ -524,37 +1060,177 @@ void MainWindow::onSetProgressBarRange(int nbArticles)
 
 void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes, const QUrl &releasePage)
 {
+    if (!_ngPost->updateChecker())
+        return;
+    _updateTag = tag;
+    _updateNotes = notes;
+    _updateReleasePage = releasePage;
+    // Between two popups, and after "Later", the status-bar link keeps the
+    // update visible and reopens the popup.
+    _showUpdateLink();
+    if (claimUpdatePrompt())
+        _promptUpdate();
+}
+
+//! Where ngPost cannot replace itself (AppImage, source build, Setup install),
+//! the popup is the same, but its button opens the release page instead.
+void MainWindow::_promptUpdate()
+{
     UpdateChecker *uc = _ngPost->updateChecker();
-    if (!uc)
+    if (!uc || _updateTag.isEmpty())
         return;
-
-    QString notesPreview = notes.left(800);
-    if (notes.size() > 800)
-        notesPreview += "...";
-    notesPreview.replace('<', "&lt;").replace('>', "&gt;").replace('\n', "<br/>");
-
-    QString body = tr("<h3>New version available: <b>ngPost %1</b></h3>"
-                      "<p>Current: v%2</p>"
-                      "<p><a href=\"%3\">View release on GitHub</a></p>")
-                       .arg(tag, NgPost::sVersion, releasePage.toString());
-    if (!notesPreview.isEmpty())
-        body += "<hr/><div style='font-size:small'>" + notesPreview + "</div>";
-
-    QMessageBox box(this);
-    box.setWindowTitle(tr("New version available"));
-    box.setTextFormat(Qt::RichText);
-    box.setTextInteractionFlags(Qt::TextBrowserInteraction);
-    box.setText(body);
-    QPushButton *install = box.addButton(tr("Install and Restart"), QMessageBox::AcceptRole);
-    box.addButton(tr("Later"), QMessageBox::RejectRole);
-    box.setDefaultButton(install);
-    box.exec();
-    if (box.clickedButton() != install)
+    const bool install = uc->canInstallAutomatically();
+    const QUrl releasePage = _updateReleasePage;
+    const auto shutdownHold = _ngPost->holdShutdown();
+    const std::unique_ptr<QDialog> dialog(
+        _createUpdateDialog(_updateTag, _updateNotes, releasePage, install));
+    if (dialog->exec() != QDialog::Accepted)
         return;
+    if (install)
+        _downloadUpdate(uc);
+    else
+        QDesktopServices::openUrl(releasePage);
+}
 
+//! The update popup: a link to the release page -- all a release published
+//! without notes offers -- and the release notes in full, folded at first.
+QDialog *MainWindow::_createUpdateDialog(const QString &tag,
+                                         const QString &notes,
+                                         const QUrl &releasePage,
+                                         bool install)
+{
+    auto *dialog = new QDialog(this);
+    dialog->setObjectName(QStringLiteral("updateDialog"));
+    dialog->setWindowTitle(tr("New version available"));
+    dialog->setMinimumWidth(QFontMetrics(font()).averageCharWidth() * 60);
+    auto *layout = new QVBoxLayout(dialog);
+    auto *header = new QLabel(tr("<h3>New version available: <b>ngPost %1</b></h3>"
+                                 "<p>Current: v%2</p>"
+                                 "<p><a href=\"%3\">View release on GitHub</a></p>")
+                                  .arg(tag,
+                                       UpdateChecker::stripVersionPrefix(UpdateChecker::buildTag()),
+                                       releasePage.toString()),
+                              dialog);
+    header->setObjectName(QStringLiteral("updateHeader"));
+    header->setTextFormat(Qt::RichText);
+    header->setWordWrap(true);
+    header->setOpenExternalLinks(true);
+    layout->addWidget(header);
+    if (!notes.trimmed().isEmpty())
+        _addReleaseNotes(dialog, notes);
+
+    auto *buttons = new QDialogButtonBox(dialog);
+    buttons
+        ->addButton(install ? tr("Install and Restart") : tr("Open Release Page"),
+                    QDialogButtonBox::AcceptRole)
+        ->setDefault(true);
+    buttons->addButton(tr("Later"), QDialogButtonBox::RejectRole);
+    connect(buttons, &QDialogButtonBox::accepted, dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    dialog->adjustSize();
+    return dialog;
+}
+
+//! The release notes, folded under a link at first so the popup stays small.
+//! Unfolding grows it to a screenful of notes; folding shrinks it back.
+void MainWindow::_addReleaseNotes(QDialog *dialog, const QString &notes)
+{
+    const QFontMetrics metrics(font());
+    // A link like the one above it -- its colour, underlined -- with an arrow the
+    // style draws: fonts disagree on the shape and size of the arrow glyphs.
+    auto *toggle = new QToolButton(dialog);
+    toggle->setObjectName(QStringLiteral("updateNotesToggle"));
+    toggle->setAutoRaise(true);
+    toggle->setCursor(Qt::PointingHandCursor);
+    toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    toggle->setIconSize(QSize(metrics.height(), metrics.height()) * 2 / 3);
+    QPalette palette = toggle->palette();
+    palette.setColor(QPalette::ButtonText, palette.color(QPalette::Link));
+    toggle->setPalette(palette);
+    QFont underlined = toggle->font();
+    underlined.setUnderline(true);
+    toggle->setFont(underlined);
+    auto *browser = new QTextBrowser(dialog);
+    browser->setObjectName(QStringLiteral("updateNotesBrowser"));
+    // As plain as the popup around it: no frame, no background of its own.
+    browser->setFrameShape(QFrame::NoFrame);
+    browser->setStyleSheet(QStringLiteral("QTextBrowser { background: transparent; }"));
+    // Raw HTML stays text, and only web links open: a relative one would
+    // otherwise load a local file into the pane.
+    browser->document()->setMarkdown(UpdateChecker::releaseNotesMarkdown(notes),
+                                     QTextDocument::MarkdownFeatures(
+                                         QTextDocument::MarkdownDialectGitHub
+                                         | QTextDocument::MarkdownNoHTML));
+    browser->moveCursor(QTextCursor::Start); // open on the top of the notes
+    browser->setOpenLinks(false);
+    connect(browser, &QTextBrowser::anchorClicked, browser, [](const QUrl &url) {
+        if (url.scheme() == QLatin1String("https"))
+            QDesktopServices::openUrl(url);
+    });
+    browser->setMinimumHeight(metrics.lineSpacing() * 12);
+    dialog->layout()->addWidget(toggle);
+    dialog->layout()->addWidget(browser);
+
+    const auto fold = [dialog, toggle, browser, metrics](bool open) {
+        toggle->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);
+        toggle->setText(open ? tr("Hide release notes") : tr("Show release notes"));
+        const QPoint centre = dialog->frameGeometry().center();
+        browser->setVisible(open);
+        if (!dialog->isVisible())
+            return; // folded from the start: sized by its builder, placed by Qt
+        const QRect area = dialog->screen() ? dialog->screen()->availableGeometry() : QRect();
+        if (open) {
+            // A screenful of notes, within the screen the popup is on.
+            QSize size(metrics.averageCharWidth() * 100, metrics.lineSpacing() * 36);
+            if (area.isValid())
+                size = size.boundedTo(area.size() * 0.8);
+            dialog->resize(size.expandedTo(dialog->minimumSizeHint()));
+        } else {
+            dialog->adjustSize();
+        }
+        // Grow and shrink about its centre, so folding puts it back in place,
+        // without leaving the screen.
+        QRect frame = dialog->frameGeometry();
+        frame.moveCenter(centre);
+        if (area.isValid())
+            frame.moveTopLeft({ qBound(area.left(), frame.left(), area.right() - frame.width()),
+                                qBound(area.top(), frame.top(), area.bottom() - frame.height()) });
+        dialog->move(frame.topLeft());
+    };
+    // Not checkable: a checked button is filled in by some styles (Windows 11).
+    connect(toggle, &QToolButton::clicked, dialog, [fold, browser] { fold(browser->isHidden()); });
+    fold(false);
+}
+
+void MainWindow::_showUpdateLink()
+{
+    auto *label = statusBar()->findChild<QLabel *>(QStringLiteral("updateAvailableLabel"));
+    if (!label) {
+        label = new QLabel(statusBar());
+        label->setObjectName(QStringLiteral("updateAvailableLabel"));
+        label->setTextFormat(Qt::RichText);
+        label->setTextInteractionFlags(Qt::TextBrowserInteraction);
+        connect(label, &QLabel::linkActivated, this, &MainWindow::_promptUpdate);
+        // Left of the zoom control, which stays the rightmost item.
+        statusBar()->insertPermanentWidget(0, label);
+    }
+    const QString text = tr("Update available: %1").arg(_updateTag);
+    label->setText(QStringLiteral("<a href=\"%1\" style=\"color: #ff5252;\">%2</a>")
+                       .arg(_updateReleasePage.toString().toHtmlEscaped(), text.toHtmlEscaped()));
+    label->show();
+}
+
+void MainWindow::_downloadUpdate(UpdateChecker *uc)
+{
     auto *progress = new QProgressDialog(tr("Downloading update..."), tr("Cancel"), 0, 100, this);
+    auto progressHold = std::make_shared<decltype(_ngPost->holdShutdown())>(
+        _ngPost->holdShutdown());
+    connect(progress, &QObject::destroyed, this, [progressHold] {});
     progress->setWindowModality(Qt::WindowModal);
     progress->setAttribute(Qt::WA_DeleteOnClose);
+    progress->setAutoClose(false);
+    progress->setAutoReset(false);
     progress->setMinimumDuration(0);
     progress->setValue(0);
 
@@ -566,33 +1242,56 @@ void MainWindow::onNewVersionAvailable(const QString &tag, const QString &notes,
                     progress->setValue(static_cast<int>(received));
                 }
             });
-    connect(uc, &UpdateChecker::installStarting, progress, &QProgressDialog::close);
-    connect(uc, &UpdateChecker::downloadFailed, this,
-            [this, progress](const QString &msg) {
+    connect(uc, &UpdateChecker::installStarting, progress, [uc, progress] {
+        // closeEvent emits canceled too. A successful handoff is not a cancel.
+        disconnect(progress, nullptr, uc, nullptr);
+        progress->close();
+    });
+    connect(uc, &UpdateChecker::downloadFailed, progress,
+            [this, uc, progress](const QString &msg) {
+                disconnect(progress, nullptr, uc, nullptr);
                 progress->close();
+                const auto shutdownHold = _ngPost->holdShutdown();
                 QMessageBox::warning(this, tr("Update failed"), msg);
             });
-    connect(progress, &QProgressDialog::canceled, uc, [uc]() {
-        // Nothing wires this to abort the QNetworkReply for now; close the dialog is enough.
-        Q_UNUSED(uc);
-    });
+    connect(progress, &QProgressDialog::canceled, uc, &UpdateChecker::cancelDownload);
+    connect(progress, &QProgressDialog::canceled, progress, &QObject::deleteLater);
 
     uc->startDownloadAndInstall();
 }
 
+
+//! Hide every VPN affordance where the platform has no VPN integration.
+//!
+//! Idempotent and called from each of the three places that bring one of these
+//! widgets into existence -- the constructor for the button and the label, and
+//! both table-population paths for the column -- because there is no single
+//! moment when all three exist. Hiding rather than removing keeps the column
+//! indices aligned with sServerListHeaders, and keeps a useVpn flag written on
+//! another platform intact in the user's configuration file.
+void MainWindow::_applyVpnPlatformVisibility()
+{
+    if (VpnManager::vpnPlatformSupported())
+        return;
+    _ui->vpnSettingsBtn->setVisible(false);
+    _ui->vpnStateLbl->setVisible(false);
+    if (_ui->serversTable->columnCount() > kServerUseVpnColumn)
+        _ui->serversTable->setColumnHidden(kServerUseVpnColumn, true);
+}
 
 void MainWindow::_initServerBox()
 {
     _ui->serversTable->verticalHeader()->hide();
     _ui->serversTable->setColumnCount(sServerListHeaders.size());
 
-    int width = 2, col = 0;
+    // The accumulated total fed a setMaximumWidth() that was commented out
+    // long ago: the table is meant to follow its container, not to pin itself
+    // to the sum of its default column widths.
+    int col = 0;
     for (int size : sServerListSizes)
-    {
         _ui->serversTable->setColumnWidth(col++, size);
-        width += size;
-    }
-//    _ui->serversTable->setMaximumWidth(width);
+
+    _applyVpnPlatformVisibility();
 
     connect(_ui->addServerButton,   &QAbstractButton::clicked, this, &MainWindow::onAddServer);
 
@@ -633,6 +1332,37 @@ void MainWindow::_initPostingBox()
                 tr("This job needs the VPN but it cannot be started:\n\n%1\n\n"
                    "The job stays in the queue.").arg(detail));
         });
+        connect(vpn, &VpnManager::unattributedVpnStateDetected,
+                this, [this](QString const &diagnostic, bool legacyOwnerActive) {
+            // Deliberately not a modal. Finding a tunnel we did not create is
+            // not a failure: ngPost opens, and it still posts to every server
+            // that does not need the VPN. Interrupting the launch with a
+            // dialog on every start -- for as long as the other instance keeps
+            // its tunnel up -- makes the application feel broken when it is
+            // not. The notice goes to the status bar and the VPN log; the
+            // decision is offered where it belongs, in the VPN settings.
+            _unattributedVpn = { true, legacyOwnerActive, diagnostic };
+            statusBar()->showMessage(
+                tr("The VPN configured in ngPost already seems to be running; "
+                   "another ngPost may be using it. See VPN settings."),
+                15000);
+        });
+
+        connect(vpn, &VpnManager::recoveryExhausted, this, [this, vpn](VpnManager::FailureKind) {
+            const auto shutdownHold = _ngPost->holdShutdown();
+            QMessageBox box(QMessageBox::Critical, tr("VPN recovery exhausted"),
+                tr("The posting job is paused and preserved for a later resume."),
+                QMessageBox::NoButton, this);
+            QPushButton *retry = box.addButton(tr("Retry"), QMessageBox::AcceptRole);
+            QPushButton *stop = box.addButton(tr("Stop and preserve for resume"),
+                                               QMessageBox::RejectRole);
+            box.exec();
+            if (box.clickedButton() == retry && !vpn->retryVpn())
+                QMessageBox::warning(this, tr("VPN recovery"),
+                                     tr("The VPN recovery could not be restarted."));
+            else if (box.clickedButton() == stop)
+                _ngPost->stopActivePostingForResume();
+        });
         onVpnStateChanged(vpn->state());
     }
 
@@ -650,7 +1380,9 @@ void MainWindow::_initPostingBox()
     _ui->threadSB->setValue(_ngPost->_nbThreads);
 
     _ui->nzbPathEdit->setText(_ngPost->_nzbPath);
+    _offeredNzbPath = QFileInfo(_ngPost->_nzbPath).absoluteFilePath();
     connect(_ui->nzbPathButton, &QAbstractButton::clicked, this, &MainWindow::onNzbPathClicked);
+    connect(_ui->nzbPathEdit, &QLineEdit::returnPressed, this, &MainWindow::_offerNzbPathToTabs);
 }
 
 void MainWindow::updateServers()
@@ -752,9 +1484,9 @@ void MainWindow::updateConfigFromUi()
         return;
 
     int currentTabIdx = _ui->postTabWidget->currentIndex();
-    if (currentTabIdx == 0)
+    if (currentTabIdx == kQuickPostTab)
         _quickJobTab->udatePostingParams();
-    else if (currentTabIdx == 1)
+    else if (currentTabIdx == kAutoPostTab)
         _autoPostTab->udatePostingParams();
     else
     {
@@ -811,6 +1543,19 @@ static QColor statusColor(const QString &status)
     if (status == QStringLiteral("unknown"))
         return dark ? QColor(0xFF, 0x66, 0xFF) : QColor(Qt::darkMagenta);
     return qApp->palette().color(QPalette::WindowText);
+}
+
+//! Empties \a chart before it is filled again. removeAllSeries() deletes the
+//! series, but removeAxis() only hands each axis back, parentless: without the
+//! deleteLater() every refresh would leak them. Later, not now, because the
+//! chart drops the axis' graphics item with a deleteLater() of its own.
+static void clearChart(QChart *chart)
+{
+    chart->removeAllSeries();
+    for (QAbstractAxis *axis : chart->axes()) {
+        chart->removeAxis(axis);
+        axis->deleteLater();
+    }
 }
 
 } // namespace
@@ -965,6 +1710,46 @@ QWidget *MainWindow::_buildHistoryTab()
     QVBoxLayout *histLayout = new QVBoxLayout(histTab);
     histLayout->setContentsMargins(4, 4, 4, 4);
 
+    _buildHistoryFilters(histTab, histLayout);
+
+    // Splitter: table / detail panel
+    QSplitter *histSplitter = new QSplitter(Qt::Vertical, histTab);
+    histLayout->addWidget(histSplitter);
+
+    _buildHistoryTable(histSplitter);
+
+    _buildHistoryDetail(histSplitter);
+
+    QHBoxLayout *historyPageRow = new QHBoxLayout();
+    _histPrevPageBtn = new QPushButton(tr("Previous"), histTab);
+    _histNextPageBtn = new QPushButton(tr("Next"), histTab);
+    _histPageLabel = new QLabel(histTab);
+    _histPrevPageBtn->setEnabled(false);
+    _histNextPageBtn->setEnabled(false);
+    _histPageLabel->setAlignment(Qt::AlignCenter);
+    historyPageRow->addStretch();
+    historyPageRow->addWidget(_histPrevPageBtn);
+    historyPageRow->addWidget(_histPageLabel);
+    historyPageRow->addWidget(_histNextPageBtn);
+    historyPageRow->addStretch();
+    histLayout->addLayout(historyPageRow);
+
+    _innerHistoryTabs->addTab(histTab, tr("History"));
+
+    _buildHistoryStats();
+
+    _buildHistoryResume();
+
+    _connectHistoryControls();
+
+    // ===== Initial data load =====
+    _refreshHistoryViews();
+
+    return root;
+}
+
+void MainWindow::_buildHistoryFilters(QWidget *histTab, QVBoxLayout *histLayout)
+{
     // Filter row 1: search / status / password
     QHBoxLayout *filterRow1 = new QHBoxLayout();
     _historySearchEdit = new QLineEdit(histTab);
@@ -1030,13 +1815,13 @@ QWidget *MainWindow::_buildHistoryTab()
     filterRow2->addWidget(_histClearBtn);
     filterRow2->addStretch();
     histLayout->addLayout(filterRow2);
+}
 
-    // Splitter: table / detail panel
-    QSplitter *histSplitter = new QSplitter(Qt::Vertical, histTab);
-    histLayout->addWidget(histSplitter);
-
+void MainWindow::_buildHistoryTable(QSplitter *histSplitter)
+{
     // History table — 11 columns
     _historyTable = new QTableWidget(histSplitter);
+    _historyTable->setObjectName(QStringLiteral("historyTable"));
     _historyTable->setColumnCount(11);
     _historyTable->setHorizontalHeaderLabels({
         tr("Date"), tr("Name"), tr("Status"), tr("Size"), tr("Speed"),
@@ -1045,12 +1830,47 @@ QWidget *MainWindow::_buildHistoryTab()
     _historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     _historyTable->setSelectionMode(QAbstractItemView::ExtendedSelection);
     _historyTable->setSortingEnabled(true);
-    _historyTable->horizontalHeader()->setStretchLastSection(false);
-    _historyTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    QHeaderView *historyHeader = _historyTable->horizontalHeader();
+    historyHeader->setStretchLastSection(false);
+    // Every column is draggable, the name one included. It used to be a Stretch
+    // section so that it filled the width, but the header sizes those itself
+    // and the mouse cannot touch them -- the name column, the widest and the
+    // first one anybody wants to narrow, could not be resized at all. The room
+    // is now given to it by _fitHistoryColumns(), which steps aside for good as
+    // soon as the user drags a column of their own.
+    historyHeader->setSectionResizeMode(QHeaderView::Interactive);
+
+    // A drag fires one of these per pixel: the widths are written to the
+    // settings once it has settled, not five hundred times on the way.
+    _historyColumnsSaveTimer = new QTimer(this);
+    _historyColumnsSaveTimer->setSingleShot(true);
+    _historyColumnsSaveTimer->setInterval(500);
+    connect(_historyColumnsSaveTimer, &QTimer::timeout, this, &MainWindow::_saveHistoryColumns);
+
+    connect(historyHeader, &QHeaderView::sectionResized, this, [this](int, int, int) {
+        if (_resizingHistoryColumns)
+            return;
+        _historyColumnsResizedByUser = true;
+        _historyColumnsSaveTimer->start();
+    });
+    // The name column follows the width of the table until then.
+    _historyTable->viewport()->installEventFilter(this);
+
+    // Right click on the header hands the columns back to ngPost.
+    historyHeader->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(historyHeader, &QWidget::customContextMenuRequested,
+            this, &MainWindow::_onHistoryHeaderContextMenu);
+
     _historyTable->verticalHeader()->hide();
     _historyTable->setContextMenuPolicy(Qt::CustomContextMenu);
-    histSplitter->addWidget(_historyTable);
 
+    // Last, once the header is wired: widths kept from the previous run.
+    _restoreHistoryColumns();
+    histSplitter->addWidget(_historyTable);
+}
+
+void MainWindow::_buildHistoryDetail(QSplitter *histSplitter)
+{
     // Detail panel
     QWidget *detailPanel = new QWidget(histSplitter);
     QVBoxLayout *detailLayout = new QVBoxLayout(detailPanel);
@@ -1098,23 +1918,10 @@ QWidget *MainWindow::_buildHistoryTab()
     histSplitter->addWidget(detailPanel);
     histSplitter->setStretchFactor(0, 3);
     histSplitter->setStretchFactor(1, 1);
+}
 
-    QHBoxLayout *historyPageRow = new QHBoxLayout();
-    _histPrevPageBtn = new QPushButton(tr("Previous"), histTab);
-    _histNextPageBtn = new QPushButton(tr("Next"), histTab);
-    _histPageLabel = new QLabel(histTab);
-    _histPrevPageBtn->setEnabled(false);
-    _histNextPageBtn->setEnabled(false);
-    _histPageLabel->setAlignment(Qt::AlignCenter);
-    historyPageRow->addStretch();
-    historyPageRow->addWidget(_histPrevPageBtn);
-    historyPageRow->addWidget(_histPageLabel);
-    historyPageRow->addWidget(_histNextPageBtn);
-    historyPageRow->addStretch();
-    histLayout->addLayout(historyPageRow);
-
-    _innerHistoryTabs->addTab(histTab, tr("History"));
-
+void MainWindow::_buildHistoryStats()
+{
     // ===== Tab 1: Stats =====
     QWidget *statsTab = new QWidget(_innerHistoryTabs);
     QVBoxLayout *statsLayout = new QVBoxLayout(statsTab);
@@ -1175,7 +1982,10 @@ QWidget *MainWindow::_buildHistoryTab()
     _statsInnerTabs->addTab(_statsTopTable, tr("Top posts"));
 
     _innerHistoryTabs->addTab(statsTab, tr("Stats"));
+}
 
+void MainWindow::_buildHistoryResume()
+{
     // ===== Tab 2: Resume =====
     QWidget *resumeTab = new QWidget(_innerHistoryTabs);
     QVBoxLayout *resumeLayout = new QVBoxLayout(resumeTab);
@@ -1223,7 +2033,10 @@ QWidget *MainWindow::_buildHistoryTab()
     resumeLayout->addLayout(resumeActions);
 
     _innerHistoryTabs->addTab(resumeTab, tr("Resume"));
+}
 
+void MainWindow::_connectHistoryControls()
+{
     // ===== Connect signals =====
     auto refreshFirstHistoryPage = [this]() {
         _historyPageOffset = 0;
@@ -1284,14 +2097,9 @@ QWidget *MainWindow::_buildHistoryTab()
     connect(_resumePurgeBtn,      &QPushButton::clicked,  this, &MainWindow::_onResumePurge);
     connect(_resumeIgnoreBtn,     &QPushButton::clicked,  this, &MainWindow::_onResumeIgnore);
     connect(_resumeDeleteBtn,     &QPushButton::clicked,  this, &MainWindow::_onResumeDeleteEntries);
-    connect(_bannerResumeBtn,     &QPushButton::clicked,  this, [this]() {
+    connect(_bannerResumeBtn, &QPushButton::clicked, this, [this]() {
         _innerHistoryTabs->setCurrentIndex(2);
     });
-
-    // ===== Initial data load =====
-    _refreshHistoryViews();
-
-    return root;
 }
 
 void MainWindow::_refreshHistoryViews(bool rewindEmptyPage)
@@ -1362,8 +2170,7 @@ void MainWindow::_refreshHistoryViews(bool rewindEmptyPage)
                 _historyTable->setItem(row, col, item);
             }
         }
-        _historyTable->resizeColumnsToContents();
-        _historyTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+        _fitHistoryColumns(true);
         _historyTable->setSortingEnabled(true);
 
         if (_histPrevPageBtn)
@@ -1425,24 +2232,138 @@ void MainWindow::_refreshHistoryViews(bool rewindEmptyPage)
     _onStatsRefresh();
 }
 
-PostingWidget *MainWindow::addNewQuickTab(int lastTabIdx, const QFileInfoList &files)
+void MainWindow::_fitHistoryColumns(bool toContents)
 {
-    if (!lastTabIdx)
-        lastTabIdx = _ui->postTabWidget->count() -1;
-    PostingWidget *newPostingWidget = new PostingWidget(_ngPost, this, static_cast<uint>(lastTabIdx));
+    // Widths belong to the user from the moment they drag one: a refresh, or a
+    // window resize, must not undo what they set.
+    if (!_historyTable || _historyColumnsResizedByUser)
+        return;
+
+    // sectionResized cannot tell a drag from a resize we asked for, so ours
+    // run behind this flag.
+    _resizingHistoryColumns = true;
+    if (toContents)
+        _historyTable->resizeColumnsToContents();
+
+    QHeaderView *header = _historyTable->horizontalHeader();
+    int          taken  = 0;
+    for (int col = 0; col < _historyTable->columnCount(); ++col)
+        if (col != kHistoryNameColumn)
+            taken += header->sectionSize(col);
+
+    // What the other columns leave goes to the name, whether that widens it or
+    // narrows it: a window made smaller must take the room back, as it did when
+    // the section was a Stretch one. Nothing left at all and the horizontal
+    // scroll bar takes over, again as before.
+    int const room = _historyTable->viewport()->width() - taken;
+    if (room >= header->minimumSectionSize())
+        header->resizeSection(kHistoryNameColumn, room);
+    _resizingHistoryColumns = false;
+}
+
+void MainWindow::_restoreHistoryColumns()
+{
+    if (!_historyTable)
+        return;
+
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    QByteArray const state = guiSettings.value(kHistoryColumnsKey).toByteArray();
+    if (state.isEmpty())
+        return;
+
+    // restoreState() resizes sections, which our handler must not read as a
+    // drag. It also refuses a state that does not fit the table -- a history
+    // written by an ngPost with other columns -- and the widths ngPost computes
+    // itself stay in charge, which is exactly the right fallback.
+    _resizingHistoryColumns = true;
+    bool const restored = _historyTable->horizontalHeader()->restoreState(state);
+    _resizingHistoryColumns = false;
+
+    // Restored widths are the user's: ngPost must not size the columns again.
+    _historyColumnsResizedByUser = restored;
+}
+
+void MainWindow::_saveHistoryColumns()
+{
+    if (!_historyTable)
+        return;
+
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    guiSettings.setValue(kHistoryColumnsKey, _historyTable->horizontalHeader()->saveState());
+    guiSettings.sync();
+}
+
+void MainWindow::_resetHistoryColumns()
+{
+    if (!_historyTable)
+        return;
+
+    // Nothing left in the settings to bring the old widths back on the next
+    // run, and ngPost sizes the columns again from here on.
+    if (_historyColumnsSaveTimer)
+        _historyColumnsSaveTimer->stop();
+    _historyColumnsResizedByUser = false;
+
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    guiSettings.remove(kHistoryColumnsKey);
+    guiSettings.sync();
+
+    _fitHistoryColumns(true);
+}
+
+void MainWindow::_onHistoryHeaderContextMenu(const QPoint &pos)
+{
+    if (!_historyTable)
+        return;
+
+    QMenu    menu(this);
+    QAction *reset = menu.addAction(tr("Reset column widths"));
+    reset->setEnabled(_historyColumnsResizedByUser);
+    if (menu.exec(_historyTable->horizontalHeader()->mapToGlobal(pos)) == reset)
+        _resetHistoryColumns();
+}
+
+bool MainWindow::_isPostingQueueRunning() const
+{
+    if (_ngPost && (_ngPost->hasPostingJobs() || _ngPost->isPosting()))
+        return true;
+    for (const auto *post : _postingWidgets()) {
+        if (post && post->isPosting())
+            return true;
+    }
+    return false;
+}
+
+uint MainWindow::_nextQuickJobNumber()
+{
+    const bool canReset = !_isPostingQueueRunning() && _postingWidgets().size() <= 1;
+    if (canReset) {
+        _highestQuickJobNumber = 1;
+    } else {
+        for (const auto *post : _postingWidgets())
+            _highestQuickJobNumber = qMax(_highestQuickJobNumber, post->jobNumber());
+    }
+    return ++_highestQuickJobNumber;
+}
+
+PostingWidget *MainWindow::addNewQuickTab(const QFileInfoList &files)
+{
+    PostingWidget *newPostingWidget = new PostingWidget(_ngPost, this, _nextQuickJobNumber());
     newPostingWidget->init();
-    // Tab layout: 0=quick (#1), 1=folder, 2=history, 3="+" — so a tab inserted
-    // at lastTabIdx becomes the (lastTabIdx-1)-th quick post for display.
-    QString tabName = QString("%1 #%2").arg(_ngPost->quickJobName()).arg(lastTabIdx - 1);
-    _ui->postTabWidget->insertTab(lastTabIdx,
-                                  newPostingWidget ,
-                                  QIcon(":/icons/quick.png"),
-                                  tabName);
-    _ui->postTabWidget->setTabToolTip(lastTabIdx, tabName);
+    if (_ngPost->uiZoom() != 100)
+        _scaleWidgetChildren(newPostingWidget, _ngPost->uiZoom() / 100.0);
+    _connectPostingWidget(newPostingWidget);
+    QString tabName =
+        QString("%1 #%2").arg(_ngPost->quickJobName()).arg(newPostingWidget->displayNumber());
+    const int index = _ui->postTabWidget->addTab(newPostingWidget,
+                                                 QIcon(":/icons/quick.svg"),
+                                                 tabName);
+    _ui->postTabWidget->setTabToolTip(index, tabName);
 
     for (const QFileInfo &file : files)
         newPostingWidget->addPath(file.absoluteFilePath(), 0, file.isDir());
 
+    updatePostAllButton();
     return newPostingWidget;
 }
 
@@ -1451,6 +2372,7 @@ bool MainWindow::_startResumePost(qint64 postId, bool askConfirmation)
     if (!postId || !_ngPost)
         return false;
 
+    const auto shutdownHold = _ngPost->holdShutdown();
     if (askConfirmation) {
         const int res = QMessageBox::question(
             this,
@@ -1462,8 +2384,7 @@ bool MainWindow::_startResumePost(qint64 postId, bool askConfirmation)
             return false;
     }
 
-    const int lastTabIdx = _ui->postTabWidget->count() - 1;
-    PostingWidget *widget = addNewQuickTab(lastTabIdx);
+    PostingWidget *widget = addNewQuickTab();
     _ui->postTabWidget->setCurrentWidget(widget);
 
     QString err;
@@ -1483,7 +2404,7 @@ bool MainWindow::_startResumePost(qint64 postId, bool askConfirmation)
 
 void MainWindow::setTab(QWidget *postWidget)
 {
-    int nbJob = _ui->postTabWidget->count() -1;
+    int nbJob = _ui->postTabWidget->count();
     for (int i = 0 ; i < nbJob ; ++i)
     {
         if (_ui->postTabWidget->widget(i) == postWidget)
@@ -1496,39 +2417,73 @@ void MainWindow::setTab(QWidget *postWidget)
 
 void MainWindow::clearJobTab(QWidget *postWidget)
 {
-    int nbJob = _ui->postTabWidget->count() -1;
-    for (int i = 0 ; i < nbJob ; ++i)
-    {
-        if (_ui->postTabWidget->widget(i) == postWidget)
-        {
-            QTabBar *bar = _ui->postTabWidget->tabBar();
-            bar->setTabToolTip(i, "");
-            bar->setTabTextColor(i, Qt::black);
-            bar->setTabIcon(i, QIcon(":/icons/quick.png"));
-        }
-    }
+    const int index = _ui->postTabWidget->indexOf(postWidget);
+    if (index < 0)
+        return;
+    auto *bar = _ui->postTabWidget->tabBar();
+    bar->setTabToolTip(index, "");
+    bar->setTabTextColor(index,
+                         palette().color(QPalette::Window).lightness() < 128
+                             ? QColor(Qt::white)
+                             : palette().color(QPalette::WindowText));
+    bar->setTabIcon(index, QIcon(":/icons/quick.svg"));
 }
 
 void MainWindow::updateJobTab(QWidget *postWidget, const QColor &color, const QIcon &icon, const QString &tooltip)
 {
-    int nbJob = _ui->postTabWidget->count() -1;
-    for (int i = 0 ; i < nbJob ; ++i)
-    {
-        if (_ui->postTabWidget->widget(i) == postWidget)
-        {
-            QTabBar *bar = _ui->postTabWidget->tabBar();
-            if (!tooltip.isEmpty())
-                bar->setTabToolTip(i, tooltip);
-            bar->setTabTextColor(i, color);
-            bar->setTabIcon(i, icon);
-            break;
-        }
-    }
+    const int index = _ui->postTabWidget->indexOf(postWidget);
+    if (index < 0)
+        return;
+    auto *bar = _ui->postTabWidget->tabBar();
+    auto *post = qobject_cast<PostingWidget *>(postWidget);
+    if (!tooltip.isEmpty())
+        bar->setTabToolTip(index, tooltip);
+    bar->setTabTextColor(index, post ? post->postingTextColor() : color);
+    if (!icon.isNull())
+        bar->setTabIcon(index, icon);
 }
 
-void MainWindow::setJobLabel(int jobNumber)
+bool MainWindow::isDarkMode() const
 {
-    _ui->jobLabel->setText(QString("<b><u>Post #%1</u></b>").arg(jobNumber != 1 ? QString::number(jobNumber) : "Auto"));
+    return palette().color(QPalette::Window).lightness() < 128;
+}
+
+QColor MainWindow::pendingColor() const
+{
+    return pendingColor(isDarkMode());
+}
+
+QIcon MainWindow::pendingIcon() const
+{
+    return pendingIcon(isDarkMode());
+}
+
+QString MainWindow::pendingIconPath(bool dark)
+{
+    return dark ? sPendingLightIcon : sPendingIcon;
+}
+
+QColor MainWindow::pendingColor(bool dark)
+{
+    return dark ? QColor(0x66, 0xAA, 0xFF) : sPendingColor;
+}
+
+QIcon MainWindow::pendingIcon(bool dark)
+{
+    return QIcon(pendingIconPath(dark));
+}
+
+void MainWindow::refreshJobLabel()
+{
+    // The selected tab can be unrelated to the transfer shown by the progress bar.
+    // Keep the last identity when the queue empties, including on retranslation.
+    if (_ngPost && _ngPost->_activeJob) {
+        const auto *post = _ngPost->_activeJob->widget();
+        _progressJobNumber = post ? static_cast<int>(post->jobNumber()) : -1;
+    }
+    _ui->jobLabel->setText(
+        QString("<b><u>Post #%1</u></b>")
+            .arg(_progressJobNumber > 0 ? QString::number(_progressJobNumber) : "Auto"));
 }
 
 
@@ -1626,6 +2581,10 @@ void MainWindow::_addServer(NntpServerParams *serverParam)
     delButton->setMaximumWidth(sDeleteColumnWidth);
     connect(delButton, &QAbstractButton::clicked, this, &MainWindow::onDelServer);
     _ui->serversTable->setCellWidget(nbRows, col++, delButton);
+
+    // setCellWidget is what grows the column count, so this is the first
+    // moment the VPN column exists on a table that was not sized up front.
+    _applyVpnPlatformVisibility();
 }
 
 int MainWindow::_serverRow(QObject *delButton)
@@ -1641,7 +2600,7 @@ int MainWindow::_serverRow(QObject *delButton)
 
 PostingWidget *MainWindow::_getPostWidget(int tabIndex) const
 {
-    if(tabIndex > 1 && tabIndex < _ui->postTabWidget->count() - 1)
+    if (tabIndex >= kNbFixedTabs && tabIndex < _ui->postTabWidget->count())
         return qobject_cast<PostingWidget*>(_ui->postTabWidget->widget(tabIndex));
     else
         return nullptr;
@@ -1649,9 +2608,8 @@ PostingWidget *MainWindow::_getPostWidget(int tabIndex) const
 
 int MainWindow::_getPostWidgetIndex(PostingWidget *postWidget) const
 {
-    int nbJob = _ui->postTabWidget->count() -1;
-    for (int i = 2; i < nbJob ; ++i)
-    {
+    int nbJob = _ui->postTabWidget->count();
+    for (int i = kNbFixedTabs; i < nbJob; ++i) {
         if (_ui->postTabWidget->widget(i) == postWidget)
             return i;
     }
@@ -1722,11 +2680,13 @@ void MainWindow::onDebugToggled(bool checked)
     else
         _ngPost->setDebug(0);
     _ui->debugSB->setEnabled(checked);
+    _applyLogCapacity(checked ? _ui->debugSB->value() : 0);
 }
 
 void MainWindow::onDebugValue(int value)
 {
     _ngPost->setDebug(static_cast<ushort>(value));
+    _applyLogCapacity(value);
 }
 
 
@@ -1744,26 +2704,188 @@ void MainWindow::_onServerFieldEdited()
     _ngPost->saveConfig();
 }
 
+void MainWindow::onPar2Settings()
+{
+    auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->currentWidget());
+    const auto *compress = post ? post->findChild<QCheckBox *>(QStringLiteral("compressCB")) : nullptr;
+    Par2SettingsDialog dialog(_ngPost, post ? post->previewFiles() : QFileInfoList{},
+                              compress && compress->isChecked(),
+                              post && post->hasPar2PercentageOverride(), this);
+    dialog.exec();
+}
+
+void MainWindow::_buildPostingControls()
+{
+    auto *controls = new QWidget(_ui->postTabWidget);
+    auto *layout = new QHBoxLayout(controls);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(4);
+
+    // Outside the tab bar, so neither a full bar nor its scrolling can hide it.
+    _newQuickTabAction = new QAction(tr("New"), this);
+    // Not QKeySequence::AddTab: under KDE its first binding is Ctrl+Shift+N.
+    _newQuickTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
+    _newQuickTabButton = new QToolButton(controls);
+    _newQuickTabButton->setObjectName(QStringLiteral("newQuickTabButton"));
+    _newQuickTabButton->setDefaultAction(_newQuickTabAction);
+    layout->addWidget(_newQuickTabButton);
+    connect(_newQuickTabAction, &QAction::triggered, this, &MainWindow::onNewQuickTab);
+    _refreshNewQuickTab();
+
+    _postAllButton = new QPushButton(controls);
+    _postAllButton->setObjectName(QStringLiteral("postAllTabsButton"));
+    _postAllButton->setIcon(QIcon(":/icons/ngPost.png"));
+    layout->addWidget(_postAllButton);
+
+    // Move the existing global pause control next to Post All Tabs.
+    layout->addWidget(_ui->pauseButton);
+    _ui->pauseButton->setIconSize(_postAllButton->iconSize());
+    _newQuickTabButton->setIconSize(_postAllButton->iconSize());
+
+    // One of the two is shown at a time, see _refreshStopOrCloseAll().
+    _stopAllButton = _addPostingControl(layout, "stopAllTabsButton", QIcon());
+    _closeAllButton = _addPostingControl(layout,
+                                         "closeAllTabsButton",
+                                         QIcon(QStringLiteral(":/icons/closeAll.png")));
+
+    _ui->postTabWidget->setCornerWidget(controls, Qt::TopRightCorner);
+    connect(_stopAllButton, &QPushButton::clicked, _ngPost, &NgPost::cancelAllPostingJobs);
+    connect(_closeAllButton, &QPushButton::clicked, this, &MainWindow::onCloseAllTabs);
+    connect(_ngPost, &NgPost::postingStateChanged, this, &MainWindow::updatePostAllButton);
+    connect(_ngPost, &NgPost::postingStateChanged, this, &MainWindow::refreshJobLabel);
+    connect(_postAllButton, &QPushButton::clicked, this, &MainWindow::onPostAllTabs);
+    connect(_ui->postTabWidget,
+            &QTabWidget::currentChanged,
+            this,
+            &MainWindow::updatePostAllButton);
+    updatePostAllButton();
+}
+
+void MainWindow::_refreshNewQuickTab()
+{
+    if (!_newQuickTabAction)
+        return;
+    _newQuickTabAction->setText(tr("New"));
+    _newQuickTabAction->setToolTip(
+        tr("New tab (%1)\nor double-click the empty part of the tab bar")
+            .arg(_newQuickTabAction->shortcut().toString(QKeySequence::NativeText)));
+
+    _newQuickTabAction->setIcon(
+        PostingControlIcon::icon(PostingControlIcon::Glyph::NewTab, isDarkMode()));
+}
+
+QPushButton *MainWindow::_addPostingControl(QHBoxLayout *layout,
+                                            const char *name,
+                                            const QIcon &icon)
+{
+    auto *button = new QPushButton(layout->parentWidget());
+    button->setObjectName(QLatin1String(name));
+    button->setIcon(icon);
+    button->setIconSize(_postAllButton->iconSize());
+    layout->addWidget(button);
+    return button;
+}
+
+void MainWindow::updatePostAllButton()
+{
+    if (!_postAllButton)
+        return;
+    int tabs = 0, ready = 0;
+    for (const auto *post : _postingWidgets()) {
+        ++tabs;
+        ready += post->canSubmit();
+    }
+    _postAllButton->setText(tr("Post all tabs"));
+    _postAllButton->setToolTip(tr("Submit %1 prepared posts in tab order. Empty, finished, queued and active posts are skipped. Requires at least two posting tabs.").arg(ready));
+    _postAllButton->setEnabled(!_submittingAll && !_ngPost->_cancelingAll && tabs > 1 && ready > 0);
+    _refreshPostingControls();
+}
+
+void MainWindow::onPostAllTabs()
+{
+    if (_submittingAll || !_postAllButton || !_postAllButton->isEnabled())
+        return;
+    {
+        QScopedValueRollback<bool> guard(_submittingAll, true);
+        updatePostAllButton();
+        _submitPreparedTabs();
+    }
+    updatePostAllButton();
+}
+
+void MainWindow::_submitPreparedTabs()
+{
+    const quint64 generation = _ngPost->_postingCancelGeneration;
+    QList<QPointer<PostingWidget>> posts;
+    for (auto *post : _postingWidgets())
+        if (post->canSubmit())
+            posts << post;
+    // Show the first post at once: the queue only switches tabs when it moves
+    // on to the next job, so the first one would stay out of view until then.
+    if (!posts.isEmpty())
+        _ui->postTabWidget->setCurrentWidget(posts.first());
+    updateServers();
+    updateParams();
+    for (const auto &post : posts) {
+        if (generation != _ngPost->_postingCancelGeneration)
+            break;
+        if (post && post->canSubmit())
+            post->postFiles(false);
+    }
+}
+
 void MainWindow::onSaveConfig()
 {
+    _offerNzbPathToTabs();
     updateServers();
     _ngPost->saveConfig();
 }
 
-void MainWindow::onJobTabClicked(int index)
+void MainWindow::_offerNzbPathToTabs()
 {
-    int nbJob = _ui->postTabWidget->count() -1;
-    qDebug() << "Click on tab: " << index << ", count: " << nbJob;
-    if (index == nbJob) // click on the last tab
-        addNewQuickTab(nbJob);
+    // Only a folder updateParams() will take, and once per new path: saving
+    // again, or Enter pressed twice, must not ask the same question again.
+    QFileInfo const folder(_ui->nzbPathEdit->text());
+    if (!folder.isDir() || !folder.isWritable() || folder.absoluteFilePath() == _offeredNzbPath)
+        return;
+    QString const path = folder.absoluteFilePath();
+    _offeredNzbPath = path;
+
+    // Prepared tabs only: a queued, running, paused or finished post keeps
+    // the nzb it was started with.
+    QList<QPointer<PostingWidget>> posts;
+    for (auto *post : _postingWidgets())
+        if (post->canSubmit() && !post->nzbFolder().isEmpty() && post->nzbFolder() != path)
+            posts << post;
+    if (posts.isEmpty())
+        return;
+
+    const auto shutdownHold = _ngPost->holdShutdown();
+    if (QMessageBox::question(this,
+                              tr("Change the NZB path of the tabs?"),
+                              tr("Tabs waiting to be posted: %1.\n"
+                                 "Write their NZB file to %2 instead of their current folder?")
+                                  .arg(posts.size())
+                                  .arg(QDir::toNativeSeparators(path)),
+                              QMessageBox::Yes,
+                              QMessageBox::No)
+        != QMessageBox::Yes)
+        return;
+    for (const auto &post : posts)
+        if (post && post->canSubmit())
+            post->setNzbFolder(path);
+}
+
+void MainWindow::onNewQuickTab()
+{
+    // Selecting it is also what scrolls a full tab bar to it.
+    _ui->postTabWidget->setCurrentWidget(addNewQuickTab());
 }
 
 void MainWindow::onCloseJob(int index)
 {
-    int nbJob = _ui->postTabWidget->count() -1;
-    qDebug() << "onCloseJob on tab: " << index << ", count: " << nbJob;
-    if (index > 1 && index < nbJob )
-    {
+    qDebug() << "onCloseJob on tab: " << index << ", count: " << _ui->postTabWidget->count();
+    if (index >= kNbFixedTabs) {
         PostingWidget *postWidget = _getPostWidget(index);
         if (!postWidget)
             return;
@@ -1777,24 +2899,29 @@ void MainWindow::onCloseJob(int index)
         {
             _ui->postTabWidget->removeTab(index);
             delete postWidget;
-
-            if (index == nbJob - 1)
-                _ui->postTabWidget->setCurrentIndex(_ui->postTabWidget->count() - 2);
         }
     }
 }
 
 void MainWindow::closeTab(PostingWidget *postWidget)
 {
-    int index = _getPostWidgetIndex(postWidget);
-    if (index)
+    if (!postWidget)
+        return;
+    // The default Quick Post tab is a fixed one: it has no close button and
+    // _getPostWidgetIndex never finds it. Auto close still has to leave it
+    // ready for the next post, so it is emptied instead, back to how it opens.
+    if (postWidget == _quickJobTab)
     {
-        int nbJob = _ui->postTabWidget->count() -1;
+        postWidget->resetForNextPost();
+        _ui->postTabWidget->tabBar()->setTabToolTip(kQuickPostTab,
+                                                    tr("Default %1").arg(_ngPost->quickJobName()));
+        return;
+    }
+
+    int index = _getPostWidgetIndex(postWidget);
+    if (index) {
         _ui->postTabWidget->removeTab(index);
         delete postWidget;
-
-        if (index == nbJob - 1)
-            _ui->postTabWidget->setCurrentIndex(_ui->postTabWidget->count() - 2);
     }
 }
 
@@ -1835,26 +2962,99 @@ void MainWindow::onShutdownToggled(bool checked)
                                         QMessageBox::Yes,
                                         QMessageBox::No);
         if (res == QMessageBox::Yes)
-            _ngPost->_doShutdownWhenDone = checked;
+            _ngPost->setShutdownWhenDone(checked);
         else
             _ui->shutdownCB->setChecked(false);
     }
     else
-        _ngPost->_doShutdownWhenDone = false;
+        _ngPost->setShutdownWhenDone(false);
 }
 
-void MainWindow::setPauseIcon(bool pause)
+void MainWindow::_fitPostingControls()
 {
-    if (pause)
-        _ui->pauseButton->setIcon(QIcon(":/icons/pause.png"));
-    else
-        _ui->pauseButton->setIcon(QIcon(":/icons/play.png"));
+    if (!_postAllButton)
+        return;
+    // "+", Pause and Stop (or Close all) are squares as tall as Post all tabs, and the tabs
+    // beside them take that height too: with them the tab bar and its scroll arrows.
+    // The "+" is a tool button, whose own size hint is a size smaller.
+    const int buttonHeight = _postAllButton->sizeHint().height();
+    _newQuickTabButton->setFixedSize(buttonHeight, buttonHeight);
+    for (auto *button : { _ui->pauseButton, _stopAllButton, _closeAllButton })
+        button->setFixedSize(buttonHeight, buttonHeight);
+
+    // What the tabs have beyond the buttons reaches down over the top line of
+    // the pane.
+    QTabBar *tabBar = _ui->postTabWidget->tabBar();
+    const int barHeight = buttonHeight + tabBarExcessOverCorner(_ui->postTabWidget, buttonHeight);
+    const int contents = qMax(barHeight - kTabFrameHeight, tabBar->fontMetrics().height());
+    const QString sheet = QStringLiteral("QTabBar::tab { height: %1px; }").arg(contents);
+    // A new style sheet repolishes the whole bar, and this runs on every change
+    // of the posting state.
+    if (tabBar->styleSheet() != sheet)
+        tabBar->setStyleSheet(sheet);
+}
+
+void MainWindow::_refreshPostingControls()
+{
+    _fitPostingControls();
+    const bool enabled = _ngPost->hasPostingJobs() && !_ngPost->_cancelingAll;
+    const bool paused = _ngPost->isPaused();
+    _ui->pauseButton->setEnabled(enabled);
+    _ui->pauseButton->setIcon(PostingControlIcon::icon(paused ? PostingControlIcon::Glyph::Resume
+                                                              : PostingControlIcon::Glyph::Pause,
+                                                       isDarkMode()));
+    _ui->pauseButton->setToolTip(paused ? tr("Resume all tabs") : tr("Pause all tabs"));
+    _ui->pauseButton->setAccessibleName(_ui->pauseButton->toolTip());
+    _refreshStopOrCloseAll();
+    for (auto *post : _postingWidgets())
+        post->refreshPostingState();
+}
+
+void MainWindow::_refreshStopOrCloseAll()
+{
+    // Stop is there while a post is in progress, greyed until the cancellation
+    // it started is over. Otherwise the same place closes the tabs: a stopped
+    // tab can be posted again or thrown away, never left stranded.
+    const bool posting = _ngPost->hasPostingJobs();
+    _stopAllButton->setVisible(posting);
+    _stopAllButton->setEnabled(posting && !_ngPost->_cancelingAll);
+    _stopAllButton->setIcon(
+        PostingControlIcon::icon(PostingControlIcon::Glyph::Stop, isDarkMode()));
+    _stopAllButton->setAccessibleName(tr("Stop all tabs"));
+    _stopAllButton->setToolTip(tr("Cancel all active and queued posts"));
+    _closeAllButton->setVisible(!posting);
+    _closeAllButton->setEnabled(!posting && _hasTabsToReset());
+    _closeAllButton->setAccessibleName(tr("Close all tabs"));
+    _closeAllButton->setToolTip(tr("Close every Quick Post tab and empty Quick Post #1"));
+}
+
+bool MainWindow::_hasTabsToReset() const
+{
+    return _postingWidgets().size() > 1 || (_quickJobTab && !_quickJobTab->isBlank());
+}
+
+void MainWindow::onCloseAllTabs()
+{
+    const auto shutdownHold = _ngPost->holdShutdown();
+    if (QMessageBox::question(this,
+                              tr("Close all tabs"),
+                              tr("Are you sure? All tabs will be lost."),
+                              QMessageBox::Yes | QMessageBox::No,
+                              QMessageBox::No)
+        != QMessageBox::Yes)
+        return;
+    // The question ran an event loop, long enough for an Auto post to start:
+    // a tab that is posting is left alone, whatever was answered.
+    for (auto *post : _postingWidgets())
+        if (!post->isPosting())
+            closeTab(post); // the default tab is emptied, the others deleted
+    _ui->postTabWidget->setCurrentWidget(_quickJobTab);
+    updatePostAllButton();
 }
 
 void MainWindow::onPauseClicked()
 {
-    if (_ngPost->isPosting())
-    {
+    if (_ngPost->hasPostingJobs()) {
         if (_ngPost->isPaused())
             _ngPost->resume();
         else
@@ -2257,9 +3457,7 @@ void MainWindow::_onStatsRefresh()
     }
 
     if (_statsTimelineChart) {
-        _statsTimelineChart->removeAllSeries();
-        for (QAbstractAxis *ax : _statsTimelineChart->axes())
-            _statsTimelineChart->removeAxis(ax);
+        clearChart(_statsTimelineChart);
 
         auto *volSet  = new QBarSet(tr("Volume (MB)"), _statsTimelineChart);
         auto *failSet = new QBarSet(tr("Failed"), _statsTimelineChart);
@@ -2290,9 +3488,7 @@ void MainWindow::_onStatsRefresh()
     }
 
     if (_statsGroupChart) {
-        _statsGroupChart->removeAllSeries();
-        for (QAbstractAxis *ax : _statsGroupChart->axes())
-            _statsGroupChart->removeAxis(ax);
+        clearChart(_statsGroupChart);
 
         auto *set = new QBarSet(tr("Posts"), _statsGroupChart);
         set->setColor(QColor(Qt::darkBlue));
@@ -2388,6 +3584,7 @@ void MainWindow::_onResumeSelectionChanged()
 void MainWindow::_onResumePost()
 {
     if (!_resumeTable || !_ngPost) return;
+    const auto shutdownHold = _ngPost->holdShutdown();
     const QModelIndexList selected = _resumeTable->selectionModel()->selectedRows();
     if (selected.isEmpty()) return;
     const int res = QMessageBox::question(
@@ -2562,7 +3759,11 @@ void MainWindow::_onHistoryContextMenu(const QPoint &pos)
 
 void MainWindow::onVpnSettingsClicked()
 {
+    if (!VpnManager::vpnPlatformSupported())
+        return;
     if (!_ngPost->vpnManager())
+        return;
+    if (_unattributedVpn.detected && !_showUnattributedVpnDecision())
         return;
     VpnSettingsDialog dlg(_ngPost->vpnManager(), this);
     dlg.exec();
@@ -2570,6 +3771,8 @@ void MainWindow::onVpnSettingsClicked()
 
 void MainWindow::onVpnStateChanged(VpnManager::State newState)
 {
+    if (!VpnManager::vpnPlatformSupported())
+        return;
     QString text;
     switch (newState) {
     case VpnManager::State::Disabled:  text = tr("VPN: disabled");                 break;
@@ -2577,21 +3780,485 @@ void MainWindow::onVpnStateChanged(VpnManager::State newState)
     case VpnManager::State::Connected:
         text = tr("VPN: connected (%1)").arg(_ngPost->vpnManager()->tunInterface());
         break;
+    case VpnManager::State::LeaseBusy: text = tr("VPN: in use by another instance"); break;
+    case VpnManager::State::Reconnecting: text = tr("VPN: reconnecting...");          break;
     case VpnManager::State::Stopping:  text = tr("VPN: stopping...");              break;
     case VpnManager::State::Failed:    text = tr("VPN: failed");                   break;
     }
     _ui->vpnStateLbl->setText(text);
 }
 
+void MainWindow::_initLogBoxToggle()
+{
+    // A direct QWidget child of QSplitter becomes another pane. Reserve a
+    // narrow strip beside the tabs so the button also survives hiding logBox.
+    _logToggleBtn = new QToolButton(_ui->fileBox);
+    _logToggleBtn->setObjectName(QStringLiteral("logToggleBtn"));
+    _logToggleBtn->setFixedSize(14, 38);
+    _logToggleBtn->setCursor(Qt::PointingHandCursor);
+    _logToggleBtn->setFocusPolicy(Qt::StrongFocus);
+    _logToggleBtn->setStyleSheet(QStringLiteral("QToolButton#logToggleBtn {"
+                                                "  border: none;"
+                                                "  background: transparent;"
+                                                "  padding: 0px;"
+                                                "  margin: 0px;"
+                                                "}"
+                                                "QToolButton#logToggleBtn:hover {"
+                                                "  background: rgba(128, 128, 128, 0.25);"
+                                                "  border-radius: 2px;"
+                                                "}"
+                                                "QToolButton#logToggleBtn:pressed {"
+                                                "  background: rgba(128, 128, 128, 0.4);"
+                                                "}"));
 
-const QString MainWindow::sGroupBoxStyle =  "\
+    connect(_logToggleBtn, &QToolButton::clicked, this, &MainWindow::_onToggleLogBox);
+    connect(_ui->postSplitter, &QSplitter::splitterMoved, this, &MainWindow::_onPostSplitterMoved);
+    _ui->verticalLayout_3->removeWidget(_ui->postTabWidget);
+    auto *layout = new QHBoxLayout;
+    layout->setSpacing(0);
+    layout->addWidget(_ui->postTabWidget, 1);
+    layout->addWidget(_logToggleBtn, 0, Qt::AlignVCenter);
+    _ui->verticalLayout_3->addLayout(layout);
+
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    _logBoxCollapsed = guiSettings.value(kLogBoxCollapsedKey, true).toBool();
+    _lastLogBoxWidth = guiSettings.value(kLogBoxWidthKey, 250).toInt();
+    if (_lastLogBoxWidth < 80)
+        _lastLogBoxWidth = 250;
+
+    _ui->logBox->setVisible(!_logBoxCollapsed);
+    _updateLogToggleBtn();
+}
+
+bool MainWindow::_isLogBoxCollapsed() const
+{
+    return _logBoxCollapsed;
+}
+
+void MainWindow::_updateLogToggleBtn()
+{
+    if (!_logToggleBtn)
+        return;
+    const bool collapsed = _isLogBoxCollapsed();
+    _logToggleBtn->setArrowType(collapsed ? Qt::LeftArrow : Qt::RightArrow);
+    _logToggleBtn->setToolTip(collapsed ? tr("Open Posting Log") : tr("Close Posting Log"));
+    _logToggleBtn->setAccessibleName(collapsed ? tr("Open Posting Log") : tr("Close Posting Log"));
+}
+
+void MainWindow::_setLogBoxCollapsed(bool collapsed, bool saveSetting)
+{
+    if (_logBoxStateRestored) {
+        const int currentWidth = _ui->postSplitter->sizes().value(1);
+        if (collapsed && !_logBoxCollapsed && currentWidth > 0)
+            _lastLogBoxWidth = currentWidth;
+        // Hiding releases the log's minimum width on smaller screens. The
+        // toggle belongs to fileBox and remains available beside the tabs.
+        _ui->logBox->setVisible(!collapsed);
+        const int total = _ui->postSplitter->width()
+            - (collapsed ? 0 : _ui->postSplitter->handleWidth());
+        const int available = qMax(1, total - _ui->fileBox->minimumSizeHint().width());
+        const int width = collapsed ? 0 : qMin(_lastLogBoxWidth, available);
+        _ui->postSplitter->setSizes({ qMax(1, total - width), width });
+    }
+    _logBoxCollapsed = collapsed;
+    _updateLogToggleBtn();
+    if (saveSetting)
+        _saveLogBoxState();
+}
+
+void MainWindow::_saveLogBoxState() const
+{
+    QSettings guiSettings(guiSettingsFilePath(), QSettings::IniFormat);
+    guiSettings.setValue(kLogBoxCollapsedKey, _isLogBoxCollapsed());
+    if (_lastLogBoxWidth >= 80)
+        guiSettings.setValue(kLogBoxWidthKey, _lastLogBoxWidth);
+    guiSettings.sync();
+}
+
+void MainWindow::_onToggleLogBox()
+{
+    _setLogBoxCollapsed(!_isLogBoxCollapsed(), true);
+}
+
+void MainWindow::_onPostSplitterMoved(int pos, int index)
+{
+    Q_UNUSED(pos);
+    if (index != 1 || !_logBoxStateRestored)
+        return;
+    const int width = _ui->postSplitter->sizes().value(1);
+    _logBoxCollapsed = width == 0;
+    if (_logBoxCollapsed)
+        _ui->logBox->hide();
+    if (width > 0)
+        _lastLogBoxWidth = width;
+    _updateLogToggleBtn();
+    _saveLogBoxState();
+}
+
+void MainWindow::_initZoomControl()
+{
+    _baseFont = font();
+
+    _zoomBtn = new QToolButton(statusBar());
+    _zoomBtn->setObjectName(QStringLiteral("zoomBtn"));
+    _zoomBtn->setIcon(QIcon(QStringLiteral(":/icons/zoom.svg")));
+    _zoomBtn->setIconSize(QSize(16, 16));
+    _zoomBtn->setText(QStringLiteral("100%"));
+    _zoomBtn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    _zoomBtn->setCursor(Qt::PointingHandCursor);
+    _zoomBtn->setFocusPolicy(Qt::NoFocus);
+    _zoomBtn->setStyleSheet(QStringLiteral("QToolButton#zoomBtn {"
+                                           "  border: none;"
+                                           "  background: transparent;"
+                                           "  padding: 2px 6px;"
+                                           "  margin: 0px;"
+                                           "}"
+                                           "QToolButton#zoomBtn:hover {"
+                                           "  background: rgba(128, 128, 128, 0.25);"
+                                           "  border-radius: 3px;"
+                                           "}"
+                                           "QToolButton#zoomBtn:pressed {"
+                                           "  background: rgba(128, 128, 128, 0.4);"
+                                           "}"));
+    _zoomBtn->setToolTip(tr("UI Zoom: %1% (Click to adjust)").arg(100));
+    statusBar()->addPermanentWidget(_zoomBtn);
+    connect(_zoomBtn, &QToolButton::clicked, this, &MainWindow::_toggleZoomPopup);
+
+    _createZoomPopup();
+}
+
+void MainWindow::_createZoomPopup()
+{
+    _zoomPopup = new QFrame(this);
+    _zoomPopup->setObjectName(QStringLiteral("zoomPopup"));
+    _zoomPopup->setStyleSheet(QStringLiteral(
+        "QFrame#zoomPopup { background-color: #2b2b2b; border: 1px solid #555555; border-radius: "
+        "6px; }\n"
+        "QLabel { color: #e0e0e0; }\n"
+        "QPushButton#zoomResetBtn { border: 1px solid #555555; border-radius: 3px; "
+        "background-color: #3a3a3a; color: #e0e0e0; padding: 1px 6px; font-size: 11px; }\n"
+        "QPushButton#zoomResetBtn:hover { background-color: #4a4a4a; }\n"
+        "QToolButton#zoomStepBtn { border: 1px solid #555555; border-radius: 3px; "
+        "background-color: #3a3a3a; color: #e0e0e0; font-weight: bold; }\n"
+        "QToolButton#zoomStepBtn:hover { background-color: #4a4a4a; }"));
+
+    auto *shadow = new QGraphicsDropShadowEffect(_zoomPopup);
+    shadow->setBlurRadius(12);
+    shadow->setColor(QColor(0, 0, 0, 160));
+    shadow->setOffset(0, 2);
+    _zoomPopup->setGraphicsEffect(shadow);
+    makeDismissable(_zoomPopup, _zoomBtn);
+
+    auto *popupLayout = new QVBoxLayout(_zoomPopup);
+    popupLayout->setContentsMargins(10, 8, 10, 8);
+    popupLayout->setSpacing(6);
+
+    auto *topRow = new QHBoxLayout;
+    topRow->setSpacing(8);
+    auto *titleLabel = new QLabel(tr("UI Zoom"), _zoomPopup);
+    QFont boldFont = titleLabel->font();
+    boldFont.setBold(true);
+    titleLabel->setFont(boldFont);
+
+    _zoomValueLabel = new QLabel(QStringLiteral("100%"), _zoomPopup);
+    _zoomValueLabel->setObjectName(QStringLiteral("zoomValueLabel"));
+
+    auto *resetBtn = new QPushButton(QStringLiteral("100%"), _zoomPopup);
+    resetBtn->setObjectName(QStringLiteral("zoomResetBtn"));
+    resetBtn->setToolTip(tr("Reset zoom to 100%"));
+    resetBtn->setCursor(Qt::PointingHandCursor);
+
+    topRow->addWidget(titleLabel);
+    topRow->addStretch();
+    topRow->addWidget(_zoomValueLabel);
+    topRow->addWidget(resetBtn);
+    popupLayout->addLayout(topRow);
+
+    auto *sliderRow = new QHBoxLayout;
+    sliderRow->setSpacing(6);
+
+    auto *outBtn = new QToolButton(_zoomPopup);
+    outBtn->setObjectName(QStringLiteral("zoomStepBtn"));
+    outBtn->setText(QStringLiteral("-"));
+    outBtn->setToolTip(tr("Zoom out (-5%)"));
+    outBtn->setFixedSize(22, 22);
+    outBtn->setCursor(Qt::PointingHandCursor);
+
+    _zoomSlider = new QSlider(Qt::Horizontal, _zoomPopup);
+    _zoomSlider->setObjectName(QStringLiteral("zoomSlider"));
+    _zoomSlider->setRange(80, 150);
+    _zoomSlider->setSingleStep(5);
+    _zoomSlider->setPageStep(10);
+    _zoomSlider->setTickInterval(10);
+    _zoomSlider->setTickPosition(QSlider::TicksBelow);
+    _zoomSlider->setValue(100);
+    _zoomSlider->setFixedWidth(160);
+
+    auto *inBtn = new QToolButton(_zoomPopup);
+    inBtn->setObjectName(QStringLiteral("zoomStepBtn"));
+    inBtn->setText(QStringLiteral("+"));
+    inBtn->setToolTip(tr("Zoom in (+5%)"));
+    inBtn->setFixedSize(22, 22);
+    inBtn->setCursor(Qt::PointingHandCursor);
+
+    sliderRow->addWidget(outBtn);
+    sliderRow->addWidget(_zoomSlider);
+    sliderRow->addWidget(inBtn);
+    popupLayout->addLayout(sliderRow);
+
+    connect(outBtn, &QToolButton::clicked, this, [this]() {
+        _zoomSlider->setValue(qMax(_zoomSlider->minimum(), _zoomSlider->value() - 5));
+    });
+    connect(inBtn, &QToolButton::clicked, this, [this]() {
+        _zoomSlider->setValue(qMin(_zoomSlider->maximum(), _zoomSlider->value() + 5));
+    });
+    connect(resetBtn, &QPushButton::clicked, this, [this]() { _zoomSlider->setValue(100); });
+    connect(_zoomSlider, &QSlider::valueChanged, this, [this](int value) {
+        applyUiZoom(value, true);
+    });
+}
+
+void MainWindow::_repositionZoomPopup()
+{
+    if (!_zoomPopup || !_zoomBtn)
+        return;
+    _zoomPopup->adjustSize();
+    const QPoint btnPos = _zoomBtn->mapTo(this, QPoint(0, 0));
+    const int popupWidth = _zoomPopup->sizeHint().width();
+    const int popupHeight = _zoomPopup->sizeHint().height();
+    const int x = qBound(4,
+                         btnPos.x() + _zoomBtn->width() - popupWidth,
+                         qMax(4, width() - popupWidth - 4));
+    const int y = qBound(4, btnPos.y() - popupHeight - 4, qMax(4, height() - popupHeight - 4));
+    _zoomPopup->setGeometry(x, y, popupWidth, popupHeight);
+}
+
+void MainWindow::_toggleZoomPopup()
+{
+    if (!_zoomPopup || !_zoomBtn)
+        return;
+    if (_zoomPopup->isVisible()) {
+        _zoomPopup->hide();
+        return;
+    }
+    _repositionZoomPopup();
+    _zoomPopup->raise();
+    _zoomPopup->show();
+}
+
+void MainWindow::_scaleWidgetChildren(QWidget *parent, qreal scale)
+{
+    if (!parent)
+        return;
+
+    const int iconBtnSize = qRound(24 * scale);
+    const int iconSize = qRound(16 * scale);
+
+    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("genCompressName"))) {
+        btn->setFixedSize(iconBtnSize, iconBtnSize);
+        btn->setIconSize(QSize(iconSize, iconSize));
+    }
+    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("genPass"))) {
+        btn->setFixedSize(iconBtnSize, iconBtnSize);
+        btn->setIconSize(QSize(iconSize, iconSize));
+    }
+    for (auto *btn : parent->findChildren<QPushButton *>(QStringLiteral("nzbFileButton")))
+        btn->setMaximumWidth(qRound(30 * scale));
+
+    for (auto *sb : parent->findChildren<QSpinBox *>(QStringLiteral("nameLengthSB")))
+        sb->setMaximumWidth(qRound(60 * scale));
+    for (auto *sb : parent->findChildren<QSpinBox *>(QStringLiteral("passLengthSB")))
+        sb->setMaximumWidth(qRound(60 * scale));
+    for (auto *sb : parent->findChildren<QSpinBox *>(QStringLiteral("redundancySB")))
+        sb->setMaximumWidth(qRound(70 * scale));
+}
+
+void MainWindow::_scaleTables(int rowHeight)
+{
+    if (_ui->serversTable) {
+        _ui->serversTable->verticalHeader()->setDefaultSectionSize(rowHeight);
+        for (int r = 0; r < _ui->serversTable->rowCount(); ++r)
+            _ui->serversTable->setRowHeight(r, rowHeight);
+    }
+    if (_historyTable) {
+        _historyTable->verticalHeader()->setDefaultSectionSize(rowHeight);
+        for (int r = 0; r < _historyTable->rowCount(); ++r)
+            _historyTable->setRowHeight(r, rowHeight);
+    }
+    if (_resumeTable) {
+        _resumeTable->verticalHeader()->setDefaultSectionSize(rowHeight);
+        for (int r = 0; r < _resumeTable->rowCount(); ++r)
+            _resumeTable->setRowHeight(r, rowHeight);
+    }
+    if (_statsTopTable) {
+        _statsTopTable->verticalHeader()->setDefaultSectionSize(rowHeight);
+        for (int r = 0; r < _statsTopTable->rowCount(); ++r)
+            _statsTopTable->setRowHeight(r, rowHeight);
+    }
+}
+
+namespace
+{
+QFont scaledFont(const QFont &base, qreal scale)
+{
+    QFont f = base;
+    if (base.pointSizeF() > 0)
+        f.setPointSizeF(base.pointSizeF() * scale);
+    else if (base.pointSize() > 0)
+        f.setPointSize(qRound(base.pointSize() * scale));
+    else if (base.pixelSize() > 0)
+        f.setPixelSize(qRound(base.pixelSize() * scale));
+    else
+        f.setPointSize(qMax(6, qRound(10 * scale)));
+    return f;
+}
+
+//! \a font with the size of \a sized, whatever unit that size is expressed in.
+QFont resizedFont(QFont font, const QFont &sized)
+{
+    if (sized.pointSizeF() > 0)
+        font.setPointSizeF(sized.pointSizeF());
+    else if (sized.pixelSize() > 0)
+        font.setPixelSize(sized.pixelSize());
+    else
+        font.setPointSize(sized.pointSize());
+    return font;
+}
+}
+
+void MainWindow::applyUiZoom(int percent, bool userInteractive)
+{
+    percent = qBound(80, percent, 150);
+    if (_ngPost)
+        _ngPost->setUiZoom(static_cast<uint>(percent));
+
+    const qreal scale = percent / 100.0;
+    const QFont f = scaledFont(_baseFont, scale);
+    _applyZoomFont(f, scale);
+    _scaleTables(qMax(26, QFontMetrics(f).height() + 10));
+    _scaleZoomedControls(scale);
+    _showZoomLevel(percent);
+    if (userInteractive)
+        _scheduleZoomSave();
+}
+
+void MainWindow::_applyZoomFont(const QFont &f, qreal scale)
+{
+    setFont(f);
+    QApplication::setFont(f);
+
+    // The popup keeps its own size, so that the control stays usable at any zoom.
+    const auto allWidgets = findChildren<QWidget *>();
+    for (QWidget *w : allWidgets) {
+        if (!widgetWithin(_zoomPopup, w))
+            w->setFont(resizedFont(w->font(), f));
+    }
+
+    if (_ui->postTabWidget && _ui->postTabWidget->tabBar()) {
+        _ui->postTabWidget->tabBar()->setFont(f);
+        _ui->postTabWidget->tabBar()->setIconSize(QSize(qRound(16 * scale), qRound(16 * scale)));
+        _ui->postTabWidget->tabBar()->updateGeometry();
+        _ui->postTabWidget->tabBar()->update();
+        _ui->postTabWidget->updateGeometry();
+    }
+}
+
+void MainWindow::_scaleZoomedControls(qreal scale)
+{
+    const int iconBtnSize = qRound(24 * scale);
+    const QSize iconSize(qRound(16 * scale), qRound(16 * scale));
+
+    if (_ui->genPoster) {
+        _ui->genPoster->setFixedSize(iconBtnSize, iconBtnSize);
+        _ui->genPoster->setIconSize(iconSize);
+    }
+    if (_ui->nzbPathButton)
+        _ui->nzbPathButton->setMaximumWidth(qRound(30 * scale));
+    if (_ui->articleSizeEdit)
+        _ui->articleSizeEdit->setMaximumWidth(qRound(80 * scale));
+    if (_zoomBtn)
+        _zoomBtn->setIconSize(iconSize);
+    if (_logToggleBtn)
+        _logToggleBtn->setIconSize(iconSize);
+    _fitPostingControls();
+    _scaleWidgetChildren(this, scale);
+}
+
+void MainWindow::_showZoomLevel(int percent)
+{
+    if (_zoomValueLabel)
+        _zoomValueLabel->setText(QString("%1%").arg(percent));
+    if (_zoomBtn) {
+        _zoomBtn->setText(QString("%1%").arg(percent));
+        _zoomBtn->setToolTip(tr("UI Zoom: %1% (Click to adjust)").arg(percent));
+    }
+    if (_zoomSlider && _zoomSlider->value() != percent) {
+        QSignalBlocker blocker(_zoomSlider);
+        _zoomSlider->setValue(percent);
+    }
+
+    if (_zoomPopup && _zoomPopup->isVisible())
+        _repositionZoomPopup();
+}
+
+void MainWindow::_scheduleZoomSave()
+{
+    // A slider drag moves through every step: write the configuration once it
+    // settles, and silently, like the rest of the window layout.
+    if (!_zoomSaveTimer) {
+        _zoomSaveTimer = new QTimer(this);
+        _zoomSaveTimer->setSingleShot(true);
+        _zoomSaveTimer->setInterval(500);
+        connect(_zoomSaveTimer, &QTimer::timeout, this, [this]() {
+            if (_ngPost)
+                _ngPost->saveConfig(true);
+        });
+    }
+    _zoomSaveTimer->start();
+}
+
+void MainWindow::_configureWaylandSplitters()
+{
+    if (!QGuiApplication::platformName().startsWith(QLatin1String("wayland")))
+        return;
+    const auto handles = findChildren<QSplitterHandle *>();
+    for (auto *proxy : findChildren<QWidget *>(QString(), Qt::FindDirectChildrenOnly)) {
+        if (proxy == centralWidget() || proxy == menuBar() || proxy == statusBar())
+            continue;
+        const QString name = QString::fromLatin1(proxy->metaObject()->className());
+        if (!name.endsWith(QLatin1String("SplitterProxy"))
+            && !proxy->inherits("Breeze::SplitterProxy"))
+            continue;
+        removeEventFilter(proxy);
+        for (auto *handle : handles) {
+            handle->removeEventFilter(proxy);
+            if (auto *splitter = handle->splitter())
+                splitter->setHandleWidth(qMax(6, splitter->handleWidth()));
+        }
+        proxy->hide();
+    }
+}
+
+void MainWindow::showEvent(QShowEvent *event)
+{
+    QMainWindow::showEvent(event);
+    _configureWaylandSplitters();
+    if (!_logBoxStateRestored) {
+        // Restore once the window has its actual layout, not Designer's placeholder geometry.
+        _logBoxStateRestored = true;
+        _setLogBoxCollapsed(_logBoxCollapsed, false);
+    }
+}
+
+
+const QString MainWindow::sGroupBoxStyle = "\
         QGroupBox {\
-        font: bold; \
         border: 1px solid palette(mid);\
         border-radius: 6px;\
         margin-top: 6px;\
         }\
         QGroupBox::title {\
+        font-weight: bold;\
         subcontrol-origin:  margin;\
         left: 7px;\
         padding: 0 5px 0 5px;\
@@ -2602,21 +4269,19 @@ const QString MainWindow::sTabWidgetStyle = "\
             border-top: 2px solid palette(mid);\
         }\
         QTabWidget::tab-bar {\
-            left: 5px;\
+            left: 0px;\
         }\
         QTabBar::tab {\
             background: palette(button);\
-            color: palette(buttonText);\
             border: 2px solid palette(mid);\
             border-bottom-color: palette(window);\
             border-top-left-radius: 4px;\
             border-top-right-radius: 4px;\
-            min-width: 8ex;\
-            padding: 2px;\
+            min-width: 10ex;\
+            padding: 0 0.8em;\
         }\
         QTabBar::tab:selected, QTabBar::tab:hover {\
             background: palette(window);\
-            color: palette(windowText);\
         }\
         QTabBar::tab:selected {\
             border-color: palette(dark);\

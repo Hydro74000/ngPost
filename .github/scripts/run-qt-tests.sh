@@ -10,6 +10,50 @@ test_root="$1"
 suite_name="$2"
 fail=0
 found=0
+unpinned=0
+host_platform="$(uname -s)"
+
+# Normalised for expected-counts.txt: Git Bash and MSYS report MINGW64_NT-...,
+# MSYS_NT-... or CYGWIN_NT-..., none of which a human would write in a table.
+case "$host_platform" in
+  Linux)                      host_key=Linux ;;
+  Darwin)                     host_key=Darwin ;;
+  MINGW*|MSYS*|CYGWIN*|Windows_NT) host_key=Windows ;;
+  *)                          host_key="$host_platform" ;;
+esac
+
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+counts_file="$script_dir/../../tests/expected-counts.txt"
+
+# The floor a binary must clear, "" when this platform pins none. A line naming
+# this platform beats the platform-agnostic one, so a suite that legitimately
+# runs fewer tests here can say so instead of being given a figure measured
+# elsewhere.
+expected_minimum() {
+  local name=$1 bin min platform default="" specific=""
+  [ -r "$counts_file" ] || return 0
+  # Git for Windows may check out the table with CRLF line endings.
+  while IFS=$' \t\r' read -r bin min platform _rest; do
+    case "$bin" in ''|\#*) continue ;; esac
+    [ "$bin" = "$name" ] || continue
+    case "$min" in ''|*[!0-9]*) continue ;; esac
+    if [ -n "${platform:-}" ]; then
+      [ "$platform" = "$host_key" ] && specific=$min
+    else
+      default=$min
+    fi
+  done < "$counts_file"
+  printf '%s' "${specific:-$default}"
+}
+
+# Only this complete suite is intentionally unavailable off Windows.
+# Other Windows-related suites contain portable tests and must execute them.
+allows_empty_suite() {
+  case "$host_platform:$1" in
+    Linux:tst_WindowsBindHelper|Darwin:tst_WindowsBindHelper) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 while IFS= read -r test_bin; do
   [ -x "$test_bin" ] || continue
@@ -35,7 +79,46 @@ while IFS= read -r test_bin; do
     echo "----- ${test_name} QtTest log -----"
     cat "$text_log"
   else
-    echo "::warning::${test_name} did not produce a QtTest text log"
+    echo "::error::${test_name} did not produce a QtTest text log"
+    code=1
+  fi
+
+  # Exit zero alone also means "all skipped" to QTest. Require a complete
+  # summary and a successful test body, not just initTestCase/cleanupTestCase.
+  allow_empty=0
+  if allows_empty_suite "${test_name%.exe}"; then allow_empty=1; fi
+  if [ -s "$text_log" ] && ! awk -v allow_empty="$allow_empty" '
+    /^PASS[[:space:]]*:/ && !/::(initTestCase|cleanupTestCase)\(/ { bodies++ }
+    /^(FAIL!|XPASS)[[:space:]]*:/ { failures++ }
+    /^Totals: [0-9]+ passed, [0-9]+ failed, [0-9]+ skipped,/ {
+      summaries++
+      if ($4 != 0) failures++
+      skipped += $6
+    }
+    END { exit !(summaries == 1 && !failures && (bodies > 0 || (allow_empty && skipped > 0))) }
+  ' "$text_log"; then
+    echo "::error file=${text_log}::${test_name}: invalid summary, failure, or no successful test body"
+    code=1
+  fi
+
+  # Floor check. Runs on the summary the block above just validated, so a
+  # missing or malformed summary is already a failure by this point.
+  minimum="$(expected_minimum "${test_name%.exe}")"
+  if [ -z "$minimum" ]; then
+    unpinned=$((unpinned + 1))
+    echo "::notice::${test_name} runs no pinned minimum on ${host_key}; see tests/expected-counts.txt"
+  elif [ -s "$text_log" ]; then
+    passed="$(sed -n 's/^Totals: \([0-9][0-9]*\) passed,.*/\1/p' "$text_log" | head -n 1)"
+    if [ -z "$passed" ]; then
+      echo "::error file=${text_log}::${test_name}: cannot read the passed count from its summary"
+      code=1
+    elif [ "$passed" -lt "$minimum" ]; then
+      echo "::error file=${text_log},title=${test_name} lost tests::${test_name} ran ${passed} tests," \
+           "below the ${minimum} pinned for ${host_key}. Check SKIP reasons and prerequisites" \
+           "first (Windows ACL tests require an elevated process), then stale in-tree .moc files." \
+           "Change tests/expected-counts.txt only when tests were deliberately removed."
+      code=1
+    fi
   fi
 
   if [ "$code" -ne 0 ]; then
@@ -48,6 +131,10 @@ done < <(find "$test_root" -type f \( -name 'tst_*' -o -name 'tst_*.exe' \) | so
 if [ "$found" -eq 0 ]; then
   echo "::error::No ${suite_name} test binaries found"
   exit 1
+fi
+
+if [ "$unpinned" -ne 0 ]; then
+  echo "::notice::${unpinned} ${suite_name} binary/binaries have no pinned minimum on ${host_key}"
 fi
 
 if [ "$fail" -ne 0 ]; then

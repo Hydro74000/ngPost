@@ -11,11 +11,17 @@
         <file>icons/file.png</file>
         <file>icons/uploading.png</file>
         <file>icons/pending.png</file>
+        <file>icons/pending_light.png</file>
         <file>icons/ok.png</file>
         <file>icons/ko.png</file>
         <file>icons/auto.png</file>
         <file>icons/scanFolder.png</file>
         <file>icons/quick.png</file>
+        <file>icons/quick.svg</file>
+        <file>icons/copy.png</file>
+        <file>icons/copy.svg</file>
+        <file>icons/zoom.png</file>
+        <file>icons/zoom.svg</file>
         <file>icons/monitor.png</file>
         <file>icons/flag_FR.png</file>
         <file>icons/flag_EN.png</file>
@@ -28,8 +34,7 @@
         <file>icons/flag_PT.png</file>
         <file>lang/ngPost_pt.qm</file>
         <file>icons/close.jpg</file>
-        <file>icons/play.png</file>
-        <file>icons/pause.png</file>
+        <file>icons/closeAll.png</file>
         <file>icons/cmd.png</file>
         <file>lang/ngPost_zh.qm</file>
         <file>icons/flag_ZH.png</file>

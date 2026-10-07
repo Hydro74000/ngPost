@@ -11,4 +11,11 @@
 
 TEMPLATE = subdirs
 
-SUBDIRS = unit integration gui vpn
+SUBDIRS = unit integration gui
+
+# The VPN end-to-end tests bring up a real WireGuard tunnel through sudo,
+# iproute2 and the privileged helper script. None of that exists off Linux, so
+# building them elsewhere only produces a binary that skips itself. CI is
+# unaffected either way: every job builds unit.pro, integration.pro or gui.pro
+# directly rather than this aggregate.
+linux: SUBDIRS += vpn

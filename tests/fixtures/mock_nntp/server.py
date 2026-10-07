@@ -25,11 +25,18 @@ import argparse
 import asyncio
 import ssl
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
 
+_START = time.monotonic()
+
+
 def _log(log_path: Optional[Path], msg: str) -> None:
+    # Milliseconds since start: the order of commands says nothing about when
+    # they arrived relative to the replies the server was still sitting on.
+    msg = f"[+{int((time.monotonic() - _START) * 1000):>6d}ms] {msg}"
     print(msg, flush=True)
     if log_path is not None:
         with log_path.open("a", encoding="utf-8") as f:
@@ -100,8 +107,31 @@ class Session:
             chunks.append(stripped + b"\r\n")
         return b"".join(chunks)
 
+    def drop_post_reply(self) -> bool:
+        if self.opts.drop_before_post_reply:
+            return True
+        if self.opts.drop_before_post_reply_count > 0:
+            self.opts.drop_before_post_reply_count -= 1
+            return True
+        return False
+
+    def rejects(self, body: bytes) -> bool:
+        part = self.opts.reject_part
+        return part > 0 and f"=ybegin part={part} ".encode() in body
+
     async def serve(self) -> None:
         self.log(f"connect (require_auth={self.opts.require_auth})")
+
+        if self.opts.partial_line:
+            # Half a greeting: readyRead fires on the client, but no complete
+            # line is ever available. A client that disarms its timeout on the
+            # mere arrival of bytes waits here for ever.
+            self.log("sending a partial greeting and going silent")
+            self.writer.write(b"200 ngPost mock NNTP serv")
+            await self.writer.drain()
+            while True:
+                await asyncio.sleep(3600)
+
         await self.write_line(b"200 ngPost mock NNTP server ready (POSTING OK)")
 
         try:
@@ -132,6 +162,11 @@ class Session:
                     if self.opts.fail_auth:
                         await self.write_line(b"481 auth rejected (test injection)")
                         continue
+                    if self.opts.fail_auth_count > 0:
+                        self.opts.fail_auth_count -= 1
+                        self.log("rejecting AUTHINFO PASS (fail-auth-count)")
+                        await self.write_line(b"481 auth rejected (test injection)")
+                        continue
                     expected_user, expected_pass = "", ""
                     if self.opts.require_auth:
                         expected_user, expected_pass = self.opts.require_auth.split(":", 1)
@@ -159,14 +194,34 @@ class Session:
                     await self.write_line(b"335 send the article")
                     body = await self.read_until_dot()
                     self._dump_article(msgid, body)
+                    if self.drop_post_reply():
+                        self.log("closing before final IHAVE reply (test injection)")
+                        self.writer.transport.abort()
+                        return
                     await self.write_line(b"235 article transferred ok")
                     continue
 
                 if upper == "POST":
                     await self.write_line(b"340 send the article; end with <CR-LF>.<CR-LF>")
+                    if self.opts.stall_article:
+                        # Stop reading: a large article stays queued in the
+                        # client's write buffer, as with a dead route.
+                        self.log("not reading the article (test injection)")
+                        while True:
+                            await asyncio.sleep(3600)
                     body = await self.read_until_dot()
+                    if self.rejects(body):
+                        # A definitive refusal, retried by the client until
+                        # its budget runs out; nothing is stored.
+                        self.log(f"rejecting part {self.opts.reject_part} with 441 (test injection)")
+                        await self.write_line(b"441 posting failed")
+                        continue
                     msgid = self._extract_msgid(body)
                     self._dump_article(msgid, body)
+                    if self.drop_post_reply():
+                        self.log("closing before final POST reply (test injection)")
+                        self.writer.transport.abort()
+                        return
                     await self.write_line(b"240 article received ok")
                     continue
 
@@ -174,7 +229,14 @@ class Session:
                     # Used by --check. Default: report the article exists.
                     parts = cmd_line.split(None, 1)
                     msgid = parts[1].strip("<>") if len(parts) > 1 else "1"
-                    if self.opts.stat_missing:
+                    # --stat-missing hides everything; --missing-ids hides a
+                    # chosen subset, which is what a PAR2 recovery scenario needs
+                    # ("this volume lost one segment, that one is intact").
+                    missing = self.opts.stat_missing or msgid in self.opts.missing_id_set
+                    # Traced so a test can assert the order articles were asked
+                    # in, and how many were asked before the check gave up.
+                    self.log(f"STAT <{msgid}> -> {'430' if missing else '223'}")
+                    if missing:
                         await self.write_line(
                             f"430 No article with message-id <{msgid}>".encode("latin1")
                         )
@@ -301,12 +363,29 @@ def main(argv: list[str]) -> int:
                    help="If set to 'user:pass', reject AUTHINFO PASS that does not match")
     p.add_argument("--fail-auth", action="store_true",
                    help="Always reject AUTHINFO PASS with 481")
+    p.add_argument("--fail-auth-count", type=int, default=0,
+                   help="Reject the first N AUTHINFO PASS with 481, server-wide, then accept")
     p.add_argument("--drop-after-bytes", type=int, default=0,
                    help="Close the connection after N bytes have been received (0 = never)")
+    p.add_argument("--drop-before-post-reply", action="store_true",
+                   help="Accept and dump an article, then close without its final 235/240 reply")
+    p.add_argument("--drop-before-post-reply-count", type=int, default=0,
+                   help="Drop the first N final replies, then allow successful retries")
+    p.add_argument("--reject-part", type=int, default=0,
+                   help="Reply 441 to every POST of yEnc part N, of any file (0 = never)")
+    p.add_argument("--stall-article", action="store_true",
+                   help="Accept POST, then never read the article nor reply")
     p.add_argument("--slow-mode-ms", type=int, default=0,
                    help="Sleep N ms before each server reply (default 0)")
     p.add_argument("--stat-missing", action="store_true",
                    help="Reply 430 to STAT (simulates missing articles for --check)")
+    p.add_argument("--partial-line", action="store_true",
+                   help="Send the greeting without its terminator and then stay silent, "
+                        "to exercise a client's read timeout on an incomplete line")
+    p.add_argument("--missing-ids", default=None,
+                   help="File of message-ids (one per line, angle brackets optional, "
+                        "'#' comments allowed) to report as missing; every other "
+                        "article is reported present")
     p.add_argument("--ssl-port", type=int, default=None,
                    help="If set, also listen on this TCP port wrapped in TLS")
     p.add_argument("--ssl-port-file", default=None,
@@ -316,6 +395,13 @@ def main(argv: list[str]) -> int:
     p.add_argument("--ssl-key", default=None,
                    help="Path to the TLS private key (PEM)")
     opts = p.parse_args(argv)
+
+    opts.missing_id_set: set[str] = set()
+    if opts.missing_ids:
+        for line in Path(opts.missing_ids).read_text(encoding="utf-8").splitlines():
+            line = line.split("#", 1)[0].strip()
+            if line:
+                opts.missing_id_set.add(line.strip("<>"))
 
     return asyncio.run(_run(opts))
 

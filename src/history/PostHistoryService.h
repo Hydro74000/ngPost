@@ -111,29 +111,35 @@ public:
     qint64 upsertFile(const PostHistoryStore::FileRecord &record, QString *error = nullptr);
     void enqueueUpdateFileStatus(qint64 fileId, const QString &status);
 
+    //! \a bytes is the slice of the source file the article carries;
+    //! \a bodyBytes its size once yEnc encoded, i.e. what the nzb advertises.
     void enqueueArticlePosting(qint64 fileId,
                                int part,
                                const QString &msgId,
                                int attemptNo,
                                qint64 pos,
-                               qint64 bytes);
+                               qint64 bytes,
+                               qint64 bodyBytes = 0);
     void enqueueArticlePosted(qint64 fileId,
                               int part,
                               const QString &msgId,
                               qint64 pos,
-                              qint64 bytes);
+                              qint64 bytes,
+                              qint64 bodyBytes = 0);
     void enqueueArticleFailed(qint64 fileId,
                               int part,
                               const QString &msgId,
                               const QString &reason,
                               qint64 pos,
-                              qint64 bytes);
+                              qint64 bytes,
+                              qint64 bodyBytes = 0);
     void enqueueArticleUnknown(qint64 fileId,
                                int part,
                                const QString &msgId,
                                const QString &reason,
                                qint64 pos,
-                               qint64 bytes);
+                               qint64 bytes,
+                               qint64 bodyBytes = 0);
     bool flush(QString *error = nullptr);
 
     bool loadPostDetails(qint64 postId,
@@ -163,13 +169,13 @@ public:
     void requestHistorySnapshot(const PostHistoryStore::ListFilter &filter,
                                 const QSet<qint64> &ignoredResumeIds,
                                 QObject *receiver,
-                                HistorySnapshotCallback callback);
+                                const HistorySnapshotCallback &callback);
     void requestStatsSnapshot(const QString &dateFrom,
                               const QString &dateTo,
                               const QString &groupFilter,
                               QObject *receiver,
-                              StatsSnapshotCallback callback);
-    void requestPostDetails(qint64 postId, QObject *receiver, DetailsCallback callback);
+                              const StatsSnapshotCallback &callback);
+    void requestPostDetails(qint64 postId, QObject *receiver, const DetailsCallback &callback);
 
 signals:
     void error(QString msg);
@@ -178,8 +184,20 @@ signals:
     void prepared(bool ok);
 
 private:
+    using ArticleKind = PostHistoryStore::ArticleEvent::Kind;
+
     template<typename Func>
     void _invokeQueued(Func func);
+    //! Queues the outcome of one article: the three enqueueArticle*() differ
+    //! only in \a kind (and a posted article carries no \a reason).
+    void _enqueueArticleEvent(ArticleKind kind,
+                              qint64 fileId,
+                              int part,
+                              const QString &msgId,
+                              const QString &reason,
+                              qint64 pos,
+                              qint64 bytes,
+                              qint64 bodyBytes);
 
     template<typename Func>
     bool _invokeBlocking(Func func);

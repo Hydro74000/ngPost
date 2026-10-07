@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="iso-8859-1" ?>
+<!--
+  A hostile nzb, for tst_PostFlow::check_hostile_nzb_sends_one_stat_only.
+
+  The second segment's message-id carries an XML-encoded CR LF followed by a
+  second STAT command. Before the ids were validated, NzbCheck pasted that text
+  straight into "stat <id>" plus CRLF, and the extra line went out on an already
+  authenticated NNTP connection, as a command of the nzb author's choosing.
+
+  The first segment is ordinary, so the test can assert that a check still runs:
+  exactly one STAT, for that segment, and nothing for the injected one.
+-->
+<nzb xmlns="http://www.newzbin.com/DTD/2003/nzb">
+  <file poster="a@b.c" date="1700000000" subject="hostile [1/1] - &quot;payload.bin&quot; yEnc (1/2)">
+    <groups>
+      <group>alt.binaries.test</group>
+    </groups>
+    <segments>
+      <segment bytes="100" number="1">legit-segment@ngpost.test</segment>
+      <segment bytes="100" number="2">evil@ngpost.test&#13;&#10;STAT &lt;injected@ngpost.test&gt;</segment>
+    </segments>
+  </file>
+</nzb>

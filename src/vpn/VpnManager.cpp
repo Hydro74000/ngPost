@@ -13,14 +13,26 @@
 #include "VpnBackend.h"
 #include "VpnProfile.h"
 #include "WireGuardBackend.h"
+#include "WireGuardConfigPolicy.h"
 #ifdef Q_OS_WIN
 #include "WindowsBindHelper.h"
+#include "WindowsSecurity.h"
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <sddl.h>
 #endif
 
 #include "nntp/NntpServerParams.h"
 #include "utils/PathHelper.h"
+#include "utils/WindowsCommandLine.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QEventLoop>
 #include <QFile>
@@ -30,6 +42,9 @@
 #include <QNetworkInterface>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QSaveFile>
+#include <QSettings>
+#include <QStandardPaths>
 #include <QStringList>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
@@ -37,9 +52,7 @@
 
 #include <qt6keychain/keychain.h>
 
-#ifdef NGPOST_TESTING
 #include <utility>
-#endif
 
 using QKeychain::ReadPasswordJob;
 using QKeychain::WritePasswordJob;
@@ -48,6 +61,59 @@ using QKeychain::Job;
 
 namespace {
 constexpr char kKeychainService[] = "ngPost-vpn";
+
+// Read by the Linux stale-session cleanup and by its test hook only: defining it
+// elsewhere leaves an unused function, which macOS builds warn about.
+#if defined(Q_OS_LINUX) || defined(NGPOST_TESTING)
+bool parseLinuxOwnerManifest(QByteArray bytes, qint64 *ownerPid,
+                             QString *ownerStart)
+{
+    if (bytes.isEmpty() || bytes.size() >= 2048)
+        return false;
+    if (bytes.endsWith('\n'))
+        bytes.chop(1);
+    if (bytes.contains('\n') || bytes.contains('\r'))
+        return false;
+
+    static const QRegularExpression pattern(QStringLiteral(
+        "^v=2 owner_pid=([0-9]+) owner_start=([0-9]+) helper_pid=[0-9]+ "
+        "backend=(?:openvpn|wireguard) session=[a-zA-Z0-9_-]+ phase=[a-z_]+ "
+        "config=[a-zA-Z0-9._~:/@+%\\-]* config_sha=(?:[0-9a-f]{64})? "
+        "vpn_pid=[0-9]+ vpn_start=[0-9]+ exe=[a-zA-Z0-9._~:/@+%\\-]* "
+        "iface=[a-zA-Z0-9_.\\-]+ tun_ip=(?:-|[0-9.]+) "
+        "route=(?:0|1|intent) rule=(?:0|1|intent) "
+        "interface=(?:0|1|intent) end=1$"));
+    QRegularExpressionMatch const match = pattern.match(QString::fromLatin1(bytes));
+    if (!match.hasMatch())
+        return false;
+    bool ok = false;
+    qint64 const pid = match.captured(1).toLongLong(&ok);
+    if (!ok || pid <= 0)
+        return false;
+    if (ownerPid)
+        *ownerPid = pid;
+    if (ownerStart)
+        *ownerStart = match.captured(2);
+    return true;
+}
+#endif
+
+bool helperDeclaresProtocol2(QByteArray const &prefix)
+{
+    static const QRegularExpression marker(QStringLiteral(
+        "(?:^|\\n)readonly[ \\t]+NGPOST_VPN_HELPER_PROTOCOL=2(?:\\r?\\n|$)"));
+    static const QRegularExpression security(QStringLiteral(
+        "(?:^|\\n)readonly[ \\t]+NGPOST_VPN_HELPER_SECURITY_REVISION=4(?:\\r?\\n|$)"));
+    const QString text = QString::fromLatin1(prefix);
+    return marker.match(text).hasMatch() && security.match(text).hasMatch();
+}
+
+bool helperPathDeclaresProtocol2(QString const &path)
+{
+    QFile helper(path);
+    return helper.open(QIODevice::ReadOnly)
+        && helperDeclaresProtocol2(helper.read(4096));
+}
 }
 
 VpnManager *VpnManager::sInstance = nullptr;
@@ -56,12 +122,15 @@ VpnManager::VpnManager(QObject *parent)
     : QObject(parent)
     , _autoConnect(false)
     , _state(State::Disabled)
+    , _health(VpnHealth::Healthy)
     , _tunIp()
     , _tunIface()
     , _dnsServer()
     , _currentBackend(nullptr)
     , _backendStartInProgress(false)
     , _backendFailedDuringStart(false)
+    , _nextRunId(0)
+    , _currentAttemptId(0)
     , _tunPollTimer(new QTimer(this))
     , _tunPollAttempts(0)
     , _profiles()
@@ -70,11 +139,39 @@ VpnManager::VpnManager(QObject *parent)
     , _autoStartedByJob(false)
     , _activeJobsNeedingVpn(0)
     , _autoDisconnectTimer(new QTimer(this))
+    , _cliMode(false)
+    , _leaseWaitMinutes(5)
+    , _recoveryMaxAttempts(0)
+    , _recoveryAttempts(0)
+    , _externalRecoveryAttempts(0)
+    , _recoveryActive(false)
+    , _recoveryReason(FailureKind::None)
+    , _recoveryTimer(new QTimer(this))
+    , _healthyResetTimer(new QTimer(this))
+#ifdef Q_OS_WIN
+    , _windowsLeaseHandle(nullptr)
+#endif
 {
+    qRegisterMetaType<BackendTermination>();
+    qRegisterMetaType<VpnFailureKind>();
+    qRegisterMetaType<VpnBackendHealth>();
     _autoDisconnectTimer->setSingleShot(true);
     _autoDisconnectTimer->setInterval(kAutoDisconnectMs);
     connect(_autoDisconnectTimer, &QTimer::timeout,
             this, &VpnManager::onAutoDisconnectTimeout);
+
+    _recoveryTimer->setSingleShot(true);
+    connect(_recoveryTimer, &QTimer::timeout,
+            this, &VpnManager::_performExternalRestart);
+    _healthyResetTimer->setSingleShot(true);
+    _healthyResetTimer->setInterval(60000);
+    connect(_healthyResetTimer, &QTimer::timeout, this, [this]() {
+        if (_state == State::Connected && _health == VpnHealth::Healthy
+            && !_recoveryActive) {
+            _recoveryAttempts = 0;
+            _externalRecoveryAttempts = 0;
+        }
+    });
 
     _tunPollTimer->setSingleShot(false);
     _tunPollTimer->setInterval(kTunPollIntervalMs);
@@ -84,6 +181,169 @@ VpnManager::VpnManager(QObject *parent)
     if (!sInstance)
         sInstance = this;
 }
+
+void VpnManager::setLeaseWaitMinutes(int minutes)
+{
+    _leaseWaitMinutes = qBound(0, minutes, 1440);
+}
+
+void VpnManager::setRecoveryMaxAttempts(int attempts)
+{
+    _recoveryMaxAttempts = qBound(0, attempts, 1000);
+}
+
+QString VpnManager::currentProcessStartTime()
+{
+#ifdef Q_OS_LINUX
+    QFile stat(QStringLiteral("/proc/self/stat"));
+    if (!stat.open(QIODevice::ReadOnly | QIODevice::Text))
+        return QStringLiteral("0");
+    QByteArray const record = stat.readAll().trimmed();
+    int const closeParen = record.lastIndexOf(')');
+    if (closeParen < 0)
+        return QStringLiteral("0");
+    QList<QByteArray> const fields = record.mid(closeParen + 2).split(' ');
+    // The first token after comm is field 3; starttime is field 22.
+    return fields.size() > 19 ? QString::fromLatin1(fields.at(19))
+                              : QStringLiteral("0");
+#elif defined(Q_OS_WIN)
+    FILETIME created{}, exited{}, kernel{}, user{};
+    if (!GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user))
+        return QStringLiteral("0");
+    ULARGE_INTEGER value{};
+    value.LowPart = created.dwLowDateTime;
+    value.HighPart = created.dwHighDateTime;
+    // The Windows watchdog compares this against
+    // [Process]::StartTime.ToFileTimeUtc() in PowerShell. Process.StartTime
+    // comes back as a Local DateTime, and ToFileTimeUtc() converts a Local
+    // value to UTC before making the file time, so it reproduces exactly the
+    // FILETIME GetProcessTimes returned here. The two must keep round-tripping:
+    // a mismatch would make the watchdog conclude the PID was reused and tear
+    // down a perfectly healthy tunnel.
+    return QString::number(value.QuadPart);
+#else
+    // Only reachable where NGPOST_VPN_SUPPORTED is not defined, i.e. where no
+    // lease exists to bind to a PID. A real value would need proc_pidinfo or
+    // KERN_PROC_PID on macOS; it is deliberately not written until there is a
+    // VPN backend that would consume it, rather than shipped untested.
+    static_assert(!VpnManager::vpnPlatformSupported(),
+                  "a platform with VPN support owes a real process start time");
+    return QStringLiteral("0");
+#endif
+}
+
+#ifdef Q_OS_WIN
+bool VpnManager::_acquireWindowsLease(QString *detail)
+{
+    if (_windowsLeaseHandle)
+        return true;
+
+    // A default mutex DACL is often limited to the creating logon session.
+    // The lease is deliberately machine-wide: every authenticated desktop or
+    // service account may wait/release it, while SYSTEM retains full control.
+    PSECURITY_DESCRIPTOR descriptor = nullptr;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            // CreateMutex opens an existing object with MUTEX_ALL_ACCESS, so
+            // authenticated owners need GA rather than only SYNCHRONIZE.
+            L"D:P(A;;GA;;;SY)(A;;GA;;;AU)", SDDL_REVISION_1,
+            &descriptor, nullptr)) {
+        if (detail)
+            *detail = tr("The machine-wide VPN lease security descriptor could not be created "
+                         "(Windows error %1).").arg(GetLastError());
+        return false;
+    }
+    SECURITY_ATTRIBUTES attributes{};
+    attributes.nLength = sizeof(attributes);
+    attributes.lpSecurityDescriptor = descriptor;
+    attributes.bInheritHandle = FALSE;
+    HANDLE handle = CreateMutexW(&attributes, FALSE, L"Global\\ngPost.VpnLease.v1");
+    DWORD const createError = GetLastError();
+    LocalFree(descriptor);
+    if (!handle) {
+        if (detail)
+            *detail = tr("The machine-wide VPN lease could not be opened (Windows error %1).")
+                          .arg(createError);
+        return false;
+    }
+    DWORD const wait = WaitForSingleObject(handle, 0);
+    if (wait != WAIT_OBJECT_0 && wait != WAIT_ABANDONED) {
+        if (detail)
+            *detail = wait == WAIT_TIMEOUT
+                ? tr("Another ngPost instance owns the machine-wide VPN lease. %1")
+                      .arg(_windowsOwnerDiagnostic())
+                : tr("The machine-wide VPN lease could not be acquired (Windows error %1).")
+                      .arg(GetLastError());
+        CloseHandle(handle);
+        return false;
+    }
+    _windowsLeaseHandle = handle;
+    return true;
+}
+
+namespace {
+QString windowsOwnerPath()
+{
+    // The lease is machine-wide, so its diagnostic record must not disappear
+    // into the current user's AppData tree. ProgramData also lets another
+    // interactive session at least identify that machine-wide state exists.
+    QString root = QString::fromLocal8Bit(qgetenv("ProgramData"));
+    if (root.isEmpty())
+        root = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+    return QDir(root).filePath(QStringLiteral("ngPost/vpn-runtime/owner-v1"));
+}
+
+}
+
+bool VpnManager::_publishWindowsOwner(Backend selectedBackend, QString *detail)
+{
+    QString const path = windowsOwnerPath();
+    QString const dirPath = QFileInfo(path).absolutePath();
+    if (!QDir().mkpath(dirPath) || !WindowsSecurity::protectOwnerAndSystem(dirPath)) {
+        if (detail)
+            *detail = tr("Could not create or secure the Windows VPN runtime directory: %1")
+                          .arg(dirPath);
+        return false;
+    }
+    QByteArray const record = QStringLiteral(
+        "v=1 owner_pid=%1 owner_start=%2 backend=%3 since=%4 end=1\n")
+        .arg(QCoreApplication::applicationPid())
+        .arg(currentProcessStartTime())
+        .arg(backendToString(selectedBackend))
+        .arg(QDateTime::currentSecsSinceEpoch()).toLatin1();
+    QSaveFile owner(path);
+    if (!owner.open(QIODevice::WriteOnly) || owner.write(record) != record.size()
+        || !owner.commit() || !WindowsSecurity::protectOwnerAndSystem(path)) {
+        owner.cancelWriting();
+        if (detail)
+            *detail = tr("Could not publish or secure the Windows VPN owner manifest: %1")
+                          .arg(path);
+        return false;
+    }
+    return true;
+}
+
+QString VpnManager::_windowsOwnerDiagnostic() const
+{
+    QFile owner(windowsOwnerPath());
+    if (!owner.open(QIODevice::ReadOnly | QIODevice::Text))
+        return tr("Owner metadata is unavailable.");
+    QString const line = QString::fromLatin1(owner.readLine()).trimmed();
+    if (!line.endsWith(QLatin1String("end=1")) || line.size() >= 512)
+        return tr("Owner metadata is malformed.");
+    return line;
+}
+
+void VpnManager::_releaseWindowsLease()
+{
+    if (!_windowsLeaseHandle)
+        return;
+    HANDLE handle = static_cast<HANDLE>(_windowsLeaseHandle);
+    QFile::remove(windowsOwnerPath());
+    ReleaseMutex(handle);
+    CloseHandle(handle);
+    _windowsLeaseHandle = nullptr;
+}
+#endif
 
 void VpnManager::setAutoConnect(bool v)
 {
@@ -189,9 +449,10 @@ bool VpnManager::addProfile(VpnProfile const &p)
     return true;
 }
 
-bool VpnManager::updateProfile(QString const &oldName, VpnProfile const &p,
+bool VpnManager::updateProfile(QString const &oldName,
+                               VpnProfile const &p,
                                bool configFileChanged,
-                               ConfigRollback restorePreviousConfig)
+                               const ConfigRollback &restorePreviousConfig)
 {
     int idx = findProfileIndex(oldName);
     if (idx < 0 || !p.isValid()) return false;
@@ -200,70 +461,12 @@ bool VpnManager::updateProfile(QString const &oldName, VpnProfile const &p,
 
 #if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
     VpnProfile const oldProfile = _profiles.at(idx);
-    bool const oldWireGuard = oldProfile.backend == Backend::WireGuard;
-    bool const newWireGuard = p.backend == Backend::WireGuard;
-    QString const oldConfig = oldProfile.absoluteConfigPath();
-    QString const newConfig = p.absoluteConfigPath();
-    QString const oldService = WireGuardBackend::serviceNameFromConfig(oldConfig);
-    QString const newService = WireGuardBackend::serviceNameFromConfig(newConfig);
-    bool const sameService = oldService.compare(newService, Qt::CaseInsensitive) == 0;
-    bool const sameConfig = oldConfig.compare(newConfig, Qt::CaseInsensitive) == 0;
-    bool const refreshWireGuard = oldWireGuard != newWireGuard
-        || (oldWireGuard && newWireGuard
-            && (configFileChanged || !sameService || !sameConfig));
-
-    // Re-registering a running service would stop the tunnel behind the
-    // manager's back while it still reports Connected. Make the user stop it
-    // explicitly; the profile file transaction in the dialog will roll back.
-    if (refreshWireGuard && _activeProfileName == oldName
-        && (_state == State::Starting || _state == State::Connected
-            || _state == State::Stopping)) {
-        emit logLine(tr("Disconnect the active VPN before changing its WireGuard configuration."));
+    if (!_refreshWireGuardServices(oldName,
+                                   oldProfile,
+                                   p,
+                                   configFileChanged,
+                                   restorePreviousConfig))
         return false;
-    }
-
-    if (oldWireGuard && newWireGuard && refreshWireGuard) {
-        if (sameService) {
-            // SCM cannot hold two services with the same name. Remove the old
-            // registration first. If installing its replacement fails and both
-            // registrations refer to the same overwritten file, restore that
-            // file *before* asking WireGuard to recreate the old service.
-            if (!unregisterWindowsWireGuardTunnel(oldService))
-                return false;
-            if (!registerWindowsWireGuardTunnel(newConfig)) {
-                bool oldConfigAvailable = true;
-                if (configFileChanged && sameConfig) {
-                    oldConfigAvailable = restorePreviousConfig
-                        && restorePreviousConfig();
-                    if (!oldConfigAvailable)
-                        emit logLine(tr("Could not restore the previous WireGuard "
-                                        "configuration before recreating %1.")
-                                         .arg(oldService));
-                }
-                if (oldConfigAvailable
-                    && !registerWindowsWireGuardTunnel(oldConfig))
-                    emit logLine(tr("WireGuard service rollback failed for %1.").arg(oldService));
-                return false;
-            }
-        } else {
-            // Preserve the old working service until its replacement exists.
-            if (!registerWindowsWireGuardTunnel(newConfig))
-                return false;
-            if (!unregisterWindowsWireGuardTunnel(oldService)) {
-                if (!unregisterWindowsWireGuardTunnel(newService))
-                    emit logLine(tr("Could not remove the replacement WireGuard service %1 "
-                                    "after the old service failed to uninstall.")
-                                     .arg(newService));
-                return false;
-            }
-        }
-    } else if (!oldWireGuard && newWireGuard) {
-        if (!registerWindowsWireGuardTunnel(newConfig))
-            return false;
-    } else if (oldWireGuard && !newWireGuard) {
-        if (!unregisterWindowsWireGuardTunnel(oldService))
-            return false;
-    }
 #else
     Q_UNUSED(configFileChanged);
     Q_UNUSED(restorePreviousConfig);
@@ -276,6 +479,114 @@ bool VpnManager::updateProfile(QString const &oldName, VpnProfile const &p,
     emit profilesChanged();
     return true;
 }
+
+bool VpnManager::_tunnelInUse() const
+{
+    return _state == State::Starting || _state == State::Connected || _state == State::Reconnecting
+        || _state == State::Stopping;
+}
+
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
+namespace
+{
+bool wireGuardNeedsRefresh(bool oldWireGuard,
+                           bool newWireGuard,
+                           bool configFileChanged,
+                           bool sameService,
+                           bool sameConfig)
+{
+    return oldWireGuard != newWireGuard
+        || (oldWireGuard && newWireGuard && (configFileChanged || !sameService || !sameConfig));
+}
+}
+
+//! Brings the WireGuard tunnel services in line with the edited profile.
+//! False when the profile must not change, the reason already logged.
+bool VpnManager::_refreshWireGuardServices(QString const &oldName,
+                                           VpnProfile const &oldProfile,
+                                           VpnProfile const &p,
+                                           bool configFileChanged,
+                                           ConfigRollback const &restorePreviousConfig)
+{
+    bool const oldWireGuard = oldProfile.backend == Backend::WireGuard;
+    bool const newWireGuard = p.backend == Backend::WireGuard;
+    QString const oldConfig = oldProfile.absoluteConfigPath();
+    QString const newConfig = p.absoluteConfigPath();
+    QString const oldService = WireGuardBackend::serviceNameFromConfig(oldConfig);
+    QString const newService = WireGuardBackend::serviceNameFromConfig(newConfig);
+    bool const sameService = oldService.compare(newService, Qt::CaseInsensitive) == 0;
+    bool const sameConfig = oldConfig.compare(newConfig, Qt::CaseInsensitive) == 0;
+    bool const refreshWireGuard = wireGuardNeedsRefresh(oldWireGuard,
+                                                        newWireGuard,
+                                                        configFileChanged,
+                                                        sameService,
+                                                        sameConfig);
+
+    // Re-registering a running service would stop the tunnel behind the
+    // manager's back while it still reports Connected. Make the user stop it
+    // explicitly; the profile file transaction in the dialog will roll back.
+    if (refreshWireGuard && _activeProfileName == oldName && _tunnelInUse()) {
+        emit logLine(tr("Disconnect the active VPN before changing its WireGuard configuration."));
+        return false;
+    }
+
+    if (oldWireGuard && newWireGuard && refreshWireGuard)
+        return sameService ? _reinstallWireGuardService(oldService,
+                                                        oldConfig,
+                                                        newConfig,
+                                                        configFileChanged && sameConfig,
+                                                        restorePreviousConfig)
+                           : _replaceWireGuardService(oldService, newService, newConfig);
+    if (!oldWireGuard && newWireGuard)
+        return registerWindowsWireGuardTunnel(newConfig);
+    if (oldWireGuard && !newWireGuard)
+        return unregisterWindowsWireGuardTunnel(oldService);
+    return true;
+}
+
+bool VpnManager::_reinstallWireGuardService(QString const &service,
+                                            QString const &oldConfig,
+                                            QString const &newConfig,
+                                            bool restoreConfigFirst,
+                                            ConfigRollback const &restorePreviousConfig)
+{
+    // SCM cannot hold two services with the same name. Remove the old
+    // registration first. If installing its replacement fails and both
+    // registrations refer to the same overwritten file, restore that
+    // file *before* asking WireGuard to recreate the old service.
+    if (!unregisterWindowsWireGuardTunnel(service))
+        return false;
+    if (registerWindowsWireGuardTunnel(newConfig))
+        return true;
+    bool oldConfigAvailable = true;
+    if (restoreConfigFirst) {
+        oldConfigAvailable = restorePreviousConfig && restorePreviousConfig();
+        if (!oldConfigAvailable)
+            emit logLine(tr("Could not restore the previous WireGuard "
+                            "configuration before recreating %1.")
+                             .arg(service));
+    }
+    if (oldConfigAvailable && !registerWindowsWireGuardTunnel(oldConfig))
+        emit logLine(tr("WireGuard service rollback failed for %1.").arg(service));
+    return false;
+}
+
+bool VpnManager::_replaceWireGuardService(QString const &oldService,
+                                          QString const &newService,
+                                          QString const &newConfig)
+{
+    // Preserve the old working service until its replacement exists.
+    if (!registerWindowsWireGuardTunnel(newConfig))
+        return false;
+    if (unregisterWindowsWireGuardTunnel(oldService))
+        return true;
+    if (!unregisterWindowsWireGuardTunnel(newService))
+        emit logLine(tr("Could not remove the replacement WireGuard service %1 "
+                        "after the old service failed to uninstall.")
+                         .arg(newService));
+    return false;
+}
+#endif
 
 bool VpnManager::removeProfile(QString const &name)
 {
@@ -328,17 +639,23 @@ void VpnManager::setProfilesFromConfig(QList<VpnProfile> const &profiles,
 VpnManager::~VpnManager()
 {
     _cancelAutoDisconnect();
+    _pendingBackendCleanup = {};
     if (_currentBackend) {
+        VpnBackend *backend = _currentBackend;
+        _currentBackend = nullptr;
+        QObject::disconnect(backend, nullptr, this, nullptr);
         // Synchronously wait for the privileged helper to run its EXIT trap
         // so we don't leave the tunnel + policy routing + openvpn behind
         // when the user quits. 5s is plenty given the trap is mostly
         // local-only ip(8) commands.
-        if (_currentBackend->isRunning())
-            _currentBackend->stopAndWait(5000);
-        delete _currentBackend;
-        _currentBackend = nullptr;
+        if (backend->isRunning())
+            backend->stopAndWait(5000);
+        delete backend;
     }
     _shredRuntimeAuthFile();
+#ifdef Q_OS_WIN
+    _releaseWindowsLease();
+#endif
     if (sInstance == this)
         sInstance = nullptr;
 }
@@ -371,32 +688,47 @@ bool readCredentialsBlocking(QString const &profileName, QString *user, QString 
     return !user->isEmpty() && !pass->isEmpty();
 }
 
-// Write a freshly-allocated temp file containing "user\npass\n" with mode
-// 600 inside <vpn runtime dir>. Returns the absolute path or empty on error.
+#ifdef Q_OS_WIN
+// OpenVPNServiceInteractive needs a pathname on Windows.  The file is
+// short-lived, owner-only and shredded as soon as the backend stops.
 QString writeAuthFile(QString const &user, QString const &pass)
 {
-    QString tmpl = PathHelper::vpnRuntimeDir() + "/auth-XXXXXX";
-    QTemporaryFile *tf = new QTemporaryFile(tmpl);
-    tf->setAutoRemove(false);
-    tf->setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-    if (!tf->open()) {
-        delete tf;
+    QString const runtimeDir = PathHelper::vpnRuntimeDir();
+    if (!WindowsSecurity::protectOwnerAndSystem(runtimeDir))
+        return QString();
+    QTemporaryFile tf(runtimeDir + QStringLiteral("/auth-XXXXXX"));
+    tf.setAutoRemove(false);
+    if (!tf.open())
+        return QString();
+    QByteArray data = user.toUtf8() + "\n" + pass.toUtf8() + "\n";
+    if (tf.write(data) != data.size() || !tf.flush()) {
+        tf.remove();
         return QString();
     }
-    QByteArray data = user.toUtf8() + "\n" + pass.toUtf8() + "\n";
-    tf->write(data);
-    tf->close();
-    QString path = tf->fileName();
-    delete tf;
+    QString const path = tf.fileName();
+    tf.close();
+    if (!QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner)
+        || !WindowsSecurity::protectOwnerAndSystem(path)) {
+        QFile::remove(path);
+        return QString();
+    }
     return path;
 }
+#endif
 } // namespace
 
 bool VpnManager::start()
 {
+    if (_state == State::Stopping) return false;
     _backendFailedDuringStart = false;
     if (_state == State::Starting || _state == State::Connected)
         return true;
+#ifdef Q_OS_WIN
+    if (qobject_cast<WireGuardBackend *>(_currentBackend) && _currentBackend->isRunning()) {
+        emit statusLine(tr("VPN: previous WireGuard service shutdown is not confirmed."));
+        return false;
+    }
+#endif
 
     VpnProfile const *p = activeProfile();
     if (!p) {
@@ -412,23 +744,77 @@ bool VpnManager::start()
         return false;
     }
 
+#ifdef Q_OS_LINUX
+    // Do not discover an outdated helper from its legacy READY record: by
+    // then v1 may already have deleted or replaced globally named resources.
+    // The installed script is root-owned and readable, so its immutable v2
+    // declaration is a safe, non-privileged capability check.
+    if (!helperPathDeclaresProtocol2(helperScriptPath())) {
+        QString const detail = tr("The installed VPN helper needs security revision 4. Open VPN settings and reinstall it with administrator authentication before connecting. An old helper's passwordless authorization remains unsafe until this migration succeeds.");
+        _backendFailedDuringStart = true;
+        _setState(State::Failed);
+        emit logLine(detail);
+        emit statusLine(detail);
+        if (_autoStartedByJob || _activeJobsNeedingVpn > 0)
+            emit vpnRequiredButUnavailable(JobBlockReason::HelperOutdated, detail);
+        return false;
+    }
+#endif
+
+#ifdef Q_OS_WIN
+    QString leaseDetail;
+    if (!_acquireWindowsLease(&leaseDetail)) {
+        _setState(State::LeaseBusy);
+        emit vpnRequiredButUnavailable(JobBlockReason::LeaseBusy, leaseDetail);
+        emit logLine(leaseDetail);
+        return false;
+    }
+    if (!_publishWindowsOwner(p->backend, &leaseDetail)) {
+        _releaseWindowsLease();
+        _setState(State::Failed);
+        emit logLine(leaseDetail);
+        emit vpnRequiredButUnavailable(JobBlockReason::VpnFailed, leaseDetail);
+        return false;
+    }
+#endif
+
     _instantiateBackend();
     if (!_currentBackend) {
         _setState(State::Failed);
+#ifdef Q_OS_WIN
+        _releaseWindowsLease();
+#endif
         return false;
     }
 
     // For OpenVPN profiles flagged hasAuth, look up credentials in the
-    // keychain. If found, write them to a short-lived auth file (chmod 600)
-    // under vpn runtime dir; pass its path to the backend so openvpn picks
-    // it up via --auth-user-pass. Cleaned up on stop / failure.
+    // keychain. Windows needs a short-lived owner-only file for its vendor
+    // service. Linux sends a base64 transport record over helper stdin; the
+    // privileged helper alone materialises the 0600 /run copy.
     QString authFilePath;
+    QString authPipePayload;
     if (p->backend == Backend::OpenVPN && p->hasAuth) {
         QString user, pass;
         if (readCredentialsBlocking(p->name, &user, &pass)) {
+#ifdef Q_OS_WIN
             authFilePath = writeAuthFile(user, pass);
-            if (authFilePath.isEmpty())
-                emit logLine(tr("VPN: could not create auth file — openvpn will prompt"));
+            if (authFilePath.isEmpty()) {
+                QString const detail = tr("VPN: could not create the protected OpenVPN authentication file");
+                emit logLine(detail);
+                _setState(State::Failed);
+                _stopAndDestroyBackend();
+                _releaseWindowsLease();
+                emit vpnRequiredButUnavailable(JobBlockReason::VpnFailed, detail);
+                return false;
+            }
+#else
+            // Linux transports the credential material over the already
+            // private helper stdin pipe.  Only the privileged helper writes
+            // it to its 0600 file below /run; no persistent source copy and
+            // no secret command-line argument are created.
+            authPipePayload = QString::fromLatin1(
+                (user.toUtf8() + '\n' + pass.toUtf8() + '\n').toBase64());
+#endif
         } else {
             emit logLine(tr("VPN: no credentials in keychain for '%1' (relying on .ovpn inline)").arg(p->name));
         }
@@ -443,20 +829,44 @@ bool VpnManager::start()
         emit logLine(line);
         emit statusLine(line);
     }
-    // The backend interface accepts a single configPath today. To pass the
-    // auth-file path, we encode it after a NUL separator. OpenVpnBackend
-    // unpacks it and adds --auth-user-pass to the openvpn argv.
+    // The backend interface accepts a single QString today. The NUL trailer
+    // carries either the Windows auth pathname or the Linux pipe payload and
+    // is never logged or placed on an external process command line.
     QString packed = cfgPath;
+#ifdef Q_OS_WIN
     if (!authFilePath.isEmpty())
         packed += QChar(QChar::Null) + authFilePath;
+#else
+    if (!authPipePayload.isEmpty())
+        packed += QChar(QChar::Null) + authPipePayload;
+#endif
 
     _backendStartInProgress = true;
+    _currentBackend->beginRun(++_nextRunId);
     bool const started = _currentBackend->start(packed);
+    return _finishBackendStart(started);
+}
+
+bool VpnManager::_finishBackendStart(bool started)
+{
     _backendStartInProgress = false;
     if (!started || _backendFailedDuringStart) {
-        _setState(State::Failed);
-        _stopAndDestroyBackend();
+        // A synchronous protocol failure can already have selected a more
+        // precise public state while start() was on the stack. In particular,
+        // keep LeaseBusy so admission and the UI do not degrade it to a
+        // generic failure merely because the backend returned false.
+        if (_state != State::LeaseBusy)
+            _setState(State::Failed);
+        State const failureState = _state;
+        if (!_stopAndDestroyBackend([this, failureState] {
+                _setState(failureState);
+                _finishBackendStart(false);
+            })) return false;
         _shredRuntimeAuthFile();
+#ifdef Q_OS_WIN
+        if (!_recoveryActive)
+            _releaseWindowsLease();
+#endif
         return false;
     }
     return true;
@@ -464,6 +874,11 @@ bool VpnManager::start()
 
 void VpnManager::_shredRuntimeAuthFile()
 {
+    // One policy for start failure, restart and recovery exhaustion: do not
+    // remove credentials while a backend requiring confirmed stop still owns
+    // the tunnel. Each completion path calls us again after termination.
+    if (_currentBackend && _currentBackend->requiresConfirmedStop()
+        && _currentBackend->isRunning()) return;
     if (_runtimeAuthFilePath.isEmpty())
         return;
     QFile f(_runtimeAuthFilePath);
@@ -481,19 +896,40 @@ void VpnManager::_shredRuntimeAuthFile()
 
 void VpnManager::stop()
 {
+    // User stop cancels any pending restart/start-failure continuation.
+    _pendingBackendCleanup = {};
     if (_state == State::Disabled || _state == State::Stopping)
         return;
 
+    _recoveryActive = false;
+    _recoveryTimer->stop();
+    _healthyResetTimer->stop();
     _setState(State::Stopping);
     if (_currentBackend)
         _currentBackend->stop();
-    else
+    else {
+        _clearTunnelIdentity();
+        _setHealth(VpnHealth::Healthy);
         _setState(State::Disabled);
+        _autoStartedByJob = false;
+        _activeJobsNeedingVpn = 0;
+#ifdef Q_OS_WIN
+        _releaseWindowsLease();
+#endif
+    }
+}
+
+void VpnManager::disconnectByUser()
+{
+    if (_activeJobsNeedingVpn > 0)
+        emit manualDisconnectRequested();
+    stop();
 }
 
 void VpnManager::onBackendReady(QString const &iface, QHostAddress const &ip,
                                 QHostAddress const &dns)
 {
+    if (_state == State::Stopping) return;
     _tunIface = iface;
     _tunIp    = ip;
     _dnsServer = dns;
@@ -561,7 +997,13 @@ void VpnManager::_pollTunIpAvailability()
                              .arg(maxAttempts * kTunPollIntervalMs)
                              .arg(visibleAddrs.join(", "));
 #endif
-        onBackendFailed(reason);
+        BackendTermination termination;
+        termination.runId = _currentBackend ? _currentBackend->runId() : _nextRunId;
+        termination.kind = VpnTerminationKind::UnexpectedExit;
+        termination.failure = FailureKind::TunnelLost;
+        termination.wasReady = true;
+        termination.detail = reason;
+        onBackendTerminated(termination);
         return;
     }
     if (!_tunPollTimer->isActive())
@@ -577,57 +1019,361 @@ void VpnManager::_completeReady()
               .arg(_tunIface, _tunIp.toString());
     emit logLine(summary);
     emit statusLine(summary);
+    _recoveryTimer->stop();
+    _recoveryActive = false;
+    _recoveryReason = FailureKind::None;
+    _setHealth(VpnHealth::Healthy);
+    // A helper recreated after an unexpected exit starts in IDLE even though
+    // VpnManager deliberately retained the suspended job. Reassert the
+    // manager's authoritative activity count before announcing Connected so
+    // WireGuard liveness supervision cannot remain disabled after recovery.
+    if (_currentBackend)
+        _currentBackend->setActive(_activeJobsNeedingVpn > 0);
     _setState(State::Connected);
+    _healthyResetTimer->start();
 }
 
-void VpnManager::onBackendFailed(QString const &reason)
+void VpnManager::_setHealth(VpnHealth health)
 {
-    QString line = tr("VPN: failed — %1").arg(reason);
-    emit logLine(line);
-    emit statusLine(line);
+    if (_health == health)
+        return;
+    _health = health;
+    if (health != VpnHealth::Healthy)
+        _healthyResetTimer->stop();
+    if (health == VpnHealth::Suspect
+        || health == VpnHealth::RecoveringInternally
+        || health == VpnHealth::Restarting)
+        _cancelAutoDisconnect();
+}
+
+bool VpnManager::_consumeRecoveryAttempt()
+{
+    if (_recoveryMaxAttempts > 0 && _recoveryAttempts >= _recoveryMaxAttempts)
+        return false;
+    ++_recoveryAttempts;
+    return true;
+}
+
+void VpnManager::onBackendHealthChanged(VpnBackendHealth health, QString const &reason)
+{
+    if (_state == State::Stopping) return;
+    if (health == VpnBackendHealth::Healthy) {
+        // HEALTHY is only a liveness transition. READY remains the sole source
+        // of the bindable interface/address identity.
+        if (_tunIp.isNull())
+            return;
+        if (_health != VpnHealth::Healthy || _state == State::Reconnecting)
+            emit statusLine(tr("VPN: tunnel health restored"));
+        _completeReady();
+        return;
+    }
+    if (health == VpnBackendHealth::Suspect) {
+        _setHealth(VpnHealth::Suspect);
+        emit statusLine(tr("VPN: tunnel health is uncertain — %1").arg(reason));
+        return;
+    }
+    if (health == VpnBackendHealth::RecoveringInternally) {
+        if (_recoveryActive && _health == VpnHealth::RecoveringInternally)
+            return; // repeated management notifications belong to one episode
+        if (!_consumeRecoveryAttempt()) {
+            _finishRecoveryExhausted(FailureKind::TunnelLost,
+                                     tr("OpenVPN recovery budget exhausted"));
+            return;
+        }
+        _recoveryActive = true;
+        _recoveryReason = FailureKind::TunnelLost;
+        _setHealth(VpnHealth::RecoveringInternally);
+        _setState(State::Reconnecting);
+        emit vpnInterrupted(_recoveryReason);
+        emit statusLine(tr("VPN: OpenVPN is reconnecting internally (attempt %1)")
+                            .arg(_recoveryAttempts));
+        _recoveryTimer->start(180000);
+        return;
+    }
+    if (_recoveryActive && _health == VpnHealth::RecoveringInternally) {
+        // OpenVPN may die (or reach its 180 s deadline) while its soft
+        // reconnect episode is already accounted for. Promote that same
+        // episode immediately to an external rebuild instead of letting the
+        // internal-recovery timer delay a confirmed DOWN.
+        _recoveryReason = FailureKind::TunnelLost;
+        _scheduleExternalRestart(_recoveryReason);
+        return;
+    }
+    requestRecovery(FailureKind::TunnelLost);
+}
+
+void VpnManager::onBackendRestartReady(quint64 attemptId, QString const &iface,
+                                       QHostAddress const &ip, QHostAddress const &dns)
+{
+    if (attemptId != _currentAttemptId)
+        return;
+    onBackendReady(iface, ip, dns);
+}
+
+void VpnManager::onBackendRestartFailed(quint64 attemptId, FailureKind failure,
+                                        QString const &detail)
+{
+    if (attemptId != _currentAttemptId || !_recoveryActive)
+        return;
+    emit logLine(tr("VPN restart attempt %1 failed: %2").arg(attemptId).arg(detail));
+    _recoveryReason = failure;
+    _scheduleExternalRestart(failure);
+}
+
+void VpnManager::requestRecovery(FailureKind reason)
+{
+    if (_state == State::Stopping && _currentBackend && _currentBackend->isRunning()) return;
+    // Recovery is an operational response to a running backend/supervisor
+    // incident. Configuration, authentication and lease failures are startup
+    // decisions and must remain terminal rather than entering an unrelated
+    // reconnect loop. In particular, NNTP failures never call this API.
+    switch (reason) {
+    case FailureKind::TunnelLost:
+    case FailureKind::HelperExited:
+    case FailureKind::ProcessExited:
+    case FailureKind::Internal:
+        break;
+    default:
+        return;
+    }
+    if (_recoveryActive)
+        return;
+    _recoveryActive = true;
+    _recoveryReason = reason;
+    _setHealth(VpnHealth::Restarting);
+    _setState(State::Reconnecting);
+    _clearTunnelIdentity();
+    _cancelAutoDisconnect();
+    emit vpnInterrupted(reason);
+    _scheduleExternalRestart(reason);
+}
+
+void VpnManager::_scheduleExternalRestart(FailureKind reason)
+{
+    Q_UNUSED(reason);
+    static const int delays[] = {0, 5, 15, 30, 60, 120};
+    int delay = _externalRecoveryAttempts < 6
+        ? delays[_externalRecoveryAttempts]
+        : 300;
+    _setHealth(VpnHealth::Restarting);
+    _setState(State::Reconnecting);
+    emit statusLine(tr("VPN: restart scheduled in %1 second(s)").arg(delay));
+    _recoveryTimer->start(delay * 1000);
+}
+
+void VpnManager::_performExternalRestart()
+{
+    if (!_recoveryActive)
+        return;
+    if (!_consumeRecoveryAttempt()) {
+        _finishRecoveryExhausted(_recoveryReason,
+                                 tr("VPN recovery budget exhausted"));
+        return;
+    }
+
+    ++_externalRecoveryAttempts;
+    ++_currentAttemptId;
+    emit statusLine(tr("VPN: external restart attempt %1 (recovery attempt %2)")
+                        .arg(_externalRecoveryAttempts)
+                        .arg(_recoveryAttempts));
+    if (_currentBackend && _currentBackend->isRunning()
+        && _currentBackend->restart(_currentAttemptId))
+        return;
+
+    if (!_stopAndDestroyBackend([this] { _resumeExternalRestart(); })) return;
+    _resumeExternalRestart();
+}
+
+void VpnManager::_resumeExternalRestart()
+{
+    _shredRuntimeAuthFile();
+    if (!_recoveryActive) return;
+    _setState(State::Reconnecting);
+    if (!start() && _recoveryActive) {
+        if (_pendingBackendCleanup || _state == State::Stopping) return;
+        if (_recoveryMaxAttempts > 0 && _recoveryAttempts >= _recoveryMaxAttempts)
+            _finishRecoveryExhausted(_recoveryReason, tr("VPN restart failed"));
+        else
+            _scheduleExternalRestart(_recoveryReason);
+    }
+}
+
+void VpnManager::_finishRecoveryExhausted(FailureKind reason, QString const &detail)
+{
+    _recoveryTimer->stop();
+    _healthyResetTimer->stop();
+    _recoveryActive = false;
+    _setHealth(VpnHealth::Restarting);
+    if (!_stopAndDestroyBackend([this, reason, detail] {
+            _finishRecoveryExhausted(reason, detail);
+        })) return;
+    _shredRuntimeAuthFile();
+    _clearTunnelIdentity();
+    _setState(State::Failed);
+#ifdef Q_OS_WIN
+    _releaseWindowsLease();
+#endif
+    emit statusLine(tr("VPN: %1").arg(detail));
+    emit recoveryExhausted(reason);
+}
+
+bool VpnManager::retryVpn()
+{
+    if (_activeJobsNeedingVpn <= 0 && !_autoStartedByJob)
+        return false;
+    _recoveryAttempts = 0;
+    _externalRecoveryAttempts = 0;
+    _recoveryActive = false;
+    requestRecovery(_recoveryReason == FailureKind::None
+                        ? FailureKind::TunnelLost : _recoveryReason);
+    return true;
+}
+
+void VpnManager::_clearTunnelIdentity()
+{
     _tunPollTimer->stop();
     _tunIp = QHostAddress();
     _tunIface.clear();
     _dnsServer = QHostAddress();
-    _setState(State::Failed);
+}
 
-    // A backend is allowed to reject start() synchronously. Stopping it from
-    // inside its own start() stack can invalidate members that start() still
-    // has to clean up. Remember the failure and let start() perform the common
-    // cleanup immediately after the backend call returns.
+VpnManager::JobBlockReason VpnManager::_blockReasonForFailure(FailureKind failure) const
+{
+    switch (failure) {
+    case FailureKind::LeaseBusy: return JobBlockReason::LeaseBusy;
+    case FailureKind::HelperOutdated: return JobBlockReason::HelperOutdated;
+    case FailureKind::UnattributedVpnState: return JobBlockReason::UnattributedVpnState;
+    default: return JobBlockReason::VpnFailed;
+    }
+}
+
+void VpnManager::onBackendStopPending(QString const &detail)
+{
+    _recoveryTimer->stop();
+    _healthyResetTimer->stop();
+    _tunPollTimer->stop();
+    _setState(State::Stopping);
+    emit statusLine(detail.isEmpty() ? tr("VPN: waiting for confirmed service shutdown…") : detail);
+    if (_activeJobsNeedingVpn > 0) emit vpnInterrupted(FailureKind::TunnelLost);
+}
+
+void VpnManager::onBackendTerminated(BackendTermination const &termination)
+{
+    // Ignore a delayed event from a backend which has already been superseded.
+    if (_currentBackend && termination.runId != _currentBackend->runId())
+        return;
+
+    if (_pendingBackendCleanup) {
+        _resumeAfterConfirmedStop();
+        return;
+    }
+
+#ifdef Q_OS_WIN
+    // Manager-side failures (e.g. bind timeout) also need confirmed teardown.
+    auto wg = qobject_cast<WireGuardBackend *>(_currentBackend);
+    if (wg && wg->isRunning()) {
+        wg->failAndStop(termination);
+        return;
+    }
+#endif
+
+    _clearTunnelIdentity();
+    _cancelAutoDisconnect();
+
+    if (termination.kind == VpnTerminationKind::RequestedStop) {
+        _finishRequestedStop();
+        return;
+    }
+
+    QString const line = tr("VPN: failed — %1").arg(termination.detail);
+    emit logLine(line);
+    emit statusLine(line);
+
+    if (!_recoverFromTermination(termination))
+        _finishFailedTermination(termination);
+}
+
+void VpnManager::_resumeAfterConfirmedStop()
+{
+    // Only confirmed shutdown may release the backend or resume work.
+    if (!_currentBackend || _currentBackend->isRunning())
+        return;
+    auto resume = std::move(_pendingBackendCleanup);
+    _pendingBackendCleanup = {};
+    _clearTunnelIdentity();
+    _cancelAutoDisconnect();
+    _destroyBackend();
+    resume();
+}
+
+void VpnManager::_finishRequestedStop()
+{
+    emit logLine(tr("VPN: tunnel stopped"));
+    emit statusLine(tr("VPN: tunnel stopped"));
+    _recoveryActive = false;
+    _recoveryTimer->stop();
+    _healthyResetTimer->stop();
+    _setHealth(VpnHealth::Healthy);
+    _setState(State::Disabled);
+    _destroyBackend();
+    _shredRuntimeAuthFile();
+    _autoStartedByJob = false;
+    _activeJobsNeedingVpn = 0;
+#ifdef Q_OS_WIN
+    _releaseWindowsLease();
+#endif
+}
+
+//! Hands a lost tunnel to recovery when jobs rely on it or recovery already
+//! runs. False when the failure is final.
+bool VpnManager::_recoverFromTermination(BackendTermination const &termination)
+{
+    if (termination.kind == VpnTerminationKind::UnexpectedExit
+        && termination.wasReady && (_activeJobsNeedingVpn > 0 || _autoStartedByJob)) {
+        _destroyBackend();
+        _shredRuntimeAuthFile();
+        auto const reason = termination.failure == FailureKind::None
+                            ? FailureKind::HelperExited : termination.failure;
+        if (_recoveryActive) _scheduleExternalRestart(reason);
+        else requestRecovery(reason);
+        return true;
+    }
+
+    if (_recoveryActive) {
+        _recoveryReason = termination.failure;
+        if (_backendStartInProgress)
+            _backendFailedDuringStart = true;
+        else {
+            _destroyBackend();
+            _shredRuntimeAuthFile();
+            _scheduleExternalRestart(termination.failure);
+        }
+        return true;
+    }
+    return false;
+}
+
+void VpnManager::_finishFailedTermination(BackendTermination const &termination)
+{
+    _setState(termination.failure == FailureKind::LeaseBusy
+                  ? State::LeaseBusy : State::Failed);
     if (_backendStartInProgress)
         _backendFailedDuringStart = true;
     else
         _stopAndDestroyBackend();
     _shredRuntimeAuthFile();
 
-    // A job waiting for an auto-started tunnel has not reached retainForJob()
-    // yet. _autoStartedByJob is therefore as important as the active count.
     bool const waitingJob = _autoStartedByJob || _activeJobsNeedingVpn > 0;
     if (waitingJob)
-        emit vpnRequiredButUnavailable(JobBlockReason::VpnFailed, reason);
-    _activeJobsNeedingVpn = 0;
-    _autoStartedByJob = false;
-    _cancelAutoDisconnect();
-}
-
-void VpnManager::onBackendStopped()
-{
-    QString line = tr("VPN: tunnel stopped");
-    emit logLine(line);
-    emit statusLine(line);
-    _tunPollTimer->stop();
-    _tunIp = QHostAddress();
-    _tunIface.clear();
-    _dnsServer = QHostAddress();
-    _setState(State::Disabled);
-    _destroyBackend();
-    _shredRuntimeAuthFile();
-    // Reaching Disabled clears the auto-started bookkeeping; a future job
-    // will re-trigger via onJobStarted from scratch.
-    _autoStartedByJob = false;
-    _activeJobsNeedingVpn = 0;
-    _cancelAutoDisconnect();
+        emit vpnRequiredButUnavailable(_blockReasonForFailure(termination.failure),
+                                       termination.detail);
+    if (!termination.wasReady) {
+        _activeJobsNeedingVpn = 0;
+        _autoStartedByJob = false;
+#ifdef Q_OS_WIN
+        _releaseWindowsLease();
+#endif
+    }
 }
 
 void VpnManager::_setState(State s)
@@ -664,9 +1410,18 @@ void VpnManager::_instantiateBackend()
     return;
 #endif
 
+    _connectBackend();
+}
+
+//! Routes every signal of the current backend to the manager.
+void VpnManager::_connectBackend()
+{
     connect(_currentBackend, &VpnBackend::ready,      this, &VpnManager::onBackendReady);
-    connect(_currentBackend, &VpnBackend::failed,     this, &VpnManager::onBackendFailed);
-    connect(_currentBackend, &VpnBackend::stopped,    this, &VpnManager::onBackendStopped);
+    connect(_currentBackend, &VpnBackend::restartReady, this, &VpnManager::onBackendRestartReady);
+    connect(_currentBackend, &VpnBackend::restartFailed, this, &VpnManager::onBackendRestartFailed);
+    connect(_currentBackend, &VpnBackend::healthChanged, this, &VpnManager::onBackendHealthChanged);
+    connect(_currentBackend, &VpnBackend::terminated, this, &VpnManager::onBackendTerminated);
+    connect(_currentBackend, &VpnBackend::stopPending, this, &VpnManager::onBackendStopPending);
     connect(_currentBackend, &VpnBackend::logLine,    this, &VpnManager::logLine);
     connect(_currentBackend, &VpnBackend::statusLine, this, &VpnManager::statusLine);
 }
@@ -674,26 +1429,36 @@ void VpnManager::_instantiateBackend()
 void VpnManager::_destroyBackend()
 {
     if (_currentBackend) {
+        QObject::disconnect(_currentBackend, nullptr, this, nullptr);
         _currentBackend->deleteLater();
         _currentBackend = nullptr;
     }
 }
 
-void VpnManager::_stopAndDestroyBackend()
+bool VpnManager::_stopAndDestroyBackend(std::function<void()> resume)
 {
     VpnBackend *backend = _currentBackend;
     if (!backend)
-        return;
+        return true;
+
+    if (backend->requiresConfirmedStop() && backend->isRunning()) {
+        if (_pendingBackendCleanup) return false;
+        _pendingBackendCleanup = resume ? std::move(resume) : [] {};
+        // Keep connections so stopPending and confirmed termination reach us.
+        // Install the continuation first: stop() may emit synchronously.
+        backend->stop();
+        return false;
+    }
 
     // Clear the manager pointer first and detach every backend -> manager
-    // connection before stopAndWait(). Windows WireGuard emits stopped()
-    // synchronously, and OpenVPN may do so while waitForDisconnected() runs.
-    // Neither is then able to re-enter onBackendStopped() and destroy twice.
+    // connection before stopAndWait(). A backend may report its typed terminal
+    // event synchronously and must not re-enter manager cleanup here.
     _currentBackend = nullptr;
     QObject::disconnect(backend, nullptr, this, nullptr);
     if (backend->isRunning())
         backend->stopAndWait(5000);
     backend->deleteLater();
+    return true;
 }
 
 QString VpnManager::backendToString(Backend b)
@@ -766,8 +1531,29 @@ QString VpnManager::helperScriptPath()
     return QString();
 }
 
+#ifdef Q_OS_WIN
+QStringList VpnManager::windowsProgramFilesRoots()
+{
+    // Query machine configuration in both registry views, not user-controlled
+    // environment variables or a hardcoded system drive.
+    QStringList roots;
+    for (auto format : {QSettings::Registry64Format, QSettings::Registry32Format}) {
+        QSettings settings(QStringLiteral("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion"), format);
+        for (auto const &key : {QStringLiteral("ProgramFilesDir"), QStringLiteral("ProgramFilesDir (x86)")}) {
+            QString const root = settings.value(key).toString();
+            if (QDir::isAbsolutePath(root) && !roots.contains(root)) roots << root;
+        }
+    }
+    return roots;
+}
+#endif
+
 bool VpnManager::isHelperInstalled() const
 {
+#ifdef NGPOST_TESTING
+    if (_testHelperInstalled.has_value())
+        return *_testHelperInstalled;
+#endif
 #ifdef Q_OS_WIN
     // There is no ngPost-owned helper to install on Windows. We rely on
     // OpenVPN Community and WireGuard for Windows; the setup installer
@@ -776,31 +1562,28 @@ bool VpnManager::isHelperInstalled() const
     // We consider the VPN feature "available" if EITHER:
     //   - wireguard.exe is in a known location (WG support)
     //   - OpenVPN Community is installed (OpenVPN support)
-    QStringList wgCandidates = {
-        QStringLiteral("C:/Program Files/WireGuard/wireguard.exe"),
-        QStringLiteral("C:/Program Files (x86)/WireGuard/wireguard.exe"),
-    };
-    for (auto const &p : wgCandidates) {
-        if (QFileInfo::exists(p))
-            return true;
-    }
-    QStringList ovpnCandidates = {
-        QStringLiteral("C:/Program Files/OpenVPN/bin/openvpn.exe"),
-        QStringLiteral("C:/Program Files (x86)/OpenVPN/bin/openvpn.exe"),
-    };
-    for (auto const &p : ovpnCandidates) {
-        if (QFileInfo::exists(p))
+    for (auto const &root : windowsProgramFilesRoots()) {
+        QDir const dir(root);
+        // Either backend is enough: wireguard.exe gives WG support, the
+        // OpenVPN Community binary gives OpenVPN support.
+        if (QFileInfo::exists(dir.filePath(QStringLiteral("WireGuard/wireguard.exe")))
+            || QFileInfo::exists(dir.filePath(QStringLiteral("OpenVPN/bin/openvpn.exe"))))
             return true;
     }
     return false;
 #else
-    return QFileInfo::exists(QString::fromLatin1(kInstalledHelperPath));
+    return helperPathDeclaresProtocol2(QString::fromLatin1(kInstalledHelperPath));
 #endif
 }
 
 bool VpnManager::vpnFeatureAvailable() const
 {
-#ifdef Q_OS_WIN
+#if !defined(NGPOST_VPN_SUPPORTED)
+    // No native integration on this platform. Answering "unavailable" here is
+    // what keeps the whole feature inert -- the master switch, the routing and
+    // job admission all read this one answer.
+    return false;
+#elif defined(Q_OS_WIN)
     return isHelperInstalled();
 #else
     return !helperScriptPath().isEmpty();
@@ -858,6 +1641,34 @@ bool VpnManager::stageBundledResources(QString const &destination,
             if (error)
                 *error = tr("could not make staged VPN resource executable: %1")
                              .arg(file);
+            return false;
+        }
+    }
+
+    // Keep AppImage-provided VPN executables stable across a brutal parent
+    // death. The installer copies these optional files to /var/lib/ngpost/bin;
+    // a stale-session cleanup can then validate /proc/<pid>/exe even after the
+    // transient AppImage mount has disappeared. Source builds may omit them
+    // and use the system tools instead.
+    QString const bundledBinDir = appDir + QStringLiteral("/vpn");
+    QString const stagedBinDir = destination + QStringLiteral("/bin");
+    for (QString const &name : {QStringLiteral("openvpn"),
+                                QStringLiteral("wireguard-go"),
+                                QStringLiteral("wg")}) {
+        QString const source = bundledBinDir + QLatin1Char('/') + name;
+        QFileInfo const sourceInfo(source);
+        if (!sourceInfo.isFile() || !sourceInfo.isExecutable())
+            continue;
+        if (!QDir().mkpath(stagedBinDir)
+            || !QFile::copy(source, stagedBinDir + QLatin1Char('/') + name)) {
+            if (error)
+                *error = tr("could not stage bundled VPN executable: %1").arg(name);
+            return false;
+        }
+        if (!QFile::setPermissions(stagedBinDir + QLatin1Char('/') + name,
+                                  scriptPermissions)) {
+            if (error)
+                *error = tr("could not secure staged VPN executable: %1").arg(name);
             return false;
         }
     }
@@ -942,7 +1753,8 @@ bool VpnManager::runUninstall()
     }
 
     // Make sure no tunnel is active first.
-    if (_state == State::Connected || _state == State::Starting)
+    if (_state == State::Connected || _state == State::Starting
+        || _state == State::Reconnecting)
         stop();
 
     QString const launcher = helperLauncherProgram();
@@ -987,33 +1799,40 @@ QString findWinScript(QString const &name)
 
 // Run a PowerShell script elevated (UAC) via Start-Process -Verb RunAs.
 // Blocks until the elevated PS exits. Returns the inner exit code, or
-// negative on failure to even launch.
-int runElevatedPowerShell(QString const &script, QStringList const &args)
+// negative on failure to even launch; -2 means the script was refused before
+// any prompt, with the reason in \a refusal.
+int runElevatedPowerShell(QString const &script, QStringList const &args, QString *refusal)
 {
-    // Quote each arg for inclusion in a single PowerShell ArgumentList.
-    auto quote = [](QString const &s) {
-        QString q = s;
-        q.replace("'", "''");
-        return "'" + q + "'";
-    };
+    // Refuse before the UAC prompt, not after. `-Verb RunAs` on a script an
+    // ordinary account can rewrite is a way to become administrator: the prompt
+    // names powershell.exe, signed by Microsoft, so nothing looks wrong. The
+    // installer lands in Program Files and is safe; the portable zip ships the
+    // same scripts wherever the user unpacked it.
+    //
+    // This is the check the Linux helper already performs on --bin-dir before
+    // running a bundled binary as root.
+    QString detail;
+    if (!WindowsSecurity::onlyPrivilegedPrincipalsCanWrite(script, &detail)) {
+        if (refusal)
+            *refusal = detail;
+        return -2;
+    }
+
+    QString const powershell = WindowsSecurity::systemPowerShell();
+    if (powershell.isEmpty()) return -1;
     QStringList psArgs;
     psArgs << "-NoProfile" << "-ExecutionPolicy" << "Bypass"
            << "-File" << script;
     psArgs.append(args);
-    QStringList quoted;
-    for (QString const &a : psArgs)
-        quoted << quote(a);
-
-    QString innerArgList = quoted.join(",");
-    QString outerScript =
-        QStringLiteral("$p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList %1; exit $p.ExitCode")
-            .arg(innerArgList);
+    // Start-Process joins ArgumentList without preserving PS quoting. Supply
+    // ONE string already serialized for the child's Win32 argument parser.
+    QString const outerScript = WindowsCommandLine::elevatedPowerShellCommand(powershell, psArgs);
 
     QProcess p;
-    p.start(QStringLiteral("powershell.exe"),
+    p.start(powershell,
             QStringList() << "-NoProfile" << "-ExecutionPolicy" << "Bypass"
                           << "-Command" << outerScript);
-    if (!p.waitForFinished(120000))
+    if (!p.waitForFinished(120000) || p.exitStatus() != QProcess::NormalExit)
         return -1;
     return p.exitCode();
 }
@@ -1030,16 +1849,38 @@ bool VpnManager::registerWindowsWireGuardTunnel(QString const &confAbsPath)
         emit logLine(tr("install-wg-tunnel.ps1 not found in app bundle"));
         return false;
     }
-    QString user = QString::fromLocal8Bit(qgetenv("USERNAME"));
-    int code = runElevatedPowerShell(script,
-        { QStringLiteral("-ConfPath"), confAbsPath,
-          QStringLiteral("-InvokerUser"), user });
-    if (code != 0) {
-        emit logLine(tr("WireGuard tunnel install failed (exit %1)").arg(code));
+    QString const sid = WindowsSecurity::currentUserSid();
+    if (sid.isEmpty()) {
+        emit logLine(tr("Could not determine the caller SID; refusing tunnel installation."));
         return false;
     }
-    emit logLine(tr("WireGuard tunnel service registered."));
-    return true;
+
+    // The profile is about to be handed to wireguard.exe running elevated, and
+    // it lives in a folder any process running as this user can write. The
+    // Linux helper has sanitised it since revision 4; do the same here, before
+    // the prompt, so the user is told which line to remove.
+    WireGuardConfigPolicy::Verdict const verdict =
+        WireGuardConfigPolicy::inspectFile(confAbsPath);
+    if (!verdict.isAccepted()) {
+        emit logLine(verdict.lineNumber > 0
+                         ? tr("WireGuard profile refused (line %1): %2")
+                               .arg(verdict.lineNumber)
+                               .arg(verdict.reason)
+                         : tr("WireGuard profile refused: %1").arg(verdict.reason));
+        return false;
+    }
+
+    QString refusal;
+    int code = runElevatedPowerShell(script,
+        { QStringLiteral("-ConfPath"), confAbsPath,
+          QStringLiteral("-InvokerSid"), sid }, &refusal);
+    if (code == -2) {
+        emit logLine(tr("Refusing to run the tunnel installer as administrator: %1. "
+                        "Install ngPost with its setup, or move it somewhere only an "
+                        "administrator can write.").arg(refusal));
+        return false;
+    }
+    return _reportWindowsWireGuardInstallResult(code);
 }
 
 bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
@@ -1053,8 +1894,26 @@ bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
         emit logLine(tr("uninstall-wg-tunnel.ps1 not found in app bundle"));
         return false;
     }
+    QString refusal;
     int code = runElevatedPowerShell(script,
-        { QStringLiteral("-ServiceName"), serviceName });
+        { QStringLiteral("-ServiceName"), serviceName }, &refusal);
+    if (code == -2) {
+        emit logLine(tr("Refusing to run the tunnel uninstaller as administrator: %1. "
+                        "Install ngPost with its setup, or move it somewhere only an "
+                        "administrator can write.").arg(refusal));
+        return false;
+    }
+    return _reportWindowsWireGuardUninstallResult(code);
+}
+#endif // Q_OS_WIN
+
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
+bool VpnManager::_reportWindowsWireGuardUninstallResult(int code)
+{
+    if (code == 1223) {
+        emit logLine(tr("WireGuard operation cancelled: administrator permission was not granted."));
+        return false;
+    }
     if (code != 0) {
         emit logLine(tr("WireGuard tunnel uninstall failed (exit %1)").arg(code));
         return false;
@@ -1062,7 +1921,45 @@ bool VpnManager::unregisterWindowsWireGuardTunnel(QString const &serviceName)
     emit logLine(tr("WireGuard tunnel service removed."));
     return true;
 }
-#endif // Q_OS_WIN
+
+bool VpnManager::_reportWindowsWireGuardInstallResult(int code)
+{
+    // RunAs returns only an exit code: the elevated console is not a channel
+    // for user-visible diagnostics. Keep this protocol in sync with the script.
+    QString message;
+    switch (code) {
+    case 0:
+        emit logLine(tr("WireGuard tunnel service registered."));
+        return true;
+    case 2:
+        message = tr("WireGuard for Windows was not found. Install it, then retry tunnel registration.");
+        break;
+    case 3:
+        message = tr("The WireGuard profile could not be read or validated. Re-import a valid profile and retry.");
+        break;
+    case 4:
+        message = tr("The WireGuard tunnel service could not be registered or stopped. Check the WireGuard installation and retry.");
+        break;
+    case 5:
+        message = tr("WireGuard rejected the profile. Check its key values and endpoint, or re-import a valid profile, then retry.");
+        break;
+    case 1223:
+        message = tr("WireGuard operation cancelled: administrator permission was not granted.");
+        break;
+    case 6:
+        message = tr("The WireGuard tunnel service permissions could not be configured. Ask an administrator to check the service permissions, then retry.");
+        break;
+    case 10:
+        message = tr("The WireGuard staging folder is unsafe or inaccessible. Ask an administrator to inspect the ngPost folder in Windows ProgramData and move it aside if untrusted, then retry.");
+        break;
+    default:
+        message = tr("WireGuard tunnel install failed (exit %1)").arg(code);
+        break;
+    }
+    emit logLine(message);
+    return false;
+}
+#endif
 
 #if defined(NGPOST_TESTING) && !defined(Q_OS_WIN)
 bool VpnManager::registerWindowsWireGuardTunnel(QString const &confAbsPath)
@@ -1086,48 +1983,300 @@ void VpnManager::setWireGuardServiceHooksForTest(WireGuardServiceHook registerHo
 
 void VpnManager::setBackendForTest(VpnBackend *backend, State state)
 {
-    _stopAndDestroyBackend();
+    if (!_stopAndDestroyBackend()) return;
     _currentBackend = backend;
     if (_currentBackend) {
         _currentBackend->setParent(this);
-        connect(_currentBackend, &VpnBackend::ready, this, &VpnManager::onBackendReady);
-        connect(_currentBackend, &VpnBackend::failed, this, &VpnManager::onBackendFailed);
-        connect(_currentBackend, &VpnBackend::stopped, this, &VpnManager::onBackendStopped);
-        connect(_currentBackend, &VpnBackend::logLine, this, &VpnManager::logLine);
-        connect(_currentBackend, &VpnBackend::statusLine, this, &VpnManager::statusLine);
+        _connectBackend();
+        _currentBackend->beginRun(++_nextRunId);
     }
     _setState(state);
 }
+
+bool VpnManager::linuxOwnerManifestForTest(QByteArray bytes, qint64 *ownerPid,
+                                           QString *ownerStart)
+{
+    return parseLinuxOwnerManifest(bytes, ownerPid, ownerStart);
+}
+
+bool VpnManager::helperDeclaresProtocol2ForTest(QByteArray const &prefix)
+{
+    return helperDeclaresProtocol2(prefix);
+}
 #endif
 
-void VpnManager::runStartupCleanup()
+#ifdef Q_OS_LINUX
+namespace
+{
+bool commandHasOutput(QString const &program, QStringList const &args)
+{
+    QProcess probe;
+    probe.start(program, args);
+    if (!probe.waitForFinished(1000)) {
+        probe.kill();
+        return false;
+    }
+    return probe.exitCode() == 0 && !probe.readAllStandardOutput().trimmed().isEmpty();
+}
+
+//! True when \a pid runs and, if \a start is set, started at that clock tick.
+bool processMatches(qint64 pid, QString const &start)
+{
+    if (pid <= 0)
+        return false;
+    QFile stat(QStringLiteral("/proc/%1/stat").arg(pid));
+    if (!stat.open(QIODevice::ReadOnly | QIODevice::Text))
+        return false;
+    QByteArray const record = stat.readAll().trimmed();
+    int const closeParen = record.lastIndexOf(')');
+    QList<QByteArray> const fields = closeParen >= 0 ? record.mid(closeParen + 2).split(' ')
+                                                     : QList<QByteArray>();
+    return fields.size() > 19
+        && (start.isEmpty() || start == QLatin1String("0")
+            || QString::fromLatin1(fields.at(19)) == start);
+}
+
+bool isLegacyHelperCommand(QList<QByteArray> const &argv)
+{
+    for (int i = 0; i + 1 < argv.size(); ++i) {
+        if (QFileInfo(QString::fromLocal8Bit(argv.at(i))).fileName()
+            != QLatin1String("ngpost-vpn-helper.sh"))
+            continue;
+        QByteArray const &action = argv.at(i + 1);
+        if (action == "openvpn" || action == "wireguard")
+            return true;
+    }
+    return false;
+}
+
+//! Positive-only recognition of a running v1 helper; 0 when none is found.
+qint64 findLegacyHelperPid()
+{
+    QDir procDir(QStringLiteral("/proc"));
+    QStringList const pidDirs = procDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (QString const &pidText : pidDirs) {
+        bool pidOk = false;
+        qint64 const pid = pidText.toLongLong(&pidOk);
+        if (!pidOk || pid <= 0)
+            continue;
+        QFile cmdline(QStringLiteral("/proc/%1/cmdline").arg(pid));
+        if (!cmdline.open(QIODevice::ReadOnly))
+            continue;
+        if (isLegacyHelperCommand(cmdline.readAll().split('\0')))
+            return pid;
+    }
+    return 0;
+}
+
+qint64 readLegacyOpenVpnPid()
+{
+    QFile pidFile(QStringLiteral("/run/ngpost-vpn-openvpn.pid"));
+    if (!pidFile.open(QIODevice::ReadOnly | QIODevice::Text))
+        return 0;
+    return QString::fromLatin1(pidFile.readLine()).trimmed().toLongLong();
+}
+
+//! True when \a pid is the OpenVPN a v1 helper started, with its management port.
+bool isLegacyOpenVpnManager(qint64 pid)
+{
+    if (!processMatches(pid, QString()))
+        return false;
+    QFile cmdline(QStringLiteral("/proc/%1/cmdline").arg(pid));
+    if (!cmdline.open(QIODevice::ReadOnly))
+        return false;
+    QByteArray const args = cmdline.readAll();
+    return args.contains("openvpn") && args.contains("--management") && args.contains("127.0.0.1")
+        && args.contains("7505");
+}
+}
+#endif
+
+void VpnManager::runStartupStaleCleanup()
 {
 #ifdef Q_OS_WIN
-    // Windows tunnels are owned by their vendor services. The POSIX helper and
-    // its `cleanup` verb do not exist here; in particular, never try to launch
-    // the default `pkexec` command merely because WireGuard/OpenVPN is installed.
-    return;
+    _cleanupStaleWindowsState();
+#elif defined(Q_OS_LINUX)
+    // Cheap, unprivileged preflight. The overwhelmingly common path performs
+    // no pkexec and therefore never displays an authentication dialog.
+    QTimer::singleShot(0, this, &VpnManager::_runLinuxStalePreflight);
 #else
-    if (!isHelperInstalled())
+    // No VPN integration on this platform, so there is no VPN state to be
+    // stale. Silence here is deliberate rather than incidental: every probe
+    // above is a Linux path or a Linux command, and reaching them on another
+    // Unix would only ever produce a confident "nothing found" about a
+    // question this build never asks.
+    return;
+#endif
+}
+
+#ifdef Q_OS_WIN
+void VpnManager::_cleanupStaleWindowsState()
+{
+    // Kernel mutex ownership disappears with its process. Acquiring it here is
+    // therefore enough to prove that a ProgramData owner record is stale; no
+    // elevation or vendor-service mutation is involved in this preflight.
+    QString detail;
+    if (_acquireWindowsLease(&detail))
+        _releaseWindowsLease();
+    else if (!detail.isEmpty())
+        emit logLine(detail);
+
+    // An OpenVPN management password file is shredded and removed by the
+    // backend destructor, which a killed ngPost never runs. Those leftovers
+    // are the one piece of Windows VPN state that outlives a crash, so sweep
+    // them here: we hold no tunnel yet, and any file still present belongs to
+    // a run that is over.
+    QDir runtimeDir(PathHelper::vpnRuntimeDir());
+    const auto stale = runtimeDir.entryInfoList({QStringLiteral("management-*")},
+                                                QDir::Files | QDir::Hidden);
+    for (QFileInfo const &leftover : stale) {
+        QFile file(leftover.absoluteFilePath());
+        qint64 const size = leftover.size();
+        if (size > 0 && file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            file.write(QByteArray(static_cast<int>(qMin<qint64>(size, 4096)), '\0'));
+            file.close();
+        }
+        file.remove();
+    }
+}
+#endif
+
+#ifdef Q_OS_LINUX
+void VpnManager::_runLinuxStalePreflight()
+{
+    QString const manifestPath = QStringLiteral("/run/ngpost-vpn/owner-v2");
+    bool const manifestExists = QFileInfo::exists(manifestPath);
+    bool const ifaceExists = QFileInfo::exists(QStringLiteral("/sys/class/net/ngpost-wg0"));
+    bool const legacyPidExists = QFileInfo::exists(QStringLiteral("/run/ngpost-vpn-openvpn.pid"));
+    bool const legacyMarkerExists = QFileInfo::exists(QStringLiteral("/run/ngpost-vpn.running"));
+
+    bool const ruleExists = commandHasOutput(QStringLiteral("ip"),
+                                             { QStringLiteral("rule"),
+                                               QStringLiteral("show"),
+                                               QStringLiteral("priority"),
+                                               QStringLiteral("1042") });
+    bool const routeExists = commandHasOutput(QStringLiteral("ip"),
+                                              { QStringLiteral("route"),
+                                                QStringLiteral("show"),
+                                                QStringLiteral("table"),
+                                                QStringLiteral("4242") });
+    bool const anyArtifact = ifaceExists || legacyPidExists || legacyMarkerExists || ruleExists
+        || routeExists;
+    if (!manifestExists && !anyArtifact)
         return;
 
-    // Defer to the next event loop iteration so we don't block startup.
-    QTimer::singleShot(0, this, [this]() {
-        QProcess *p = new QProcess(this);
-        p->setProcessChannelMode(QProcess::MergedChannels);
-        connect(p, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-                this, [this, p](int code, QProcess::ExitStatus) {
-                    QString const out = QString::fromLocal8Bit(p->readAll()).trimmed();
-                    if (out.contains(QLatin1String("CLEANED")) && !out.isEmpty())
-                        emit logLine(tr("Startup: cleaned up stale VPN state"));
-                    if (code != 0 && !out.isEmpty())
-                        emit logLine(QStringLiteral("[startup-cleanup] ") + out);
-                    p->deleteLater();
-                });
-        QStringList args = helperLauncherPrefixArgs();
-        args << QString::fromLatin1(kInstalledHelperPath) << QStringLiteral("cleanup");
-        p->start(helperLauncherProgram(), args);
+    if (manifestExists)
+        _cleanupStaleLinuxSession(manifestPath);
+    else
+        _reportUnattributedLinuxState(ifaceExists, ruleExists, routeExists, legacyPidExists);
+}
+
+void VpnManager::_cleanupStaleLinuxSession(QString const &manifestPath)
+{
+    QFile manifest(manifestPath);
+    if (!manifest.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        emit logLine(
+            tr("VPN startup preflight could not read %1; no cleanup attempted").arg(manifestPath));
+        return;
+    }
+    qint64 ownerPid = 0;
+    QString ownerStart;
+    if (!parseLinuxOwnerManifest(manifest.read(2048), &ownerPid, &ownerStart)) {
+        emit logLine(tr("VPN startup manifest is malformed; no cleanup attempted"));
+        return;
+    }
+    if (processMatches(ownerPid, ownerStart))
+        return;
+    if (!isHelperInstalled()) {
+        emit logLine(
+            tr("An orphaned VPN session was detected, but the v2 helper is not installed"));
+        return;
+    }
+    if (!helperPathDeclaresProtocol2(QString::fromLatin1(kInstalledHelperPath))) {
+        emit logLine(tr("An orphaned VPN session was detected, but the installed helper is version "
+                        "1; no cleanup attempted"));
+        return;
+    }
+
+    QProcess *p = new QProcess(this);
+    p->setProcessChannelMode(QProcess::MergedChannels);
+    connect(p,
+            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this,
+            [this, p](int code, QProcess::ExitStatus) {
+        QString const out = QString::fromLocal8Bit(p->readAll()).trimmed();
+        if (out.contains(QLatin1String("CLEANED")))
+            emit logLine(tr("Startup: cleaned an orphaned VPN v2 session"));
+        if (code != 0 && !out.isEmpty())
+            emit logLine(QStringLiteral("[startup-cleanup] ") + out);
+        p->deleteLater();
     });
+    QStringList args = helperLauncherPrefixArgs();
+    args << QString::fromLatin1(kInstalledHelperPath) << QStringLiteral("cleanup-stale")
+         << QStringLiteral("--nonblocking") << QStringLiteral("--protocol") << QStringLiteral("2")
+         << QStringLiteral("--owner-pid") << QString::number(QCoreApplication::applicationPid())
+         << QStringLiteral("--owner-start") << currentProcessStartTime();
+    p->start(helperLauncherProgram(), args);
+}
+
+void VpnManager::_reportUnattributedLinuxState(bool ifaceExists,
+                                               bool ruleExists,
+                                               bool routeExists,
+                                               bool legacyPidExists)
+{
+    // Positive-only recognition of a v1 helper. Failure to recognise one
+    // never authorises deletion: it remains unattributed and requires the
+    // same explicit destructive action. Recognising it disables that action.
+    qint64 const legacyHelperPid = findLegacyHelperPid();
+    qint64 const legacyPid = legacyPidExists ? readLegacyOpenVpnPid() : 0;
+    bool const legacyOwnerActive = legacyHelperPid > 0 || isLegacyOpenVpnManager(legacyPid);
+    // Machine-readable diagnostic for a bug report, not prose: kept out of
+    // the translation catalogue so no locale can reshape the keys.
+    QString const diagnostic =
+        QStringLiteral("interface=%1 rule=%2 table=%3 legacy_pid=%4 legacy_helper_pid=%5")
+            .arg(ifaceExists ? QStringLiteral("ngpost-wg0") : QStringLiteral("-"))
+            .arg(ruleExists ? QStringLiteral("1042") : QStringLiteral("-"))
+            .arg(routeExists ? QStringLiteral("4242") : QStringLiteral("-"))
+            .arg(legacyPid)
+            .arg(legacyHelperPid);
+    emit logLine((legacyOwnerActive ? QStringLiteral("LEGACY_OWNER_ACTIVE ")
+                                    : QStringLiteral("UNATTRIBUTED_VPN_STATE "))
+                 + diagnostic);
+    emit unattributedVpnStateDetected(diagnostic, legacyOwnerActive);
+}
+#endif
+
+bool VpnManager::cleanupUnattributed(bool confirmed)
+{
+#ifdef Q_OS_WIN
+    Q_UNUSED(confirmed);
+    return false;
+#else
+    if (!confirmed || !isHelperInstalled())
+        return false;
+    if (!helperPathDeclaresProtocol2(QString::fromLatin1(kInstalledHelperPath))) {
+        emit logLine(tr("The installed VPN helper is version 1; no cleanup was attempted."));
+        return false;
+    }
+    QProcess p;
+    p.setProcessChannelMode(QProcess::MergedChannels);
+    QStringList args = helperLauncherPrefixArgs();
+    args << QString::fromLatin1(kInstalledHelperPath)
+         << QStringLiteral("cleanup-unattributed") << QStringLiteral("--yes")
+         << QStringLiteral("--protocol") << QStringLiteral("2")
+         << QStringLiteral("--owner-pid")
+         << QString::number(QCoreApplication::applicationPid())
+         << QStringLiteral("--owner-start") << currentProcessStartTime();
+    p.start(helperLauncherProgram(), args);
+    if (!p.waitForFinished(30000)) {
+        p.kill();
+        emit logLine(tr("VPN cleanup timed out"));
+        return false;
+    }
+    QString const output = QString::fromLocal8Bit(p.readAll()).trimmed();
+    if (!output.isEmpty())
+        emit logLine(output);
+    return p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
 #endif
 }
 
@@ -1139,6 +2288,11 @@ bool VpnManager::jobNeedsVpn(QList<NntpServerParams *> const &activeServers) con
     // that case. Per-server useVpn remains fail-closed below.
     if (forceAllConnectionsThroughVpn())
         return true;
+    // Per-server useVpn stays fail-closed on every platform, including those
+    // with no VPN integration at all. Ignoring it there would silently post in
+    // the clear to a server the user deliberately marked as VPN-only, which is
+    // a worse outcome than refusing the job: the refusal is visible and the
+    // user can clear the flag, whereas the clear-text post cannot be undone.
     for (NntpServerParams *srv : activeServers)
         if (srv && srv->enabled && srv->useVpn)
             return true;
@@ -1148,42 +2302,92 @@ bool VpnManager::jobNeedsVpn(QList<NntpServerParams *> const &activeServers) con
 VpnManager::Admission
 VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
 {
-    QStringList serverUseVpnNames;
-    for (NntpServerParams *srv : activeServers) {
-        if (!srv || !srv->enabled || !srv->useVpn)
-            continue;
-        QString name = srv->host.trimmed();
-        serverUseVpnNames << (name.isEmpty() ? tr("(unnamed server)") : name);
-    }
+    return admitJob(activeServers, jobNeedsVpn(activeServers));
+}
+
+VpnManager::Admission
+VpnManager::admitJob(QList<NntpServerParams *> const &activeServers,
+                     bool vpnRequirementFrozen)
+{
+    QStringList const serverUseVpnNames = _vpnServerNames(activeServers);
     bool const perServerVpnRequested = !serverUseVpnNames.isEmpty();
 
     // The master switch was requested (config VPN_AUTO_CONNECT) but the VPN
     // cannot be used on this machine or has no usable selected profile: ignore
     // the global switch rather than blocking. Per-server `useVpn` is handled
     // below and remains fail-closed.
-    if (_autoConnect) {
-        if (!vpnFeatureAvailable()) {
-            emit statusLine(tr("Master switch (VPN_AUTO_CONNECT) is ON but no VPN "
-                               "helper is installed - ignoring the master switch. "
-                               "Per-server 'Use VPN' is still enforced."));
-        } else {
-            QString profileDetail;
-            if (!_activeProfileUsable(&profileDetail)) {
-                emit statusLine(tr("Master switch (VPN_AUTO_CONNECT) is ON but the "
-                                   "VPN is not correctly configured (%1) - ignoring "
-                                   "the master switch. Per-server 'Use VPN' is still "
-                                   "enforced.")
-                                .arg(profileDetail));
-            }
-        }
-    }
+    // On a platform with no VPN integration the switch is not "on but
+    // unusable", it is simply not a switch. Saying anything about a helper
+    // would send the user looking for something that does not exist.
+    if (_autoConnect && vpnPlatformSupported())
+        _warnIgnoredMasterSwitch();
 
-    if (!jobNeedsVpn(activeServers))
+    // This overload receives the immutable decision stored on the job. A
+    // false value must stay false even if the live server/master settings were
+    // changed while that job waited behind another post.
+    if (!vpnRequirementFrozen)
         return Admission::Proceed;
 
-    // Diagnose blocking conditions.
-    JobBlockReason reason = JobBlockReason::None;
     QString detail;
+    JobBlockReason const reason = _diagnoseVpnBlock(&detail);
+    if (reason != JobBlockReason::None) {
+        if (perServerVpnRequested) {
+            detail = vpnPlatformSupported()
+                ? tr("Use VPN is enabled for NNTP server(s): %1.\n\n"
+                     "The VPN is not correctly configured: %2\n\n"
+                     "Open the VPN options with the VPN button and check the "
+                     "VPN configuration, or edit the server configuration and "
+                     "disable VPN by clearing its Use VPN checkbox.")
+                      .arg(serverUseVpnNames.join(QStringLiteral(", ")), detail)
+                // There is no VPN button to send them to, so the only honest
+                // instruction is the one that works: clear the flag. The job is
+                // refused rather than quietly posted in the clear.
+                : tr("Use VPN is enabled for NNTP server(s): %1, but %2\n\n"
+                     "Edit the server configuration and clear its Use VPN "
+                     "setting to post to it without a tunnel.")
+                      .arg(serverUseVpnNames.join(QStringLiteral(", ")), detail);
+            emit statusLine(detail);
+        }
+        emit vpnRequiredButUnavailable(reason, detail);
+        return Admission::Blocked;
+    }
+
+    return _startForAdmittedJob();
+}
+
+QStringList VpnManager::_vpnServerNames(QList<NntpServerParams *> const &servers) const
+{
+    QStringList names;
+    for (NntpServerParams *srv : servers) {
+        if (!srv || !srv->enabled || !srv->useVpn)
+            continue;
+        QString name = srv->host.trimmed();
+        names << (name.isEmpty() ? tr("(unnamed server)") : name);
+    }
+    return names;
+}
+
+void VpnManager::_warnIgnoredMasterSwitch()
+{
+    if (!vpnFeatureAvailable()) {
+        emit statusLine(tr("Master switch (VPN_AUTO_CONNECT) is ON but no VPN "
+                           "helper is installed - ignoring the master switch. "
+                           "Per-server 'Use VPN' is still enforced."));
+        return;
+    }
+    QString profileDetail;
+    if (!_activeProfileUsable(&profileDetail)) {
+        emit statusLine(tr("Master switch (VPN_AUTO_CONNECT) is ON but the "
+                           "VPN is not correctly configured (%1) - ignoring "
+                           "the master switch. Per-server 'Use VPN' is still "
+                           "enforced.")
+                            .arg(profileDetail));
+    }
+}
+
+//! Why a job that needs the VPN cannot have it, None when nothing blocks it.
+VpnManager::JobBlockReason VpnManager::_diagnoseVpnBlock(QString *detail) const
+{
     VpnProfile const *active = activeProfile();
     QString activeCfgPath = active ? active->absoluteConfigPath() : QString();
 
@@ -1193,48 +2397,50 @@ VpnManager::admitJob(QList<NntpServerParams *> const &activeServers)
     // platform rationale (in-tree dev/CI helper on *nix, binaries on Windows).
     bool const capabilityMissing = !vpnFeatureAvailable();
     if (capabilityMissing) {
-        reason = JobBlockReason::HelperNotInstalled;
-        detail = tr("The VPN helper is not installed. Open the VPN dialog "
-                    "and click Install.");
-    } else if (!active || activeCfgPath.isEmpty()) {
-        reason = JobBlockReason::NoConfigSelected;
-        detail = tr("No active VPN profile / configuration is selected.");
-    } else {
-        QFileInfo cfg(activeCfgPath);
-        if (!cfg.exists() || !cfg.isReadable()) {
-            reason = JobBlockReason::ConfigUnreadable;
-            detail = tr("The VPN configuration file is missing or unreadable: %1")
-                         .arg(activeCfgPath);
-        } else if (_state == State::Failed) {
-            reason = JobBlockReason::VpnFailed;
-            detail = tr("The last VPN attempt failed. Open the VPN dialog and try again.");
-        }
+        // Telling a macOS user to install a helper would send them looking for
+        // something that does not exist for their system. Name the real
+        // situation, and the one action that actually unblocks them.
+        *detail = vpnPlatformSupported()
+            ? tr("The VPN helper is not installed. Open the VPN dialog "
+                 "and click Install.")
+            : tr("ngPost has no VPN support on this operating system.");
+        return JobBlockReason::HelperNotInstalled;
     }
-    if (reason != JobBlockReason::None) {
-        if (perServerVpnRequested) {
-            detail = tr("Use VPN is enabled for NNTP server(s): %1.\n\n"
-                        "The VPN is not correctly configured: %2\n\n"
-                        "Open the VPN options with the VPN button and check the "
-                        "VPN configuration, or edit the server configuration and "
-                        "disable VPN by clearing its Use VPN checkbox.")
-                     .arg(serverUseVpnNames.join(QStringLiteral(", ")), detail);
-            emit statusLine(detail);
-        }
-        emit vpnRequiredButUnavailable(reason, detail);
-        return Admission::Blocked;
+    if (!active || activeCfgPath.isEmpty()) {
+        *detail = tr("No active VPN profile / configuration is selected.");
+        return JobBlockReason::NoConfigSelected;
     }
+    QFileInfo cfg(activeCfgPath);
+    if (!cfg.exists() || !cfg.isReadable()) {
+        *detail = tr("The VPN configuration file is missing or unreadable: %1").arg(activeCfgPath);
+        return JobBlockReason::ConfigUnreadable;
+    }
+    if (_state == State::LeaseBusy) {
+        *detail = tr("Another ngPost instance owns the machine-wide VPN lease.");
+        return JobBlockReason::LeaseBusy;
+    }
+    if (_state == State::Failed) {
+        *detail = tr("The last VPN attempt failed. Open the VPN dialog and try again.");
+        return JobBlockReason::VpnFailed;
+    }
+    return JobBlockReason::None;
+}
 
+//! The VPN is usable: proceed on a healthy tunnel, otherwise start it and let
+//! the caller queue the job until Connected.
+VpnManager::Admission VpnManager::_startForAdmittedJob()
+{
     // VPN is fine. Already Connected -> proceed. Otherwise kick off start
     // and tell the caller to wait.
-    if (_state == State::Connected)
+    if (_state == State::Connected && _health == VpnHealth::Healthy)
         return Admission::Proceed;
 
     if (_state == State::Disabled) {
         _autoStartedByJob = true;
         emit logLine(tr("Auto-starting VPN for incoming job..."));
         if (!start()) {
-            // A backend that emitted failed() during start() already supplied
-            // its precise reason through onBackendFailed(). Do not produce a
+            // A backend that reported failure during start() already supplied
+            // its precise reason. Do not produce a
             // second popup with a generic message.
             if (!_backendFailedDuringStart)
                 emit vpnRequiredButUnavailable(JobBlockReason::VpnFailed,
@@ -1252,19 +2458,43 @@ void VpnManager::retainForJob()
 {
     _cancelAutoDisconnect();
     ++_activeJobsNeedingVpn;
+    if (_currentBackend)
+        _currentBackend->setActive(true);
 }
 
 void VpnManager::releaseForJob()
 {
     if (_activeJobsNeedingVpn > 0)
         --_activeJobsNeedingVpn;
+    if (_activeJobsNeedingVpn == 0 && _currentBackend)
+        _currentBackend->setActive(false);
+
+    // A tunnel that is no longer healthy must not be kept forever merely
+    // because the guarded idle timer is intentionally disabled while health
+    // is uncertain.  Once the last retained job has gone away there is
+    // nothing left to recover, so tear an auto-started tunnel down directly.
+    if (_activeJobsNeedingVpn == 0 && _autoStartedByJob
+        && (_recoveryActive || _state == State::Reconnecting
+            || (_state == State::Connected && _health != VpnHealth::Healthy))) {
+        _autoStartedByJob = false;
+        stop();
+        return;
+    }
+
+    if (_activeJobsNeedingVpn == 0
+        && (_state == State::Disabled || _state == State::Failed
+            || _state == State::LeaseBusy)) {
+        _autoStartedByJob = false;
+        return;
+    }
 
     // Schedule the grace timer silently. The user only sees a log line if
     // the timer actually fires — i.e., no follow-up job arrived. Otherwise
     // the message would be misleading whenever the queue continues right
     // after a cancel/finish.
     if (_activeJobsNeedingVpn == 0 && _autoStartedByJob
-        && _state == State::Connected) {
+        && _state == State::Connected && _health == VpnHealth::Healthy
+        && !_recoveryActive) {
         _autoDisconnectTimer->start();
     }
 }
@@ -1274,9 +2504,11 @@ void VpnManager::onAutoDisconnectTimeout()
     // Double-check at fire time: a job may have started in the grace window.
     // We log here (not at scheduling time) so the user only sees the message
     // when the disconnect actually happens.
-    if (_activeJobsNeedingVpn > 0)
-        return;
-    if (!_autoStartedByJob)
+    if (_state != State::Connected
+        || _health != VpnHealth::Healthy
+        || _recoveryActive
+        || _activeJobsNeedingVpn > 0
+        || !_autoStartedByJob)
         return;
     emit logLine(tr("Queue empty for %1 s — disconnecting VPN")
                      .arg(kAutoDisconnectMs / 1000));
@@ -1296,6 +2528,8 @@ QString VpnManager::stateToString(State s)
     case State::Disabled:  return tr("disabled");
     case State::Starting:  return tr("starting...");
     case State::Connected: return tr("connected");
+    case State::LeaseBusy: return tr("VPN lease busy");
+    case State::Reconnecting: return tr("reconnecting...");
     case State::Stopping:  return tr("stopping...");
     case State::Failed:    return tr("failed");
     }

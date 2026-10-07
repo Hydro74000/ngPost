@@ -1,0 +1,92 @@
+name: Update process
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: updates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: Update process (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: linux_gcc_64
+          - os: windows-latest
+            arch: win64_msvc2022_64
+          - os: macos-15
+            arch: clang_64
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libsecret-1-dev
+      - name: Enable MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: '6.8.2'
+          arch: ${{ matrix.arch }}
+          cache: true
+      - name: Build QtKeychain
+        shell: bash
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git "$RUNNER_TEMP/qtkeychain"
+          cmake -S "$RUNNER_TEMP/qtkeychain" -B "$RUNNER_TEMP/qtkeychain/build" \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON -DBUILD_TESTING=OFF \
+            -DBUILD_TRANSLATIONS=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build "$RUNNER_TEMP/qtkeychain/build" --config Release --parallel 2
+          cmake --install "$RUNNER_TEMP/qtkeychain/build" --config Release
+      - name: Build update tests (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          c++ -std=c++17 tests/update/update_fixture.cpp -o "$RUNNER_TEMP/update-fixture"
+          cd tests/unit/tst_UpdateChecker
+          qmake tst_UpdateChecker.pro CONFIG+=release CONFIG+=ngpost_werror
+          make -j2
+      - name: Build update tests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cl /nologo /EHsc /std:c++17 tests/update/update_fixture.cpp /Fe:$env:RUNNER_TEMP/update-fixture.exe
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cd tests/unit/tst_UpdateChecker
+          qmake tst_UpdateChecker.pro CONFIG+=release CONFIG+=ngpost_werror 'QMAKE_CXXFLAGS+=/MP2'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          nmake /NOLOGO
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Run update tests sequentially
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            export NGPOST_UPDATE_FIXTURE="$RUNNER_TEMP/update-fixture.exe"
+            export NGPOST_UPDATE_CLIENT="$PWD/tests/unit/tst_UpdateChecker/release/tst_UpdateChecker.exe"
+          else
+            export NGPOST_UPDATE_FIXTURE="$RUNNER_TEMP/update-fixture"
+            export NGPOST_UPDATE_CLIENT="$PWD/tests/unit/tst_UpdateChecker/tst_UpdateChecker"
+          fi
+          bash .github/scripts/run-qt-tests.sh tests/unit/tst_UpdateChecker update
+          python tests/update/test_update_e2e.py -v
+          python tests/update/test_update_handoff.py -v
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: update-tests-${{ runner.os }}
+          path: tests/unit/tst_UpdateChecker/*.log
+          if-no-files-found: ignore

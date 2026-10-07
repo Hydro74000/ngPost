@@ -1,0 +1,87 @@
+name: Docker image
+
+# The container image is a deliverable of its own: the headless build, two
+# tools, a configuration and the way the wiki says to run it. This workflow
+# checks all of it on the image itself, with the script release.yml runs on the
+# image it is about to publish.
+#
+# It runs when something the image is made of changes, and once a week: the
+# Debian base and its packages move under an unchanged Dockerfile, and a renamed
+# or withdrawn package breaks the image without any commit to show for it.
+on:
+  push:
+    branches: [master, devel]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - .hadolint.yaml
+      - ngPost.docker.conf
+      - src/**
+      - tests/fixtures/mock_nntp/**
+      - .github/scripts/test-docker-image.sh
+      - .github/workflows/docker.yml
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - .hadolint.yaml
+      - ngPost.docker.conf
+      - src/**
+      - tests/fixtures/mock_nntp/**
+      - .github/scripts/test-docker-image.sh
+      - .github/workflows/docker.yml
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+# A newer push supersedes this run: finishing it only delays the result that
+# matters and holds a runner.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Dockerfile and test script
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Pinned by version and digest, as the actions are by hash. Its rules are
+      # in .hadolint.yaml, with the reason for the one it ignores.
+      - name: hadolint
+        run: |
+          docker run --rm -v "$PWD:/w:ro" -w /w \
+            hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
+            hadolint Dockerfile
+
+      - name: shellcheck
+        run: shellcheck .github/scripts/test-docker-image.sh
+
+  image:
+    name: Build and test the image
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Debian packages only, no Qt install step: a failure here means the
+      # recipe or its base moved, not the project.
+      - name: Build the image
+        run: docker build --build-arg JOBS="$(nproc)" -t ngpost:test .
+
+      # Everything the image promises, down to a real post: see the script.
+      - name: Test the image
+        run: bash .github/scripts/test-docker-image.sh ngpost:test
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Container image"
+            echo
+            docker image ls ngpost:test --format 'Size: {{.Size}}' || true
+            docker run --rm ngpost:test --version 2>/dev/null | grep 'SSL support' || true
+          } >>"$GITHUB_STEP_SUMMARY"

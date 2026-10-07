@@ -26,14 +26,18 @@ class NgPost;
 class NntpFile;
 class MainWindow;
 class PostingJob;
+struct PostingJobOptions;
 #include "postinfo/PostInfoData.h"
 
 #include <QFileInfoList>
 #include <QMap>
 
+class QAction;
 class QCheckBox;
 class QGroupBox;
+class QLineEdit;
 class QPushButton;
+class QSpinBox;
 class QTableWidget;
 class QToolButton;
 class QWidget;
@@ -56,6 +60,26 @@ private:
     PostingJob        *_postingJob;
     STATE              _state;
     bool               _postingFinished;
+    //! A finished post this tab may submit again from scratch: its preparation
+    //! failed before any transfer, or the user stopped it.
+    bool _resubmittable = false;
+    //! What a stopped post leaves behind until this tab posts again: the NZB
+    //! it may have written, its history row and its temporary archives.
+    struct StoppedAttempt
+    {
+        qint64 historyPostId = 0;
+        QString nzbPath;
+        QString archiveFolder;
+    };
+    StoppedAttempt _stoppedAttempt;
+    void _armResubmission(const PostingJob *job);
+    void _supersedeStoppedAttempt();
+    void _fillJobOptions(PostingJobOptions &options,
+                         const QString &nzbPath,
+                         const QFileInfoList &files) const;
+    bool _hasPreparedFiles() const;
+    bool _isStoppedAttemptNzb(const QString &nzbPath) const;
+    bool _stoppedAttemptIsReplaceable() const;
 
     // Post info file, per post. One discreet checkbox on the tab; everything
     // else lives in a dialog, because a posting tab is about posting.
@@ -69,7 +93,7 @@ private:
 
 public:
     explicit PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber);
-    ~PostingWidget();
+    ~PostingWidget() override;
 
     void setIDLE();
     void setPosting();
@@ -103,16 +127,43 @@ public:
     QMap<QString, MetaValue> postInfoMeta() const { return _postInfoMeta; }
 
     void retranslate();
+    uint displayNumber() const { return _jobNumber; }
+    void refreshPostingState();
+    QColor postingTextColor() const;
 
     void setNzbPassword(const QString &pass);
     void setPackingAuto(bool enabled, const QStringList &keys);
 
     void postFiles(bool updateMainParams);
+    bool canSubmit() const;
+    //! Folder of this post's nzb file, empty while it has none.
+    QString nzbFolder() const;
+    void setNzbFolder(const QString &folder);
+    //! Nothing listed, nothing posted: what a new tab looks like.
+    bool isBlank() const;
+    QFileInfoList previewFiles() const;
+    void refreshPar2Default();
+    //! Shows the global PAR2 redundancy as \a box's special value, and widens
+    //! \a box to fit it. The Auto tab shares it.
+    static void showPar2Default(QSpinBox *box, uint percentage);
+    //! Loads the configured obfuscated name and password lengths. The Auto tab
+    //! shares it.
+    static void loadObfuscationLengths(QSpinBox *nameLength,
+                                       QSpinBox *passLength,
+                                       const NgPost *ngPost);
+    void setPar2PercentageOverride(int percentage);
+    bool hasPar2PercentageOverride() const;
 
+    //! Empty the tab and its decorations so the next post starts from scratch.
+    void resetForNextPost();
+
+
+signals:
+    void submissionEligibilityChanged();
 
 public slots: // for PostingJob
-    void onFilePosted(QString filePath, uint nbArticles, uint nbFailed);
-    void onArchiveFileNames(QStringList paths);
+    void onFilePosted(const QString &filePath, uint nbArticles, uint nbFailed);
+    void onArchiveFileNames(const QStringList &paths);
     void onArticlesNumber(int nbArticles);
     void onPostingJobDone();
 
@@ -136,12 +187,16 @@ private slots: // for the HMI
 
 
 private:
+    bool _confirmNzbOverwrite(const QString &nzbPath);
     void _buildPostInfoRow();
     void retranslatePostInfoTexts();
     void _buildFilesList(QFileInfoList &files, bool &hasFolder);
     bool _fileAlreadyInList(const QString &fileName, int currentNbFiles) const;
+    void _setupCopyActions();
+    void _copyToClipboard(QAction *action, QLineEdit *edit);
 
-
+    QAction *_copyCompressNameAction = nullptr;
+    QAction *_copyPassAction = nullptr;
 };
 
 uint PostingWidget::jobNumber() const { return _jobNumber; }

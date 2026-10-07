@@ -101,8 +101,26 @@ qint64 Yenc::encode(const char data[], qint64 dataSize, uchar encbuffer[], quint
 
         case '\t' :
         case ' ' :
-            if(!column || column - 1 == maxwidth)
-            {
+            // yEnc requires TAB and SPACE to be escaped at BOTH ends of a
+            // line: anything that trims trailing whitespace in transit drops
+            // the byte outright, and the decoded file is then one byte short
+            // with a failing CRC32.
+            //
+            // The end-of-line half used to read `column - 1 == maxwidth`,
+            // which needs column == 129 and is unreachable: column is reset to
+            // 0 as soon as it reaches maxwidth, so it never exceeds 127 here.
+            // A byte landing on the last column is the one whose write makes
+            // ++column reach maxwidth, i.e. column == maxwidth - 1.
+            //
+            // Frequency, before the fix: input 0xF6 encodes to ' ' and 0xDF to
+            // '\t', so ~2 of every 256 line-final bytes went out raw -- about
+            // 44 per 700 KB article. Escaping here costs one extra column on
+            // that line, exactly as the four escapes above already do.
+            //
+            // The last byte of the input ends a line too -- a short one, right
+            // before the =yend trailer -- so it gets the same treatment
+            // wherever its column falls.
+            if (!column || column == maxwidth - 1 || i == dataSize - 1) {
                 ++column;
                 ++encSize;
                 *(pointer++) = '=';
@@ -119,6 +137,8 @@ qint64 Yenc::encode(const char data[], qint64 dataSize, uchar encbuffer[], quint
                 c += 64;
             }
             break;
+
+        default: break;
         }
 
         *(pointer++) = c;

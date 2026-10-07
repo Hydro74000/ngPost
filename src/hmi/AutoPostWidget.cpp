@@ -55,17 +55,16 @@ void AutoPostWidget::init()
 {
     _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
 
-    _ui->redundancySB->setRange(0, 100);
-    _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
+    _ui->redundancySB->setRange(-1, 100);
+    _ui->redundancySB->setValue(-1);
+    refreshPar2Default();
+    connect(_ngPost, &NgPost::par2DefaultsChanged, this, &AutoPostWidget::refreshPar2Default, Qt::UniqueConnection);
     // The label that carried the unit is gone with the row it lived on, so the
     // suffix carries it instead, as on a posting tab.
     _ui->redundancySB->setSuffix(QStringLiteral(" %"));
 
     _ui->autoDirEdit->setText(_ngPost->_inputDir);
-    _ui->nameLengthSB->setRange(5, 50);
-    _ui->nameLengthSB->setValue(static_cast<int>(_ngPost->_lengthName));
-    _ui->passLengthSB->setRange(5, 50);
-    _ui->passLengthSB->setValue(static_cast<int>(_ngPost->_lengthPass));
+    PostingWidget::loadObfuscationLengths(_ui->nameLengthSB, _ui->passLengthSB, _ngPost);
 
     _ui->filesList->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
@@ -145,8 +144,9 @@ Press the Scan button and remove what you don't want to post ;)\n\
         if (nfo.isFile())
             postFiles << nfo;
 
-        PostingWidget *quickPostWidget = _hmi->addNewQuickTab(0, postFiles);
+        PostingWidget *quickPostWidget = _hmi->addNewQuickTab(postFiles);
         quickPostWidget->init();
+        quickPostWidget->setPar2PercentageOverride(_ui->redundancySB->value());
         // One choice for the whole run: every post it launches gets it.
         quickPostWidget->setPostInfo(_postInfoCB && _postInfoCB->isChecked(),
                                      _postInfoTemplate,
@@ -267,10 +267,10 @@ void AutoPostWidget::onMonitoringClicked()
 
 void AutoPostWidget::newFileToProcess(const QFileInfo &fileInfo)
 {
-    QListWidgetItem *newItem = new QListWidgetItem(
-                QIcon(fileInfo.isDir()?":/icons/folder.png":":/icons/file.png"),
-                QString("- %1").arg(fileInfo.absoluteFilePath()));
-    newItem->setForeground(_hmi->sPendingColor);
+    const QIcon icon(fileInfo.isDir() ? ":/icons/folder.png" : ":/icons/file.png");
+    auto *newItem = new QListWidgetItem(icon, QString("- %1").arg(fileInfo.absoluteFilePath()));
+    newItem->setData(Qt::UserRole, true);
+    newItem->setForeground(_hmi->pendingColor());
     _ui->filesList->addItem(newItem);
 }
 
@@ -319,9 +319,11 @@ void AutoPostWidget::updatePackingDependents()
                         tr("by default archives and par2 files are deleted uppon post success but you can choose to keep them"),
                         needsCompress);
 
-    setDependentEnabled(_ui->redundancySB, _ui->par2CB->isChecked(),
-                        tr("Using PAR2_ARGS from config file: %1").arg(_ngPost->_par2Args),
-                        tr("requires: %1").arg(_ui->par2CB->text()));
+    setDependentEnabled(
+        _ui->redundancySB,
+        _ui->par2CB->isChecked(),
+        tr("Using the PAR2 arguments of the configuration: %1").arg(_ngPost->par2ArgsInUse()),
+        tr("requires: %1").arg(_ui->par2CB->text()));
 }
 
 void AutoPostWidget::onCompressToggled(bool checked)
@@ -388,7 +390,7 @@ void AutoPostWidget::udatePostingParams()
     _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
 
     // fetch par2 settings
-    _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
+    _ngPost->_par2Pct = (_ui->redundancySB->value() < 0 ? _ngPost->_par2PctDefault : static_cast<uint>(_ui->redundancySB->value()));
 
     QFileInfo inputDir(_ui->autoDirEdit->text());
     if (inputDir.exists() && inputDir.isDir() && inputDir.isWritable())
@@ -415,8 +417,7 @@ void AutoPostWidget::updateFinishedJob(const QString &path, uint nbArticles, uin
 {
     QString srcPath = QString("- %1").arg(path);
     int nbFiles = _ui->filesList->count();
-    for (int i = 1; i < nbFiles; ++i)
-    {
+    for (int i = 1; i < nbFiles; ++i) {
         QListWidgetItem *item = _ui->filesList->item(i);
         if (item->text() == srcPath)
         {
@@ -431,6 +432,7 @@ void AutoPostWidget::updateFinishedJob(const QString &path, uint nbArticles, uin
                 else
                     color = _hmi->sArticlesFailedColor;
             }
+            item->setData(Qt::UserRole, false);
             item->setForeground(color);
             break;
         }
@@ -442,6 +444,7 @@ bool AutoPostWidget::deleteFilesOncePosted() const { return _ui->delFilesCB->isC
 void AutoPostWidget::retranslate()
 {
     _ui->retranslateUi(this);
+    refreshPar2Default();
     // retranslateUi() has just reset the tooltips to the plain .ui text, which
     // drops what a greyed control is waiting for. Rebuild both halves.
     updatePackingDependents();
@@ -550,13 +553,13 @@ void AutoPostWidget::retranslatePostInfoTexts()
 //! run can be shown.
 PostInfoData AutoPostWidget::_postInfoPreview() const
 {
-    PostInfoData data;
-    data.appVersion = QString(APP_VERSION);
-    data.groups     = _ngPost->groups();
+    PostInfoData postData;
+    postData.appVersion = QString(APP_VERSION);
+    postData.groups = _ngPost->groups();
     if (!_ngPost->_genFrom && !_ngPost->_from.empty())
-        data.nzbPoster = QString::fromStdString(_ngPost->_from);
-    data.par2Pct = _ngPost->_doPar2 ? static_cast<int>(_ngPost->_par2Pct) : -1;
-    return data;
+        postData.nzbPoster = QString::fromStdString(_ngPost->_from);
+    postData.par2Pct = _ngPost->_doPar2 ? static_cast<int>(_ngPost->_par2Pct) : -1;
+    return postData;
 }
 
 void AutoPostWidget::onPostInfoToggled(bool checked) { _postInfoButton->setEnabled(checked); }
@@ -607,5 +610,21 @@ void AutoPostWidget::onEditPostInfo()
         _ngPost->saveConfig();
         _hmi->log(tr("Post info defaults saved: model %1, written to %2")
                       .arg(_ngPost->postInfoTemplatePath(), _ngPost->postInfoOutputPattern()));
+    }
+}
+
+void AutoPostWidget::refreshPar2Default()
+{
+    PostingWidget::showPar2Default(_ui->redundancySB, _ngPost->par2DefaultPercentage());
+    // The tooltip of the redundancy names the arguments a post runs with.
+    updatePackingDependents();
+}
+
+void AutoPostWidget::refreshPendingColors()
+{
+    for (int i = 0; i < _ui->filesList->count(); ++i) {
+        auto *item = _ui->filesList->item(i);
+        if (item->data(Qt::UserRole).toBool())
+            item->setForeground(_hmi->pendingColor());
     }
 }

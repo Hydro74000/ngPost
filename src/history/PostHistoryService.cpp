@@ -20,6 +20,8 @@
 #include <QTimer>
 #include <QtGlobal>
 
+#include <utility>
+
 namespace
 {
 
@@ -593,7 +595,9 @@ void PostHistoryService::_invokeQueued(Func func)
 {
     if (!_worker)
         return;
-    QMetaObject::invokeMethod(_worker, [worker = _worker, func]() { func(worker); }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(_worker, [worker = _worker, func = std::move(func)]() {
+        func(worker);
+    }, Qt::QueuedConnection);
 }
 
 template<typename Func>
@@ -882,7 +886,8 @@ void PostHistoryService::enqueueArticlePosting(qint64 fileId,
                                                const QString &msgId,
                                                int attemptNo,
                                                qint64 pos,
-                                               qint64 bytes)
+                                               qint64 bytes,
+                                               qint64 bodyBytes)
 {
     PostHistoryStore::ArticleEvent event;
     event.kind = PostHistoryStore::ArticleEvent::Kind::Posting;
@@ -892,6 +897,28 @@ void PostHistoryService::enqueueArticlePosting(qint64 fileId,
     event.attemptNo = attemptNo;
     event.pos = pos;
     event.bytes = bytes;
+    event.bodyBytes = bodyBytes;
+    _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
+}
+
+void PostHistoryService::_enqueueArticleEvent(ArticleKind kind,
+                                              qint64 fileId,
+                                              int part,
+                                              const QString &msgId,
+                                              const QString &reason,
+                                              qint64 pos,
+                                              qint64 bytes,
+                                              qint64 bodyBytes)
+{
+    PostHistoryStore::ArticleEvent event;
+    event.kind = kind;
+    event.fileId = fileId;
+    event.part = part;
+    event.msgId = msgId;
+    event.error = reason;
+    event.pos = pos;
+    event.bytes = bytes;
+    event.bodyBytes = bodyBytes;
     _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
 }
 
@@ -899,16 +926,10 @@ void PostHistoryService::enqueueArticlePosted(qint64 fileId,
                                               int part,
                                               const QString &msgId,
                                               qint64 pos,
-                                              qint64 bytes)
+                                              qint64 bytes,
+                                              qint64 bodyBytes)
 {
-    PostHistoryStore::ArticleEvent event;
-    event.kind = PostHistoryStore::ArticleEvent::Kind::Posted;
-    event.fileId = fileId;
-    event.part = part;
-    event.msgId = msgId;
-    event.pos = pos;
-    event.bytes = bytes;
-    _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
+    _enqueueArticleEvent(ArticleKind::Posted, fileId, part, msgId, {}, pos, bytes, bodyBytes);
 }
 
 void PostHistoryService::enqueueArticleFailed(qint64 fileId,
@@ -916,17 +937,10 @@ void PostHistoryService::enqueueArticleFailed(qint64 fileId,
                                               const QString &msgId,
                                               const QString &reason,
                                               qint64 pos,
-                                              qint64 bytes)
+                                              qint64 bytes,
+                                              qint64 bodyBytes)
 {
-    PostHistoryStore::ArticleEvent event;
-    event.kind = PostHistoryStore::ArticleEvent::Kind::Failed;
-    event.fileId = fileId;
-    event.part = part;
-    event.msgId = msgId;
-    event.error = reason;
-    event.pos = pos;
-    event.bytes = bytes;
-    _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
+    _enqueueArticleEvent(ArticleKind::Failed, fileId, part, msgId, reason, pos, bytes, bodyBytes);
 }
 
 void PostHistoryService::enqueueArticleUnknown(qint64 fileId,
@@ -934,17 +948,10 @@ void PostHistoryService::enqueueArticleUnknown(qint64 fileId,
                                                const QString &msgId,
                                                const QString &reason,
                                                qint64 pos,
-                                               qint64 bytes)
+                                               qint64 bytes,
+                                               qint64 bodyBytes)
 {
-    PostHistoryStore::ArticleEvent event;
-    event.kind = PostHistoryStore::ArticleEvent::Kind::Unknown;
-    event.fileId = fileId;
-    event.part = part;
-    event.msgId = msgId;
-    event.error = reason;
-    event.pos = pos;
-    event.bytes = bytes;
-    _invokeQueued([event](PostHistoryWorker *worker) { worker->enqueueArticleEvent(event); });
+    _enqueueArticleEvent(ArticleKind::Unknown, fileId, part, msgId, reason, pos, bytes, bodyBytes);
 }
 
 bool PostHistoryService::flush(QString *error)
@@ -1067,7 +1074,7 @@ bool PostHistoryService::checkResume(qint64 postId, ResumeRow *row, QString *err
 void PostHistoryService::requestHistorySnapshot(const PostHistoryStore::ListFilter &filter,
                                                 const QSet<qint64> &ignoredResumeIds,
                                                 QObject *receiver,
-                                                HistorySnapshotCallback callback)
+                                                const HistorySnapshotCallback &callback)
 {
     if (!receiver || !callback)
         return;
@@ -1087,7 +1094,7 @@ void PostHistoryService::requestStatsSnapshot(const QString &dateFrom,
                                               const QString &dateTo,
                                               const QString &groupFilter,
                                               QObject *receiver,
-                                              StatsSnapshotCallback callback)
+                                              const StatsSnapshotCallback &callback)
 {
     if (!receiver || !callback)
         return;
@@ -1103,7 +1110,9 @@ void PostHistoryService::requestStatsSnapshot(const QString &dateFrom,
     });
 }
 
-void PostHistoryService::requestPostDetails(qint64 postId, QObject *receiver, DetailsCallback callback)
+void PostHistoryService::requestPostDetails(qint64 postId,
+                                            QObject *receiver,
+                                            const DetailsCallback &callback)
 {
     if (!receiver || !callback)
         return;

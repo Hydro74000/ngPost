@@ -9,6 +9,8 @@
 
 #include "PathHelper.h"
 
+#include "vpn/WindowsSecurity.h"
+
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -22,6 +24,7 @@
 #include <QThread>
 
 #include <algorithm>
+#include <utility>
 
 #if defined(Q_OS_UNIX)
 #  include <cerrno>
@@ -110,7 +113,7 @@ ConfigMigrationResult result(ConfigMigrationStatus status,
 //! a copy of, .save marks a file ngPost stopped reading.
 QString savePathFor(const QString &path)
 {
-    const QString simple = path + QStringLiteral(".save");
+    QString simple = path + QStringLiteral(".save");
     if (!QFile::exists(simple))
         return simple;
 
@@ -234,7 +237,7 @@ bool copyFileAtomically(const QString &from, const QString &to, QString *error)
     target.setPermissions(source.permissions());
 
     QByteArray block;
-    while (!(block = source.read(1024 * 1024)).isEmpty()) {
+    while (!(block = source.read(qint64(1024) * 1024)).isEmpty()) {
         if (target.write(block) != block.size()) {
             if (error)
                 *error = QStringLiteral("cannot copy it (%1)").arg(target.errorString());
@@ -674,7 +677,103 @@ MigrationRun &migrationRun()
     return run;
 }
 
+//! Every bit that grants access to somebody other than the owner.
+//!
+//! Asked as "is anything beyond the owner set", never as an equality against
+//! the wanted mode: QFileInfo::permissions() also reports the *User* aliases
+//! (ReadUser, WriteUser, ExeUser) for the account the process runs as, so a
+//! file that is exactly 0600 never compares equal to ReadOwner|WriteOwner, and
+//! an equality test reads "still open" for ever.
+constexpr QFileDevice::Permissions kBeyondOwner =
+        QFileDevice::ReadGroup | QFileDevice::WriteGroup | QFileDevice::ExeGroup
+        | QFileDevice::ReadOther | QFileDevice::WriteOther | QFileDevice::ExeOther;
+
+//! True when \a info is reachable by an account other than its owner.
+bool isReadableBeyondOwner(QFileInfo const &info)
+{
+    return (info.permissions() & kBeyondOwner) != QFileDevice::Permissions();
+}
+
 } // namespace
+
+bool restrictToOwner(const QString &path)
+{
+    if (path.isEmpty())
+        return false;
+
+    QFileInfo const info(path);
+    if (!info.exists())
+        return false;
+
+    QFileDevice::Permissions ownerOnly = QFileDevice::ReadOwner | QFileDevice::WriteOwner;
+    if (info.isDir())
+        ownerOnly |= QFileDevice::ExeOwner; // a directory needs it to be entered
+
+    bool ok = !isReadableBeyondOwner(info) || QFile::setPermissions(path, ownerOnly);
+
+#ifdef Q_OS_WIN
+    // Qt maps the POSIX bits onto NTFS without touching the DACL, so the call
+    // above can report success while an ACE inherited from a portable folder
+    // or a shared volume still grants everyone read access. The DACL is what
+    // decides here; the result of the two is the honest answer.
+    ok = WindowsSecurity::protectCurrentUserOnly(path, info.isDir()) && ok;
+#endif
+
+    return ok;
+}
+
+SecretsHardeningResult hardenConfigSecrets()
+{
+    SecretsHardeningResult result;
+
+    QString const dir  = configDirPath();
+    QString const conf = dir + QStringLiteral("/ngPost.conf");
+
+    QStringList targets;
+    targets << dir << conf;
+
+    // Migrations and hand edits leave copies of the credentials beside the
+    // live file. They are exactly as sensitive and were never restricted.
+    QDir const configQDir(dir);
+    if (configQDir.exists()) {
+        QStringList const filters{ QStringLiteral("ngPost.conf.*"),
+                                   QStringLiteral("ngPost.conf") };
+        for (QFileInfo const &sibling :
+             configQDir.entryInfoList(filters, QDir::Files | QDir::Hidden)) {
+            QString const path = sibling.absoluteFilePath();
+            if (!targets.contains(path))
+                targets << path;
+        }
+    }
+
+    for (QString const &path : std::as_const(targets)) {
+        QFileInfo const info(path);
+        if (!info.exists())
+            continue;
+
+#ifndef Q_OS_WIN
+        // Reading the mode back is what separates "ngPost had to fix this" from
+        // "it was already private". Not on NTFS, where Qt reports the group and
+        // other bits as set whatever the DACL actually says: there the DACL is
+        // applied every time and only a failure is worth a word, or every
+        // single launch would greet the user with a repair notice.
+        if (!isReadableBeyondOwner(info))
+            continue;
+#endif
+        if (!restrictToOwner(path)) {
+            result.unrepairable << QStringLiteral("%1: %2").arg(
+                    path,
+                    QStringLiteral("ngPost cannot restrict it to you here; move the "
+                                   "configuration onto a filesystem that carries ownership"));
+            continue;
+        }
+#ifndef Q_OS_WIN
+        result.repaired << path;
+#endif
+    }
+
+    return result;
+}
 
 QString configDirPath()
 {
@@ -690,7 +789,18 @@ QString configDirPath()
 QString configDir()
 {
     const QString d = configDirPath();
+    bool const wasAbsent = !QFileInfo::exists(d);
     QDir().mkpath(d);
+    // mkpath() applies the umask, so a fresh folder is typically 0755 and its
+    // ngPost.conf -- NNTP and proxy credentials, the fixed archive password --
+    // is listable by every other account on the machine. Restrict it the way
+    // vpnRuntimeDir() already restricts its own. Only on creation: repairing an
+    // existing installation is hardenConfigSecrets()' job, once, at startup,
+    // where the outcome can be reported instead of silently retried on every
+    // single call to this function. A no-op when mkpath() failed: there is then
+    // no folder to restrict, and restrictToOwner() says so.
+    if (wasAbsent)
+        restrictToOwner(d);
     return d;
 }
 
@@ -766,7 +876,7 @@ QString legacyConfigFilePath()
 
 QString backupPathFor(const QString &path)
 {
-    const QString simple = path + QStringLiteral(".bak");
+    QString simple = path + QStringLiteral(".bak");
     if (!QFile::exists(simple))
         return simple;
 
@@ -845,117 +955,13 @@ ConfigMigrationResult migrateLegacyConfigIfNeeded(bool overwriteConfirmed)
                   newPath);
 }
 
-const ConfigDirMigrationResult &migrateAppNamedConfigDirIfNeeded(const QString &legacyAppName)
+namespace
 {
-    ConfigDirMigrationResult &state = migrationState();
-    MigrationRun            &run   = migrationRun();
 
-#ifdef NGPOST_TESTING
-    // Check the sandbox BEFORE configDir() creates or scans anything. This is
-    // deliberately stricter than a production guard: a forgotten HomeSandbox
-    // must not even create a directory in the developer's real profile.
-    //  - NGPOST_TEST_CONFIG_DIR pins configDir() outright, so there is no
-    //    name-derived sibling to adopt in the first place;
-    //  - no sandbox marker at all means a test forgot its HomeSandbox. Refuse
-    //    before consulting QStandardPaths.
-    if (!testEnvPath("NGPOST_TEST_CONFIG_DIR").isEmpty()
-        || testEnvPath("NGPOST_TEST_HOME").isEmpty()) {
-        state = ConfigDirMigrationResult();
-        return state;
-    }
-#endif
-
-    // configDir() creates the target directory. No user file is touched yet.
-    const QString target = configDir();
-    if (run.done && run.appName == legacyAppName && run.targetDir == target)
-        return state;
-
-    state           = ConfigDirMigrationResult();
-    state.targetDir = target;
-    run.appName     = legacyAppName;
-    run.targetDir   = target;
-    run.done        = true;
-
-    const QStringList candidates = configDirCandidates(target, legacyAppName);
-    if (candidates.isEmpty())
-        return state; // NotNeeded — fresh install, or nothing left to adopt
-
-    state.legacyDir       = candidates.first();
-    state.otherLegacyDirs = candidates.mid(1);
-
-    // Two renamed ngPost processes can start together (desktop double-click,
-    // monitor restart, cron overlap). Only one may decide which old folder is
-    // adopted. Never expire a live lock merely because a user kept a large
-    // model or other asset in the old folder; a dead local process is still
-    // detected by QLockFile's PID/host checks.
-    QLockFile lock(target + QStringLiteral("/.ngPost_config_migration.lock"));
-    lock.setStaleLockTime(0);
-#ifdef NGPOST_TESTING
-    constexpr int lockWaitMs = 50;
-#else
-    constexpr int lockWaitMs = 10000;
-#endif
-    if (!lock.tryLock(lockWaitMs)) {
-        state.status = ConfigDirMigrationStatus::Failed;
-        switch (lock.error()) {
-        case QLockFile::PermissionError:
-            state.error = QStringLiteral("cannot create the migration lock (permission denied)");
-            break;
-        case QLockFile::LockFailedError:
-            state.error = QStringLiteral("another ngPost process is adopting the configuration");
-            break;
-        default:
-            state.error = QStringLiteral("cannot acquire the configuration migration lock");
-            break;
-        }
-        return state;
-    }
-
-    // One shot, durably. The stamp survives the user later deleting or
-    // replacing ngPost.conf, which the "target is configured" test below would
-    // not: without it, wiping a config would silently pull in an older install.
-    if (QFileInfo::exists(migrationStampPath(target)))
-        return state;
-
-    // A configured install is never overwritten. A history bundle counts as
-    // user data too even when no ngPost.conf exists (a CLI-only install can
-    // legitimately create exactly that layout), so it also blocks adoption.
-    const QString targetConf = target + QStringLiteral("/ngPost.conf");
-    const QFileInfo targetConfInfo(targetConf);
-    const bool targetConfigured = targetConfInfo.exists() || targetConfInfo.isSymLink()
-        || hasHistoryBundle(target);
-
-    if (targetConfigured) {
-        state.status = ConfigDirMigrationStatus::SkippedTargetConfigured;
-        if (!targetConfInfo.exists() && !targetConfInfo.isSymLink())
-            state.skipped << QStringLiteral("history already present in the new folder");
-        // Stamped too, so the "you have other config folders" notice is shown
-        // once rather than at every single start for the rest of time.
-        QString stampError;
-        if (!writeMigrationStamp(target,
-                                 "skipped-target-already-configured",
-                                 state,
-                                 &stampError))
-            state.error = QStringLiteral("could not record the one-time check (%1)")
-                              .arg(stampError);
-        return state;
-    }
-
-    const QString legacy     = state.legacyDir;
-    const QString legacyConf = legacy + QStringLiteral("/ngPost.conf");
-    QByteArray legacyConfig;
-    QFileDevice::Permissions configPermissions{};
-    QString stableReadError;
-    if (!readStableConfig(legacyConf,
-                          &legacyConfig,
-                          &configPermissions,
-                          &stableReadError)) {
-        state.status = ConfigDirMigrationStatus::Failed;
-        state.error  = QStringLiteral("could not read '%1' (%2)")
-                          .arg(legacyConf, stableReadError);
-        return state;
-    }
-
+void copyMigrationAssets(ConfigDirMigrationResult &state,
+                         const QString &legacy,
+                         const QString &target)
+{
     // Step 1 — copy every non-database asset first, merging directories and
     // never overwriting a name already present. Publishing ngPost.conf last is
     // the recovery protocol: if the process stops here, the next start sees no
@@ -997,7 +1003,18 @@ const ConfigDirMigrationResult &migrateAppNamedConfigDirIfNeeded(const QString &
         else
             state.skipped << QStringLiteral("%1: %2").arg(name, err);
     }
+}
 
+const ConfigDirMigrationResult &completeConfigDirMigration(
+    ConfigDirMigrationResult &state,
+    const QString &legacy,
+    const QString &target,
+    const QString &legacyConf,
+    const QString &targetConf,
+    const QByteArray &legacyConfig,
+    QFileDevice::Permissions configPermissions)
+{
+    QString stableReadError;
     // Step 2 — snapshot the source configuration as .save, and deliberately
     // leave the original file exactly where it is. The snapshot is helpful but
     // non-fatal: the original itself remains the authoritative rollback copy.
@@ -1074,6 +1091,123 @@ const ConfigDirMigrationResult &migrateAppNamedConfigDirIfNeeded(const QString &
         state.error = QStringLiteral("the one-time migration marker could not be written");
     }
     return state;
+}
+
+} // namespace
+
+const ConfigDirMigrationResult &migrateAppNamedConfigDirIfNeeded(const QString &legacyAppName)
+{
+    ConfigDirMigrationResult &state = migrationState();
+    MigrationRun &run = migrationRun();
+
+#ifdef NGPOST_TESTING
+    // Check the sandbox BEFORE configDir() creates or scans anything. This is
+    // deliberately stricter than a production guard: a forgotten HomeSandbox
+    // must not even create a directory in the developer's real profile.
+    //  - NGPOST_TEST_CONFIG_DIR pins configDir() outright, so there is no
+    //    name-derived sibling to adopt in the first place;
+    //  - no sandbox marker at all means a test forgot its HomeSandbox. Refuse
+    //    before consulting QStandardPaths.
+    if (!testEnvPath("NGPOST_TEST_CONFIG_DIR").isEmpty()
+        || testEnvPath("NGPOST_TEST_HOME").isEmpty()) {
+        state = ConfigDirMigrationResult();
+        return state;
+    }
+#endif
+
+    // configDir() creates the target directory. No user file is touched yet.
+    const QString target = configDir();
+    if (run.done && run.appName == legacyAppName && run.targetDir == target)
+        return state;
+
+    state = ConfigDirMigrationResult();
+    state.targetDir = target;
+    run.appName = legacyAppName;
+    run.targetDir = target;
+    run.done = true;
+
+    const QStringList candidates = configDirCandidates(target, legacyAppName);
+    if (candidates.isEmpty())
+        return state; // NotNeeded — fresh install, or nothing left to adopt
+
+    state.legacyDir = candidates.first();
+    state.otherLegacyDirs = candidates.mid(1);
+
+    // Two renamed ngPost processes can start together (desktop double-click,
+    // monitor restart, cron overlap). Only one may decide which old folder is
+    // adopted. Never expire a live lock merely because a user kept a large
+    // model or other asset in the old folder; a dead local process is still
+    // detected by QLockFile's PID/host checks.
+    QLockFile lock(target + QStringLiteral("/.ngPost_config_migration.lock"));
+    lock.setStaleLockTime(0);
+#ifdef NGPOST_TESTING
+    constexpr int lockWaitMs = 50;
+#else
+    constexpr int lockWaitMs = 10000;
+#endif
+    if (!lock.tryLock(lockWaitMs)) {
+        state.status = ConfigDirMigrationStatus::Failed;
+        switch (lock.error()) {
+        case QLockFile::PermissionError:
+            state.error = QStringLiteral("cannot create the migration lock (permission denied)");
+            break;
+        case QLockFile::LockFailedError:
+            state.error = QStringLiteral("another ngPost process is adopting the configuration");
+            break;
+        default:
+            state.error = QStringLiteral("cannot acquire the configuration migration lock");
+            break;
+        }
+        return state;
+    }
+
+    // One shot, durably. The stamp survives the user later deleting or
+    // replacing ngPost.conf, which the "target is configured" test below would
+    // not: without it, wiping a config would silently pull in an older install.
+    if (QFileInfo::exists(migrationStampPath(target)))
+        return state;
+
+    // A configured install is never overwritten. A history bundle counts as
+    // user data too even when no ngPost.conf exists (a CLI-only install can
+    // legitimately create exactly that layout), so it also blocks adoption.
+    const QString targetConf = target + QStringLiteral("/ngPost.conf");
+    const QFileInfo targetConfInfo(targetConf);
+    const bool targetConfigured = targetConfInfo.exists() || targetConfInfo.isSymLink()
+        || hasHistoryBundle(target);
+
+    if (targetConfigured) {
+        state.status = ConfigDirMigrationStatus::SkippedTargetConfigured;
+        if (!targetConfInfo.exists() && !targetConfInfo.isSymLink())
+            state.skipped << QStringLiteral("history already present in the new folder");
+        // Stamped too, so the "you have other config folders" notice is shown
+        // once rather than at every single start for the rest of time.
+        QString stampError;
+        if (!writeMigrationStamp(target, "skipped-target-already-configured", state, &stampError))
+            state.error = QStringLiteral("could not record the one-time check (%1)")
+                              .arg(stampError);
+        return state;
+    }
+
+    const QString legacy = state.legacyDir;
+    const QString legacyConf = legacy + QStringLiteral("/ngPost.conf");
+    QByteArray legacyConfig;
+    QFileDevice::Permissions configPermissions{};
+    QString stableReadError;
+    if (!readStableConfig(legacyConf, &legacyConfig, &configPermissions, &stableReadError)) {
+        state.status = ConfigDirMigrationStatus::Failed;
+        state.error = QStringLiteral("could not read '%1' (%2)").arg(legacyConf, stableReadError);
+        return state;
+    }
+
+    copyMigrationAssets(state, legacy, target);
+
+    return completeConfigDirMigration(state,
+                                      legacy,
+                                      target,
+                                      legacyConf,
+                                      targetConf,
+                                      legacyConfig,
+                                      configPermissions);
 }
 
 const ConfigDirMigrationResult &configDirMigrationResult()

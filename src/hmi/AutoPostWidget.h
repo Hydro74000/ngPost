@@ -60,9 +60,10 @@ private:
 
 public:
     explicit AutoPostWidget(NgPost *ngPost, MainWindow *hmi);
-    ~AutoPostWidget();
+    ~AutoPostWidget() override;
 
     void init();
+    void refreshPar2Default();
 
     void handleKeyEvent(QKeyEvent *keyEvent);
     void handleDropEvent(QDropEvent *e);
@@ -78,6 +79,8 @@ public:
     void retranslate();
 
     void setPackingAuto(bool enabled, const QStringList &keys);
+
+    void refreshPendingColors();
 
 public slots:
     void onMonitorJobStart();

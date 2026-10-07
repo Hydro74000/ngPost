@@ -9,9 +9,13 @@
 #define NGPOST_H
 #include "PostingJobOptions.h"
 #include "history/PostHistoryStore.h"
+#include "par2/Par2Settings.h"
+#include "tools/ExternalToolResolver.h"
+#include "utils/LogTimestamp.h"
 #include "utils/PathHelper.h"
 #include "utils/CmdOrGuiApp.h"
 #include "utils/Macros.h"
+#include "utils/RandomToken.h"
 
 #include <QCommandLineOption>
 #include <QDir>
@@ -21,6 +25,7 @@
 #include <QNetworkProxy>
 #include <QProcess>
 #include <QQueue>
+#include <QScopeGuard>
 #include <QSet>
 #include <QSettings>
 #include <QTextStream>
@@ -74,6 +79,7 @@ class NgPost : public QObject, public CmdOrGuiApp
     friend class PostingWidget;
     friend class AutoPostWidget;
     friend class CompressionSettingsDialog;
+    friend class Par2SettingsDialog;
     friend class PostingJob;
     friend class UpdateChecker;
 
@@ -85,6 +91,8 @@ public:
         CONF,
         SHUTDOWN_CMD,
         CHECK,
+        CHECK_JSON,
+        CHECK_FULL,
         QUIET,
         PROXY_SOCKS5,
         DISP_PROGRESS,
@@ -131,12 +139,15 @@ public:
         NB_RETRY,
         GEN_FROM,
         OBFUSCATE,
+        OBFUSCATE_FILENAME,
         INPUT_DIR,
         AUTO_DIR,
         MONITOR_DIR,
         DEL_AUTO,
         TMP_DIR,
         RAR_PATH,
+        RAR_TOOL,
+        RAR_SOURCE,
         RAR_EXTRA,
         RAR_SIZE,
         RAR_MAX,
@@ -147,7 +158,11 @@ public:
 #endif
         PAR2_PCT,
         PAR2_PATH,
+        PAR2_SOURCE,
+        PAR2_ARGS_CUSTOM,
+        PAR2_TOOL,
         PAR2_ARGS,
+        PAR2_BLOCK_SIZE,
         PACK,
         COMPRESS,
         GEN_PAR2,
@@ -176,10 +191,13 @@ public:
         NZBCHECK,
         CHECK_FOR_UPDATES,
         LAST_UPDATE_CHECK,
+        UI_ZOOM,
         VPN_AUTO_CONNECT,
         VPN_BACKEND,        //!< legacy, kept for migration only
         VPN_CONFIG_PATH,    //!< legacy, kept for migration only
         VPN_ACTIVE_PROFILE,
+        VPN_LEASE_WAIT_MINUTES,
+        VPN_RECOVERY_MAX_ATTEMPTS,
         VPN_PROFILE_NAME,        //!< inside [vpn_profile] block
         VPN_PROFILE_BACKEND,
         VPN_PROFILE_CONFIG_FILE,
@@ -188,6 +206,7 @@ public:
         VPN,            //!< CLI-only: master switch on
         NO_VPN,         //!< CLI-only: master switch off
         VPN_PROFILE,    //!< CLI-only: select active profile by name
+        VPN_CLEANUP_UNATTRIBUTED, //!< CLI-only, requires --yes
         HISTORY,
         HISTORY_SHOW,
         HISTORY_IMPORT_CSV,
@@ -211,6 +230,41 @@ private:
 
     static const QMap<Opt, QString> sOptionNames;
 
+    //! The keys a configuration older than [server] blocks put at the top
+    //! level: _parseConfig() still reads them there, so the merge must not move
+    //! one back above the sections and create a second server.
+    static QStringList const &topLevelServerKeys();
+    //! The keys _parseConfig() gives to a [vpn_profile] block rather than to the
+    //! settings, when they stand inside one.
+    static QStringList const &vpnProfileKeys();
+
+    //! The "key = value" lines _parseConfig() reads as settings, wherever they
+    //! stand: above the sections, or among them when the block they sit in does
+    //! not own that key. Comments are left out; the last line wins, as in the
+    //! parser.
+    static QMap<QString, QString> topLevelSettings(QString const &text);
+    //! The lines that make the [server] and [vpn_profile] blocks: their headers
+    //! and the keys each block owns, in order. Comments, blank lines and the
+    //! settings placed among the blocks are left out, since none of them changes
+    //! a server or a profile.
+    static QString sectionsText(QString const &text);
+
+    //! Whether ngPost knows a setting name at all, to tell a line it does not
+    //! use from one it uses but reads only at startup.
+    static bool isKnownSetting(QString const &key);
+
+    //! Whether a setting's value can hold a credential. The log panel ends up in
+    //! bug reports, so a message about one of these names the key, never the value.
+    static bool isSecretSetting(QString const &key);
+
+    //! The four one-shot VPN overrides (--vpn, --no_vpn, --vpn_profile,
+    //! --vpn-cleanup-unattributed). Where there is no VPN integration they are
+    //! never registered with the parser and never listed by --help, so --vpn
+    //! answers "Unknown option" instead of being accepted and then quietly
+    //! ignored -- posting in the clear is the one outcome a user who asked for
+    //! a tunnel must never silently get.
+    static bool _isVpnOverrideOption(QCommandLineOption const &option);
+
     enum class AppMode { CMD = 0, HMI = 1 }; //!< supposed to be CMD but a simple HMI has been added
 
     enum class ERROR_CODE : ushort {
@@ -232,7 +286,8 @@ private:
         ERR_SERVER_PORT,
         ERR_SERVER_CONS,
         ERR_INPUT_READ,
-        ERR_HISTORY
+        ERR_HISTORY,
+        ERR_VPN
     };
 
 private:
@@ -284,14 +339,34 @@ private:
 #endif
     QString _tmpPath;
     QString _rarPath;
+    QString _rarPathConfig;
+    QString _rarTool = QStringLiteral("rar");
+    externaltool::PathMode _rarPathMode = externaltool::PathMode::Automatic;
     QString _rarArgs;
     uint _rarSize;
     uint _rarMax;
     bool _useRarMax;
     uint _par2Pct;
+    uint _par2PctDefault = 0;
+    par2::Tool _par2Tool = par2::Tool::Auto;
     QString _par2Path;
     QString _par2Args;
+    //! PAR2_ARGS_CUSTOM: the user's own arguments. When this line is present in
+    //! the configuration it replaces PAR2_ARGS for every post, and ngPost never
+    //! rewrites it -- commenting it out is how you go back to PAR2_ARGS.
+    QString _par2ArgsCustom;
+    //! The engine this run uses instead of the configured one: the installed
+    //! engine when PAR2_TOOL names a missing one, or the engine --par2_path
+    //! points at. Never saved -- PAR2_TOOL and PAR2_ARGS keep the user's
+    //! choice, which a reinstall or the next run makes valid again.
+    //! Tool::Auto when the configured engine is the one running.
+    par2::Tool _par2ToolFallback = par2::Tool::Auto;
+    //! --par2_path names the executable of this run, and says so itself: the
+    //! configuration's own fallback is then neither used nor announced.
+    bool _par2PathOnCommandLine = false;
+    qint64  _par2BlockSize; //!< PAR2 slice size for --check's recovery analysis; 0 = unknown
     QString _par2PathConfig;
+    externaltool::PathMode _par2PathMode = externaltool::PathMode::Automatic;
 
     bool _doCompress;
     bool _doPar2;
@@ -299,7 +374,12 @@ private:
     bool _genPass;
 
     uint _lengthName;
-    uint _lengthPass;
+    uint _lengthPass; //!< what THIS post uses, refreshed from its tab before each job
+    //! What a new tab starts with, what the Compression settings dialog edits
+    //! and what LENGTH_PASS holds on disk. Kept apart from _lengthPass, as
+    //! _keepRarDefault is from _keepRar, so that the tab in front at save time
+    //! does not overwrite the length the dialog has just set.
+    uint _lengthPassDefault = sDefaultLengthPass;
     QString _rarName;
     QString _rarPass;
     QString _rarPassFixed;
@@ -310,6 +390,12 @@ private:
     PostingJob *_activeJob;
     QQueue<PostingJob *> _pendingJobs;
     PostingJob *_packingJob;
+    bool _queuePaused = false;
+    bool _cancelingAll = false;
+    quint64 _postingCancelGeneration = 0;
+    bool _resumeActiveJob();
+    bool _confirmPostingAdmission();
+    void _startNextPostingJob();
 
     QString _historyFieldSeparator;
     QString _postHistoryFile;
@@ -344,13 +430,26 @@ private:
     QString _urlNzbUploadStr;
 
     bool _doShutdownWhenDone;
+    bool _transferEndedSinceShutdownArmed = false;
+    int _shutdownHolds = 0;
+    bool _waitingForTransfer = false;
+    bool _shutdownRecheckQueued = false;
+    void _resetShutdownCompletion();
+    void _releaseShutdownHold();
+    void _onPostingJobEnded(const PostingJob *job);
+#ifdef NGPOST_TESTING
+    int _shutdownStartCount = 0;
+    int _shutdownRecheckCount = 0;
+    QString _allowedShutdownCmdForTest;
+#endif
+    bool _waitingForUnsubmittedPosts = false;
     QProcess *_shutdownProc;
     QString _shutdownCmd;
 
     bool _removeAccentsOnNzbFileName;
     bool _autoCloseTabs;
     bool _checkForUpdates;
-    qint64 _lastUpdateCheckEpoch;
+    uint _uiZoom = 100;
     bool _rarNoRootFolder;
     bool _keepNfoExtension; //!< when obfuscating file names, keep the .nfo extension visible
     bool _copyNfoWithNzb;   //!< copy the .nfo from the original files next to the generated nzb
@@ -390,6 +489,9 @@ private:
     //! Exit code a fatal error asked for, < 0 when none. The post commands of
     //! posts that already succeeded still get to finish first.
     int _pendingExitCode;
+    //! Recovery exhaustion must first let the active job close its transports
+    //! and persist every ambiguous article as unknown.
+    bool _pendingExitWaitsForActiveJob;
     //! True when stdout carries data a caller pipes (an exported record sheet),
     //! so every message goes to stderr instead of corrupting it.
     bool _stdoutIsData;
@@ -407,8 +509,40 @@ private:
     VpnManager *_vpnManager; //!< app-scoped VPN (OpenVPN / WireGuard), bound to NNTP sockets only
     bool _lastPostingStartCanceled;
 
+    //! Top-level configuration keys as ngPost believes them: what it read at
+    //! startup, then what each save wrote. A value that differs from this on
+    //! disk was edited behind ngPost's back, and _mergeExternalConfigEdits()
+    //! folds it back in. Empty when the parsed file is not the one saveConfig()
+    //! writes (-c), where nothing is ever written back.
+    QMap<QString, QString> _configBelief;
+    //! Top-level keys whose edited value ngPost keeps in the file without using
+    //! it before the next start, with the value already announced for each: the
+    //! saves that follow patch the line again, but say it only once.
+    QMap<QString, QString> _configKeptForRestart;
+    //! The [server] and [vpn_profile] blocks of the file as ngPost last read or
+    //! wrote them (sectionsText()). Those blocks are rewritten from memory,
+    //! never merged, so a difference here is an edit this save is about to
+    //! discard.
+    QString _configSections;
+
+    //! Fold the edits made in the file since ngPost read it into \a text, and
+    //! into memory for the keys that can be applied while it runs. Returns what
+    //! ngPost will believe once \a text is written. Sections are left alone.
+    QMap<QString, QString> _mergeExternalConfigEdits(QString &text);
+    //! Apply one top-level key to the running state, false when this key needs a
+    //! restart (paths and engines are resolved once, at startup).
+    bool _adoptConfigValue(QString const &key, QString const &value);
+    //! Settle _par2ToolFallback and _par2Path once PAR2_TOOL, its path mode and
+    //! _par2Path are known: when the chosen engine is not installed, this run
+    //! uses the one that is. \a announce says it in the log.
+    void _applyPar2Fallback(bool announce);
+
     QFile *_logFile;
     QTextStream *_logStream;
+    mutable LogTimestamp _logTimestamp{ LogTimestamp::CarriageReturn::RewritesLine };
+    mutable bool _logFragmentOpen = false;
+    mutable bool _logEntryComplete = true;
+    QMap<QString, int> _connectionRetries;
 
     static constexpr const char *sDefaultShutdownCmdLinux = "sudo -n /sbin/poweroff";
     static constexpr const char *sDefaultShutdownCmdWindows = "shutdown /s /f /t 0";
@@ -436,7 +570,7 @@ private:
     //! An upload has no reason to take longer, and it is the only thing that
     //! keeps ngPost from quitting or powering off.
     static const int sDefaultNzbUploadTimeoutSec = 300;
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
     static constexpr const char *sDefaultNzbPath = ""; //!< local folder
     static constexpr const char *sDefaultConfig = "ngPost.conf";
 #else
@@ -495,6 +629,7 @@ public:
 
     void checkForNewVersion() override;
     bool checkSupportSSL();
+    void reportNzbCheckSslUnavailable();
 #ifdef __USE_HMI__
     int startHMI() override;
 #endif
@@ -507,11 +642,26 @@ public:
     inline MainWindow *mainWindowForTest() const;
 #endif
 #ifdef NGPOST_TESTING
+    bool allowShutdownCommandForTest(const QString &expected)
+    {
+        if (expected.isEmpty() || _shutdownCmd != expected)
+            return false;
+        _allowedShutdownCmdForTest = expected;
+        return true;
+    }
+    int shutdownStartCountForTest() const { return _shutdownStartCount; }
+    int shutdownRecheckCountForTest() const { return _shutdownRecheckCount; }
+    bool shutdownInProgressForTest() const { return _shutdownProc != nullptr; }
     //! Read back what the configuration parsing produced, so a test can check
     //! that saveConfig() writes something that parses back to the same thing.
     QString postInfoOutputForTest() const { return _postInfoOutput; }
 
     bool postInfoOnlyOnSuccessForTest() const { return _postInfoOnlySuccess; }
+    bool obfuscateArticlesForTest() const { return _obfuscateArticles; }
+    bool obfuscateFileNameForTest() const { return _obfuscateFileName; }
+    qint64 par2BlockSizeForTest() const { return _par2BlockSize; }
+    //! The executable this run hands the par2 step, fallback included.
+    QString par2PathForTest() const { return _par2Path; }
     int postCmdTimeoutSecForTest() const { return _postCmdTimeoutSec; }
     bool postCmdFailIsErrorForTest() const { return _postCmdFailIsError; }
     bool postCmdExposePasswordForTest() const { return _postCmdExposePassword; }
@@ -532,12 +682,17 @@ public:
 
     inline QString randomFrom(ushort length = 13) const;
     QString randomPass(uint length = 13) const;
+    QString randomName(uint length = 13) const { return RandomToken::publicName(length); }
 
     inline QList<QString> languages() const;
 
     inline bool isPosting() const;
     inline bool hasPostingJobs() const;
     void closeAllPostingJobs();
+    //! Finalize only the active job after a terminal VPN failure. Transport
+    //! shutdown preserves ambiguous articles as unknown, leaving the history
+    //! row available to Resume; queued GUI jobs remain queued.
+    void stopActivePostingForResume();
 
     bool resumePostGui(qint64 postId, PostingWidget *widget = nullptr, QString *error = nullptr);
     bool regenerateNzbGui(qint64 postId, const QString &outPath, bool includePassword = false);
@@ -557,10 +712,13 @@ public:
     inline bool debugMode() const;
     inline bool debugFull() const;
     inline void setDebug(ushort level);
+    bool stdoutIsData() const { return _stdoutIsData; }
 
     inline bool dispPostingFile() const;
 
-    void saveConfig();
+    //! \a silent leaves out the line announcing the update, for a window layout
+    //! value such as the zoom; errors are reported either way.
+    void saveConfig(bool silent = false);
 
     UpdateChecker *updateChecker() const { return _updateChecker; }
 
@@ -574,6 +732,15 @@ public:
     //! The only place allowed to quit or to power the machine off. Waits for
     //! the posts, the post commands and the nzb uploads.
     void maybeFinishApplication();
+    void setShutdownWhenDone(bool enabled);
+    //! Re-evaluate an armed shutdown once, after the current UI change settles.
+    void requestShutdownRecheck();
+    //! Keep shutdown deferred through a dialog and the resulting queue changes.
+    auto holdShutdown()
+    {
+        ++_shutdownHolds;
+        return qScopeGuard([this] { _releaseShutdownHold(); });
+    }
 
     //! True when something will actually read the description of a post: a
     //! post info file, a post command, or an upload. Consolidating it costs a
@@ -636,7 +803,8 @@ public:
     inline bool removeRarRootFolder() const;
 
     bool isPaused() const;
-    void pause() const;
+    void pause();
+    void cancelAllPostingJobs();
     void resume();
 
     inline bool tryResumePostWhenConnectionLost() const;
@@ -655,9 +823,28 @@ public:
 
     inline bool nzbCheck() const;
     int nbMissingArticles() const;
+    int nzbCheckExitCode() const;
 
+    //! Tell the folder monitor (if any) that a path about to appear is ngPost's
+    //! own doing, so it is not mistaken for a new file to post.
+    void ignoreMonitorPath(const QString &absolutePath);
+    void stopIgnoringMonitorPath(const QString &absolutePath);
+
+    //! The engine this run really uses: the configured one, or the fallback
+    //! picked when it is not installed.
+    inline par2::Tool par2ToolInUse() const;
+    //! The arguments the configuration holds: PAR2_ARGS_CUSTOM when the user
+    //! wrote one, otherwise the PAR2_ARGS line the PAR2 Settings dialog
+    //! maintains. This is what that dialog edits and what a save writes.
+    inline QString par2ArgsConfigured() const;
+    //! The arguments this run really passes to the engine: none when
+    //! --par2_path selected another engine, whose switches these are not.
+    inline QString par2ArgsInUse() const;
     inline bool useParPar() const;
     inline bool useMultiPar() const;
+    uint par2DefaultPercentage() const { return _par2PctDefault; }
+    uint uiZoom() const { return _uiZoom; }
+    void setUiZoom(uint zoom) { _uiZoom = zoom; }
     inline bool lastPostingStartCanceled() const;
 
     inline void enableAutoPacking(bool enable = true);
@@ -666,6 +853,8 @@ public:
     PostHistoryService *historyService() const { return _historyService; }
 
 signals:
+    void postingStateChanged();
+    void par2DefaultsChanged();
     void log(QString msg, bool newline); //!< in case we signal from another thread
     void error(QString msg);             //!< in case we signal from another thread
 
@@ -686,9 +875,11 @@ public slots:
 #endif
 
 private slots:
-    void onLog(QString msg, bool newline);
-    void onError(QString msg);
-    void onErrorConnecting(QString err);
+    void onLog(const QString &msg, bool newline);
+    void onConnectionRetry(const QString &server, const QString &detail);
+    void flushConnectionRetries();
+    void onError(const QString &msg);
+    void onErrorConnecting(const QString &err);
     void onRefreshprogressbarBar();
 
     void onNewFileToProcess(const QFileInfo &fileInfo);
@@ -699,6 +890,8 @@ private:
     void _post(const QFileInfo &fileInfo, const QString &monitorFolder = "");
     void _finishPosting();
     void _discardUnstartedJob(PostingJob *job);
+    void _retainVpnForJob(PostingJob *job);
+    void _releaseVpnForJob(PostingJob *job);
 
     //! Parses one key=value metadata. Returns false (and reports) on a malformed
     //! pair or on a key claimed by both --meta and --post_meta.
@@ -720,7 +913,7 @@ private:
     PostingJobOptions _baseJobOptions() const;
 
     void _startShutdown();
-    void _requestExit(ERROR_CODE code);
+    void _requestExit(ERROR_CODE code, bool waitForActiveJob = false);
 
     //! True when the command line asks for a history command rather than a
     //! post: it both dispatches and tells that no input file is needed.
@@ -741,6 +934,8 @@ private:
 
     void _prepareNextPacking();
 
+    void _initVpnManager();
+    void _connectVpnRecoverySignals();
     void _startMonitoring(const QString &folderPath);
     void _stopMonitoring();
 
@@ -750,7 +945,98 @@ private:
     bool _confirmMasterSwitchWithoutVpnProfileIfNeeded();
 
     void _syntax(char *appName);
-    QString _parseConfig(const QString &configPath);
+    void _writeConfigGeneral(QTextStream &stream);
+    void _writeConfigPostCommands(QTextStream &stream);
+    void _writeConfigPostInfo(QTextStream &stream);
+    void _writeConfigMonitoring(QTextStream &stream);
+    void _writeConfigPosting(QTextStream &stream);
+    void _writeConfigVpn(QTextStream &stream);
+    void _writeConfigTransfer(QTextStream &stream);
+    void _writeConfigPacking(QTextStream &stream);
+    void _writeConfigArchive(QTextStream &stream);
+    void _writeConfigPar2(QTextStream &stream);
+    void _writeConfigServers(QTextStream &stream);
+    void _writeConfigVpnProfiles(QTextStream &stream);
+
+    void _prepareCliOutput(const QCommandLineParser &parser);
+    bool _loadCliConfig(const QCommandLineParser &parser);
+    void _applyCliConfigOverrides(const QCommandLineParser &parser);
+    void _parseCliDisplayOptions(const QCommandLineParser &parser);
+    bool _startCliNzbCheck(const QCommandLineParser &parser);
+    bool _parseCliInputMode(const QCommandLineParser &parser, bool hasHistoryCommand);
+    bool _parseCliVpnOptions(const QCommandLineParser &parser);
+    bool _parseCliPackingOptions(const QCommandLineParser &parser);
+    bool _parseCliMonitorOptions(const QCommandLineParser &parser, bool &isMonitoring);
+    bool _parseCliArticleOptions(const QCommandLineParser &parser);
+    bool _parseCliPostInfoOptions(const QCommandLineParser &parser);
+    bool _parseCliPostCommandOptions(const QCommandLineParser &parser);
+    bool _parseCliMetadataOptions(const QCommandLineParser &parser);
+    bool _parseCliArticleSizeOptions(const QCommandLineParser &parser);
+    bool _parseCliArchiveOptions(const QCommandLineParser &parser);
+    bool _parseCliPar2Options(const QCommandLineParser &parser);
+    void _parseCliArchiveNameOptions(const QCommandLineParser &parser);
+    bool _parseCliServerList(const QCommandLineParser &parser);
+    bool _parseCliSingleServer(const QCommandLineParser &parser);
+    bool _collectCliInputFiles(const QCommandLineParser &parser,
+                               QList<QFileInfo> &filesToUpload,
+                               QStringList &rawInputPaths);
+    bool _startCliPosting(const QCommandLineParser &parser,
+                          bool isMonitoring,
+                          const QList<QFileInfo> &filesToUpload,
+                          const QStringList &rawInputPaths);
+
+    struct ConfigParseState;
+    bool _parseConfigTransferKey(const QString &opt, QString val, QString &err);
+    bool _parseConfigDisplayKey(const QString &opt, QString val);
+    bool _parseConfigVpnKey(const QString &opt, QString val, ConfigParseState &state);
+    bool _parseVpnProfileKey(const QString &opt, QString val, ConfigParseState &state);
+    bool _parseConfigNfoKey(const QString &opt, QString val);
+    bool _parseConfigArticleKey(const QString &opt, QString val);
+    bool _parseConfigIdentityKey(const QString &opt, QString val, QString &err);
+    bool _parseConfigPostInfoKey(const QString &opt, const QString &val, QString &err);
+    bool _parseConfigHistoryKey(const QString &opt, const QString &val, QString &err);
+#ifdef __USE_TMP_RAM__
+    bool _parseConfigRamKey(const QString &opt, const QString &val, QString &err);
+#endif
+    bool _parseConfigArchiveKey(const QString &opt,
+                                QString val,
+                                ConfigParseState &state,
+                                QString &err);
+    bool _parseConfigPackingKey(const QString &opt,
+                                QString val,
+                                ConfigParseState &state,
+                                QString &err);
+    bool _parseConfigPar2Key(const QString &opt,
+                             const QString &val,
+                             ConfigParseState &state,
+                             QString &err);
+    bool _parseServerKey(const QString &opt, QString val, ConfigParseState &state);
+    void _parseConfigKey(const QString &opt,
+                         const QString &val,
+                         ConfigParseState &state,
+                         QString &err);
+    void _readConfigToolPath(const QString &key,
+                             const QString &sourceKey,
+                             const QStringList &kinds,
+                             QString &tool,
+                             externaltool::PathMode &mode,
+                             QString &path,
+                             bool explicitMode,
+                             const QString &toolArgs,
+                             bool requested);
+    void _scanConfigLanguage(QFile &file);
+    void _readConfigFile(const QFileInfo &fileInfo, ConfigParseState &state, QString &err);
+    void _settleConfigToolNames(ConfigParseState &state);
+    bool _resolveConfigTools(const ConfigParseState &state);
+    void _validateConfigPar2Args(bool par2Requested);
+    void _applyConfigVpnProfiles(ConfigParseState &state);
+    //! \a isDefaultConfig tells the file saveConfig() writes from a -c one:
+    //! only the former is remembered for the merge, and asking
+    //! PathHelper::configFilePath() here would create the folder a read-only
+    //! invocation must leave alone.
+    QString _parseConfig(const QString &configPath, bool isDefaultConfig = false);
+    //! The value of the `obfuscate` config key for the current settings.
+    QString _obfuscationKinds() const;
 
     //! Tell the user about the config directory adopted at startup by
     //! PathHelper::migrateAppNamedConfigDirIfNeeded(). The GUI adoption happens
@@ -848,7 +1134,7 @@ QString NgPost::groups() const
 QStringList NgPost::getPostingGroups() const
 {
     if (_groupPolicy == GROUP_POLICY::EACH_POST && _nbGroups > 1)
-        return QStringList(_grpList.at(std::rand() % _nbGroups));
+        return QStringList(_grpList.at(QRandomGenerator::global()->bounded(_nbGroups)));
     else
         return _grpList;
 }
@@ -874,13 +1160,29 @@ bool NgPost::nzbCheck() const
     return _nzbCheck != nullptr;
 }
 
+inline par2::Tool NgPost::par2ToolInUse() const
+{
+    if (_par2ToolFallback != par2::Tool::Auto)
+        return _par2ToolFallback;
+    return _par2Tool == par2::Tool::Auto ? par2::detectTool(_par2Path) : _par2Tool;
+}
+inline QString NgPost::par2ArgsConfigured() const
+{
+    return _par2ArgsCustom.isEmpty() ? _par2Args : _par2ArgsCustom;
+}
+inline QString NgPost::par2ArgsInUse() const
+{
+    // An engine other than the configured one cannot be given the configured
+    // switches: par2j reads /switches where the other two read -switches.
+    return _par2ToolFallback == par2::Tool::Auto ? par2ArgsConfigured() : QString();
+}
 inline bool NgPost::useParPar() const
 {
-    return _par2Path.toLower().contains("parpar");
+    return par2ToolInUse() == par2::Tool::ParPar;
 }
 inline bool NgPost::useMultiPar() const
 {
-    return _par2Path.toLower().contains("par2j");
+    return par2ToolInUse() == par2::Tool::MultiPar;
 }
 
 inline bool NgPost::lastPostingStartCanceled() const
@@ -919,7 +1221,7 @@ int NgPost::getSocketTimeout() const
 }
 QString NgPost::nzbPath() const
 {
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
     if (_nzbPath.isEmpty())
         return _nzbName;
     else
@@ -996,7 +1298,7 @@ QString NgPost::randomFrom(ushort length) const
 
 std::string NgPost::randomStdFrom(ushort length)
 {
-    const std::string sRandomAlphabet = "abcdefghijklmnopqrstuvwxyz";
+    const std::string lowercaseAlphabet = "abcdefghijklmnopqrstuvwxyz";
     const std::vector<std::string> tlds = {
         ".com", ".net", ".org", ".io", ".us", ".uk", ".de", ".jp", ".fr", ".au",
         ".ca", ".cn", ".es", ".it", ".nl", ".ru", ".ch", ".se", ".no", ".in",
@@ -1005,7 +1307,7 @@ std::string NgPost::randomStdFrom(ushort length)
         ".ro", ".hu", ".ie", ".il", ".th", ".sa", ".ae", ".is", ".pk", ".vn"
     };
 
-    size_t nbLetters = sRandomAlphabet.length();
+    size_t nbLetters = lowercaseAlphabet.length();
 
     std::random_device rd;
     std::mt19937 engine(rd());
@@ -1016,12 +1318,12 @@ std::string NgPost::randomStdFrom(ushort length)
     std::string signature;
 
     for (size_t i = 0; i < length; ++i)
-        randomFrom.push_back(sRandomAlphabet[distAlphabet(engine)]);
+        randomFrom.push_back(lowercaseAlphabet[distAlphabet(engine)]);
 
     randomFrom.push_back('@');
 
     for (size_t i = 0; i < length; ++i)
-        signature.push_back(sRandomAlphabet[distAlphabet(engine)]);
+        signature.push_back(lowercaseAlphabet[distAlphabet(engine)]);
 
     randomFrom.append(signature);
 

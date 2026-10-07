@@ -26,6 +26,7 @@ class NzbCheck;
 #include <QObject>
 #include <QSslError>
 #include <QTcpSocket>
+#include <QTimer>
 class QSslSocket;
 class QByteArray;
 
@@ -34,6 +35,18 @@ class NntpCheckCon : public QObject
     Q_OBJECT
 
 private:
+    //! Either report this connection finished, or bring it back for another
+    //! try when there is still work and budget left.
+    void _finishOrRetry();
+
+    //! Write a command and arm the watchdog. Every write goes through here:
+    //! a command sent without arming is a command that can hang for ever.
+    //! Send one command, already serialised by Nntp. An empty array is that
+    //! serialiser's refusal and never reaches the socket. There is deliberately
+    //! no raw overload beside it: every command on this connection is built in
+    //! one place, so exactly one CRLF ends each of them.
+    void _send(QByteArray const &cmd);
+
     enum class PostingState {
         NOT_CONNECTED = 0,
         CONNECTED,
@@ -44,18 +57,27 @@ private:
     };
 
     NzbCheck *const _nzbCheck;
-    const int _id;                      //!< connection id
+    const int _conId;                   //!< connection id
     const NntpServerParams &_srvParams; //!< server parameters
 
-    QTcpSocket *_socket; //!< Real TCP socket
+    //! Owned, without a Qt parent on purpose: created by onStartConnection() in
+    //! this connection's thread, released by its close paths with deleteLater() and
+    //! nulled, so a queued event can never reach a deleted socket. Not a
+    //! unique_ptr: a QObject living in another thread must not be deleted at once.
+    QTcpSocket *_socket;
     bool _isConnected;   //!< to avoid to rely on iSocket && iSocket->isOpen()
 
     PostingState _postingState;
     QString _currentArticle;
+    ushort  _nbRetries;   //!< reconnections already spent by this connection
+    ushort  _nbPar2Waits; //!< polls spent waiting for the PAR2 phase to close
+
+    static const int sPar2WaitMs = 25; //!< how long to idle between those polls
+    QTimer  _watchdog;  //!< fires when the server has gone silent for too long
 
 public:
     NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &srvParams);
-    ~NntpCheckCon();
+    ~NntpCheckCon() override;
 
 signals:
     void startConnection();
@@ -72,6 +94,7 @@ public slots:
 
     void onConnected();
     void onEncrypted();
+    void onWatchdogTimeout();
 
     void onDisconnected(); //!< Handle disconnection
 

@@ -42,14 +42,17 @@
 
 NntpConnection::NntpConnection(NgPost *ngPost, int id, const NntpServerParams &srvParams)
     : QObject()
-    , _id(id)
+    , _conId(id)
     , _srvParams(srvParams)
     , _socket(nullptr)
     , _isConnected(false)
-    , _logPrefix(QString("NntpCon #%1").arg(_id))
+    , _logPrefix(QString("NntpCon #%1").arg(_conId))
     , _postingState(PostingState::NOT_CONNECTED)
     , _currentArticle(nullptr)
+    , _currentArticlePreserved(false)
     , _nbDisconnected(0)
+    , _authRejected(false)
+    , _becameReady(false)
     , _ngPost(ngPost)
     , _poster(nullptr)
 #ifdef __USE_CONNECTION_TIMEOUT__
@@ -82,22 +85,7 @@ NntpConnection::~NntpConnection()
 
     // this should already have been triggered as the sockets lives in another thread
     if (_socket) {
-        disconnect(_socket, &QAbstractSocket::disconnected, this, &NntpConnection::onDisconnected);
-        disconnect(_socket, &QIODevice::readyRead, this, &NntpConnection::onReadyRead);
-        disconnect(_socket,
-                   SIGNAL(errorOccurred(QAbstractSocket::SocketError)),
-                   this,
-                   SLOT(onErrors(QAbstractSocket::SocketError)));
-        if (_srvParams.useSSL)
-            disconnect(_socket,
-                       SIGNAL(sslErrors(QList<QSslError>)),
-                       this,
-                       SLOT(onSslErrors(QList<QSslError>)));
-
-        _socket->disconnectFromHost();
-        if (_socket->state() != QAbstractSocket::UnconnectedState)
-            _socket->waitForDisconnected();
-        deleteSocket();
+        _shutdownSocket();
     }
 #ifdef __USE_CONNECTION_TIMEOUT__
     if (_timeout)
@@ -110,6 +98,14 @@ void NntpConnection::onStartConnection()
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
     _log("Starting connection...");
 #endif
+    // A reconnect signal can already be queued when a user/VPN pause publishes
+    // its admission barrier. Do not even create a transport in that window;
+    // resume() will emit a fresh startConnection once the route is healthy.
+    if (_poster && _poster->isPaused())
+        return;
+
+    _lastTransportError.clear();
+    _authRejected = false;
     if (_srvParams.useSSL)
         _socket = new QSslSocket();
     else
@@ -212,7 +208,7 @@ connect_done:
 void NntpConnection::onKillConnection()
 {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
-    qDebug() << "[killConnection] #" << _id;
+    qDebug() << "[killConnection] #" << _conId;
 #endif
 #ifdef __USE_CONNECTION_TIMEOUT__
     if (_timeout)
@@ -223,35 +219,63 @@ void NntpConnection::onKillConnection()
         if (_ngPost->debugMode())
             _log("Killing connection..");
 
-        disconnect(_socket, &QAbstractSocket::disconnected, this, &NntpConnection::onDisconnected);
-        disconnect(_socket, &QIODevice::readyRead, this, &NntpConnection::onReadyRead);
-        disconnect(_socket,
-                   SIGNAL(errorOccurred(QAbstractSocket::SocketError)),
-                   this,
-                   SLOT(onErrors(QAbstractSocket::SocketError)));
-        if (_srvParams.useSSL)
-            disconnect(_socket,
-                       SIGNAL(sslErrors(QList<QSslError>)),
-                       this,
-                       SLOT(onSslErrors(QList<QSslError>)));
-
-        _socket->disconnectFromHost();
-        if (_socket->state() != QAbstractSocket::UnconnectedState)
-            _socket->waitForDisconnected();
-        deleteSocket();
-
-        // Pause/stop can cut an article after the socket write but before the
-        // server reply. Treat it like the other ambiguous network exits.
-        if (_currentArticle) {
-            _currentArticle->nntpFile()->markArticleUnknown(
-                _currentArticle,
-                tr("connection killed before server confirmation"));
-            _currentArticle->genNewId();
-        }
+        _shutdownSocket();
     }
+    // Pause/stop can cut an article after the socket write but before the
+    // server reply. This is independent of whether the socket object survived
+    // until the queued kill slot ran.
+    _preserveCurrentArticleAfterTransportLoss(
+        tr("connection killed before server confirmation"));
 }
 
-void NntpConnection::_closeConnection()
+void NntpConnection::_preserveCurrentArticleAfterTransportLoss(QString const &reason)
+{
+    if (!_currentArticle)
+        return;
+
+    if (_currentArticlePreserved)
+        return;
+
+    // Persist the Message-ID used by the ambiguous attempt before replacing it:
+    // it is the identifier that may already exist on the server and is needed
+    // for diagnosis/history. A later resume must use a fresh Message-ID.
+    _currentArticle->nntpFile()->markArticleUnknown(_currentArticle, reason);
+    _currentArticlePreserved = true;
+    _currentArticle->genNewId();
+
+    // _currentArticle is deliberately kept. The reconnect path in
+    // onDisconnected() reposts exactly this article, so clearing it here would
+    // drop it. On the terminal paths the connection is finished either way and
+    // _finishPosting() closes every transport before the counters are read.
+}
+
+//! Stops the socket from reaching this connection: data, errors, TLS errors.
+void NntpConnection::_detachSocketSignals()
+{
+    disconnect(_socket, &QIODevice::readyRead, this, &NntpConnection::onReadyRead);
+    disconnect(_socket,
+               SIGNAL(errorOccurred(QAbstractSocket::SocketError)),
+               this,
+               SLOT(onErrors(QAbstractSocket::SocketError)));
+    if (_srvParams.useSSL)
+        disconnect(_socket,
+                   SIGNAL(sslErrors(QList<QSslError>)),
+                   this,
+                   SLOT(onSslErrors(QList<QSslError>)));
+}
+
+//! Detaches every socket signal, closes the connection and deletes the socket.
+void NntpConnection::_shutdownSocket()
+{
+    disconnect(_socket, &QAbstractSocket::disconnected, this, &NntpConnection::onDisconnected);
+    _detachSocketSignals();
+    _socket->disconnectFromHost();
+    if (_socket->state() != QAbstractSocket::UnconnectedState)
+        _socket->waitForDisconnected();
+    deleteSocket();
+}
+
+void NntpConnection::_closeConnection(bool dropTransport)
 {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
     _log("closeConnection");
@@ -263,43 +287,29 @@ void NntpConnection::_closeConnection()
         _timeout->stop();
 #endif
     if (_socket && _isConnected) {
-        disconnect(_socket, &QIODevice::readyRead, this, &NntpConnection::onReadyRead);
-        disconnect(_socket,
-                   SIGNAL(errorOccurred(QAbstractSocket::SocketError)),
-                   this,
-                   SLOT(onErrors(QAbstractSocket::SocketError)));
-        if (_srvParams.useSSL)
-            disconnect(_socket,
-                       SIGNAL(sslErrors(QList<QSslError>)),
-                       this,
-                       SLOT(onSslErrors(QList<QSslError>)));
+        _detachSocketSignals();
 
-        _socket->disconnectFromHost(); // we will end up in NntpConnect::onDisconnected
-    } else                             // wrong host info or network down
+        if (dropTransport) {
+            // A stalled or failed transport never flushes its write buffer:
+            // disconnectFromHost() would wait for it until TCP gives up.
+            // The test below is not redundant: abort() re-enters onDisconnected().
+            // cppcheck-suppress nullPointerRedundantCheck
+            _socket->abort();
+            // From a connected state abort() emits disconnected(), and
+            // onDisconnected() has already released the socket.
+            if (_socket)
+                onDisconnected();
+        } else {
+            _socket->disconnectFromHost(); // we will end up in NntpConnect::onDisconnected
+        }
+    } else // wrong host info or network down
     {
         _isConnected = false;
         if (_socket)
             deleteSocket();
 
-        if (_currentArticle && !_ngPost->tryResumePostWhenConnectionLost()) {
-#ifdef __DISP_ARTICLE_SERVER__
-            if (_ngPost->debugMode())
-                _log(
-                    tr("Article FAIL2: %1 (on %2)").arg(_currentArticle->id()).arg(_srvParams.host));
-#endif
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-            _poster->releaseArticle(_logPrefix, _currentArticle);
-#else
-            emit _currentArticle->failed(_currentArticle->size());
-#endif
-            _currentArticle = nullptr;
-        }
-        else if (_currentArticle) {
-            _currentArticle->nntpFile()->markArticleUnknown(
-                _currentArticle,
-                tr("connection closed before server confirmation"));
-            _currentArticle->genNewId();
-        }
+        _preserveCurrentArticleAfterTransportLoss(
+            tr("connection closed before server confirmation"));
         emit disconnected(this);
     }
 }
@@ -308,41 +318,39 @@ void NntpConnection::onDisconnected()
 {
     if (_socket) {
 #if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
-        _error("> disconnected");
+        // A peer disconnect is not by itself an application error: at the
+        // end of a successful post it is the expected transport lifecycle.
+        // Debug-only diagnostic -- the enclosing block is compiled out of
+        // release builds, where _error() therefore never ran either.
+        _log("> disconnected");
 #endif
         _isConnected = false;
 
         deleteSocket();
     }
-    if (_poster->isPosting() && _postingState != PostingState::NO_MORE_FILES
-        && _nbDisconnected++ < NntpArticle::nbMaxTrySending()) {
+    if (_poster->isPosting() && !_poster->isPaused() && _postingState != PostingState::NO_MORE_FILES
+        && !_authRejected && _nbDisconnected++ < NntpArticle::nbMaxTrySending()) {
         // Let's try to reconnect
-        _error(
-            tr("Connection lost, trying to reconnect! (nb disconnected: %1)").arg(_nbDisconnected));
-        if (_currentArticle) {
-            _currentArticle->nntpFile()->markArticleUnknown(
-                _currentArticle,
-                tr("connection lost before server confirmation"));
-            _currentArticle->genNewId();
-        }
+        const QString server = QString("%1:%2").arg(_srvParams.host).arg(_srvParams.port);
+        emit retryingConnection(
+            server,
+            QString("[%1] %2: %3 (%4)")
+                .arg(_logPrefix,
+                     server,
+                     tr("Connection lost, trying to reconnect! (nb disconnected: %1)")
+                         .arg(_nbDisconnected),
+                     _lastTransportError.isEmpty() ? tr("Remote connection closed")
+                                                   : _lastTransportError));
+        _preserveCurrentArticleAfterTransportLoss(
+            tr("connection lost before server confirmation"));
 
         emit startConnection();
     } else {
-        if (_currentArticle) {
-#ifdef __DISP_ARTICLE_SERVER__
-            if (_ngPost->debugMode())
-                _log(
-                    tr("Article FAIL3: %1 (on %2)").arg(_currentArticle->id()).arg(_srvParams.host));
-#endif
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-            _poster->releaseArticle(_logPrefix, _currentArticle);
-#else
-            emit _currentArticle->failed(_currentArticle->size());
-#endif
-            if (_ngPost->debugMode())
-                _error(tr("Closing connection, Failed Article: %1").arg(_currentArticle->str()));
-            _currentArticle = nullptr;
-        }
+        if (!_lastTransportError.isEmpty() && !_poster->isPaused()
+            && _postingState != PostingState::NO_MORE_FILES)
+            _error(_lastTransportError);
+        _preserveCurrentArticleAfterTransportLoss(
+            tr("connection lost before server confirmation"));
         emit disconnected(this);
     }
 }
@@ -394,15 +402,23 @@ void NntpConnection::onSslErrors(const QList<QSslError> &errors)
 
 void NntpConnection::onErrors(QAbstractSocket::SocketError)
 {
-    _error(QString("Error Socket: %1").arg(_socket->errorString()));
-    _closeConnection();
+    if (!_socket)
+        return;
+    _lastTransportError = QString("Error Socket: %1").arg(_socket->errorString());
+    // Established transports get a bounded retry in onDisconnected(). A
+    // recovered interruption is a diagnostic, not a permanently failed post.
+    if (!_isConnected)
+        _error(_lastTransportError);
+    _closeConnection(true);
 }
 
 #ifdef __USE_CONNECTION_TIMEOUT__
 void NntpConnection::onTimeout()
 {
-    _error(QString("Socket Timeout (%1 ms)").arg(_ngPost->getSocketTimeout()));
-    _closeConnection();
+    _lastTransportError = QString("Socket Timeout (%1 ms)").arg(_ngPost->getSocketTimeout());
+    if (!_isConnected)
+        _error(_lastTransportError);
+    _closeConnection(true);
 }
 #endif
 
@@ -419,196 +435,259 @@ void NntpConnection::onReadyRead()
         _log(QString("Data In: %1").arg(line.constData()));
 #endif
         if (_postingState == PostingState::SENDING_ARTICLE) {
-#if defined(__DEBUG__) && defined(LOG_POSTING_STEPS)
-            _log(QString("post response: %1").arg(line.constData()));
-#endif
-
-            if (strncmp(line.constData(), Nntp::getResponse(340), 3) == 0) {
-                _postingState = PostingState::WAITING_ANSWER;
-                _currentArticle->write(this, _ngPost->aticleSignature()); // This will be done async
-                if (_ngPost->dispPostingFile() && _currentArticle->isFirstArticle())
-                    emit _currentArticle->nntpFile()->startPosting();
-            } else {
-                //                if (++_nbErrors < NntpArticle::nbMaxTrySending())
-                //                {
-                //                    _socket->write(Nntp::POST);
-                //                    if (_ngPost->debugMode())
-                //                        _error(tr("ERROR on post command: %1").arg(line.constData()));
-                //                }
-                //                else
-                //                {
-                _postingState = PostingState::NOT_CONNECTED;
-                _error(tr("Closing Connection due to ERROR on post command: '%2' (%1 skipped)\n")
-                           .arg(_currentArticle->str())
-                           .arg(line.constData()));
-                //                    emit _currentArticle->failed(_currentArticle->size());
-                _closeConnection();
-                //                }
-            }
+            _handlePostResponse(line);
         } else if (_postingState == PostingState::WAITING_ANSWER) {
-            if (strncmp(line.constData(), Nntp::getResponse(240), 3) == 0) {
-                // Check if the server overwrite the Message-ID
-                // 240 <5ed10f42$0$7342$f56682d5@speedium.nl> Article posted
-                const char *lt = strchr(line.constData(), '<');
-                if (lt) {
-                    const char *gt = strchr(lt, '>');
-                    if (gt) {
-                        line[static_cast<int>(gt - line.constData())] = '\0';
-                        QString newMsgId(lt + 1);
-                        if (_ngPost->debugFull())
-                            _log(QString("the server has overwritten the Message-ID to : %1 "
-                                         "(article: %2)")
-                                     .arg(newMsgId)
-                                     .arg(_currentArticle->id()));
-                        _currentArticle->overwriteMsgId(newMsgId);
-                    }
-                }
-                _postingState = PostingState::IDLE;
-#if defined(__DEBUG__) && defined(LOG_POSTING_STEPS)
-                _log(tr("POSTED: %1").arg(_currentArticle->str()));
-#endif
-#ifdef __DISP_ARTICLE_SERVER__
-                if (_ngPost->debugMode())
-                    _log(tr("Article posted: %1 (on %2) %3")
-                             .arg(_currentArticle->id())
-                             .arg(_srvParams.host)
-                             .arg(line.constData()));
-#endif
-                emit _currentArticle->posted(_currentArticle->size());
-            } else {
-#if defined(__DEBUG__) && defined(LOG_POSTING_STEPS)
-                _error(tr("Error on posting article %1: %2")
-                           .arg(_currentArticle->id())
-                           .arg(line.constData()));
-#endif
-                if (_currentArticle->tryResend()) {
-                    _postingState = PostingState::SENDING_ARTICLE;
-                    _socket->write(Nntp::POST);
-                    if (_ngPost->debugMode())
-                        _log(tr("ReTry %1 (Error: '%2')")
-                                 .arg(_currentArticle->str())
-                                 .arg(line.constData()));
-                } else {
-                    _postingState = PostingState::IDLE;
-                    _error(tr("FAIL posting %1 (Error: '%2')")
-                               .arg(_currentArticle->str())
-                               .arg(line.constData()));
-#ifdef __DISP_ARTICLE_SERVER__
-                    if (_ngPost->debugMode())
-                        _log(tr("Article FAIL: %1 (on %2) %3")
-                                 .arg(_currentArticle->id())
-                                 .arg(_srvParams.host)
-                                 .arg(line.constData()));
-#endif
-
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-                    _poster->releaseArticle(_logPrefix, _currentArticle);
-#else
-                    emit _currentArticle->failed(_currentArticle->size());
-#endif
-                }
-            }
-            if (_postingState == PostingState::IDLE) {
-                _currentArticle = nullptr;
-                _sendNextArticle();
-            }
+            _handleArticleResponse(line);
         } else if (_postingState == PostingState::CONNECTED) {
-            // Check welcome message
-            if (strncmp(line.constData(), Nntp::getResponse(200), 3) != 0) {
-                QString err("Reading welcome message. Should start with 200... Server message: ");
-                err += line.constData();
-                if (_ngPost->debugMode())
-                    _error(err);
-                //#if defined(__DEBUG__) && defined(LOG_CONNECTION_ERRORS_BEFORE_EMIT_SIGNALS)
-                //                _error(err);
-                //#endif
-                emit errorConnecting(tr("[Connection #%1] Error connecting to server %2:%3")
-                                         .arg(_id)
-                                         .arg(_srvParams.host)
-                                         .arg(_srvParams.port));
-                _closeConnection();
-            } else {
-#if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
-                _log("> received Hello Message");
-#endif
-
-                // Start authentication : send user info
-                if (_srvParams.user.empty()) {
-                    _postingState = PostingState::IDLE;
-                    _sendNextArticle();
-                } else {
-                    _postingState = PostingState::AUTH_USER;
-
-                    std::string cmd(Nntp::AUTHINFO_USER);
-                    cmd += _srvParams.user;
-                    cmd += Nntp::ENDLINE;
-                    _socket->write(cmd.c_str());
-                }
-            }
+            if (!_handleWelcome(line))
+                return;
         } else if (_postingState == PostingState::AUTH_USER) {
-            // validate the reply
-            if (strncmp(line.constData(), Nntp::getResponse(381), 2) != 0) {
-                QString err("Wrong Authentication: response from '");
-                err += Nntp::AUTHINFO_USER;
-                err += "' should start with 38... resp: ";
-                err += line.constData();
-                if (_ngPost->debugMode())
-                    _error(err);
-                //#if defined(__DEBUG__) && defined(LOG_CONNECTION_ERRORS_BEFORE_EMIT_SIGNALS)
-                //                _error(err);
-                //#endif
-                emit errorConnecting(tr("[Connection #%1] Error sending user '%4' to server %2:%3")
-                                         .arg(_id)
-                                         .arg(_srvParams.host)
-                                         .arg(_srvParams.port)
-                                         .arg(_srvParams.user.c_str()));
-                _closeConnection();
-            } else {
-#if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
-                _log("> AUTHINFO_USER succeed");
-#endif
-
-                // Continue authentication : send pass info
-                _postingState = PostingState::AUTH_PASS;
-
-                std::string cmd(Nntp::AUTHINFO_PASS);
-                cmd += _srvParams.pass;
-                cmd += Nntp::ENDLINE;
-                _socket->write(cmd.c_str());
-            }
+            if (!_handleAuthUser(line))
+                return;
         } else if (_postingState == PostingState::AUTH_PASS) {
-            if (strncmp(line.constData(), Nntp::getResponse(281), 2) != 0) {
-                QString err("Wrong Authentication: response from '");
-                err += Nntp::AUTHINFO_PASS;
-                err += "' should start with 28... resp: ";
-                err += line.constData();
-                if (_ngPost->debugMode())
-                    _error(err);
-                //#if defined(__DEBUG__) && defined(LOG_CONNECTION_ERRORS_BEFORE_EMIT_SIGNALS)
-                //                _error(err);
-                //#endif
-                emit errorConnecting(tr("[Connection #%1] Error authentication to server %2:%3 "
-                                        "with user '%4'")
-                                         .arg(_id)
-                                         .arg(_srvParams.host)
-                                         .arg(_srvParams.port)
-                                         .arg(_srvParams.user.c_str()));
-                _closeConnection();
-            } else {
-#if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
-                _log("> AUTHINFO_PASS succeed => ready to POST \\o/");
+            _handleAuthPass(line);
+        }
+    }
+}
+
+void NntpConnection::_handlePostResponse(QByteArray &line)
+{
+#if defined(__DEBUG__) && defined(LOG_POSTING_STEPS)
+    _log(QString("post response: %1").arg(line.constData()));
 #endif
-                _postingState = PostingState::IDLE;
-                _sendNextArticle();
+
+    if (strncmp(line.constData(), Nntp::getResponse(340), 3) == 0) {
+        _postingState = PostingState::WAITING_ANSWER;
+        // A body is about to go over the wire. It is a new ambiguous
+        // attempt even when this article was preserved on a previous
+        // connection and retained for retry.
+        _currentArticlePreserved = false;
+        _currentArticle->write(this, _ngPost->aticleSignature()); // This will be done async
+        if (_ngPost->dispPostingFile() && _currentArticle->isFirstArticle())
+            emit _currentArticle->nntpFile()->startPosting();
+    } else {
+        //                if (++_nbErrors < NntpArticle::nbMaxTrySending())
+        //                {
+        //                    _socket->write(Nntp::POST);
+        //                    if (_ngPost->debugMode())
+        //                        _error(tr("ERROR on post command: %1").arg(line.constData()));
+        //                }
+        //                else
+        //                {
+        _postingState = PostingState::NOT_CONNECTED;
+        _error(tr("Closing Connection due to ERROR on post command: '%2' (%1 skipped)\n")
+                   .arg(_currentArticle->str())
+                   .arg(line.constData()));
+        //                    emit _currentArticle->failed(_currentArticle->size());
+        _closeConnection();
+        //                }
+    }
+}
+
+void NntpConnection::_handleArticleResponse(QByteArray &line)
+{
+    if (strncmp(line.constData(), Nntp::getResponse(240), 3) == 0) {
+        // Check if the server overwrite the Message-ID
+        // 240 <5ed10f42$0$7342$f56682d5@speedium.nl> Article posted
+        const char *lt = strchr(line.constData(), '<');
+        if (lt) {
+            const char *gt = strchr(lt, '>');
+            if (gt) {
+                line[static_cast<int>(gt - line.constData())] = '\0';
+                QString newMsgId(lt + 1);
+                if (_ngPost->debugFull())
+                    _log(QString("the server has overwritten the Message-ID to : %1 "
+                                 "(article: %2)")
+                             .arg(newMsgId)
+                             .arg(_currentArticle->id()));
+                _currentArticle->overwriteMsgId(newMsgId);
             }
         }
+        _postingState = PostingState::IDLE;
+#if defined(__DEBUG__) && defined(LOG_POSTING_STEPS)
+        _log(tr("POSTED: %1").arg(_currentArticle->str()));
+#endif
+#ifdef __DISP_ARTICLE_SERVER__
+        if (_ngPost->debugMode())
+            _log(tr("Article posted: %1 (on %2) %3")
+                     .arg(_currentArticle->id())
+                     .arg(_srvParams.host)
+                     .arg(line.constData()));
+#endif
+        emit _currentArticle->posted(_currentArticle->size());
+    } else {
+#if defined(__DEBUG__) && defined(LOG_POSTING_STEPS)
+        _error(
+            tr("Error on posting article %1: %2").arg(_currentArticle->id()).arg(line.constData()));
+#endif
+        if (_currentArticle->tryResend()) {
+            _postingState = PostingState::SENDING_ARTICLE;
+            _socket->write(Nntp::POST);
+            if (_ngPost->debugMode())
+                _log(
+                    tr("ReTry %1 (Error: '%2')").arg(_currentArticle->str()).arg(line.constData()));
+        } else {
+            _postingState = PostingState::IDLE;
+            _error(tr("FAIL posting %1 (Error: '%2')")
+                       .arg(_currentArticle->str())
+                       .arg(line.constData()));
+#ifdef __DISP_ARTICLE_SERVER__
+            if (_ngPost->debugMode())
+                _log(tr("Article FAIL: %1 (on %2) %3")
+                         .arg(_currentArticle->id())
+                         .arg(_srvParams.host)
+                         .arg(line.constData()));
+#endif
+
+            // A complete NNTP reply is definitive. Once this
+            // article's retry budget is exhausted it is failed; only
+            // transport loss without a final reply is classified as
+            // unknown.
+            emit _currentArticle->failed(_currentArticle->size());
+        }
+    }
+    if (_postingState == PostingState::IDLE) {
+        _currentArticle = nullptr;
+        _currentArticlePreserved = false;
+        _sendNextArticle();
+    }
+}
+
+bool NntpConnection::_handleWelcome(QByteArray &line)
+{
+    // Check welcome message
+    if (strncmp(line.constData(), Nntp::getResponse(200), 3) != 0) {
+        QString err("Reading welcome message. Should start with 200... Server message: ");
+        err += line.constData();
+        if (_ngPost->debugMode())
+            _error(err);
+        //#if defined(__DEBUG__) && defined(LOG_CONNECTION_ERRORS_BEFORE_EMIT_SIGNALS)
+        //                _error(err);
+        //#endif
+        emit errorConnecting(tr("[Connection #%1] Error connecting to server %2:%3")
+                                 .arg(_conId)
+                                 .arg(_srvParams.host)
+                                 .arg(_srvParams.port));
+        _closeConnection();
+    } else {
+#if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
+        _log("> received Hello Message");
+#endif
+
+        // Start authentication : send user info
+        if (_srvParams.user.empty()) {
+            _postingState = PostingState::IDLE;
+            _becameReady = true;
+            _sendNextArticle();
+        } else {
+            _postingState = PostingState::AUTH_USER;
+
+            QByteArray const cmd = Nntp::authInfoUser(_srvParams.user);
+            if (cmd.isEmpty()) {
+                emit errorConnecting(tr("[Connection #%1] The configured user for %2:%3 contains a "
+                                        "line break and cannot be sent")
+                                         .arg(_conId)
+                                         .arg(_srvParams.host)
+                                         .arg(_srvParams.port));
+                _authRejected = true;
+                _closeConnection();
+                return false;
+            }
+            _socket->write(cmd);
+        }
+    }
+    return true;
+}
+
+bool NntpConnection::_handleAuthUser(QByteArray &line)
+{
+    // validate the reply
+    if (strncmp(line.constData(), Nntp::getResponse(381), 2) != 0) {
+        QString err("Wrong Authentication: response from '");
+        err += Nntp::AUTHINFO_USER;
+        err += "' should start with 38... resp: ";
+        err += line.constData();
+        if (_ngPost->debugMode())
+            _error(err);
+        //#if defined(__DEBUG__) && defined(LOG_CONNECTION_ERRORS_BEFORE_EMIT_SIGNALS)
+        //                _error(err);
+        //#endif
+        emit errorConnecting(tr("[Connection #%1] Error sending user '%4' to server %2:%3")
+                                 .arg(_conId)
+                                 .arg(_srvParams.host)
+                                 .arg(_srvParams.port)
+                                 .arg(_srvParams.user.c_str()));
+        _authRejected = true;
+        _closeConnection();
+    } else {
+#if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
+        _log("> AUTHINFO_USER succeed");
+#endif
+
+        // Continue authentication : send pass info
+        _postingState = PostingState::AUTH_PASS;
+
+        QByteArray const cmd = Nntp::authInfoPass(_srvParams.pass);
+        if (cmd.isEmpty()) {
+            emit errorConnecting(tr("[Connection #%1] The configured password for %2:%3 contains a "
+                                    "line break and cannot be sent")
+                                     .arg(_conId)
+                                     .arg(_srvParams.host)
+                                     .arg(_srvParams.port));
+            _authRejected = true;
+            _closeConnection();
+            return false;
+        }
+        _socket->write(cmd);
+    }
+    return true;
+}
+
+void NntpConnection::_handleAuthPass(QByteArray &line)
+{
+    if (strncmp(line.constData(), Nntp::getResponse(281), 2) != 0) {
+        QString err("Wrong Authentication: response from '");
+        err += Nntp::AUTHINFO_PASS;
+        err += "' should start with 28... resp: ";
+        err += line.constData();
+        if (_ngPost->debugMode())
+            _error(err);
+        //#if defined(__DEBUG__) && defined(LOG_CONNECTION_ERRORS_BEFORE_EMIT_SIGNALS)
+        //                _error(err);
+        //#endif
+        emit errorConnecting(tr("[Connection #%1] Error authentication to server %2:%3 "
+                                "with user '%4'")
+                                 .arg(_conId)
+                                 .arg(_srvParams.host)
+                                 .arg(_srvParams.port)
+                                 .arg(_srvParams.user.c_str()));
+        _authRejected = true;
+        _closeConnection();
+    } else {
+#if defined(__DEBUG__) && defined(LOG_CONNECTION_STEPS)
+        _log("> AUTHINFO_PASS succeed => ready to POST \\o/");
+#endif
+        _postingState = PostingState::IDLE;
+        _becameReady = true;
+        _sendNextArticle();
     }
 }
 
 void NntpConnection::_sendNextArticle()
 {
-    if (!_currentArticle) // in case of error and reconnection, we repost the _currentArticle
+    if (_poster->isPaused())
+        return;
+
+    if (!_currentArticle) { // in case of error and reconnection, we repost the _currentArticle
         _currentArticle = _poster->getNextArticle(_logPrefix);
+        _currentArticlePreserved = false;
+    }
+
+    // Pause can race with getNextArticle() on another thread. Hold an article
+    // already dequeued for the later resume, and treat a null result as an
+    // admission barrier rather than end-of-input.
+    if (_poster->isPaused())
+        return;
 
     if (_currentArticle) {
         _postingState = PostingState::SENDING_ARTICLE;

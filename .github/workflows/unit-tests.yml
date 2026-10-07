@@ -1,6 +1,7 @@
 name: Unit Tests
 
 on:
+  workflow_call:
   push:
   pull_request:
   workflow_dispatch:
@@ -9,26 +10,92 @@ on:
 # matters and holds a runner. Release publishing keeps its own group and is
 # deliberately never cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: unit-tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   linux:
     name: Linux unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libsecret-1-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libsecret-1-dev shellcheck bubblewrap
+
+      # Ubuntu 24.04 runners restrict unprivileged user namespaces through
+      # AppArmor, so bwrap fails with "setting up uid map: Permission denied".
+      # tst_CliParser needs bwrap to isolate the Qt TLS plugins, and its pinned
+      # test count rejects a silent skip.
+      - name: Allow unprivileged user namespaces for bwrap
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Verify TLS plugin isolation prerequisite
+        run: bwrap --ro-bind / / --dev-bind /dev /dev --proc /proc true
+
+      - name: Validate privileged VPN helper
+        run: |
+          scripts=(
+            src/vpn/scripts/ngpost-vpn-helper.sh
+            src/vpn/scripts/ngpost-vpn-install.sh
+            src/vpn/scripts/ngpost-vpn-uninstall.sh
+            tests/vpn/test_helper_lease.sh
+          )
+          for script in "${scripts[@]}"; do
+            bash -n "$script"
+          done
+          shellcheck "${scripts[@]}"
+
+      - name: Test SHA-256 updater and release manifests
+        run: |
+          python3 -m unittest discover -s tests/security -v
+
+      - name: Test privileged helper migration and Polkit identity validation
+        run: |
+          docker run --rm --network none --memory=256m --cpus=1 \
+            -e NGPOST_DISPOSABLE_UPGRADE_TEST=1 \
+            -v "$PWD:/audit-input:ro" --entrypoint python3 \
+            python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea \
+            /audit-input/tests/security/test_helper_upgrade.py
+
+      - name: Verify VPN helper fails closed before network mutation
+        run: |
+          set +e
+          persistent_output=$(docker run --rm \
+            -v "$PWD/src/vpn/scripts/ngpost-vpn-helper.sh:/helper:ro" \
+            ubuntu:24.04 bash /helper cleanup-stale --protocol 2 --nonblocking)
+          persistent_status=$?
+          readonly_output=$(docker run --rm --tmpfs /run:ro \
+            -v "$PWD/src/vpn/scripts/ngpost-vpn-helper.sh:/helper:ro" \
+            ubuntu:24.04 bash /helper cleanup-stale --protocol 2 --nonblocking)
+          readonly_status=$?
+          set -e
+
+          test "$persistent_status" -eq 1
+          test "$(printf '%s\n' "$persistent_output" | wc -l)" -eq 2
+          printf '%s\n' "$persistent_output" | grep -Fxq 'PROTOCOL 2'
+          printf '%s\n' "$persistent_output" | grep -Eq \
+            '^RUNTIME_NOT_VOLATILE path=/run fstype=[^ ]+ detail='
+
+          test "$readonly_status" -eq 1
+          test "$(printf '%s\n' "$readonly_output" | wc -l)" -eq 2
+          printf '%s\n' "$readonly_output" | grep -Fxq 'PROTOCOL 2'
+          printf '%s\n' "$readonly_output" | grep -Eq \
+            '^LEASE_UNAVAILABLE path=/run/lock detail='
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
           modules: 'qtcharts'
           cache: true
+
+      - name: Check translation extraction
+        run: python3 .github/scripts/check-translations.py
 
       - name: Build QtKeychain
         run: |
@@ -47,14 +114,23 @@ jobs:
           for ts in lang/ngPost_*.ts; do
             lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
           done
-          qmake ngPost.pro CONFIG+=release
+          qmake ngPost.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(nproc)"
 
       - name: Build unit tests
         run: |
           cd tests/unit
-          qmake unit.pro CONFIG+=release
+          qmake unit.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(nproc)"
+
+      - name: Bundle the pinned PAR2 tools
+        run: |
+          # tst_Par2Settings creates par2 files with the real tools, damages a
+          # block and repairs it. Those rows QSKIP when no tool is on PATH,
+          # which is how they went unexecuted on every runner: give them the
+          # exact builds the packages ship, from the shared pin list.
+          ./.github/scripts/fetch-par2-tools.sh "$RUNNER_TEMP/par2-tools"
+          echo "$RUNNER_TEMP/par2-tools" >> "$GITHUB_PATH"
 
       - name: Run unit tests
         env:
@@ -65,7 +141,7 @@ jobs:
 
       - name: Upload logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: unit-test-logs-linux
           path: |
@@ -79,10 +155,10 @@ jobs:
     # Qt 6.8.2/qmake links AGL; the macOS 26 SDK no longer ships it.
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.2'
           arch: 'clang_64'
@@ -106,14 +182,23 @@ jobs:
           for ts in lang/ngPost_*.ts; do
             lrelease "$ts" -qm "resources/lang/$(basename "$ts" .ts).qm"
           done
-          qmake ngPost.pro CONFIG+=release
+          qmake ngPost.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(sysctl -n hw.ncpu)"
 
       - name: Build unit tests
         run: |
           cd tests/unit
-          qmake unit.pro CONFIG+=release
+          qmake unit.pro CONFIG+=release CONFIG+=ngpost_werror
           make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Bundle the pinned PAR2 tools
+        run: |
+          # tst_Par2Settings creates par2 files with the real tools, damages a
+          # block and repairs it. Those rows QSKIP when no tool is on PATH,
+          # which is how they went unexecuted on every runner: give them the
+          # exact builds the packages ship, from the shared pin list.
+          ./.github/scripts/fetch-par2-tools.sh "$RUNNER_TEMP/par2-tools"
+          echo "$RUNNER_TEMP/par2-tools" >> "$GITHUB_PATH"
 
       - name: Run unit tests
         env:
@@ -124,7 +209,7 @@ jobs:
 
       - name: Upload logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: unit-test-logs-macos
           path: |
@@ -137,13 +222,13 @@ jobs:
     name: Windows MSVC unit tests
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Enable Developer Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1.13.0
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           aqtversion: '==3.2.0'
           version: '6.8.2'
@@ -171,15 +256,25 @@ jobs:
           Get-ChildItem lang/ngPost_*.ts | ForEach-Object {
             lrelease $_.FullName -qm "resources/lang/$($_.BaseName).qm"
           }
-          qmake ngPost.pro -spec win32-msvc CONFIG+=release
+          qmake ngPost.pro -spec win32-msvc CONFIG+=release CONFIG+=ngpost_werror
           nmake
 
       - name: Build unit tests
         shell: pwsh
         run: |
           cd tests/unit
-          qmake unit.pro -spec win32-msvc CONFIG+=release
+          qmake unit.pro -spec win32-msvc CONFIG+=release CONFIG+=ngpost_werror
           nmake
+
+      - name: Bundle the pinned PAR2 tools
+        shell: pwsh
+        run: |
+          # par2j is Windows-only, so the MultiPar row of tst_Par2Settings is
+          # compiled here and nowhere else -- and it QSKIPped on every runner
+          # for want of a binary, leaving that backend with no execution
+          # coverage at all. Same pin list as the packages.
+          .\.github\scripts\fetch-par2-tools.ps1 -Destination "$env:RUNNER_TEMP\par2-tools"
+          "$env:RUNNER_TEMP\par2-tools" | Add-Content -Path $env:GITHUB_PATH -Encoding utf8
 
       - name: Run unit tests
         env:
@@ -189,9 +284,39 @@ jobs:
         run: |
           bash .github/scripts/run-qt-tests.sh tests/unit "unit"
 
+      - name: Parse Windows VPN scripts
+        shell: pwsh
+        run: |
+          Get-ChildItem src/vpn/scripts/win/*.ps1 | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+          }
+
+      # Parsing proves the syntax only. Windows PowerShell 5.1 is what runs the
+      # elevated scripts, so the analysis runs there too. Rules and the reasons
+      # for the two excluded ones: PSScriptAnalyzerSettings.psd1.
+      - name: Analyze PowerShell scripts
+        shell: powershell
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
+          Import-Module PSScriptAnalyzer -RequiredVersion 1.25.0
+          $scripts = git ls-files '*.ps1'
+          $findings = $scripts | ForEach-Object {
+            Invoke-ScriptAnalyzer -Path $_ -Settings ./PSScriptAnalyzerSettings.psd1
+          }
+          $findings | Format-Table ScriptName, Line, RuleName, Message -AutoSize -Wrap | Out-String -Width 200
+          if ($findings) { throw "PSScriptAnalyzer: $(@($findings).Count) finding(s)" }
+
+      - name: Test Windows WireGuard staging and profile policy
+        shell: powershell
+        run: ./tests/security/test_windows_wireguard.ps1
+
       - name: Upload logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: unit-test-logs-windows
           path: |

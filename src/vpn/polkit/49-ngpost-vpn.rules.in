@@ -1,7 +1,8 @@
 // Auto-installed by ngpost-vpn-install. Grants polkit.Result.YES to pkexec
 // for the helper script — but ONLY when:
 //   * the requested program is the exact installed absolute path
-//   * the invoking subject is the user who ran the install
+//   * the invoking subject is the user resolved from the installing caller UID
+// The installer validates the name before inserting it into this JS string.
 //
 // This means Connect/Disconnect/Cleanup operations don't prompt. The strict
 // path scope ensures an attacker cannot swap in their own script: /var/lib/
@@ -11,7 +12,7 @@
 polkit.addRule(function(action, subject) {
     if (action.id == "org.freedesktop.policykit.exec" &&
         action.lookup("program") == "/var/lib/ngpost/ngpost-vpn-helper.sh" &&
-        subject.user == "@@USER@@") {
+        subject.user === "@@USER@@") {
         return polkit.Result.YES;
     }
 });

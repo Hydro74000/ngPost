@@ -29,13 +29,22 @@
 NntpCheckCon::NntpCheckCon(NzbCheck *nzbCheck, int id, const NntpServerParams &srvParams)
     : QObject()
     , _nzbCheck(nzbCheck)
-    , _id(id)
+    , _conId(id)
     , _srvParams(srvParams)
     , _socket(nullptr)
     , _isConnected(false)
     , _postingState(PostingState::NOT_CONNECTED)
     , _currentArticle()
+    , _nbRetries(0)
+    , _nbPar2Waits(0)
+    , _watchdog()
 {
+    // A server that accepts the TCP connection and then says nothing used to
+    // hold the whole check open for ever: nothing in this class ever looked at
+    // the socket timeout.
+    _watchdog.setSingleShot(true);
+    connect(&_watchdog, &QTimer::timeout, this, &NntpCheckCon::onWatchdogTimeout);
+
     connect(this,
             &NntpCheckCon::startConnection,
             this,
@@ -118,6 +127,7 @@ void NntpCheckCon::onStartConnection()
             Qt::DirectConnection);
 
     // Resolve through a DNS socket bound to the tunnel IP.
+    bool connecting = false;
     if (routeViaVpn) {
         if (vpn && !vpn->dnsServer().isNull()) {
             QString dnsErr;
@@ -130,19 +140,36 @@ void NntpCheckCon::onStartConnection()
                     static_cast<QSslSocket *>(_socket)
                         ->setPeerVerifyName(_srvParams.host);
                 _socket->connectToHost(records.first(), _srvParams.port);
-                return;
+                connecting = true;
+            } else {
+                _nzbCheck->error(
+                        tr("VPN DNS lookup failed for %1 via %2: %3 — falling back to system DNS")
+                                .arg(_srvParams.host,
+                                     vpn->dnsServer().toString(),
+                                     dnsErr.isEmpty() ? tr("unknown error") : dnsErr));
             }
-            _nzbCheck->error(tr("VPN DNS lookup failed for %1 via %2: %3 — falling back to system DNS")
-                                 .arg(_srvParams.host,
-                                      vpn->dnsServer().toString(),
-                                      dnsErr.isEmpty() ? tr("unknown error") : dnsErr));
         }
     }
-    _socket->connectToHost(_srvParams.host, _srvParams.port);
+    if (!connecting)
+        _socket->connectToHost(_srvParams.host, _srvParams.port);
+
+    // Single arming point. The VPN branch used to return from the middle of
+    // this function, leaving a tunnelled check with no watchdog at all.
+    _watchdog.start(_nzbCheck->socketTimeOut());
+}
+
+void NntpCheckCon::_send(QByteArray const &cmd)
+{
+    if (!_socket || cmd.isEmpty())
+        return;
+    _socket->write(cmd);
+    // Anything we ask for, we wait for -- with a deadline.
+    _watchdog.start(_nzbCheck->socketTimeOut());
 }
 
 void NntpCheckCon::onKillConnection()
 {
+    _watchdog.stop();
     if (_socket) {
         disconnect(_socket, &QIODevice::readyRead, this, &NntpCheckCon::onReadyRead);
         disconnect(_socket, &QAbstractSocket::disconnected, this, &NntpCheckCon::onDisconnected);
@@ -173,7 +200,7 @@ void NntpCheckCon::onConnected()
         emit sslSock->startClientEncryption();
     } else {
         if (_nzbCheck->debugMode())
-            _nzbCheck->log(tr("[Con #%1] Connected").arg(_id));
+            _nzbCheck->log(tr("[Con #%1] Connected").arg(_conId));
 
         _postingState = PostingState::CONNECTED;
         // We should receive the Hello Message
@@ -183,7 +210,7 @@ void NntpCheckCon::onConnected()
 void NntpCheckCon::onEncrypted()
 {
     if (_nzbCheck->debugMode())
-        _nzbCheck->log(tr("[Con #%1] Connected").arg(_id));
+        _nzbCheck->log(tr("[Con #%1] Connected").arg(_conId));
 
     _postingState = PostingState::CONNECTED;
     // We should receive the Hello Message
@@ -191,17 +218,70 @@ void NntpCheckCon::onEncrypted()
 
 void NntpCheckCon::onDisconnected()
 {
+    _watchdog.stop();
     if (_socket) {
         _isConnected = false;
         _socket->deleteLater();
         _socket = nullptr;
     }
+    _finishOrRetry();
+}
+
+void NntpCheckCon::onWatchdogTimeout()
+{
+    _nzbCheck->error(tr("[Con #%1] %2:%3 stopped answering after %4 s, dropping the connection")
+                         .arg(_conId)
+                         .arg(_srvParams.host)
+                         .arg(_srvParams.port)
+                         .arg(_nzbCheck->socketTimeOut() / 1000));
+    if (!_socket) {
+        _finishOrRetry();
+        return;
+    }
+    disconnect(_socket, &QIODevice::readyRead, this, &NntpCheckCon::onReadyRead);
+    bool const wasConnected = _isConnected;
+    _socket->abort();
+    // abort() only emits disconnected() when the socket had reached the
+    // connected state; a stalled connect leaves us to close the loop ourselves.
+    if (!wasConnected) {
+        _socket->deleteLater();
+        _socket      = nullptr;
+        _isConnected = false;
+        _finishOrRetry();
+    }
+}
+
+void NntpCheckCon::_finishOrRetry()
+{
+    // The article that was in flight never got its answer. Hand it back, or it
+    // is simply never checked and the run quietly reports fewer articles than
+    // the nzb holds -- which is exactly what makes a check "incomplete".
+    if (!_currentArticle.isNull()) {
+        _nzbCheck->requeueArticle(_currentArticle);
+        _currentArticle.clear();
+    }
+
+    if (_nzbCheck->hasArticlesLeft() && _nbRetries < _nzbCheck->maxRetries()) {
+        ++_nbRetries;
+        _nzbCheck->error(tr("[Con #%1] reconnecting (attempt %2 of %3)")
+                             .arg(_conId)
+                             .arg(_nbRetries)
+                             .arg(_nzbCheck->maxRetries()));
+        _postingState = PostingState::NOT_CONNECTED;
+        emit startConnection();
+        return;
+    }
+
     emit disconnected(this);
 }
 
 void NntpCheckCon::onReadyRead()
 {
     while (_isConnected && _socket->canReadLine()) {
+        // Disarmed here and not before the loop: readyRead also fires on half a
+        // line, and stopping the watchdog on that left a server free to send
+        // one byte and then go quiet for ever.
+        _watchdog.stop();
         QByteArray line = _socket->readLine();
         //        qDebug() << "line: " << line.constData();
 
@@ -209,14 +289,16 @@ void NntpCheckCon::onReadyRead()
             if (strncmp(line.constData(), Nntp::getResponse(430), 3) == 0)
                 _nzbCheck->missingArticle(_currentArticle);
 
-            _nzbCheck->articleChecked();
+            _nzbCheck->articleChecked(_currentArticle);
+            _currentArticle.clear(); // answered: no longer in flight
+            _nbRetries = 0;          // the budget is per incident, not per run
             _postingState = PostingState::IDLE;
             _checkNextArticle();
         } else if (_postingState == PostingState::CONNECTED) {
             // Check welcome message
             if (strncmp(line.constData(), Nntp::getResponse(200), 3) != 0) {
                 emit errorConnecting(tr("[Connection #%1] Error connecting to server %2:%3")
-                                         .arg(_id)
+                                         .arg(_conId)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port));
                 _closeConnection();
@@ -228,17 +310,25 @@ void NntpCheckCon::onReadyRead()
                 } else {
                     _postingState = PostingState::AUTH_USER;
 
-                    std::string cmd(Nntp::AUTHINFO_USER);
-                    cmd += _srvParams.user;
-                    cmd += Nntp::ENDLINE;
-                    _socket->write(cmd.c_str());
+                    QByteArray const cmd = Nntp::authInfoUser(_srvParams.user);
+                    if (cmd.isEmpty()) {
+                        emit errorConnecting(
+                            tr("[Connection #%1] The configured user for %2:%3 contains a "
+                               "line break and cannot be sent")
+                                .arg(_conId)
+                                .arg(_srvParams.host)
+                                .arg(_srvParams.port));
+                        _closeConnection();
+                        return;
+                    }
+                    _send(cmd);
                 }
             }
         } else if (_postingState == PostingState::AUTH_USER) {
             // validate the reply
             if (strncmp(line.constData(), Nntp::getResponse(381), 2) != 0) {
                 emit errorConnecting(tr("[Connection #%1] Error sending user '%4' to server %2:%3")
-                                         .arg(_id)
+                                         .arg(_conId)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
                                          .arg(_srvParams.user.c_str()));
@@ -247,16 +337,24 @@ void NntpCheckCon::onReadyRead()
                 // Continue authentication : send pass info
                 _postingState = PostingState::AUTH_PASS;
 
-                std::string cmd(Nntp::AUTHINFO_PASS);
-                cmd += _srvParams.pass;
-                cmd += Nntp::ENDLINE;
-                _socket->write(cmd.c_str());
+                QByteArray const cmd = Nntp::authInfoPass(_srvParams.pass);
+                if (cmd.isEmpty()) {
+                    emit errorConnecting(
+                        tr("[Connection #%1] The configured password for %2:%3 contains a "
+                           "line break and cannot be sent")
+                            .arg(_conId)
+                            .arg(_srvParams.host)
+                            .arg(_srvParams.port));
+                    _closeConnection();
+                    return;
+                }
+                _send(cmd);
             }
         } else if (_postingState == PostingState::AUTH_PASS) {
             if (strncmp(line.constData(), Nntp::getResponse(281), 2) != 0) {
                 emit errorConnecting(tr("[Connection #%1] Error authentication to server %2:%3 "
                                         "with user '%4'")
-                                         .arg(_id)
+                                         .arg(_conId)
                                          .arg(_srvParams.host)
                                          .arg(_srvParams.port)
                                          .arg(_srvParams.user.c_str()));
@@ -294,23 +392,53 @@ void NntpCheckCon::_closeConnection()
         if (_socket)
             _socket->deleteLater();
         _socket = nullptr;
-        emit disconnected(this);
+        _finishOrRetry();
     }
 }
 
 void NntpCheckCon::_checkNextArticle()
 {
-    _currentArticle = _nzbCheck->getNextArticle();
+    // The command is built before the article is accepted as in flight: the
+    // serialiser is the last gate, and one it refuses must not be waited for.
+    // Parsing already dropped malformed ids, so this loop normally runs once.
+    QByteArray command;
+    while (true) {
+        _currentArticle = _nzbCheck->getNextArticle();
+        if (_currentArticle.isNull())
+            break;
+
+        command = Nntp::statCommand(_currentArticle);
+        if (!command.isEmpty())
+            break;
+
+        _nzbCheck->log(tr("[Con #%1] Refusing to send a malformed article id").arg(_conId));
+        // Counted the way a server-side loss is counted, so the PAR2 phase
+        // still closes and the run cannot wait for an answer never asked for.
+        _nzbCheck->missingArticle(_currentArticle);
+        _nzbCheck->articleChecked(_currentArticle);
+        _currentArticle.clear();
+    }
 
     if (!_currentArticle.isNull()) {
         if (_nzbCheck->debugMode())
-            _nzbCheck->log(tr("[Con #%1] Checking article %2").arg(_id).arg(_currentArticle));
+            _nzbCheck->log(tr("[Con #%1] Checking article %2").arg(_conId).arg(_currentArticle));
 
         _postingState = PostingState::CHECKING_ARTICLE;
-        _socket->write(QString("%1 %2\r\n").arg(Nntp::STAT).arg(_currentArticle).toLocal8Bit());
+        _nbPar2Waits  = 0;
+        _send(command);
+    } else if (_nzbCheck->waitingForPar2()
+               && _nbPar2Waits++ < _nzbCheck->socketTimeOut() / sPar2WaitMs) {
+        // Nothing to hand out yet, but not because the run is over: the PAR2
+        // answers that close the phase are still on their way. Idle rather
+        // than start on the data, which is what the phase exists to prevent.
+        // Bounded by the socket timeout, so a PAR2 answer that never comes is
+        // dealt with by the watchdog instead of parking us here.
+        _watchdog.stop();
+        QTimer::singleShot(sPar2WaitMs, this, [this]() { _checkNextArticle(); });
     } else {
+        _watchdog.stop();
         if (_nzbCheck->debugMode())
-            _nzbCheck->log(tr("[Con #%1] No more Article").arg(_id));
+            _nzbCheck->log(tr("[Con #%1] No more Article").arg(_conId));
 
         _postingState = PostingState::IDLE;
         _closeConnection();

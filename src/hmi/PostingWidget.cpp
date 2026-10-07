@@ -26,6 +26,7 @@
 #include "MainWindow.h"
 #include "NgPost.h"
 #include "PostingJob.h"
+#include "history/PostHistoryService.h"
 #include "nntp/NntpFile.h"
 
 #include <QCheckBox>
@@ -41,29 +42,37 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QDir>
-#include <QKeyEvent>
+#include <QAction>
+#include <QApplication>
 #include <QClipboard>
+#include <QKeyEvent>
 #include <QMimeData>
+#include <QStatusBar>
+#include <QTimer>
+#include <QToolTip>
+
+#include <utility>
 
 
-
-PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber) :
-    QWidget(hmi),
-    _ui(new Ui::PostingWidget),
-    _hmi(hmi),
-    _ngPost(ngPost),
-    _jobNumber(jobNumber),
-    _postingJob(nullptr),
-    _state(STATE::IDLE),
-    _postingFinished(false),
-    _postInfoCB(nullptr),
-    _postInfoButton(nullptr),
-    _postInfoTemplate(),
-    _postInfoMeta()
+PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber)
+    : QWidget(hmi)
+    , _ui(new Ui::PostingWidget)
+    , _hmi(hmi)
+    , _ngPost(ngPost)
+    , _jobNumber(jobNumber)
+    , _postingJob(nullptr)
+    , _state(STATE::IDLE)
+    , _postingFinished(false)
+    , _postInfoCB(nullptr)
+    , _postInfoButton(nullptr)
 {
     _ui->setupUi(this);
+    _setupCopyActions();
+    _ui->postButton->setText(tr("Start Quick Post #%1").arg(displayNumber()));
+    connect(_ui->filesList->model(), &QAbstractItemModel::rowsInserted, this, &PostingWidget::submissionEligibilityChanged);
+    connect(_ui->filesList->model(), &QAbstractItemModel::rowsRemoved, this, &PostingWidget::submissionEligibilityChanged);
+    connect(_ui->filesList->model(), &QAbstractItemModel::modelReset, this, &PostingWidget::submissionEligibilityChanged);
     _buildPostInfoRow();
-
     connect(_ui->postButton, &QAbstractButton::clicked, this, &PostingWidget::onPostFiles);
     connect(_ui->nzbPassCB,  &QAbstractButton::toggled, this, &PostingWidget::onNzbPassToggled);
     connect(_ui->genPass,    &QAbstractButton::clicked, this, &PostingWidget::onGenNzbPassword);
@@ -75,10 +84,15 @@ PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber) :
 
 PostingWidget::~PostingWidget()
 {
+    // The file list and its model are children, deleted by ~QWidget() after
+    // this body has run. The model announces modelReset as it goes, and Qt
+    // only drops this object's connections in ~QObject(), later still: the
+    // signal would reach a PostingWidget that no longer exists (UBSan).
+    disconnect(_ui->filesList->model(), nullptr, this, nullptr);
     delete _ui;
 }
 
-void PostingWidget::onFilePosted(QString filePath, uint nbArticles, uint nbFailed)
+void PostingWidget::onFilePosted(const QString &filePath, uint nbArticles, uint nbFailed)
 {
     int nbFiles = _ui->filesList->count();
     for (int i = 0 ; i < nbFiles ; ++i)
@@ -103,7 +117,7 @@ void PostingWidget::onFilePosted(QString filePath, uint nbArticles, uint nbFaile
     }
 }
 
-void PostingWidget::onArchiveFileNames(QStringList paths)
+void PostingWidget::onArchiveFileNames(const QStringList &paths)
 {
     _ui->filesList->clear();
     for (const QString & path : paths)
@@ -113,30 +127,113 @@ void PostingWidget::onArchiveFileNames(QStringList paths)
 void PostingWidget::onArticlesNumber(int nbArticles)
 {
     Q_UNUSED(nbArticles);
-    _hmi->setJobLabel(static_cast<int>(_jobNumber));
+    _hmi->refreshJobLabel();
 }
 
 void PostingWidget::onPostingJobDone()
 {
-    // we could arrive here twice: from PostingJob::postingFinished or PostingJob::noMoreConnection
-    // This could happen especially when we exceed the number of connections allowed by a provider
+    // Both postingFinished and noMoreConnection can notify the same completion.
     if (!_postingJob)
         return;
 
-    if (_postingJob->nbArticlesTotal() > 0)
-    {
-        if (_postingJob->nbArticlesFailed() > 0)
+    // Detached before the tab is decorated: restoring the sources refreshes
+    // every tab, and one still holding a job that is no longer the active one
+    // gets the queued icon back. We don't own it, NgPost will delete it.
+    PostingJob *job = std::exchange(_postingJob, nullptr);
+    disconnect(job);
+    _postingFinished = true;
+
+    if (job->nbArticlesTotal() > 0) {
+        if (job->nbArticlesFailed() > 0)
             _hmi->updateJobTab(this, _hmi->sDoneKOColor, QIcon(_hmi->sDoneKOIcon));
         else
             _hmi->updateJobTab(this, _hmi->sDoneOKColor, QIcon(_hmi->sDoneOKIcon));
-    }
-    else
+    } else
         _hmi->clearJobTab(this);
 
-    disconnect(_postingJob);
-    _postingJob = nullptr; //!< we don't own it, NgPost will delete it
-    _postingFinished = true;
+    _armResubmission(job);
     setIDLE();
+}
+
+bool PostingWidget::canSubmit() const
+{
+    return _state == STATE::IDLE && !_postingJob && _hasPreparedFiles();
+}
+
+QString PostingWidget::nzbFolder() const
+{
+    QString const nzb = _ui->nzbFileEdit->text();
+    return nzb.isEmpty() ? QString() : QFileInfo(nzb).absolutePath();
+}
+
+void PostingWidget::setNzbFolder(const QString &folder)
+{
+    QString const nzb = _ui->nzbFileEdit->text();
+    if (!nzb.isEmpty())
+        _ui->nzbFileEdit->setText(QDir(folder).filePath(QFileInfo(nzb).fileName()));
+}
+
+bool PostingWidget::_hasPreparedFiles() const
+{
+    return (!_postingFinished || _resubmittable) && _ui->filesList->count() > 0;
+}
+
+bool PostingWidget::isBlank() const
+{
+    return _state == STATE::IDLE && !_postingJob && !_postingFinished
+        && _ui->filesList->count() == 0;
+}
+
+void PostingWidget::_armResubmission(const PostingJob *job)
+{
+    // A fresh submission is safe before any transfer started, and after a stop:
+    // the post then starts over from scratch. A history resume keeps its resume
+    // semantics; the History tab is where it is resumed again.
+    bool const stopped = job->cancelRequested();
+    _resubmittable = !job->isResumeFromHistory() && (stopped || !job->startedAtWall().isValid());
+    if (!_resubmittable)
+        return;
+    if (stopped) {
+        _stoppedAttempt = { job->historyPostId(),
+                            QFileInfo(job->nzbFilePath()).absoluteFilePath(),
+                            job->archiveFolder() };
+        // Ready to post again, not done: no OK/KO mark for what was cut short.
+        _hmi->clearJobTab(this);
+    }
+    if (job->inputPaths().isEmpty())
+        return;
+    // Packing may have replaced the list with temporary archives. Restore the
+    // user's sources without regenerating the NZB name, password or metadata.
+    _ui->filesList->clear2();
+    for (const QString &path : job->inputPaths())
+        _ui->filesList->addPath(path, QFileInfo(path).isDir());
+}
+
+void PostingWidget::_supersedeStoppedAttempt()
+{
+    // Posting a stopped post again from scratch replaces it. Its archives were
+    // kept for a resume and would make the new compression refuse the same
+    // folder; they are ngPost's own output, created by that job alone, and the
+    // sources they came from are untouched. Its history row is closed, since
+    // the NZB it may have written is about to be overwritten.
+    bool const replaceable = _stoppedAttemptIsReplaceable();
+    StoppedAttempt const stopped = std::exchange(_stoppedAttempt, {});
+    if (!replaceable)
+        return;
+    if (!stopped.archiveFolder.isEmpty() && QFileInfo::exists(stopped.archiveFolder)
+        && !QDir(stopped.archiveFolder).removeRecursively())
+        _hmi->logError(
+            tr("Could not remove the archives of the stopped post: %1").arg(stopped.archiveFolder));
+    if (stopped.historyPostId && _ngPost->historyService())
+        _ngPost->historyService()->setPostAbandoned(stopped.historyPostId);
+}
+
+QFileInfoList PostingWidget::previewFiles() const
+{
+    QFileInfoList files;
+    for (int i = 0; i < _ui->filesList->count(); ++i)
+        files << QFileInfo(_ui->filesList->item(i)->text());
+    return files;
 }
 
 void PostingWidget::onPostFiles()
@@ -176,46 +273,25 @@ void PostingWidget::postFiles(bool updateMainParams)
             _hmi->updateParams();
         }
         udatePostingParams();
+        // A confirmation runs a nested event loop; an Auto Posting event may
+        // update the shared globals while it is open. Keep this tab's values.
+        PostingJobOptions options = _ngPost->_baseJobOptions();
 
         // check if the nzb file name already exist
-        QString nzbPath = _ngPost->nzbPath();
+        QString nzbPath = nzbFolder().isEmpty() ? _ngPost->nzbPath()
+                                                : QDir(nzbFolder()).filePath(_ngPost->_nzbName);
         if (!nzbPath.endsWith(".nzb"))
             nzbPath += ".nzb";
-        QFileInfo fiNzb(nzbPath);
-        if (fiNzb.exists())
-        {
-            int overwrite = QMessageBox::question(nullptr,
-                                                  tr("Overwrite existing nzb file?"),
-                                                  tr("The nzb file '%1' already exists.\nWould you like to overwrite it ?").arg(nzbPath),
-                                                  QMessageBox::Yes,
-                                                  QMessageBox::No);
-            if (overwrite == QMessageBox::No)
-                return;
-        }
+        if (!_confirmNzbOverwrite(nzbPath))
+            return;
+        // Before the job exists: an active one may compress at once.
+        _supersedeStoppedAttempt();
 
         _postingFinished = false;
+        _resubmittable = false;
         _state = STATE::POSTING;
-        PostingJobOptions options = _ngPost->_baseJobOptions();
-        options.nzbFilePath       = nzbPath;
-        options.files             = files;
-        // in the GUI the list holds exactly what the user dropped, folders included
-        options.inputPaths.reserve(files.size());
-        for (QFileInfo const &file : files)
-            options.inputPaths << file.absoluteFilePath();
-        // the GUI already asked about overwriting, and never deletes the sources
-        options.overwriteNzb      = true;
-        options.delFilesAfterPost = false;
-        // per post, deliberately not copied into the NgPost globals
-        // The fields belong to the post info feature as a whole: with the box
-        // unticked there is no sheet, and nothing to publish in the nzb either.
-        // Leaving them in would publish through a box the user just turned off.
-        options.writePostInfoFile = writesPostInfoFile();
-        if (options.writePostInfoFile)
-        {
-            options.meta             = _postInfoMeta;
-            options.postInfoTemplate = _postInfoTemplate;
-            options.postInfoOutput   = _postInfoOutput;
-        }
+        emit submissionEligibilityChanged();
+        _fillJobOptions(options, nzbPath, files);
 
         _postingJob = new PostingJob(_ngPost, options, this);
 
@@ -228,31 +304,89 @@ void PostingWidget::postFiles(bool updateMainParams)
             return;
         }
 
-        QString buttonTxt;
-        QColor  tabColor;
-        QString tabIcon;
-        if (hasStarted)
-        {
-            buttonTxt = tr("Stop Posting");
-            tabColor  = _hmi->sPostingColor;
-            tabIcon   = _hmi->sPostingIcon;
-        }
-        else
-        {
-            buttonTxt = tr("Cancel Posting");
-            tabColor  = _hmi->sPendingColor;
-            tabIcon   = _hmi->sPendingIcon;
-        }
-        _ui->postButton->setText(buttonTxt);
-        _hmi->updateJobTab(this, tabColor, QIcon(tabIcon), _postingJob->nzbName());
+        _ui->postButton->setText(hasStarted ? tr("Stop Posting") : tr("Cancel Posting"));
+        _hmi->updateJobTab(this,
+                           hasStarted ? _hmi->sPostingColor : _hmi->pendingColor(),
+                           hasStarted ? QIcon(_hmi->sPostingIcon) : _hmi->pendingIcon(),
+                           _postingJob->nzbName());
     }
     else  if (_state == STATE::POSTING)
     {
         _state = STATE::STOPPING;
         emit _postingJob->stopPosting();
+        emit submissionEligibilityChanged();
     }
 }
 
+
+void PostingWidget::_fillJobOptions(PostingJobOptions &options,
+                                    const QString &nzbPath,
+                                    const QFileInfoList &files) const
+{
+    options.nzbFilePath = nzbPath;
+    options.files = files;
+    // in the GUI the list holds exactly what the user dropped, folders included
+    options.inputPaths.reserve(files.size());
+    for (QFileInfo const &file : files)
+        options.inputPaths << file.absoluteFilePath();
+    // the GUI already asked about overwriting, and never deletes the sources
+    options.overwriteNzb = true;
+    options.delFilesAfterPost = false;
+    // per post, deliberately not copied into the NgPost globals
+    // The fields belong to the post info feature as a whole: with the box
+    // unticked there is no sheet, and nothing to publish in the nzb either.
+    // Leaving them in would publish through a box the user just turned off.
+    options.writePostInfoFile = writesPostInfoFile();
+    if (options.writePostInfoFile) {
+        options.meta = _postInfoMeta;
+        options.postInfoTemplate = _postInfoTemplate;
+        options.postInfoOutput = _postInfoOutput;
+    }
+}
+
+bool PostingWidget::_stoppedAttemptIsReplaceable() const
+{
+    // Only while it is still the post this tab stopped. The History tab may
+    // have resumed it since, or be resuming it from these very archives: its
+    // NZB, archives and history row then belong to that resume.
+    qint64 const id = _stoppedAttempt.historyPostId;
+    if (!id)
+        return true;
+    QList<PostingJob *> jobs(_ngPost->_pendingJobs.cbegin(), _ngPost->_pendingJobs.cend());
+    jobs << _ngPost->_activeJob;
+    for (PostingJob const *job : jobs)
+        if (job && job->historyPostId() == id)
+            return false;
+    PostHistoryService::ResumeRow row;
+    if (auto *history = _ngPost->historyService())
+        history->checkResume(id, &row); // fills the row even when not resumable
+    return row.status != QLatin1String("success") && row.status != QLatin1String("posting");
+}
+
+bool PostingWidget::_isStoppedAttemptNzb(const QString &nzbPath) const
+{
+    // Written by the stopped post of this very tab, or already there when the
+    // user agreed to replace it for that post: asking again is noise.
+    return !_stoppedAttempt.nzbPath.isEmpty()
+        && QFileInfo(nzbPath).absoluteFilePath() == _stoppedAttempt.nzbPath
+        && _stoppedAttemptIsReplaceable();
+}
+
+bool PostingWidget::_confirmNzbOverwrite(const QString &nzbPath)
+{
+    const quint64 generation = _ngPost->_postingCancelGeneration;
+    if (QFileInfo::exists(nzbPath) && !_isStoppedAttemptNzb(nzbPath)
+        && QMessageBox::question(
+               nullptr,
+               tr("Overwrite existing nzb file?"),
+               tr("The nzb file '%1' already exists.\nWould you like to overwrite it ?")
+                   .arg(nzbPath),
+               QMessageBox::Yes,
+               QMessageBox::No)
+            != QMessageBox::Yes)
+        return false;
+    return generation == _ngPost->_postingCancelGeneration;
+}
 
 void PostingWidget::onNzbPassToggled(bool checked)
 {
@@ -278,6 +412,7 @@ void PostingWidget::onGenNzbPassword()
 
 void PostingWidget::onSelectFilesClicked()
 {
+    const auto shutdownHold = _ngPost->holdShutdown();
     QStringList files = QFileDialog::getOpenFileNames(
                 this,
                 tr("Select one or more files to Post"),
@@ -290,6 +425,7 @@ void PostingWidget::onSelectFilesClicked()
 
 void PostingWidget::onSelectFolderClicked()
 {
+    const auto shutdownHold = _ngPost->holdShutdown();
     QString folder = QFileDialog::getExistingDirectory(
                 this,
                 tr("Select a Folder"),
@@ -302,6 +438,7 @@ void PostingWidget::onSelectFolderClicked()
 
 void PostingWidget::onClearFilesClicked()
 {
+    if (!_postingJob) _postingFinished = false;
     _ui->filesList->clear2();
     // The post information describes the post that was there; leaving it would
     // hand the title of one post to the next one queued in this tab.
@@ -310,15 +447,36 @@ void PostingWidget::onClearFilesClicked()
     _postInfoOutput.clear();
     _ui->nzbFileEdit->clear();
     _ui->compressNameEdit->clear();
+    // A new post: the stopped one stays resumable from the History tab.
+    _stoppedAttempt = {};
     if (_hmi->hasAutoCompress())
     {
         onGenCompressName();
         onGenNzbPassword();
     }
-    else
-        _ui->compressNameEdit->clear();
 
     _hmi->clearJobTab(this);
+}
+
+void PostingWidget::resetForNextPost()
+{
+    // Auto close reaches us through NgPost's end of job slot, connected to
+    // PostingJob::postingFinished before ours and so served first: the job is
+    // over, but this tab has not heard it yet. Closing it there simply deletes
+    // it; emptying it has to end the job here first. onPostingJobDone is
+    // already written to be called twice, so the queued one that follows finds
+    // nothing left to do.
+    if (_postingJob)
+        onPostingJobDone();
+
+    // Anything else than an idle tab is not ours to empty: what is listed
+    // belongs to the post using it.
+    if (_state != STATE::IDLE)
+        return;
+
+    // Same emptying as the Clear button, decorations included.
+    onClearFilesClicked();
+    _postingFinished = false;
 }
 
 void PostingWidget::onCompressCB(bool checked)
@@ -357,14 +515,16 @@ void PostingWidget::onPar2CB(bool checked)
     QString const needs = compress ? tr("requires: %1").arg(_ui->par2CB->text())
                                    : tr("requires: %1").arg(_ui->compressCB->text());
 
-    setDependentEnabled(_ui->redundancySB, checked && compress,
-                        tr("Using PAR2_ARGS from config file: %1").arg(_ngPost->_par2Args),
-                        needs);
+    setDependentEnabled(
+        _ui->redundancySB,
+        checked && compress,
+        tr("Using the PAR2 arguments of the configuration: %1").arg(_ngPost->par2ArgsInUse()),
+        needs);
 }
 
 void PostingWidget::onGenCompressName()
 {
-    _ui->compressNameEdit->setText(_ngPost->randomPass(static_cast<uint>(_ui->nameLengthSB->value())));
+    _ui->compressNameEdit->setText(_ngPost->randomName(static_cast<uint>(_ui->nameLengthSB->value())));
 }
 
 void PostingWidget::onNzbFileClicked()
@@ -465,8 +625,10 @@ void PostingWidget::init()
 
     _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
 
-    _ui->redundancySB->setRange(0, 100);
-    _ui->redundancySB->setValue(static_cast<int>(_ngPost->_par2Pct));
+    _ui->redundancySB->setRange(-1, 100);
+    _ui->redundancySB->setValue(-1);
+    refreshPar2Default();
+    connect(_ngPost, &NgPost::par2DefaultsChanged, this, &PostingWidget::refreshPar2Default, Qt::UniqueConnection);
     // The suffix travels inside the spin box, so the number stops being an
     // unlabelled one without costing a widget and its layout spacing.
     _ui->redundancySB->setSuffix(QStringLiteral(" %"));
@@ -477,10 +639,7 @@ void PostingWidget::init()
         _ui->nzbPassEdit->setText(_ngPost->_rarPassFixed);
     }
 
-    _ui->nameLengthSB->setRange(5, 50);
-    _ui->nameLengthSB->setValue(static_cast<int>(_ngPost->_lengthName));
-    _ui->passLengthSB->setRange(5, 50);
-    _ui->passLengthSB->setValue(static_cast<int>(_ngPost->_lengthPass));
+    loadObfuscationLengths(_ui->nameLengthSB, _ui->passLengthSB, _ngPost);
 
     _ui->copyNfoWithNzbCB->setChecked(_ngPost->_copyNfoWithNzb);
 
@@ -536,13 +695,11 @@ void PostingWidget::genNameAndPassword(bool genName, bool genPass, bool doPar2)
 
 void PostingWidget::udatePostingParams()
 {
+    // Only the name: the folder of this post's nzb is not the configured one.
+    // Written into NgPost it would be saved as NZB_PATH, and taken by the
+    // other tabs and the Auto Posting.
     if (!_ui->nzbFileEdit->text().isEmpty())
-    {
-        QFileInfo nzb(_ui->nzbFileEdit->text());
-        if (!nzb.absolutePath().isEmpty())
-            _ngPost->_nzbPath = nzb.absolutePath();
-        _ngPost->setNzbName(nzb);
-    }
+        _ngPost->setNzbName(QFileInfo(_ui->nzbFileEdit->text()));
 
     // fetch compression settings. The compression paths and the volume size are
     // NOT read here any more: they are configuration, they live in the
@@ -558,7 +715,7 @@ void PostingWidget::udatePostingParams()
     _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
     // fetch par2 settings
     _ngPost->_doPar2  = _ui->par2CB->isChecked();
-    _ngPost->_par2Pct = static_cast<uint>(_ui->redundancySB->value());
+    _ngPost->_par2Pct = (_ui->redundancySB->value() < 0 ? _ngPost->_par2PctDefault : static_cast<uint>(_ui->redundancySB->value()));
 
     _ngPost->_keepRar = _ui->keepRarCB->isChecked();
 
@@ -672,40 +829,43 @@ void PostingWidget::onEditPostInfo()
 //! writes into the NgPost globals: previewing a layout must change nothing.
 PostInfoData PostingWidget::_postInfoPreview() const
 {
-    PostInfoData data;
-    data.appVersion = QString(APP_VERSION);
+    PostInfoData postData;
+    postData.appVersion = QString(APP_VERSION);
 
     if (!_ui->nzbFileEdit->text().isEmpty())
     {
         QFileInfo const nzb(_ui->nzbFileEdit->text());
-        data.nzbPath     = nzb.absoluteFilePath();
-        data.nzbDir      = nzb.absolutePath();
-        data.nzbName     = nzb.completeBaseName();
-        data.nzbFileName = nzb.fileName();
+        postData.nzbPath = nzb.absoluteFilePath();
+        postData.nzbDir = nzb.absolutePath();
+        postData.nzbName = nzb.completeBaseName();
+        postData.nzbFileName = nzb.fileName();
     }
 
-    data.rarName = _ui->compressNameEdit->text();
+    postData.rarName = _ui->compressNameEdit->text();
     if (_ui->nzbPassCB->isChecked())
-        data.rarPass = _ui->nzbPassEdit->text();
+        postData.rarPass = _ui->nzbPassEdit->text();
 
-    data.groups = _ngPost->groups();
+    postData.groups = _ngPost->groups();
     // Left empty when ngPost draws a poster at random: showing one sample
     // would name an address the post is not going to use.
     if (!_ngPost->_genFrom && !_ngPost->_from.empty())
-        data.nzbPoster = QString::fromStdString(_ngPost->_from);
+        postData.nzbPoster = QString::fromStdString(_ngPost->_from);
 
-    data.par2Pct = _ui->par2CB->isChecked() ? _ui->redundancySB->value() : -1;
+    postData.par2Pct = _ui->par2CB->isChecked()
+        ? (_ui->redundancySB->value() < 0 ? int(_ngPost->_par2PctDefault)
+                                          : _ui->redundancySB->value())
+        : -1;
 
     QFileInfoList files;
     bool          hasFolder = false;
     const_cast<PostingWidget *>(this)->_buildFilesList(files, hasFolder);
     if (!files.isEmpty())
     {
-        data.sourcePath   = files.first().absoluteFilePath();
-        data.originalName = files.first().fileName();
-        data.originalPath = files.first().absolutePath();
+        postData.sourcePath = files.first().absoluteFilePath();
+        postData.originalName = files.first().fileName();
+        postData.originalPath = files.first().absolutePath();
     }
-    return data;
+    return postData;
 }
 
 void PostingWidget::setPostInfo(bool enabled,
@@ -728,20 +888,20 @@ bool PostingWidget::writesPostInfoFile() const
 void PostingWidget::retranslate()
 {
     _ui->retranslateUi(this);
-    // code built widgets are not touched by retranslateUi()
+    refreshPostingState();
+    refreshPar2Default();
     retranslatePostInfoTexts();
-    // The tooltips of the dependent controls carry both their help text and,
-    // while they are greyed, what they are waiting for. retranslateUi() has just
-    // reset them to the plain .ui text, so let the handlers rebuild both halves
-    // in the new language instead of setting them here and losing the state.
+    _copyCompressNameAction->setText(tr("Copy archive name to clipboard"));
+    _copyPassAction->setText(tr("Copy password to clipboard"));
     onCompressCB(_ui->compressCB->isChecked());
     onPar2CB(_ui->par2CB->isChecked());
-    _ui->filesList->setToolTip(QString("%1<ul><li>%2</li><li>%3</li><li>%4</li></ul>%5").arg(
-                                   tr("You can add files or folder by:")).arg(
-                                   tr("Drag & Drop files/folders")).arg(
-                                   tr("Right Click to add Files")).arg(
-                                   tr("Click on Select Files/Folder buttons")).arg(
-                                   tr("Bare in mind you can select items in the list and press DEL to remove them")));
+    _ui->filesList->setToolTip(
+        QString("%1<ul><li>%2</li><li>%3</li><li>%4</li></ul>%5")
+            .arg(tr("You can add files or folder by:"),
+                 tr("Drag & Drop files/folders"),
+                 tr("Right Click to add Files"),
+                 tr("Click on Select Files/Folder buttons"),
+                 tr("Bare in mind you can select items in the list and press DEL to remove them")));
 }
 
 void PostingWidget::setNzbPassword(const QString &pass)
@@ -791,6 +951,8 @@ void PostingWidget::addPath(const QString &path, int currentNbFiles, int isDir)
 {
     if (_ui->filesList->addPathIfNotInList(path, currentNbFiles, isDir))
     {
+        if (!_postingJob) _postingFinished = false;
+        emit submissionEligibilityChanged();
         QFileInfo fileInfo(path);
         if (_ui->nzbFileEdit->text().isEmpty())
         {
@@ -812,10 +974,40 @@ bool PostingWidget::_fileAlreadyInList(const QString &fileName, int currentNbFil
     return false;
 }
 
+QColor PostingWidget::postingTextColor() const
+{
+    const bool submitted = _postingJob && !_postingFinished;
+    const bool stopping = submitted && _postingJob->cancelRequested();
+    const bool active = submitted && _ngPost->_activeJob == _postingJob;
+    const bool paused = submitted && !stopping
+        && (_ngPost->_queuePaused || _postingJob->isPaused());
+    const QPalette theme = _hmi->palette();
+    const bool dark = theme.color(QPalette::Window).lightness() < 128;
+    if (paused)
+        return dark ? QColor(Qt::yellow) : QColor(160, 110, 0);
+    if (active && !stopping)
+        return dark ? QColor(0x4c, 0xff, 0x4c) : QColor(Qt::darkGreen);
+    return dark ? QColor(Qt::white) : theme.color(QPalette::WindowText);
+}
+
+void PostingWidget::refreshPostingState()
+{
+    const bool submitted = _postingJob && !_postingFinished;
+    const bool stopping = submitted && _postingJob->cancelRequested();
+    const bool active = submitted && _ngPost->_activeJob == _postingJob;
+    _ui->postButton->setText(!submitted   ? tr("Start Quick Post #%1").arg(displayNumber())
+                                 : active ? tr("Stop Posting")
+                                          : tr("Cancel Posting"));
+    _ui->postButton->setEnabled(!stopping && !_ngPost->_cancelingAll);
+    const QIcon icon = (submitted && !active) ? _hmi->pendingIcon() : QIcon();
+    _hmi->updateJobTab(this, postingTextColor(), icon);
+}
+
 void PostingWidget::setIDLE()
 {
-    _ui->postButton->setText(tr("Post Files"));
+    _ui->postButton->setText(tr("Start Quick Post #%1").arg(displayNumber()));
     _state = STATE::IDLE;
+    emit submissionEligibilityChanged();
 }
 
 void PostingWidget::setPosting()
@@ -823,6 +1015,7 @@ void PostingWidget::setPosting()
     _hmi->updateJobTab(this, _hmi->sPostingColor, QIcon(_hmi->sPostingIcon), _postingJob->nzbName());
     _ui->postButton->setText(tr("Stop Posting"));
     _state = STATE::POSTING;
+    emit submissionEligibilityChanged();
 }
 
 void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted)
@@ -839,11 +1032,110 @@ void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files,
     _state = STATE::POSTING;
     _ui->nzbFileEdit->setText(job->nzbFilePath());
 
-    if (hasStarted) {
-        _ui->postButton->setText(tr("Stop Posting"));
-        _hmi->updateJobTab(this, _hmi->sPostingColor, QIcon(_hmi->sPostingIcon), job->nzbName());
-    } else {
-        _ui->postButton->setText(tr("Cancel Posting"));
-        _hmi->updateJobTab(this, _hmi->sPendingColor, QIcon(_hmi->sPendingIcon), job->nzbName());
+    _ui->postButton->setText(hasStarted ? tr("Stop Posting") : tr("Cancel Posting"));
+    _hmi->updateJobTab(this,
+                       hasStarted ? _hmi->sPostingColor : _hmi->pendingColor(),
+                       hasStarted ? QIcon(_hmi->sPostingIcon) : _hmi->pendingIcon(),
+                       job->nzbName());
+    emit submissionEligibilityChanged();
+}
+
+
+void PostingWidget::showPar2Default(QSpinBox *box, uint percentage)
+{
+    box->setSpecialValueText(tr("Global (%1 %)").arg(percentage));
+    box->setMaximumWidth(QWIDGETSIZE_MAX);
+    box->setMinimumWidth(box->sizeHint().width());
+}
+
+void PostingWidget::loadObfuscationLengths(QSpinBox *nameLength,
+                                           QSpinBox *passLength,
+                                           const NgPost *ngPost)
+{
+    nameLength->setRange(5, 50);
+    nameLength->setValue(static_cast<int>(ngPost->_lengthName));
+    passLength->setRange(5, 50);
+    passLength->setValue(static_cast<int>(ngPost->_lengthPassDefault));
+}
+
+void PostingWidget::refreshPar2Default()
+{
+    showPar2Default(_ui->redundancySB, _ngPost->par2DefaultPercentage());
+    // The tooltip of the redundancy names the arguments a post runs with.
+    onPar2CB(_ui->par2CB->isChecked());
+}
+
+void PostingWidget::setPar2PercentageOverride(int percentage)
+{
+    _ui->redundancySB->setValue(percentage);
+}
+bool PostingWidget::hasPar2PercentageOverride() const
+{
+    return _ui->redundancySB->value() >= 0;
+}
+
+static const char *sActionLineEditStyle =
+    "QLineEdit QToolButton { border: none; background: transparent; padding: 0px; margin: 0px; }"
+    "QLineEdit QToolButton:hover { border: none; background: rgba(128, 128, 128, 40); "
+    "border-radius: 3px; }"
+    "QLineEdit QToolButton:pressed { border: none; background: rgba(128, 128, 128, 80); "
+    "border-radius: 3px; }";
+
+void PostingWidget::_setupCopyActions()
+{
+    _ui->compressNameEdit->setStyleSheet(sActionLineEditStyle);
+    _ui->nzbPassEdit->setStyleSheet(sActionLineEditStyle);
+
+    const QIcon copyIcon(QStringLiteral(":/icons/copy.png"));
+
+    _copyCompressNameAction = _ui->compressNameEdit->addAction(copyIcon,
+                                                               QLineEdit::TrailingPosition);
+    _copyCompressNameAction->setText(tr("Copy archive name to clipboard"));
+
+    _copyPassAction = _ui->nzbPassEdit->addAction(copyIcon, QLineEdit::TrailingPosition);
+    _copyPassAction->setText(tr("Copy password to clipboard"));
+
+    for (auto *action : { _copyCompressNameAction, _copyPassAction }) {
+        auto *resetTimer = new QTimer(action);
+        resetTimer->setSingleShot(true);
+        connect(resetTimer, &QTimer::timeout, action, [action, copyIcon] {
+            action->setIcon(copyIcon);
+        });
     }
+
+    for (auto *tb : _ui->compressNameEdit->findChildren<QToolButton *>()) {
+        tb->setCursor(Qt::PointingHandCursor);
+        tb->setAutoRaise(true);
+    }
+    for (auto *tb : _ui->nzbPassEdit->findChildren<QToolButton *>()) {
+        tb->setCursor(Qt::PointingHandCursor);
+        tb->setAutoRaise(true);
+    }
+
+    connect(_copyCompressNameAction, &QAction::triggered, this, [this]() {
+        _copyToClipboard(_copyCompressNameAction, _ui->compressNameEdit);
+    });
+    connect(_copyPassAction, &QAction::triggered, this, [this]() {
+        _copyToClipboard(_copyPassAction, _ui->nzbPassEdit);
+    });
+}
+
+void PostingWidget::_copyToClipboard(QAction *action, QLineEdit *edit)
+{
+    if (!edit || !action)
+        return;
+
+    const QString text = edit->text();
+    if (text.isEmpty()) {
+        QToolTip::showText(QCursor::pos(), tr("Nothing to copy"), edit, {}, 1500);
+        return;
+    }
+
+    QApplication::clipboard()->setText(text);
+
+    QToolTip::showText(QCursor::pos(), tr("Copied!"), edit, {}, 1500);
+
+    action->setIcon(QIcon(QStringLiteral(":/icons/ok.png")));
+    // Restart the action's feedback timer; repeated clicks always restore the copy icon.
+    action->findChild<QTimer *>()->start(1200);
 }

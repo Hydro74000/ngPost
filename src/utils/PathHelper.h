@@ -116,6 +116,43 @@ struct ConfigDirMigrationResult
     QString error;
 };
 
+//! What hardenConfigSecrets() found and what it could do about it.
+struct SecretsHardeningResult
+{
+    //! Paths that were readable beyond their owner and are now restricted.
+    QStringList repaired;
+
+    //! Paths still reachable by someone else, "<path>: <reason>". A config on
+    //! a filesystem with no ownership at all (exFAT, a network share, a USB
+    //! stick) lands here: nothing ngPost can do makes it private, and saying
+    //! so is the only honest outcome.
+    QStringList unrepairable;
+
+    bool isClean() const { return repaired.isEmpty() && unrepairable.isEmpty(); }
+};
+
+//! Restrict \a path to the user running ngPost: 0600 for a file and 0700 for a
+//! directory on POSIX, a protected owner-only DACL on Windows -- where the
+//! POSIX bits Qt exposes do not restrict anything on their own.
+//!
+//! Best effort, like the history database's own guard: a configuration on a
+//! filesystem that cannot express ownership must keep working. Returns false
+//! when the restriction could not be applied, which is what
+//! hardenConfigSecrets() reports rather than swallows.
+bool restrictToOwner(const QString &path);
+
+//! Repair the permissions of an installation created before ngPost restricted
+//! them -- the config directory, ngPost.conf, and the backups a migration left
+//! beside it, each of which holds NNTP and proxy credentials plus the fixed
+//! archive password.
+//!
+//! QSaveFile copies the permissions of the file it replaces and otherwise
+//! creates one at 0666 minus the umask, so an existing ngPost.conf keeps
+//! whatever mode it was first written with -- 0644 under a standard umask, and
+//! there are installations at 0777. Writing the file again never narrowed that,
+//! so tightening has to happen on the way in, once, at startup.
+SecretsHardeningResult hardenConfigSecrets();
+
 //! Absolute path to the user's ngPost config directory, without creating it.
 //! Use this for read-only defaults built before command-line intent is known.
 QString configDirPath();

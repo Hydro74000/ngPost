@@ -16,6 +16,7 @@
 
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QFileInfo>
 #include <QMessageBox>
 #include <QTextBrowser>
 #include <QVBoxLayout>
@@ -84,7 +85,13 @@ void VpnSettingsDialog::onStart()
 
 void VpnSettingsDialog::onStop()
 {
-    _manager->stop();
+    if (_manager->hasActiveVpnJobs()
+        && QMessageBox::question(this, tr("Disconnect VPN"),
+             tr("A posting job currently depends on this VPN. Disconnecting "
+                "will pause that job until you resume it manually. Continue?"),
+             QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+        return;
+    _manager->disconnectByUser();
 }
 
 void VpnSettingsDialog::onNewProfile()
@@ -183,8 +190,10 @@ void VpnSettingsDialog::_refreshUi()
     bool installed = _manager->isHelperInstalled();
     bool hasActive = (_manager->activeProfile() != nullptr);
     bool canStart  = installed && hasActive
-                  && (s == VpnManager::State::Disabled || s == VpnManager::State::Failed);
-    bool canStop   = (s == VpnManager::State::Connected || s == VpnManager::State::Starting);
+                  && (s == VpnManager::State::Disabled || s == VpnManager::State::Failed
+                      || s == VpnManager::State::LeaseBusy);
+    bool canStop   = (s == VpnManager::State::Connected || s == VpnManager::State::Starting
+                      || s == VpnManager::State::Reconnecting);
     _ui->startBtn->setEnabled(canStart);
     _ui->stopBtn->setEnabled(canStop);
     _ui->profilesBox->setEnabled(installed);
@@ -197,8 +206,14 @@ void VpnSettingsDialog::_refreshUi()
 void VpnSettingsDialog::_refreshSetupUi()
 {
     bool const installed = _manager->isHelperInstalled();
+    bool const obsolete = !installed && QFileInfo::exists(QString::fromLatin1(VpnManager::kInstalledHelperPath));
     _ui->installBtn->setVisible(!installed);
-    _ui->uninstallBtn->setVisible(installed);
+    _ui->uninstallBtn->setVisible(installed || obsolete);
+    if (obsolete) {
+        _ui->setupLabel->setText(tr("Security update required: reinstall the VPN helper with administrator authentication. Until then the old passwordless helper remains unsafe."));
+        _ui->setupLabel->setStyleSheet(QStringLiteral("color: #c62828;"));
+        return;
+    }
     if (installed) {
         _ui->setupLabel->setText(
             tr("VPN tunnel is installed. Connect / Disconnect will not prompt."));

@@ -24,11 +24,13 @@
 #include "utils/Macros.h"
 
 #include <QDateTime>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QFileInfoList>
 #include <QMap>
 #include <QMutex>
+#include <QProcess>
 #include <QQueue>
 #include <QSet>
 #include <QStringList>
@@ -37,11 +39,11 @@
 #include <QTime>
 #include <QTimer>
 #include <QVector>
-class QProcess;
 class NgPost;
 class NntpConnection;
 class NntpFile;
 class NntpArticle;
+class PostHistoryService;
 class PostingWidget;
 class Poster;
 
@@ -67,7 +69,12 @@ public:
     //! in PostingJobOptions.h so that the options can carry it.
     using ResumeFileState = PostingJobResumeFileState;
 
+    enum class PauseReason { None, User, ConnectionBackoff, VpnRecovery };
+    Q_ENUM(PauseReason)
+
 private:
+    static PauseReason _mergedPauseReason(PauseReason current, PauseReason incoming);
+
     NgPost *const _ngPost; //!< handle on the application to access global configs
 
     //! Frozen at construction: a job may wait in the queue while the global
@@ -100,6 +107,9 @@ private:
     const uint _rarSize;
     const bool _useRarMax;
     const uint _par2Pct;
+    const QString _par2Path;
+    const QString _par2Args;
+    const par2::Tool _par2Tool;
 
     const bool _doCompress;
     const bool _doPar2;
@@ -151,6 +161,8 @@ private:
     uint _nbArticlesTotal;    //!< number of Articles of all the files to post
 
     AtomicBool _stopPosting;
+    // User/requested cancellation, distinct from normal worker shutdown.
+    bool _cancelRequested = false;
     AtomicBool _noMoreFiles;
 
     bool _postStarted;
@@ -177,7 +189,8 @@ private:
 
     const bool _overwriteNzb;
 
-    QMap<QString, QString> _obfuscatedFileNames;
+    QMap<QString, QString> _obfuscatedFileNames; //!< obfuscated path -> real path, undone after compression
+    QString _obfuscationStagingPath;              //!< folder the obfuscated inputs were moved to (empty if none)
 
     const QList<QString>
         _grpList; //!< Newsgroup where we're posting in a list format to write in the nzb file
@@ -185,9 +198,24 @@ private:
 
     bool _use7z;
 
-    bool _isPaused;
+    //! Read by the NNTP worker threads to stop article admission before the
+    //! queued connection-kill events arrive.
+    AtomicBool _isPaused;
+    PauseReason _pauseReason;
+    //! Frozen when the job enters ngPost's queue. `_vpnRetained` prevents a
+    //! recovery/user-resume transition from reference-counting it twice.
+    bool _vpnRequired;
+    bool _vpnRetained;
 
     QTimer _resumeTimer;
+    //! Consecutive backoff cycles in which every connection had its
+    //! credentials refused and none reached the posting state.
+    ushort _authRejectedCycles;
+    //! A provider can refuse good credentials for a while -- connections left
+    //! over by a crashed run still count against its limit -- so one refused
+    //! cycle is not proof. Three are, and replaying bad credentials forever is
+    //! what gets an account or an address blocked.
+    static constexpr ushort kMaxAuthRejectedCycles = 3;
 
     bool _isActiveJob;
     qint64 _historyPostId;
@@ -206,12 +234,19 @@ public:
                const PostingJobOptions &options,
                PostingWidget *postWidget = nullptr,
                QObject *parent = nullptr);
-    ~PostingJob();
+    ~PostingJob() override;
 
     qint64 articleSizeBytes() const { return _articleSizeBytes; }
 
-    void pause();
+    void pause(PauseReason reason = PauseReason::User);
     void resume();
+    bool resumeIfPausedFor(PauseReason reason);
+    bool waitForVpnAfterUserResume();
+
+#ifdef NGPOST_TESTING
+    static PauseReason mergePauseReasonForTest(PauseReason current, PauseReason incoming)
+    { return _mergedPauseReason(current, incoming); }
+#endif
 
     inline QString avgSpeed() const;
 
@@ -221,6 +256,7 @@ public:
     inline uint nbArticlesTotal() const;
     inline uint nbArticlesUploaded() const;
     inline uint nbArticlesFailed() const;
+    uint nbArticlesUnknown() const;
     inline bool hasUploaded() const;
 
     inline const QString &nzbName() const;
@@ -261,6 +297,8 @@ public:
     inline bool hasPostStarted() const;
     inline bool hasPostFinished() const;
     inline bool hasPostFinishedSuccessfully() const;
+    //! Stop/Cancel was requested, whether or not the job had already finished.
+    inline bool cancelRequested() const;
 
     //! The success rule itself, so it can be exercised without a live post.
     inline static bool postSucceeded(bool postFinished, uint nbArticlesFailed, bool anyFileFailed);
@@ -277,9 +315,13 @@ public:
     inline bool isPosting() const;
 
     inline bool isPaused() const;
+    inline PauseReason pauseReason() const { return _pauseReason; }
 
     inline const QString &nzbFilePath() const;
     inline const QString &originalDirectory() const;
+    //! Temporary folder this job created for its archives or parity, empty
+    //! when it made none. _createArchiveFolder() refuses an existing one.
+    inline QString archiveFolder() const;
 
     inline static QString humanSize(double size);
 
@@ -301,9 +343,14 @@ public:
                                             bool useParPar,
                                             bool useMultiPar,
                                             uint redundancy);
+    static bool restoreObfuscatedPathsForTest(QMap<QString, QString> &paths,
+                                              QString &stagingPath);
+    static QSet<QString> unrestoredOriginalsForTest(QMap<QString, QString> const &stillObfuscated)
+    { return _unrestoredOriginals(stillObfuscated); }
 #endif
 
 signals:
+    void pauseChanged();
     void startPosting(
         bool isActiveJob); //!< connected to onStartPosting (to be able to run on a different Thread)
     void stopPosting();
@@ -332,6 +379,7 @@ private slots:
 
     void onExtProcReadyReadStandardOutput();
     void onExtProcReadyReadStandardError();
+    void onExtProcError(QProcess::ProcessError error);
 
     void onCompressionFinished(int exitCode);
     void onGenPar2Finished(int exitCode);
@@ -369,6 +417,15 @@ private:
     NntpArticle *_readNextArticleIntoBufferPtr(const QString &threadName, char **bufferPtr);
 
     void _delOriginalFiles();
+    //! _delOriginalFiles() once every article is confirmed, a refusal otherwise.
+    void _delOriginalFilesOfCompletePost();
+
+    //! Original paths whose obfuscated source never made it back to its real
+    //! name, and which _delOriginalFiles() must therefore leave alone.
+    static QSet<QString> _unrestoredOriginals(QMap<QString, QString> const &stillObfuscated);
+
+    void _obfuscateInputFileNames(QString const &tmpFolder, QString const &archiveName);
+    bool _restoreObfuscatedFileNames();
 
     void _resolveNfoSource();
     void _copyNfoNextToNzb();
@@ -382,6 +439,15 @@ private:
     //! jobs are finalized as failed in history; a refused resume keeps the
     //! original post resumable.
     void _abortBeforeTransfer(bool keepResumeResumable = false);
+    void _connectJobSignals();
+#ifdef __USE_HMI__
+    void _connectWidgetSignals();
+#endif
+    void _createHistoryRecord();
+    void _copyNfoToArchive();
+    void _collectPackedFiles();
+    void _writeNzbHeader();
+    void _startPosterThreads(int nbPosters, int nbCon);
     void _postFiles();
     void _finishPosting();
 
@@ -397,10 +463,16 @@ private:
                             uint volSize = 0);
     bool startGenPar2(const QString &tmpFolder, const QString &archiveName, uint redundancy = 0);
 
-    bool _canCompress() const;
-    bool _canGenPar2() const;
+    bool _canCompress(bool checkTemporaryPath = true) const;
+    bool _canGenPar2(bool checkTemporaryPath = true) const;
 
+    bool _finishIfCanceled();
+    void _terminateExternalProcess();
     void _cleanExtProc();
+    void _createExtProc();
+    PostHistoryService *_recordHistoryArticleEnd(NntpArticle *article,
+                                                 const QString &reason,
+                                                 bool unknown);
     void _cleanCompressDir();
 
     QString _createArchiveFolder(const QString &tmpFolder, const QString &archiveName);
@@ -592,6 +664,10 @@ bool PostingJob::hasPostFinished() const
 {
     return _postFinished;
 }
+bool PostingJob::cancelRequested() const
+{
+    return _cancelRequested;
+}
 bool PostingJob::hasPostFinishedSuccessfully() const
 {
     return postSucceeded(_postFinished, _nbArticlesFailed, !_filesFailed.isEmpty());
@@ -638,12 +714,17 @@ bool PostingJob::isPosting() const
 }
 bool PostingJob::isPaused() const
 {
-    return _isPaused;
+    return MB_LoadAtomic(_isPaused) != 0x0;
 }
 
 const QString &PostingJob::nzbFilePath() const
 {
     return _nzbFilePath;
+}
+
+QString PostingJob::archiveFolder() const
+{
+    return _compressDir ? _compressDir->absolutePath() : QString();
 }
 
 const QString& PostingJob::originalDirectory() const

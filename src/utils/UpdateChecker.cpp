@@ -7,9 +7,7 @@
 #include "UpdateChecker.h"
 
 #include <QCoreApplication>
-#include <QDateTime>
 #include <QDebug>
-#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -21,6 +19,8 @@
 #include <QNetworkRequest>
 #include <QProcess>
 #include <QStandardPaths>
+#include <QTimer>
+#include <QRegularExpression>
 
 #include "NgPost.h"
 
@@ -30,20 +30,67 @@ const QString UpdateChecker::sReleaseApiUrl =
         QStringLiteral("https://api.github.com/repos/%1/%2/releases/latest")
         .arg(UpdateChecker::sRepoOwner, UpdateChecker::sRepoName);
 const QString UpdateChecker::sReleaseListApiUrl =
-        QStringLiteral("https://api.github.com/repos/%1/%2/releases?per_page=20")
+    QStringLiteral("https://api.github.com/repos/%1/%2/releases?per_page=10")
         .arg(UpdateChecker::sRepoOwner, UpdateChecker::sRepoName);
 
-UpdateChecker::UpdateChecker(NgPost *ngPost, QNetworkAccessManager *netMgr, QObject *parent)
-    : QObject(parent),
-      _ngPost(ngPost),
-      _netMgr(netMgr),
-      _reply(nullptr),
-      _assetSize(0)
+UpdateChecker::UpdateChecker(QNetworkAccessManager *netMgr, QObject *parent)
+    : QObject(parent)
+    , _netMgr(netMgr)
+    , _reply(nullptr)
+    , _assetSize(0)
 {}
 
 bool UpdateChecker::isAppImage()
 {
     return qEnvironmentVariableIsSet("APPIMAGE") || qEnvironmentVariableIsSet("APPDIR");
+}
+
+QString UpdateChecker::installationDirectory()
+{
+    QDir directory(QCoreApplication::applicationDirPath());
+#ifdef Q_OS_MACOS
+    if (directory.dirName() == QLatin1String("MacOS")) {
+        directory.cdUp();
+        if (directory.dirName() == QLatin1String("Contents"))
+            directory.cdUp();
+    }
+#endif
+    return directory.absolutePath();
+}
+
+bool UpdateChecker::isReplaceableInstallation(const QString &directory)
+{
+    const QFileInfo info(directory);
+    const QString path = info.canonicalFilePath();
+    const QFileInfo marker(directory + QStringLiteral("/.ngpost-installation"));
+    // The legacy updater overlaid ZIP/TAR contents even on source builds.
+    // Such a build can carry a copied marker without being a disposable package.
+    const QStringList buildFiles{ QStringLiteral("ngPost.pro"),
+                                  QStringLiteral("ngPost_core.pri"),
+                                  QStringLiteral("Makefile"),
+                                  QStringLiteral(".git") };
+    for (const auto &name : buildFiles)
+        if (QFileInfo::exists(directory + QLatin1Char('/') + name))
+            return false;
+    // Inno Setup owns its uninstall database and optional components. A ZIP
+    // directory swap would discard both; keep these installs on Setup.
+    return !info.isSymLink() && !path.isEmpty() && marker.isFile() && !marker.isSymLink()
+        && !QDir(path).isRoot() && path != QFileInfo(QDir::homePath()).canonicalFilePath()
+        && path != QLatin1String("/usr/bin") && path != QLatin1String("/usr/local/bin")
+        && QFileInfo(info.absolutePath()).isWritable()
+        && QDir(directory).entryList({ QStringLiteral("unins*.exe") }, QDir::Files).isEmpty();
+}
+
+bool UpdateChecker::canInstallAutomatically() const
+{
+#if defined(Q_PROCESSOR_X86_64) || defined(Q_OS_MACOS)
+    return !isAppImage() && isReplaceableInstallation(installationDirectory())
+        && isTrustedDownloadUrl(_assetUrl) && _assetSize > 0 && _assetSize <= 1024LL * 1024 * 1024
+        && (!QStandardPaths::findExecutable(QStringLiteral("python3")).isEmpty()
+            || !QStandardPaths::findExecutable(QStringLiteral("python")).isEmpty());
+#else
+    return false; // Published Linux/Windows archives target x86_64 only.
+#endif
 }
 
 QString UpdateChecker::stripVersionPrefix(const QString &tag)
@@ -104,6 +151,51 @@ int compareDotted(const QString &a, const QString &b, bool numericOnly)
 }
 } // namespace
 
+bool UpdateChecker::isPromptDue(qint64 lastPromptEpoch, qint64 nowEpoch)
+{
+    return lastPromptEpoch <= 0 || lastPromptEpoch > nowEpoch
+        || nowEpoch - lastPromptEpoch >= sPromptIntervalSeconds;
+}
+
+QString UpdateChecker::releaseNotesMarkdown(const QString &body)
+{
+    static const QRegularExpression banner(QStringLiteral("^={5,}\\s*$"));
+    static const QRegularExpression section(QStringLiteral("^-{3}\\s+(.+?)\\s+-{3}\\s*$"));
+    static const QRegularExpression heading(QStringLiteral("^#{1,2}\\s"));
+    const QStringList lines = QString(body)
+                                  .replace(QStringLiteral("\r\n"), QStringLiteral("\n"))
+                                  .split(QLatin1Char('\n'));
+    QStringList markdown;
+    bool code = false, hashes = false;
+    for (int i = 0; i < lines.size(); ++i) {
+        const QString &line = lines.at(i);
+        const bool fence = line.startsWith(QStringLiteral("```"));
+        // The installer checks the SHA-256 section itself, and its long hash
+        // lines would scroll the pane sideways: that one stays on GitHub.
+        if (!code && heading.match(line).hasMatch())
+            hashes = line.startsWith(QStringLiteral("## SHA-256"));
+        if (fence || code) {
+            code ^= fence;
+            if (!hashes)
+                markdown << line;
+        } else if (hashes || (i == 0 && line.startsWith(QStringLiteral("# ")))) {
+            continue; // the release title: the popup's header already names it
+        } else if (banner.match(line).hasMatch()) {
+            // A title under a banner, closed by a second one or not.
+            const QString title = i + 1 < lines.size() ? lines.at(i + 1).trimmed() : QString();
+            if (!title.isEmpty() && !banner.match(title).hasMatch()) {
+                markdown << QString() << QStringLiteral("### ") + title << QString();
+                i += i + 2 < lines.size() && banner.match(lines.at(i + 2)).hasMatch() ? 2 : 1;
+            }
+        } else if (const auto match = section.match(line); match.hasMatch()) {
+            markdown << QString() << QStringLiteral("#### ") + match.captured(1) << QString();
+        } else {
+            markdown << line;
+        }
+    }
+    return markdown.join(QLatin1Char('\n'));
+}
+
 bool UpdateChecker::isPreRelease(const QString &tag)
 {
     return stripVersionPrefix(tag).contains(QLatin1Char('-'));
@@ -140,11 +232,8 @@ bool UpdateChecker::isVersionNewer(const QString &candidate, const QString &curr
 
 void UpdateChecker::checkLatestRelease()
 {
-    if (isAppImage())
-    {
-        qDebug() << "[UpdateChecker] running as AppImage, skipping check (zsync handles updates)";
+    if (_reply || _busy)
         return;
-    }
 
     // A stable build asks GitHub for "the latest release", which by definition
     // ignores pre-releases. A pre-release build has to look at the list: what
@@ -153,9 +242,23 @@ void UpdateChecker::checkLatestRelease()
     QNetworkRequest req(url);
     req.setRawHeader("User-Agent", "ngPost C++ app");
     req.setRawHeader("Accept",     "application/vnd.github+json");
-    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::SameOriginRedirectPolicy);
+    req.setTransferTimeout(30000);
 
     _reply = _netMgr->get(req);
+    _reply->setReadBufferSize(65536);
+    QNetworkReply *reply = _reply;
+    connect(reply, &QIODevice::readyRead, this, [reply] {
+        QByteArray body = reply->property("boundedBody").toByteArray();
+        const QByteArray chunk = reply->read(65536);
+        if (body.size() + chunk.size() > sMaxReleaseInfoBytes) {
+            reply->setProperty("oversized", true);
+            reply->abort();
+            return;
+        }
+        body += chunk;
+        reply->setProperty("boundedBody", body);
+    });
     connect(_reply, &QNetworkReply::finished, this, &UpdateChecker::onReleaseInfoReceived);
 }
 
@@ -165,54 +268,26 @@ void UpdateChecker::onReleaseInfoReceived()
     reply->deleteLater();
     _reply = nullptr;
 
-    if (reply->error() != QNetworkReply::NoError)
-    {
-        qDebug() << "[UpdateChecker] release info request failed:" << reply->errorString();
+    const QByteArray body = reply->property("boundedBody").toByteArray() + reply->readAll();
+    if (reply->property("oversized").toBool() || body.size() > sMaxReleaseInfoBytes) {
+        _failCheck(QStringLiteral("reply over %1 bytes").arg(sMaxReleaseInfoBytes));
         return;
     }
-
-    const QByteArray body = reply->readAll();
+    if (reply->error() != QNetworkReply::NoError) {
+        _failCheck(reply->errorString());
+        return;
+    }
     QJsonParseError err;
     const QJsonDocument doc = QJsonDocument::fromJson(body, &err);
     if (err.error != QJsonParseError::NoError || (!doc.isObject() && !doc.isArray()))
     {
-        qDebug() << "[UpdateChecker] invalid JSON from GitHub:" << err.errorString();
+        _failCheck(QStringLiteral("invalid JSON from GitHub: %1").arg(err.errorString()));
         return;
     }
 
-    // "/releases/latest" answers with one release, "/releases" with a list.
-    // Pick the entry that supersedes this build by the most: the list is
-    // ordered by creation date, but a stable published before a later unstable
-    // is still the one to offer.
-    QJsonObject root;
-    if (doc.isObject())
-        root = doc.object();
-    else
-    {
-        const QString mine = buildTag();
-        QString best;
-        for (const QJsonValue &v : doc.array())
-        {
-            const QJsonObject candidate = v.toObject();
-            if (candidate.value("draft").toBool())
-                continue;
-            const QString tag = candidate.value("tag_name").toString();
-            if (tag.isEmpty() || !isVersionNewer(tag, mine))
-                continue;
-            if (best.isEmpty() || isVersionNewer(tag, best))
-            {
-                best = tag;
-                root = candidate;
-            }
-        }
-        if (best.isEmpty())
-        {
-            _ngPost->_lastUpdateCheckEpoch = QDateTime::currentSecsSinceEpoch();
-            _ngPost->saveConfig();
-            qDebug() << "[UpdateChecker] up to date (current" << mine << ")";
-            return;
-        }
-    }
+    const QJsonObject root = selectRelease(doc, buildTag());
+    if (root.isEmpty())
+        return;
     _latestTag        = root.value("tag_name").toString();
     _releaseNotes     = root.value("body").toString();
     _releasePageUrl   = QUrl(root.value("html_url").toString());
@@ -220,36 +295,11 @@ void UpdateChecker::onReleaseInfoReceived()
     _assetFileName.clear();
     _assetSize = 0;
 
-    if (_latestTag.isEmpty())
-        return;
-
-    // Update "last check" timestamp regardless of whether a newer version is available,
-    // so we honour the once-per-day cadence even when already up to date.
-    _ngPost->_lastUpdateCheckEpoch = QDateTime::currentSecsSinceEpoch();
-    _ngPost->saveConfig();
-
-    // A stable install is never offered a pre-release, whatever came back.
-    // The endpoint already excludes them, so this only closes the door on a
-    // future caller: isVersionNewer() alone would say yes to a HIGHER numbered
-    // pre-release, which is right for an unstable build and wrong here.
-    if (isPreRelease(_latestTag) && !isPreRelease(buildTag()))
-    {
-        qDebug() << "[UpdateChecker] ignoring pre-release" << _latestTag
-                 << "for stable build" << buildTag();
-        return;
-    }
-
-    if (!isVersionNewer(_latestTag, buildTag()))
-    {
-        qDebug() << "[UpdateChecker] up to date (current" << buildTag()
-                 << "latest" << _latestTag << ")";
-        return;
-    }
+    _releasePageUrl = QUrl(QStringLiteral("https://github.com/Hydro74000/ngPost/releases/tag/") + _latestTag);
 
     const QString wantedName = assetNameForCurrentOS(_latestTag);
     const QJsonArray assets  = root.value("assets").toArray();
-    for (const QJsonValue &v : assets)
-    {
+    for (const auto &v : assets) {
         const QJsonObject a = v.toObject();
         if (a.value("name").toString() == wantedName)
         {
@@ -261,13 +311,45 @@ void UpdateChecker::onReleaseInfoReceived()
     }
 
     // Defence in depth: only accept GitHub-hosted asset URLs.
-    if (!_assetUrl.isValid() || !_assetUrl.host().endsWith("github.com"))
+    if (!isTrustedDownloadUrl(_assetUrl) || _assetUrl != QUrl(
+            QStringLiteral("https://github.com/Hydro74000/ngPost/releases/download/")
+            + _latestTag + QLatin1Char('/') + wantedName))
     {
         qDebug() << "[UpdateChecker] no usable asset for OS, falling back to release page";
         _assetUrl.clear();
     }
 
     emit newVersionAvailable(_latestTag, _releaseNotes, _releasePageUrl);
+}
+
+//! qWarning, not qDebug: release builds define QT_NO_DEBUG_OUTPUT, and a check
+//! that fails on every start must leave a trace somewhere.
+void UpdateChecker::_failCheck(const QString &reason)
+{
+    qWarning().noquote() << QStringLiteral("[UpdateChecker] release check failed: %1").arg(reason);
+    emit checkFailed(reason);
+}
+
+QJsonObject UpdateChecker::selectRelease(const QJsonDocument &document, const QString &current)
+{
+    // GitHub's list is ordered by creation date, not version. A stable build
+    // must filter prereleases before choosing the best remaining candidate.
+    const auto releases = document.isArray() ? document.array() : QJsonArray{ document.object() };
+    const QRegularExpression validTag(
+        QStringLiteral("^[vV]?[0-9]+(?:[.][0-9]+)+(?:-[A-Za-z0-9.-]+)?$"));
+    QJsonObject best;
+    for (const auto &entry : releases) {
+        const auto release = entry.toObject();
+        const auto tag = release.value("tag_name").toString();
+        if (release.value("draft").toBool() || !validTag.match(tag).hasMatch()
+            || (!isPreRelease(current)
+                && (release.value("prerelease").toBool() || isPreRelease(tag)))
+            || !isVersionNewer(tag, current))
+            continue;
+        if (best.isEmpty() || isVersionNewer(tag, best.value("tag_name").toString()))
+            best = release;
+    }
+    return best;
 }
 
 QString UpdateChecker::assetNameForCurrentOS(const QString &tag) const
@@ -281,200 +363,296 @@ QString UpdateChecker::assetNameForCurrentOS(const QString &tag) const
 #endif
 }
 
+bool UpdateChecker::isTrustedDownloadUrl(const QUrl &url)
+{
+    return url.isValid() && url.scheme() == QLatin1String("https")
+        && url.userInfo().isEmpty() && url.port(443) == 443
+        && (url.host() == QLatin1String("github.com")
+            || url.host() == QLatin1String("release-assets.githubusercontent.com")
+            || url.host() == QLatin1String("objects.githubusercontent.com"));
+}
+
+UpdateChecker::~UpdateChecker()
+{
+    // No signal may leave the object from here on: a slot reacting to one
+    // would run against a half-destroyed UpdateChecker.
+    _destructing = true;
+    // The detached installer must survive application teardown after handoff.
+    if (!_handoff) cancelDownload();
+}
+
+bool UpdateChecker::_markCancelledForInstaller()
+{
+    // The detached installer polls for this file and aborts when it appears
+    // (install_update.py, "cancelled"). It is the ONLY channel we have once
+    // startDetached() has returned, so a silent failure here means a cancelled
+    // update installs itself anyway -- after ngPost has already exited.
+    if (!_work)
+        return true; // nothing staged, nothing to call off
+
+    QString const path = _work->filePath(QStringLiteral("cancelled"));
+    QFile         cancelled(path);
+    if (cancelled.open(QIODevice::WriteOnly)) {
+        cancelled.close();
+        return true;
+    }
+
+    // qWarning, not qDebug: release builds define QT_NO_DEBUG_OUTPUT, and this
+    // is the one trace left when the GUI is already gone.
+    qWarning().noquote() << QStringLiteral(
+                                "[UpdateChecker] could not write '%1' (%2); a detached update "
+                                "installer cannot be called off")
+                                .arg(path, cancelled.errorString());
+    return false;
+}
+
+void UpdateChecker::cancelDownload()
+{
+    ++_generation;
+    _cancelled = true;
+    bool const calledOff = _markCancelledForInstaller();
+    if (_downloadReply) {
+        auto reply = _downloadReply.data();
+        _downloadReply = nullptr;
+        disconnect(reply, nullptr, this, nullptr);
+        reply->abort();
+        reply->deleteLater();
+    }
+    _downloadFile.reset();
+    if (_installer) {
+        auto process = _installer.data();
+        _installer = nullptr;
+        disconnect(process, nullptr, this, nullptr);
+        process->kill();
+        process->waitForFinished(3000);
+        process->deleteLater();
+    }
+    _busy = false;
+
+    // Killing our own child says nothing about the detached installer: once
+    // _detached is set, that process owns the install directory and only the
+    // marker stops it. Telling the user the cancellation did not take is the
+    // whole point -- silently returning would leave them believing it did.
+    if (!calledOff && _detached && !_destructing)
+        emit downloadFailed(tr("Could not cancel the update: ngPost failed to signal the installer "
+                               "already running, and it may replace this installation. Check the "
+                               "version after the next start."));
+}
+
+void UpdateChecker::failDownload(const QString &message)
+{
+    // Invalidate detached-readiness timers before a retry can create new work.
+    ++_generation;
+    bool const calledOff = _markCancelledForInstaller();
+    _busy = false;
+    _downloadFile.reset();
+    if (_cancelled)
+        return;
+
+    QString reported = message;
+    if (!calledOff && _detached) {
+        reported += QLatin1Char(' ')
+                  + tr("The installer already running could not be stopped either, and it may "
+                       "replace this installation.");
+    }
+    emit downloadFailed(reported);
+}
+
 void UpdateChecker::startDownloadAndInstall()
 {
-    if (!_assetUrl.isValid())
-    {
-        QDesktopServices::openUrl(_releasePageUrl);
+    if (_busy || isAppImage()) return;
+    ++_generation;
+    _cancelled = false;
+    // A previous attempt that reached startDetached() and then failed its
+    // readiness wait leaves _detached set. Carrying that into a retry makes a
+    // failed marker write claim an installer is running when none is, which
+    // turns a warning the user must trust into one they learn to ignore.
+    _detached = false;
+    if (!isTrustedDownloadUrl(_assetUrl) || _assetSize <= 0 || _assetSize > 1024LL * 1024 * 1024) {
+        failDownload(tr("No bounded, trusted update asset is available."));
         return;
     }
-
-#if defined(Q_OS_LINUX)
-    if (!QFileInfo(QCoreApplication::applicationDirPath()).isWritable())
-    {
-        emit downloadFailed(tr("Unable to write to install directory %1. Opening release page instead.")
-                            .arg(QCoreApplication::applicationDirPath()));
-        QDesktopServices::openUrl(_releasePageUrl);
+    _python = QStandardPaths::findExecutable(QStringLiteral("python3"));
+    if (_python.isEmpty()) _python = QStandardPaths::findExecutable(QStringLiteral("python"));
+    if (_python.isEmpty()) {
+        failDownload(tr("Automatic updates require Python 3.9+. Install this release manually after checking its published SHA-256 hash."));
         return;
     }
-#endif
-
-    QNetworkRequest req(_assetUrl);
-    req.setRawHeader("User-Agent", "ngPost C++ app");
-    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-
-    _reply = _netMgr->get(req);
-    connect(_reply, &QNetworkReply::downloadProgress, this, &UpdateChecker::downloadProgress);
-    connect(_reply, &QNetworkReply::finished,         this, &UpdateChecker::onAssetDownloadFinished);
-}
-
-void UpdateChecker::onAssetDownloadFinished()
-{
-    QNetworkReply *reply = static_cast<QNetworkReply *>(sender());
-    reply->deleteLater();
-    _reply = nullptr;
-
-    if (reply->error() != QNetworkReply::NoError)
-    {
-        emit downloadFailed(reply->errorString());
+    _installDir = installationDirectory();
+    if (!QFileInfo::exists(_installDir + QStringLiteral("/.ngpost-installation"))) {
+        failDownload(tr("This installation has no package ownership marker. Install a package manually after checking its SHA-256 hash before enabling automatic replacement."));
         return;
     }
-
-    const QString tmpDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    QDir().mkpath(tmpDir);
-    const QString archivePath = QDir(tmpDir).filePath(_assetFileName);
-
-    QFile out(archivePath);
-    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
-    {
-        emit downloadFailed(tr("Cannot write to %1").arg(archivePath));
+    // Stage on the same filesystem. Replacing /usr/bin or another shared
+    // directory is never an allowed updater operation.
+    if (!canInstallAutomatically()) {
+        failDownload(tr("This installation cannot be replaced safely; use its package installer."));
         return;
     }
-    out.write(reply->readAll());
-    out.close();
-
-    emit installStarting();
-
-#if defined(Q_OS_WIN)
-    runInstallerWindows(archivePath);
-#elif defined(Q_OS_MACOS)
-    runInstallerMacOS(archivePath);
-#else
-    runInstallerLinux(archivePath);
-#endif
+    _work.reset(new QTemporaryDir(QFileInfo(_installDir).absolutePath() + QStringLiteral("/.ngpost-update-XXXXXX")));
+    if (!_work->isValid() || !PathHelper::restrictToOwner(_work->path())) {
+        failDownload(tr("Cannot create a private update directory."));
+        return;
+    }
+    for (const QString &name : {QStringLiteral("install_update.py")}) {
+        const QString target = _work->filePath(name);
+        if (!QFile::copy(QStringLiteral(":/update/") + name, target)
+            || !PathHelper::restrictToOwner(target)) {
+            failDownload(tr("Cannot stage update verifier."));
+            return;
+        }
+    }
+    _busy = true;
+    QUrl manifest = _assetUrl;
+    manifest.setPath(_assetUrl.path().left(_assetUrl.path().lastIndexOf('/') + 1) + QStringLiteral("manifest.json"));
+    manifest.setQuery(QString());
+    downloadFile(manifest, QStringLiteral("manifest.json"), qint64(1024) * 1024, [this] {
+        downloadFile(_assetUrl, QStringLiteral("archive"), _assetSize, [this] { prepareInstall(); });
+    });
 }
 
-#if defined(Q_OS_WIN)
-bool UpdateChecker::runInstallerWindows(const QString &archivePath)
+void UpdateChecker::downloadFile(const QUrl &url,
+                                 const QString &name,
+                                 qint64 cap,
+                                 const std::function<void()> &done)
 {
-    const QString tmpDir       = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    const QString extractDir   = QDir(tmpDir).filePath("ngPost-update");
-    const QString installDir   = QCoreApplication::applicationDirPath();
-    const QString scriptPath   = QDir(tmpDir).filePath("ngPost-update.bat");
-    const QString exePath      = QDir(installDir).filePath("ngPost.exe");
-
-    QFile bat(scriptPath);
-    if (!bat.open(QIODevice::WriteOnly | QIODevice::Truncate))
-        return false;
-    QTextStream s(&bat);
-    s << "@echo off\r\n"
-      << "timeout /t 2 /nobreak >nul\r\n"
-      << "if exist \"" << QDir::toNativeSeparators(extractDir) << "\" rd /s /q \""
-                       << QDir::toNativeSeparators(extractDir) << "\"\r\n"
-      << "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Expand-Archive -LiteralPath '"
-                       << QDir::toNativeSeparators(archivePath) << "' -DestinationPath '"
-                       << QDir::toNativeSeparators(extractDir) << "' -Force\"\r\n"
-      // The archive contains a single top-level folder ngPost-<tag>-windows-x86_64/
-      << "for /d %%D in (\"" << QDir::toNativeSeparators(extractDir) << "\\*\") do (\r\n"
-      << "    xcopy /E /Y /I /Q \"%%D\\*\" \"" << QDir::toNativeSeparators(installDir) << "\"\r\n"
-      << ")\r\n"
-      << "start \"\" \"" << QDir::toNativeSeparators(exePath) << "\"\r\n"
-      << "rd /s /q \"" << QDir::toNativeSeparators(extractDir) << "\"\r\n"
-      << "del /q \"" << QDir::toNativeSeparators(archivePath) << "\"\r\n"
-      << "del /q \"%~f0\"\r\n";
-    s.flush();
-    bat.close();
-
-    const bool ok = QProcess::startDetached(
-        "cmd.exe", { "/c", QDir::toNativeSeparators(scriptPath) });
-    if (ok)
-        QCoreApplication::quit();
-    return ok;
+    if (_cancelled) return;
+    _downloadFile.reset(new QFile(_work->filePath(name)));
+    if (!_downloadFile->open(QIODevice::WriteOnly | QIODevice::NewOnly)
+        || !PathHelper::restrictToOwner(_downloadFile->fileName())) {
+        failDownload(tr("Cannot write update file."));
+        return;
+    }
+    QNetworkRequest req(url);
+    req.setTransferTimeout(30000);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::UserVerifiedRedirectPolicy);
+    auto *reply = _netMgr->get(req);
+    _downloadReply = reply;
+    reply->setReadBufferSize(65536);
+    connect(reply, &QNetworkReply::redirected, reply, [reply](const QUrl &redirect) {
+        if (isTrustedDownloadUrl(redirect)) reply->redirectAllowed();
+        else reply->abort();
+    });
+    auto written = std::make_shared<qint64>(0);
+    auto error = std::make_shared<QString>();
+    auto drain = [this, reply, cap, written, error] {
+        _drainDownload(reply, cap, written.get(), error.get());
+    };
+    connect(reply, &QIODevice::readyRead, this, drain);
+    connect(reply, &QNetworkReply::downloadProgress, this, &UpdateChecker::downloadProgress);
+    connect(reply,
+            &QNetworkReply::finished,
+            this,
+            [this, reply, drain, written, error, name, cap, done] {
+        if (_downloadReply != reply) {
+            reply->deleteLater();
+            return;
+        }
+        drain();
+        _downloadReply = nullptr;
+        reply->deleteLater();
+        _completeDownload(reply, name, *written, cap, *error, done);
+    });
 }
-#else
-bool UpdateChecker::runInstallerWindows(const QString &) { return false; }
-#endif
 
-#if defined(Q_OS_MACOS)
-bool UpdateChecker::runInstallerMacOS(const QString &archivePath)
+//! Moves what \a reply holds into the download file, \a cap bytes at most.
+void UpdateChecker::_drainDownload(QNetworkReply *reply,
+                                   qint64 cap,
+                                   qint64 *written,
+                                   QString *error)
 {
-    // applicationDirPath() inside a bundle points to <App>.app/Contents/MacOS — climb 2 levels up.
-    const QFileInfo appExe(QCoreApplication::applicationFilePath());
-    QDir bundleDir = appExe.dir();
-    bundleDir.cdUp(); // Contents
-    bundleDir.cdUp(); // <App>.app
-    const QString bundlePath  = bundleDir.absolutePath();
-    const QString installRoot = QFileInfo(bundlePath).absolutePath();
-
-    const QString tmpExtract = "/tmp/ngPost-update";
-    const QString scriptPath = "/tmp/ngPost-update.sh";
-
-    QFile sh(scriptPath);
-    if (!sh.open(QIODevice::WriteOnly | QIODevice::Truncate))
-        return false;
-    QTextStream s(&sh);
-    s << "#!/bin/bash\n"
-      << "set -e\n"
-      << "sleep 1\n"
-      << "rm -rf '" << tmpExtract << "'\n"
-      << "mkdir -p '" << tmpExtract << "'\n"
-      << "unzip -q '" << archivePath << "' -d '" << tmpExtract << "'\n"
-      << "rm -rf '" << bundlePath << "'\n"
-      << "if [ -d '" << tmpExtract << "/ngPost.app' ]; then\n"
-      << "    mv '" << tmpExtract << "/ngPost.app' '" << installRoot << "/'\n"
-      << "else\n"
-      << "    # archive may wrap the bundle in a subfolder\n"
-      << "    APP=$(find '" << tmpExtract << "' -maxdepth 3 -name 'ngPost.app' -print -quit)\n"
-      << "    [ -n \"$APP\" ] && mv \"$APP\" '" << installRoot << "/'\n"
-      << "fi\n"
-      << "rm -rf '" << tmpExtract << "' '" << archivePath << "'\n"
-      << "open '" << bundlePath << "'\n"
-      << "rm -f \"$0\"\n";
-    s.flush();
-    sh.close();
-    QFile::setPermissions(scriptPath,
-        QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner |
-        QFile::ReadGroup | QFile::ExeGroup |
-        QFile::ReadOther | QFile::ExeOther);
-
-    const bool ok = QProcess::startDetached("/bin/bash", { scriptPath });
-    if (ok)
-        QCoreApplication::quit();
-    return ok;
+    if (_downloadReply != reply || !_downloadFile)
+        return;
+    while (reply->bytesAvailable() && error->isEmpty() && !_cancelled) {
+        const QByteArray data = reply->read(65536);
+        if (data.isEmpty())
+            break;
+        if (*written + data.size() > cap || _downloadFile->write(data) != data.size()) {
+            *error = tr("Update exceeds its size limit or could not be written.");
+            reply->abort();
+            return;
+        }
+        *written += data.size();
+    }
 }
-#else
-bool UpdateChecker::runInstallerMacOS(const QString &) { return false; }
-#endif
 
-#if defined(Q_OS_LINUX)
-bool UpdateChecker::runInstallerLinux(const QString &archivePath)
+//! Once \a reply has finished: keeps the file and calls \a done when it is
+//! complete, fails the update otherwise. The archive must be exactly \a cap long.
+void UpdateChecker::_completeDownload(QNetworkReply *reply,
+                                      const QString &name,
+                                      qint64 written,
+                                      qint64 cap,
+                                      const QString &error,
+                                      const std::function<void()> &done)
 {
-    const QString installDir = QCoreApplication::applicationDirPath();
-    const QString tmpExtract = "/tmp/ngPost-update";
-    const QString scriptPath = "/tmp/ngPost-update.sh";
-    const QString exePath    = QDir(installDir).filePath("ngPost");
-
-    QFile sh(scriptPath);
-    if (!sh.open(QIODevice::WriteOnly | QIODevice::Truncate))
-        return false;
-    QTextStream s(&sh);
-    s << "#!/bin/bash\n"
-      << "set -e\n"
-      << "sleep 1\n"
-      << "rm -rf '" << tmpExtract << "'\n"
-      << "mkdir -p '" << tmpExtract << "'\n"
-      << "tar -xzf '" << archivePath << "' -C '" << tmpExtract << "'\n"
-      // Tarball contains a single top-level folder ngPost-<tag>-linux-x86_64/
-      << "SRC=$(find '" << tmpExtract << "' -mindepth 1 -maxdepth 1 -type d -print -quit)\n"
-      << "if [ -n \"$SRC\" ]; then\n"
-      << "    cp -af \"$SRC\"/. '" << installDir << "/'\n"
-      << "fi\n"
-      << "chmod +x '" << exePath << "' 2>/dev/null || true\n"
-      << "rm -rf '" << tmpExtract << "' '" << archivePath << "'\n"
-      << "( '" << exePath << "' & ) >/dev/null 2>&1\n"
-      << "rm -f \"$0\"\n";
-    s.flush();
-    sh.close();
-    QFile::setPermissions(scriptPath,
-        QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner |
-        QFile::ReadGroup | QFile::ExeGroup |
-        QFile::ReadOther | QFile::ExeOther);
-
-    const bool ok = QProcess::startDetached("/bin/bash", { scriptPath });
-    if (ok)
-        QCoreApplication::quit();
-    return ok;
+    const bool ok = !_cancelled && error.isEmpty() && reply->error() == QNetworkReply::NoError
+        && reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200
+        && (name != QLatin1String("archive") || written == cap) && _downloadFile
+        && _downloadFile->flush();
+    _downloadFile.reset();
+    if (!ok) {
+        failDownload(error.isEmpty() ? tr("Update canceled, truncated or refused by the server.")
+                                     : error);
+        return;
+    }
+    done();
 }
-#else
-bool UpdateChecker::runInstallerLinux(const QString &) { return false; }
-#endif
+
+void UpdateChecker::prepareInstall()
+{
+    auto *process = new QProcess(this);
+    _installer = process;
+    QTimer::singleShot(120000, process, [process] {
+        if (process->state() != QProcess::NotRunning) process->kill();
+    });
+    process->setProcessChannelMode(QProcess::MergedChannels);
+    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart && _installer == process) {
+            _installer = nullptr;
+            process->deleteLater();
+            failDownload(tr("Cannot start update verifier."));
+        }
+    });
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [this, process](int code, QProcess::ExitStatus status) {
+        process->deleteLater();
+        if (_installer != process) return;
+        _installer = nullptr;
+        if (_cancelled) return;
+        if (status != QProcess::NormalExit || code != 0) {
+            failDownload(tr("SHA-256, extraction or package validation failed: %1")
+                         .arg(QString::fromUtf8(process->readAll()).left(2048)));
+            return;
+        }
+        const QString work = _work->path();
+        if (!QProcess::startDetached(_python, {QStringLiteral("-I"), _work->filePath(QStringLiteral("install_update.py")),
+            QStringLiteral("commit"), work, QStringLiteral("--pid"), QString::number(QCoreApplication::applicationPid())})) {
+            failDownload(tr("Cannot start update transaction."));
+            return;
+        }
+        // From here the installer is out of our process tree: the "cancelled"
+        // marker is the only way left to stop it.
+        _detached = true;
+        // Keep files alive until the detached installer acknowledges readiness.
+        _work->setAutoRemove(false);
+        auto *timer = new QTimer(this);
+        auto elapsed = std::make_shared<int>(0);
+        const quint64 generation = _generation;
+        connect(timer, &QTimer::timeout, this, [this, timer, work, elapsed, generation] {
+            if (_cancelled || generation != _generation) { timer->stop(); timer->deleteLater(); return; }
+            if (QFileInfo::exists(work + QStringLiteral("/ready"))) {
+                timer->stop(); timer->deleteLater();
+                _handoff = true;
+                emit installStarting();
+                QCoreApplication::quit();
+            } else if (++*elapsed > 100 || QFileInfo::exists(work + QStringLiteral("/error.txt"))) {
+                timer->stop(); timer->deleteLater();
+                failDownload(tr("Update installer did not become ready. Previous installation retained."));
+            }
+        });
+        timer->start(100);
+    });
+    process->start(_python, {QStringLiteral("-I"), _work->filePath(QStringLiteral("install_update.py")),
+        QStringLiteral("prepare"), _work->path(), QStringLiteral("--tag"), _latestTag,
+        QStringLiteral("--asset"), _assetFileName, QStringLiteral("--install"), _installDir});
+}

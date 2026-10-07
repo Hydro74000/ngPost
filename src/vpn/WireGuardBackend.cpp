@@ -10,6 +10,13 @@
 #include "WireGuardBackend.h"
 
 #include "VpnManager.h"
+#include "VpnProtocol.h"
+#ifdef Q_OS_WIN
+#include "WindowsSecurity.h"
+#include "WindowsServiceControl.h"
+#include <QElapsedTimer>
+#include <QThread>
+#endif
 
 #include <QCoreApplication>
 #include <QFile>
@@ -23,12 +30,14 @@ WireGuardBackend::WireGuardBackend(QObject *parent)
     , _proc(nullptr)
     , _stdoutBuffer()
     , _readySignaled(false)
+    , _protocolV2Seen(false)
 #ifdef Q_OS_WIN
     , _winServiceName()
     , _winConfigPath()
     , _winIface()
     , _winPollAttempts(0)
     , _winPollTimer(nullptr)
+    , _winWatchdog(nullptr)
 #endif
 {}
 
@@ -37,7 +46,7 @@ namespace
 QString bundledVpnBinDir()
 {
 #ifdef Q_OS_LINUX
-    QString const dir = QCoreApplication::applicationDirPath() + QStringLiteral("/vpn");
+    QString dir = QCoreApplication::applicationDirPath() + QStringLiteral("/vpn");
     if (QFileInfo::exists(dir + QStringLiteral("/wg"))
         || QFileInfo::exists(dir + QStringLiteral("/wireguard-go")))
         return dir;
@@ -87,6 +96,23 @@ bool WireGuardBackend::parseInterfaceAddrAndDns(QString const &confContent,
 
 WireGuardBackend::~WireGuardBackend()
 {
+#ifdef Q_OS_WIN
+    if (_winWatchdog) {
+        disconnect(_winWatchdog, nullptr, this, nullptr);
+        if (!_winServiceName.isEmpty()) {
+            // A timed-out shutdown must not kill the last parent-death guard.
+            // Leave this independent process alive until ngPost exits.
+            _winWatchdog->setParent(nullptr);
+            connect(_winWatchdog, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+                    _winWatchdog, &QObject::deleteLater);
+        } else {
+            _winWatchdog->kill();
+            _winWatchdog->waitForFinished(2000);
+            delete _winWatchdog;
+        }
+        _winWatchdog = nullptr;
+    }
+#endif
     if (_proc) {
         if (_proc->state() != QProcess::NotRunning) {
             _proc->closeWriteChannel();
@@ -100,6 +126,7 @@ WireGuardBackend::~WireGuardBackend()
 
 bool WireGuardBackend::start(QString const &configPathPacked)
 {
+    _resetRunState();
 #ifdef Q_OS_WIN
     // Drive the registered WireGuard tunnel service via the Service Control
     // Manager. Keep locals scoped away from the Linux path below.
@@ -112,8 +139,10 @@ bool WireGuardBackend::start(QString const &configPathPacked)
     }
 #elif !defined(Q_OS_LINUX)
     Q_UNUSED(configPathPacked);
-    emit failed(tr("Native VPN integration is currently Linux-only. "
-                   "macOS support is in progress."));
+    _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                         VpnFailureKind::Configuration,
+                         tr("Native VPN integration is currently Linux-only. "
+                            "macOS support is in progress."));
     return false;
 #endif
 
@@ -130,17 +159,22 @@ bool WireGuardBackend::start(QString const &configPathPacked)
 
     QFileInfo fi(configPath);
     if (!fi.exists() || !fi.isReadable()) {
-        emit failed(tr("Config file not found or unreadable: %1").arg(configPath));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::Configuration,
+                             tr("Config file not found or unreadable: %1").arg(configPath));
         return false;
     }
 
     QString helper = VpnManager::helperScriptPath();
     if (helper.isEmpty()) {
-        emit failed(tr("Privileged helper script ngpost-vpn-helper.sh not found"));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Privileged helper script ngpost-vpn-helper.sh not found"));
         return false;
     }
 
     _readySignaled = false;
+    _protocolV2Seen = false;
     _stdoutBuffer.clear();
 
     _proc = new QProcess(this);
@@ -154,8 +188,14 @@ bool WireGuardBackend::start(QString const &configPathPacked)
             this, &WireGuardBackend::onProcessError);
 
     QStringList helperArgs;
-    helperArgs << helper << "wireguard" << fi.absoluteFilePath();
-    QString const binDir = bundledVpnBinDir();
+    helperArgs << helper << "wireguard" << fi.absoluteFilePath()
+               << "--protocol" << "2"
+               << "--owner-pid" << QString::number(QCoreApplication::applicationPid())
+               << "--owner-start" << VpnManager::currentProcessStartTime()
+               << "--wait-minutes" << QString::number(VpnManager::instance()
+                       ? VpnManager::instance()->effectiveLeaseWaitMinutes() : 0);
+    QString const binDir = helper == QString::fromLatin1(VpnManager::kInstalledHelperPath)
+        ? QString() : bundledVpnBinDir();
     if (!binDir.isEmpty())
         helperArgs << "--bin-dir" << binDir;
 
@@ -166,7 +206,9 @@ bool WireGuardBackend::start(QString const &configPathPacked)
     emit logLine(tr("Launching VPN helper: %1 %2").arg(launcher, args.join(' ')));
     _proc->start(launcher, args);
     if (!_proc->waitForStarted(5000)) {
-        emit failed(tr("Failed to start %1/helper").arg(launcher));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Failed to start %1/helper").arg(launcher));
         delete _proc;
         _proc = nullptr;
         return false;
@@ -176,26 +218,58 @@ bool WireGuardBackend::start(QString const &configPathPacked)
 
 void WireGuardBackend::stop()
 {
+    _requestStop();
 #ifdef Q_OS_WIN
     _stopWindows();
     return;
 #endif
     if (!_proc) {
-        emit stopped();
+        _emitTerminationOnce(VpnTerminationKind::RequestedStop,
+                             VpnFailureKind::None, QString());
         return;
     }
     if (_proc->state() == QProcess::NotRunning) {
-        emit stopped();
+        _emitTerminationOnce(VpnTerminationKind::RequestedStop,
+                             VpnFailureKind::None, QString());
         return;
     }
     _proc->closeWriteChannel();
+}
+
+bool WireGuardBackend::restart(quint64 attemptId)
+{
+#ifdef Q_OS_WIN
+    Q_UNUSED(attemptId);
+    return false;
+#else
+    if (!_proc || _proc->state() == QProcess::NotRunning)
+        return false;
+    QByteArray command = QByteArrayLiteral("RESTART attempt_id=")
+        + QByteArray::number(attemptId) + '\n';
+    return _proc->write(command) == command.size();
+#endif
+}
+
+void WireGuardBackend::setActive(bool active)
+{
+#ifndef Q_OS_WIN
+    if (_proc && _proc->state() != QProcess::NotRunning)
+        _proc->write(active ? "ACTIVE\n" : "IDLE\n");
+#else
+    Q_UNUSED(active);
+#endif
 }
 
 void WireGuardBackend::stopAndWait(int timeoutMs)
 {
     stop();
 #ifdef Q_OS_WIN
-    Q_UNUSED(timeoutMs);
+    QElapsedTimer deadline;
+    deadline.start();
+    while (isRunning() && deadline.elapsed() < timeoutMs) {
+        QThread::msleep(50);
+        _pollWindowsStop();
+    }
     return;
 #endif
     if (_proc && _proc->state() != QProcess::NotRunning)
@@ -227,46 +301,127 @@ void WireGuardBackend::_handleLine(QString const &line)
 {
     if (line.isEmpty())
         return;
-    if (line.startsWith(QLatin1String("READY "))) {
-        QStringList parts = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-        if (parts.size() >= 3) {
-            QHostAddress ip(parts.at(2));
-            if (!ip.isNull()) {
-                QHostAddress dns;
-                if (parts.size() >= 4 && parts.at(3) != QLatin1String("-"))
-                    dns = QHostAddress(parts.at(3));
-                _readySignaled = true;
-                emit ready(parts.at(1), ip, dns);
-                return;
-            }
-        }
-        emit logLine(tr("Malformed READY from helper: %1").arg(line));
-    }
-    else if (line.startsWith(QLatin1String("ERROR "))) {
-        emit failed(line.mid(6));
-    }
-    else if (line.startsWith(QLatin1String("LOG "))) {
-        emit logLine(line.mid(4));
-    }
-    else {
+    VpnProtocol::Message const message = VpnProtocol::parse(line);
+    using Type = VpnProtocol::Type;
+    if (message.type == Type::Invalid) {
         emit logLine(line);
+        return;
+    }
+    if (message.type == Type::Protocol) {
+        _protocolV2Seen = true;
+        return;
+    }
+    if (message.type == Type::Log) {
+        emit logLine(message.detail);
+        return;
+    }
+    if (message.type == Type::Waiting || message.type == Type::Busy) {
+        emit statusLine(message.type == Type::Waiting
+            ? tr("Waiting for VPN lease held by ngPost PID %1 (helper %2)")
+                  .arg(message.fields.value(QStringLiteral("owner_pid")),
+                       message.fields.value(QStringLiteral("helper_pid")))
+            : tr("VPN lease is held by ngPost PID %1 (helper %2)")
+                  .arg(message.fields.value(QStringLiteral("owner_pid")),
+                       message.fields.value(QStringLiteral("helper_pid"))));
+        if (message.type == Type::Waiting)
+            return;
+    }
+    if (message.type == Type::Ready) {
+        if (!_protocolV2Seen || message.legacy) {
+            _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                                 VpnFailureKind::HelperOutdated,
+                                 tr("The installed VPN helper is version 1; update it before connecting."));
+            if (_proc)
+                _proc->closeWriteChannel();
+            return;
+        }
+        QHostAddress const ip(message.fields.value(QStringLiteral("ip")));
+        QHostAddress dns;
+        QString const dnsText = message.fields.value(QStringLiteral("dns"));
+        if (!dnsText.isEmpty() && dnsText != QLatin1String("-"))
+            dns = QHostAddress(dnsText);
+        bool ok = false;
+        quint64 const attemptId = message.fields.value(QStringLiteral("attempt_id")).toULongLong(&ok);
+        if (ip.isNull() || !ok) {
+            emit logLine(tr("Malformed READY from helper: %1").arg(line));
+            return;
+        }
+        _readySignaled = true;
+        _markReady();
+        if (attemptId == 0)
+            emit ready(message.fields.value(QStringLiteral("iface")), ip, dns);
+        else
+            emit restartReady(attemptId, message.fields.value(QStringLiteral("iface")), ip, dns);
+        return;
+    }
+    if (message.type == Type::Suspect) {
+        emit healthChanged(VpnBackendHealth::Suspect,
+                           message.fields.value(QStringLiteral("reason")));
+        return;
+    }
+    if (message.type == Type::Healthy) {
+        emit healthChanged(VpnBackendHealth::Healthy, QString());
+        return;
+    }
+    if (message.type == Type::Down) {
+        emit healthChanged(VpnBackendHealth::Down,
+                           message.fields.value(QStringLiteral("reason")));
+        return;
+    }
+    if (message.type == Type::RestartFailed) {
+        emit restartFailed(message.fields.value(QStringLiteral("attempt_id")).toULongLong(),
+                           vpnFailureKindFromProtocol(
+                               message.fields.value(QStringLiteral("failure")),
+                               VpnFailureKind::TunnelLost),
+                           message.detail);
+        return;
+    }
+    VpnFailureKind failure = VpnFailureKind::Internal;
+    if (message.legacy) failure = VpnFailureKind::HelperOutdated;
+    else if (message.type == Type::Busy || message.type == Type::LegacyOwnerActive)
+        failure = VpnFailureKind::LeaseBusy;
+    else if (message.type == Type::LeaseTimeout) failure = VpnFailureKind::LeaseTimeout;
+    else if (message.type == Type::LeaseUnavailable) failure = VpnFailureKind::LeaseUnavailable;
+    else if (message.type == Type::RuntimeNotVolatile) failure = VpnFailureKind::RuntimeNotVolatile;
+    else if (message.type == Type::UnattributedVpnState)
+        failure = VpnFailureKind::UnattributedVpnState;
+    else if (message.type == Type::Error)
+        failure = vpnFailureKindFromProtocol(
+            message.fields.value(QStringLiteral("failure")));
+    if (message.isTerminal()) {
+        QString detail = message.detail;
+        if (detail.isEmpty()) detail = line;
+        _emitTerminationOnce(_wasReady ? VpnTerminationKind::UnexpectedExit
+                                       : VpnTerminationKind::StartFailure,
+                             failure, detail);
     }
 }
 
 void WireGuardBackend::onProcessFinished(int exitCode, QProcess::ExitStatus status)
 {
-    Q_UNUSED(status);
-    if (!_readySignaled)
-        emit failed(tr("helper exited (code %1) before tunnel was ready").arg(exitCode));
-    emit stopped();
+    VpnTerminationKind const kind = _stopRequested
+        ? VpnTerminationKind::RequestedStop
+        : (_wasReady ? VpnTerminationKind::UnexpectedExit
+                     : VpnTerminationKind::StartFailure);
+    VpnFailureKind const failure = _stopRequested ? VpnFailureKind::None
+        : (_wasReady ? VpnFailureKind::HelperExited : VpnFailureKind::HelperUnavailable);
+    QString const detail = status == QProcess::CrashExit
+        ? tr("VPN helper crashed") : tr("VPN helper exited with code %1").arg(exitCode);
+    _emitTerminationOnce(kind, failure, detail);
 }
 
 void WireGuardBackend::onProcessError(QProcess::ProcessError err)
 {
     if (err == QProcess::FailedToStart)
-        emit failed(tr("pkexec/helper failed to start"));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("pkexec/helper failed to start"));
     else if (err == QProcess::Crashed)
-        emit failed(tr("helper process crashed"));
+        _emitTerminationOnce(_wasReady ? VpnTerminationKind::UnexpectedExit
+                                       : VpnTerminationKind::StartFailure,
+                             _wasReady ? VpnFailureKind::HelperExited
+                                       : VpnFailureKind::HelperUnavailable,
+                             tr("helper process crashed"));
 }
 
 #ifdef Q_OS_WIN
@@ -288,21 +443,31 @@ void WireGuardBackend::onProcessError(QProcess::ProcessError err)
 //   - Disconnect : sc stop  WireGuardTunnel$<name>
 //   - Query info : wg.exe show <name>  → iface, ip, dns
 //
-// We use sc.exe via QProcess rather than calling the Win32 SCM API directly
-// because it keeps the code paths uniform with the rest of the project (we
-// already shell out to a binary on Linux too) and avoids pulling in
-// advapi32-only types into headers that should compile under both OSes.
+// SCM queries use the native API: localized sc.exe text and a successful
+// STOP request cannot prove that the service is actually stopped.
 
+#include <QDir>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QStandardPaths>
 #include <QTimer>
 
 bool WireGuardBackend::_queryTunnelInfo(QString *iface, QString *ip, QString *dns) const
 {
     // After the service brings the tunnel up, query its state with wg.exe.
-    QString wgPath = QStandardPaths::findExecutable(QStringLiteral("wg.exe"));
+    // Only the machine's Program Files roots, never PATH or environment roots.
+    QString wgPath;
+    {
+        for (QString const &root : VpnManager::windowsProgramFilesRoots()) {
+            QString const candidate = QDir(root).filePath(QStringLiteral("WireGuard/wg.exe"));
+            if (QFileInfo::exists(candidate)) {
+                wgPath = candidate;
+                break;
+            }
+        }
+    }
     if (wgPath.isEmpty())
-        wgPath = QStringLiteral("C:/Program Files/WireGuard/wg.exe");
+        return false;
 
     // wg show takes the iface name = service name without the prefix.
     QString tunnelName = _winServiceName;
@@ -336,7 +501,9 @@ bool WireGuardBackend::_startWindows(QString const &configPath)
 {
     QFileInfo fi(configPath);
     if (!fi.exists()) {
-        emit failed(tr("WireGuard config not found: %1").arg(configPath));
+        _emitTerminationOnce(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::Configuration,
+                             tr("WireGuard config not found: %1").arg(configPath));
         return false;
     }
     _winServiceName = serviceNameFromConfig(configPath);
@@ -345,21 +512,60 @@ bool WireGuardBackend::_startWindows(QString const &configPath)
 
     emit logLine(tr("Starting WireGuard service: %1").arg(_winServiceName));
 
-    QProcess sc;
-    sc.start(QStringLiteral("sc.exe"),
-             {QStringLiteral("start"), _winServiceName});
-    if (!sc.waitForFinished(5000)) {
-        emit failed(tr("sc start timed out — is the tunnel registered? "
-                       "(re-import the profile)"));
-        return false;
+    QString startError;
+    if (!WindowsServiceControl::startDemand(_winServiceName, &startError)) {
+        _finishWindowsRun(VpnTerminationKind::StartFailure,
+                          VpnFailureKind::ProcessExited, startError);
+        // Teardown owns this run until SCM confirms it is really stopped.
+        return true;
     }
-    int code = sc.exitCode();
-    // sc.exe exits 1056 = "service is already running", which we accept.
-    if (code != 0 && code != 1056) {
-        emit failed(tr("sc start failed (exit %1) — make sure the WireGuard "
-                       "tunnel was installed via wireguard.exe /installtunnelservice "
-                       "and that runtime ACL grants you START.").arg(code));
-        return false;
+
+    // A service is not a child process, so it would otherwise outlive a killed
+    // ngPost indefinitely. This small independent watcher opens the parent now,
+    // waits on that process handle (not a reused PID), and stops this exact
+    // WireGuard service after the handle is signalled. Arguments travel through
+    // the environment so profile-controlled service names never enter code.
+    _winWatchdog = new QProcess(this);
+    QProcessEnvironment watchdogEnv = QProcessEnvironment::systemEnvironment();
+    watchdogEnv.insert(QStringLiteral("NGPOST_VPN_PARENT_PID"),
+                       QString::number(QCoreApplication::applicationPid()));
+    watchdogEnv.insert(QStringLiteral("NGPOST_VPN_PARENT_START"),
+                       VpnManager::currentProcessStartTime());
+    watchdogEnv.insert(QStringLiteral("NGPOST_VPN_SERVICE"), _winServiceName);
+    _winWatchdog->setProcessEnvironment(watchdogEnv);
+    _winWatchdog->setStandardOutputFile(QProcess::nullDevice());
+    _winWatchdog->setStandardErrorFile(QProcess::nullDevice());
+    connect(_winWatchdog,
+            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this](int, QProcess::ExitStatus) {
+        if (!_stopRequested && !_winServiceName.isEmpty()) {
+            _finishWindowsRun(_wasReady ? VpnTerminationKind::UnexpectedExit
+                                           : VpnTerminationKind::StartFailure,
+                                 VpnFailureKind::HelperExited,
+                                 tr("WireGuard parent watchdog exited unexpectedly"));
+        }
+    });
+    QString const watcher = QStringLiteral(
+        "$ErrorActionPreference='Stop';"
+        "try {"
+        "$p=Get-Process -Id ([int]$env:NGPOST_VPN_PARENT_PID);"
+        "if ($p.StartTime.ToFileTimeUtc() -eq ([Int64]$env:NGPOST_VPN_PARENT_START)) "
+        "{$p.WaitForExit()}"
+        "} finally {"
+        "$s=[System.ServiceProcess.ServiceController]::new($env:NGPOST_VPN_SERVICE);"
+        "if ($s.Status -ne 'Stopped') {$s.Stop(); $s.WaitForStatus('Stopped',[TimeSpan]::FromSeconds(30))}"
+        "}");
+    _winWatchdog->start(WindowsSecurity::systemPowerShell(),
+                        {QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"),
+                         QStringLiteral("-WindowStyle"), QStringLiteral("Hidden"),
+                         QStringLiteral("-Command"), watcher});
+    if (!_winWatchdog->waitForStarted(3000)) {
+        _winWatchdog->deleteLater();
+        _winWatchdog = nullptr;
+        _finishWindowsRun(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::HelperUnavailable,
+                             tr("Could not start the WireGuard parent watchdog"));
+        return true;
     }
 
     // Poll briefly for the tunnel to actually come up (wg show returns OK).
@@ -374,9 +580,12 @@ bool WireGuardBackend::_startWindows(QString const &configPath)
 
 void WireGuardBackend::onWinPollTimer()
 {
+    if (_winStopTimer && _winStopTimer->isActive()) return;
     if (++_winPollAttempts > 40) { // 40 * 500ms = 20s
         _winPollTimer->stop();
-        emit failed(tr("WireGuard tunnel did not come up within 20s"));
+        _finishWindowsRun(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::TunnelLost,
+                             tr("WireGuard tunnel did not come up within 20s"));
         return;
     }
     QString iface, ip, dns;
@@ -386,29 +595,69 @@ void WireGuardBackend::onWinPollTimer()
     QHostAddress ipAddr(ip);
     QHostAddress dnsAddr = dns.isEmpty() ? QHostAddress() : QHostAddress(dns);
     if (ipAddr.isNull()) {
-        emit failed(tr("Could not parse local IP from WireGuard config"));
+        _finishWindowsRun(VpnTerminationKind::StartFailure,
+                             VpnFailureKind::Configuration,
+                             tr("Could not parse local IP from WireGuard config"));
         return;
     }
     _winIface = iface;
+    _markReady();
     emit ready(iface, ipAddr, dnsAddr);
 }
 
 void WireGuardBackend::_stopWindows()
 {
+    _finishWindowsRun(VpnTerminationKind::RequestedStop, VpnFailureKind::None, {});
+}
+
+void WireGuardBackend::_finishWindowsRun(VpnTerminationKind kind,
+                                        VpnFailureKind failure, QString const &detail)
+{
     if (_winPollTimer)
         _winPollTimer->stop();
-    if (_winServiceName.isEmpty()) {
-        emit stopped();
+    _winPendingTermination.kind = kind;
+    _winPendingTermination.failure = failure;
+    _winPendingTermination.detail = detail;
+    if (!_winStopTimer) {
+        _winStopTimer = new QTimer(this);
+        connect(_winStopTimer, &QTimer::timeout, this, &WireGuardBackend::_pollWindowsStop);
+    }
+    _winStopError.clear();
+    emit stopPending(detail);
+    // Always asynchronous: start() must return before a terminal callback
+    // can destroy its backend; retain the lease throughout cleanup.
+    _winStopTimer->start(500);
+}
+
+void WireGuardBackend::_pollWindowsStop()
+{
+    if (!_winStopTimer || !_winStopTimer->isActive()) return;
+    QString error;
+    auto const result = _winServiceName.isEmpty() ? WindowsServiceControl::StopResult::Stopped
+        : WindowsServiceControl::stopStep(
+            [&] { return WindowsServiceControl::query(_winServiceName, &error); },
+            [&] { return WindowsServiceControl::requestStop(_winServiceName, &error); });
+    if (result != WindowsServiceControl::StopResult::Stopped) {
+        if (result == WindowsServiceControl::StopResult::Failed && error != _winStopError) {
+            _winStopError = error;
+            QString const message = tr("WireGuard stop is NOT confirmed (%1). The tunnel may still be active; retaining ownership and retrying.").arg(error);
+            emit logLine(message);
+            emit statusLine(message);
+        }
         return;
     }
-    QProcess sc;
-    sc.start(QStringLiteral("sc.exe"),
-             {QStringLiteral("stop"), _winServiceName});
-    sc.waitForFinished(5000);
-    // We don't strictly need to verify exit code: a failed stop just
-    // leaves the tunnel up; the next session will detect.
+    _winStopTimer->stop();
+    if (_winWatchdog) {
+        disconnect(_winWatchdog, nullptr, this, nullptr);
+        _winWatchdog->kill();
+        _winWatchdog->waitForFinished(2000);
+        _winWatchdog->deleteLater();
+        _winWatchdog = nullptr;
+    }
     _winServiceName.clear();
     _winConfigPath.clear();
-    emit stopped();
+    _winIface.clear();
+    _emitTerminationOnce(_winPendingTermination.kind, _winPendingTermination.failure,
+                         _winPendingTermination.detail);
 }
 #endif // Q_OS_WIN

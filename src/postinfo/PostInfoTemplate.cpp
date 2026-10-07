@@ -70,7 +70,7 @@ QString formatDate(QDateTime const &dt, QString const &format)
 QString resolvedPath(QString const &path)
 {
     QFileInfo const fi(path);
-    QString const canonical = fi.canonicalFilePath();
+    QString canonical = fi.canonicalFilePath();
     if (!canonical.isEmpty())
         return canonical;
     // Nothing there (yet): the destination of a file about to be written is the

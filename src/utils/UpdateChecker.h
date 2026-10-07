@@ -10,20 +10,44 @@
 #include <QObject>
 #include <QString>
 #include <QUrl>
+#include <QPointer>
+#include <QTemporaryDir>
+#include <QFile>
+#include <memory>
+#include <functional>
 
-class NgPost;
 class QNetworkAccessManager;
 class QNetworkReply;
+class QProcess;
+class QJsonObject;
+class QJsonDocument;
 
 class UpdateChecker : public QObject
 {
     Q_OBJECT
 public:
-    explicit UpdateChecker(NgPost *ngPost, QNetworkAccessManager *netMgr, QObject *parent = nullptr);
+    explicit UpdateChecker(QNetworkAccessManager *netMgr, QObject *parent = nullptr);
+    ~UpdateChecker() override;
 
     void checkLatestRelease();
 
-    static bool    isAppImage();
+    static bool isAppImage();
+    static QString installationDirectory();
+    static bool isReplaceableInstallation(const QString &directory);
+    bool canInstallAutomatically() const;
+    static bool isTrustedDownloadUrl(const QUrl &url);
+
+    //! The install popup interrupts, so it comes back once a day at most; in
+    //! between, the status-bar link keeps the update visible. A last prompt in
+    //! the future (the clock was set back) never silences it.
+    static bool isPromptDue(qint64 lastPromptEpoch, qint64 nowEpoch);
+
+    //! A release body as Markdown fit for display. Its release notes are
+    //! release_notes.txt, plain text: "=====" banners around section titles and
+    //! "--- Title ---" subsections, which Markdown would render as stray "="
+    //! runs and titles lost in the text. Both become headings. The leading
+    //! title and the SHA-256 section are left to the release page.
+    static QString releaseNotesMarkdown(const QString &body);
 
     //! True when \a candidate supersedes \a current, both given as release
     //! tags. Numbers first; on a tie a stable release beats a pre-release of
@@ -51,29 +75,70 @@ signals:
     void downloadProgress(qint64 received, qint64 total);
     void downloadFailed(const QString &msg);
     void installStarting();
+    //! The release check did not complete (network, oversized or invalid reply).
+    void checkFailed(const QString &reason);
 
 public slots:
     void startDownloadAndInstall();
+    void cancelDownload();
 
 private slots:
     void onReleaseInfoReceived();
-    void onAssetDownloadFinished();
 
 private:
+#ifdef NGPOST_TESTING
+    friend class TestUpdateChecker;
+#endif
+    static QJsonObject selectRelease(const QJsonDocument &document, const QString &current);
     QString assetNameForCurrentOS(const QString &tag) const;
-    bool    runInstallerWindows(const QString &archivePath);
-    bool    runInstallerMacOS(const QString &archivePath);
-    bool    runInstallerLinux(const QString &archivePath);
+    void downloadFile(const QUrl &url,
+                      const QString &name,
+                      qint64 cap,
+                      const std::function<void()> &done);
+    void _drainDownload(QNetworkReply *reply, qint64 cap, qint64 *written, QString *error);
+    void _completeDownload(QNetworkReply *reply,
+                           const QString &name,
+                           qint64 written,
+                           qint64 cap,
+                           const QString &error,
+                           const std::function<void()> &done);
+    void prepareInstall();
+    void failDownload(const QString &message);
+    void _failCheck(const QString &reason);
+
+    //! Drops the "cancelled" marker the detached installer polls for. False
+    //! when it could not be written, which is the only case where a cancelled
+    //! update can still install itself; a warning names the path either way.
+    //! True when nothing is staged -- there is then nothing to call off.
+    bool _markCancelledForInstaller();
 
     static const QString sReleaseApiUrl;
     static const QString sReleaseListApiUrl;
     static const QString sRepoOwner;
     static const QString sRepoName;
-    static const qint64  sCheckIntervalSeconds = 86400; // once per day
+    static constexpr qint64 sPromptIntervalSeconds = qint64(24) * 3600;
+    //! Bound on a release check reply. A release weighs ~70 KB of JSON, its
+    //! notes and assets; 1 MB no longer held a list of 20 and every unstable
+    //! build stopped seeing its successors, silently.
+    static constexpr qint64 sMaxReleaseInfoBytes = qint64(8) * 1024 * 1024;
 
-    NgPost                *_ngPost;
     QNetworkAccessManager *_netMgr;
     QNetworkReply         *_reply;
+    QPointer<QNetworkReply> _downloadReply;
+    QPointer<QProcess> _installer;
+    std::unique_ptr<QTemporaryDir> _work;
+    std::unique_ptr<QFile> _downloadFile;
+    QString _installDir, _python;
+    bool _busy = false;
+    bool _cancelled = false;
+    bool _handoff = false;
+    //! A detached installer has been started and is polling the work folder.
+    //! Until then a failed "cancelled" marker costs nothing; after it, that
+    //! marker is the only thing standing between a cancellation and an install.
+    bool _detached = false;
+    //! Set by the destructor so nothing emits from a half-destroyed object.
+    bool _destructing = false;
+    quint64 _generation = 0;
 
     QString _latestTag;
     QString _releaseNotes;

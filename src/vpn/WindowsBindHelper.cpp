@@ -11,7 +11,16 @@
 
 #ifdef Q_OS_WIN
 
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
+// winsock2.h pulls windows.h in, which without this defines min/max as
+// macros. Any standard or Qt header included after it that names std::min or
+// std::max then fails to compile, and only on MSVC. The other two Windows
+// translation units already guard themselves this way.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 

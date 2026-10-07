@@ -1,6 +1,12 @@
 # Created by https://www.toptal.com/developers/gitignore/api/clion+all,qt,qtcreator,cmake,visualstudio
 # Edit at https://www.toptal.com/developers/gitignore?templates=clion+all,qt,qtcreator,cmake,visualstudio
 
+# Private signing backups must never enter Git, even when signing is disabled.
+release-private.pem
+*.pfx
+*.p12
+*.p8
+
 ### CLion+all ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
@@ -606,6 +612,8 @@ src/ngPost
 src/ui_*.h
 src/qmake_qmake_immediate_rc.py
 src/resources/resources_rc.py
+# Python exports generated from Qt Designer forms (the app uses C++ uic output).
+src/hmi/*_ui.py
 .claude/
 
 # tests/ build artifacts. Only the per-test source files
@@ -623,3 +631,10 @@ tests/**/.qmake.stash
 PLAN*.md
 AGENTS.md
 TODO.md
+audit*
+plan*.md
+tests/*.md
+src/utils/update/update_rc.py
+revue*
+docs/code-quality-lot5.md
+docs/quick-post-controls-validation.md

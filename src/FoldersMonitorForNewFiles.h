@@ -25,6 +25,7 @@
 #include <QFileInfoList>
 #include <QFileSystemWatcher>
 #include <QMap>
+#include <QMutex>
 #include <QSet>
 using AtomicBool = QAtomicInteger<unsigned short>; // 16 bit only (faster than using 8 bit variable...)
 using PathSet = QSet<QString>;
@@ -54,14 +55,46 @@ private:
     QMap<QString, FolderScan *> _folders; //!< track files processed (their date might be > _lastCheck)
     AtomicBool _stopListening;
 
+    mutable QMutex _ignoredPathsMutex; //!< the writer is the posting thread, the reader is ours
+    PathSet _ignoredPaths;             //!< paths ngPost itself is about to create
+
     static ulong sMSleep;
+    //! How many consecutive identical (size, mtime) samples make a file "done".
+    //! One is not enough: a copy over SMB, or any tool that pre-allocates,
+    //! holds a stable size for a moment in the middle of the write.
+    static ushort sNbStableScans;
+#if defined(Q_OS_WIN)
+    static ushort sMaxLockRetries; //!< how long to wait on a share violation, in sMSleep units
+#endif
 
 public:
     FoldersMonitorForNewFiles(const QString &folderPath, QObject *parent = nullptr);
-    ~FoldersMonitorForNewFiles();
+    ~FoldersMonitorForNewFiles() override;
+
+#ifdef NGPOST_TESTING
+    static bool retryWriteLockForTest(ushort &lockRetries, ushort maxRetries)
+    {
+        return _retryWriteLock(lockRetries, maxRetries);
+    }
+    static quint64 writeLockWaitMsForTest(ushort maxRetries, ulong sleepMs)
+    {
+        return _writeLockWaitMs(maxRetries, sleepMs);
+    }
+#endif
 
     bool addFolder(const QString &folderPath);
     void stopListening();
+
+    //! Declare a path ngPost is about to create itself (an obfuscated input
+    //! file, or that same file being put back). Without this, PostingJob
+    //! renaming the files it is posting makes us report them as new ones and
+    //! the post loops forever -- issue #193. Thread safe: called from the
+    //! posting thread while we run in the monitor thread.
+    void ignoreNextAppearance(const QString &path);
+
+    //! Drop a reservation made by ignoreNextAppearance() that will never be
+    //! used (the rename failed, or the file has left that path for good).
+    void stopIgnoringMonitorPath(const QString &path);
 
 signals:
     void newFileToProcess(const QFileInfo &fileInfo);
@@ -72,6 +105,35 @@ public slots:
 private:
     qint64 _pathSize(QFileInfo &fileInfo) const;
     qint64 _dirSize(const QString &path) const;
+
+    static QString _normalized(const QString &path);
+    static bool _retryWriteLock(ushort &lockRetries, ushort maxRetries);
+    static quint64 _writeLockWaitMs(ushort maxRetries, ulong sleepMs);
+    bool _consumeIgnoredPath(const QString &absolutePath);
+    void _releaseSpentReservations(const QString &folderPath, const PathSet &scan);
+
+    //! A path the scan just reported as new, and the last (size, mtime) sample
+    //! taken of it. nbStable counts how many consecutive samples came back
+    //! identical; sNbStableScans of them mean the write is over.
+    struct PendingPath
+    {
+        QFileInfo fileInfo;
+        qint64    size = 0;
+        QDateTime lastModified;
+        ushort    nbStable = 0;
+        //! Rounds spent waiting for another process to release its write
+        //! handle. Windows only; nothing sets it elsewhere.
+        ushort    lockRetries = 0;
+    };
+
+    //! Hand a settled path over to the posting side, after the Windows
+    //! "is anyone still writing this?" check where that question has an answer.
+    void _emitSettledPath(const PendingPath &entry, ushort nbWait);
+#if defined(Q_OS_WIN)
+    //! Is another process still holding this open for writing? One probe, no
+    //! waiting: the round loop is what provides the retries.
+    bool _isWriteLockedByAnotherProcess(const QFileInfo &fileInfo) const;
+#endif
 };
 
 #endif // FOLDERSMONITORFORNEWFILES_H

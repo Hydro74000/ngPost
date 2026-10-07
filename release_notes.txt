@@ -8,11 +8,826 @@
 
 
 
-TODO: --nfo option (cf github issue #10 and NewsUp dev)
+####################################################
+###       Release: ngPost v5.6                   ###
+###       date:    2026/09/23                    ###
+####################################################
 
-TODO: include ParPar instead of par2cmdline?
+ngPost v5.6 is a major feature, security, resilience, and performance release.
+It introduces sequential multi-tab posting with global queue controls, an interactive
+UI zoom level controller with dynamic interface scaling, a guided PAR2 configuration
+dialog supporting modern parity engines (ParPar, MultiPar, par2j), deep NZB post
+verification with redundancy analysis, external configuration merging, an official
+headless build and Docker container, comprehensive VPN and credential security
+hardening, yEnc 1.3 compliance, and significant performance optimizations across
+the NNTP streaming pipeline and SQLite history store.
 
-TODO: auto RAR size and par2 parameters depending on the inputs size?
+====================================================
+1. FUNCTIONAL CHANGES (Partie fonctionnelle)
+====================================================
+
+--- New features and Removals (Nouveautés et suppressions) ---
+
+- In-app update validation and reliability:
+  * Native Linux, Windows and macOS update tests now cover notification,
+    download verification, process handoff, replacement, restart and rollback.
+  * Release archives are exercised by the current installer and the unmodified
+    5.5.1 updater before publication; Windows Setup also validates a real upgrade.
+  * Fixed Windows update failures when flushing the transaction journal or
+    inheriting the installation directory as the updater process working directory.
+  * Every installation shows the update popup with its release notes. Where
+    ngPost cannot replace itself (source builds, AppImages, Setup-managed
+    installs), its button opens the release page in the browser instead of
+    installing and restarting.
+  * The release check now runs asynchronously at every GUI start instead of once
+    a day, so a release published after the last check is no longer missed and a
+    known update stays visible across restarts. LAST_UPDATE_CHECK is retired
+    and dropped from ngPost.conf on the next save. The update popup still
+    appears at most once a day; in between, and after Later, a red link left of
+    the zoom level keeps the update visible and reopens the popup.
+  * The update popup carries the whole release notes, folded under a
+    link that unfolds them (growing the popup) into a scrolling pane with headings
+    and lists, below the link to the release page.
+  * Update dialogs hold automatic shutdown during the update interaction.
+  * Unstable builds see newer releases again: the release list, twenty releases
+    with their full notes, outgrew the 1 MB bound of the check, which then failed
+    without a word. The bound is now 8 MB for a list of ten, and a failed check
+    is reported (in the log pane in debug mode).
+- Sequential Multi-Tab Posting & Global Queue Controls:
+  * "Post all" button added to submit all prepared Quick Post tabs sequentially
+    into a managed posting queue (_pendingJobs), automatically focusing the first
+    submitting tab.
+  * Global Pause, Resume, and Stop controls added in the header to safely pause
+    or cancel running and queued tasks across all tabs.
+  * Harmonized control styling with compact 16x16 circular action icons,
+    colour-coded: green "+" and Resume, yellow Pause, red Stop. They switch to
+    lighter shades on a dark theme and keep a readable contrast on both.
+- Guided PAR2 Configuration Dialog (Par2SettingsDialog):
+  * Dedicated modal dialog accessible from the Options menu or posting tabs.
+  * Extended parity engine support: par2cmdline, ParPar (with automatic OpenCL
+    GPU acceleration detection), MultiPar, and par2j (64-bit).
+  * Dynamic block count guidance preventing the 32,768 source block limit in
+    par2j / MultiPar on large posts.
+  * Custom argument support via PAR2_ARGS_CUSTOM preserving user-defined flags
+    without automatic GUI overwrites.
+  * Engine-specific argument validation executed at configuration load time.
+- Advanced NZB Integrity Verification (--check / --check_json):
+  * Post integrity assessment based on residual PAR2 recovery packets, yielding
+    clear verdicts (ProbablyRecoverable, Unrecoverable, Undetermined).
+  * Stable, script-friendly process exit codes: 0 (complete), 1 (missing but
+    recoverable via PAR2), 2 (unrecoverable / missing beyond repair), 3 (inconclusive /
+    preflight failure).
+  * Pure JSON machine report mode (--check_json) on stdout with diagnostics
+    routed to stderr.
+  * Early exit (early-stop) mechanism terminating checks immediately once a post
+    is mathematically proven unrecoverable.
+  * File-by-file damage accounting reporting exact residual redundancy percentage.
+- Configuration Merging on Save (saveConfig):
+  * Saving configuration merges external edits made to ngPost.conf (comments,
+    custom flags, reordered keys) instead of blindly overwriting the file.
+- Persistent Filename Obfuscation:
+  * Added CLI flag --obfuscate_filename (--obfuscate-filename) and persistent
+    multi-value configuration key 'obfuscate = article, filename'.
+- Pinned Startup Tab:
+  * Ability to designate the default tab to display on startup via the tab bar
+    context menu, highlighted with a bold tab title (StartupTabBar).
+- Interactive UI Zoom Level Control:
+  * Discrete status bar affordance featuring a seamless magnifying glass icon and
+    real-time zoom percentage badge (e.g. 100%).
+  * Clicking the icon toggles a compact popup slider anchored directly above the
+    status bar, with quick-reset to 100% and automatic dismissal on click-outside or Escape.
+  * Comprehensive interface scaling from 80% to 150%: dynamically scales typography,
+    buttons, inputs, spinboxes, headers, and table row heights across all tabs.
+  * Debounced persistence in ngPost.conf (UI_ZOOM) restoring user zoom preference across
+    sessions, saved silently without cluttering the activity log.
+  * Proportional tab dimensions and padding (em/ex metrics) adapting gracefully to
+    custom font scaling and High-DPI screens, with tab bar height and scroll buttons
+    dynamically matching corner posting controls.
+- Inline Clipboard Copy Actions:
+  * Quick-copy buttons with animated tooltips added to generated NZB name and
+    archive password fields.
+- Collapsible Posting Log Pane:
+  * Transparent overlay toggle button anchored beside the tab bar to collapse
+    and restore the posting log splitter.
+  * Collapsed by default on startup with saved geometry in ngPost_gui.ini, and
+    automatic uncollapse whenever an error is logged (logError()).
+- Official Headless Build & Docker Container:
+  * Dedicated compile flag (CONFIG+=no_hmi) stripping all GUI, X11, and OpenGL
+    dependencies for minimal headless server and NAS deployments.
+  * Official minimal container image based on Debian trixie-slim published to
+    ghcr.io, running as an unprivileged user (1000:1000) with a read-only root,
+    bundled with 7-Zip and par2cmdline.
+  * Pre-created /config and /data mount points owned by 1000:1000 so named or
+    anonymous volumes inherit unprivileged ownership out of the box.
+  * Upgrading from the 5.5.x image, which ran as root: the files it wrote in the
+    mounted config/ and data/ folders belong to root. Run
+    `chown -R <uid>:<gid> config data` once, for the user the container runs as
+    (1000:1000, or the one given with --user), before starting 5.6.
+- Removals:
+  * Removed obsolete build scripts: src/ngPost_cmd.pro, src/makeAppImage_cmd.sh,
+    and src/makeAppImage.sh.
+  * Removed dead macros (__RELEASE_ARTICLES_WHEN_CON_FAILS__) and unused code in
+    Poster (prepareArticlesInAdvance, _prepareNextArticle) and NntpArticle (body()).
+
+--- Improvements (Améliorations) ---
+
+- Main Tab Ergonomics & Navigation:
+  * Logical tab ordering: History (tab 0), Folder Monitoring (tab 1), Quick
+    Post (tab 2+).
+  * The "+" that opens a new Quick Post tab is now a fixed button left of "Post
+    all tabs" (shortcut Ctrl+T) instead of a trailing tab that scrolled out of
+    sight once many tabs were open.
+  * Ctrl+click on the tab bar scroll arrows jumps to the first or the last tab.
+  * Double-clicking the empty part of the tab bar opens a new Quick Post tab, as
+    in a web browser.
+  * A full tab bar first shortens Quick Post titles from the left, always keeping
+    their "#N", before showing scroll arrows; History and Auto keep their title.
+  * Monotonic Quick Post numbering (Post #1, Post #2, ...): tab closing never
+    reuses active IDs while tasks are running; counter resets only when idle.
+  * Progress header label decoupled from active tab view: continuously displays
+    the task actively transferring in the background.
+  * High-contrast styling and visual queue badges for pending tabs.
+- Unified External Tool Resolution (ExternalToolResolver):
+  * Deterministic search prioritizing bundled tools shipped alongside ngPost
+    before scanning system PATH.
+  * Graceful fallback with warning to automatic discovery when a configured custom
+    path is missing, rather than failing silently.
+- Archive Volume Size Limits:
+  * Supported maximum RAR volume size limit (RAR_SIZE_MAX).
+  * Suppressed redundant volume size adjustment logs when requested size is zero.
+- History Table Column Management:
+  * Interactive column resizing with debounced persistence in ngPost_gui.ini and
+    a context-menu action to reset column widths.
+- Folder Monitoring (FoldersMonitorForNewFiles):
+  * Batch file stabilization using shared polling rounds instead of sequential
+    delays per file.
+- Precise Diagnostic Timestamps:
+  * Prefixed all GUI, file, and CLI logs with millisecond timestamps [hh:mm:ss.zzz]
+    while preserving clean machine-readable outputs for JSON commands.
+- Unified Log File Location:
+  * Centralized ngPost.log in the user configuration directory across Linux,
+    macOS, and Windows.
+
+--- Bug Fixes (Corrections / Fix) ---
+
+- Staging Recovery on Preparation Failure:
+  * Restores original source files back into the GUI tab and cleans up temporary
+    compression directories if archive preparation fails before transfer starts.
+- Safe Obfuscation & Monitored File Deletion:
+  * Prevented monitored folder loop where restored obfuscated filenames were
+    detected as new files and re-posted.
+  * Guarded --rm_posted against deleting original source files if their obfuscated
+    counterparts failed to restore.
+  * --rm_posted and the Auto tab's "delete once posted" no longer delete the
+    sources of a post with failed or unconfirmed articles (behaviour inherited
+    from v4.1): the files stay in place for a resume from the history. Temporary
+    archives keep their own rules.
+- Stop All and Close All Tabs:
+  * The Stop button is shown only while a post is in progress. Otherwise a
+    "Close all tabs" cross takes its place: after a confirmation, it closes every
+    Quick Post tab and empties Quick Post #1; new tabs are numbered from #2 again.
+  * Stopped tabs can be posted again from scratch with "Post all tabs" or their
+    own button: the user's sources are restored, the NZB the stop left behind is
+    replaced without a question, the stopped post's temporary archives are
+    removed, and its history entry is closed. A stopped post resumed from the
+    History tab in the meantime is left untouched.
+  * A tab stopped with its own "Stop Posting" button no longer keeps the queued
+    icon: it shows the Quick Post icon again, ready to be posted.
+  * A new "NZB Destination Path", confirmed with Enter or by saving the
+    configuration, offers to move there the NZB of the tabs waiting to be posted
+    (stopped ones included); No leaves them as they are. Saving no longer records
+    the NZB folder of the tab on screen as NZB_PATH.
+  * Used kernel rename calls to prevent silent cross-filesystem file copies (EXDEV).
+- One Packing at a Time (PREPARE_PACKING):
+  * Posts queued by "Post all tabs" while the VPN was connecting, or while the
+    queue was paused, had the first two compressed at the same time. The next
+    post is again packed only while the current one uploads.
+- Safe Auto-Shutdown Guarding (holdShutdown()):
+  * Auto-shutdown is strictly gated: only triggers if at least one article was
+    successfully uploaded since the option was armed.
+  * Scoped hold prevents shutdown while modal dialogs (file pickers, settings,
+    confirmations) are open or unposted tabs remain in the queue.
+  * Manual task cancellation never triggers automatic machine shutdown.
+- Default Tab Closure Logic:
+  * Hardened tab closure on default Quick Post tab to cleanly reset inputs rather
+    than producing invalid UI states.
+- Wayland & Offscreen Splitter Fixes:
+  * Resolved splitter mouse-grab and resizing issues under Wayland and KDE Breeze.
+- PAR2 Empty Output Detection:
+  * Aborts post with an explicit error when a PAR2 tool exits with code 0 but
+    generated zero recovery files.
+- MultiPar Byte Limits & Arguments:
+  * Corrected byte calculations and block limits passed to MultiPar and par2j.
+- Log Formatting Fixes:
+  * Stripped unintended HTML tags from PostingJob log messages.
+
+====================================================
+2. SECURITY HARDENING (Sécurité)
+====================================================
+
+--- New features and Removals (Nouveautés et suppressions) ---
+
+- Official Security Policy (SECURITY.md):
+  * Published formal vulnerability reporting procedures, disclosure guidelines,
+    and defined the dual-branch maintenance model (stable-security, devel-security).
+- Machine-Wide VPN Routing Lease:
+  * Machine-wide routing lease preventing interface and routing table collisions
+    across concurrent instances (VPN_LEASE_WAIT_MINUTES, VPN_RECOVERY_MAX_ATTEMPTS).
+- Keyless Release Provenance & Checksums:
+  * Enforced published SHA-256 release checksums and automated supply-chain
+    provenance attestation (SLSA) on all build artifacts.
+
+--- Improvements (Améliorations) ---
+
+- Strict Credential & Secret Masking (SecretMasker):
+  * Automatic redaction of archive and proxy passwords glued to command-line
+    switches (-p, -hp) in all logs and console output; verified by unit tests.
+- Cryptographically Secure Password Generation:
+  * Archive passwords generated directly from OS entropy (QRandomGenerator::system())
+    using unbiased rejection sampling.
+- Filesystem & Configuration Access Control:
+  * Restricted SQLite history database (history.db, -wal, -shm) and configuration
+    files to 0600 permissions (0700 for directory) on POSIX.
+  * Applied protected Windows DACLs granting access exclusively to the caller's SID.
+  * Automatic startup repair of insecure permissions on legacy installations.
+- Verified Application Updates:
+  * Cryptographic signature and SHA-256 hash verification for update manifests,
+    with strict download enforcement limited to trusted GitHub domains.
+
+--- Bug Fixes (Corrections / Fix) ---
+
+- Windows WireGuard Tunnel Hardening:
+  * Staged WireGuard profiles in %ProgramData%\ngPost\wg under protected ACLs
+    (SYSTEM and Administrators only) to eliminate TOCTOU privilege escalation.
+  * Sanitized WireGuard configurations (WireGuardConfigPolicy) by rejecting command
+    execution directives (PreUp, PostUp, PreDown, PostDown).
+  * Safely serialized elevated PowerShell arguments and enforced system binary paths.
+  * Handled UAC prompt cancellations (Win32 error 1223 / ERROR_CANCELLED) gracefully.
+  * Verified Service Control Manager (SCM) service state before tunnel teardown.
+- Linux Privileged VPN Helper Hardening (Protocol v2/v3, Revision 4):
+  * Helper verifies that the calling user possesses read permissions on configuration
+    and authentication files before root opens them, preventing local exfiltration.
+  * Validated Polkit caller identity before generating authorization rules.
+  * OpenVPN credentials streamed over helper stdin and stored only on volatile
+    /run storage with owner-only permissions.
+  * Revoked legacy Polkit authorizations automatically during helper upgrades.
+- OpenVPN Configuration Policy:
+  * Strict directive whitelist enforced before elevation, blocking dangerous
+    directives such as 'plugin' or directory traversal paths.
+  * Rejected positional credentials on http-proxy/socks-proxy and denied
+    http-proxy-user-pass.
+  * Stripped profile routing directives (redirect-gateway, route) to preserve
+    host network routing integrity.
+- NNTP Authentication Failure Circuit Breaker:
+  * Aborts upload task after 3 consecutive backoff cycles with rejected server
+    credentials, avoiding provider account lockouts.
+- NNTP Framing & Injection Prevention:
+  * Strict Message-ID format validation and centralized command serialization
+    ensuring exactly one CRLF delimiter, neutralizing header injection risks.
+
+====================================================
+3. THE REST: PERFORMANCE, ARCHITECTURE & QUALITY (Le reste)
+====================================================
+
+--- New features and Removals (Nouveautés et suppressions) ---
+
+- Function Length Enforcement (Lizard Ratchet):
+  * CI enforcement of function complexity and physical line bounds (<= 100 lines
+    for new functions, hard ceiling at 200 lines) locked in function-length-baseline.txt.
+- Static Analysis & Memory Sanitizer Workflows:
+  * Integrated Clang-Tidy (.clang-tidy) and Cppcheck static analysis pipelines.
+  * Added automated AddressSanitizer (ASan) and UndefinedBehaviorSanitizer (UBSan)
+    testing workflows in CI.
+- Pinned Test Count Floors:
+  * Pinned minimum test pass counts per platform in tests/expected-counts.txt to
+    prevent test omissions or silent suite skipping.
+
+--- Improvements (Améliorations) ---
+
+- yEnc Encoding Performance:
+  * Single memory allocation for complete yEnc article bodies (=ybegin, headers,
+    data, =yend), reducing allocator traffic from 6.44 MB to 1.46 MB per article.
+  * Fixed buffer sizes calculated against provable mathematical worst cases.
+- NNTP Pipeline & Socket Throughput:
+  * Socket writes pass precalculated wire lengths (_bodyWireSize), eliminating
+    redundant strlen() calls across 700 KB buffers.
+  * Thread-local seeded pseudo-random engines (std::mt19937) for Message-ID
+    generation, eliminating mutex contention.
+  * Reduced lock scope in Poster: queue lock held strictly during article enqueue.
+- SQLite History Database Performance:
+  * Set synchronous=NORMAL under WAL mode, eliminating redundant fsync operations.
+  * Schema v5 migration: post_articles table converted to WITHOUT ROWID to index
+    directly on (file_id, part).
+- GUI Responsiveness & Memory Bounding:
+  * Log pane document capped to 5,000 blocks with disabled undo history.
+  * Log block insertion bounded to 2,048 characters to prevent layout freezes.
+- Code Modernization & Architecture:
+  * Major modularization of monolithic classes (NgPost, PostingJob, MainWindow,
+    NntpConnection, VpnManager, Par2Settings, NzbCheck, NzbHistoryRegenerator)
+    into focused, cohesive components.
+  * Decomposed monolithic routines across PAR2 settings validation, VPN profile
+    enforcement, Windows security audits, and NZB recovery into discrete helpers
+    conforming to the <= 100-line function complexity gate.
+  * Replaced raw buffer pointers with std::unique_ptr<char[]> in NntpArticle.
+- Complete Internationalization (i18n):
+  * Full translation updates and 100% catalog completion across all seven
+    supported languages: German, English, Spanish, French, Dutch, Portuguese,
+    and Chinese.
+
+--- Bug Fixes (Corrections / Fix) ---
+
+- Strict yEnc 1.3 Compliance:
+  * Escaped trailing spaces and tabs at line ends and on the final byte of an
+    article with '=' as required by yEnc 1.3, preventing CRC mismatches from
+    whitespace-trimming NNTP servers.
+  * Padded pcrc32 checksums to 8 hexadecimal digits.
+- NNTP EOF Synchronization:
+  * Poster waits for in-flight article encoding to complete before concluding EOF,
+    preventing premature socket disconnects and stalled uploads.
+- Event Loop Starvation Prevention:
+  * Bounded socket read buffer size during network signal processing to preserve
+    Qt event loop responsiveness.
+- Memory Leaks & Undefined Behavior:
+  * Fixed QChart axis memory leak during statistics chart refresh.
+  * Fixed QTranslator memory leak on application exit.
+  * Cleaned up file list model connections in PostingWidget destructor.
+  * Resolved integer overflow under UBSan in yEnc test suite.
+- Windows Offscreen CI Geometry:
+  * Configured virtual offscreen display (2560x1440) for headless GUI tests,
+    fixing test window clamping issues on Windows CI runners.
+- Strict Warning-Free Compilation:
+  * Enforced CONFIG+=ngpost_werror (-Werror / /WX) across all builds, with MSVC
+    external header suppression via /external:anglebrackets.
+
+====================================================
+Notes de version (Français) :
+
+ngPost v5.6 est une version majeure combinant de nouvelles fonctionnalités, un
+durcissement complet de la sécurité, une meilleure résilience des transferts et
+des optimisations substantielles de performances. Elle introduit notamment la file
+d'attente séquentielle multi-onglets avec contrôles globaux, un réglage interactif
+du niveau de zoom de l'interface avec mise à l'échelle dynamique, un dialogue guidé
+de configuration PAR2 supportant les moteurs modernes (ParPar, MultiPar, par2j), une
+vérification approfondie de l'intégrité des NZB avec calcul de réparabilité, la
+fusion intelligente de la configuration, un binaire headless officiel et son
+image Docker, la conformité yEnc 1.3, ainsi qu'une révision complète de la
+sécurité VPN et de l'isolation des identifiants.
+
+====================================================
+1. PARTIE FONCTIONNELLE
+====================================================
+
+--- Nouveautés et suppressions ---
+
+- Validation et fiabilité de la mise à jour intégrée :
+  * Les tests natifs sous Linux, Windows et macOS couvrent désormais la notification,
+    la vérification du téléchargement, le passage de témoin entre processus (handoff),
+    le remplacement des fichiers, le redémarrage et la restauration (rollback).
+  * Les archives de publication sont testées avec le programme d'installation actuel
+    ainsi qu'avec l'ancien outil 5.5.1 non modifié avant publication ; l'installeur
+    Windows valide également une mise à niveau réelle.
+  * Correction des échecs de mise à jour sous Windows lors du vidage du journal de
+    transaction ou de l'héritage du dossier d'installation comme répertoire de travail
+    de l'installeur détaché.
+  * Toutes les installations affichent la fenêtre de mise à jour avec ses notes de
+    version. Là où ngPost ne peut pas se remplacer lui-même (versions compilées depuis
+    les sources, paquets AppImage, installations gérées par l'installeur), son bouton
+    ouvre la page de la release dans le navigateur au lieu d'installer et redémarrer.
+  * Les dialogues de mise à jour suspendent l'extinction automatique du système durant
+    l'interaction utilisateur.
+  * Les versions unstable voient de nouveau les releases plus récentes : la liste des
+    releases, vingt avec leurs notes complètes, dépassait la limite de 1 Mo de la
+    vérification, qui échouait alors sans rien dire. La limite passe à 8 Mo pour une
+    liste de dix, et un échec de vérification est signalé (dans le log en mode debug).
+  * La recherche de mise à jour s'exécute désormais en arrière-plan à chaque démarrage
+    de l'interface graphique, et non plus une fois par jour : une version publiée après
+    la dernière vérification n'est plus manquée et une mise à jour connue reste visible
+    d'un démarrage à l'autre. LAST_UPDATE_CHECK est abandonné et retiré de ngPost.conf
+    à la sauvegarde suivante. La fenêtre de mise à jour n'apparaît toujours qu'une fois
+    par jour au plus ; entre-temps, et après « Plus tard », un lien rouge à gauche du
+    niveau de zoom garde la mise à jour visible et rouvre la fenêtre.
+  * La fenêtre de mise à jour contient l'intégralité des notes de version,
+    repliées sous un lien qui les déplie (en agrandissant la fenêtre) dans une zone
+    défilante avec titres et listes, sous le lien vers la page de la release.
+- Envoi séquentiel multi-onglets & contrôles globaux de file :
+  * Ajout du bouton « Poster tout » pour soumettre séquentiellement l'ensemble des
+    onglets « Post rapide » préparés dans une file d'attente gérée (_pendingJobs),
+    en donnant automatiquement le focus au premier onglet soumis.
+  * Ajout de commandes globales Pause, Reprise et Stop dans l'en-tête permettant
+    de suspendre ou d'interrompre l'ensemble des posts actifs et en attente.
+  * Harmonisation visuelle des contrôles avec des icônes circulaires compactes 16x16,
+    codées par couleur : « + » et Reprise en vert, Pause en jaune, Stop en rouge.
+    Elles passent à des teintes plus claires en thème sombre et restent bien
+    contrastées dans les deux thèmes.
+- Boîte de dialogue guidée des paramètres PAR2 (Par2SettingsDialog) :
+  * Nouveau dialogue dédié accessible depuis le menu Options ou les onglets de post.
+  * Prise en charge élargie des moteurs : par2cmdline, ParPar (avec détection
+    automatique de l'accélération GPU OpenCL), MultiPar et par2j (64 bits).
+  * Calcul dynamique et recommandations pour éviter le dépassement de la limite de
+    32 768 blocs sources imposée par par2j / MultiPar sur les gros volumes.
+  * Prise en charge des arguments personnalisés via PAR2_ARGS_CUSTOM, préservés
+    sans écrasement par l'interface graphique.
+  * Validation des arguments spécifiques au moteur choisi dès le chargement de la
+    configuration.
+- Vérification approfondie de l'intégrité des NZB (--check / --check_json) :
+  * Évaluation de l'intégrité basée sur les paquets de récupération PAR2 résiduels,
+    produisant un verdict clair (ProbablyRecoverable, Unrecoverable, Undetermined).
+  * Codes de retour stables et documentés : 0 (complet), 1 (incomplet mais
+    réparable avec PAR2), 2 (irrécupérable / au-delà de la redondance), 3 (non concluant /
+    échec pré-vol).
+  * Mode JSON pur (--check_json) sur stdout avec redirection des journaux sur stderr.
+  * Arrêt anticipé (early-stop) dès qu'un post est mathématiquement prouvé
+    irrécupérable, évitant de vérifier inutilement des dizaines de milliers d'articles.
+  * Décompte rigoureux des blocs endommagés par fichier avec rapport du pourcentage
+    de redondance réel préservé.
+- Fusion automatique de la configuration à l'enregistrement (saveConfig) :
+  * Préserve les modifications manuelles externes apportées à ngPost.conf
+    (commentaires, options avancées, clés réorganisées) lors des sauvegardes GUI/CLI.
+- Persistance de l'offuscation des noms de fichiers :
+  * Nouvelle option en ligne de commande --obfuscate_filename (--obfuscate-filename)
+    et support de la clé combinée 'obfuscate = article, filename'.
+- Épinglage de l'onglet de démarrage :
+  * Possibilité de définir l'onglet ouvert par défaut au démarrage via le menu
+    contextuel, mis en évidence par un intitulé en gras (StartupTabBar).
+- Réglage interactif du niveau de zoom de l'interface (UI Zoom) :
+  * Intégration discrète dans la barre d'état avec icône loupe sans contour et badge
+    affichant le pourcentage de zoom en temps réel (ex. 100 %).
+  * Clic sur l'icône ouvrant une fenêtre popup avec curseur (slider) aux dimensions
+    adaptées, ancrée directement au-dessus de la loupe, avec réinitialisation rapide à 100 %.
+  * Fermeture intuitive automatique au clic en dehors de la popup ou par la touche Échap.
+  * Mise à l'échelle complète de l'interface de 80 % à 150 % : adapte dynamiquement la
+    taille des polices, boutons, champs de saisie, spinboxes, en-têtes et hauteur des lignes
+    de tableaux sur l'ensemble des onglets.
+  * Mémorisation temporisée dans ngPost.conf (UI_ZOOM) restituant le niveau de zoom choisi
+    à chaque démarrage, enregistrée silencieusement sans polluer le journal d'activité.
+  * Dimensions et marges des onglets dimensionnées proportionnellement aux métriques de police
+    (unités em/ex) pour un rendu net et homogène sur les écrans haute densité (HiDPI), avec
+    alignement dynamique de la hauteur de la barre et des boutons de défilement sur les
+    contrôles d'envoi.
+- Boutons de copie rapide dans le presse-papiers :
+  * Boutons de copie inline avec infobulle et confirmation visuelle pour le nom du
+    fichier NZB et le mot de passe de l'archive.
+- Volet rétractable du journal de post (Posting Log) :
+  * Bouton transparent repliable ancré à côté des onglets pour masquer/afficher
+    le séparateur de journal.
+  * Replié par défaut au démarrage (état mémorisé dans ngPost_gui.ini) et ouverture
+    automatique dès qu'une erreur de post survient (logError()).
+- Binaire Headless officiel & conteneur Docker :
+  * Option de compilation dédiée (CONFIG+=no_hmi) supprimant toute dépendance
+    graphique X11/Widgets pour les serveurs et NAS.
+  * Image Docker officielle basée sur Debian trixie-slim publiée sur ghcr.io,
+    exécutée sous utilisateur non-privilégié (1000:1000) avec système de fichiers
+    root en lecture seule, incluant 7-Zip et par2cmdline.
+  * Pré-création des dossiers /config et /data avec propriétaire 1000:1000 dans l'image
+    pour un fonctionnement immédiat avec les volumes nommés sans conflit de permissions.
+  * Mise à jour depuis l'image 5.5.x, qui tournait en root : les fichiers qu'elle a
+    écrits dans les dossiers montés config/ et data/ appartiennent à root. Lancez
+    une fois `chown -R <uid>:<gid> config data`, pour l'utilisateur du conteneur
+    (1000:1000, ou celui donné par --user), avant de démarrer la 5.6.
+- Suppressions :
+  * Suppression des anciens scripts et profils de compilation : src/ngPost_cmd.pro,
+    src/makeAppImage_cmd.sh et src/makeAppImage.sh.
+  * Suppression de la macro obsolète __RELEASE_ARTICLES_WHEN_CON_FAILS__ et du
+    code mort dans Poster et NntpArticle.
+
+--- Améliorations ---
+
+- Ergonomie et navigation dans les onglets :
+  * Disposition logique : Historique (0), Surveillance de dossiers (1), Post
+    rapide (2+).
+  * Le « + » qui ouvre un nouvel onglet de post rapide est désormais un bouton fixe à
+    gauche de « Poster tous les onglets » (raccourci Ctrl+T), et non plus un onglet en
+    fin de barre qui sortait du champ dès que les onglets étaient nombreux.
+  * Ctrl+clic sur les flèches de défilement de la barre d'onglets saute au premier ou
+    au dernier onglet.
+  * Un double-clic sur la partie vide de la barre d'onglets ouvre un nouvel onglet de
+    post rapide, comme dans un navigateur web.
+  * Une barre d'onglets pleine raccourcit d'abord les titres des posts rapides par la
+    gauche, en gardant toujours leur « #N », avant d'afficher les flèches de
+    défilement ; Historique et Post Auto gardent leur titre.
+  * Numérotation strictement monotone des onglets de post rapide (Post #1, #2, ...) :
+    aucun numéro actif n'est réutilisé pendant l'exécution ; remise à 1 uniquement
+    lorsque la file est totalement inactive.
+  * Découplage de l'étiquette de progression : indique en permanence le post en cours
+    de transfert en arrière-plan, indépendamment de l'onglet affiché à l'écran.
+  * Style contrasté et badge lumineux indiquant clairement les onglets en attente.
+- Résolution unifiée des outils externes (ExternalToolResolver) :
+  * Ordre de recherche déterministe privilégiant les binaires fournis à côté
+    d'ngPost avant le PATH système.
+  * Basculement automatique avec avertissement vers la découverte automatique
+    si un chemin configuré n'existe plus.
+- Gestion de la taille des volumes d'archive :
+  * Prise en compte de la limite maximale des volumes RAR (RAR_SIZE_MAX).
+  * Suppression des logs superflus d'ajustement de volume lorsque la taille demandée
+    vaut zéro.
+- Gestion des colonnes du tableau d'historique :
+  * Redimensionnement interactif des colonnes avec mémorisation des largeurs dans
+    ngPost_gui.ini et action de réinitialisation dans le menu contextuel.
+- Surveillance de dossiers (FoldersMonitorForNewFiles) :
+  * Stabilisation des nouveaux fichiers par lots en rounds partagés au lieu de
+    délais séquentiels cumulés par fichier.
+- Horodatage précis des diagnostics :
+  * Préfixe systématique [hh:mm:ss.zzz] sur tous les journaux (interface, console,
+    fichier) sans corrompre les flux de données JSON.
+- Emplacement unifié du fichier journal :
+  * Centralisation de ngPost.log dans le répertoire de configuration d'ngPost sur
+    toutes les plateformes.
+
+--- Corrections (Fix) ---
+
+- Restauration des fichiers en cas d'échec de préparation :
+  * Restauration automatique des fichiers sources dans l'onglet de post et nettoyage
+    du dossier temporaire si la compression ou la préparation échoue avant le début
+    du transfert.
+- Sécurisation de l'offuscation et de la suppression des sources :
+  * Élimination de la boucle de surveillance où la restauration d'un nom offusqué
+    était détectée comme un nouveau fichier et ré-uploadée.
+  * Protection de l'option --rm_posted : interdiction stricte de supprimer un
+    fichier source si son nom d'origine offusqué n'a pas pu être restauré.
+  * --rm_posted et l'option « supprimer une fois posté » de l'onglet Auto ne
+    suppriment plus les sources d'un post ayant des articles échoués ou non
+    confirmés (comportement hérité de la v4.1) : les fichiers restent en place
+    pour permettre une reprise depuis l'historique. Les archives temporaires
+    conservent leurs propres règles.
+- Arrêt et fermeture de tous les onglets :
+  * Le bouton Stop n'est affiché que pendant qu'un post est en cours. Hors transfert,
+    une croix « Fermer tous les onglets » prend sa place : après confirmation,
+    elle ferme tous les onglets de post rapide et vide l'onglet #1 ; la numérotation
+    repart ensuite de #2.
+  * Les onglets arrêtés peuvent être relancés de zéro avec « Poster tout » ou leur
+    propre bouton : les sources de l'utilisateur sont restaurées, le fichier NZB
+    laissé par l'arrêt est écrasé sans redemander confirmation, les archives temporaires
+    du post arrêté sont supprimées et son entrée dans l'historique est fermée. Un post
+    arrêté repris entre-temps depuis l'Historique n'est pas modifié.
+  * Un onglet arrêté par son bouton « Stop Post » ne garde plus l'icône
+    « en file d'attente » : il reprend l'icône de post rapide, prêt à être relancé.
+  * Un nouveau « Chemin de destination du NZB », validé par Entrée ou par
+    l'enregistrement de la configuration, propose d'y déplacer le NZB des onglets
+    en attente de post (onglets arrêtés compris) ; Non les laisse tels quels.
+    L'enregistrement n'inscrit plus comme NZB_PATH le dossier NZB de l'onglet affiché.
+  * Utilisation d'appels de renommage atomiques au niveau du noyau pour empêcher
+    les copies complètes silencieuses lors de déplacements entre partitions (EXDEV).
+- Une seule préparation à la fois (PREPARE_PACKING) :
+  * Les posts mis en file par « Poster tous les onglets » pendant la connexion du
+    VPN, ou pendant une pause de la file, voyaient les deux premiers compressés en
+    même temps. Le post suivant n'est de nouveau préparé que pendant l'envoi du
+    post en cours.
+- Sécurisation de l'extinction automatique du PC (holdShutdown()) :
+  * Extinction conditionnée à l'envoi effectif d'au moins un article depuis
+    l'armement de l'option.
+  * Verrou de sécurité empêchant l'extinction tant qu'une boîte de dialogue modale
+    (fichiers, paramètres, confirmation) est ouverte ou que des onglets préparés
+    attendent dans la file.
+  * Une annulation manuelle de post ne déclenche jamais l'extinction.
+- Fermeture propre de l'onglet de post par défaut :
+  * Réinitialisation cohérente des contrôles de l'onglet par défaut au lieu de
+    laisser des états d'interface invalides.
+- Correctifs pour Wayland et environnements offscreen :
+  * Correction du redimensionnement du panneau de log et des conflits de capture
+    souris sous Wayland et KDE Breeze.
+- Détection des échecs PAR2 sans fichier généré :
+  * Interruption immédiate du post en cas de code retour 0 d'un outil PAR2 n'ayant
+    produit aucun fichier de parité.
+- Limites de blocs et calculs MultiPar :
+  * Correction des calculs en octets et des limites de blocs transmis à MultiPar
+    et par2j.
+- Formatage des journaux :
+  * Nettoyage des balises HTML résiduelles dans les messages de PostingJob.
+
+====================================================
+2. SÉCURITÉ
+====================================================
+
+--- Nouveautés et suppressions ---
+
+- Politique de sécurité officielle (SECURITY.md) :
+  * Publication des directives de divulgation responsable des vulnérabilités et
+    présentation de la stratégie à double branche (stable-security, devel-security).
+- Bail machine exclusif pour les ressources VPN :
+  * Mise en place d'un verrou machine évitant les conflits de routage entre
+    plusieurs instances concurrentes (VPN_LEASE_WAIT_MINUTES, VPN_RECOVERY_MAX_ATTEMPTS).
+- Attestation d'intégrité et de provenance sans clé :
+  * Publication systématique des empreintes SHA-256 pour chaque livrable et
+    attestation cryptographique de la chaîne de compilation (SLSA).
+
+--- Améliorations ---
+
+- Masquage strict des secrets dans les journaux (SecretMasker) :
+  * Censure automatique des mots de passe attachés aux commandes d'archivage
+    (-p, -hp) dans tous les logs et sorties console ; vérifié par tests unitaires.
+- Génération de mots de passe cryptographiquement sûrs :
+  * Génération des mots de passe d'archive basée directement sur l'entropie de l'OS
+    avec un échantillonnage par rejet sans biais.
+- Contrôle d'accès strict sur la base d'historique et la configuration :
+  * Permissions restreintes à 0600 (0700 pour les répertoires) sur POSIX pour
+    history.db, -wal, -shm et ngPost.conf.
+  * Application d'ACL Windows (DACL) protégées limitant l'accès au SID de
+    l'utilisateur appelant.
+  * Réparation automatique des permissions non conformes au démarrage.
+- Validation des mises à jour applicatives :
+  * Vérification cryptographique des manifestes et sommes de contrôle SHA-256 avec
+    restriction stricte aux domaines de téléchargement GitHub de confiance.
+
+--- Corrections (Fix) ---
+
+- Sécurisation du tunnel WireGuard sous Windows :
+  * Déploiement des configurations WireGuard dans %ProgramData%\ngPost\wg avec des
+    droits stricts (SYSTEM et Administrateurs uniquement) pour bloquer toute
+    attaque TOCTOU.
+  * Rejet formel par WireGuardConfigPolicy de toute directive d'exécution de
+    scripts (PreUp, PostUp, PreDown, PostDown).
+  * Sérialisation sécurisée des arguments PowerShell exécutés avec privilèges élevés.
+  * Prise en compte propre des refus ou annulations d'UAC (code Win32 1223).
+  * Validation de l'arrêt du service auprès du SCM avant la déconnexion du tunnel.
+- Sécurisation du helper VPN privilégié sous Linux (Protocole v2/v3, Révision 4) :
+  * Le helper root vérifie formellement que l'utilisateur appelant a le droit de
+    lire les fichiers de configuration et d'identifiants avant de les ouvrir,
+    empêchant toute tentative d'exfiltration locale.
+  * Vérification de l'identité Polkit avant la création des règles d'autorisation.
+  * Passage des identifiants OpenVPN par stdin, stockés exclusivement sur /run
+    dans un dossier temporaire volatile propriétaire.
+  * Révocation automatique des anciennes autorisations Polkit lors des mises à jour.
+- Politique de configuration OpenVPN durcie :
+  * Liste blanche stricte des directives autorisées avant exécution en root,
+    neutralisant les directives critiques comme 'plugin' ou les traversées de répertoires.
+  * Rejet des identifiants proxy passés par fichier (http-proxy-user-pass).
+  * Suppression automatique des directives de routage globales (redirect-gateway,
+    route) pour éviter toute altération indésirable des tables réseau de l'hôte.
+- Disjoncteur sur échec d'authentification NNTP :
+  * Interruption de l'envoi après 3 cycles consécutifs de refus d'authentification,
+    évitant le blocage ou le bannissement du compte chez le fournisseur Usenet.
+- Cadrage strict des commandes NNTP :
+  * Validation du format des Message-IDs et cadrage unique CRLF pour chaque
+    commande NNTP, éliminant les risques d'injection CRLF via des noms de fichiers.
+
+====================================================
+3. LE RESTE (PERFORMANCES, ARCHITECTURE & QUALITÉ)
+====================================================
+
+--- Nouveautés et suppressions ---
+
+- Plafonds de taille de fonctions (Ratchet Lizard) :
+  * Contrôle strict en CI de la longueur physique des fonctions (<= 100 lignes
+    pour les nouvelles fonctions, plafond absolu à 200 lignes) consigné dans
+    tests/function-length-baseline.txt.
+- Analyse statique et sanitizers mémoire en intégration continue :
+  * Intégration de Clang-Tidy et Cppcheck dans les workflows de validation.
+  * Intégration continue avec AddressSanitizer (ASan) et UndefinedBehaviorSanitizer
+    (UBSan) pour traquer fuites mémoire et comportements indéfinis.
+- Planchers stricts de tests unitaires :
+  * Nombre minimal de tests imposé par plateforme dans tests/expected-counts.txt
+    empêchant toute omission ou régression silencieuse.
+
+--- Améliorations ---
+
+- Performances de l'encodage yEnc :
+  * Allocation mémoire unique pour le corps complet de l'article yEnc (=ybegin,
+    en-tête, corps encodé, =yend), réduisant le trafic mémoire de 6,44 Mo à
+    1,46 Mo par article.
+  * Dimensionnement mathématique des tampons fixes à leur pire cas prouvé.
+- Débit du pipeline NNTP et des sockets :
+  * Transmission de la taille pré-calculée (_bodyWireSize) aux écritures sockets,
+    éliminant les appels redondants à strlen() sur des blocs de 700 Ko.
+  * Utilisation d'un moteur pseudo-aléatoire thread-local (std::mt19937) pour
+    générer les Message-IDs sans contention de verrous.
+  * Réduction du temps de verrouillage dans Poster : mutex réservé strictement
+    à l'enfilement des articles.
+- Performances de la base SQLite d'historique :
+  * Passage en synchronous=NORMAL sous WAL, supprimant les fsyncs redondants.
+  * Migration en schéma v5 avec WITHOUT ROWID pour la table post_articles,
+    indexant directement sur (file_id, part).
+- Réactivité et gestion mémoire de l'interface graphique :
+  * Document du journal de bord borné à ses 5 000 derniers blocs, avec désactivation
+    de l'historique d'annulation.
+  * Découpage des blocs de texte insérés à 2 048 caractères pour éliminer les gels
+    de l'interface Qt.
+- Refactoring architectural & modernisation C++ :
+  * Découpage et modularisation de plusieurs classes volumineuses (NgPost, PostingJob,
+    MainWindow, NntpConnection, VpnManager, Par2Settings, NzbCheck, NzbHistoryRegenerator)
+    en composants spécialisés.
+  * Décomposition systématique des routines complexes de validation PAR2, de politiques
+    VPN, de sécurité Windows et de récupération NZB pour satisfaire la règle de complexité
+    cyclomatique et de longueur de fonction (<= 100 lignes).
+  * Remplacement des pointeurs bruts par std::unique_ptr<char[]> dans NntpArticle.
+- Internationalisation (i18n) complète :
+  * Synchronisation et complétion à 100 % des catalogues de traduction pour les
+    7 langues : allemand, anglais, espagnol, français, néerlandais, portugais
+    et chinois.
+
+--- Corrections (Fix) ---
+
+- Conformité stricte yEnc 1.3 :
+  * Échappement obligatoire des espaces et tabulations en fin de ligne ainsi que
+    sur le dernier octet de chaque article avec '=', éliminant les erreurs de CRC
+    provoquées par les serveurs NNTP qui tronquent les espaces de fin de ligne.
+  * Alignement du champ pcrc32 sur 8 caractères hexadécimaux complets.
+- Synchronisation EOF du poster :
+  * Attente obligatoire de la fin de l'encodage des articles en cours avant de
+    déclarer la fin de fichier (EOF), évitant la déconnexion prématurée des sockets.
+- Prévention de la famine de la boucle d'événements Qt :
+  * Limitation de la taille du tampon de lecture lors du traitement des signaux
+    réseau pour préserver la réactivité de la boucle d'événements.
+- Fuites de mémoire et stabilité :
+  * Élimination de la fuite mémoire des axes QChart lors du rafraîchissement des statistiques.
+  * Libération propre des instances QTranslator à l'arrêt d'ngPost.
+  * Déconnexion sécurisée du modèle de fichiers dans le destructeur de PostingWidget.
+  * Correction d'un dépassement d'entier signé sous UBSan dans tst_Yenc.
+- Résolution virtuelle en CI graphique offscreen :
+  * Définition d'un écran virtuel 2560x1440 pour les tests offscreen Windows et
+    Linux, évitant le bridage des dimensions de fenêtres par l'API Win32.
+- Compilation stricte sans avertissements :
+  * Mode CONFIG+=ngpost_werror (-Werror / /WX) appliqué sur tous les compilateurs,
+    avec masquage des en-têtes externes via /external:anglebrackets sous MSVC.
+
+####################################################
+###       Release: ngPost v5.5.1                 ###
+###       date:    2026/09/02                    ###
+####################################################
+
+ngPost v5.5.1 is a maintenance and usability release focused on streamlining the
+posting interface, centralising archive compression settings, providing contextual
+guidance for dependencies, and updating translations across all supported languages.
+
+Major improvements and fixes:
+
+- Dedicated Compression Settings Dialog:
+  * Archive compression options (RAR vs 7-Zip selection, binary executable paths,
+    volume split size / RAR max limit, default archive retention policy, fixed
+    archive password) are now centralized in a dedicated modal dialog accessible
+    via the Options menu or directly from posting tabs.
+  * Cleans up both Quick Post and Auto Post tabs by removing cluttered inline
+    technical configuration fields.
+  * Disentangles the configured global default for preserving archives (KEEP_RAR)
+    from per-post tab overrides, preventing a one-off post setting from silently
+    overwriting the permanent configuration on disk.
+
+- Refactored Posting Tab Layout:
+  * Streamlined posting tab controls into a clean, intuitive two-row layout.
+  * Unified packaging and compression options with immediate access to the
+    Compression Settings dialog.
+
+- Contextual Dependency Tooltips:
+  * Greyed-out (disabled) checkboxes and fields now display explicit contextual
+    tooltips explaining why they are disabled and which prerequisite option must
+    be enabled first (e.g. explaining that compression must be active to keep
+    archive files).
+  * Prerequisite tooltips are dynamically updated and properly preserved across
+    on-the-fly language changes.
+
+- Translations:
+  * Full translation updates and refreshed binary catalogs (.qm) across all
+    seven supported languages: German (de), English (en), Spanish (es),
+    French (fr), Dutch (nl), Portuguese (pt), and Chinese (zh).
+
+- Quality Assurance:
+  * Added extensive GUI test coverage in tst_MainWindow (+464 lines) testing the
+    dialog lifecycle, control dependency synchronization, configuration
+    persistence, and translation resilience.
+
+====================================================
+Notes de version (Français) :
+
+ngPost v5.5.1 est une version de maintenance et d'ergonomie qui simplifie
+l'interface de post, centralise les réglages de compression d'archives,
+ajoute des infobulles contextuelles pour les options dépendantes et met à
+jour l'ensemble des traductions.
+
+Principaux changements et améliorations :
+
+- Boîte de dialogue dédiée aux réglages de compression :
+  * Les options de compression d'archives (choix entre RAR et 7-Zip, chemins des
+    exécutables, taille des volumes / limite RAR max, conservation des archives,
+    mot de passe fixe) sont désormais regroupées dans une boîte de dialogue
+    dédiée « Paramètres de compression » (accessible via le menu Options ou
+    depuis les onglets de post).
+  * Allège considérablement les onglets de post (« Post rapide » et « Auto-post »)
+    en éliminant les champs de configuration encombrants.
+  * Sépare proprement la valeur par défaut configurée (KEEP_RAR) du choix
+    spécifique fait sur un post donné, évitant qu'un réglage ponctuel n'écrase la
+    configuration globale.
+
+- Réorganisation de la disposition des onglets de post :
+  * Nouvelle disposition claire et aérée sur deux lignes logiques.
+  * Simplification visuelle des options d'empaquetage et de compression.
+
+- Infobulles d'aide sur les contrôles dépendants :
+  * Les cases à cocher et champs grisés (désactivés) affichent désormais une
+    infobulle explicative indiquant clairement quelle option parente doit être
+    activée au préalable (par exemple, pourquoi la conservation des archives
+    nécessite d'activer la compression).
+  * Les infobulles d'explication sont mises à jour dynamiquement lors des
+    changements de langue en cours d'utilisation.
+
+- Traductions complètes :
+  * Mises à jour complètes des catalogues de traduction dans les 7 langues
+    supportées : Allemand (de), Anglais (en), Espagnol (es), Français (fr),
+    Néerlandais (nl), Portugais (pt) et Chinois (zh).
+
+- Tests et assurance qualité :
+  * Ajout d'une suite complète de tests d'interface dans tst_MainWindow
+    validant le cycle de vie du dialogue de compression, la persistance des
+    réglages et la cohérence des infobulles contextuelles.
+
 
 ####################################################
 ###       Release: ngPost v5.5.1                 ###

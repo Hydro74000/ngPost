@@ -40,7 +40,7 @@ private:
 
 public:
     FileUploader(QNetworkAccessManager &netMgr, const QString &nzbFilePath);
-    ~FileUploader();
+    ~FileUploader() override;
 
     void startUpload(const QUrl &serverUrl);
 

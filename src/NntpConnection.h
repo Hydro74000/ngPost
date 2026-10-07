@@ -56,17 +56,30 @@ private:
         NO_MORE_FILES
     };
 
-    const int _id;                      //!< connection id
+    const int _conId;                   //!< connection id
     const NntpServerParams &_srvParams; //!< server parameters
 
-    QTcpSocket *_socket; //!< Real TCP socket
+    //! Owned, without a Qt parent on purpose: created by onStartConnection() in
+    //! this connection's thread, released by deleteSocket() with deleteLater() and
+    //! nulled, so a queued event can never reach a deleted socket. Not a
+    //! unique_ptr: a QObject living in another thread must not be deleted at once.
+    QTcpSocket *_socket;
     bool _isConnected;   //!< to avoid to rely on iSocket && iSocket->isOpen()
 
     QString _logPrefix; //!< log prefix: NntpConnection[<iSocketDescriptor>]
 
     PostingState _postingState;
     NntpArticle *_currentArticle;
+    bool _currentArticlePreserved;
     ushort _nbDisconnected;
+    QString _lastTransportError;
+    //! The server refused our credentials (or they cannot be sent) on the
+    //! latest attempt. Replaying them at once cannot succeed, so the immediate
+    //! reconnect is skipped and PostingJob decides from the backoff cycle.
+    bool _authRejected;
+    //! Reached the posting state since PostingJob last asked: proof that these
+    //! credentials worked, which takeBecameReady() consumes.
+    bool _becameReady;
 
     NgPost *_ngPost;
     Poster *_poster;
@@ -87,15 +100,26 @@ public:
     NntpConnection &operator=(const NntpConnection &) = delete;
     NntpConnection &operator=(const NntpConnection &&) = delete;
 
-    ~NntpConnection(); //!< destructor: delete the QTcpSocket
+    ~NntpConnection() override; //!< destructor: delete the QTcpSocket
 
     inline int getId() const; //!< NntpConnection id: iSocketDescriptor
 
     inline void write(const QByteArray &aBuffer); //!< write on the socket
-    inline void write(const char *aBuffer);       //!< write on the socket
+
+    //! Write \a size bytes on the socket. Every call site knows the length
+    //! already, and letting QIODevice recover it means a strlen over a
+    //! ~700 KB article body on each send.
+    inline void write(const char *aBuffer, qint64 size);
 
     inline void resetErrorCount();
     inline bool isConnected() const;
+
+    //! Only meaningful once disconnected() was emitted: the connection is then
+    //! idle until the next startConnection.
+    inline bool authenticationRejected() const;
+    //! Whether the connection reached the posting state since the previous
+    //! call. Same idle-only contract as authenticationRejected().
+    inline bool takeBecameReady();
 
     void setPoster(Poster *poster);
 
@@ -112,6 +136,7 @@ signals:
     void socketError(QString aError); //!< Error during socket creation (ssl or not)
     void errorConnecting(QString aError);
     void disconnected(NntpConnection *con);
+    void retryingConnection(QString server, QString detail);
     void log(QString msg, bool newline = true) const;
     void error(QString msg) const;
 
@@ -140,24 +165,36 @@ private:
     inline void _error(const char *aMsg) const;        //!< log function for char *
     inline void _error(const std::string &aMsg) const; //!< log function for std::string
 
+    void _handlePostResponse(QByteArray &line);
+    void _handleArticleResponse(QByteArray &line);
+    bool _handleWelcome(QByteArray &line);
+    bool _handleAuthUser(QByteArray &line);
+    void _handleAuthPass(QByteArray &line);
+
     void _sendNextArticle();
-    void _closeConnection();
+    void _closeConnection(bool dropTransport = false);
+    void _detachSocketSignals();
+    void _shutdownSocket();
+    //! A transport close while an article is awaiting a definitive NNTP
+    //! response is ambiguous: the server may already have accepted it. Keep
+    //! the article resumable independently of VPN state and NO_RESUME_AUTO.
+    void _preserveCurrentArticleAfterTransportLoss(QString const &reason);
 
     inline void deleteSocket();
 };
 
 int NntpConnection::getId() const
 {
-    return _id;
+    return _conId;
 }
 
 void NntpConnection::write(const QByteArray &aBuffer)
 {
     _socket->write(aBuffer);
 }
-void NntpConnection::write(const char *aBuffer)
+void NntpConnection::write(const char *aBuffer, qint64 size)
 {
-    _socket->write(aBuffer);
+    _socket->write(aBuffer, size);
 }
 
 void NntpConnection::resetErrorCount()
@@ -167,6 +204,18 @@ void NntpConnection::resetErrorCount()
 bool NntpConnection::isConnected() const
 {
     return _isConnected;
+}
+
+bool NntpConnection::authenticationRejected() const
+{
+    return _authRejected;
+}
+
+bool NntpConnection::takeBecameReady()
+{
+    bool const ready = _becameReady;
+    _becameReady = false;
+    return ready;
 }
 
 bool NntpConnection::hasNoMoreFiles() const

@@ -6,7 +6,7 @@
       <group>alt.binaries.test</group>
     </groups>
     <segments>
-      <segment bytes="19" number="1">MSGID-0</segment>
+      <segment bytes="128" number="1">MSGID-0</segment>
     </segments>
   </file>
 </nzb>

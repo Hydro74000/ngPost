@@ -15,6 +15,7 @@
 #define POSTINGJOBOPTIONS_H
 
 #include "postinfo/PostInfoData.h"
+#include "par2/Par2Settings.h"
 
 #include <QFileInfo>
 #include <QFileInfoList>
@@ -78,10 +79,15 @@ struct PostingJobOptions
     // packing
     QString tmpPath;
     QString rarPath;
+    QString rarTool;
     QString rarArgs;
     uint    rarSize   = 0;
     bool    useRarMax = false;
+    uint    rarMax   = 99;
     uint    par2Pct   = 0;
+    QString par2Path;
+    QString par2Arguments;
+    par2::Tool par2Tool = par2::Tool::Auto;
     bool    doCompress = false; //!< an ORDER: true means "run rar now"
     bool    doPar2     = false; //!< an ORDER: true means "run par2 now"
     QString rarName;

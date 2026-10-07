@@ -11,6 +11,7 @@
 lessThan(QT_MAJOR_VERSION, 6): error("ngPost requires Qt 6 (qtkeychain-qt6). Use qmake6, not qmake/qmake-qt5.")
 
 QT += core network sql
+RESOURCES += $$PWD/utils/update/update.qrc
 
 # Cross-platform credential store (QtKeychain) for OpenVPN auth.
 # Packages: Fedora qtkeychain-qt6, Ubuntu libqt6keychain1-dev, brew qtkeychain.
@@ -31,7 +32,11 @@ LIBS    += -lqt6keychain
 # a DLL that nothing imports, which windeployqt then skips.
 linux:!android: QT += dbus
 
-VERSION = 5.5.1
+# devel carries the next minor. Unstable tags derive from it, so it must stay
+# ahead of the newest stable tag: with VERSION behind, v5.5-unstable sorted
+# below the released v5.5.1 and the update check offered stable to devel users
+# while never offering them the build they had just published.
+VERSION = 5.6
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 # The exact release this binary was built as, e.g. "v5.5" or
@@ -49,12 +54,40 @@ CONFIG += c++17
 
 macx: QMAKE_CXXFLAGS += -Wno-error=implicit-function-declaration
 
+# A local hiding a member or an outer local compiles silently and reads the
+# wrong variable. MSVC has no -Wshadow (its C4456-C4459 need /W4), so the flag
+# stays on the GCC and clang toolchains.
+!msvc: QMAKE_CXXFLAGS += -Wshadow
+
+# CI builds pass CONFIG+=ngpost_werror so that any new warning fails the job.
+# It stays off by default: a newer compiler at a packager's must not turn a
+# fresh warning into a broken build.
+#
+# Only our own code is held to it. qmake hands Qt's header directories to the
+# compiler with a plain -I, so a warning inside a Qt header -- GCC 16 with Qt
+# 6.11 already emits -Wsfinae-incomplete from qchar.h -- would fail the build
+# too. Declaring them system headers silences that: GCC and clang drop a -I
+# that duplicates an -isystem (a glob, not the QT list, because modules are
+# added further down this file); MSVC is told below.
+ngpost_werror {
+    !msvc {
+        NGPOST_THIRD_PARTY_HEADERS = $$[QT_INSTALL_HEADERS] $$files($$[QT_INSTALL_HEADERS]/Qt*)
+        !isEmpty(QT_KEYCHAIN_PREFIX): NGPOST_THIRD_PARTY_HEADERS += $$QT_KEYCHAIN_PREFIX/include
+        QMAKE_CXXFLAGS += -Werror
+        for(dir, NGPOST_THIRD_PARTY_HEADERS): QMAKE_CXXFLAGS += -isystem $$shell_quote($$dir)
+        macx: QMAKE_CXXFLAGS += -iframework $$shell_quote($$[QT_INSTALL_LIBS])
+    }
+    # One /external:I per Qt module made the command line longer than nmake
+    # accepts (U1095). Every Qt and QtKeychain header is included with angle
+    # brackets and none of ours is, so /external:anglebrackets draws the same
+    # line in one flag.
+    msvc: QMAKE_CXXFLAGS += /WX /external:anglebrackets /external:W0
+}
+
 DEFINES += __USE_CONNECTION_TIMEOUT__
 DEFINES += __COMPUTE_IMMEDIATE_SPEED__
 
 DEFINES += __USE_TMP_RAM__
-
-DEFINES += __RELEASE_ARTICLES_WHEN_CON_FAILS__
 
 # macro for debuging posting on multiple provides (no need anymore)
 #DEFINES -= __DISP_ARTICLE_SERVER__
@@ -105,20 +138,28 @@ SOURCES += \
         $$PWD/PostCmdRunner.cpp \
         $$PWD/Poster.cpp \
         $$PWD/PostingJob.cpp \
+        $$PWD/par2/Par2Settings.cpp \
+        $$PWD/tools/ExternalToolResolver.cpp \
         $$PWD/nntp/Nntp.cpp \
         $$PWD/nntp/NntpArticle.cpp \
         $$PWD/nntp/NntpFile.cpp \
         $$PWD/postinfo/PostInfoTemplate.cpp \
         $$PWD/utils/CmdOrGuiApp.cpp \
         $$PWD/utils/PathHelper.cpp \
+        $$PWD/utils/SecretMasker.cpp \
         $$PWD/utils/UpdateChecker.cpp \
         $$PWD/utils/Yenc.cpp \
         $$PWD/vpn/VpnDnsResolver.cpp \
         $$PWD/vpn/OpenVpnBackend.cpp \
+        $$PWD/vpn/OpenVpnConfigPolicy.cpp \
         $$PWD/vpn/VpnManager.cpp \
         $$PWD/vpn/VpnProfile.cpp \
+        $$PWD/vpn/VpnProtocol.cpp \
         $$PWD/vpn/VpnSocketBinder.cpp \
+        $$PWD/vpn/WindowsSecurity.cpp \
+        $$PWD/vpn/WindowsServiceControl.cpp \
         $$PWD/vpn/WindowsBindHelper.cpp \
+        $$PWD/vpn/WireGuardConfigPolicy.cpp \
         $$PWD/vpn/WireGuardBackend.cpp
 
 HEADERS += \
@@ -130,6 +171,7 @@ HEADERS += \
     $$PWD/history/PostHistoryStore.h \
     $$PWD/history/ResumePlanner.h \
     $$PWD/NgPost.h \
+    $$PWD/tools/ExternalToolResolver.h \
     $$PWD/NntpCheckCon.h \
     $$PWD/NntpConnection.h \
     $$PWD/NzbCheck.h \
@@ -144,17 +186,27 @@ HEADERS += \
     $$PWD/postinfo/PostInfoTemplate.h \
     $$PWD/utils/CmdOrGuiApp.h \
     $$PWD/utils/Macros.h \
+    $$PWD/utils/LogTimestamp.h \
     $$PWD/utils/PathHelper.h \
+    $$PWD/utils/RandomToken.h \
     $$PWD/utils/PureStaticClass.h \
+    $$PWD/utils/SecretMasker.h \
     $$PWD/utils/UpdateChecker.h \
+    $$PWD/utils/WindowsCommandLine.h \
     $$PWD/utils/Yenc.h \
     $$PWD/vpn/VpnDnsResolver.h \
     $$PWD/vpn/OpenVpnBackend.h \
+    $$PWD/vpn/OpenVpnConfigPolicy.h \
     $$PWD/vpn/VpnBackend.h \
     $$PWD/vpn/VpnManager.h \
+    $$PWD/vpn/VpnPlatform.h \
     $$PWD/vpn/VpnProfile.h \
+    $$PWD/vpn/VpnProtocol.h \
     $$PWD/vpn/VpnSocketBinder.h \
+    $$PWD/vpn/WindowsSecurity.h \
+    $$PWD/vpn/WindowsServiceControl.h \
     $$PWD/vpn/WindowsBindHelper.h \
+    $$PWD/vpn/WireGuardConfigPolicy.h \
     $$PWD/vpn/WireGuardBackend.h
 
 # HMI sources are pulled in only when the consumer set `CONFIG += use_hmi`
@@ -165,7 +217,7 @@ HEADERS += \
 # .pro files only have to do `CONFIG += use_hmi ; include(common.pri)` and
 # everything resolves consistently.
 use_hmi {
-QT += gui charts
+QT += gui charts concurrent
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 DEFINES += __USE_HMI__
 
@@ -173,9 +225,13 @@ SOURCES += \
     $$PWD/hmi/AutoPostWidget.cpp \
     $$PWD/hmi/CheckBoxCenterWidget.cpp \
     $$PWD/hmi/CompressionSettingsDialog.cpp \
+    $$PWD/hmi/ExternalToolPathWidget.cpp \
+    $$PWD/hmi/Par2SettingsDialog.cpp \
     $$PWD/hmi/PostInfoDialog.cpp \
+    $$PWD/hmi/PostingControlIcon.cpp \
     $$PWD/hmi/PostingWidget.cpp \
     $$PWD/hmi/SignedListWidget.cpp \
+    $$PWD/hmi/StartupTabBar.cpp \
     $$PWD/hmi/MainWindow.cpp \
     $$PWD/hmi/VpnProfileEditDialog.cpp \
     $$PWD/hmi/VpnSettingsDialog.cpp
@@ -184,13 +240,18 @@ HEADERS += \
     $$PWD/hmi/AutoPostWidget.h \
     $$PWD/hmi/CheckBoxCenterWidget.h \
     $$PWD/hmi/CompressionSettingsDialog.h \
+    $$PWD/hmi/ExternalToolPathWidget.h \
+    $$PWD/hmi/Par2SettingsDialog.h \
     $$PWD/hmi/DependentControl.h \
     $$PWD/hmi/PostInfoDialog.h \
+    $$PWD/hmi/PostingControlIcon.h \
     $$PWD/hmi/PostingWidget.h \
     $$PWD/hmi/SignedListWidget.h \
+    $$PWD/hmi/StartupTabBar.h \
     $$PWD/hmi/MainWindow.h \
     $$PWD/hmi/VpnProfileEditDialog.h \
-    $$PWD/hmi/VpnSettingsDialog.h
+    $$PWD/hmi/VpnSettingsDialog.h \
+    $$PWD/hmi/WrappedLabels.h
 
 FORMS += \
     $$PWD/hmi/AutoPostWidget.ui \

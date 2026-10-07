@@ -7,6 +7,11 @@ on:
       - master
   workflow_dispatch:
     inputs:
+      updates_only:
+        description: "Validate update paths, release packages and GUI only; publication is refused."
+        required: false
+        default: false
+        type: boolean
       version:
         description: "Release version (e.g., v1.2.3). Leave empty for a build-only (no release) run."
         required: false
@@ -23,13 +28,36 @@ on:
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
+
+# PAR2 tools bundled with the packages. One list for every OS: the same ParPar
+# and par2cmdline builds end up in the Windows installer, the Linux archive, the
+# AppImage and the macOS bundle, so a post behaves the same everywhere and a bug
+# report names one version. MultiPar is Windows-only (par2j is a Windows
+# executable), so it has no counterpart on the other platforms.
+#
+# Every download is pinned by SHA-256. The upstream tag alone is not enough: a
+# re-tagged or replaced asset would be picked up silently, and these binaries
+# run on the user's machine with the files they are about to post.
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  test-update:
+    uses: ./.github/workflows/update-tests.yml
+  test-unit:
+    if: ${{ !inputs.updates_only }}
+    uses: ./.github/workflows/unit-tests.yml
+  test-integration:
+    if: ${{ !inputs.updates_only }}
+    uses: ./.github/workflows/integration-tests.yml
+  test-gui:
+    uses: ./.github/workflows/gui-tests.yml
+  test-vpn:
+    if: ${{ !inputs.updates_only }}
+    uses: ./.github/workflows/vpn-e2e.yml
   release-metadata:
     name: Prepare Release Metadata
     runs-on: ubuntu-latest
@@ -42,14 +70,21 @@ jobs:
       appimage_update_tag: ${{ steps.metadata.outputs.appimage_update_tag }}
       appimage_update_glob: ${{ steps.metadata.outputs.appimage_update_glob }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Compute release identity
         id: metadata
         env:
+          UPDATES_ONLY: ${{ inputs.updates_only || false }}
+          PUBLISH_REQUESTED: ${{ inputs.publish || false }}
           RELEASE_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '' }}
           PRERELEASE_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
         run: |
           set -euo pipefail
+
+          if [ "$UPDATES_ONLY" = true ] && [ "$PUBLISH_REQUESTED" = true ]; then
+            echo "Update-only validation cannot publish a release." >&2
+            exit 1
+          fi
 
           if [ -n "$RELEASE_INPUT" ]; then
             tag="$RELEASE_INPUT"
@@ -127,11 +162,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: release-metadata
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install dependencies
         run: sudo apt update && sudo apt install -y build-essential cmake libsecret-1-dev
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
@@ -142,7 +177,7 @@ jobs:
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
-          cmake --build build -j$(nproc)
+          cmake --build build -j"$(nproc)"
           cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
@@ -163,14 +198,31 @@ jobs:
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
-          make -j$(nproc)
+          make -j"$(nproc)"
+      - name: Smoke test the built binary
+        run: |
+          # Nothing else in this workflow ever runs what it is about to publish.
+          # --version is enough to catch the failure that actually happens: a
+          # binary that starts but has no working TLS (missing OpenSSL, a Qt
+          # network plugin left out of the bundle) posts nothing at all, and we
+          # only ever found out after the release was live.
+          # argc > 1 means cmd mode, so this needs no display.
+          out=$(./src/ngPost --version 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "SSL support: yes" \
+            || { echo "FAIL: no working SSL in the built binary"; exit 1; }
       - name: Package
         run: |
           VERSION="${{ needs.release-metadata.outputs.package_version }}"
           PKG="ngPost-${VERSION}-linux-x86_64"
           mkdir -p "dist/${PKG}"
           cp src/ngPost "dist/${PKG}/"
-          cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
+          touch "dist/${PKG}/.ngpost-installation"
+          # Same pinned ParPar + par2cmdline as the Windows, AppImage and macOS
+          # packages. ngPost picks them up because they sit next to its binary.
+          ./.github/scripts/fetch-par2-tools.sh "dist/${PKG}"
+          cp ngPost.conf.example ngPost_fr.conf "dist/${PKG}/"
+          cp release_notes.txt README* THIRD_PARTY_LICENSES.md "dist/${PKG}/" 2>/dev/null || true
           cp -R templates "dist/${PKG}/"
           test -f "dist/${PKG}/templates/post_info_default.txt"
           test -f "dist/${PKG}/templates/post_info_baselien.txt"
@@ -178,8 +230,17 @@ jobs:
           tar -C dist -czf "dist/${PKG}.tar.gz" "${PKG}"
           rm -rf "dist/${PKG}"
           ls -la dist/
+      - name: Validate update transactions on the release archive
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python3 tests/update/check_release_package.py --archive dist/*-linux-x86_64.tar.gz --tag "$RELEASE_TAG"
+          python3 tests/update/build_legacy_client.py "$RUNNER_TEMP/legacy-client"
+          python3 tests/update/check_legacy_package.py --archive dist/*-linux-x86_64.tar.gz --client "$RUNNER_TEMP/legacy-client/legacy-client"
+
       - name: Upload Linux Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binary-linux
           path: dist/*.tar.gz
@@ -189,11 +250,11 @@ jobs:
     runs-on: windows-latest
     needs: release-metadata
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Enable Developer Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1.13.0
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           aqtversion: '==3.2.0'
           version: '6.8.2'
@@ -231,7 +292,7 @@ jobs:
         run: |
           cd src
           Remove-Item -Force Makefile* -ErrorAction SilentlyContinue
-          qmake ngPost.pro -spec win32-msvc CONFIG+="qtquickcompiler release use_hmi" DEFINES+="UNICODE _UNICODE WIN32 __USE_CONNECTION_TIMEOUT__ __COMPUTE_IMMEDIATE_SPEED__ __USE_TMP_RAM__ __RELEASE_ARTICLES_WHEN_CON_FAILS__"
+          qmake ngPost.pro -spec win32-msvc CONFIG+="qtquickcompiler release use_hmi" DEFINES+="UNICODE _UNICODE WIN32 __USE_CONNECTION_TIMEOUT__ __COMPUTE_IMMEDIATE_SPEED__ __USE_TMP_RAM__"
           nmake
       - name: Deploy Qt DLLs with windeployqt
         run: windeployqt src/release/ngPost.exe --release --qmldir src --compiler-runtime
@@ -251,85 +312,12 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path src/release/sqldrivers | Out-Null
           Copy-Item $sqlitePlugin src/release/sqldrivers/ -Force
-      - name: Fetch ParPar for optional bundling
+      - name: Bundle the pinned PAR2 tools
         shell: pwsh
         run: |
-          # NgPost.cpp auto-detects an "embedded" parpar.exe sitting next to
-          # ngPost.exe (see par2Candidates loop in NgPost::NgPost). We ship
-          # ParPar specifically (not par2cmdline / par2cmdline-turbo) because
-          # ngPost passes wildcard arguments like archive.7z* to the par2
-          # binary on Windows. QProcess invokes CreateProcess directly with
-          # no shell, so the binary has to do its own globbing —
-          # par2cmdline-turbo currently doesn't, while ngPost's ParPar path
-          # uses -R <folder> and avoids globbing entirely. ParPar is
-          # released by animetosho into the public domain (CC0).
-          #
-          # parpar is staged outside src/release/ on purpose: src/release/*
-          # is copied unconditionally by both the ZIP package and the Inno
-          # Setup main [Files] entry. parpar.exe is wired into Inno Setup as
-          # a task-gated extra source instead.
-          $parparVersion = "0.4.5"
-          $asset         = "parpar-v$parparVersion-win64.7z"
-          $url           = "https://github.com/animetosho/ParPar/releases/download/v$parparVersion/$asset"
-          $stage         = Join-Path (Get-Location) "dist\parpar"
-          New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          $archive = Join-Path $env:RUNNER_TEMP $asset
-          Invoke-WebRequest -Uri $url -OutFile $archive
-          # 7-Zip ships preinstalled on windows-latest runners. PowerShell's
-          # Expand-Archive does not support .7z, so we shell out to 7z.exe.
-          $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-          if (-not (Test-Path $sevenZip)) {
-            throw "7-Zip not found at $sevenZip — runner image changed?"
-          }
-          $extract = Join-Path $env:RUNNER_TEMP "parpar-extract"
-          Remove-Item -Recurse -Force $extract -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force -Path $extract | Out-Null
-          & $sevenZip x $archive "-o$extract" -y | Out-Null
-          if ($LASTEXITCODE -ne 0) {
-            throw "7-Zip failed to extract $asset (exit $LASTEXITCODE)"
-          }
-          $parpar = Get-ChildItem $extract -Recurse -File -Filter 'parpar.exe' |
-            Select-Object -First 1
-          if (-not $parpar) {
-            throw "parpar.exe not found inside $asset"
-          }
-          Copy-Item $parpar.FullName (Join-Path $stage 'parpar.exe') -Force
-      - name: Bundle par2cmdline and MultiPar fallback tools
-        shell: pwsh
-        run: |
-          # NgPost auto-detects parpar.exe -> par2.exe -> par2j64.exe sitting
-          # next to ngPost.exe (see par2Candidates in NgPost::NgPost). ParPar is
-          # the preferred, opt-out tool (staged in dist/parpar above). par2cmdline
-          # and MultiPar are dropped UNCONDITIONALLY into src/release so PAR2
-          # generation keeps working even when the user unticks ParPar at install
-          # time. Both self-expand the archive.7z* / archive*rar wildcards ngPost
-          # passes under QProcess's shell-less CreateProcess (verified).
-          $release = "src/release"
-
-          # par2cmdline 0.8.0 - vendored in-repo (release/libs), self-globs.
-          $par2Zip = "release/libs/par2cmdline-0.8.0-win-x64.zip"
-          if (-not (Test-Path $par2Zip)) { throw "Missing vendored $par2Zip" }
-          $tmpPar2 = Join-Path $env:RUNNER_TEMP "par2cmdline"
-          Remove-Item -Recurse -Force $tmpPar2 -ErrorAction SilentlyContinue
-          Expand-Archive -Path $par2Zip -DestinationPath $tmpPar2 -Force
-          $par2 = Get-ChildItem $tmpPar2 -Recurse -File -Filter 'par2.exe' |
-            Select-Object -First 1
-          if (-not $par2) { throw "par2.exe not found in $par2Zip" }
-          Copy-Item $par2.FullName (Join-Path $release 'par2.exe') -Force
-
-          # MultiPar (par2j64.exe) - GPL, official GitHub release.
-          $mpVersion = "1.3.3.6"
-          $mpAsset   = "MultiPar1336.zip"
-          $mpUrl     = "https://github.com/Yutaka-Sawada/MultiPar/releases/download/v$mpVersion/$mpAsset"
-          $mpArchive = Join-Path $env:RUNNER_TEMP $mpAsset
-          Invoke-WebRequest -Uri $mpUrl -OutFile $mpArchive
-          $tmpMp = Join-Path $env:RUNNER_TEMP "multipar"
-          Remove-Item -Recurse -Force $tmpMp -ErrorAction SilentlyContinue
-          Expand-Archive -Path $mpArchive -DestinationPath $tmpMp -Force
-          $par2j = Get-ChildItem $tmpMp -Recurse -File -Filter 'par2j64.exe' |
-            Select-Object -First 1
-          if (-not $par2j) { throw "par2j64.exe not found in $mpAsset" }
-          Copy-Item $par2j.FullName (Join-Path $release 'par2j64.exe') -Force
+          # Keep optional ParPar outside the installer's unconditional files.
+          # Tests and releases share downloads, checksums and runtime checks.
+          .\.github\scripts\fetch-par2-tools.ps1 -Destination src/release -ParParDestination dist/parpar
       - name: Clean Build Artifacts
         shell: pwsh
         run: |
@@ -371,11 +359,14 @@ jobs:
             throw "Missing staged parpar.exe (dist/parpar/parpar.exe)"
           }
           # par2cmdline + MultiPar are the always-installed PAR2 fallbacks.
-          foreach ($fallback in @("par2.exe", "par2j64.exe")) {
+          foreach ($fallback in @("par2.exe", "par2j64.exe", "vcomp140.dll")) {
             if (-not (Test-Path (Join-Path $root $fallback))) {
               throw "Missing bundled PAR2 fallback: $fallback"
             }
           }
+
+          # Recheck after deployment/cleanup, without downloading again.
+          .\.github\scripts\fetch-par2-tools.ps1 -Destination src/release -ParParDestination dist/parpar -VerifyOnly
 
           $expectedDlls = @(
             "Qt6Core.dll",
@@ -400,6 +391,18 @@ jobs:
               throw "ngPost.exe does not declare expected dependency: $dll"
             }
           }
+      - name: Smoke test the built binary
+        shell: pwsh
+        run: |
+          # The deployment check above proves the DLLs are declared; this proves
+          # they actually load and that TLS works. A Windows build shipping
+          # without a usable OpenSSL starts fine and then posts nothing.
+          # ngPost.pro sets CONFIG += console on Windows, so stdout is captured.
+          $out = & "src/release/ngPost.exe" --version 2>&1 | Out-String
+          Write-Host $out
+          if ($out -notmatch "SSL support: yes") {
+            throw "FAIL: no working SSL in the built binary"
+          }
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -410,12 +413,14 @@ jobs:
           $pkg = "ngPost-$version-windows-x86_64"
           New-Item -ItemType Directory -Force -Path "dist/$pkg" | Out-Null
           Copy-Item -Recurse src/release/* "dist/$pkg/"
+          New-Item -ItemType File -Path "dist/$pkg/.ngpost-installation" | Out-Null
           # parpar is staged outside src/release/ so the Inno Setup installer
           # can gate it behind the optional "installparpar" task. For the
           # standalone ZIP we always include it — no install wizard to drive
           # the choice, and users who don't want it can just delete the file.
           Copy-Item dist/parpar/parpar.exe "dist/$pkg/parpar.exe" -Force
-          Copy-Item ngPost.conf.example, release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
+          Copy-Item ngPost.conf.example, ngPost_fr.conf "dist/$pkg/" -ErrorAction Stop
+          Copy-Item release_notes.txt "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item README* "dist/$pkg/" -ErrorAction SilentlyContinue
           Copy-Item THIRD_PARTY_LICENSES.md "dist/$pkg/" -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path "dist/$pkg/templates" | Out-Null
@@ -523,6 +528,17 @@ jobs:
           MultiPar's par2j64.exe is a fast PAR2 client bundled as an alternative
           PAR2 backend (selectable via PAR2_PATH).
           Full GPL text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+
+          ------------------------------------------------------------------------
+          6. Microsoft Visual C++ OpenMP runtime (vcomp140.dll)
+          ------------------------------------------------------------------------
+          Licence  : Microsoft Visual C++ redistributable terms (Distributable Code)
+          Copyright: (c) Microsoft Corporation
+
+          par2.exe is an MSVC/OpenMP build and does not start without this runtime.
+          It is shipped next to it because windeployqt does not deploy the OpenMP
+          runtime and a machine without the VC++ redistributable would fail at the
+          par2 step of a post.
 
           ------------------------------------------------------------------------
 
@@ -644,7 +660,7 @@ jobs:
           end;
 
           // No PAR2_PATH seeding is needed: the installer ships only
-          // ngPost.conf.example (a reference template, not an active config),
+          // reference templates ngPost.conf.example and ngPost_fr.conf,
           // so ngPost regenerates a fresh ngPost.conf in the per-user config
           // dir on first launch. Its runtime auto-detection then picks up the
           // bundled parpar.exe / par2.exe / par2j64.exe sitting next to
@@ -654,8 +670,33 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
           Remove-Item -Recurse -Force "dist/$pkg"
           Get-ChildItem dist
+      - name: Validate update transactions on the release ZIP
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $archive = (Get-ChildItem dist/*-windows-x86_64.zip).FullName
+          python tests/update/check_release_package.py --archive $archive --tag $env:RELEASE_TAG
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tests/update/build_legacy_client.py "$env:RUNNER_TEMP/legacy-client"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tests/update/check_legacy_package.py --archive $archive --client "$env:RUNNER_TEMP/legacy-client/release/legacy-client.exe"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Validate upgrade from the previous stable Windows Setup
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v5.5.1 --pattern 'ngPost-v5.5.1-windows-x86_64-setup.exe' --dir "$env:RUNNER_TEMP/previous-setup"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $previous = (Get-ChildItem "$env:RUNNER_TEMP/previous-setup/*.exe").FullName
+          $candidate = (Get-ChildItem dist/*-windows-x86_64-setup.exe).FullName
+          ./tests/update/test_setup_upgrade.ps1 -PreviousSetup $previous -CandidateSetup $candidate
+
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binary-windows
           path: |
@@ -668,9 +709,9 @@ jobs:
     runs-on: macos-15
     needs: release-metadata
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.2'
           arch: 'clang_64'
@@ -681,7 +722,7 @@ jobs:
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
-          cmake --build build -j$(sysctl -n hw.ncpu)
+          cmake --build build -j"$(sysctl -n hw.ncpu)"
           cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
@@ -702,25 +743,79 @@ jobs:
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
-          make -j$(sysctl -n hw.ncpu)
+          make -j"$(sysctl -n hw.ncpu)"
       - name: Bundle Qt frameworks into .app
-        run: macdeployqt src/ngPost.app
+        run: |
+          macdeployqt src/ngPost.app
+          touch src/ngPost.app/.ngpost-installation
+      - name: Smoke test the built binary
+        run: |
+          # Nothing else in this workflow ever runs what it is about to publish.
+          # --version is enough to catch the failure that actually happens: a
+          # binary that starts but has no working TLS (missing OpenSSL, a Qt
+          # network plugin left out of the bundle) posts nothing at all, and we
+          # only ever found out after the release was live.
+          # argc > 1 means cmd mode, so this needs no display.
+          out=$(./src/ngPost.app/Contents/MacOS/ngPost --version 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "SSL support: yes" \
+            || { echo "FAIL: no working SSL in the built binary"; exit 1; }
+      - name: Bundle PAR2 tools
+        run: |
+          # After macdeployqt, and into Contents/MacOS: that is what
+          # QCoreApplication::applicationDirPath() returns inside a bundle, so
+          # ngPost's own detection finds them with no configuration.
+          ./.github/scripts/fetch-par2-tools.sh src/ngPost.app/Contents/MacOS
       - name: Package
         run: |
           VERSION="${{ needs.release-metadata.outputs.package_version }}"
           PKG="ngPost-${VERSION}-macos"
           mkdir -p dist
-          cd src
-          zip -qr "../dist/${PKG}.zip" ngPost.app
-          cd ..
+          ditto -c -k --keepParent src/ngPost.app "dist/${PKG}.zip"
           zip -qj "dist/${PKG}.zip" THIRD_PARTY_LICENSES.md
+          zip -qj "dist/${PKG}.zip" ngPost.conf.example ngPost_fr.conf
+          unzip -l "dist/${PKG}.zip" | grep -q 'ngPost.conf.example'
+          unzip -l "dist/${PKG}.zip" | grep -q 'ngPost_fr.conf'
           zip -qr "dist/${PKG}.zip" templates
           unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_default.txt'
           unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_baselien.txt'
           unzip -l "dist/${PKG}.zip" | grep -q 'templates/post_info_json.txt'
           ls -la dist/
+      - name: Verify the packaged macOS bundle
+        run: |
+          # The Windows job verifies its deployment; macOS shipped no such check
+          # and no PAR2 tool at all. Both are unpacked and run here, from the
+          # archive the user downloads: a zip round-trip is exactly where an
+          # executable bit or an ad-hoc signature gets lost, and arm64 kills an
+          # unsigned Mach-O outright rather than warning about it.
+          VERSION="${{ needs.release-metadata.outputs.package_version }}"
+          PKG="ngPost-${VERSION}-macos"
+          work="$RUNNER_TEMP/verify-macos"
+          rm -rf "$work" && mkdir -p "$work"
+          ditto -x -k "dist/${PKG}.zip" "$work"
+          app="$work/ngPost.app/Contents/MacOS"
+          for tool in ngPost parpar par2; do
+            test -x "$app/$tool" \
+              || { echo "ERROR: $tool missing or not executable in the packaged bundle" >&2; exit 1; }
+          done
+          "$app/parpar" --version 2>&1 | grep -qx "$PARPAR_VERSION" \
+            || { echo "ERROR: packaged ParPar does not report $PARPAR_VERSION" >&2; exit 1; }
+          "$app/par2" -V | grep -q "par2cmdline version $PAR2CMDLINE_VERSION" \
+            || { echo "ERROR: packaged par2cmdline does not report $PAR2CMDLINE_VERSION" >&2; exit 1; }
+          out=$("$app/ngPost" --version 2>&1)
+          echo "$out" | grep -q "SSL support: yes" \
+            || { echo "FAIL: the packaged binary lost SSL"; echo "$out"; exit 1; }
+      - name: Validate update transactions on the release archive
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python3 tests/update/check_release_package.py --archive dist/*-macos.zip --tag "$RELEASE_TAG"
+          python3 tests/update/build_legacy_client.py "$RUNNER_TEMP/legacy-client"
+          python3 tests/update/check_legacy_package.py --archive dist/*-macos.zip --client "$RUNNER_TEMP/legacy-client/legacy-client"
+
       - name: Upload macOS Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: binary-macos
           path: dist/*.zip
@@ -730,21 +825,20 @@ jobs:
     runs-on: ubuntu-24.04
     needs: release-metadata
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install build & runtime dependencies
         run: |
           sudo apt update
           sudo apt install -y \
             build-essential cmake libfuse2t64 wget file patchelf desktop-file-utils \
             libssl3t64 openssl \
-            par2 \
             openvpn wireguard-tools wireguard-go \
             libsecret-1-dev \
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 \
             libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
       - name: Install Go for wireguard-go fallback
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.24.x'
       - name: Build wireguard-go fallback
@@ -759,7 +853,7 @@ jobs:
           sudo install -m 755 /tmp/wireguard-go/wireguard-go /usr/local/bin/wireguard-go
           wireguard-go --version || true
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
         with:
           version: '6.8.2'
           arch: 'linux_gcc_64'
@@ -770,7 +864,7 @@ jobs:
           cd /tmp/qtkeychain
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
                 -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
-          cmake --build build -j$(nproc)
+          cmake --build build -j"$(nproc)"
           cmake --install build
       - name: Compile translations (.ts -> .qm)
         run: |
@@ -791,7 +885,7 @@ jobs:
         run: |
           cd src
           qmake ngPost.pro CONFIG+=release
-          make -j$(nproc)
+          make -j"$(nproc)"
       - name: Prepare AppDir
         run: |
           resolve_bin() {
@@ -832,7 +926,6 @@ jobs:
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           cp src/ngPost AppDir/usr/bin/
-          install_bin par2 AppDir/usr/bin/par2 par2 par2create par2repair
           if [ -x tools/rar ]; then
             cp tools/rar AppDir/usr/bin/rar
           fi
@@ -856,7 +949,8 @@ jobs:
           cp src/resources/icons/ngPost.png AppDir/usr/share/icons/hicolor/256x256/apps/
           cp src/resources/icons/ngPost.png AppDir/
           cp ngPost.desktop AppDir/
-          cp ngPost.conf.example release_notes.txt README* THIRD_PARTY_LICENSES.md AppDir/ || true
+          cp ngPost.conf.example ngPost_fr.conf AppDir/
+          cp release_notes.txt README* THIRD_PARTY_LICENSES.md AppDir/ || true
           cp -R templates AppDir/
       - name: Locate OpenSSL libraries
         id: openssl
@@ -864,8 +958,8 @@ jobs:
           SSL=$(find /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu -maxdepth 1 -name 'libssl.so.3' 2>/dev/null | head -1)
           CRYPTO=$(find /usr/lib/x86_64-linux-gnu /lib/x86_64-linux-gnu -maxdepth 1 -name 'libcrypto.so.3' 2>/dev/null | head -1)
           test -n "$SSL" && test -n "$CRYPTO" || { echo "OpenSSL libs not found"; exit 1; }
-          echo "ssl=$SSL"       >> $GITHUB_OUTPUT
-          echo "crypto=$CRYPTO" >> $GITHUB_OUTPUT
+          echo "ssl=$SSL"       >> "$GITHUB_OUTPUT"
+          echo "crypto=$CRYPTO" >> "$GITHUB_OUTPUT"
       - name: Locate QtKeychain library
         id: qtkeychain
         run: |
@@ -877,7 +971,7 @@ jobs:
                  /lib/x86_64-linux-gnu -maxdepth 2 \
                  -name 'libqt6keychain.so*' 2>/dev/null | sort | head -1)
           test -n "$KC" || { echo "libqt6keychain not found"; exit 1; }
-          echo "kc=$KC" >> $GITHUB_OUTPUT
+          echo "kc=$KC" >> "$GITHUB_OUTPUT"
       - name: Download linuxdeployqt
         run: |
           wget -q -O linuxdeployqt https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
@@ -914,29 +1008,46 @@ jobs:
           ./linuxdeploy \
             --appdir AppDir \
             --plugin qt \
-            --output appimage \
             --library "${{ steps.openssl.outputs.ssl }}" \
             --library "${{ steps.openssl.outputs.crypto }}" \
             --library "${{ steps.qtkeychain.outputs.kc }}" \
-            --executable AppDir/usr/bin/par2 \
             --executable AppDir/usr/bin/vpn/openvpn \
             --executable AppDir/usr/bin/vpn/wireguard-go \
             --executable AppDir/usr/bin/vpn/wg \
             --desktop-file AppDir/usr/share/applications/ngPost.desktop \
             --icon-file AppDir/ngPost.png
+          # Add these after linuxdeploy: it patches every ELF in usr/bin,
+          # including files not supplied with --executable. Patching ParPar
+          # breaks its embedded integrity check; static par2 cannot be patched.
+          ./.github/scripts/fetch-par2-tools.sh AppDir/usr/bin
+          ./linuxdeploy --appimage-extract > /dev/null
+          ./squashfs-root/usr/bin/linuxdeploy-plugin-appimage --appdir AppDir
           mkdir -p dist
-          mv *.AppImage *.AppImage.zsync dist/
+          mv -- *.AppImage *.AppImage.zsync dist/
           ls -la dist/
           # Hard fail if zsync file wasn't generated (means UPDATE_INFORMATION wasn't picked up)
           test -f dist/*.AppImage.zsync || { echo "ERROR: .zsync file not generated"; exit 1; }
+      - name: Smoke test the AppImage
+        run: |
+          # Run it the way a user does -- mounted through FUSE, not extracted --
+          # so a missing Qt network plugin or OpenSSL inside the bundle fails
+          # here rather than on someone's machine after the release.
+          cd dist
+          APPIMAGE=$(ls -- *.AppImage)
+          out=$(./"$APPIMAGE" --version 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "SSL support: yes" \
+            || { echo "FAIL: no working SSL in the AppImage"; exit 1; }
       - name: Verify AppImage is self-contained & update-info embedded
         env:
           APPIMAGE_UPDATE_TAG: ${{ needs.release-metadata.outputs.appimage_update_tag }}
           APPIMAGE_UPDATE_GLOB: ${{ needs.release-metadata.outputs.appimage_update_glob }}
         run: |
           cd dist
-          APPIMAGE=$(ls *.AppImage)
+          APPIMAGE=$(ls -- *.AppImage)
           ./"$APPIMAGE" --appimage-extract >/dev/null
+          squashfs-root/usr/bin/parpar --version 2>&1 | grep -Fx "$PARPAR_VERSION"
+          squashfs-root/usr/bin/par2 -V | grep -F "par2cmdline version $PAR2CMDLINE_VERSION"
           export LD_LIBRARY_PATH="$PWD/squashfs-root/usr/lib:$PWD/squashfs-root/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
           while IFS= read -r -d '' elf; do
             if file "$elf" | grep -q 'ELF'; then
@@ -970,6 +1081,8 @@ jobs:
           test -f squashfs-root/templates/post_info_default.txt  || { echo "ERROR: default post info model not bundled"; exit 1; }
           test -f squashfs-root/templates/post_info_baselien.txt || { echo "ERROR: Baselien post info model not bundled"; exit 1; }
           test -f squashfs-root/templates/post_info_json.txt     || { echo "ERROR: JSON post info model not bundled"; exit 1; }
+          test -f squashfs-root/ngPost.conf.example              || { echo "ERROR: English config template not bundled"; exit 1; }
+          test -f squashfs-root/ngPost_fr.conf                   || { echo "ERROR: French config template not bundled"; exit 1; }
           # Check the update-information string is embedded in the ELF
           expected_update_info="gh-releases-zsync|Hydro74000|ngPost|$APPIMAGE_UPDATE_TAG|$APPIMAGE_UPDATE_GLOB"
           if ! strings "$APPIMAGE" | grep -Fq "$expected_update_info"; then
@@ -981,29 +1094,89 @@ jobs:
           rm -rf squashfs-root
           echo "AppImage is self-contained, update-info embedded, zsync file present."
       - name: Upload AppImage Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: appimage-linux
           path: |
             dist/*.AppImage
             dist/*.AppImage.zsync
 
+  publish-image:
+    name: Publish container image
+    runs-on: ubuntu-latest
+    # After the release, whose needs already cover every build and test suite:
+    # a version tag -- and "latest" on the stable channel -- must never point at
+    # an image whose release failed. A failed push here leaves a release without
+    # its image, which re-running this failed job publishes; the reverse would
+    # leave a public tag behind a release that does not exist.
+    needs: [release-metadata, release]
+    permissions:
+      contents: read
+      packages: write
+    # Same rule as the release job: a push to master/devel publishes, a manual
+    # run only when its "publish" input is checked.
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # The Dockerfile labels the source and the documentation; the release
+      # says which version, from which commit, built when.
+      - name: Build the image
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.package_version }}
+        run: |
+          docker build --build-arg JOBS="$(nproc)" \
+            --label org.opencontainers.image.version="$VERSION" \
+            --label org.opencontainers.image.revision="$GITHUB_SHA" \
+            --label org.opencontainers.image.created="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t ngpost:release .
+
+      # What docker.yml checks on every change, down to a real post, run on the
+      # very image pushed below: a tag cannot point at bytes that skipped it.
+      - name: Test the image
+        run: bash .github/scripts/test-docker-image.sh ngpost:release
+
+      # No third-party action: the token this pushes with is the one GitHub
+      # hands the job, and it never leaves the runner.
+      - name: Publish to ghcr.io
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release-metadata.outputs.package_version }}
+          CHANNEL: ${{ needs.release-metadata.outputs.channel }}
+        run: |
+          image="ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker tag ngpost:release "$image:$VERSION"
+          docker push "$image:$VERSION"
+          # "latest" follows the stable channel only: an unstable build must
+          # never become what a bare `docker pull ngpost` gives.
+          if [ "$CHANNEL" = "stable" ]; then
+            docker tag ngpost:release "$image:latest"
+            docker push "$image:latest"
+          fi
+          docker logout ghcr.io
+
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [release-metadata, build-linux, build-windows, build-macos, build-appimage]
+    needs: [release-metadata, build-linux, build-windows, build-macos, build-appimage, test-update, test-unit, test-integration, test-gui, test-vpn]
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     # Push to master/devel always publishes. A manual workflow_dispatch only
     # publishes when its "publish" input is checked — leaving it unchecked
     # gives a build-only run (artifacts uploaded, no GitHub release created).
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
+          pattern: "{binary-*,appimage-*}"
           merge-multiple: true
       - name: List artifacts
         run: ls -la artifacts/
@@ -1033,6 +1206,26 @@ jobs:
               exit 1
             }
           done
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          path: artifacts
+          format: spdx-json
+          output-file: artifacts/ngPost.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Generate and verify release SHA-256 hashes
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.release_tag }}
+        run: |
+          python3 .github/scripts/release-checksums.py
+          (cd artifacts && sha256sum --check SHA256SUMS)
+      # GitHub OIDC + Sigstore: no maintainer signing key or paid certificate.
+      # Includes the final packages, SBOM and both checksum manifests.
+      - name: Attest release provenance (keyless)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: artifacts/*
       - name: Generate release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1083,7 +1276,25 @@ jobs:
               echo "- Previous release: none found"
             fi
             echo
-            echo "## Detailed release notes"
+            if [ "$CHANNEL" = "unstable" ] && [ -n "$range" ]; then
+              # An unstable build leads with its own increment; the cumulative
+              # notes of the version in preparation follow, for installs that
+              # are several builds behind.
+              echo "## What's new since ${previous_tag}"
+              echo
+              delta="$(python3 .github/scripts/release-notes-delta.py --previous "$previous_tag")"
+              if [ -n "$delta" ]; then
+                printf '%s\n' "$delta"
+              else
+                echo "No release-note entry since ${previous_tag}: see the commits below."
+              fi
+              echo
+              echo "## Cumulative release notes"
+              echo
+              echo "Everything this version brings so far, for installs several builds behind."
+            else
+              echo "## Detailed release notes"
+            fi
             echo
             awk '
               tolower($0) ~ /^### +.*release:/ {
@@ -1100,9 +1311,18 @@ jobs:
             echo
             cat commits.md
             echo
+            echo "## SHA-256 integrity checks"
+            echo
+            echo 'Packages have no Windows/Apple code signature. SHA256SUMS and manifest.json are attached.'
+            echo 'These hashes verify file integrity, not independent publisher authenticity.'
+            echo 'GitHub keyless provenance is available separately: gh attestation verify FILE -R Hydro74000/ngPost --signer-workflow Hydro74000/ngPost/.github/workflows/release.yml'
+            echo
+            echo '```text'
+            cat artifacts/SHA256SUMS
+            echo '```'
           } > release-body.md
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ needs.release-metadata.outputs.release_tag }}
           name: ${{ needs.release-metadata.outputs.release_name }}

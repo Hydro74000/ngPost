@@ -25,9 +25,12 @@ nzbPath  = /tmp
 ## Shutdown command to switch off the computer when ngPost is done with all its queued posting
 ## this should mainly used with the auto posting
 ## you could use whatever script instead (like to send a mail...)
-#SHUTDOWN_CMD = shutdown /s /f /t 0  (Windows)
-#SHUTDOWN_CMD = sudo -n /sbin/poweroff  (Linux, make sure poweroff has sudo rights without any password or change the command)
-#SHUTDOWN_CMD = sudo -n shutdown -h now (MacOS, same make sure you've sudo rights)
+## the three lines below are for Windows, Linux and macOS, in that order; the
+## last two need sudo rights without a password. Uncomment one as it is:
+## anything after the = is the command, including a note in parentheses.
+#SHUTDOWN_CMD = shutdown /s /f /t 0
+#SHUTDOWN_CMD = sudo -n /sbin/poweroff
+#SHUTDOWN_CMD = sudo -n shutdown -h now
 
 ## upload the nzb to a specific URL
 ## only http, https or ftp (neither ftps or sftp are supported)
@@ -150,6 +153,18 @@ POST_HISTORY = /nzb/ngPost_history.csv
 ## Character used to separate fields in the history posting file
 #FIELD_SEPARATOR = ;
 
+## SQLite database holding the post history, the statistics and the resume
+## information. This is the modern history; POST_HISTORY above is the legacy
+## csv and the two are independent.
+## Defaults to ngPost_history.sqlite next to this configuration file.
+#POST_DB = /nzb/ngPost_history.sqlite
+
+## Store archive passwords in that database (true by default).
+## They are kept in clear text so that "resume" and "regenerate nzb" can still
+## open your archives later. Set it to false if you would rather keep no copy
+## of them, at the cost of having to remember the password of every post.
+#HISTORY_STORE_PASSWORDS = false
+
 GROUPS   = alt.binaries.test,alt.binaries.misc
 
 ## If you give several Groups (comma separated) you've 3 policy when posting:
@@ -189,7 +204,21 @@ retry = 5
 
 ## uncomment the following line to obfuscate the subjects of each Article
 ## /!\ CAREFUL you won't find your post if you lose the nzb file /!\
+## 'filename' renames the input files with a random name before compressing
+## them, so the archive carries no original name. Both can be asked at once:
+##   obfuscate = article, filename
 #obfuscate = article
+
+## when obfuscating file names, leave the .nfo extension visible instead of
+## renaming it like the rest (only meaningful with 'obfuscate = filename')
+#KEEP_NFO_EXTENSION = true
+
+## copy the .nfo found next to the posted files beside the generated nzb
+#NZB_COPY_NFO = true
+
+## auto posting: include a sibling .nfo (same base name, .nfo extension) in the
+## post itself, alongside the files it describes
+#AUTO_INCLUDE_NFO = true
 
 ## remove accents and special characters from the nzb file names
 NZB_RM_ACCENTS = true
@@ -202,13 +231,36 @@ NZB_RM_ACCENTS = true
 ## (internal) last update check timestamp, epoch seconds — managed automatically
 LAST_UPDATE_CHECK = 0
 
+## tunnel selected NNTP connections through the active VPN profile
+VPN_AUTO_CONNECT = false
+#VPN_ACTIVE_PROFILE = My VPN
+
+## CLI only: wait for the exclusive machine-wide VPN lease.
+## Default: 5 minutes; 0 fails immediately; accepted range: 0..1440.
+VPN_LEASE_WAIT_MINUTES = 5
+
+## Number of VPN recovery episodes before leaving a resumable post in error.
+## Default: 0 (unlimited); accepted range: 0..1000.
+VPN_RECOVERY_MAX_ATTEMPTS = 0
+
+## VPN profiles are normally managed from the GUI. The referenced config file
+## lives in ngPost's vpn/ configuration directory; credentials are not stored
+## in this file.
+#[vpn_profile]
+#name = My VPN
+#backend = openvpn
+#config_file = profile.ovpn
+#has_auth = false
+
 
 ## Time to wait (seconds) before trying to resume a Post automatically in case of loss of Network (min: 30)
 RESUME_WAIT = 30
 
 ## By default, ngPost tries to resume a Post if the network is down.
 ## it won't stop trying until the network is back and the post is finished properly
-## you can disable this feature and thus stop a post when you loose the network
+## you can disable automatic retry. An article whose server reply was not
+## received still becomes 'unknown' and remains resumable; the run exits in
+## error instead of silently classifying the article as failed.
 #NO_RESUME_AUTO = true
 
 ## if there is no activity on a connection it will be closed and restarted
@@ -219,7 +271,7 @@ SOCK_TIMEOUT = 30
 PREPARE_PACKING = true
 
 ## For GUI ONLY, save the logs in a file (to debug potential crashes)
-## ~/ngPost.log on Linux and MacOS, in the executable folder for Windows
+## ngPost.log is written in the ngPost configuration folder
 ## The log is overwritten each time ngPost is launched
 ## => after a crash, please SAVE the log before relaunching ngPost
 LOG_IN_FILE = true
@@ -257,10 +309,11 @@ TMP_DIR = /tmp
 TMP_RAM_RATIO = 1.1
 
 
-## RAR absolute file path (external application)
-## /!\ The file MUST EXIST and BE EXECUTABLE /!\
-## this is set for Linux environment, Windows users MUST change it
-RAR_PATH = /usr/bin/rar
+## Automatic path: selected tool in the current bundle, then system installations.
+## For a custom path, set RAR_SOURCE = custom and provide RAR_PATH.
+RAR_TOOL = rar
+RAR_SOURCE = auto
+#RAR_PATH = /usr/bin/rar
 #RAR_PATH = C:\Program Files\WinRAR\Rar.exe
 #RAR_PATH = /usr/bin/7z
 #RAR_PATH = C:\Program Files\7-Zip\7z.exe
@@ -270,17 +323,21 @@ RAR_PATH = /usr/bin/rar
 ## -hp will be added if you use a password with --gen_pass, --rar_pass or using the HMI
 ## -v42m will be added with --rar_size or using the HMI
 ## you could change the compression level, lock the archive, add redundancy...
+## the first line below is for rar, the second for 7-zip:
 #RAR_EXTRA = -ep1 -m0 -k -rr5p
-#RAR_EXTRA = -mx0 -mhe=on   (for 7-zip)
+#RAR_EXTRA = -mx0 -mhe=on
 
-## size in MB of the RAR volumes (0 by default meaning NO split)
+## RAR volume size in MiB (1 MiB = 1048576 bytes; 0 means no split without RAR_MAX)
 ## feel free to change the value or to comment the next line if you don't want to split the archive
 RAR_SIZE = 42
 
-## maximum number of archive volumes
-## we'll use RAR_SIZE except if it genereates too many volumes
-## in that case we'll update rar_size to be <size of post> / rar_max
-RAR_MAX = 99
+## Optional limit on the number of archive volumes (disabled below).
+## When enabled, this limit takes priority: ngPost increases the volume size
+## if needed, based on the source size and the limit, with rounding.
+## The calculated size applies to that post; RAR_SIZE is not rewritten.
+## For fixed 250 MiB volumes, change RAR_SIZE above to 250 and keep RAR_MAX commented.
+#RAR_SIZE = 250
+#RAR_MAX = 99
 
 ## keep rar folder after posting (otherwise it is automatically deleted uppon successful post)
 #KEEP_RAR = true
@@ -291,19 +348,47 @@ RAR_MAX = 99
 ## par2 redundancy percentage (0 by default meaning NO par2 generation)
 PAR2_PCT = 8
 
+## Optional tool type, including executables with a custom name; absence keeps historical detection.
+PAR2_TOOL = auto
+PAR2_SOURCE = auto
+## auto | parpar | par2cmdline | multipar
+
 ## par2 (or alternative) absolute file path
-## this is only useful if you compile from source (as par2 is included on Windows and the AppImage)
+## Optional: set PAR2_SOURCE = custom to use this path.
+## Automatic paths search the current bundle and PATH for the selected engine.
 ## or if you wish to use an alternative to par2 (for exemple Multipar on Windows)
 ## (in that case, you may need to set also PAR2_ARGS)
 #PAR2_PATH = /usr/local/bin/parpar
 #PAR2_PATH = /usr/bin/par2
 #PAR2_PATH = C:\Program Files\MultiPar\par2j64.exe
 
-## fixed parameters for the par2 (or alternative) command
-## you could for exemple use Multipar on Windows
-#PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q   (for parpar)
-#PAR2_ARGS = c -l -m1024 -r8 -s768000                 (for par2cmdline)
-#PAR2_ARGS = create /rr8 /lc40 /lr /rd2 /ss768000     (for Multipar)
+## PAR2_ARGS holds the fixed parameters of the par2 command, and the PAR2
+## Settings window of the GUI owns that line: it rewrites it from its fields, so
+## editing it by hand does not last.
+##
+## Your own arguments go on PAR2_ARGS_CUSTOM instead. Uncomment the line written
+## for your PAR2_TOOL and ngPost runs it, without ever rewriting it; only the
+## redundancy of each post is replaced. Comment it again to go back to the
+## window's fields. Each tool rejects the switches of the others.
+##
+## The three lines below are for ParPar, par2cmdline and MultiPar, in that
+## order. Uncomment one as it is: everything after the = goes to the tool, a
+## note in parentheses included.
+#PAR2_ARGS_CUSTOM = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q
+#PAR2_ARGS_CUSTOM = c -l -m1024 -r8 -s768000
+#PAR2_ARGS_CUSTOM = c /rr8 /sn3000 /rd3 /ls2 /lr260000000
+
+## MultiPar (par2j) stops at 32768 source blocks. Asking for smaller blocks than
+## that - /ss250000 on a 20 GB post, for instance - does not give you more: par2j
+## picks its own size and the PAR2 step takes several times longer. /sn3000 asks
+## for about 3000 blocks, like MultiPar's own default, and /ls2 /lr260000000
+## keeps each recovery file under 248 MiB.
+
+## par2 slice (block) size in bytes, used by --check to work out how much of a
+## damaged post the recovery files can actually repair.
+## Leave it out unless you set an explicit slice size in PAR2_ARGS: ngPost then
+## cannot know it, and reports the recovery capacity as unknown.
+#PAR2_BLOCK_SIZE = 768000
 
 
 ## length of the random generated archive's file name

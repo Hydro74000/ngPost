@@ -46,9 +46,11 @@ the GNU GPL v2 in all respects.
 
 ## par2cmdline (`par2` / `par2.exe`)
 
-- **How used**: bundled inside the Linux AppImage (from the Debian/Ubuntu
-  `par2` package) and shipped on Windows as `par2.exe` (par2cmdline 0.8.0), the
-  always-installed PAR2 fallback used when ParPar is not present.
+- **How used**: bundled in every package — Windows (`par2.exe`), the Linux
+  archive, the AppImage and the macOS bundle — from the same pinned upstream
+  release (par2cmdline 1.4.0), as the always-installed PAR2 fallback used when
+  ParPar is not present. The Windows build is MSVC/OpenMP, so Microsoft's
+  redistributable `vcomp140.dll` is shipped next to it (see below).
 - **Licence**: GNU General Public Licence, version 2 or later
 - **Copyright**: © 2003 Peter Brian Clements; © 2019–2024 par2cmdline contributors
 - **Source code**: <https://github.com/Parchive/par2cmdline>
@@ -56,17 +58,56 @@ the GNU GPL v2 in all respects.
 
 ---
 
-## ParPar (`parpar.exe`)
+## ParPar (`parpar` / `parpar.exe`)
 
-- **How used**: shipped in the Windows ZIP and offered as an optional installer
-  task on Windows. ngPost prefers ParPar over par2cmdline on Windows because
-  QProcess invokes CreateProcess directly (no shell), so file-list wildcards
-  must be expanded by the par2 binary itself — ParPar's `-R <folder>` flow
-  avoids the issue entirely.
+- **How used**: bundled in every package (ParPar 0.4.6) — in the Windows ZIP and
+  offered as an optional installer task on Windows, and shipped next to the
+  binary in the Linux archive, the AppImage and the macOS bundle. ngPost prefers
+  ParPar because QProcess invokes the tool directly (no shell), so file-list
+  wildcards must be expanded by the par2 binary itself — ParPar's `-R <folder>`
+  flow avoids the question entirely.
 - **Licence**: Public Domain / CC0 1.0 Universal
 - **Copyright**: released into the public domain by Anime Tosho
 - **Source code**: <https://github.com/animetosho/ParPar>
 - **Full licence text**: <https://creativecommons.org/publicdomain/zero/1.0/legalcode>
+
+### GPU runtime dependencies
+
+ParPar and MultiPar include their OpenCL processing code in the executable;
+the upstream archives contain no separate GPU plugin to copy. These packages
+do not include vendor GPU drivers or CUDA modules. par2cmdline uses CPU/OpenMP
+and has no GPU backend.
+
+- **Linux x86_64**: ParPar's glibc build loads the system OpenCL ICD loader
+  (`libOpenCL.so`, `libOpenCL.so.1` or `libOpenCL.so.1.0.0`). The host needs both
+  that loader and an OpenCL implementation for its GPU. The AppImage uses the
+  host driver as well.
+- **Windows x64**: ParPar and MultiPar load `OpenCL.dll` from the installed
+  OpenCL runtime. A compatible 64-bit GPU driver/runtime is required.
+  `vcomp140.dll` below is a CPU threading dependency, not a GPU module.
+- **macOS ARM64 and x86_64**: the pinned upstream ParPar 0.4.6 executables
+  have their dynamic OpenCL loader compiled out. They support CPU generation;
+  installing an OpenCL runtime alone will not enable GPU processing in those
+  binaries. A different build with a working macOS OpenCL loader would need
+  native validation before being shipped. MultiPar is Windows-only.
+
+Upstream references: [ParPar OpenCL requirements](https://github.com/animetosho/ParPar/blob/v0.4.6/README.md#opencl-support),
+[ParPar executable build](https://github.com/animetosho/ParPar/blob/v0.4.6/nexe/build.js),
+[ParPar loader](https://github.com/animetosho/ParPar/blob/v0.4.6/gf16/opencl-include/cl.c),
+[MultiPar loader](https://github.com/Yutaka-Sawada/MultiPar/blob/v1.3.3.6/source/par2j/lib_opencl.c).
+
+---
+
+## Microsoft Visual C++ OpenMP runtime (`vcomp140.dll`)
+
+- **How used**: shipped in the Windows package next to `par2.exe`, which is an
+  MSVC/OpenMP build of par2cmdline and does not start without it. It is not
+  deployed by `windeployqt --compiler-runtime`, and a machine without the VC++
+  redistributable would otherwise fail at the par2 step of a post.
+- **Licence**: Microsoft Visual C++ redistributable terms (Distributable Code)
+- **Copyright**: © Microsoft Corporation
+- **Source of the binary**: the Visual Studio redistributable directory on the
+  build machine (`vcomp140.dll`, x64)
 
 ---
 

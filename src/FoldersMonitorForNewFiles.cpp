@@ -22,11 +22,30 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QDir>
+#include <QMutexLocker>
 #include <QThread>
 #include "utils/Macros.h"
 
+#if defined(Q_OS_WIN)
+#include <windows.h>
+#endif
+
 ulong FoldersMonitorForNewFiles::sMSleep
     = 1000; //!< 1sec in case we move file from samba or unrar when the system is quite loaded
+ushort FoldersMonitorForNewFiles::sNbStableScans = 2;
+#if defined(Q_OS_WIN)
+ushort FoldersMonitorForNewFiles::sMaxLockRetries = 30;
+#endif
+
+bool FoldersMonitorForNewFiles::_retryWriteLock(ushort &lockRetries, ushort maxRetries)
+{
+    return ++lockRetries <= maxRetries;
+}
+
+quint64 FoldersMonitorForNewFiles::_writeLockWaitMs(ushort maxRetries, ulong sleepMs)
+{
+    return static_cast<quint64>(maxRetries) * static_cast<quint64>(sleepMs);
+}
 
 FoldersMonitorForNewFiles::FoldersMonitorForNewFiles(const QString &folderPath, QObject *parent)
     : QObject(parent)
@@ -91,6 +110,14 @@ void FoldersMonitorForNewFiles::onDirectoryChanged(const QString &folderPath)
     // iterate new paths
     PathSet newFiles = newScan; // this will detach!
     newFiles.subtract(folderScan->previousScan);
+
+    // Every new entry is watched in the same rounds, rather than each one
+    // being followed to completion before the next is even looked at. A drop
+    // of N files used to cost N * sNbStableScans * sMSleep before the last one
+    // reached the posting side; it now costs what the slowest single file
+    // costs, because one sleep serves the whole batch.
+    QList<PendingPath> pending;
+    pending.reserve(newFiles.size());
     for (const QString &fileName : newFiles) {
         if (MB_LoadAtomic(_stopListening))
             break;
@@ -99,46 +126,201 @@ void FoldersMonitorForNewFiles::onDirectoryChanged(const QString &folderPath)
         QFileInfo fi(filePath);
         fi.setCaching(
             false); // really important to be able to check if the file is finished to be written
+
+        // Did we put this here ourselves? Checked before anything else so an
+        // obfuscation rename never costs a full stability wait. It lands in
+        // previousScan at the end of the sweep, so it is seen exactly once.
+        if (_consumeIgnoredPath(_normalized(fi.absoluteFilePath()))) {
+            qDebug() << "[directoryChanged] ignoring path ngPost renamed itself: " << filePath;
+            continue;
+        }
+
         if (!fi.exists()) {
             qCritical() << "[directoryChanged] error file doesn't exist: " << filePath;
             continue;
         }
 
-        qint64 size = _pathSize(fi);
-        qDebug() << "[directoryChanged] processing new file: " << filePath << ", size: " << size
-                 << ", lastModif: " << fi.lastModified();
+        PendingPath entry;
+        entry.fileInfo     = fi;
+        entry.size         = _pathSize(entry.fileInfo);
+        entry.lastModified = entry.fileInfo.lastModified();
 
-        // wait the file is fully written
-        ushort nbWait = 0;
-        do {
-            size = _pathSize(fi);
-            QThread::msleep(sMSleep);
-            ++nbWait;
-        } while (fi.exists() && size != _pathSize(fi));
+        qDebug() << "[directoryChanged] processing new file: " << filePath
+                 << ", size: " << entry.size << ", lastModif: " << entry.lastModified;
 
-        if (fi.exists()) {
-            qDebug() << "[directoryChanged] after " << nbWait * sMSleep << " msec, "
-                     << "ready to process file: " << filePath << ", size: " << size
-                     << ", lastModif: " << fi.lastModified();
+        pending.append(entry);
+    }
 
-            if (!MB_LoadAtomic(_stopListening))
-                emit newFileToProcess(fi);
-#ifdef __DEBUG__
-            if (fi.isDir()) {
-                for (QFileInfo &subFile :
-                     QDir(fi.absoluteFilePath())
-                         .entryInfoList(QDir::Files | QDir::Hidden | QDir::System | QDir::Dirs
-                                        | QDir::NoDotAndDotDot))
-                    qDebug() << "\t- " << subFile.fileName() << ": size: " << _pathSize(subFile);
+    ushort nbWait = 0;
+    while (!pending.isEmpty() && !MB_LoadAtomic(_stopListening)) {
+        QThread::msleep(sMSleep);
+        ++nbWait;
+
+        // Backwards, so removing a settled entry does not skip the next one.
+        for (int i = pending.size() - 1; i >= 0; --i) {
+            PendingPath &entry = pending[i];
+
+            if (!entry.fileInfo.exists()) {
+                qDebug() << "[directoryChanged] ignoring temporary file: "
+                         << entry.fileInfo.absoluteFilePath();
+                pending.removeAt(i);
+                continue;
+            }
+
+            qint64 const    newSize     = _pathSize(entry.fileInfo);
+            QDateTime const newModified = entry.fileInfo.lastModified();
+            if (newSize == entry.size && newModified == entry.lastModified)
+                ++entry.nbStable;
+            else
+                entry.nbStable = 0; // it moved again: start counting over
+
+            entry.size         = newSize;
+            entry.lastModified = newModified;
+
+            if (entry.nbStable < sNbStableScans)
+                continue;
+
+#if defined(Q_OS_WIN)
+            // Windows is the only platform where "is another process still
+            // writing this?" has an answer, and the size going quiet is not it
+            // (issue #112). One probe per round, not a blocking wait: waiting
+            // here would hold up the sampling of every other file in the
+            // batch, which is exactly what the rounds exist to avoid.
+            if (!entry.fileInfo.isDir() && _isWriteLockedByAnotherProcess(entry.fileInfo)) {
+                // The first probe is immediate. Continue through retry N so
+                // N complete sleep intervals elapse before we give up on the
+                // following probe, matching the old blocking loop's patience.
+                if (_retryWriteLock(entry.lockRetries, sMaxLockRetries))
+                    continue;
+                qDebug() << "[directoryChanged] WARNING: still locked by another process after "
+                         << _writeLockWaitMs(sMaxLockRetries, sMSleep)
+                         << " msec, processing anyway: " << entry.fileInfo.absoluteFilePath();
             }
 #endif
-        } else
-            qDebug() << "[directoryChanged] ignoring temporary file: " << filePath;
+
+            _emitSettledPath(entry, nbWait);
+            pending.removeAt(i);
+        }
     }
+
+    // Anything still reserved for this folder that the scan just saw is now
+    // part of the baseline below, so it can never be reported as new again and
+    // the reservation is spent. Dropping it matters: the watcher coalesces
+    // events, and a file put back before any scan noticed it had left is never
+    // "new" -- a reservation left behind would silently swallow a genuine
+    // re-drop of the same name later on.
+    _releaseSpentReservations(folderPath, newScan);
 
     folderScan->lastUpdate = currentUpdate;
     folderScan->previousScan = newScan;
 }
+
+void FoldersMonitorForNewFiles::ignoreNextAppearance(const QString &path)
+{
+    QMutexLocker lock(&_ignoredPathsMutex);
+    _ignoredPaths.insert(_normalized(path));
+}
+
+void FoldersMonitorForNewFiles::stopIgnoringMonitorPath(const QString &path)
+{
+    QMutexLocker lock(&_ignoredPathsMutex);
+    _ignoredPaths.remove(_normalized(path));
+}
+
+void FoldersMonitorForNewFiles::_releaseSpentReservations(const QString &folderPath,
+                                                          const PathSet &scan)
+{
+    QMutexLocker lock(&_ignoredPathsMutex);
+    if (_ignoredPaths.isEmpty())
+        return;
+
+    const QString prefix = _normalized(folderPath) + QLatin1Char('/');
+    for (auto it = _ignoredPaths.begin(); it != _ignoredPaths.end();) {
+        const QString &entry = *it;
+        if (!entry.startsWith(prefix)) {
+            ++it;
+            continue;
+        }
+        // Direct children only: the scan lists this folder, not its subtrees.
+        const QString name = entry.mid(prefix.size());
+        if (name.contains(QLatin1Char('/')) || !scan.contains(name))
+            ++it;
+        else
+            it = _ignoredPaths.erase(it);
+    }
+}
+
+QString FoldersMonitorForNewFiles::_normalized(const QString &path)
+{
+    // absoluteFilePath() rather than canonicalFilePath(): the latter returns an
+    // empty string for a path that does not exist yet, and we register paths
+    // precisely before creating them.
+    return QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+}
+
+bool FoldersMonitorForNewFiles::_consumeIgnoredPath(const QString &absolutePath)
+{
+    QMutexLocker lock(&_ignoredPathsMutex);
+    return _ignoredPaths.remove(absolutePath);
+}
+
+void FoldersMonitorForNewFiles::_emitSettledPath(const PendingPath &entry, ushort nbWait)
+{
+    QFileInfo fi = entry.fileInfo;
+
+    if (!fi.exists()) {
+        qDebug() << "[directoryChanged] ignoring temporary file: " << fi.absoluteFilePath();
+        return;
+    }
+
+    qDebug() << "[directoryChanged] after " << nbWait * sMSleep << " msec, "
+             << "ready to process file: " << fi.absoluteFilePath() << ", size: " << entry.size
+             << ", lastModif: " << fi.lastModified();
+
+    if (!MB_LoadAtomic(_stopListening))
+        emit newFileToProcess(fi);
+
+#ifdef __DEBUG__
+    if (fi.isDir()) {
+        for (QFileInfo &subFile :
+             QDir(fi.absoluteFilePath())
+                 .entryInfoList(QDir::Files | QDir::Hidden | QDir::System | QDir::Dirs
+                                | QDir::NoDotAndDotDot))
+            qDebug() << "\t- " << subFile.fileName() << ": size: " << _pathSize(subFile);
+    }
+#endif
+}
+
+#if defined(Q_OS_WIN)
+bool FoldersMonitorForNewFiles::_isWriteLockedByAnotherProcess(const QFileInfo &fileInfo) const
+{
+    // The question is "does anyone hold this open for writing?", and
+    // dwShareMode = FILE_SHARE_READ asks exactly that: we tolerate other
+    // readers (an antivirus or a search indexer must not read as a lock), but
+    // the open fails with ERROR_SHARING_VIOLATION for as long as the copying
+    // process holds its write handle. GENERIC_READ is all we request, so this
+    // also works on a read-only share -- opening for writing would report
+    // "locked" forever on any file we simply are not allowed to write.
+    //
+    // One attempt, and no sleeping: the caller retries once per round, so a
+    // file somebody else is still writing no longer holds up the sampling of
+    // every other file in the batch.
+    QString const native = QDir::toNativeSeparators(fileInfo.absoluteFilePath());
+    HANDLE handle = ::CreateFileW(reinterpret_cast<LPCWSTR>(native.utf16()),
+                                  GENERIC_READ,
+                                  FILE_SHARE_READ,
+                                  nullptr,
+                                  OPEN_EXISTING,
+                                  FILE_ATTRIBUTE_NORMAL,
+                                  nullptr);
+    if (handle != INVALID_HANDLE_VALUE) {
+        ::CloseHandle(handle);
+        return false;
+    }
+    // Gone, or denied for another reason: not ours to solve, and not a lock.
+    return ::GetLastError() == ERROR_SHARING_VIOLATION;
+}
+#endif
 
 qint64 FoldersMonitorForNewFiles::_pathSize(QFileInfo &fileInfo) const
 {

@@ -17,6 +17,8 @@ namespace Ui
 class CompressionSettingsDialog;
 }
 class NgPost;
+class ExternalToolPathWidget;
+class QComboBox;
 
 //! Where ngPost builds its archives, with what, and under which default
 //! password. These are configuration values, not per post choices: they used to
@@ -41,13 +43,18 @@ public slots:
 
 private slots:
     void onCompressPathClicked();
-    void onRarPathClicked();
     void onGenPass();
     void onPassToggled(bool checked);
+    void updateVolumeHelp();
 
 private:
+    bool event(QEvent *event) override;
+    bool _layoutReady = false;
     Ui::CompressionSettingsDialog *_ui;
     NgPost                        *_ngPost;
+    ExternalToolPathWidget *_toolPath;
+    QComboBox *_tool;
+    QString _chosenTool; //!< engine picked by hand, or read from the configuration
 };
 
 #endif // COMPRESSIONSETTINGSDIALOG_H

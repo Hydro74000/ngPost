@@ -21,13 +21,25 @@ ok()   { printf "  \033[32mPASS\033[0m %s\n" "$*"; pass=$((pass+1)); }
 ko()   { printf "  \033[31mFAIL\033[0m %s\n" "$*"; fail=$((fail+1)); }
 
 run_ngpost() {
-    # Run ngPost briefly inside a sandboxed HOME. We use --version because it
-    # triggers the constructor (which runs PathHelper::migrateLegacyConfigIfNeeded
-    # and parseDefaultConfig) but exits immediately afterwards. Some output is
-    # discarded; we care about the filesystem side effects.
+    # Run ngPost briefly inside a sandboxed HOME, on a path that parses the
+    # default configuration -- which is what runs migrateLegacyConfigIfNeeded()
+    # and parseDefaultConfig(). --check on a file that does not exist reaches
+    # both, then stops on the unreadable nzb without opening a socket.
+    #
+    # NOT --version: since v5.5 the inspection commands are deliberately
+    # read-only (see "Inspection commands must stay read-only" in NgPost.cpp),
+    # so a renamed AppImage asked only for its version adopts nothing. Driving
+    # the migration through them stopped testing anything at all.
     local h="$1"; shift
     HOME="$h" XDG_CONFIG_HOME="$h/.config" \
-        "$BIN" --version "$@" > "$h/ngpost.out" 2>&1 || true
+        "$BIN" --check "$h/nonexistent.nzb" "$@" > "$h/ngpost.out" 2>&1 || true
+}
+
+run_ngpost_readonly() {
+    # An inspection command, which must touch nothing on disk.
+    local h="$1"; shift
+    HOME="$h" XDG_CONFIG_HOME="$h/.config" \
+        "$BIN" --version "$@" > "$h/ngpost.ro.out" 2>&1 || true
 }
 
 # -------------------------------------------------------------------------
@@ -90,14 +102,14 @@ nzbCheck = false
 useVpn = true
 EOF
 
-# Trigger a re-save by forcing a configChanged: ngPost will re-emit the conf
-# if the auto-save is triggered. With --version it isn't; the file should
-# remain UNCHANGED (no wipe). Verify nothing was lost.
+# ngPost re-emits the conf when an auto-save is triggered. Parsing one must
+# not be such a trigger: the file has to come back byte for byte, keys this
+# build knows nothing about included. Verify nothing was lost.
 cp "$T2/.config/ngPost/ngPost.conf" "$T2/conf.before"
 run_ngpost "$T2"
 diff -q "$T2/conf.before" "$T2/.config/ngPost/ngPost.conf" >/dev/null \
-    && ok "conf untouched on read-only run" \
-    || ko "conf was rewritten on --version run (signals should be blocked)"
+    && ok "conf untouched by a run that only parses it" \
+    || ko "conf was rewritten on a parse-only run (signals should be blocked)"
 grep -q "^\[vpn_profile\]" "$T2/.config/ngPost/ngPost.conf" \
     && ok "[vpn_profile] block preserved" \
     || ko "[vpn_profile] block was stripped"
@@ -140,9 +152,34 @@ run_ngpost "$T3"
 rm -rf "$T3"
 
 # -------------------------------------------------------------------------
-# Test 4: helper script cleanup mode is idempotent (no-op when nothing stale)
+# Test 4: inspection commands adopt nothing.
+#
+# A renamed AppImage asked only for --version must not migrate a legacy config
+# as a side effect (see "Inspection commands must stay read-only" in NgPost.cpp).
 # -------------------------------------------------------------------------
-echo "Test 4: helper script cleanup mode on clean state"
+echo "Test 4: --version leaves the legacy config alone"
+T4=$(mktemp -d)
+cat > "$T4/.ngPost" <<'EOF'
+lang = EN
+[server]
+host = inspect.example.com
+port = 119
+EOF
+
+run_ngpost_readonly "$T4"
+
+[ -e "$T4/.config/ngPost/ngPost.conf" ] \
+    && ko "--version adopted the legacy config (it must stay read-only)" \
+    || ok "--version created no config"
+[ -f "$T4/.ngPost" ] && ok "legacy ~/.ngPost untouched" \
+    || ko "legacy ~/.ngPost disappeared on a --version run"
+
+rm -rf "$T4"
+
+# -------------------------------------------------------------------------
+# Test 5: helper script cleanup mode is idempotent (no-op when nothing stale)
+# -------------------------------------------------------------------------
+echo "Test 5: helper script cleanup mode on clean state"
 HELPER=/var/lib/ngpost/ngpost-vpn-helper.sh
 if [ -x "$HELPER" ]; then
     out=$(pkexec --disable-internal-agent "$HELPER" cleanup 2>&1 < /dev/null || true)

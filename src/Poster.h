@@ -25,6 +25,7 @@
 #include <QQueue>
 #include <QThread>
 #include <QVector>
+#include <QWaitCondition>
 class NgPost;
 class ArticleBuilder;
 class NntpConnection;
@@ -46,6 +47,12 @@ class Poster
 {
     friend class ArticleBuilder;
 
+    // Copying a Poster would duplicate a running thread pair and a mutex the
+    // builders synchronise on. Its QThread/QMutex members already make the
+    // compiler reject it; saying so here is what stops a reader from having to
+    // work that out from the member list.
+    Q_DISABLE_COPY(Poster)
+
 private:
     const ushort _id;
     NgPost *const _ngPost;
@@ -61,19 +68,20 @@ private:
     QQueue<NntpArticle *> _articles;
     QMutex _secureArticles;
 
+    //! True while the dedicated builder has reserved an article but has not
+    //! handed it to this Poster's queue yet. A temporarily empty queue is not
+    //! end-of-input while this is set, even if another builder has already set
+    //! PostingJob::_noMoreFiles after reserving the final source slice.
+    bool _articleBuildInProgress;
+    QWaitCondition _articleBuilt;
+
 public:
     Poster(PostingJob *job, ushort id);
     ~Poster();
 
     void addConnection(NntpConnection *connection);
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-    uint nbActiveConnections() const;
-#endif
 
     NntpArticle *getNextArticle(const QString &conPrefix);
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-    void releaseArticle(const QString &conPrefix, NntpArticle *article);
-#endif
 
     inline void lockQueue();
     inline void unlockQueue();
@@ -83,13 +91,10 @@ public:
     inline void startThreads();
     void stopThreads();
 
-    bool prepareArticlesInAdvance();
     void scheduleArticlesInAdvance(int rounds);
 
     bool isPosting() const;
-
-private:
-    NntpArticle *_prepareNextArticle(const QString &threadName, bool fillQueue = true);
+    bool isPaused() const;
 };
 
 void Poster::lockQueue()

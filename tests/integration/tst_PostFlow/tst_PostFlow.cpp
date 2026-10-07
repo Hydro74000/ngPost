@@ -26,13 +26,17 @@
 #include <QJsonObject>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QRegularExpression>
+#include <QSet>
 #include <QStandardPaths>
 #include <QXmlStreamReader>
 
+#include "Fixtures.h"
 #include "history/PostHistoryStore.h"
 #include "MockNntpServer.h"
 #include "TestEnv.h"
 
+using ngpost::tests::fixturesDir;
 using ngpost::tests::HomeSandbox;
 using ngpost::tests::MockNntpServer;
 using ngpost::tests::locateNgPostBinary;
@@ -84,6 +88,13 @@ int runNgPost(const QString &bin, const QStringList &args,
         return -2;
     }
     output = QString::fromLocal8Bit(p.readAll());
+    // A crash must never look like an exit code: QProcess reports the signal
+    // number on Unix, and SIGSEGV is 11 -- exactly ERROR_CODE::ERR_ARTICLE_SIZE.
+    if (p.exitStatus() == QProcess::CrashExit) {
+        output += QStringLiteral("\n[harness] ngPost died on signal %1 instead of exiting\n")
+                          .arg(p.exitCode());
+        return -3;
+    }
     return p.exitCode();
 }
 
@@ -152,6 +163,11 @@ private slots:
     //! dump dir.
     void post_split_file_matches_segment_count();
 
+    //! A builder may still be yEnc-encoding a reserved article when another
+    //! builder reaches EOF. Connections must wait for that in-flight article,
+    //! not close merely because their queue is momentarily empty.
+    void multi_poster_waits_for_in_flight_articles_at_eof();
+
     //! Post over SSL using the mock's TLS port. ngPost rejects the
     //! mock's self-signed cert (no `--insecure-ssl` flag exists yet — this
     //! is current production behaviour). The test asserts the cert rejection
@@ -165,9 +181,53 @@ private slots:
     //! we then grep for.
     void obfuscation_hides_filename_in_article_headers();
 
+    //! With `-x`, the yEnc name of each article is drawn at random. The
+    //! draws must stay varied across the articles of one post: the engine
+    //! behind them is kept per thread rather than rebuilt per article, and a
+    //! degenerate one would hand every article the same name.
+    void obfuscation_gives_each_article_its_own_random_name();
+
+    //! The yEnc format calls for eight hex digits in pcrc32. The payload below
+    //! is chosen so its CRC32 is 0x051e59f4 -- a zero top nibble, which the
+    //! unpadded formatting used to write as seven digits. One article in
+    //! sixteen looks like this, so the assertion is deterministic rather than
+    //! left to chance.
+    void yenc_pcrc32_is_padded_to_eight_digits();
+
     //! The mock drops the connection after N bytes; ngPost must not crash or
     //! hang regardless of whether retry eventually succeeds.
     void retry_on_dropped_connection();
+    void recovered_connection_is_successful_and_timestamped();
+    //! Credentials the server refuses are not replayed at once, and three
+    //! backoff cycles refused in a row stop the post with an error instead of
+    //! retrying forever -- which is what gets a provider account blocked.
+    //! Each cycle waits RESUME_WAIT (30 s minimum), so this takes a minute.
+    void refused_credentials_stop_after_three_cycles();
+    //! A refusal that clears up -- a provider still counting the connections
+    //! of a crashed run -- must not stop the post before the third cycle.
+    void refused_credentials_recover_before_the_limit();
+    //! A server that stops reading mid-article leaves bytes queued: the socket
+    //! timeout must drop the transport at once, not wait for a graceful close.
+    void stalled_upload_times_out_promptly();
+    void missing_parity_tool_stops_before_compression();
+    void cli_parity_path_overrides_configured_engine();
+    //! PAR2_TOOL names an engine automatic discovery cannot find, so the
+    //! configuration falls back to another; --par2_path then points at the
+    //! configured engine. That path must run with the configured arguments,
+    //! not with the fallback's defaults, which the engine rejects.
+    void cli_parity_path_to_the_configured_engine_keeps_its_arguments();
+    //! par2j handed switches it does not know prints its usage and exits 0. The
+    //! post must stop there, not go out without any recovery file.
+    void parity_tool_that_writes_nothing_stops_the_post();
+    void unavailable_compressor_stops_and_preserves_input_data();
+    void unavailable_compressor_stops_and_preserves_input();
+    //! A transport loss after the article body but before 240 is ambiguous,
+    //! even when automatic resume is disabled: preserve it as unknown.
+    void no_resume_transport_loss_is_unknown_and_nonzero();
+    //! --rm_posted deletes the sources of a complete post only: an article the
+    //! server refused leaves them in place, the complete control run does not.
+    void rm_posted_keeps_sources_of_an_incomplete_post_data();
+    void rm_posted_keeps_sources_of_an_incomplete_post();
 
     //! Resuming only the second file of a multi-file post must preserve the
     //! original history row/ordinal instead of overwriting file #1.
@@ -181,6 +241,18 @@ private slots:
     //! bytes of the archive and its parity, WITHOUT the .nfo copied next to
     //! the rar volumes, and the private metadata must not reach the nzb.
     void post_info_file_reports_archive_and_par2_size_only();
+
+    //! An nzb is an untrusted document. A segment whose message-id carries an
+    //! XML-encoded CR/LF used to append a second command to an already
+    //! authenticated NNTP session; the server must see one STAT, for the one
+    //! well-formed segment, and never the injected id.
+    void check_hostile_nzb_sends_one_stat_only();
+
+    //! rar takes its password glued to the switch (-hp<pass>), so it is an
+    //! ordinary argv entry, and the line that logs the command used to print
+    //! it -- in CLI mode, not only under --debug. A job output pasted into a
+    //! bug report carried the archive password with it.
+    void archive_password_never_reaches_the_output();
 };
 
 void TestPostFlow::initTestCase()
@@ -285,6 +357,44 @@ void TestPostFlow::post_split_file_matches_segment_count()
     QCOMPARE(arts.size(), 8);
 }
 
+void TestPostFlow::multi_poster_waits_for_in_flight_articles_at_eof()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    // Two posters reserve these two parts concurrently. The second part is
+    // deliberately tiny, so its builder can reach EOF while the first one is
+    // still encoding. Before the in-flight hand-off was represented in
+    // Poster, both connections closed and the process waited forever with the
+    // encoded articles stranded in their queues.
+    constexpr qint64 articleSize = 2 * 1024 * 1024;
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/uneven-split.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        QVERIFY(in.resize(articleSize + 1));
+    }
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/uneven-split.nzb");
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:2:nossl").arg(mock.port());
+    QString out;
+    const int exitCode = runNgPost(_bin,
+                                   { "-S", srv, "-i", inPath, "-o", nzbPath,
+                                     "-g", "alt.binaries.test",
+                                     "-a", QString::number(articleSize),
+                                     "-t", "4", // two Posters, one connection each
+                                     "--quiet", "--disp_progress", "none" },
+                                   sandbox.rootPath(), out, 10000);
+    QVERIFY2(exitCode == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    QCOMPARE(mock.receivedArticles().size(), 2);
+    QFile nzb(nzbPath);
+    QVERIFY(nzb.open(QIODevice::ReadOnly));
+    QCOMPARE(countSegmentsInNzb(nzb.readAll()), 2);
+}
+
 void TestPostFlow::ssl_rejects_self_signed_cert()
 {
     HomeSandbox sandbox;
@@ -368,6 +478,97 @@ void TestPostFlow::obfuscation_hides_filename_in_article_headers()
                             .arg(QString::fromLatin1(headers))));
 }
 
+//! The yEnc name of an article, i.e. what follows " name=" on its =ybegin
+//! line. Empty if the article carries no such line.
+static QByteArray yEncName(const QByteArray &article)
+{
+    const int begin = article.indexOf("=ybegin ");
+    if (begin < 0)
+        return {};
+    const int name = article.indexOf(" name=", begin);
+    if (name < 0)
+        return {};
+    const int from = name + int(qstrlen(" name="));
+    const int eol  = article.indexOf("\r\n", from);
+    return eol < 0 ? article.mid(from) : article.mid(from, eol - from);
+}
+
+void TestPostFlow::obfuscation_gives_each_article_its_own_random_name()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    // 3 KiB over 1 KiB articles → 3 segments, so the names can be compared.
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/obf-split.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write(QByteArray(3072, 'z'));
+    }
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/obf-split.nzb");
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:2:nossl").arg(mock.port());
+    QString out;
+    const int exitCode = runNgPost(_bin,
+                                   { "-S", srv, "-i", inPath, "-o", nzbPath,
+                                     "-g", "alt.binaries.test", "-a", "1024", "-x",
+                                     "--quiet", "--disp_progress", "none" },
+                                   sandbox.rootPath(), out);
+    QVERIFY2(exitCode == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    const QStringList arts = mock.receivedArticles();
+    QCOMPARE(arts.size(), 3);
+
+    const QRegularExpression randomName(QStringLiteral("\\A[0-9A-Za-z]{32,62}\\z"));
+    QSet<QByteArray> names;
+    for (const QString &art : arts) {
+        const QByteArray name = yEncName(mock.readArticle(art));
+        QVERIFY2(randomName.match(QString::fromLatin1(name)).hasMatch(),
+                 qPrintable(QStringLiteral("yEnc name is not a 32-62 char random string: '%1'")
+                                    .arg(QString::fromLatin1(name))));
+        names.insert(name);
+    }
+    QCOMPARE(names.size(), arts.size()); // one distinct draw per article
+}
+
+void TestPostFlow::yenc_pcrc32_is_padded_to_eight_digits()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    // zlib.crc32(b"ngPost pcrc32 padding fixture 10") == 0x051e59f4
+    const QByteArray payload("ngPost pcrc32 padding fixture 10");
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/pcrc32.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        QCOMPARE(in.write(payload), qint64(payload.size()));
+    }
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/pcrc32.nzb");
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+    QString out;
+    const int exitCode = runNgPost(_bin,
+                                   { "-S", srv, "-i", inPath, "-o", nzbPath,
+                                     "-g", "alt.binaries.test",
+                                     "--quiet", "--disp_progress", "none" },
+                                   sandbox.rootPath(), out);
+    QVERIFY2(exitCode == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    const QStringList arts = mock.receivedArticles();
+    QCOMPARE(arts.size(), 1);
+    const QByteArray article = mock.readArticle(arts.first());
+
+    const QRegularExpression pcrc(QStringLiteral("pcrc32=([0-9a-f]*)"));
+    const QRegularExpressionMatch m = pcrc.match(QString::fromLatin1(article));
+    QVERIFY2(m.hasMatch(), "the article body carries no =yend pcrc32 field");
+    QCOMPARE(m.captured(1), QStringLiteral("051e59f4"));
+}
+
 void TestPostFlow::retry_on_dropped_connection()
 {
     HomeSandbox sandbox;
@@ -398,6 +599,189 @@ void TestPostFlow::retry_on_dropped_connection()
     // non-zero exit. Either way we want a NON-hanging finish.
     QVERIFY2(code != -1 && code != -2,
              qPrintable(QStringLiteral("ngPost crashed or timed out (code=%1):\n%2").arg(code).arg(out)));
+}
+
+namespace
+{
+//! One "connect" line per TCP connection the mock accepted.
+int mockConnectionCount(const MockNntpServer &mock)
+{
+    QFile log(mock.logFile());
+    if (!log.open(QIODevice::ReadOnly | QIODevice::Text))
+        return -1;
+    return QString::fromUtf8(log.readAll()).count(QStringLiteral("] connect ("));
+}
+}
+
+void TestPostFlow::refused_credentials_stop_after_three_cycles()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--fail-auth" }));
+
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/refused.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write("refused");
+    }
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/refused.nzb");
+    const QString srv = QStringLiteral("u:wrong@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+
+    QString out;
+    const int code = runNgPost(_bin,
+                               {
+                                   "-S",
+                                   srv,
+                                   "-i",
+                                   inPath,
+                                   "-o",
+                                   nzbPath,
+                                   "-g",
+                                   "alt.binaries.test",
+                                   "--disp_progress",
+                                   "none",
+                               },
+                               sandbox.rootPath(),
+                               out,
+                               /*timeoutMs=*/150000);
+
+    QVERIFY2(code > 0,
+             qPrintable(QStringLiteral("refused credentials must end the run non-zero "
+                                       "(code=%1):\n%2")
+                            .arg(code)
+                            .arg(out)));
+    QVERIFY2(out.contains(QStringLiteral("refused the credentials 3 times in a row")),
+             qPrintable(out));
+    // One attempt per cycle: the old path replayed the credentials
+    // nbMaxTrySending() more times on the spot, every cycle, forever.
+    QCOMPARE(mockConnectionCount(mock), 3);
+    QVERIFY(mock.receivedArticles().isEmpty());
+}
+
+void TestPostFlow::refused_credentials_recover_before_the_limit()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--fail-auth-count", "2" }));
+
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/late.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write("accepted on the third cycle");
+    }
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/late.nzb");
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+
+    QString out;
+    const int code = runNgPost(_bin,
+                               {
+                                   "-S",
+                                   srv,
+                                   "-i",
+                                   inPath,
+                                   "-o",
+                                   nzbPath,
+                                   "-g",
+                                   "alt.binaries.test",
+                                   "--disp_progress",
+                                   "none",
+                               },
+                               sandbox.rootPath(),
+                               out,
+                               /*timeoutMs=*/150000);
+
+    // COMPLETED_WITH_ERRORS (1), not 0: NgPost::onErrorConnecting has always
+    // marked the run as soon as a connection error is reported, even when the
+    // post then completes. What this test pins is that it DOES complete.
+    QVERIFY2(code == 1,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(code).arg(out)));
+    QVERIFY2(out.contains(QStringLiteral("posted: 1")), qPrintable(out));
+    QVERIFY2(out.contains(QStringLiteral("failed: 0")), qPrintable(out));
+    QVERIFY2(!out.contains(QStringLiteral("refused the credentials")), qPrintable(out));
+    QCOMPARE(mockConnectionCount(mock), 3);
+    QCOMPARE(mock.receivedArticles().size(), 1);
+    QVERIFY(QFile::exists(nzbPath));
+}
+
+void TestPostFlow::no_resume_transport_loss_is_unknown_and_nonzero()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--drop-before-post-reply" }));
+
+    const QString inPath = sandbox.rootPath() + QStringLiteral("/ambiguous.bin");
+    QFile input(inPath);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("ambiguous");
+    input.close();
+
+    const QString nzbPath = sandbox.rootPath() + QStringLiteral("/ambiguous.nzb");
+    const QString dbPath = sandbox.rootPath() + QStringLiteral("/history.sqlite");
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/ngPost.conf");
+    QFile conf(confPath);
+    QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+    conf.write("NO_RESUME_AUTO = true\n");
+    conf.close();
+
+    const QString srv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port());
+    QString out;
+    const int code = runNgPost(_bin, {
+        "-c", confPath, "--post_db", dbPath,
+        "-S", srv, "-i", inPath, "-o", nzbPath,
+        "-g", "alt.binaries.test", "-r", "0", "--disp_progress", "none",
+    }, sandbox.rootPath(), out, 30000);
+    QVERIFY2(code > 0,
+             qPrintable(QStringLiteral("ambiguous post must fail non-zero (code=%1):\n%2")
+                            .arg(code).arg(out)));
+    QVERIFY2(out.contains(QStringLiteral("unknown: 1")), qPrintable(out));
+    QVERIFY2(out.contains(QStringLiteral("failed: 0")), qPrintable(out));
+
+    PostHistoryStore store(dbPath, true);
+    QString error;
+    QVERIFY2(store.initialize(&error), qPrintable(error));
+    QList<PostHistoryStore::PostSummary> const posts =
+        store.listPosts(PostHistoryStore::ListFilter(), &error);
+    QVERIFY2(!posts.isEmpty(), qPrintable(error));
+    PostHistoryStore::PostDetails details;
+    QVERIFY2(store.loadPostDetails(posts.first().id, &details, &error), qPrintable(error));
+    QCOMPARE(details.files.size(), 1);
+    QList<PostHistoryStore::ArticleSummary> const articles =
+        details.articlesByFile.value(details.files.first().id);
+    QCOMPARE(articles.size(), 1);
+    QCOMPARE(articles.first().status, QStringLiteral("unknown"));
+    QVERIFY(!articles.first().msgId.isEmpty());
+    const QString ambiguousMsgId = articles.first().msgId;
+    QVERIFY(posts.first().resumable);
+
+    // A later explicit resume must never reuse the Message-ID whose first
+    // server outcome was ambiguous. That is the externally observable part
+    // of genNewId(): duplicate prevention must survive the process boundary.
+    MockNntpServer resumeMock;
+    QVERIFY(resumeMock.start());
+    const QString resumeSrv = QStringLiteral("u:p@@@127.0.0.1:%1:1:nossl")
+                                  .arg(resumeMock.port());
+    QString resumeOut;
+    const int resumeCode = runNgPost(_bin, {
+        "-S", resumeSrv,
+        "--resume-post", QString::number(posts.first().id),
+        "--yes", "--post_db", dbPath,
+        "--quiet", "--disp_progress", "none",
+    }, sandbox.rootPath(), resumeOut, 30000);
+    QVERIFY2(resumeCode == 0,
+             qPrintable(QStringLiteral("resume exit=%1, output:\n%2")
+                            .arg(resumeCode).arg(resumeOut)));
+    QCOMPARE(resumeMock.receivedArticles().size(), 1);
+    const QByteArray resumedBody =
+        resumeMock.readArticle(resumeMock.receivedArticles().first());
+    const QRegularExpression idPattern(
+        QStringLiteral("(?im)^Message-ID:[ \\t]*<([^>]+)>") );
+    const QRegularExpressionMatch idMatch =
+        idPattern.match(QString::fromLatin1(resumedBody));
+    QVERIFY2(idMatch.hasMatch(), resumedBody.constData());
+    QVERIFY2(idMatch.captured(1) != ambiguousMsgId,
+             "resume reused the Message-ID of an ambiguous upload");
 }
 
 void TestPostFlow::resume_history_post_preserves_original_file_ordinals()
@@ -757,5 +1141,565 @@ void TestPostFlow::post_info_file_reports_archive_and_par2_size_only()
 #endif
 }
 
+void TestPostFlow::check_hostile_nzb_sends_one_stat_only()
+{
+    HomeSandbox    sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    const QString hostile = fixturesDir() + QStringLiteral("/nzb/hostile_crlf_segment.nzb");
+    QVERIFY2(QFile::exists(hostile), qPrintable(hostile));
+
+    // A config file rather than -S: checking needs a server with nzbcheck on,
+    // which the shorthand cannot express.
+    const QString confPath = sandbox.rootPath() + QStringLiteral("/ngPost.conf");
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "[server]\n"
+          << "host = 127.0.0.1\n"
+          << "port = " << mock.port() << "\n"
+          << "ssl = false\n"
+          << "connection = 1\n"
+          << "enabled = true\n"
+          << "nzbcheck = true\n";
+    }
+
+    const QStringList args = {
+        "-c", confPath,
+        "--check", hostile,
+        // The refused segment counts as missing, and with no PAR2 in this nzb
+        // the check would otherwise stop right there -- correctly, since
+        // nothing could repair it -- and never reach the well-formed segment
+        // this test is about.
+        "--check_full",
+        "--disp_progress", "none",
+    };
+
+    QString   out;
+    const int exitCode = runNgPost(_bin, args, sandbox.rootPath(), out);
+    // 0 = all present, 1 = something missing, 2 = missing beyond repair. The
+    // refused segment makes it one of the last two; what the test is really
+    // asserting is what reached the socket.
+    QVERIFY2(exitCode >= 0 && exitCode <= 2,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(exitCode).arg(out)));
+
+    QFile log(mock.logFile());
+    QVERIFY(log.open(QIODevice::ReadOnly));
+    const QString serverLog = QString::fromUtf8(log.readAll());
+
+    const QStringList statLines = serverLog.split(QLatin1Char('\n')).filter(
+            QStringLiteral("STAT <"));
+    QVERIFY2(statLines.size() == 1,
+             qPrintable(QStringLiteral("expected exactly one STAT, got %1:\n%2")
+                                .arg(statLines.size())
+                                .arg(serverLog)));
+    QVERIFY2(statLines.first().contains(QStringLiteral("legit-segment@ngpost.test")),
+             qPrintable(statLines.first()));
+    QVERIFY2(!serverLog.contains(QStringLiteral("injected@ngpost.test")),
+             qPrintable(QStringLiteral("the injected command reached the server:\n%1")
+                                .arg(serverLog)));
+    // A 500 would mean the extra line was written and merely not understood.
+    QVERIFY2(!serverLog.contains(QStringLiteral("unknown command")),
+             qPrintable(serverLog));
+    QVERIFY2(out.contains(QStringLiteral("malformed article id")),
+             qPrintable(QStringLiteral("the rejection was not reported to the user:\n%1").arg(out)));
+}
+
+void TestPostFlow::archive_password_never_reaches_the_output()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("the fake rar tool is a shell script");
+#else
+    HomeSandbox    sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+
+    const QString root = sandbox.rootPath();
+
+    // The stand-in records the arguments it was handed, so the test can prove
+    // the password really was passed to the archiver and is therefore missing
+    // from the output because it was masked, not because it was never used.
+    const QString argsDump = root + QStringLiteral("/rar-args.txt");
+    QVERIFY(writeFakeTool(root + "/fakerar",
+                          QStringLiteral("#!/bin/sh\n"
+                                         "printf '%s\\n' \"$@\" > '%1'\n"
+                                         "for a in \"$@\"; do case \"$a\" in *.rar) t=\"$a\";; esac; done\n"
+                                         "head -c 4096 /dev/zero > \"$t\"\n"
+                                         "exit 0\n")
+                                  .arg(argsDump)));
+
+    const QString inPath = root + QStringLiteral("/secret-payload.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write(QByteArray(2048, 'x'));
+    }
+
+    const QString nzbDir = root + QStringLiteral("/nzb");
+    QVERIFY(QDir().mkpath(nzbDir));
+
+    // Distinctive enough that finding it anywhere in the output is unambiguous.
+    const QString secret   = QStringLiteral("Zq7-CANARY-passphrase-9xK");
+    const QString confPath = root + QStringLiteral("/ngPost.conf");
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "nzbPath = " << nzbDir << "\n"
+          << "TMP_DIR = " << root << "\n"
+          << "RAR_PATH = " << root << "/fakerar\n"
+          << "RAR_PASS = " << secret << "\n"
+          << "PACK = compress\n"
+          << "[server]\n"
+          << "host = 127.0.0.1\n"
+          << "port = " << mock.port() << "\n"
+          << "ssl = false\n"
+          << "connection = 1\n"
+          << "enabled = true\n"
+          << "nzbcheck = false\n";
+    }
+
+    // No --quiet and no --debug: the plain CLI run, which is the branch that
+    // used to print the whole argument list because _postWidget is null.
+    QString   out;
+    const int code = runNgPost(_bin,
+                               { "-c", confPath, "-i", inPath,
+                                 "-g", "alt.binaries.test",
+                                 "--pack",
+                                 "--disp_progress", "none" },
+                               sandbox.rootPath(), out);
+    QVERIFY2(code == 0, qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(code).arg(out)));
+
+    QFile dump(argsDump);
+    QVERIFY2(dump.open(QIODevice::ReadOnly), qPrintable(out));
+    const QString rarArgs = QString::fromUtf8(dump.readAll());
+    QVERIFY2(rarArgs.contains(QStringLiteral("-hp") + secret),
+             qPrintable(QStringLiteral("the password never reached rar, so this test proves "
+                                       "nothing. Args were:\n%1").arg(rarArgs)));
+
+    QVERIFY2(!out.contains(secret),
+             qPrintable(QStringLiteral("the archive password reached the CLI output:\n%1").arg(out)));
+    QVERIFY2(out.contains(QStringLiteral("-hp********")),
+             qPrintable(QStringLiteral("the command line was logged without the mask, so this "
+                                       "test is not looking at the line it thinks:\n%1").arg(out)));
+#endif
+}
+
 QTEST_MAIN(TestPostFlow)
 #include "tst_PostFlow.moc"
+
+void TestPostFlow::recovered_connection_is_successful_and_timestamped()
+{
+    HomeSandbox sandbox;
+    const QString source = sandbox.rootPath() + "/retry.bin";
+    QFile input(source);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write(QByteArray(160000, 'r'));
+    input.close();
+    for (const bool debug : { false, true }) {
+        // A fresh server gives each log mode its own recoverable interruption.
+        MockNntpServer mock;
+        QVERIFY(mock.start({ "--drop-before-post-reply-count", "1" }));
+        const QString nzb = sandbox.rootPath() + (debug ? "/debug.nzb" : "/normal.nzb");
+        QStringList args{ "-S",
+                          QString("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port()),
+                          "-i",
+                          source,
+                          "-o",
+                          nzb,
+                          "-g",
+                          "alt.binaries.test",
+                          "-r",
+                          "3",
+                          "--disp_progress",
+                          "none" };
+        if (debug)
+            args << "-d";
+        QString out;
+        const int code = runNgPost(_bin, args, sandbox.rootPath(), out);
+        QVERIFY2(code == 0, qPrintable(QString("exit=%1\n%2").arg(code).arg(out)));
+        QFile result(nzb);
+        QVERIFY(result.open(QIODevice::ReadOnly));
+        QCOMPARE(countSegmentsInNzb(result.readAll()), 1);
+        QVERIFY2(out.contains(debug ? "Connection lost, trying to reconnect"
+                                    : "automatic reconnection attempted"),
+                 qPrintable(out));
+        const QRegularExpression timestamp("^\\[\\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\] ");
+        for (const auto &line : out.split('\n'))
+            if (line.contains("reconnect") || line.contains("Error Socket"))
+                QVERIFY2(timestamp.match(line).hasMatch(), qPrintable(line));
+    }
+}
+
+void TestPostFlow::stalled_upload_times_out_promptly()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--stall-article" }));
+
+    // Larger than the loopback socket buffers on both ends, so most of the
+    // article is still in Qt's write buffer when the timeout fires.
+    const int articleSize = 16 * 1024 * 1024;
+    const QString source = sandbox.rootPath() + "/stall.bin";
+    QFile input(source);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write(QByteArray(articleSize, 's'));
+    input.close();
+
+    const QString config = sandbox.rootPath() + "/stall.conf";
+    QFile conf(config);
+    QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+    conf.write("NO_RESUME_AUTO = true\nSOCK_TIMEOUT = 6\n");
+    conf.close();
+
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config,
+                                 "-S",
+                                 QString("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port()),
+                                 "-i",
+                                 source,
+                                 "-o",
+                                 sandbox.rootPath() + "/stall.nzb",
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "-a",
+                                 QString::number(articleSize),
+                                 "-r",
+                                 "0",
+                                 "--disp_progress",
+                                 "none" },
+                               sandbox.rootPath(),
+                               out,
+                               25000);
+    QVERIFY2(code != -2, qPrintable("ngPost hung on the stalled connection:\n" + out));
+    QVERIFY2(code > 0, qPrintable(QString("exit=%1\n%2").arg(code).arg(out)));
+    QVERIFY2(out.contains("Socket Timeout (6000 ms)"), qPrintable(out));
+}
+
+void TestPostFlow::missing_parity_tool_stops_before_compression()
+{
+    HomeSandbox sandbox;
+    const QString source = sandbox.rootPath() + "/source.bin";
+    QFile input(source);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("test");
+    input.close();
+    const QString config = sandbox.rootPath() + "/missing.conf";
+    QFile file(config);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(QString("GROUPS = alt.binaries.test\nTMP_DIR = %1\nRAR_PATH = %2\n"
+                       "PAR2_SOURCE = custom\nPAR2_TOOL = parpar\nPAR2_PATH = "
+                       "%1/missing-parpar\nPAR2_PCT = 10\n")
+                   .arg(sandbox.rootPath(), _bin)
+                   .toUtf8());
+    file.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config,
+                                 "-S",
+                                 "u:p@@@127.0.0.1:1:1:nossl",
+                                 "-i",
+                                 source,
+                                 "-o",
+                                 sandbox.rootPath() + "/missing.nzb",
+                                 "--compress",
+                                 "--gen_par2" },
+                               sandbox.rootPath(),
+                               out);
+    QVERIFY2(code > 0, qPrintable(out));
+    QVERIFY2(out.contains("PAR2 tool") && out.contains("missing-parpar"), qPrintable(out));
+    QVERIFY(!out.contains("Compressing files"));
+    QVERIFY(!out.contains("Configured NNTP"));
+}
+
+void TestPostFlow::unavailable_compressor_stops_and_preserves_input_data()
+{
+    QTest::addColumn<bool>("brokenInterpreter");
+    QTest::newRow("missing executable") << false;
+#ifdef Q_OS_UNIX
+    QTest::newRow("missing interpreter") << true;
+#endif
+}
+
+void TestPostFlow::unavailable_compressor_stops_and_preserves_input()
+{
+    QFETCH(bool, brokenInterpreter);
+    HomeSandbox sandbox;
+    const QString source = sandbox.rootPath() + "/original.bin";
+    QFile input(source);
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("original contents");
+    input.close();
+    const QString compressor = sandbox.rootPath() + "/fakerar";
+    if (brokenInterpreter) {
+        QFile script(compressor);
+        QVERIFY(script.open(QIODevice::WriteOnly));
+        script.write("#!/ngpost-test/missing-interpreter\n");
+        script.close();
+        QVERIFY(script.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                      | QFileDevice::ExeOwner));
+    }
+    const QString config = sandbox.rootPath() + "/compression.conf";
+    QFile file(config);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(QString("TMP_DIR = %1\nRAR_SOURCE = custom\nRAR_TOOL = rar\nRAR_PATH = %2\n")
+                   .arg(sandbox.rootPath(), compressor)
+                   .toUtf8());
+    file.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config,
+                                 "-S",
+                                 "u:p@@@127.0.0.1:1:1:nossl",
+                                 "-i",
+                                 source,
+                                 "-o",
+                                 sandbox.rootPath() + "/unavailable.nzb",
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "--compress",
+                                 "--obfuscate-filename",
+                                 "--debug" },
+                               sandbox.rootPath(),
+                               out);
+    QVERIFY2(code > 0, qPrintable(out));
+    QVERIFY2(out.contains(brokenInterpreter ? "Could not start external tool"
+                                            : "Compression tool unavailable"),
+             qPrintable(out));
+    QVERIFY(!out.contains("Configured NNTP"));
+    QVERIFY(input.open(QIODevice::ReadOnly));
+    QCOMPARE(input.readAll(), QByteArray("original contents"));
+}
+
+void TestPostFlow::cli_parity_path_overrides_configured_engine()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("Uses a shell script to capture tool arguments");
+#else
+    HomeSandbox sandbox;
+    const auto root = sandbox.rootPath();
+    const auto captured = root + "/arguments";
+    QVERIFY(writeFakeTool(root + "/par2",
+                          "#!/bin/sh\nprintf '%s\\n' \"$@\" > '" + captured + "'\nexit 9\n"));
+    QFile input(root + "/source.bin");
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("payload");
+    input.close();
+    QFile config(root + "/tools.conf");
+    QVERIFY(config.open(QIODevice::WriteOnly));
+    config.write(("TMP_DIR = " + root
+                  + "\nPAR2_TOOL = parpar\nPAR2_SOURCE = auto\n"
+                    "PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -q\nPAR2_PCT = 10\n")
+                     .toUtf8());
+    config.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config.fileName(),
+                                 "-S",
+                                 "u:p@@@127.0.0.1:1:1:nossl",
+                                 "-i",
+                                 input.fileName(),
+                                 "-o",
+                                 root + "/test.nzb",
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "--gen_par2",
+                                 "--par2_path",
+                                 root + "/par2" },
+                               root,
+                               out);
+    QVERIFY2(code > 0, qPrintable(out));
+    QVERIFY2(out.contains("ignored for this run"), qPrintable(out));
+    QFile args(captured);
+    QVERIFY2(args.open(QIODevice::ReadOnly), qPrintable(out));
+    const auto text = args.readAll();
+    QVERIFY2(text.startsWith("c\n"), text.constData());
+    QVERIFY(!text.contains("--auto-slice-size"));
+    QVERIFY(text.contains("-r10\n"));
+#endif
+}
+
+void TestPostFlow::cli_parity_path_to_the_configured_engine_keeps_its_arguments()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("Uses shell scripts, and PATH, to stand in for the engines");
+#else
+    if (QFileInfo::exists(QFileInfo(_bin).absolutePath() + "/parpar"))
+        QSKIP("A ParPar bundled next to ngPost leaves nothing to fall back from");
+    HomeSandbox sandbox;
+    const auto root = sandbox.rootPath();
+    // par2cmdline is the only engine on PATH; ParPar lives where automatic
+    // discovery does not look, so PAR2_TOOL = parpar falls back to par2cmdline.
+    QVERIFY(QDir().mkpath(root + "/bin"));
+    QVERIFY(QDir().mkpath(root + "/opt"));
+    const auto captured = root + "/arguments";
+    QVERIFY(writeFakeTool(root + "/bin/par2", "#!/bin/sh\nexit 0\n"));
+    QVERIFY(writeFakeTool(root + "/opt/parpar",
+                          "#!/bin/sh\nprintf '%s\\n' \"$@\" > '" + captured + "'\nexit 9\n"));
+    const QByteArray savedPath = qgetenv("PATH");
+    qputenv("PATH", QString(root + "/bin").toLocal8Bit());
+    const auto restorePath = qScopeGuard([&] { qputenv("PATH", savedPath); });
+
+    QFile input(root + "/source.bin");
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write("payload");
+    input.close();
+    QFile config(root + "/tools.conf");
+    QVERIFY(config.open(QIODevice::WriteOnly));
+    config.write(("TMP_DIR = " + root
+                  + "\nPAR2_TOOL = parpar\nPAR2_SOURCE = auto\n"
+                    "PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -q\nPAR2_PCT = 10\n")
+                     .toUtf8());
+    config.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config.fileName(),
+                                 "-S",
+                                 "u:p@@@127.0.0.1:1:1:nossl",
+                                 "-i",
+                                 input.fileName(),
+                                 "-o",
+                                 root + "/test.nzb",
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "--gen_par2",
+                                 "--par2_path",
+                                 root + "/opt/parpar" },
+                               root,
+                               out);
+    QVERIFY2(code > 0, qPrintable(out));
+    // Nothing to announce: the path names the engine the configuration chose.
+    QVERIFY2(!out.contains("is not installed here"), qPrintable(out));
+    QVERIFY2(!out.contains("ignored for this run"), qPrintable(out));
+    QFile args(captured);
+    QVERIFY2(args.open(QIODevice::ReadOnly), qPrintable(out));
+    const auto text = args.readAll();
+    QVERIFY2(!text.startsWith("c\n"), text.constData());
+    QVERIFY2(text.contains("--auto-slice-size\n"), text.constData());
+    QVERIFY2(text.contains("-r10%\n"), text.constData());
+#endif
+}
+
+void TestPostFlow::parity_tool_that_writes_nothing_stops_the_post()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("Uses a shell script to stand in for the engine");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+    const auto root = sandbox.rootPath();
+    // What par2j does with ParPar's switches: its usage on stdout, exit code 0,
+    // and not a single file written.
+    QVERIFY(writeFakeTool(root + "/par2", "#!/bin/sh\necho Usage\nexit 0\n"));
+    QFile input(root + "/source.bin");
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    input.write(QByteArray(4096, 'x'));
+    input.close();
+    QFile config(root + "/tools.conf");
+    QVERIFY(config.open(QIODevice::WriteOnly));
+    config.write(("TMP_DIR = " + root
+                  + "\nPAR2_TOOL = par2cmdline\nPAR2_SOURCE = custom\nPAR2_PATH = " + root
+                  + "/par2\nPAR2_PCT = 10\nNO_RESUME_AUTO = true\n")
+                     .toUtf8());
+    config.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config.fileName(),
+                                 "-S",
+                                 QString("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port()),
+                                 "-i",
+                                 input.fileName(),
+                                 "-o",
+                                 root + "/test.nzb",
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "--gen_par2" },
+                               root,
+                               out);
+    QVERIFY2(code > 0, qPrintable(out));
+    QVERIFY2(out.contains("wrote no par2 file"), qPrintable(out));
+    QVERIFY2(mock.receivedArticles().isEmpty(), "nothing may be posted without its par2");
+    QVERIFY(input.exists());
+#endif
+}
+
+void TestPostFlow::rm_posted_keeps_sources_of_an_incomplete_post_data()
+{
+    QTest::addColumn<bool>("refused");
+    QTest::newRow("article refused") << true;
+    QTest::newRow("complete post") << false;
+}
+
+void TestPostFlow::rm_posted_keeps_sources_of_an_incomplete_post()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("Uses a shell script to stand in for the parity engine");
+#else
+    QFETCH(bool, refused);
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start(refused ? QStringList{ "--reject-part", "2" } : QStringList{}));
+    const auto root = sandbox.rootPath();
+    QVERIFY(writeFakeTool(root + "/par2",
+                          "#!/bin/sh\n"
+                          "for a in \"$@\"; do case \"$a\" in *.par2) t=\"$a\";; esac; done\n"
+                          "head -c 100 /dev/zero > \"$t\"\n"
+                          "exit 0\n"));
+
+    // --auto with parity only posts each file of the folder as it is: the file
+    // --rm_posted deletes is then the user's only copy.
+    const QString watched = root + QStringLiteral("/watched");
+    QVERIFY(QDir().mkpath(watched));
+    QFile input(watched + QStringLiteral("/source.bin"));
+    QVERIFY(input.open(QIODevice::WriteOnly));
+    QCOMPARE(input.write(QByteArray(4096, 's')), qint64(4096));
+    input.close();
+
+    QFile config(root + "/rm_posted.conf");
+    QVERIFY(config.open(QIODevice::WriteOnly));
+    config.write(("TMP_DIR = " + root + "\nnzbPath = " + root
+                  + "\nPAR2_TOOL = par2cmdline\nPAR2_SOURCE = custom\nPAR2_PATH = " + root
+                  + "/par2\nPAR2_PCT = 10\n")
+                     .toUtf8());
+    config.close();
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 config.fileName(),
+                                 "--post_db",
+                                 root + "/history.sqlite",
+                                 "-S",
+                                 QString("u:p@@@127.0.0.1:%1:1:nossl").arg(mock.port()),
+                                 "--auto",
+                                 watched,
+                                 "--gen_par2",
+                                 "--rm_posted",
+                                 "-a",
+                                 "1024",
+                                 "-r",
+                                 "0",
+                                 "-g",
+                                 "alt.binaries.test" },
+                               root,
+                               out,
+                               30000);
+    if (refused) {
+        QVERIFY2(code > 0, qPrintable(out));
+        QVERIFY2(out.contains("Not deleting the posted files"), qPrintable(out));
+        QVERIFY2(input.exists(), qPrintable(out));
+    } else {
+        QVERIFY2(code == 0, qPrintable(out));
+        QVERIFY2(!input.exists(), qPrintable(out));
+    }
+#endif
+}

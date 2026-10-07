@@ -29,11 +29,17 @@ public:
     void stop() override;
     void stopAndWait(int timeoutMs) override;
     bool isRunning() const override;
+    bool restart(quint64 attemptId) override;
+    void setActive(bool active) override;
 
 #ifdef NGPOST_TESTING
     static bool windowsActivityForTest(bool servicePipeConnected,
                                        bool hasManagementSocket,
                                        bool retryTimerActive);
+    static void terminateMgmtPasswordPromptForTest(QByteArray &buffer);
+    void handleProtocolLineForTest(QString const &line) { _handleLine(line); }
+    void finishProcessForTest(int exitCode, QProcess::ExitStatus status)
+    { onProcessFinished(exitCode, status); }
 #endif
 
 private slots:
@@ -46,7 +52,7 @@ private slots:
     // OpenVPNServiceInteractive named pipe protocol
     void onWinPipeReadyRead();
     void onWinPipeDisconnected();
-    // openvpn --management TCP socket on 127.0.0.1:7505
+    // openvpn --management TCP socket on a dynamic loopback port
     void onWinMgmtConnected();
     void onWinMgmtReadyRead();
     void onWinMgmtDisconnected();
@@ -54,12 +60,18 @@ private slots:
 
 private:
     void _handleLine(QString const &line);
+
+    //! Refuse a profile carrying anything OpenVpnConfigPolicy has not reviewed,
+    //! reporting which directive and why. The privileged helper repeats this
+    //! check on its own side; this one exists so the user gets the reason.
+    bool _profilePassesPolicy(QString const &configPath);
 #ifdef Q_OS_WIN
     bool _startWindowsViaInteractiveService(QString const &configPath,
                                             QString const &authFilePath);
     void _ensureWinManagementSocket();
     void _stopWindows();
     void _parseMgmtLine(QString const &line);
+    void _removeWinManagementPassword();
     QString _buildOpenVpnOptions(QString const &configPath,
                                   QString const &authFilePath) const;
 #endif
@@ -67,13 +79,18 @@ private:
     QProcess  *_proc;            //!< Linux: the pkexec/helper subprocess.
     QByteArray _stdoutBuffer;
     bool       _readySignaled;
+    bool       _protocolV2Seen;
 
 #ifdef Q_OS_WIN
     QLocalSocket *_winServicePipe; //!< \\.\pipe\openvpn\service
-    QTcpSocket   *_winMgmt;        //!< openvpn --management 127.0.0.1:7505
+    QTcpSocket   *_winMgmt;        //!< openvpn --management on dynamic loopback port
     QByteArray    _winMgmtBuffer;
     QTimer       *_winMgmtRetryTimer;
     int           _winMgmtRetryCount;
+    quint16       _winMgmtPort;
+    QString       _winMgmtPassword;
+    QString       _winMgmtPasswordPath;
+    bool          _winMgmtAuthenticated;
     bool          _winStopRequested;
     QString       _winTunIface;
     QHostAddress  _winTunIp;

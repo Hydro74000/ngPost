@@ -17,7 +17,7 @@
 namespace
 {
 
-QString escapeXml(QString s)
+QString escapeXml(const QString &s)
 {
     return NgPost::escapeXML(s);
 }
@@ -108,6 +108,40 @@ qint64 inferSegmentBytes(const PostHistoryStore::FileSummary &file,
     return fullArticleBytes;
 }
 
+//! What the history says went wrong with the articles of one file.
+struct ArticleIssues
+{
+    bool unknown = false;
+    bool nonPosted = false;
+    bool missing = false;
+};
+
+ArticleIssues scanArticles(const PostHistoryStore::FileSummary &file,
+                           const QList<PostHistoryStore::ArticleSummary> &articles)
+{
+    ArticleIssues issues;
+    issues.missing = articles.size() < file.totalArticles;
+    for (const PostHistoryStore::ArticleSummary &article : articles) {
+        if (article.status == QStringLiteral("unknown"))
+            issues.unknown = true;
+        if (article.status != QStringLiteral("posted"))
+            issues.nonPosted = true;
+        if (article.status == QStringLiteral("posted") && article.msgId.isEmpty())
+            issues.missing = true;
+    }
+    return issues;
+}
+
+int countConfirmedSegments(const QList<PostHistoryStore::ArticleSummary> &articles)
+{
+    int confirmedSegments = 0;
+    for (const PostHistoryStore::ArticleSummary &article : articles) {
+        if (article.status == QStringLiteral("posted") && !article.msgId.isEmpty())
+            ++confirmedSegments;
+    }
+    return confirmedSegments;
+}
+
 } // namespace
 
 NzbHistoryRegenerator::NzbHistoryRegenerator(PostHistoryStore *store)
@@ -144,7 +178,24 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
         && passwordOverride.isEmpty() && warnings)
         *warnings << tr("post had an archive password, but it is not stored");
 
-    const QString tab = NgPost::space();
+    if (!_writeHeader(postId, details, stream, includePassword, error, passwordOverride))
+        return false;
+
+    if (!_writeFiles(details, stream, warnings, error))
+        return false;
+
+    stream << "</nzb>\n";
+    return true;
+}
+
+bool NzbHistoryRegenerator::_writeHeader(qint64 postId,
+                                         const PostHistoryStore::PostDetails &details,
+                                         QTextStream &stream,
+                                         bool includePassword,
+                                         QString *error,
+                                         const QString &passwordOverride)
+{
+    const QString &tab = NgPost::space();
     stream << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
            << "<!DOCTYPE nzb PUBLIC \"-//newzBin//DTD NZB 1.1//EN\" "
               "\"http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd\">\n"
@@ -193,6 +244,15 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
         stream << tab << "</head>\n\n";
     }
 
+    return true;
+}
+
+
+bool NzbHistoryRegenerator::_writeFiles(const PostHistoryStore::PostDetails &details,
+                                        QTextStream &stream,
+                                        QStringList *warnings,
+                                        QString *error)
+{
     int padding = 1;
     int n = details.files.size();
     while (n >= 10) {
@@ -210,73 +270,149 @@ bool NzbHistoryRegenerator::writeNzb(qint64 postId,
     const qint64 postFullArticleBytesHint = hasExactArticleSize
         ? details.articleSizeBytes
         : inferPostFullArticleBytesHint(details);
+    // Segment sizes have to describe the same thing throughout one nzb. A post
+    // that straddles the v3 -> v4 upgrade has body_bytes on the articles posted
+    // after it and nothing on the ones before, so mixing the two would hand the
+    // client a document where some segments are yEnc encoded sizes and others
+    // are the decoded ones. When even a single article predates the column,
+    // fall back to the decoded sizes everywhere -- the behaviour of every
+    // release before v4.
+    bool useBodyBytes = true;
+    for (const PostHistoryStore::FileSummary &file : details.files) {
+        for (const PostHistoryStore::ArticleSummary &article : details.articlesByFile.value(file.id)) {
+            if (article.status == QStringLiteral("posted") && !article.msgId.isEmpty()
+                && article.bodyBytes <= 0) {
+                useBodyBytes = false;
+                break;
+            }
+        }
+        if (!useBodyBytes)
+            break;
+    }
+
     int repairedArticleBytes = 0;
     for (const PostHistoryStore::FileSummary &file : details.files) {
-        const QList<PostHistoryStore::ArticleSummary> articles = details.articlesByFile.value(file.id);
-        const qint64 fullArticleBytes =
-            inferFullArticleBytes(file, articles, postFullArticleBytesHint, hasExactArticleSize);
-        bool hasUnknown = false;
-        bool hasNonPosted = false;
-        bool hasMissing = articles.size() < file.totalArticles;
-        for (const PostHistoryStore::ArticleSummary &article : articles) {
-            if (article.status == QStringLiteral("unknown"))
-                hasUnknown = true;
-            if (article.status != QStringLiteral("posted"))
-                hasNonPosted = true;
-            if (article.status == QStringLiteral("posted") && article.msgId.isEmpty())
-                hasMissing = true;
-        }
-        if (hasUnknown && warnings)
-            *warnings << tr("file %1 contains unknown articles").arg(file.postedName);
-        if (hasNonPosted && warnings)
-            *warnings << tr("file %1 contains non-posted articles").arg(file.postedName);
-        if (hasMissing && warnings)
-            *warnings << tr("file %1 has missing article records").arg(file.postedName);
-        if (details.post.status == QStringLiteral("success")
-            && (hasNonPosted || hasMissing)) {
-            if (error)
-                *error = tr("history for successful file %1 is incomplete; refusing to replace "
-                            "the NZB")
-                             .arg(file.postedName);
+        if (!_writeFile(details,
+                        file,
+                        stream,
+                        padding,
+                        postFullArticleBytesHint,
+                        hasExactArticleSize,
+                        useBodyBytes,
+                        repairedArticleBytes,
+                        warnings,
+                        error))
             return false;
-        }
-
-        stream << tab << "<file poster=\"" << escapeXml(details.from) << "\""
-               << " date=\"" << QDateTime::currentSecsSinceEpoch() << "\""
-               << QString(" subject=\"[%1/%2] - &quot;")
-                      .arg(file.ordinal, padding, 10, QChar('0'))
-                      .arg(details.files.size())
-               << escapeXml(file.postedName)
-               << "&quot; yEnc (1/" << file.totalArticles << ") " << file.sizeBytes << "\">\n";
-
-        stream << tab << tab << "<groups>\n";
-        for (const QString &group : splitGroups(file.groups))
-            stream << tab << tab << tab << "<group>" << escapeXml(group) << "</group>\n";
-        stream << tab << tab << "</groups>\n";
-
-        stream << tab << tab << "<segments>\n";
-        for (const PostHistoryStore::ArticleSummary &article : articles) {
-            if (article.status != QStringLiteral("posted") || article.msgId.isEmpty())
-                continue;
-            qint64 segmentBytes = article.bytes;
-            if (segmentBytes <= 0) {
-                segmentBytes = inferSegmentBytes(file, article.part, fullArticleBytes);
-                ++repairedArticleBytes;
-            }
-            stream << tab << tab << tab << "<segment"
-                   << " bytes=\"" << segmentBytes << "\""
-                   << " number=\"" << article.part << "\">"
-                   << escapeXml(article.msgId)
-                   << "</segment>\n";
-        }
-        stream << tab << tab << "</segments>\n"
-               << tab << "</file>\n";
     }
 
     if (repairedArticleBytes > 0 && warnings)
-        *warnings << tr("%1 article segment sizes were missing in history and rebuilt from file metadata")
-                         .arg(repairedArticleBytes);
+        *warnings
+            << tr("%1 article segment sizes were missing in history and rebuilt from file metadata")
+                   .arg(repairedArticleBytes);
 
-    stream << "</nzb>\n";
     return true;
+}
+
+
+bool NzbHistoryRegenerator::_writeFile(const PostHistoryStore::PostDetails &details,
+                                       const PostHistoryStore::FileSummary &file,
+                                       QTextStream &stream,
+                                       int padding,
+                                       qint64 postFullArticleBytesHint,
+                                       bool hasExactArticleSize,
+                                       bool useBodyBytes,
+                                       int &repairedArticleBytes,
+                                       QStringList *warnings,
+                                       QString *error)
+{
+    const QString &tab = NgPost::space();
+    const QList<PostHistoryStore::ArticleSummary> articles = details.articlesByFile.value(file.id);
+    const qint64 fullArticleBytes = inferFullArticleBytes(file,
+                                                          articles,
+                                                          postFullArticleBytesHint,
+                                                          hasExactArticleSize);
+    if (!_checkFileHistory(details, file, articles, warnings, error))
+        return false;
+
+    // A <file> carrying no segment at all is not a usable NZB entry: no
+    // client can act on it, and emitting it says strictly less than
+    // leaving it out. Count what is actually confirmed first -- the
+    // warnings above already tell the user the file is incomplete.
+    if (countConfirmedSegments(articles) == 0) {
+        if (warnings)
+            *warnings << tr("file %1 has no confirmed article and is left out of the NZB")
+                             .arg(file.postedName);
+        return true;
+    }
+
+    stream << tab << "<file poster=\"" << escapeXml(details.from) << "\""
+           << " date=\"" << QDateTime::currentSecsSinceEpoch() << "\""
+           << QString(" subject=\"[%1/%2] - &quot;")
+                  .arg(file.ordinal, padding, 10, QChar('0'))
+                  .arg(details.files.size())
+           << escapeXml(file.postedName) << "&quot; yEnc (1/" << file.totalArticles << ") "
+           << file.sizeBytes << "\">\n";
+
+    stream << tab << tab << "<groups>\n";
+    for (const QString &group : splitGroups(file.groups))
+        stream << tab << tab << tab << "<group>" << escapeXml(group) << "</group>\n";
+    stream << tab << tab << "</groups>\n";
+
+    _writeSegments(file, articles, stream, fullArticleBytes, useBodyBytes, repairedArticleBytes);
+    return true;
+}
+
+//! Warns about the gaps in the history of \a file. False, with \a error set,
+//! when a post recorded as successful has gaps: its NZB must not be replaced.
+bool NzbHistoryRegenerator::_checkFileHistory(
+    const PostHistoryStore::PostDetails &details,
+    const PostHistoryStore::FileSummary &file,
+    const QList<PostHistoryStore::ArticleSummary> &articles,
+    QStringList *warnings,
+    QString *error)
+{
+    const ArticleIssues issues = scanArticles(file, articles);
+    if (issues.unknown && warnings)
+        *warnings << tr("file %1 contains unknown articles").arg(file.postedName);
+    if (issues.nonPosted && warnings)
+        *warnings << tr("file %1 contains non-posted articles").arg(file.postedName);
+    if (issues.missing && warnings)
+        *warnings << tr("file %1 has missing article records").arg(file.postedName);
+    if (details.post.status == QStringLiteral("success") && (issues.nonPosted || issues.missing)) {
+        if (error)
+            *error = tr("history for successful file %1 is incomplete; refusing to replace "
+                        "the NZB")
+                         .arg(file.postedName);
+        return false;
+    }
+    return true;
+}
+
+void NzbHistoryRegenerator::_writeSegments(const PostHistoryStore::FileSummary &file,
+                                           const QList<PostHistoryStore::ArticleSummary> &articles,
+                                           QTextStream &stream,
+                                           qint64 fullArticleBytes,
+                                           bool useBodyBytes,
+                                           int &repairedArticleBytes)
+{
+    const QString &tab = NgPost::space();
+    stream << tab << tab << "<segments>\n";
+    for (const PostHistoryStore::ArticleSummary &article : articles) {
+        if (article.status != QStringLiteral("posted") || article.msgId.isEmpty())
+            continue;
+        // What the nzb advertises is the size of the article ON THE SERVER,
+        // i.e. the yEnc encoded body -- roughly 3% larger than the data it
+        // decodes to. `bytes` is that decoded slice, kept for rows written
+        // before body_bytes existed (schema v4).
+        qint64 segmentBytes = useBodyBytes ? article.bodyBytes : article.bytes;
+        if (segmentBytes <= 0) {
+            segmentBytes = inferSegmentBytes(file, article.part, fullArticleBytes);
+            ++repairedArticleBytes;
+        }
+        stream << tab << tab << tab << "<segment"
+               << " bytes=\"" << segmentBytes << "\""
+               << " number=\"" << article.part << "\">" << escapeXml(article.msgId)
+               << "</segment>\n";
+    }
+    stream << tab << tab << "</segments>\n" << tab << "</file>\n";
 }

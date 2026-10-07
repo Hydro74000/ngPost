@@ -1,0 +1,160 @@
+name: Code quality
+
+# What a plain build and test run cannot see: clang-tidy and cppcheck over the
+# real compile database of the GUI and headless builds, and the unit,
+# integration and GUI suites under AddressSanitizer and UndefinedBehaviorSanitizer.
+# Not called by release.yml, so a push runs it once.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# A newer push supersedes this run: finishing it only delays the result that
+# matters and holds a runner.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  function-length:
+    name: Function length ratchet
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install pinned lizard and dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/function-length"
+          "$RUNNER_TEMP/function-length/bin/pip" install --require-hashes --only-binary=:all: \
+            -r .github/scripts/function-length-requirements.txt
+          echo "$RUNNER_TEMP/function-length/bin" >> "$GITHUB_PATH"
+
+      - name: Verify the ratchet and its negative controls
+        run: |
+          python -m unittest discover -s tests/quality -p test_function_length.py -v
+          python .github/scripts/check-function-length.py
+
+  static-analysis:
+    name: clang-tidy and cppcheck
+    runs-on: ubuntu-24.04
+    # Fedora, pinned by digest: its clang-tidy (22) and cppcheck (2.21) are the
+    # versions .clang-tidy and the suppressions were reviewed with. The
+    # Ubuntu runner ships clang-tidy 18 and cppcheck 2.13, which report other
+    # things, and an analyser whose verdict depends on the machine is no gate.
+    # Reproduce locally in the same image with
+    # .github/scripts/static-analysis.sh <build-dir>...
+    container:
+      image: fedora:44@sha256:43b29f65a41eb9c35e1cd5323e3bdf3b655c2357a9f4f1ff2f9c2798e5045d80
+    steps:
+      - name: Install the toolchain
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            git make clang clang-tools-extra cppcheck bear python3 \
+            qt6-qtbase-devel qt6-qtcharts-devel qtkeychain-qt6-devel
+          clang-tidy --version | head -2
+          cppcheck --version
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # bear records the compile database the two analysers read. The headless
+      # build compiles other #ifdef branches, so both are analysed.
+      - name: Build the GUI and headless variants
+        run: |
+          for variant in gui headless; do
+            extra=""
+            [ "$variant" = headless ] && extra="CONFIG+=no_hmi"
+            mkdir -p "build/$variant"
+            (cd "build/$variant" \
+              && qmake6 -spec linux-clang ../../src/ngPost.pro CONFIG+=release CONFIG+=ngpost_werror $extra \
+              && bear -- make -j"$(nproc)")
+          done
+
+      - name: Analyse
+        run: bash .github/scripts/static-analysis.sh build/gui build/headless
+
+  sanitizers:
+    name: Unit, integration and GUI tests under ASan and UBSan
+    # The environment of the Linux jobs of unit-tests.yml, integration-tests.yml
+    # and gui-tests.yml, so the per-binary floors of expected-counts.txt hold
+    # here too; only the build flags differ. The GUI suite earns its place: it
+    # found a slot called on a half-destroyed PostingWidget the others miss.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # xcb/xkbcommon: gui-tests.yml -- Qt loads them even under offscreen QPA.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libsecret-1-dev bubblewrap \
+            libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-sync1 \
+            libxcb-xfixes0 libxcb-xkb1 libxcb-cursor0
+
+      # tst_CliParser isolates the Qt TLS plugins with bwrap: see unit-tests.yml.
+      - name: Allow unprivileged user namespaces for bwrap
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4
+        with:
+          version: '6.8.2'
+          arch: 'linux_gcc_64'
+          modules: 'qtcharts'
+          cache: true
+
+      - name: Build QtKeychain
+        run: |
+          git clone --depth=1 -b 0.15.0 https://github.com/frankosterfeld/qtkeychain.git /tmp/qtkeychain
+          cmake -S /tmp/qtkeychain -B /tmp/qtkeychain/build \
+                -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_QT6=ON \
+                -DBUILD_TESTING=OFF -DBUILD_TRANSLATIONS=OFF \
+                -DCMAKE_INSTALL_PREFIX="$QT_ROOT_DIR"
+          cmake --build /tmp/qtkeychain/build -j"$(nproc)"
+          cmake --install /tmp/qtkeychain/build
+
+      # qmake's own sanitizer support. The ngPost binary the CLI and
+      # integration tests start is instrumented as well, so a leak or an
+      # overflow in the application fails the test that ran it.
+      - name: Build ngPost and the tests with sanitizers
+        run: |
+          flags=('CONFIG+=release' 'CONFIG+=sanitizer' 'CONFIG+=sanitize_address' 'CONFIG+=sanitize_undefined')
+          (cd src && qmake ngPost.pro "${flags[@]}" && make -j"$(nproc)")
+          (cd tests/unit && qmake unit.pro "${flags[@]}" && make -j"$(nproc)")
+          (cd tests/integration && qmake integration.pro "${flags[@]}" && make -j"$(nproc)")
+          (cd tests/gui && qmake gui.pro "${flags[@]}" && make -j"$(nproc)")
+
+      - name: Bundle the pinned PAR2 tools
+        run: |
+          ./.github/scripts/fetch-par2-tools.sh "$RUNNER_TEMP/par2-tools"
+          echo "$RUNNER_TEMP/par2-tools" >> "$GITHUB_PATH"
+
+      # halt_on_error makes UBSan fatal like ASan, so a finding cannot pass as
+      # a warning in a green log. Leaks are reported at exit, where they turn
+      # the exit code non-zero.
+      - name: Run the tests
+        env:
+          NGPOST_BIN: ${{ github.workspace }}/src/ngPost
+          QT_QPA_PLATFORM: offscreen
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          status=0
+          bash .github/scripts/run-qt-tests.sh tests/unit "unit" || status=1
+          bash .github/scripts/run-qt-tests.sh tests/integration "integration" || status=1
+          bash .github/scripts/run-qt-tests.sh tests/gui "GUI" || status=1
+          exit "$status"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sanitizer-test-logs
+          path: |
+            tests/unit/**/*.log
+            tests/integration/**/*.log
+            tests/gui/**/*.log
+          if-no-files-found: ignore

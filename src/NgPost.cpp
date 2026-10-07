@@ -1,3 +1,5 @@
+#include <climits>
+#include <type_traits>
 /*
  * Copyright (c) 2020 Matthieu Bruel <Matthieu.Bruel@gmail.com>
  * Copyright (c) 2024-2026 Hydro74000 <acymap@gmail.com>
@@ -43,6 +45,7 @@
 #include <QDateTime>
 #include <QFile>
 #include <QSaveFile>
+#include <QScopeGuard>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -51,6 +54,7 @@
 #include <QDir>
 #include <QNetworkProxy>
 #include <QStandardPaths>
+#include <optional>
 
 #include "nntp/NntpFile.h"
 #ifdef __USE_TMP_RAM__
@@ -75,6 +79,7 @@ const QStringList NgPost::sDefaultGroups  = {"alt.binaries.test", "alt.binaries.
 qint64        NgPost::sArticleSize = sDefaultArticleSize;
 const QString NgPost::sSpace       = sDefaultSpace;
 
+// clang-format off
 const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 {
     {Opt::PROXY_SOCKS5,   "proxy_socks5"},
@@ -116,6 +121,8 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::SOCK_TIMEOUT,    "sock_timeout"},
     {Opt::PREPARE_PACKING, "prepare_packing"},
     {Opt::CHECK,           "check"},
+    {Opt::CHECK_JSON,      "check_json"},
+    {Opt::CHECK_FULL,      "check_full"},
     {Opt::QUIET,           "quiet"},
 
 
@@ -142,11 +149,14 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::GEN_FROM,     "gen_from"},
 
     {Opt::OBFUSCATE,    "obfuscate"},
+    {Opt::OBFUSCATE_FILENAME, "obfuscate_filename"},
     {Opt::INPUT_DIR,    "inputdir"},
     {Opt::GROUP_POLICY, "group_policy"},
 
     {Opt::TMP_DIR,      "tmp_dir"},
     {Opt::RAR_PATH,     "rar_path"},
+    {Opt::RAR_TOOL,     "rar_tool"},
+    {Opt::RAR_SOURCE,   "rar_source"},
     {Opt::RAR_EXTRA,    "rar_extra"},
     {Opt::RAR_SIZE,     "rar_size"},
     {Opt::RAR_MAX,      "rar_max"},
@@ -158,7 +168,11 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 
     {Opt::PAR2_PCT,     "par2_pct"},
     {Opt::PAR2_PATH,    "par2_path"},
+    {Opt::PAR2_SOURCE,  "par2_source"},
+    {Opt::PAR2_ARGS_CUSTOM, "par2_args_custom"},
+    {Opt::PAR2_TOOL,    "par2_tool"},
     {Opt::PAR2_ARGS,    "par2_args"},
+    {Opt::PAR2_BLOCK_SIZE, "par2_block_size"},
 
     {Opt::AUTO_COMPRESS,"auto_compress"},
     {Opt::PACK,         "pack"},
@@ -183,11 +197,14 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
 
     {Opt::CHECK_FOR_UPDATES, "check_for_updates"},
     {Opt::LAST_UPDATE_CHECK, "last_update_check"},
+    {Opt::UI_ZOOM, "ui_zoom"},
 
     {Opt::VPN_AUTO_CONNECT,        "vpn_auto_connect"},
     {Opt::VPN_BACKEND,             "vpn_backend"},
     {Opt::VPN_CONFIG_PATH,         "vpn_config_path"},
     {Opt::VPN_ACTIVE_PROFILE,      "vpn_active_profile"},
+    {Opt::VPN_LEASE_WAIT_MINUTES,  "vpn_lease_wait_minutes"},
+    {Opt::VPN_RECOVERY_MAX_ATTEMPTS, "vpn_recovery_max_attempts"},
     {Opt::VPN_PROFILE_NAME,        "name"},
     {Opt::VPN_PROFILE_BACKEND,     "backend"},
     {Opt::VPN_PROFILE_CONFIG_FILE, "config_file"},
@@ -197,6 +214,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::VPN,                     "vpn"},
     {Opt::NO_VPN,                  "no_vpn"},
     {Opt::VPN_PROFILE,             "vpn_profile"},
+    {Opt::VPN_CLEANUP_UNATTRIBUTED,"vpn-cleanup-unattributed"},
     {Opt::HISTORY,                 "history"},
     {Opt::HISTORY_SHOW,            "history_show"},
     {Opt::HISTORY_IMPORT_CSV,      "history_import_csv"},
@@ -213,6 +231,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::YES,                     "yes"},
     {Opt::JSON,                    "json"},
 };
+// clang-format on
 
 const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::HELP],                tr("Help: display syntax")},
@@ -223,7 +242,10 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::DEBUG_FULL],          tr( "display full debug information")},
     {{"l", sOptionNames[Opt::LANG]},          tr( "application language"), sOptionNames[Opt::LANG]},
 
-    { sOptionNames[Opt::CHECK],               tr( "check nzb file (if articles are available on Usenet) cf https://github.com/mbruel/nzbCheck"), sOptionNames[Opt::CHECK]},
+    { sOptionNames[Opt::CHECK],               tr( "check nzb file (if articles are available on Usenet). Exit code: 0 = every article is there, 1 = articles are missing, see the report for whether they can be repaired, 2 = missing beyond any repair, 3 = no verdict (nzb unreadable, no server enabled for checking, or connections failed)"), sOptionNames[Opt::CHECK]},
+    { sOptionNames[Opt::CHECK_JSON],          tr( "with --check: print a single machine readable JSON report on stdout instead of the human one")},
+    { sOptionNames[Opt::CHECK_FULL],          tr( "with --check: verify every article even once the post is provably beyond repair")},
+    { sOptionNames[Opt::PAR2_BLOCK_SIZE],     tr( "with --check: PAR2 slice size in bytes used to create the post, for the recovery analysis (default: derived from the nzb)"), sOptionNames[Opt::PAR2_BLOCK_SIZE]},
     { {"q", sOptionNames[Opt::QUIET]},        tr( "quiet mode (no output on stdout)")},
 
     { QStringList{sOptionNames[Opt::HISTORY]}, tr("list structured post history")},
@@ -254,6 +276,7 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
 
 // general options
     {{"x", sOptionNames[Opt::OBFUSCATE]},     tr("obfuscate the subjects of the articles (CAREFUL you won't find your post if you lose the nzb file)")},
+    {QStringList{sOptionNames[Opt::OBFUSCATE_FILENAME], "obfuscate-filename"}, tr("rename the input files with a random name before compressing them, so the archive does not carry the original name (to be used with --compress)")},
     {{"g", sOptionNames[Opt::GROUPS]},        tr("newsgroups where to post the files (coma separated without space)"), sOptionNames[Opt::GROUPS]},
     {{"m", sOptionNames[Opt::META]},          tr("one of your fields, written in the post info file AND published in the nzb header (typically \"password=qwerty42\")"), sOptionNames[Opt::META]},
     {QStringList{sOptionNames[Opt::POST_META], "post-meta"}, tr("one of your fields, written in the post info file only, never published in the nzb (ex: \"title=Photo backup 2026\")"), sOptionNames[Opt::POST_META]},
@@ -318,7 +341,23 @@ const QList<QCommandLineOption> NgPost::sCmdOptions = {
     { sOptionNames[Opt::VPN],                 tr("force all NNTP connections through the configured VPN (master switch ON)")},
     { sOptionNames[Opt::NO_VPN],              tr("disable VPN for this run (master switch OFF, per-server useVpn ignored too)")},
     { sOptionNames[Opt::VPN_PROFILE],         tr("select the active VPN profile by name (must already exist in the config)"), sOptionNames[Opt::VPN_PROFILE]},
+    { sOptionNames[Opt::VPN_CLEANUP_UNATTRIBUTED],
+      tr("remove unowned ngPost VPN resources after rechecking them (requires --yes)")},
 };
+
+bool NgPost::_isVpnOverrideOption(QCommandLineOption const &option)
+{
+    static const QSet<QString> vpnOptionNames = {
+        sOptionNames[Opt::VPN],
+        sOptionNames[Opt::NO_VPN],
+        sOptionNames[Opt::VPN_PROFILE],
+        sOptionNames[Opt::VPN_CLEANUP_UNATTRIBUTED],
+    };
+    for (QString const &name : option.names())
+        if (vpnOptionNames.contains(name))
+            return true;
+    return false;
+}
 
 const QMap<NgPost::GROUP_POLICY, QString> NgPost::sGroupPolicies = {
     {GROUP_POLICY::ALL,       "all"},
@@ -329,6 +368,8 @@ const QMap<NgPost::GROUP_POLICY, QString> NgPost::sGroupPolicies = {
 #if __DEBUG__ && QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
 #include <QNetworkConfigurationManager>
 #endif
+// Predates .clang-format, which would rewrap the whole list around any edit.
+// clang-format off
 NgPost::NgPost(int &argc, char *argv[]):
     QObject (), CmdOrGuiApp(argc, argv),
     _cout(stdout),
@@ -354,7 +395,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _storage(nullptr), _ramPath(), _ramRatio(sRamRatioMin),
   #endif
     _tmpPath(), _rarPath(), _rarArgs(), _rarSize(0), _rarMax(sDefaultRarMax), _useRarMax(false),
-    _par2Pct(0), _par2Path(), _par2Args(), _par2PathConfig(),
+    _par2Pct(0), _par2Path(), _par2Args(), _par2BlockSize(0), _par2PathConfig(),
     _doCompress(false), _doPar2(false), _genName(), _genPass(),
     _lengthName(sDefaultLengthName), _lengthPass(sDefaultLengthPass),
     _rarName(), _rarPass(), _rarPassFixed(),
@@ -376,7 +417,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _lang("en"), _translators(),
     _netMgr(), _updateChecker(nullptr), _urlNzbUpload(nullptr), _urlNzbUploadStr(),
     _doShutdownWhenDone(false), _shutdownProc(nullptr),
-#if defined(WIN32) || defined(__MINGW64__)
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
     _shutdownCmd(sDefaultShutdownCmdWindows),
 #elif defined(__APPLE__)|| defined(__MACH__)
     _shutdownCmd(sDefaultShutdownCmdMacOS),
@@ -386,7 +427,6 @@ NgPost::NgPost(int &argc, char *argv[]):
     _removeAccentsOnNzbFileName(false),
     _autoCloseTabs(false),
     _checkForUpdates(true),
-    _lastUpdateCheckEpoch(0),
     _rarNoRootFolder(false),
     _keepNfoExtension(false),
     _copyNfoWithNzb(false),
@@ -400,7 +440,8 @@ NgPost::NgPost(int &argc, char *argv[]):
     _noPostInfo(false),
     _postCmdTimeoutSec(0), _postCmdFailIsError(false), _postCmdExposePassword(false),
     _nzbUploadTimeoutSec(sDefaultNzbUploadTimeoutSec), _postCmdRunner(nullptr),
-    _waitingForPostCmds(false), _pendingExitCode(-1), _stdoutIsData(false),
+    _waitingForPostCmds(false), _pendingExitCode(-1),
+    _pendingExitWaitsForActiveJob(false), _stdoutIsData(false),
     _stdoutRedirect(nullptr),
     _preparePacking(false),
     _groupPolicy(GROUP_POLICY::ALL),
@@ -409,6 +450,7 @@ NgPost::NgPost(int &argc, char *argv[]):
     _vpnManager(nullptr),
     _lastPostingStartCanceled(false),
     _logFile(nullptr), _logStream(nullptr)
+// clang-format on
 {
     QThread::currentThread()->setObjectName(sMainThreadName);
 
@@ -417,87 +459,13 @@ NgPost::NgPost(int &argc, char *argv[]):
         _hmi->setWindowTitle(QString("%1_v%2").arg(sAppName).arg(sVersion));
 #endif
 
-    // in case we want to generate random uploader (_from not provided)
-//    std::srand(static_cast<uint>(QDateTime::currentMSecsSinceEpoch()));
-    std::srand(QUuid::createUuid().data1); // use more random seed
-
-    // check if an embedded par2 implementation sits next to the binary
-    // (Windows installer / AppImage). We prefer parpar when present because
-    // it does not rely on shell wildcard expansion (see useParPar handling
-    // in PostingJob::startGenPar2) — a hard requirement on Windows where
-    // QProcess invokes CreateProcess directly without a shell.
-    const QString appDir = QCoreApplication::applicationDirPath();
-    QStringList par2Candidates;
-#if defined(WIN32) || defined(__MINGW64__)
-    // Fallback order: ParPar (preferred — no shell globbing needed via -R),
-    // then par2cmdline (par2.exe), then MultiPar (par2j64/par2j). All three are
-    // bundled by the Windows installer so par2 generation keeps working even if
-    // the user opts out of ParPar. par2cmdline 0.8.0 and par2j self-expand the
-    // archive.7z* / archive*rar wildcards ngPost passes (verified), so they are
-    // safe under QProcess's shell-less CreateProcess.
-    par2Candidates << QString("%1/parpar.exe").arg(appDir)
-                   << QString("%1/par2.exe").arg(appDir)
-                   << QString("%1/par2j64.exe").arg(appDir)
-                   << QString("%1/par2j.exe").arg(appDir);
-#else
-    par2Candidates << QString("%1/parpar").arg(appDir)
-                   << QString("%1/par2").arg(appDir);
-#endif
-    for (const QString &candidate : par2Candidates) {
-        QFileInfo fi(candidate);
-        if (fi.exists() && fi.isFile() && fi.isExecutable()) {
-            _par2Path = candidate;
-            break;
-        }
-    }
-
-#if defined(WIN32) || defined(__MINGW64__)
-    // Fall back to system-wide installations when no bundled binary was found.
-    // Search order: PATH (parpar first, then par2), then QuickPar typical paths.
-    if (_par2Path.isEmpty()) {
-        for (const QString &name : {QStringLiteral("parpar.exe"), QStringLiteral("par2.exe")}) {
-            const QString found = QStandardPaths::findExecutable(name);
-            if (!found.isEmpty()) {
-                _par2Path = found;
-                break;
-            }
-        }
-    }
-    if (_par2Path.isEmpty()) {
-        for (const char *envVar : {"PROGRAMFILES", "PROGRAMFILES(X86)"}) {
-            const QString pf = QString::fromLocal8Bit(qgetenv(envVar));
-            if (pf.isEmpty())
-                continue;
-            // Some QuickPar installs ship the par2cmdline-compatible par2.exe in
-            // their folder; use it when present. We deliberately do NOT fall back
-            // to QuickPar.exe itself: it is a GUI-only tool (no headless creation
-            // mode — verified empirically), so launching it would just pop a
-            // window and hang the posting job forever.
-            const QString candidate = QString("%1/QuickPar/par2.exe").arg(pf);
-            QFileInfo fi(candidate);
-            if (fi.exists() && fi.isFile() && fi.isExecutable()) {
-                _par2Path = candidate;
-                break;
-            }
-        }
-    }
-#endif
-
-    // check if an embedded rar is available (windows or appImage)
-    QString rarEmbedded;
-#if defined(WIN32) || defined(__MINGW64__)
-    rarEmbedded = QString("%1/rar.exe").arg(QCoreApplication::applicationDirPath());
-#else
-    rarEmbedded = QString("%1/rar").arg(QCoreApplication::applicationDirPath());
-#endif
-    QFileInfo rarFi(rarEmbedded);
-    if (rarFi.exists() && rarFi.isFile() && rarFi.isExecutable())
-        _rarPath = rarEmbedded;
+    _par2Path = externaltool::resolve(QStringLiteral("auto")).path;
+    _rarPath = externaltool::resolve(_rarTool).path;
 
     connect(this, &NgPost::log,   this, &NgPost::onLog,   Qt::QueuedConnection);
     connect(this, &NgPost::error, this, &NgPost::onError, Qt::QueuedConnection);
 
-    _updateChecker = new UpdateChecker(this, &_netMgr, this);
+    _updateChecker = new UpdateChecker(&_netMgr, this);
 
     _postCmdRunner = new PostCmdRunner(_netMgr, this);
     connect(_postCmdRunner,
@@ -513,10 +481,51 @@ NgPost::NgPost(int &argc, char *argv[]):
             &NgPost::maybeFinishApplication,
             Qt::QueuedConnection);
 
+    _initVpnManager();
+    _connectVpnRecoverySignals();
+
+    _loadTanslators();
+    _historyService = new PostHistoryService(_postDbFile, _historyStorePasswords, this);
+    connect(_historyService, &PostHistoryService::error, this, [this](const QString &msg) {
+        _error(msg);
+    }, Qt::QueuedConnection);
+    connect(_historyService, &PostHistoryService::prepared, this, [this](bool ok) {
+        _historyCrashedArticlesChecked = ok;
+    }, Qt::QueuedConnection);
+
+#if defined(__DEBUG__) && QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+    QNetworkConfigurationManager netConfMgr;
+    for (const QNetworkConfiguration &conf : netConfMgr.allConfigurations()) {
+        qDebug() << "net conf: " << conf.name() << ", bearerType: " << conf.bearerTypeName()
+#if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
+                 << ", timeout: " << conf.connectTimeout()
+#endif
+                 << ", isValid: " << conf.isValid() << ", state: " << conf.state();
+    }
+
+    QNetworkConfiguration conf = netConfMgr.defaultConfiguration();
+    qDebug() << "DEFAULT conf: " << conf.name() << ", bearerType: " << conf.bearerTypeName()
+#if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
+             << ", timeout: " << conf.connectTimeout()
+#endif
+             << ", isValid: " << conf.isValid() << ", state: " << conf.state();
+#endif
+
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+    connect(&_netMgr,
+            &QNetworkAccessManager::networkAccessibleChanged,
+            this,
+            &NgPost::onNetworkAccessibleChanged);
+#endif
+}
+
+void NgPost::_initVpnManager()
+{
     _vpnManager    = new VpnManager(this);
+    _vpnManager->setCliMode(!useHMI());
     // Best-effort sweep of any stale VPN state from a previous crashed run.
     // No-op (and no prompt) if the VPN helper hasn't been installed yet.
-    _vpnManager->runStartupCleanup();
+    _vpnManager->runStartupStaleCleanup();
     // Phase 3 — auto-persist VPN preferences as they change so the user
     // doesn't have to click "Save Config" after every tweak.
     connect(_vpnManager, &VpnManager::configChanged,
@@ -537,70 +546,89 @@ NgPost::NgPost(int &argc, char *argv[]):
     connect(_vpnManager, &VpnManager::stateChanged,
             this, [this](VpnManager::State s) {
         if (s == VpnManager::State::Connected) {
-            if (_activeJob || _pendingJobs.isEmpty()) return;
-            _vpnManager->retainForJob();
-            _activeJob = _pendingJobs.dequeue();
-            emit _activeJob->startPosting(true);
+            if (_queuePaused || _cancelingAll)
+                return;
+            if (_activeJob) {
+                if (_activeJob->resumeIfPausedFor(PostingJob::PauseReason::VpnRecovery)) {
+                    _progressbarTimer.start(_refreshRate);
+                }
+                return;
+            }
+            _startNextPostingJob();
+            emit postingStateChanged();
             return;
         }
-        if (s == VpnManager::State::Failed && !useHMI() && !_pendingJobs.isEmpty()) {
-            while (!_pendingJobs.isEmpty())
-                _discardUnstartedJob(_pendingJobs.dequeue());
-            _error(tr("VPN could not be established — aborting pending jobs"),
-                   ERROR_CODE::ERR_WRONG_ARG);
-            _requestExit(ERROR_CODE::ERR_WRONG_ARG);
-        }
+        if (_activeJob
+            && (s == VpnManager::State::Disabled
+                || ((s == VpnManager::State::Failed
+                     || s == VpnManager::State::LeaseBusy)
+                    && !_vpnManager->hasActiveVpnJobs())))
+            // RequestedStop and a failure before READY reset the manager's
+            // count. Keep the job's local association in sync so a later user
+            // retry retains it once. RecoveryExhausted deliberately keeps the
+            // manager count and therefore does not enter this branch.
+            _activeJob->_vpnRetained = false;
     });
+}
+
+void NgPost::_connectVpnRecoverySignals()
+{
     // Blocked admission also needs CLI handling: the GUI shows a popup, but
     // there's no popup in CLI, so without this hook the binary hangs forever
     // until the parent times it out. Surface the reason and exit non-zero.
     connect(_vpnManager, &VpnManager::vpnRequiredButUnavailable,
             this, [this](VpnManager::JobBlockReason, QString const &detail) {
         if (useHMI()) return;
+        while (!_pendingJobs.isEmpty())
+            _discardUnstartedJob(_pendingJobs.dequeue());
         _error(tr("VPN required but unavailable: %1").arg(detail),
-               ERROR_CODE::ERR_WRONG_ARG);
-        _requestExit(ERROR_CODE::ERR_WRONG_ARG);
+               ERROR_CODE::ERR_VPN);
+        if (_activeJob) {
+            // A second, VPN-requiring queued job can fail admission while a
+            // direct job is still running. Never kill that successful work.
+            // Conversely, an active VPN job whose backend became terminal has
+            // to close now so its ambiguous articles are flushed as unknown.
+            bool const stopForPreservation = _activeJob->_vpnRequired;
+            if (stopForPreservation)
+                _activeJob->pause(PostingJob::PauseReason::VpnRecovery);
+            _requestExit(ERROR_CODE::ERR_VPN, true);
+            if (stopForPreservation)
+                emit _activeJob->stopPosting();
+        } else {
+            _requestExit(ERROR_CODE::ERR_VPN);
+        }
     });
-
-    _loadTanslators();
-    _historyService = new PostHistoryService(_postDbFile, _historyStorePasswords, this);
-    connect(_historyService,
-            &PostHistoryService::error,
-            this,
-            [this](const QString &msg) { _error(msg); },
-            Qt::QueuedConnection);
-    connect(_historyService,
-            &PostHistoryService::prepared,
-            this,
-            [this](bool ok) { _historyCrashedArticlesChecked = ok; },
-            Qt::QueuedConnection);
-
-#if defined(__DEBUG__) && QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
-    QNetworkConfigurationManager netConfMgr;
-    for (const QNetworkConfiguration &conf : netConfMgr.allConfigurations())
-    {
-        qDebug() << "net conf: " << conf.name()
-                 << ", bearerType: " << conf.bearerTypeName()
-            #if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
-                 << ", timeout: " << conf.connectTimeout()
-            #endif
-                 << ", isValid: " << conf.isValid()
-                 << ", state: " << conf.state();
-    }
-
-    QNetworkConfiguration conf = netConfMgr.defaultConfiguration();
-    qDebug() << "DEFAULT conf: " << conf.name()
-             << ", bearerType: " << conf.bearerTypeName()
-          #if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
-             << ", timeout: " << conf.connectTimeout()
-          #endif
-             << ", isValid: " << conf.isValid()
-             << ", state: " << conf.state();
-#endif
-
-#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
-    connect(&_netMgr, &QNetworkAccessManager::networkAccessibleChanged, this, &NgPost::onNetworkAccessibleChanged);
-#endif
+    connect(_vpnManager, &VpnManager::vpnInterrupted,
+            this, [this](VpnManager::FailureKind) {
+        if (_activeJob)
+            _activeJob->pause(PostingJob::PauseReason::VpnRecovery);
+    });
+    connect(_vpnManager, &VpnManager::manualDisconnectRequested,
+            this, [this]() {
+        if (_activeJob)
+            _activeJob->pause(PostingJob::PauseReason::User);
+    });
+    connect(_vpnManager, &VpnManager::recoveryExhausted, this, [this](VpnManager::FailureKind) {
+        if (!useHMI()) {
+            _error(tr("VPN recovery exhausted; the post was preserved for resume."),
+                   ERROR_CODE::ERR_VPN);
+            while (!_pendingJobs.isEmpty())
+                _discardUnstartedJob(_pendingJobs.dequeue());
+        }
+        if (_activeJob) {
+            _activeJob->pause(PostingJob::PauseReason::VpnRecovery);
+            if (!useHMI()) {
+                // Let PostingJob close every connection and flush the unknown
+                // article states before the normal no-jobs barrier exits with
+                // ERR_VPN. Exiting immediately here would recreate the crash
+                // window this recovery path is meant to close.
+                _requestExit(ERROR_CODE::ERR_VPN, true);
+                emit _activeJob->stopPosting();
+            }
+        } else if (!useHMI()) {
+            _requestExit(ERROR_CODE::ERR_VPN);
+        }
+    });
 }
 
 void NgPost::_startMonitoring(const QString &folderPath)
@@ -659,6 +687,11 @@ NgPost::~NgPost()
 
     qDeleteAll(_nntpServers);
 
+    // Each ~QTranslator() takes itself off the application's list, installed
+    // or not. "en" maps to nullptr, and deleting that is a no-op.
+    qDeleteAll(_translators);
+    _translators.clear();
+
     if (_urlNzbUpload)
         delete _urlNzbUpload;
 
@@ -674,6 +707,23 @@ NgPost::~NgPost()
         delete _stdoutRedirect;
         _stdoutRedirect = nullptr;
     }
+}
+
+void NgPost::ignoreMonitorPath(const QString &absolutePath)
+{
+    if (_folderMonitor)
+        _folderMonitor->ignoreNextAppearance(absolutePath);
+}
+
+void NgPost::stopIgnoringMonitorPath(const QString &absolutePath)
+{
+    if (_folderMonitor)
+        _folderMonitor->stopIgnoringMonitorPath(absolutePath);
+}
+
+int NgPost::nzbCheckExitCode() const
+{
+    return _nzbCheck ? _nzbCheck->exitCode() : 0;
 }
 
 int NgPost::nbMissingArticles() const
@@ -702,7 +752,7 @@ void NgPost::_finishPosting()
 #ifdef __USE_HMI__
             if (!_hmi)
 #endif
-                std::cout << std::endl;
+                std::cout << '\n';
         }
     }
 }
@@ -1394,8 +1444,13 @@ int NgPost::startHMI()
 
     connect(_updateChecker, &UpdateChecker::newVersionAvailable,
             _hmi,           &MainWindow::onNewVersionAvailable);
+    // In the log pane only when debugging: an offline start is not worth a line.
+    connect(_updateChecker, &UpdateChecker::checkFailed, this, [this](const QString &reason) {
+        if (debugMode())
+            _log(tr("Update check failed: %1").arg(reason));
+    });
 
-    // run after parseDefaultConfig so CHECK_FOR_UPDATES + LAST_UPDATE_CHECK are loaded
+    // run after parseDefaultConfig so CHECK_FOR_UPDATES is loaded
     checkForNewVersion();
 
     return _app->exec();
@@ -1403,20 +1458,50 @@ int NgPost::startHMI()
 #endif
 
 
-void NgPost::onLog(QString msg, bool newline)
+void NgPost::onLog(const QString &msg, bool newline)
 {
     _log(msg, newline);
 }
 
-void NgPost::onError(QString msg)
+void NgPost::onConnectionRetry(const QString &server, const QString &detail)
 {
-    _error(msg, ERROR_CODE::COMPLETED_WITH_ERRORS);
+    if (debugMode()) {
+        _log(detail);
+        return;
+    }
+    if (_connectionRetries.isEmpty())
+        QTimer::singleShot(1000, this, &NgPost::flushConnectionRetries);
+    ++_connectionRetries[server];
+}
+
+void NgPost::flushConnectionRetries()
+{
+    const auto retries = _connectionRetries;
+    _connectionRetries.clear();
+    for (auto it = retries.cbegin(); it != retries.cend(); ++it)
+        _log(tr("%1: %2 connection interruption(s); automatic reconnection attempted. See Debug "
+                "for details.")
+                 .arg(it.key())
+                 .arg(it.value()));
+}
+
+void NgPost::onError(const QString &msg)
+{
+    // Worker diagnostics are intentionally generic.  They may arrive after a
+    // typed terminal decision (for example ERR_VPN followed by the final
+    // unknown-article flush); never let that queued diagnostic erase the
+    // actionable CLI exit code.
+    if (_err == ERROR_CODE::NONE)
+        _err = ERROR_CODE::COMPLETED_WITH_ERRORS;
+    _error(msg);
 }
 
 
-void NgPost::onErrorConnecting(QString err)
+void NgPost::onErrorConnecting(const QString &err)
 {
-    _error(err, ERROR_CODE::COMPLETED_WITH_ERRORS);
+    if (_err == ERROR_CODE::NONE)
+        _err = ERROR_CODE::COMPLETED_WITH_ERRORS;
+    _error(err);
 }
 
 
@@ -1500,7 +1585,6 @@ void NgPost::onNewFileToProcess(const QFileInfo & fileInfo)
     if (_hmi)
     {
         _hmi->updateAutoPostingParams(); // refreshes _autoIncludeNfo from the UI
-        _hmi->setJobLabel(-1);
         _delAuto = _hmi->autoWidget()->deleteFilesOncePosted();
     }
 #endif
@@ -1570,11 +1654,9 @@ void NgPost::checkForNewVersion()
 {
     if (!_checkForUpdates)
         return;
-    if (UpdateChecker::isAppImage())
-        return; // handled by zsync embedded update info
-    const qint64 now = QDateTime::currentSecsSinceEpoch();
-    if (_lastUpdateCheckEpoch > 0 && (now - _lastUpdateCheckEpoch) < 86400)
-        return; // once per day
+    // Every GUI start, asynchronously. A daily cadence missed any release
+    // published after the last check, and forgot the one it had announced on
+    // the next start. GitHub's anonymous quota is per client IP, not per app.
     _updateChecker->checkLatestRelease();
 }
 
@@ -1587,6 +1669,12 @@ bool NgPost::checkSupportSSL()
         return false;
     }
     return true;
+}
+
+void NgPost::reportNzbCheckSslUnavailable()
+{
+    if (_nzbCheck)
+        _nzbCheck->reportUnusable(tr("SSL support is unavailable"));
 }
 
 void NgPost::doNzbPostCMD(PostingJob *job)
@@ -1614,17 +1702,72 @@ void NgPost::doNzbPostCMD(PostingJob *job)
 //! A fatal error asked us to stop. Only one thing may still delay it: post
 //! commands of posts that already went out. Killing those would throw away
 //! work that succeeded, just because a later job could not start.
-void NgPost::_requestExit(ERROR_CODE code)
+void NgPost::_requestExit(ERROR_CODE code, bool waitForActiveJob)
 {
     _pendingExitCode = static_cast<int>(code);
+    _pendingExitWaitsForActiveJob = _pendingExitWaitsForActiveJob || waitForActiveJob;
     // A VPN admission failure can be emitted synchronously while CLI parsing
     // is still running, before exec(). Qt ignores exit() in that window.
     QTimer::singleShot(0, this, [this]() { maybeFinishApplication(); });
 }
 
+void NgPost::setShutdownWhenDone(bool enabled)
+{
+    _doShutdownWhenDone = enabled;
+    _resetShutdownCompletion();
+}
+
+void NgPost::_resetShutdownCompletion()
+{
+    _transferEndedSinceShutdownArmed = false;
+    _waitingForUnsubmittedPosts = false;
+    _waitingForTransfer = false;
+}
+
+void NgPost::_releaseShutdownHold()
+{
+    --_shutdownHolds;
+    requestShutdownRecheck();
+}
+
+void NgPost::requestShutdownRecheck()
+{
+    // Only an armed shutdown needs UI changes re-evaluated, and a burst of them
+    // (a dropped folder adds one row at a time) needs a single check.
+    if (!_doShutdownWhenDone || _shutdownRecheckQueued)
+        return;
+    _shutdownRecheckQueued = true;
+    QTimer::singleShot(0, this, [this] {
+        _shutdownRecheckQueued = false;
+#ifdef NGPOST_TESTING
+        ++_shutdownRecheckCount;
+#endif
+        maybeFinishApplication();
+    });
+}
+
+void NgPost::_onPostingJobEnded(const PostingJob *job)
+{
+    // Called synchronously when the job ends, so re-arming shutdown before the
+    // queued onPostingJobFinished() cannot be satisfied by this job. A terminal
+    // connection loss counts if some articles were confirmed; an explicit
+    // Stop/Cancel (even preserved for resume) withdraws any earlier completion.
+    if (job->cancelRequested())
+        _resetShutdownCompletion();
+    else if (_doShutdownWhenDone && job->nbArticlesUploaded() > job->nbArticlesFailed())
+        _transferEndedSinceShutdownArmed = true;
+}
+
 void NgPost::maybeFinishApplication()
 {
+#ifdef __USE_HMI__
+    // Set only while shutdown is armed: scan the tabs only to end that episode.
+    if (_waitingForUnsubmittedPosts && !(_hmi && _hmi->hasUnsubmittedPosts()))
+        _waitingForUnsubmittedPosts = false;
+#endif
     if (_pendingExitCode >= 0) {
+        if (_pendingExitWaitsForActiveJob && _activeJob)
+            return;
         if (_postCmdRunner && !_postCmdRunner->isIdle()) {
             if (!_waitingForPostCmds) {
                 _waitingForPostCmds = true;
@@ -1636,7 +1779,7 @@ void NgPost::maybeFinishApplication()
         return;
     }
 
-    if (_activeJob || !_pendingJobs.isEmpty())
+    if (_shutdownHolds || _activeJob || !_pendingJobs.isEmpty())
         return;
     if (_postCmdRunner && !_postCmdRunner->isIdle()) {
         if (!_waitingForPostCmds) {
@@ -1648,6 +1791,29 @@ void NgPost::maybeFinishApplication()
     _waitingForPostCmds = false;
 
     if (_doShutdownWhenDone && !_shutdownCmd.isEmpty()) {
+        // UI changes only re-evaluate an already eligible shutdown. Arming
+        // while idle must not turn clearing old tabs into a power-off action.
+        if (!_transferEndedSinceShutdownArmed) {
+            if (!_waitingForTransfer) {
+                _waitingForTransfer = true;
+                _log(tr("Shutdown postponed: waiting for a completed post with at least one "
+                        "successfully sent article (manual cancellations do not count)."));
+            }
+            return;
+        }
+        _waitingForTransfer = false;
+#ifdef __USE_HMI__
+        // Prepared tabs do not enter _pendingJobs until Post Files is clicked.
+        // They must also finish (or be removed) before the computer can stop.
+        if (_hmi && _hmi->hasUnsubmittedPosts()) {
+            if (!_waitingForUnsubmittedPosts) {
+                _waitingForUnsubmittedPosts = true;
+                _log(tr("Shutdown postponed: some posting tabs have not been submitted. "
+                        "Post them, clear them or close them to allow shutdown."));
+            }
+            return;
+        }
+#endif
         _startShutdown();
         return;
     }
@@ -1666,35 +1832,71 @@ void NgPost::maybeFinishApplication()
 
 bool NgPost::isPaused() const
 {
-    if (_activeJob && _activeJob->isPaused())
+    if (_queuePaused || (_activeJob && _activeJob->isPaused()))
         return true;
     else
         return false;
 }
 
-void NgPost::pause() const
+void NgPost::pause()
 {
-    if (_activeJob && !_activeJob->isPaused())
+    if (!hasPostingJobs() || _cancelingAll)
+        return;
+    _queuePaused = true;
+    const auto notify = qScopeGuard([this] { emit postingStateChanged(); });
+    if (_activeJob)
     {
-        _activeJob->pause();
-#ifdef __USE_HMI__
-        if (_hmi)
-            _hmi->setPauseIcon(false);
-#endif
+        _activeJob->pause(PostingJob::PauseReason::User);
     }
 }
 
 void NgPost::resume()
 {
+    if (_cancelingAll)
+        return;
+    const auto notify = qScopeGuard([this] { emit postingStateChanged(); });
+    if (!_resumeActiveJob())
+        return;
+    _queuePaused = false;
+    _startNextPostingJob();
+    if (_preparePacking && !_packingJob && _activeJob && _activeJob->isPacked())
+        _prepareNextPacking();
+}
+
+bool NgPost::_resumeActiveJob()
+{
     if (_activeJob && _activeJob->isPaused())
     {
+        if (_activeJob->pauseReason() == PostingJob::PauseReason::User
+            && _vpnManager && _activeJob->_vpnRequired
+            && (_vpnManager->state() != VpnManager::State::Connected
+                || _vpnManager->health() != VpnManager::VpnHealth::Healthy)) {
+            if (_vpnManager->state() == VpnManager::State::Stopping) {
+                _log(tr("The post remains paused until the requested VPN stop completes."));
+                return false;
+            }
+            VpnManager::Admission const admission =
+                _vpnManager->admitJob(_nntpServers, _activeJob->_vpnRequired);
+            if (admission != VpnManager::Admission::Proceed) {
+                if (admission == VpnManager::Admission::Wait
+                    && _activeJob->waitForVpnAfterUserResume()) {
+                    _queuePaused = false;
+                    _retainVpnForJob(_activeJob);
+                }
+                return false;
+            }
+        }
+        if (_activeJob->pauseReason() == PostingJob::PauseReason::VpnRecovery
+            && _vpnManager
+            && (_vpnManager->state() != VpnManager::State::Connected
+                || _vpnManager->health() != VpnManager::VpnHealth::Healthy)) {
+            _log(tr("The post remains paused until VPN recovery completes."));
+            return false;
+        }
         _activeJob->resume();
-#ifdef __USE_HMI__
-        if (_hmi)
-            _hmi->setPauseIcon(true);
-#endif
         _progressbarTimer.start(_refreshRate);
     }
+    return true;
 }
 
 
@@ -1748,7 +1950,7 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
     if (_doCompress)
     {
         if (_genName)
-            _rarName = randomPass(_lengthName);
+            _rarName = randomName(_lengthName);
 
         if (_genPass) // shall we gen password?
             _rarPass = randomPass(_lengthPass);
@@ -1903,6 +2105,18 @@ bool NgPost::_addMeta(const QString &keyValue, MetaScope scope)
     return true;
 }
 
+//! When nothing is enabled the line is written commented out, so it still has
+//! to name something the user can uncomment.
+QString NgPost::_obfuscationKinds() const
+{
+    QStringList kinds;
+    if (_obfuscateArticles)
+        kinds << QStringLiteral("article");
+    if (_obfuscateFileName)
+        kinds << QStringLiteral("filename");
+    return kinds.isEmpty() ? QStringLiteral("article") : kinds.join(QStringLiteral(", "));
+}
+
 PostingJobOptions NgPost::_baseJobOptions() const
 {
     PostingJobOptions opt;
@@ -1916,7 +2130,13 @@ PostingJobOptions NgPost::_baseJobOptions() const
     opt.rarArgs           = _rarArgs;
     opt.rarSize           = _rarSize;
     opt.useRarMax         = _useRarMax;
+    opt.rarMax            = _rarMax;
     opt.par2Pct           = _par2Pct;
+    opt.par2Path          = _par2Path;
+    // par2ArgsInUse() is already empty when another engine had to be picked:
+    // its switches are not the ones the configuration holds.
+    opt.par2Arguments = par2ArgsInUse();
+    opt.par2Tool = par2ToolInUse();
     opt.doCompress        = _doCompress;
     opt.doPar2            = _doPar2;
     opt.rarName           = _rarName;
@@ -1927,6 +2147,9 @@ PostingJobOptions NgPost::_baseJobOptions() const
     opt.meta              = _meta;
     opt.declaredPassword  = _declaredPassword;
     opt.writePostInfoFile = !_noPostInfo;
+
+    // Which archiver rarPath runs: the switches of one fail on the other.
+    opt.rarTool = _rarTool;
     return opt;
 }
 
@@ -2022,8 +2245,7 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPackingDone] job: " << job
 
 void NgPost::_prepareNextPacking()
 {
-    if (_pendingJobs.size())
-    {
+    if (!_queuePaused && !_cancelingAll && !_pendingJobs.isEmpty()) {
         _packingJob = _pendingJobs.first();
         if (_packingJob->hasPacking())
             emit _packingJob->startPosting(false);
@@ -2034,6 +2256,13 @@ void NgPost::_prepareNextPacking()
 
 void NgPost::onPostingJobFinished()
 {
+    const auto notify = qScopeGuard([this] {
+        if (!hasPostingJobs()) {
+            _queuePaused = false;
+            _cancelingAll = false;
+        }
+        emit postingStateChanged();
+    });
     PostingJob *job = static_cast<PostingJob*>(sender());
 #ifdef __DEBUG__
 qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
@@ -2077,85 +2306,23 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
             _hmi->closeTab(_activeJob->widget());
 #endif
 
-        _activeJob->deleteLater();
+        PostingJob *finishedJob = _activeJob;
         _activeJob = nullptr;
+        _releaseVpnForJob(finishedJob);
+        finishedJob->deleteLater();
 
-        if (_vpnManager)
-            _vpnManager->releaseForJob();
-
-        if (_pendingJobs.size())
-        {
-            // The next job may itself need (or not) the VPN. Re-admit it so
-            // we either dequeue normally, defer (Wait), or refuse to activate
-            // it now if the VPN can't come up.
-            VpnManager::Admission nextAdm = VpnManager::Admission::Proceed;
-            if (_vpnManager)
-                nextAdm = _vpnManager->admitJob(_nntpServers);
-            if (nextAdm != VpnManager::Admission::Proceed) {
-                // Leave it in pending; the stateChanged(Connected) hook (or
-                // a Blocked->fixed user action) will eventually flush.
-                return;
-            }
-            _activeJob = _pendingJobs.dequeue();
-            if (_vpnManager)
-                _vpnManager->retainForJob();
-
-#ifdef __USE_HMI__
-            if (_hmi)
-                _hmi->setTab(_activeJob->widget());
-#endif
-            if (_preparePacking)
-            {
-                if (_packingJob == _activeJob)
-                {
-                    _packingJob = nullptr;
-                    if (_activeJob->isPacked())
-                    {
-                        _activeJob->_postFiles();
-                        _prepareNextPacking();
-                    }
-                    else if (!_activeJob->hasPacking())
-                    {
-                        if (debugFull())
-                            _log(tr("start non packing job..."));
-                        emit _activeJob->startPosting(true);
-                        _prepareNextPacking();
-                    }
-                    // otherwise it will be triggered automatically when the packing is finished
-                    // as it is now the active job ;)
-                }
-                else if (_packingJob == nullptr)
-                {
-                    // Recovery path: the previous active job was cancelled
-                    // while still mid-packing, so _prepareNextPacking() had
-                    // not yet pre-packed the now-dequeued job. Start it
-                    // normally (its own packing happens as part of postFiles)
-                    // and schedule pre-pack of whatever comes after.
-                    if (debugFull())
-                        _log(tr("Recovering: starting next job that wasn't pre-packed"));
-                    emit _activeJob->startPosting(true);
-                    _prepareNextPacking();
-                }
-                else
-                    _error("next active job different to the packing one..."); // should never happen...
-            }
-            else
-                emit _activeJob->startPosting(true);
-        }
+        if (!_pendingJobs.isEmpty())
+            _startNextPostingJob();
         else
-        {
-            // Everything that had to be posted is out; the barrier decides
-            // when it is safe to quit or to power the machine off, because
-            // the post commands and the nzb uploads may still be running.
             maybeFinishApplication();
-        }
     }
     else if (_preparePacking && job ==_packingJob)
     {
         _packingJob = nullptr;
         _pendingJobs.dequeue(); // remove the packingJob
         job->deleteLater();
-        _error(tr("packing job finished unexpectedly..."));
+        if (!job->cancelRequested())
+            _error(tr("packing job finished unexpectedly..."));
         _prepareNextPacking();
     }
     else
@@ -2168,15 +2335,76 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
     }
 }
 
+void NgPost::_startNextPostingJob()
+{
+    if (_activeJob || _queuePaused || _cancelingAll || _pendingJobs.isEmpty())
+        return;
+    // The next job may itself need (or not) the VPN. Re-admit it so
+    // we either dequeue normally, defer (Wait), or refuse to activate
+    // it now if the VPN can't come up.
+    VpnManager::Admission nextAdm = VpnManager::Admission::Proceed;
+    if (_vpnManager)
+        nextAdm = _vpnManager->admitJob(_nntpServers, _pendingJobs.head()->_vpnRequired);
+    if (nextAdm != VpnManager::Admission::Proceed) {
+        // Leave it in pending; the stateChanged(Connected) hook (or
+        // a Blocked->fixed user action) will eventually flush.
+        return;
+    }
+    _activeJob = _pendingJobs.dequeue();
+    _retainVpnForJob(_activeJob);
+
+#ifdef __USE_HMI__
+    if (_hmi)
+        _hmi->setTab(_activeJob->widget());
+#endif
+    if (_preparePacking) {
+        if (_packingJob == _activeJob) {
+            _packingJob = nullptr;
+            if (_activeJob->isPacked()) {
+                _activeJob->_postFiles();
+                _prepareNextPacking();
+            } else if (!_activeJob->hasPacking()) {
+                if (debugFull())
+                    _log(tr("start non packing job..."));
+                emit _activeJob->startPosting(true);
+                _prepareNextPacking();
+            }
+            // otherwise it will be triggered automatically when the packing is finished
+            // as it is now the active job ;)
+        } else if (_packingJob == nullptr) {
+            // Nothing was pre-packed: the previous active job was cancelled
+            // mid-packing, or the queue waited for the VPN or a resume.
+            // Start normally; a job that packs pre-packs the next one from
+            // onPackingDone(): two packings must never run at once.
+            if (debugFull())
+                _log(tr("Recovering: starting next job that wasn't pre-packed"));
+            emit _activeJob->startPosting(true);
+            if (!_activeJob->hasPacking())
+                _prepareNextPacking();
+        } else
+            _error("next active job different to the packing one..."); // should never happen...
+    } else
+        emit _activeJob->startPosting(true);
+}
+
 void NgPost::_startShutdown()
 {
     if (_shutdownProc)
         return;
 
+#ifdef NGPOST_TESTING
+    // Fail closed even if a test forgets to check its config, or parsing regresses.
+    if (_allowedShutdownCmdForTest.isEmpty() || _shutdownCmd != _allowedShutdownCmdForTest)
+        qFatal("Refusing an unverified shutdown command in a test build");
+#endif
+
     // This is a one-shot action. If the configured command merely notifies
     // another service, or fails to power the machine off, completing it must
     // release the normal CLI exit path instead of starting it over forever.
-    _doShutdownWhenDone = false;
+    setShutdownWhenDone(false);
+#ifdef NGPOST_TESTING
+    ++_shutdownStartCount;
+#endif
 
     //cf https://forum.qt.io/topic/111602/qprocess-signals-not-received-in-slots-except-in-debug-with-breakpoints/
 //    int exitCode = QProcess::execute("echo \\\"toto\\\" | /usr/bin/sudo -S /bin/ls -al");
@@ -2287,35 +2515,42 @@ void NgPost::onNetworkAccessibleChanged(QNetworkAccessManager::NetworkAccessibil
 
 void NgPost::_log(const QString &aMsg, bool newline) const
 {
+    const QString text = _logTimestamp.format(aMsg, newline || _logEntryComplete);
+    const QString separator = newline && _logFragmentOpen ? QStringLiteral("\n") : QString();
 #ifdef __USE_HMI__
-    if (_hmi)
-    {
-        _hmi->log(aMsg, newline);
-        if (_logStream && newline)
-            *_logStream << aMsg << "\n" << MB_FLUSH; // force flush in case of crash
-    }
-    else
+    if (_hmi) {
+        _hmi->log(text, newline);
+        // Include debug process output and progress fragments in the file too.
+        if (_logStream)
+            *_logStream << separator << text << (newline ? "\n" : "") << MB_FLUSH;
+    } else
 #endif
-    {
-        _cout << aMsg;
-        if (newline)
-            _cout << "\n";
-        _cout << MB_FLUSH;
-    }
+        _cout << separator << text << (newline ? "\n" : "") << MB_FLUSH;
+    if (newline || !text.isEmpty())
+        _logFragmentOpen = !newline && !text.endsWith(QLatin1Char('\n'));
+    if (newline || !aMsg.isEmpty())
+        _logEntryComplete = newline;
 }
 
 void NgPost::_error(const QString &error) const
 {
+    const QString text = _logTimestamp.format(error, true);
 #ifdef __USE_HMI__
-    if (_hmi)
-    {
-        _hmi->logError(error);
+    if (_hmi) {
+        _hmi->logError(text);
         if (_logStream)
-            *_logStream << "ERR: " << error << "\n" << MB_FLUSH; // force flush in case of crash
-    }
-    else
+            *_logStream << (_logFragmentOpen ? "\n" : "")
+                        << _logTimestamp.format(QStringLiteral("ERR: ") + error, true) << "\n"
+                        << MB_FLUSH;
+    } else
 #endif
-        _cerr << error << "\n" << MB_FLUSH;
+    {
+        if (_logFragmentOpen)
+            _cout << "\n" << MB_FLUSH;
+        _cerr << text << "\n" << MB_FLUSH;
+    }
+    _logFragmentOpen = false;
+    _logEntryComplete = true;
 }
 
 void NgPost::_error(const QString &error, NgPost::ERROR_CODE code)
@@ -2327,19 +2562,40 @@ void NgPost::_error(const QString &error, NgPost::ERROR_CODE code)
 
 QString NgPost::randomPass(uint length) const
 {
-    QString pass, alphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-    int nbLetters = alphabet.length();
-    for (uint i = 0 ; i < length ; ++i)
-        pass.append(alphabet.at(std::rand()%nbLetters));
-
-    return pass;
+    return RandomToken::secret(length);
 }
 
 void NgPost::closeAllPostingJobs()
 {
+    // Deleted pending jobs never report their end; the active one does.
+    _resetShutdownCompletion();
     qDeleteAll(_pendingJobs);
+    _pendingJobs.clear();
     if (_activeJob)
         _activeJob->onStopPosting();
+}
+
+void NgPost::cancelAllPostingJobs()
+{
+    if (!hasPostingJobs() || _cancelingAll)
+        return;
+    _cancelingAll = true;
+    ++_postingCancelGeneration;
+    _queuePaused = false;
+    _resetShutdownCompletion();
+    // Mark every job before queued completion callbacks can advance the queue.
+    for (PostingJob *job : _pendingJobs)
+        if (!job->cancelRequested())
+            emit job->stopPosting();
+    if (_activeJob && !_activeJob->cancelRequested())
+        emit _activeJob->stopPosting();
+    emit postingStateChanged();
+}
+
+void NgPost::stopActivePostingForResume()
+{
+    if (_activeJob)
+        emit _activeJob->stopPosting();
 }
 
 void NgPost::closeAllMonitoringJobs()
@@ -2350,6 +2606,7 @@ void NgPost::closeAllMonitoringJobs()
         PostingJob *job = *it;
         if (!job->widget())
         {
+            _resetShutdownCompletion(); // deleted below without reporting its end
             it = _pendingJobs.erase(it);
             if (_debug)
                 _error(tr("Cancelling monitoring job: %1").arg(job->getFirstOriginalFile()));
@@ -2392,7 +2649,15 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     QString appVersion = QString("%1_v%2").arg(sAppName, sVersion);
     QCommandLineParser parser;
     parser.setApplicationDescription(appVersion);
-    parser.addOptions(sCmdOptions);
+    if (VpnManager::vpnPlatformSupported()) {
+        parser.addOptions(sCmdOptions);
+    } else {
+        QList<QCommandLineOption> options;
+        for (QCommandLineOption const &option : sCmdOptions)
+            if (!_isVpnOverrideOption(option))
+                options << option;
+        parser.addOptions(options);
+    }
 
 
     // Process the actual command line arguments given by the user
@@ -2409,7 +2674,106 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
 
     if (parser.isSet(sOptionNames[Opt::QUIET]))
         _quiet = true;
+    // Known before the configuration is read: an explicit executable makes the
+    // engine fallback of PAR2_TOOL moot, and its announcement wrong.
+    _par2PathOnCommandLine = parser.isSet(sOptionNames[Opt::PAR2_PATH]);
 
+    _prepareCliOutput(parser);
+
+    // Inspection commands must stay read-only. In particular, a renamed
+    // AppImage invoked only for --help/--version must not adopt configuration
+    // files as a side effect. Honor an explicit language for their output,
+    // but do not parse or migrate any configuration.
+    if (parser.isSet(sOptionNames[Opt::HELP]) || parser.isSet(sOptionNames[Opt::VERSION])) {
+        if (parser.isSet(sOptionNames[Opt::LANG]))
+            changeLanguage(parser.value(sOptionNames[Opt::LANG]).toLower());
+        _showVersionASCII();
+        if (parser.isSet(sOptionNames[Opt::HELP]))
+            _syntax(argv[0]);
+        return false;
+    }
+
+    if (!_loadCliConfig(parser))
+        return false;
+
+    _applyCliConfigOverrides(parser);
+
+    if (parser.isSet(sOptionNames[Opt::VPN_CLEANUP_UNATTRIBUTED])) {
+        if (!parser.isSet(sOptionNames[Opt::YES])) {
+            _error(tr("Error: --vpn-cleanup-unattributed requires --yes because it can interrupt "
+                      "another ngPost tunnel."),
+                   ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+        if (!_vpnManager || !_vpnManager->cleanupUnattributed(true))
+            _error(tr("VPN resources were not removed."), ERROR_CODE::ERR_VPN);
+        return false;
+    }
+
+    const bool hasHistoryCommand = _isHistoryCommand(parser);
+
+    _parseCliDisplayOptions(parser);
+
+    if (parser.isSet(sOptionNames[Opt::CHECK]))
+        return _startCliNzbCheck(parser);
+
+    if (!_parseCliInputMode(parser, hasHistoryCommand))
+        return false;
+
+    if (!_parseCliVpnOptions(parser))
+        return false;
+
+    if (!_parseCliPackingOptions(parser))
+        return false;
+
+    bool isMonitoring = false;
+    if (!_parseCliMonitorOptions(parser, isMonitoring))
+        return false;
+
+    if (!_parseCliArticleOptions(parser))
+        return false;
+
+    if (!_parseCliPostInfoOptions(parser))
+        return false;
+
+    if (!_parseCliPostCommandOptions(parser))
+        return false;
+
+    if (!_parseCliMetadataOptions(parser))
+        return false;
+
+    if (!_parseCliArticleSizeOptions(parser))
+        return false;
+
+    if (!_parseCliArchiveOptions(parser))
+        return false;
+
+    if (!_parseCliPar2Options(parser))
+        return false;
+
+    _parseCliArchiveNameOptions(parser);
+
+    if (!_parseCliServerList(parser))
+        return false;
+
+    if (!_parseCliSingleServer(parser))
+        return false;
+
+    bool startEventLoopFromHistory = false;
+    if (_handleHistoryCommand(parser, &startEventLoopFromHistory))
+        return startEventLoopFromHistory;
+
+
+    QList<QFileInfo> filesToUpload;
+    QStringList rawInputPaths;
+    if (!_collectCliInputFiles(parser, filesToUpload, rawInputPaths))
+        return false;
+
+    return _startCliPosting(parser, isMonitoring, filesToUpload, rawInputPaths);
+}
+
+void NgPost::_prepareCliOutput(const QCommandLineParser &parser)
+{
     // Decided before the configuration is even read, because loading it
     // already has things to say (a migrated config, for one) and stdout is
     // about to carry a record sheet someone will pipe.
@@ -2425,7 +2789,9 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         (parser.isSet(sOptionNames[Opt::EXPORT_POST_INFO])
          || parser.isSet(QStringLiteral("export-post-info")))
         && !parser.isSet(sOptionNames[Opt::OUTPUT]);
-    _stdoutIsData = jsonStdout || regeneratedNzbStdout || postInfoStdout;
+    const bool checkJsonStdout = parser.isSet(sOptionNames[Opt::CHECK])
+                                 && parser.isSet(sOptionNames[Opt::CHECK_JSON]);
+    _stdoutIsData = jsonStdout || regeneratedNzbStdout || postInfoStdout || checkJsonStdout;
     if (_stdoutIsData)
     {
         // Everything ngPost says normally goes to _cout, from 40-odd places.
@@ -2440,21 +2806,10 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
             _stdoutRedirect = nullptr;
         }
     }
+}
 
-    // Inspection commands must stay read-only. In particular, a renamed
-    // AppImage invoked only for --help/--version must not adopt configuration
-    // files as a side effect. Honor an explicit language for their output,
-    // but do not parse or migrate any configuration.
-    if (parser.isSet(sOptionNames[Opt::HELP]) || parser.isSet(sOptionNames[Opt::VERSION]))
-    {
-        if (parser.isSet(sOptionNames[Opt::LANG]))
-            changeLanguage(parser.value(sOptionNames[Opt::LANG]).toLower());
-        _showVersionASCII();
-        if (parser.isSet(sOptionNames[Opt::HELP]))
-            _syntax(argv[0]);
-        return false;
-    }
-
+bool NgPost::_loadCliConfig(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::CONF]))
     {
         const QString confPath = parser.value(sOptionNames[Opt::CONF]);
@@ -2496,6 +2851,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         }
     }
 
+    return true;
+}
+
+void NgPost::_applyCliConfigOverrides(const QCommandLineParser &parser)
+{
     // Command-line language has higher precedence than the adopted/default
     // config and must already be active for the one-time migration report.
     if (parser.isSet(sOptionNames[Opt::LANG]))
@@ -2521,18 +2881,19 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
 
     if (_historyService)
         _historyService->configure(_postDbFile, _historyStorePasswords);
+}
 
-    const bool hasHistoryCommand = _isHistoryCommand(parser);
-
+void NgPost::_parseCliDisplayOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::DEBUG]))
     {
         _debug = 1;
-        _cout << tr("Extra logs are ON\n") << MB_FLUSH;
+        _log(tr("Extra logs are ON\n").trimmed());
     }
     if (parser.isSet(sOptionNames[Opt::DEBUG_FULL]))
     {
         _debug = 2;
-        _cout << tr("Full debug logs are ON\n") << MB_FLUSH;
+        _log(tr("Full debug logs are ON\n").trimmed());
     }
 
     if (parser.isSet(sOptionNames[Opt::DISP_PROGRESS]))
@@ -2557,22 +2918,90 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
             _dispFilesPosting = false;
         }
     }
+}
 
+bool NgPost::_startCliNzbCheck(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::CHECK]))
     {
+        bool const jsonReport = parser.isSet(sOptionNames[Opt::CHECK_JSON]);
+
         _nzbCheck = new NzbCheck();
-        _nzbCheck->setDebug(_debug);
-        _nzbCheck->setDispProgressBar(_dispProgressBar||_dispFilesPosting);
-        _nzbCheck->setQuiet(_quiet);
-        int nbArticles = _nzbCheck->parseNzb(parser.value(sOptionNames[Opt::CHECK]));
-        if (nbArticles > 0 )
+        // NzbCheck owns a separate stdout stream for its report. Its verbose
+        // traces must therefore be disabled while that stream carries JSON.
+        _nzbCheck->setDebug(jsonReport ? 0 : _debug);
+        // A JSON report is meant to be piped into something: keep stdout to
+        // that one object, progress bar and running commentary included.
+        _nzbCheck->setDispProgressBar(!jsonReport && (_dispProgressBar || _dispFilesPosting));
+        _nzbCheck->setQuiet(_quiet || jsonReport);
+        _nzbCheck->setJsonOutput(jsonReport);
+        _nzbCheck->setCheckFull(parser.isSet(sOptionNames[Opt::CHECK_FULL]));
+
+        // Block size, most specific source first. Anything below these is a
+        // guess NzbCheck makes from the nzb itself, and says so in its report.
+        _nzbCheck->setArticleSize(sArticleSize);
+        _nzbCheck->setSocketTimeOut(_socketTimeOut);
+        _nzbCheck->setMaxRetries(NntpArticle::nbMaxTrySending());
+        if (parser.isSet(sOptionNames[Opt::PAR2_BLOCK_SIZE]))
         {
-            _nzbCheck->checkPost(_nntpServers);
-            return true;
+            bool     ok        = false;
+            qint64 const bytes = parser.value(sOptionNames[Opt::PAR2_BLOCK_SIZE]).toLongLong(&ok);
+            if (!ok || bytes <= 0)
+            {
+                _error(tr("Error: --%1 expects a positive number of bytes")
+                               .arg(sOptionNames[Opt::PAR2_BLOCK_SIZE]),
+                       ERROR_CODE::ERR_WRONG_ARG);
+                return false;
+            }
+            _nzbCheck->setPar2BlockSize(bytes, tr("given on the command line"));
         }
-        return false;
+        else if (_par2BlockSize > 0)
+            _nzbCheck->setPar2BlockSize(_par2BlockSize, tr("from the configuration"));
+        int nbArticles = _nzbCheck->parseNzb(parser.value(sOptionNames[Opt::CHECK]));
+        if (nbArticles <= 0)
+        {
+            // parseNzb() has already said what went wrong; what matters here is
+            // that the caller gets a verdict instead of a silent exit 0.
+            _nzbCheck->reportUnusable(tr("the nzb file could not be read"));
+            return false;
+        }
+
+        // checkPost() only ever opens connections to servers flagged for
+        // checking. With none of them flagged it opens nothing, no connection
+        // ever reports itself finished, and the event loop used to run forever.
+        int nbCheckServers = 0;
+        int nbCheckConnections = 0;
+        for (NntpServerParams *srvParam : _nntpServers)
+        {
+            if (srvParam->nzbCheck) {
+                ++nbCheckServers;
+                if (srvParam->nbCons > 0)
+                    nbCheckConnections += srvParam->nbCons;
+            }
+        }
+        if (nbCheckServers == 0)
+        {
+            _nzbCheck->reportUnusable(
+                    tr("no server is enabled for nzb checking: set 'nzbCheck = true' on at least "
+                       "one [server] of your configuration"));
+            return false;
+        }
+        if (nbCheckConnections == 0)
+        {
+            _nzbCheck->reportUnusable(
+                    tr("the servers enabled for nzb checking have no positive connection count"));
+            return false;
+        }
+
+        _nzbCheck->checkPost(_nntpServers);
+        return true;
     }
 
+    return false;
+}
+
+bool NgPost::_parseCliInputMode(const QCommandLineParser &parser, bool hasHistoryCommand)
+{
     if (!hasHistoryCommand
         && !parser.isSet(sOptionNames[Opt::INPUT])
         && !parser.isSet(sOptionNames[Opt::AUTO_DIR])
@@ -2604,6 +3033,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (parser.isSet(sOptionNames[Opt::AUTO_INCLUDE_NFO]))
         _autoIncludeNfo = true;
 
+    return true;
+}
+
+bool NgPost::_parseCliVpnOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::VPN]) && parser.isSet(sOptionNames[Opt::NO_VPN]))
     {
         _error(tr("Error syntax: --vpn and --no_vpn are mutually exclusive"),
@@ -2637,6 +3071,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _vpnManager->blockSignals(vpnSignalsWereBlocked);
     }
 
+    return true;
+}
+
+bool NgPost::_parseCliPackingOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::COMPRESS]))
         _doCompress = true;
     if (parser.isSet(sOptionNames[Opt::GEN_PAR2]))
@@ -2677,9 +3116,13 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
                 }
             }
         }
-    }        
+    }
 
-    bool isMonitoring = false;
+    return true;
+}
+
+bool NgPost::_parseCliMonitorOptions(const QCommandLineParser &parser, bool &isMonitoring)
+{
     if (parser.isSet(sOptionNames[Opt::MONITOR_DIR]))
     {
         if (!_doCompress && (!_doPar2 || !_monitorIgnoreDir))
@@ -2710,10 +3153,23 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         }
     }
 
+    return true;
+}
+
+bool NgPost::_parseCliArticleOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::OBFUSCATE]))
     {
         _obfuscateArticles = true;
         _cout << tr("Do article obfuscation (the subject of each Article will be a UUID)\n") << MB_FLUSH;
+    }
+
+    if (parser.isSet(sOptionNames[Opt::OBFUSCATE_FILENAME])
+        || parser.isSet(QStringLiteral("obfuscate-filename")))
+    {
+        _obfuscateFileName = true;
+        _cout << tr("Do file name obfuscation (the input files are renamed before compression)\n")
+              << MB_FLUSH;
     }
 
 
@@ -2731,6 +3187,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         }
     }
 
+    return true;
+}
+
+bool NgPost::_parseCliPostInfoOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::POST_INFO_TEMPLATE]))
     {
         // From the command line a relative path is relative to where the user
@@ -2759,6 +3220,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (parser.isSet(sOptionNames[Opt::NO_POST_INFO_ONLY_ON_SUCCESS]))
         _postInfoOnlySuccess = false;
 
+    return true;
+}
+
+bool NgPost::_parseCliPostCommandOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::NZB_POST_CMD]))
     {
         // Replace rather than append: the command line overrides the
@@ -2827,6 +3293,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     // Both paths converge here: the separator is final by now.
     _ensurePostHistoryHeader();
 
+    return true;
+}
+
+bool NgPost::_parseCliMetadataOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::META]))
     {
         for (const QString &meta : parser.values(sOptionNames[Opt::META]))
@@ -2870,6 +3341,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _from = randomStdFrom();
 
 
+    return true;
+}
+
+bool NgPost::_parseCliArticleSizeOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::MSG_ID]))
         sArticleIdSignature = escapeXML(parser.value(sOptionNames[Opt::MSG_ID])).toStdString();
 
@@ -2902,12 +3378,21 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     }
 
 
+    return true;
+}
 
+bool NgPost::_parseCliArchiveOptions(const QCommandLineParser &parser)
+{
     // compression section
     if (parser.isSet(sOptionNames[Opt::TMP_DIR]))
         _tmpPath = parser.value(sOptionNames[Opt::TMP_DIR]);
-    if (parser.isSet(sOptionNames[Opt::RAR_PATH]))
+    if (parser.isSet(sOptionNames[Opt::RAR_PATH])) {
         _rarPath = parser.value(sOptionNames[Opt::RAR_PATH]);
+        // The executable's name tells its engine; a name that says neither keeps RAR_TOOL.
+        const QString archiver = externaltool::archiverForFile(_rarPath);
+        if (!archiver.isEmpty())
+            _rarTool = archiver;
+    }
     if (parser.isSet(sOptionNames[Opt::RAR_SIZE]))
     {
         bool ok;
@@ -2920,9 +3405,18 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         _useRarMax = true;
         bool ok;
         uint nb = parser.value(sOptionNames[Opt::RAR_MAX]).toUInt(&ok);
-        if (ok)
-            _rarMax = nb;
+        if (!ok || nb == 0 || nb > uint(INT_MAX))
+        {
+            _error(tr("RAR_MAX must be a positive integer no greater than 2147483647."), ERROR_CODE::ERR_WRONG_ARG);
+            return false;
+        }
+        _rarMax = nb;
     }
+    return true;
+}
+
+bool NgPost::_parseCliPar2Options(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::PAR2_PCT]))
     {
         bool ok;
@@ -2930,6 +3424,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         if (ok)
         {
             _par2Pct = nb;
+            _par2PctDefault = nb;
             if (nb > 0)
                 _doPar2 = true;
         }
@@ -2937,21 +3432,44 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (parser.isSet(sOptionNames[Opt::PAR2_PATH]))
     {
         QString val = parser.value(sOptionNames[Opt::PAR2_PATH]);
-        if (!val.isEmpty())
-        {
-            QFileInfo fi(val);
-            if (fi.exists() && fi.isFile() && fi.isExecutable())
-                _par2Path = val;
+        // An explicit CLI path must fail clearly if missing, never execute an
+        // unrelated auto-detected binary. A recognizable executable also
+        // overrides the configured engine; unnamed wrappers keep PAR2_TOOL.
+        // Either way it replaces the engine the configuration fell back to: the
+        // path of the configured engine, found elsewhere, runs with its own
+        // arguments again.
+        _par2ToolFallback = par2::Tool::Auto;
+        par2::Tool tool;
+        if (par2::parseTool(externaltool::toolForFile(val), tool)) {
+            const auto previous = _par2Tool == par2::Tool::Auto ? par2::detectTool(_par2Path)
+                                                                : _par2Tool;
+            if (tool != previous) {
+                // One-shot option: PAR2_TOOL, PAR2_ARGS and PAR2_BLOCK_SIZE
+                // belong to the other engine and stay as they are -- a save
+                // that follows must not write this run's choice into the file.
+                // Only the run changes engine, and its switches with it.
+                if (!par2ArgsConfigured().isEmpty())
+                    _error(tr("--par2_path selects %1 instead of %2, so the par2 arguments of your "
+                              "configuration are ignored for this run and %1 runs with its own "
+                              "defaults. The configuration is left as it is.")
+                               .arg(par2::toolName(tool), par2::toolName(previous)));
+                _par2ToolFallback = tool;
+            }
         }
+        _par2Path = val;
     }
 
-    if (_doPar2 && _par2Pct == 0 && _par2Args.isEmpty())
-    {
+    if (_doPar2 && _par2Pct == 0 && par2ArgsInUse().isEmpty()) {
         _error(tr("Error: can't generate par2 if the redundancy percentage is null or PAR2_ARGS is not provided...\nEither use --par2_pct or set PAR2_PCT or PAR2_ARGS in the config file."),
                ERROR_CODE::ERR_PAR2_ARGS);
         return false;
     }
 
+    return true;
+}
+
+void NgPost::_parseCliArchiveNameOptions(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::RAR_NAME]))
         _rarName = parser.value(sOptionNames[Opt::RAR_NAME]);
     if (parser.isSet(sOptionNames[Opt::RAR_PASS]))
@@ -2974,11 +3492,13 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         if (ok)
             _lengthPass = nb;
     }
+}
 
-
-
+bool NgPost::_parseCliServerList(const QCommandLineParser &parser)
+{
     if (parser.isSet(sOptionNames[Opt::SERVER]))
     {
+        qDeleteAll(_nntpServers);
         _nntpServers.clear();
         QRegularExpression regExp(sNntpServerStrRegExp,  QRegularExpression::CaseInsensitiveOption);
         for (const QString &serverParam : parser.values(sOptionNames[Opt::SERVER]))
@@ -3017,6 +3537,11 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         }
     }
 
+    return true;
+}
+
+bool NgPost::_parseCliSingleServer(const QCommandLineParser &parser)
+{
     // Server Section under
     // check if the server params are given in the command line
     if (parser.isSet(sOptionNames[Opt::HOST]))
@@ -3024,8 +3549,10 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
         QString host = parser.value(sOptionNames[Opt::HOST]);
 
 
-        if (!parser.isSet(sOptionNames[Opt::SERVER]))
+        if (!parser.isSet(sOptionNames[Opt::SERVER])) {
+            qDeleteAll(_nntpServers);
             _nntpServers.clear();
+        }
         NntpServerParams *server = new NntpServerParams(host);
         _nntpServers << server;
 
@@ -3075,17 +3602,17 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     }
 
 
-    bool startEventLoopFromHistory = false;
-    if (_handleHistoryCommand(parser, &startEventLoopFromHistory))
-        return startEventLoopFromHistory;
+    return true;
+}
 
-
-    QList<QFileInfo> filesToUpload;
+bool NgPost::_collectCliInputFiles(const QCommandLineParser &parser,
+                                   QList<QFileInfo> &filesToUpload,
+                                   QStringList &rawInputPaths)
+{
     QStringList filesPath;
     // The raw -i values, before a folder is expanded into its files: this is
     // what the user actually asked to post, and the only thing that can feed
     // __sourcePath__ or protect a source file from being overwritten.
-    QStringList rawInputPaths;
     for (const QString &filePath : parser.values(sOptionNames[Opt::INPUT]))
     {
         rawInputPaths << QFileInfo(filePath).absoluteFilePath();
@@ -3147,6 +3674,14 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     }
 
 
+    return true;
+}
+
+bool NgPost::_startCliPosting(const QCommandLineParser &parser,
+                              bool isMonitoring,
+                              const QList<QFileInfo> &filesToUpload,
+                              const QStringList &rawInputPaths)
+{
     if (parser.isSet("o"))
     {
         QFileInfo nzb(parser.value(sOptionNames[Opt::OUTPUT]));
@@ -3160,7 +3695,7 @@ bool NgPost::parseCommandLine(int argc, char *argv[])
     if (_doCompress)
     {
         if (_genName)
-            _rarName = randomPass(_lengthName);
+            _rarName = randomName(_lengthName);
 
         if (_genPass)
         {
@@ -3250,7 +3785,1363 @@ QString NgPost::nzbPath(const QString &monitorFolder)
 }
 
 
-QString NgPost::_parseConfig(const QString &configPath)
+//! Before "[server]" blocks existed, a configuration put its single server's
+//! keys at the top level, and _parseConfig() still reads them that way. The
+//! merge needs the same list: writing such a key above the sections again would
+//! add a second server on the next start.
+//! Every key of the server section of _parseConfig(), and only those: that
+//! function creates the server a top-level key implies before writing into it,
+//! so a key missing here would be written through a null pointer.
+QStringList const &NgPost::topLevelServerKeys()
+{
+    static QStringList const keys{
+        sOptionNames[Opt::HOST],      sOptionNames[Opt::PORT],
+        sOptionNames[Opt::SSL],       sOptionNames[Opt::ENABLED],
+        sOptionNames[Opt::NZBCHECK],  sOptionNames[Opt::SERVER_USE_VPN].toLower(),
+        sOptionNames[Opt::USER],      sOptionNames[Opt::PASS],
+        sOptionNames[Opt::CONNECTION]
+    };
+    return keys;
+}
+
+bool NgPost::isKnownSetting(QString const &key)
+{
+    static QSet<QString> const names(sOptionNames.cbegin(), sOptionNames.cend());
+    return names.contains(key);
+}
+
+bool NgPost::isSecretSetting(QString const &key)
+{
+    // RAR_EXTRA carries -hp<password> as well as it carries -m0: SecretMasker
+    // hides it on the archiver's command line, so the merge must not print it
+    // either. A command line, SHUTDOWN_CMD as NZB_POST_CMD, can hold any token.
+    static QStringList const secrets{
+        sOptionNames[Opt::RAR_PASS],       sOptionNames[Opt::PASS],
+        sOptionNames[Opt::USER],           sOptionNames[Opt::PROXY_SOCKS5],
+        sOptionNames[Opt::NZB_UPLOAD_URL], sOptionNames[Opt::NZB_POST_CMD],
+        sOptionNames[Opt::RAR_EXTRA],      sOptionNames[Opt::SHUTDOWN_CMD]
+    };
+    return secrets.contains(key);
+}
+
+QStringList const &NgPost::vpnProfileKeys()
+{
+    static QStringList const keys{ sOptionNames[Opt::VPN_PROFILE_NAME],
+                                   sOptionNames[Opt::VPN_PROFILE_BACKEND],
+                                   sOptionNames[Opt::VPN_PROFILE_CONFIG_FILE],
+                                   sOptionNames[Opt::VPN_PROFILE_HAS_AUTH] };
+    return keys;
+}
+
+//! Walk a configuration text the way _parseConfig() reads it, and sort each
+//! "key = value" line: a setting, or a line of the block it stands in. Blocks do
+//! not end: a [server] block owns the server keys that follow it, a
+//! [vpn_profile] block those and its own four, and any other key is a setting
+//! wherever it is -- appended at the end of the file, for one. Server keys above
+//! the first block are the legacy single server: they stay with the settings,
+//! where the merge recognises them.
+static void splitConfigText(QString const &text,
+                            QStringList const &serverKeys,
+                            QStringList const &profileKeys,
+                            QMap<QString, QString> *settings,
+                            QStringList *sections)
+{
+    enum class Area {
+        Settings,
+        Server,
+        VpnProfile
+    } area = Area::Settings;
+    for (QString const &raw : text.split(QLatin1Char('\n'))) {
+        QString const line = raw.trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#'))
+            || line.startsWith(QLatin1Char('/')))
+            continue;
+        // Only the two headers the parser knows. Any other [name] line has no
+        // '=' and is dropped below, as the parser drops it.
+        bool const server = line == QLatin1String("[server]");
+        if (server || line == QLatin1String("[vpn_profile]")) {
+            area = server ? Area::Server : Area::VpnProfile;
+            if (sections)
+                *sections << line;
+            continue;
+        }
+        int const equal = line.indexOf(QLatin1Char('='));
+        if (equal <= 0)
+            continue;
+        QString const key = line.left(equal).trimmed().toLower();
+        bool const owned = (area != Area::Settings && serverKeys.contains(key))
+            || (area == Area::VpnProfile && profileKeys.contains(key));
+        if (owned) {
+            if (sections)
+                *sections << line;
+        } else if (settings)
+            settings->insert(key, line.mid(equal + 1).trimmed());
+    }
+}
+
+//! Sections are deliberately not merged: two [server] blocks have no identity a
+//! merge could rely on. The settings among them are, like any other.
+QMap<QString, QString> NgPost::topLevelSettings(QString const &text)
+{
+    QMap<QString, QString> settings;
+    splitConfigText(text, topLevelServerKeys(), vpnProfileKeys(), &settings, nullptr);
+    return settings;
+}
+
+QString NgPost::sectionsText(QString const &text)
+{
+    QStringList sections;
+    splitConfigText(text, topLevelServerKeys(), vpnProfileKeys(), nullptr, &sections);
+    return sections.join(QLatin1Char('\n'));
+}
+
+//! Put \a value on the line of \a key, above the first section: on its own
+//! line when it has one, just under the commented example the writer leaves
+//! when the setting is empty (so the explanation above still applies), else on
+//! a line inserted before the sections, with the other settings -- wherever the
+//! user wrote it, since \a text is the file as ngPost writes it.
+static void setTopLevelValue(QString &text,
+                             QString const &key,
+                             QString const &value,
+                             QString const &insertedHeader)
+{
+    QStringList lines = text.split(QLatin1Char('\n'));
+    int sections = lines.size(), commented = -1;
+    for (int i = 0; i < lines.size(); ++i) {
+        QString const line = lines.at(i).trimmed();
+        // The commented [server] and [vpn_profile] examples end the settings
+        // area just as a real block does: a line added under them reads as
+        // belonging to whatever section the user uncomments there next.
+        if (line.startsWith(QLatin1Char('[')) || line.startsWith(QLatin1String("#["))) {
+            sections = i;
+            break;
+        }
+        int const equal = lines.at(i).indexOf(QLatin1Char('='));
+        if (equal <= 0)
+            continue;
+        QString const name = lines.at(i).left(equal).trimmed();
+        if (name.compare(key, Qt::CaseInsensitive) == 0) {
+            lines[i] = lines.at(i).left(equal + 1) + QLatin1Char(' ') + value;
+            text = lines.join(QLatin1Char('\n'));
+            return;
+        }
+        if (name.startsWith(QLatin1Char('#'))
+            && name.mid(1).trimmed().compare(key, Qt::CaseInsensitive) == 0)
+            commented = i; // the last example wins: that is where the writer puts the real line
+    }
+    QString const line = QString("%1 = %2").arg(key.toUpper(), value);
+    int header = -1;
+    for (int i = 0; i < sections && header < 0; ++i)
+        if (lines.at(i) == insertedHeader)
+            header = i;
+    if (commented >= 0)
+        lines.insert(commented + 1, line);
+    else if (header >= 0) {
+        // One header for every line kept this way, the new one at the end.
+        int end = header + 1;
+        while (end < sections && !lines.at(end).trimmed().isEmpty())
+            ++end;
+        lines.insert(end, line);
+    } else
+        for (QString const &added : QStringList{ QString(), insertedHeader, line })
+            lines.insert(sections++, added);
+    text = lines.join(QLatin1Char('\n'));
+}
+
+//! Drop the line of \a key from the settings area: a line the user commented
+//! out or deleted must not come back active on the next save.
+static void removeTopLevelLine(QString &text, QString const &key)
+{
+    QStringList lines = text.split(QLatin1Char('\n'));
+    // Every occurrence: the parser keeps the last line of a repeated key, so
+    // leaving one behind would bring the setting back on the next start.
+    for (int i = 0; i < lines.size();) {
+        QString const line = lines.at(i).trimmed();
+        if (line.startsWith(QLatin1Char('[')) || line.startsWith(QLatin1String("#[")))
+            break;
+        int const equal = lines.at(i).indexOf(QLatin1Char('='));
+        if (equal > 0 && lines.at(i).left(equal).trimmed().compare(key, Qt::CaseInsensitive) == 0)
+            lines.removeAt(i);
+        else
+            ++i;
+    }
+    text = lines.join(QLatin1Char('\n'));
+}
+
+bool NgPost::_adoptConfigValue(QString const &key, QString const &value)
+{
+    // Only the settings that are nothing but a value in memory. A path, an
+    // engine or a VPN profile is resolved once, at startup: taking one here
+    // would leave _par2Path, the engine fallback or the tunnel pointing at the
+    // previous choice, which is worse than waiting for the next start.
+    // Nor a value a window owns: saveConfig() starts by reading LENGTH_NAME back
+    // from the spin box of the posting tab in front, so taking it here would
+    // last until the next save and quietly revert the file with it. LENGTH_PASS
+    // is the dialog's default, which no tab writes: that one can be taken.
+    // Read exactly as _parseConfig() reads it, so adopting a line and restarting
+    // on it give the same state: 0 is a value (no par2, no split), and what the
+    // parser refuses -- a word, a number too large for the type -- is refused
+    // here too rather than silently truncated.
+    auto const number = [&value](auto &target) {
+        using Target = std::remove_reference_t<decltype(target)>;
+        bool ok = false;
+        if constexpr (std::is_same_v<Target, qint64>) {
+            qint64 const parsed = value.toLongLong(&ok);
+            if (!ok || parsed <= 0)
+                return false;
+            target = parsed;
+        } else {
+            uint const parsed = value.toUInt(&ok);
+            if (!ok)
+                return false;
+            target = static_cast<Target>(parsed);
+        }
+        return true;
+    };
+    if (key == sOptionNames[Opt::PAR2_ARGS_CUSTOM])
+        _par2ArgsCustom = value;
+    else if (key == sOptionNames[Opt::PAR2_ARGS])
+        _par2Args = value;
+    else if (key == sOptionNames[Opt::RAR_EXTRA])
+        _rarArgs = value;
+    else if (key == sOptionNames[Opt::TMP_DIR])
+        _tmpPath = value;
+    else if (key == sOptionNames[Opt::PAR2_BLOCK_SIZE])
+        return number(_par2BlockSize);
+    else if (key == sOptionNames[Opt::RAR_SIZE])
+        return number(_rarSize);
+    else if (key == sOptionNames[Opt::LENGTH_PASS])
+        return number(_lengthPassDefault);
+    else if (key == sOptionNames[Opt::UI_ZOOM])
+        return number(_uiZoom);
+    else if (key == sOptionNames[Opt::PAR2_PCT]) {
+        uint percentage = 0;
+        if (!number(percentage))
+            return false;
+        _par2Pct = _par2PctDefault = percentage;
+    } else
+        return false;
+    return true;
+}
+
+QMap<QString, QString> NgPost::_mergeExternalConfigEdits(QString &text)
+{
+    QMap<QString, QString> mine = topLevelSettings(text);
+    QString const conf = PathHelper::configFilePath();
+    QFile file(conf);
+    // Nothing read from this file yet (first run, or a -c configuration): there
+    // is no baseline that could tell an edit from ngPost's own state.
+    if (_configBelief.isEmpty() || !file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return mine;
+    QString const diskText = QString::fromUtf8(file.readAll());
+    file.close();
+    QMap<QString, QString> const theirs = topLevelSettings(diskText);
+
+    QString const header = tr("## Added to your configuration file, kept here");
+    QMap<QString, QString> belief = mine;
+    QStringList adopted, afterRestart, kept, cleared, refused, dropped;
+    for (auto it = theirs.cbegin(); it != theirs.cend(); ++it) {
+        QString const &key = it.key();
+        QString const &onDisk = it.value();
+        // ngPostWrites: the line is in the text just built, so ngPost has a
+        // value for it. diskChanged: the file no longer says what ngPost read.
+        bool const ngPostWrites = mine.contains(key);
+        bool const diskChanged = !_configBelief.contains(key) || onDisk != _configBelief.value(key);
+
+        // A configuration older than [server] blocks put its single server at
+        // the top level. The parser gives those keys the server they imply, and
+        // this save writes it as a [server] block: the top-level line goes, and
+        // that is worth saying once, because the file visibly changes shape.
+        if (topLevelServerKeys().contains(key)) {
+            if (!ngPostWrites)
+                dropped << key;
+            continue;
+        }
+
+        if (!diskChanged) {
+            // ngPost's own line, or a setting it has just cleared and therefore
+            // stops writing: either way the text already says what it holds.
+            if (ngPostWrites || isKnownSetting(key))
+                continue;
+            // A line ngPost does not use: put it back where it was, without
+            // saying again what was said the save it appeared.
+            setTopLevelValue(text, key, onDisk, header);
+            belief.insert(key, onDisk);
+            continue;
+        }
+
+        // Changed on both sides -- an empty mine.value() means the window
+        // cleared it -- so the window the user just validated wins.
+        if (_configBelief.contains(key) && mine.value(key) != _configBelief.value(key)
+            && mine.value(key) != onDisk) {
+            refused << (isSecretSetting(key) ? key : QString("%1 = %2").arg(key, onDisk));
+            _configKeptForRestart.remove(key);
+            continue;
+        }
+
+        setTopLevelValue(text, key, onDisk, header);
+        if (!isKnownSetting(key)) {
+            kept << key; // nothing to adopt: ngPost never reads it
+            belief.insert(key, onDisk);
+        } else if (_adoptConfigValue(key, onDisk)) {
+            adopted << key;
+            belief.insert(key, onDisk);
+            _configKeptForRestart.remove(key);
+        } else {
+            // The file keeps their value while ngPost keeps believing its own,
+            // so every save preserves the line until a start really loads it --
+            // announced the first time, then patched in silence.
+            if (_configKeptForRestart.value(key) != onDisk)
+                afterRestart << key;
+            _configKeptForRestart.insert(key, onDisk);
+        }
+    }
+    for (QString const &key : _configKeptForRestart.keys())
+        if (!theirs.contains(key))
+            _configKeptForRestart.remove(key);
+
+    // Commenting a line out is how the configuration turns a setting off, and
+    // that is an edit like any other. Only where an empty value means something
+    // on its own: _adoptConfigValue() refuses a number, whose absence would
+    // mean its default rather than what the file used to say.
+    for (auto it = _configBelief.cbegin(); it != _configBelief.cend(); ++it) {
+        QString const &key = it.key();
+        if (theirs.contains(key) || !mine.contains(key))
+            continue; // still in the file, or ngPost no longer writes it either
+        if (mine.value(key) != it.value())
+            continue; // also changed in the GUI, which wins as everywhere else
+        if (_adoptConfigValue(key, QString())) {
+            removeTopLevelLine(text, key);
+            belief.remove(key);
+            cleared << key;
+        }
+    }
+
+    // The posting tabs show the default redundancy and the arguments a post
+    // runs with: they must follow a value taken from the file, as they follow
+    // the PAR2 Settings window.
+    for (QString const &key : adopted + cleared)
+        if (key.startsWith(QLatin1String("par2_"))) {
+            emit par2DefaultsChanged();
+            break;
+        }
+
+    if (!adopted.isEmpty())
+        _log(tr("'%1' was edited while ngPost was running; taken from your file: %2.")
+                 .arg(conf, adopted.join(QStringLiteral(", "))));
+    if (!afterRestart.isEmpty())
+        _log(tr("Also edited in '%1' and kept there, but used only after a restart: %2.")
+                 .arg(conf, afterRestart.join(QStringLiteral(", "))));
+    if (!cleared.isEmpty())
+        _log(tr("Commented out or deleted in '%1' while ngPost was running, so it stops using "
+                "them: %2.")
+                 .arg(conf, cleared.join(QStringLiteral(", "))));
+    if (!kept.isEmpty())
+        _log(tr("Kept in '%1' as they are, unused by ngPost: %2.")
+                 .arg(conf, kept.join(QStringLiteral(", "))));
+    if (!refused.isEmpty())
+        _error(
+            tr("Edited both in '%1' and in ngPost, which keeps its own value and drops yours: %2.")
+                .arg(conf, refused.join(QStringLiteral(" ; "))));
+    if (!dropped.isEmpty())
+        _error(tr("Dropped by this save of '%1', because a [server] section holds them now: %2.")
+                   .arg(conf, dropped.join(QStringLiteral(", "))));
+    // The blocks themselves are not merged: two [server] sections have no
+    // identity a merge could rely on, so ngPost writes them from its own state.
+    // Saying so is the least it owes an edit it is about to discard.
+    if (sectionsText(diskText) != _configSections)
+        _error(
+            tr("The [server] and [vpn_profile] blocks of '%1' were edited by hand, and this save "
+               "writes the ones ngPost holds instead: those changes are lost. Change servers and "
+               "VPN profiles in the GUI, or with ngPost closed.")
+                .arg(conf));
+    return belief;
+}
+
+void NgPost::_applyPar2Fallback(bool announce)
+{
+    _par2ToolFallback = par2::Tool::Auto;
+    if (_par2Tool == par2::Tool::Auto || _par2PathMode != externaltool::PathMode::Automatic
+        || !_par2Path.isEmpty())
+        return;
+    // The chosen engine is not installed here. Running whatever is beats
+    // stopping every post that generates par2 -- but the fallback stays in
+    // memory: PAR2_TOOL keeps the user's choice, which a reinstall (or the
+    // optional ParPar of the Windows installer) makes valid again. An explicit
+    // PAR2_PATH is excluded on purpose: a custom path never falls back, and its
+    // own message already says so.
+    QString const par2Tool = par2::toolName(_par2Tool);
+    const auto fallback = externaltool::resolve(QStringLiteral("auto"));
+    par2::Tool fallbackTool = par2::Tool::Auto;
+    if (fallback.available() && par2::parseTool(fallback.tool, fallbackTool)) {
+        _par2ToolFallback = fallbackTool;
+        _par2Path = fallback.path;
+        if (announce) {
+            _error(tr("Configuration: PAR2_TOOL = %1 is not installed here; ngPost uses %2 for "
+                      "this run: %3. The configuration keeps PAR2_TOOL = %1.")
+                       .arg(par2Tool, par2::toolName(fallbackTool), fallback.path));
+            // Engine-specific switches: par2j rejects ParPar's, and the reverse.
+            // The line stays in the configuration for the day the chosen engine
+            // is back; this run uses the defaults instead. What the file holds,
+            // not what this run uses: the fallback is already in effect above, so
+            // par2ArgsInUse() is empty by now.
+            if (!par2ArgsConfigured().isEmpty())
+                _error(tr("The par2 arguments of your configuration are written for %1, so %2 "
+                          "runs with its default arguments this time. The line is left in the "
+                          "configuration.")
+                           .arg(par2Tool, par2::toolName(fallbackTool)));
+        }
+    } else if (announce)
+        _error(tr("Configuration: PAR2_TOOL = %1: no executable was found. Install %1, select "
+                  "another PAR2_TOOL, or set PAR2_SOURCE = custom and PAR2_PATH to its executable "
+                  "(PAR2 Settings in the GUI).")
+                   .arg(par2Tool));
+}
+
+struct NgPost::ConfigParseState
+{
+    QList<VpnProfile> parsedVpnProfiles;
+    QString parsedActiveVpnProfile;
+    QString legacyVpnConfigPath;
+    QString legacyVpnBackend;
+    bool parsedPack = false;
+    bool legacyAutoCompress = false;
+    std::optional<QString> rarToolLine;
+    std::optional<QString> rarSourceLine;
+    std::optional<QString> par2ToolLine;
+    std::optional<QString> par2SourceLine;
+    NntpServerParams *serverParams = nullptr;
+    VpnProfile currentVpn;
+    bool inVpnProfile = false;
+};
+
+bool NgPost::_parseConfigTransferKey(const QString &opt, QString val, QString &err)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::THREAD]) {
+        int nb = val.toInt(&ok);
+        if (ok) {
+            if (nb < 1)
+                _nbThreads = 1;
+            else
+                _nbThreads = nb;
+        }
+    } else if (opt == sOptionNames[Opt::NZB_PATH]) {
+        if (val.isEmpty()) {
+            // Unset NZB_PATH: legitimate (use default current dir at post time)
+            _nzbPath.clear();
+            _nzbPathConf.clear();
+        } else {
+            QFileInfo nzbFI(val);
+            if (nzbFI.exists() && nzbFI.isDir() && nzbFI.isWritable()) {
+                _nzbPath = val;
+                _nzbPathConf = val;
+            } else
+                err += tr("the nzbPath '%1' is not writable...\n").arg(val);
+        }
+    } else if (opt == sOptionNames[Opt::NZB_UPLOAD_URL])
+        _setNzbUploadUrl(val, err);
+    else if (opt == sOptionNames[Opt::RESUME_WAIT]) {
+        ushort nb = val.toUShort(&ok);
+        if (ok && nb > sDefaultResumeWaitInSec)
+            _waitDurationBeforeAutoResume = nb;
+    } else if (opt == sOptionNames[Opt::NO_RESUME_AUTO]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _tryResumePostWhenConnectionLost = false;
+    } else if (opt == sOptionNames[Opt::PREPARE_PACKING]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _preparePacking = true;
+    } else if (opt == sOptionNames[Opt::SOCK_TIMEOUT]) {
+        int nb = val.toInt(&ok);
+        if (ok) {
+            int timeout = nb * 1000;
+            if (timeout > sMinSocketTimeOut)
+                _socketTimeOut = timeout;
+        }
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigDisplayKey(const QString &opt, QString val)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::MONITOR_FOLDERS]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _monitor_nzb_folders = true;
+    } else if (opt == sOptionNames[Opt::MONITOR_IGNORE_DIR]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _monitorIgnoreDir = true;
+    } else if (opt == sOptionNames[Opt::MONITOR_SEC_DELAY_SCAN]) {
+        int nb = val.toInt(&ok);
+        if (ok && nb > 1 && nb <= 120) {
+            _monitorSecDelayScan = static_cast<ushort>(nb);
+            FoldersMonitorForNewFiles::sMSleep = static_cast<ulong>(_monitorSecDelayScan) * 1000;
+        }
+    } else if (opt == sOptionNames[Opt::NZB_RM_ACCENTS]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _removeAccentsOnNzbFileName = true;
+    } else if (opt == sOptionNames[Opt::AUTO_CLOSE_TABS]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _autoCloseTabs = true;
+    } else if (opt == sOptionNames[Opt::CHECK_FOR_UPDATES]) {
+        val = val.toLower();
+        _checkForUpdates = (val == "true" || val == "on" || val == "1");
+    } else if (opt == sOptionNames[Opt::LAST_UPDATE_CHECK]) {
+        // Retired with the daily check; known, so the next save drops the line.
+    } else if (opt == sOptionNames[Opt::UI_ZOOM]) {
+        int const nb = val.toInt(&ok);
+        if (ok && nb >= 80 && nb <= 150) // the range the zoom slider offers
+            _uiZoom = static_cast<uint>(nb);
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigVpnKey(const QString &opt, QString val, ConfigParseState &state)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::VPN_AUTO_CONNECT]) {
+        val = val.toLower();
+        _vpnManager->setAutoConnect(val == "true" || val == "on" || val == "1");
+    } else if (opt == sOptionNames[Opt::VPN_ACTIVE_PROFILE]) {
+        state.parsedActiveVpnProfile = val;
+    } else if (opt == sOptionNames[Opt::VPN_LEASE_WAIT_MINUTES]) {
+        int minutes = val.toInt(&ok);
+        if (ok && minutes >= 0 && minutes <= 1440)
+            _vpnManager->setLeaseWaitMinutes(minutes);
+        else {
+            _vpnManager->setLeaseWaitMinutes(5);
+            _log(tr("Warning: VPN_LEASE_WAIT_MINUTES must be in 0..1440; using 5."));
+        }
+    } else if (opt == sOptionNames[Opt::VPN_RECOVERY_MAX_ATTEMPTS]) {
+        int attempts = val.toInt(&ok);
+        if (ok && attempts >= 0 && attempts <= 1000)
+            _vpnManager->setRecoveryMaxAttempts(attempts);
+        else {
+            _vpnManager->setRecoveryMaxAttempts(0);
+            _log(tr("Warning: VPN_RECOVERY_MAX_ATTEMPTS must be in 0..1000; using 0 (unlimited)."));
+        }
+    }
+    // Legacy single-profile keys (kept for migration only).
+    else if (opt == sOptionNames[Opt::VPN_BACKEND]) {
+        state.legacyVpnBackend = val;
+    } else if (opt == sOptionNames[Opt::VPN_CONFIG_PATH]) {
+        state.legacyVpnConfigPath = val;
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseVpnProfileKey(const QString &opt, QString val, ConfigParseState &state)
+{
+    // Inside [vpn_profile] block — these key names collide with
+    // server fields but we know we're in a vpn_profile context.
+    if (state.inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_NAME]) {
+        state.currentVpn.name = val;
+    } else if (state.inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_BACKEND]) {
+        bool backendOk = false;
+        VpnManager::Backend b = VpnManager::backendFromString(val, &backendOk);
+        if (backendOk)
+            state.currentVpn.backend = b;
+    } else if (state.inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_CONFIG_FILE]) {
+        state.currentVpn.configFileName = val;
+    } else if (state.inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_HAS_AUTH]) {
+        val = val.toLower();
+        state.currentVpn.hasAuth = (val == "true" || val == "on" || val == "1");
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigNfoKey(const QString &opt, QString val)
+{
+    if (opt == sOptionNames[Opt::KEEP_NFO_EXTENSION]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _keepNfoExtension = true;
+    } else if (opt == sOptionNames[Opt::NZB_COPY_NFO]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _copyNfoWithNzb = true;
+    } else if (opt == sOptionNames[Opt::AUTO_INCLUDE_NFO]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _autoIncludeNfo = true;
+    } else if (opt == sOptionNames[Opt::LOG_IN_FILE] && useHMI()) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1") {
+            // The configuration folder, on every platform. $HOME may be
+            // unset (a service, a container), which put the log at /ngPost.log,
+            // and the working directory of a GUI started from a shortcut
+            // is wherever the shortcut says.
+            QString const logFilePath = PathHelper::configDir() + QLatin1Char('/')
+                + sDefaultLogFile;
+
+            _logFile = new QFile(logFilePath);
+            if (_logFile->open(QIODevice::WriteOnly | QIODevice::Text)) {
+                _logStream = new QTextStream(_logFile);
+                _log(tr("ngPost starts logging: %1")
+                         .arg(QDateTime::currentDateTime().toString("yyyy/MM/dd hh:mm:ss")));
+            } else {
+                delete _logFile;
+                _logFile = nullptr;
+                _error(
+                    tr("Error opening log file: '%1'").arg(QDir::toNativeSeparators(logFilePath)));
+            }
+        }
+    } else if (opt == sOptionNames[Opt::MONITOR_EXT]) {
+        for (const QString &extension : val.split(","))
+            _monitorExtensions << extension.trimmed();
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigArticleKey(const QString &opt, QString val)
+{
+    if (opt == sOptionNames[Opt::OBFUSCATE]) {
+        // Historically a single word, and "article" was the only
+        // one understood. It is a list now, so that file name
+        // obfuscation -- until 5.6 reachable only from the GUI
+        // checkbox, and lost on every restart -- can be asked
+        // for in the configuration like everything else.
+        for (QString const &kind : val.toLower().split(QLatin1Char(','))) {
+            QString const what = kind.trimmed();
+            if (what.startsWith(QLatin1String("article"))) {
+                _obfuscateArticles = true;
+                qDebug() << "Do article obfuscation (the subject of each Article will be a UUID)\n";
+            } else if (what.startsWith(QLatin1String("filename"))
+                       || what.startsWith(QLatin1String("file_name"))
+                       || what.startsWith(QLatin1String("file name"))) {
+                _obfuscateFileName = true;
+                qDebug() << "Do file name obfuscation (the input files are renamed before "
+                            "compression)\n";
+            }
+        }
+    } else if (opt == sOptionNames[Opt::GROUP_POLICY]) {
+        val = val.toLower();
+        if (val == sGroupPolicies[GROUP_POLICY::EACH_POST]) {
+            _groupPolicy = GROUP_POLICY::EACH_POST;
+            if (_debug)
+                _log(tr("Group Policy: one group per Post"));
+        } else if (val == sGroupPolicies[GROUP_POLICY::EACH_FILE]) {
+            _groupPolicy = GROUP_POLICY::EACH_FILE;
+            if (_debug)
+                _log(tr("Group Policy: one group per File"));
+        }
+    } else if (opt == sOptionNames[Opt::DISP_PROGRESS]) {
+        val = val.toLower();
+        if (val == "bar") {
+            _dispProgressBar = true;
+            qDebug() << "Display progressbar bar\n";
+        } else if (val == "files") {
+            _dispFilesPosting = true;
+            qDebug() << "Display Files when start posting\n";
+        }
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigIdentityKey(const QString &opt, QString val, QString &err)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::MSG_ID]) {
+        sArticleIdSignature = val.toStdString();
+    } else if (opt == sOptionNames[Opt::ARTICLE_SIZE]) {
+        int nb = val.toInt(&ok);
+        if (ok && nb > 0)
+            sArticleSize = nb;
+        else
+            err += tr("ARTICLE_SIZE must be a positive integer") + QLatin1Char('\n');
+    } else if (opt == sOptionNames[Opt::NB_RETRY]) {
+        ushort nb = val.toUShort(&ok);
+        if (ok)
+            NntpArticle::setNbMaxRetry(nb);
+    } else if (opt == sOptionNames[Opt::FROM]) {
+        QRegularExpression email("\\w+@\\w+\\.\\w+");
+        if (!email.match(val).hasMatch())
+            val += "@ngPost.com";
+        val = escapeXML(val);
+        _from = val.toStdString();
+        _saveFrom = true;
+    } else if (opt == sOptionNames[Opt::GEN_FROM]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1") {
+            _genFrom = true;
+            if (_debug)
+                _cout << tr("Generate new random poster for each post") << "\n" << MB_FLUSH;
+        }
+    } else if (opt == sOptionNames[Opt::GROUPS])
+        updateGroups(val);
+
+    else if (opt == sOptionNames[Opt::LANG])
+        changeLanguage(val.toLower());
+
+    else if (opt == sOptionNames[Opt::SHUTDOWN_CMD])
+        _shutdownCmd = val;
+
+    else if (opt == sOptionNames[Opt::PROXY_SOCKS5]) {
+        QRegularExpression regExp(sProxyStrRegExp, QRegularExpression::CaseInsensitiveOption);
+        QRegularExpressionMatch match = regExp.match(val);
+        if (match.hasMatch()) {
+            _proxyUrl = val;
+            // "^(([^:]+):([^@]+)@)?([\\w\\.\\-_]+):(\\d+)$";
+            QString user = match.captured(2);
+            QString pass = match.captured(3);
+            QString host = match.captured(4);
+            ushort port = match.captured(5).toUShort();
+            _proxySocks5 = QNetworkProxy(QNetworkProxy::Socks5Proxy, host, port, user, pass);
+            QNetworkProxy::setApplicationProxy(_proxySocks5);
+        } else
+            err += tr("Error parsing Proxy Socks5 parameters. The syntax should be: %1")
+                       .arg(sProxyStrRegExp);
+
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigPostInfoKey(const QString &opt, const QString &val, QString &err)
+{
+    if (opt == sOptionNames[Opt::NZB_POST_CMD])
+        _nzbPostCmd << val;
+
+    else if (opt == sOptionNames[Opt::POST_INFO_TEMPLATE]) {
+        _postInfoTemplate = val;
+        _postInfoTemplateFromCli = false;
+    } else if (opt == sOptionNames[Opt::POST_INFO_OUTPUT]) {
+        if (val.trimmed().isEmpty())
+            err += tr("POST_INFO_OUTPUT can't be empty\n");
+        else {
+            _postInfoOutput = val;
+            _postInfoOutputFromCli = false;
+        }
+    } else if (opt == sOptionNames[Opt::POST_INFO_ONLY_ON_SUCCESS])
+        _postInfoOnlySuccess = (val.toLower() == "true");
+    else if (opt == sOptionNames[Opt::POST_CMD_TIMEOUT]) {
+        bool timeoutOk = false;
+        int nb = val.toInt(&timeoutOk);
+        if (timeoutOk && nb >= 0)
+            _postCmdTimeoutSec = nb;
+        else
+            err += tr("POST_CMD_TIMEOUT must be a number of seconds (0 = no limit)\n");
+    } else if (opt == sOptionNames[Opt::POST_CMD_FAIL_IS_ERROR])
+        _postCmdFailIsError = (val.toLower() == "true");
+    else if (opt == sOptionNames[Opt::POST_CMD_EXPOSE_PASSWORD])
+        _postCmdExposePassword = (val.toLower() == "true");
+    else if (opt == sOptionNames[Opt::NZB_UPLOAD_TIMEOUT]) {
+        bool timeoutOk = false;
+        int nb = val.toInt(&timeoutOk);
+        if (timeoutOk && nb >= 0)
+            _nzbUploadTimeoutSec = nb;
+        else
+            err += tr("NZB_UPLOAD_TIMEOUT must be a number of seconds (0 = no limit)\n");
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigHistoryKey(const QString &opt, const QString &val, QString &err)
+{
+    if (opt == sOptionNames[Opt::INPUT_DIR])
+        _inputDir = val;
+
+    else if (opt == sOptionNames[Opt::POST_HISTORY])
+        _setPostHistoryFile(val, err);
+
+    else if (opt == sOptionNames[Opt::FIELD_SEPARATOR])
+        _historyFieldSeparator = val;
+
+    else if (opt == sOptionNames[Opt::POST_DB])
+        _postDbFile = val;
+
+    else if (opt == sOptionNames[Opt::HISTORY_STORE_PASSWORDS])
+        _historyStorePasswords = val.toLower() == "true";
+    else
+        return false;
+    return true;
+}
+
+#ifdef __USE_TMP_RAM__
+bool NgPost::_parseConfigRamKey(const QString &opt, const QString &val, QString &err)
+{
+    bool ok = false;
+    // compression section
+
+    if (opt == sOptionNames[Opt::TMP_RAM]) {
+        _ramPath = val;
+        QFileInfo fi(_ramPath);
+        if (!fi.isDir())
+            err += QString("%1 %2\n")
+                       .arg(sOptionNames[Opt::TMP_RAM].toUpper())
+                       .arg(tr("should be a directory!..."));
+        else if (!fi.isWritable())
+            err += QString("%1 %2\n")
+                       .arg(sOptionNames[Opt::TMP_RAM].toUpper())
+                       .arg(tr("should be writable!..."));
+        else {
+            _storage = new QStorageInfo(_ramPath);
+
+            if (useHMI() || !_quiet)
+                _log(tr("Using RAM Storage %1, root: %2, type: %3, size: %4, available: %5")
+                         .arg(_ramPath)
+                         .arg(_storage->rootPath())
+                         .arg(QString(_storage->fileSystemType()))
+                         .arg(PostingJob::humanSize(static_cast<double>(_storage->bytesTotal())))
+                         .arg(PostingJob::humanSize(
+                             static_cast<double>(_storage->bytesAvailable()))));
+        }
+    } else if (opt == sOptionNames[Opt::TMP_RAM_RATIO]) {
+        double ratio = val.toDouble(&ok);
+        if (!ok || ratio < sRamRatioMin || ratio > sRamRatioMax)
+            err += QString("%1 %2\n")
+                       .arg(sOptionNames[Opt::TMP_RAM_RATIO].toUpper())
+                       .arg(tr("should be a ratio between %1 and %2")
+                                .arg(sRamRatioMin)
+                                .arg(sRamRatioMax));
+        else
+            _ramRatio = ratio;
+    } else
+        return false;
+    return true;
+}
+#endif
+
+bool NgPost::_parseConfigArchiveKey(const QString &opt,
+                                    QString val,
+                                    ConfigParseState &state,
+                                    QString &err)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::TMP_DIR])
+        _tmpPath = val;
+    else if (opt == sOptionNames[Opt::RAR_PATH])
+        _rarPathConfig = val;
+    else if (opt == sOptionNames[Opt::RAR_TOOL])
+        state.rarToolLine = val;
+    else if (opt == sOptionNames[Opt::RAR_SOURCE])
+        state.rarSourceLine = val;
+    else if (opt == sOptionNames[Opt::RAR_PASS]) {
+        _rarPassFixed = val;
+        _rarPass = val;
+    } else if (opt == sOptionNames[Opt::RAR_EXTRA])
+        _rarArgs = val;
+    else if (opt == sOptionNames[Opt::RAR_SIZE]) {
+        uint nb = val.toUInt(&ok);
+        if (ok)
+            _rarSize = nb;
+    } else if (opt == sOptionNames[Opt::RAR_MAX]) {
+        uint nb = val.toUInt(&ok);
+        if (!ok || nb == 0 || nb > uint(INT_MAX))
+            err += tr("RAR_MAX must be a positive integer no greater than 2147483647.")
+                + QLatin1Char('\n');
+        else {
+            _useRarMax = true;
+            _rarMax = nb;
+        }
+    } else if (opt == sOptionNames[Opt::KEEP_RAR]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1") {
+            _keepRar = true;
+            _keepRarDefault = true;
+        }
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigPackingKey(const QString &opt,
+                                    QString val,
+                                    ConfigParseState &state,
+                                    QString &err)
+{
+    if (opt == sOptionNames[Opt::AUTO_COMPRESS]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            state.legacyAutoCompress = true;
+        if (useHMI())
+            _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click "
+                    "SAVE to update your conf and then go check it."));
+        else if (!_quiet)
+            _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please refer to "
+                    "the conf example: %1")
+                     .arg("https://github.com/Hydro74000/ngPost/blob/master/"
+                          "ngPost.conf.example#L140"));
+    } else if (opt == sOptionNames[Opt::PACK]) {
+        val = val.toLower();
+        state.parsedPack = true;
+        QStringList packKeywords = val.split(","), wrongKeywords, parsedKeywords,
+                    allowedKeywords = defaultPackKeywords();
+        for (auto it = packKeywords.cbegin(), itEnd = packKeywords.cend(); it != itEnd; ++it) {
+            QString keyWord = (*it).trimmed();
+            if (allowedKeywords.contains(keyWord))
+                parsedKeywords << keyWord;
+            else
+                wrongKeywords << keyWord.toUpper();
+        }
+
+        if (wrongKeywords.size())
+            err += tr("Wrong keywords for PACK: %1. It should be a subset of (%2)")
+                       .arg(wrongKeywords.join(", "), allowedKeywords.join(", ").toUpper());
+        else {
+            _packAutoKeywords = parsedKeywords;
+            if (useHMI())
+                enableAutoPacking();
+        }
+    } else if (opt == sOptionNames[Opt::RAR_NO_ROOT_FOLDER]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            _rarNoRootFolder = true;
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseConfigPar2Key(const QString &opt,
+                                 const QString &val,
+                                 ConfigParseState &state,
+                                 QString &err)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::PAR2_PCT]) {
+        uint nb = val.toUInt(&ok);
+        if (ok) {
+            _par2Pct = nb;
+            _par2PctDefault = nb;
+        }
+    } else if (opt == sOptionNames[Opt::PAR2_TOOL])
+        state.par2ToolLine = val;
+    else if (opt == sOptionNames[Opt::PAR2_PATH])
+        _par2PathConfig = val;
+    else if (opt == sOptionNames[Opt::PAR2_SOURCE])
+        state.par2SourceLine = val;
+    else if (opt == sOptionNames[Opt::PAR2_ARGS_CUSTOM])
+        _par2ArgsCustom = val;
+    else if (opt == sOptionNames[Opt::PAR2_ARGS])
+        _par2Args = val;
+    else if (opt == sOptionNames[Opt::PAR2_BLOCK_SIZE]) {
+        qint64 nb = val.toLongLong(&ok);
+        if (ok && nb > 0)
+            _par2BlockSize = nb;
+        else
+            err += QString("%1 %2\n")
+                       .arg(sOptionNames[Opt::PAR2_BLOCK_SIZE].toUpper())
+                       .arg(tr("should be a positive number of bytes!..."));
+    } else if (opt == sOptionNames[Opt::LENGTH_NAME]) {
+        uint nb = val.toUInt(&ok);
+        if (ok)
+            _lengthName = nb;
+    } else if (opt == sOptionNames[Opt::LENGTH_PASS]) {
+        uint nb = val.toUInt(&ok);
+        if (ok)
+            _lengthPass = _lengthPassDefault = nb;
+    } else
+        return false;
+    return true;
+}
+
+bool NgPost::_parseServerKey(const QString &opt, QString val, ConfigParseState &state)
+{
+    bool ok = false;
+
+    // Server Section under
+    // state.serverParams is set for each of these keys: the block
+    // in _readConfigFile creates it for any key of topLevelServerKeys(),
+    // which lists exactly this section.
+    // NOLINTBEGIN(clang-analyzer-core.NullDereference,clang-analyzer-core.CallAndMessage)
+    if (opt == sOptionNames[Opt::HOST]) {
+        state.serverParams->host = val;
+    } else if (opt == sOptionNames[Opt::PORT]) {
+        ushort nb = val.toUShort(&ok);
+        if (ok)
+            state.serverParams->port = nb;
+
+    } else if (opt == sOptionNames[Opt::SSL]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1") {
+            state.serverParams->useSSL = true;
+            if (state.serverParams->port == NntpServerParams::sDefaultPort)
+                state.serverParams->port = NntpServerParams::sDefaultSslPort;
+        }
+    } else if (opt == sOptionNames[Opt::ENABLED]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            state.serverParams->enabled = true;
+        else
+            state.serverParams->enabled = false;
+    } else if (opt == sOptionNames[Opt::NZBCHECK]) {
+        val = val.toLower();
+        if (val == "true" || val == "on" || val == "1")
+            state.serverParams->nzbCheck = true;
+        else
+            state.serverParams->nzbCheck = false;
+    } else if (opt == sOptionNames[Opt::SERVER_USE_VPN].toLower()) {
+        val = val.toLower();
+        state.serverParams->useVpn = (val == "true" || val == "on" || val == "1");
+    } else if (opt == sOptionNames[Opt::USER]) {
+        state.serverParams->user = val.toStdString();
+        state.serverParams->auth = true;
+    } else if (opt == sOptionNames[Opt::PASS]) {
+        state.serverParams->pass = val.toStdString();
+        state.serverParams->auth = true;
+    } else if (opt == sOptionNames[Opt::CONNECTION]) {
+        int nb = val.toInt(&ok);
+        if (ok)
+            state.serverParams->nbCons = nb;
+    }
+    // NOLINTEND(clang-analyzer-core.NullDereference,clang-analyzer-core.CallAndMessage)
+    else
+        return false;
+    return true;
+}
+
+void NgPost::_parseConfigKey(const QString &opt,
+                             const QString &val,
+                             ConfigParseState &state,
+                             QString &err)
+{
+    if (_parseConfigTransferKey(opt, val, err))
+        return;
+    if (_parseConfigDisplayKey(opt, val))
+        return;
+    if (_parseConfigVpnKey(opt, val, state))
+        return;
+    if (_parseVpnProfileKey(opt, val, state))
+        return;
+    if (_parseConfigNfoKey(opt, val))
+        return;
+    if (_parseConfigArticleKey(opt, val))
+        return;
+    if (_parseConfigIdentityKey(opt, val, err))
+        return;
+    if (_parseConfigPostInfoKey(opt, val, err))
+        return;
+    if (_parseConfigHistoryKey(opt, val, err))
+        return;
+#ifdef __USE_TMP_RAM__
+    if (_parseConfigRamKey(opt, val, err))
+        return;
+#endif
+    if (_parseConfigArchiveKey(opt, val, state, err))
+        return;
+    if (_parseConfigPackingKey(opt, val, state, err))
+        return;
+    if (_parseConfigPar2Key(opt, val, state, err))
+        return;
+    if (_parseServerKey(opt, val, state))
+        return;
+}
+
+void NgPost::_scanConfigLanguage(QFile &file)
+{
+    // Settle the language before the main loop emits anything. Parsing is
+    // single pass, so a LANG line placed low in the file used to leave
+    // every diagnostic above it in English -- which is exactly the file
+    // layout a translated user ends up with. One cheap scan, then rewind.
+    {
+        QTextStream langScan(&file);
+        while (!langScan.atEnd()) {
+            QString const scanned = langScan.readLine().trimmed();
+            if (scanned.isEmpty() || scanned.startsWith('#') || scanned.startsWith('/'))
+                continue;
+            int const eq = scanned.indexOf('=');
+            if (eq < 0)
+                continue;
+            if (scanned.left(eq).trimmed().toLower() == sOptionNames[Opt::LANG]) {
+                changeLanguage(scanned.mid(eq + 1).trimmed().toLower());
+                break;
+            }
+        }
+        file.seek(0);
+    }
+}
+
+
+void NgPost::_readConfigFile(const QFileInfo &fileInfo, ConfigParseState &state, QString &err)
+{
+    QFile file(fileInfo.absoluteFilePath());
+    if (file.open(QIODevice::ReadOnly)) {
+        state.currentVpn.configBaseDir = _loadedConfigDir;
+        auto flushVpnProfile = [&]() {
+            if (state.inVpnProfile && state.currentVpn.isValid())
+                state.parsedVpnProfiles << state.currentVpn;
+            state.currentVpn = VpnProfile();
+            state.currentVpn.configBaseDir = _loadedConfigDir;
+            state.inVpnProfile = false;
+        };
+        _scanConfigLanguage(file);
+
+        QTextStream stream(&file);
+        while (!stream.atEnd()) {
+            QString line = stream.readLine().trimmed();
+            // saveConfig keeps the inactive GUI limit as #RAR_MAX = N. Read
+            // that preference without enabling it; an active key always wins.
+            if (!_useRarMax && line.startsWith(QStringLiteral("#RAR_MAX"), Qt::CaseInsensitive)) {
+                const int equal = line.indexOf('=');
+                if (equal > 0
+                    && line.left(equal).trimmed().compare(QStringLiteral("#RAR_MAX"),
+                                                          Qt::CaseInsensitive)
+                        == 0) {
+                    bool ok = false;
+                    const uint maximum = line.mid(equal + 1).trimmed().toUInt(&ok);
+                    if (ok && maximum > 0 && maximum <= uint(INT_MAX))
+                        _rarMax = maximum;
+                }
+            }
+            if (line.isEmpty() || line.startsWith('#') || line.startsWith('/'))
+                continue;
+            else if (line == "[server]") {
+                flushVpnProfile();
+                state.serverParams = new NntpServerParams();
+                _nntpServers << state.serverParams;
+            } else if (line == "[vpn_profile]") {
+                flushVpnProfile();
+                state.serverParams = nullptr;
+                state.inVpnProfile = true;
+                state.currentVpn = VpnProfile();
+                state.currentVpn.configBaseDir = _loadedConfigDir;
+            } else {
+                const int equalIdx = line.indexOf('=');
+                if (equalIdx > 0) {
+                    QString opt = line.left(equalIdx).trimmed().toLower(),
+                            val = line.mid(equalIdx + 1).trimmed();
+
+                    // Those keys still parse, but no block ever created the
+                    // object they write into -- so a file written that way used
+                    // to crash here on a null pointer. Give them the server
+                    // they imply.
+                    if (!state.serverParams && topLevelServerKeys().contains(opt)) {
+                        state.serverParams = new NntpServerParams();
+                        _nntpServers << state.serverParams;
+                    }
+
+                    _parseConfigKey(opt, val, state, err);
+                }
+            }
+        }
+        // Flush any trailing [vpn_profile] block (no [section] header after it).
+        flushVpnProfile();
+        file.close();
+    }
+}
+
+
+void NgPost::_readConfigToolPath(const QString &key,
+                                 const QString &sourceKey,
+                                 const QStringList &kinds,
+                                 QString &tool,
+                                 externaltool::PathMode &mode,
+                                 QString &path,
+                                 bool explicitMode,
+                                 const QString &toolArgs,
+                                 bool requested)
+{
+    if (path.isEmpty())
+        return;
+    if (explicitMode) {
+        if (mode == externaltool::PathMode::Automatic) {
+            _error(tr("Configuration: %1 is ignored because %2 = auto. Set %2 = custom to use "
+                      "this path.")
+                       .arg(key, sourceKey));
+            path.clear();
+        } else if (requested && !externaltool::executable(path))
+            _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
+                      "tool will stop before the transfer.")
+                       .arg(key, path));
+        return;
+    }
+    // The file name says which engine the line meant. It only matters when
+    // that engine can run the configured arguments: adopt it when they were
+    // written for it, or when it is installed. Otherwise auto detection
+    // stays, and builds the arguments for whichever engine it finds -- the
+    // bundle may well have lost that engine (ParPar is optional on Windows).
+    const auto adoptNamedEngine = [&](const QString &named) {
+        if (tool == QLatin1String("auto") && kinds.contains(named)
+            && (!toolArgs.isEmpty() || externaltool::resolve(named).available()))
+            tool = named;
+    };
+    const QString bundled = externaltool::bundledTool(path);
+    if (kinds.contains(bundled) && (tool == QLatin1String("auto") || tool == bundled)) {
+        adoptNamedEngine(bundled);
+        mode = externaltool::PathMode::Automatic;
+        path.clear();
+        return;
+    }
+    if (externaltool::executable(path)) {
+        mode = externaltool::PathMode::Custom;
+        return;
+    }
+    adoptNamedEngine(externaltool::toolForFile(path));
+    mode = externaltool::PathMode::Automatic;
+    if (requested) {
+        const QString found = externaltool::resolve(tool).path;
+        if (found.isEmpty())
+            _error(tr("Configuration: %1 = %2 is not an executable file. Posts that need this "
+                      "tool will stop before the transfer.")
+                       .arg(key, path));
+        else
+            _error(tr("Configuration: %1 = %2 is not an executable file; ngPost uses %3, found "
+                      "automatically, instead.")
+                       .arg(key, path, found));
+    }
+    // Keep legacy user paths, even when unavailable. Save them without a
+    // *_SOURCE line so a reload retains this fallback and can use the
+    // original executable again if it becomes available.
+}
+
+void NgPost::_settleConfigToolNames(ConfigParseState &state)
+{
+    // Checked once the whole file is read, like the paths they qualify: as for
+    // every key, the last line wins. A value that means nothing is reported and
+    // read as if the line were absent, but not in err (see _readConfigToolPath()).
+    if (state.rarToolLine) {
+        const QString rarTool = state.rarToolLine->trimmed().toLower();
+        if (rarTool == QLatin1String("rar") || rarTool == QLatin1String("7zip"))
+            _rarTool = rarTool;
+        else {
+            _error(tr("RAR_TOOL must be rar or 7zip."));
+            state.rarToolLine.reset();
+        }
+    }
+    if (state.par2ToolLine && !par2::parseTool(*state.par2ToolLine, _par2Tool))
+        _error(tr("PAR2_TOOL must be auto, parpar, par2cmdline or multipar."));
+    if (state.rarSourceLine && !externaltool::parseMode(*state.rarSourceLine, _rarPathMode)) {
+        _error(tr("RAR_SOURCE must be auto or custom."));
+        state.rarSourceLine.reset();
+    }
+    if (state.par2SourceLine && !externaltool::parseMode(*state.par2SourceLine, _par2PathMode)) {
+        _error(tr("PAR2_SOURCE must be auto or custom."));
+        state.par2SourceLine.reset();
+    }
+}
+
+
+bool NgPost::_resolveConfigTools(const ConfigParseState &state)
+{
+    // A missing tool is only worth saying when this configuration can use it:
+    // an install that never compresses or generates par2 would otherwise be
+    // told at every start about a tool it does not use. A post that asks for
+    // it later (the GUI boxes, --compress, --gen_par2) still gets the explicit
+    // message from PostingJob::_canCompress() and _canGenPar2().
+    bool const legacyPacking = state.legacyAutoCompress && !state.parsedPack;
+    bool const par2Requested = _par2Pct > 0 || _doPar2 || legacyPacking
+        || _packAutoKeywords.contains(sOptionNames[Opt::GEN_PAR2]);
+    bool const compressRequested = _doCompress || legacyPacking
+        || _packAutoKeywords.contains(sOptionNames[Opt::COMPRESS]);
+
+    // How a *_PATH line is read. With an explicit *_SOURCE, as written: a custom
+    // path never falls back to another executable. Without one, the configuration
+    // predates *_SOURCE: a bundled path (even of an old AppImage mount) becomes
+    // automatic discovery of that tool, an executable path stays custom, and a
+    // path that no longer exists falls back to automatic discovery, as PAR2_PATH
+    // always did. A line that does not do what it says is reported, but not in
+    // err: that stops ngPost, the very place where the settings get fixed.
+    QString par2Tool = par2::toolName(_par2Tool);
+    _readConfigToolPath(QStringLiteral("PAR2_PATH"),
+                        QStringLiteral("PAR2_SOURCE"),
+                        { QStringLiteral("parpar"),
+                          QStringLiteral("par2cmdline"),
+                          QStringLiteral("multipar") },
+                        par2Tool,
+                        _par2PathMode,
+                        _par2PathConfig,
+                        state.par2SourceLine.has_value(),
+                        par2ArgsInUse(),
+                        par2Requested);
+    par2::parseTool(par2Tool, _par2Tool);
+    const QString rarNamed = externaltool::archiverForFile(_rarPathConfig);
+    if (!state.rarToolLine && !rarNamed.isEmpty()
+        && (!state.rarSourceLine || _rarPathMode == externaltool::PathMode::Custom))
+        _rarTool = rarNamed;
+    _readConfigToolPath(QStringLiteral("RAR_PATH"),
+                        QStringLiteral("RAR_SOURCE"),
+                        { QStringLiteral("rar"), QStringLiteral("7zip") },
+                        _rarTool,
+                        _rarPathMode,
+                        _rarPathConfig,
+                        state.rarSourceLine.has_value(),
+                        _rarArgs,
+                        compressRequested);
+    // The example configuration sets RAR_TOOL = rar next to a commented
+    // RAR_PATH = /usr/bin/7z: rar's switches would make 7-Zip fail every time.
+    if (_rarPathMode == externaltool::PathMode::Custom && !rarNamed.isEmpty()
+        && rarNamed != _rarTool) {
+        _error(tr("Configuration: RAR_TOOL = %1 does not match RAR_PATH = %2; %3 is used.")
+                   .arg(_rarTool, _rarPathConfig, rarNamed));
+        _rarTool = rarNamed;
+    }
+    _par2Path = externaltool::resolve(par2Tool, _par2PathMode, _par2PathConfig).path;
+    _rarPath = externaltool::resolve(_rarTool, _rarPathMode, _rarPathConfig).path;
+
+    return par2Requested;
+}
+
+
+void NgPost::_validateConfigPar2Args(bool par2Requested)
+{
+    // A custom line written for another engine cannot run: par2j reads
+    // /switches where the other two read -switches. Said here rather than at the
+    // par2 step, after the compression, with only the tool's own error to show.
+    if (par2Requested && !_par2ArgsCustom.isEmpty()) {
+        bool multiParStyle = false, otherStyle = false;
+        for (QString const &token : QProcess::splitCommand(_par2ArgsCustom)) {
+            multiParStyle = multiParStyle || token.startsWith(QLatin1Char('/'));
+            otherStyle = otherStyle || token.startsWith(QLatin1Char('-'));
+        }
+        bool const multiPar = par2ToolInUse() == par2::Tool::MultiPar;
+        if ((multiPar && otherStyle && !multiParStyle)
+            || (!multiPar && multiParStyle && !otherStyle))
+            _error(tr("Configuration: PAR2_ARGS_CUSTOM is written for another tool than %1, so the "
+                      "par2 step would fail. Comment that line out, or write it for %1.")
+                       .arg(par2::toolName(par2ToolInUse())));
+    }
+}
+
+
+void NgPost::_applyConfigVpnProfiles(ConfigParseState &state)
+{
+    // Phase 4 — legacy single-profile config (VPN_BACKEND + VPN_CONFIG_PATH).
+    // Migrate it into a "Default" profile by copying the .ovpn/.conf into
+    // <configDir>/vpn/ if no [vpn_profile] block was found.
+    if (state.parsedVpnProfiles.isEmpty() && !state.legacyVpnConfigPath.isEmpty()) {
+        QFileInfo legacy(state.legacyVpnConfigPath);
+        if (legacy.exists() && legacy.isFile()) {
+            const QString vpnBase = QDir(_loadedConfigDir.isEmpty() ? PathHelper::configDir()
+                                                                    : _loadedConfigDir)
+                                        .filePath(QStringLiteral("vpn"));
+            QDir().mkpath(vpnBase);
+            QString destName = legacy.fileName();
+            QString destPath = QDir(vpnBase).filePath(destName);
+            if (!QFile::exists(destPath))
+                QFile::copy(state.legacyVpnConfigPath, destPath);
+            VpnProfile p;
+            p.name = QStringLiteral("Default");
+            bool ok = false;
+            VpnManager::Backend b = VpnManager::backendFromString(state.legacyVpnBackend, &ok);
+            p.backend = ok ? b : VpnManager::Backend::OpenVPN;
+            p.configFileName = destName;
+            p.configBaseDir = _loadedConfigDir;
+            p.hasAuth = false; // legacy didn't track creds
+            state.parsedVpnProfiles << p;
+            state.parsedActiveVpnProfile = p.name;
+            if (useHMI() || !_quiet)
+                _log(tr("VPN: migrated legacy VPN_CONFIG_PATH into profile 'Default'"));
+        }
+    }
+
+    if (_vpnManager)
+        _vpnManager->setProfilesFromConfig(state.parsedVpnProfiles, state.parsedActiveVpnProfile);
+}
+
+QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
 {
     QString err;
     QFileInfo fileInfo(configPath);
@@ -3270,684 +5161,47 @@ QString NgPost::_parseConfig(const QString &configPath)
     if (_vpnManager)
         vpnSignalsWereBlocked = _vpnManager->blockSignals(true);
 
-    // Phase 4 — collected during parse, applied to VpnManager at end.
-    QList<VpnProfile> parsedVpnProfiles;
-    QString           parsedActiveVpnProfile;
-    QString           legacyVpnConfigPath;
-    QString           legacyVpnBackend;
-    bool              parsedPack = false;
-    bool              legacyAutoCompress = false;
+    ConfigParseState state;
 
-    QFile file(fileInfo.absoluteFilePath());
-    if (file.open(QIODevice::ReadOnly))
-    {
-        NntpServerParams *serverParams = nullptr;
-        VpnProfile        currentVpn;
-        currentVpn.configBaseDir = _loadedConfigDir;
-        bool              inVpnProfile = false;
-        auto flushVpnProfile = [&]() {
-            if (inVpnProfile && currentVpn.isValid())
-                parsedVpnProfiles << currentVpn;
-            currentVpn   = VpnProfile();
-            currentVpn.configBaseDir = _loadedConfigDir;
-            inVpnProfile = false;
-        };
-        QTextStream stream(&file);
-        while (!stream.atEnd())
-        {
-            QString line = stream.readLine().trimmed();
-            if (line.isEmpty() || line.startsWith('#') || line.startsWith('/'))
-                continue;
-            else if (line == "[server]")
-            {
-                flushVpnProfile();
-                serverParams = new NntpServerParams();
-                _nntpServers << serverParams;
-            }
-            else if (line == "[vpn_profile]")
-            {
-                flushVpnProfile();
-                serverParams = nullptr;
-                inVpnProfile = true;
-                currentVpn   = VpnProfile();
-                currentVpn.configBaseDir = _loadedConfigDir;
-            }
-            else
-            {
-                const int equalIdx = line.indexOf('=');
-                if (equalIdx > 0)
-                {
-                    QString opt = line.left(equalIdx).trimmed().toLower(),
-                            val = line.mid(equalIdx + 1).trimmed();
-                    bool ok = false;
+    _par2ArgsCustom.clear();
+    _par2ToolFallback = par2::Tool::Auto;
+    _par2PathConfig.clear();
+    _rarPathConfig.clear();
+    _rarTool = QStringLiteral("rar");
+    _par2Tool = par2::Tool::Auto;
+    _par2PathMode = _rarPathMode = externaltool::PathMode::Automatic;
 
-                    // Before "[server]" blocks existed, a configuration put its
-                    // single server's keys at the top level. Those keys still
-                    // parse, but no block ever created the object they write
-                    // into -- so a file written that way used to crash here on
-                    // a null pointer. Give them the server they imply.
-                    static const QStringList sTopLevelServerKeys = {
-                        sOptionNames[Opt::HOST],     sOptionNames[Opt::PORT],
-                        sOptionNames[Opt::SSL],      sOptionNames[Opt::ENABLED],
-                        sOptionNames[Opt::NZBCHECK], sOptionNames[Opt::SERVER_USE_VPN].toLower(),
-                        sOptionNames[Opt::USER],     sOptionNames[Opt::PASS],
-                        sOptionNames[Opt::CONNECTION]
-                    };
-                    if (!serverParams && sTopLevelServerKeys.contains(opt))
-                    {
-                        serverParams = new NntpServerParams();
-                        _nntpServers << serverParams;
-                    }
-
-                    if (opt == sOptionNames[Opt::THREAD])
-                    {
-                        int nb = val.toInt(&ok);
-                        if (ok)
-                        {
-                            if (nb < 1)
-                                _nbThreads = 1;
-                            else
-                                _nbThreads = nb;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::NZB_PATH])
-                    {
-                        if (val.isEmpty())
-                        {
-                            // Unset NZB_PATH: legitimate (use default current dir at post time)
-                            _nzbPath.clear();
-                            _nzbPathConf.clear();
-                        }
-                        else
-                        {
-                            QFileInfo nzbFI(val);
-                            if (nzbFI.exists() && nzbFI.isDir() && nzbFI.isWritable())
-                            {
-                                _nzbPath     = val;
-                                _nzbPathConf = val;
-                            }
-                            else
-                                err += tr("the nzbPath '%1' is not writable...\n").arg(val);
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::NZB_UPLOAD_URL])
-                        _setNzbUploadUrl(val, err);
-                    else if (opt == sOptionNames[Opt::RESUME_WAIT])
-                    {
-                        ushort nb = val.toUShort(&ok);
-                        if (ok && nb > sDefaultResumeWaitInSec)
-                            _waitDurationBeforeAutoResume = nb;
-                    }
-                    else if (opt == sOptionNames[Opt::NO_RESUME_AUTO])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _tryResumePostWhenConnectionLost = false;
-                    }
-                    else if (opt == sOptionNames[Opt::PREPARE_PACKING])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _preparePacking = true;
-                    }
-                    else if (opt == sOptionNames[Opt::SOCK_TIMEOUT])
-                    {
-                        int nb = val.toInt(&ok);
-                        if (ok)
-                        {
-                            int timeout = nb *1000;
-                            if (timeout > sMinSocketTimeOut)
-                                _socketTimeOut = timeout;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::MONITOR_FOLDERS])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _monitor_nzb_folders = true;
-                    }
-                    else if (opt == sOptionNames[Opt::MONITOR_IGNORE_DIR])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _monitorIgnoreDir = true;
-                    }
-                    else if (opt == sOptionNames[Opt::MONITOR_SEC_DELAY_SCAN])
-                    {
-                        int nb = val.toInt(&ok);
-                        if (ok && nb > 1 && nb <= 120) {
-                            _monitorSecDelayScan = static_cast<ushort>(nb);
-                            FoldersMonitorForNewFiles::sMSleep = _monitorSecDelayScan * 1000;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::NZB_RM_ACCENTS])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _removeAccentsOnNzbFileName = true;
-                    }
-                    else if (opt == sOptionNames[Opt::AUTO_CLOSE_TABS])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _autoCloseTabs = true;
-                    }
-                    else if (opt == sOptionNames[Opt::CHECK_FOR_UPDATES])
-                    {
-                        val = val.toLower();
-                        _checkForUpdates = (val == "true" || val == "on" || val == "1");
-                    }
-                    else if (opt == sOptionNames[Opt::LAST_UPDATE_CHECK])
-                    {
-                        _lastUpdateCheckEpoch = val.toLongLong();
-                    }
-                    else if (opt == sOptionNames[Opt::VPN_AUTO_CONNECT])
-                    {
-                        val = val.toLower();
-                        _vpnManager->setAutoConnect(val == "true" || val == "on" || val == "1");
-                    }
-                    else if (opt == sOptionNames[Opt::VPN_ACTIVE_PROFILE])
-                    {
-                        parsedActiveVpnProfile = val;
-                    }
-                    // Legacy single-profile keys (kept for migration only).
-                    else if (opt == sOptionNames[Opt::VPN_BACKEND])
-                    {
-                        legacyVpnBackend = val;
-                    }
-                    else if (opt == sOptionNames[Opt::VPN_CONFIG_PATH])
-                    {
-                        legacyVpnConfigPath = val;
-                    }
-                    // Inside [vpn_profile] block — these key names collide with
-                    // server fields but we know we're in a vpn_profile context.
-                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_NAME])
-                    {
-                        currentVpn.name = val;
-                    }
-                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_BACKEND])
-                    {
-                        bool ok = false;
-                        VpnManager::Backend b = VpnManager::backendFromString(val, &ok);
-                        if (ok)
-                            currentVpn.backend = b;
-                    }
-                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_CONFIG_FILE])
-                    {
-                        currentVpn.configFileName = val;
-                    }
-                    else if (inVpnProfile && opt == sOptionNames[Opt::VPN_PROFILE_HAS_AUTH])
-                    {
-                        val = val.toLower();
-                        currentVpn.hasAuth =
-                            (val == "true" || val == "on" || val == "1");
-                    }
-                    else if (opt == sOptionNames[Opt::KEEP_NFO_EXTENSION])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _keepNfoExtension = true;
-                    }
-                    else if (opt == sOptionNames[Opt::NZB_COPY_NFO])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _copyNfoWithNzb = true;
-                    }
-                    else if (opt == sOptionNames[Opt::AUTO_INCLUDE_NFO])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _autoIncludeNfo = true;
-                    }
-                    else if (opt == sOptionNames[Opt::LOG_IN_FILE] && useHMI())
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                        {
-#if defined(WIN32) || defined(__MINGW64__)
-                            QString logFilePath = sDefaultLogFile;
-#else
-                            QString logFilePath = QString("%1/%2").arg(getenv("HOME")).arg(sDefaultLogFile);
-#endif
-
-                            _logFile = new QFile(logFilePath);
-                            if (_logFile->open(QIODevice::WriteOnly|QIODevice::Text))
-                            {
-                                _logStream = new QTextStream(_logFile);
-                                _log(tr("ngPost starts logging: %1").arg(QDateTime::currentDateTime().toString("yyyy/MM/dd hh:mm:ss")));
-                            }
-                            else
-                            {
-                                delete _logFile;
-                                _logFile = nullptr;
-                                _error(tr("Error opening log file: '%1'").arg(logFilePath));
-                            }
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::MONITOR_EXT])
-                    {
-                        for (const QString &extension : val.split(","))
-                            _monitorExtensions << extension.trimmed();
-                    }
-                    else if (opt == sOptionNames[Opt::OBFUSCATE])
-                    {
-                        if (val.toLower().startsWith("article"))
-                        {
-                            _obfuscateArticles = true;
-                            qDebug() << "Do article obfuscation (the subject of each Article will be a UUID)\n";
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::GROUP_POLICY])
-                    {
-                        val = val.toLower();
-                        if (val == sGroupPolicies[GROUP_POLICY::EACH_POST])
-                        {
-                            _groupPolicy = GROUP_POLICY::EACH_POST;
-                            if (_debug)
-                                _log(tr("Group Policy: one group per Post"));
-                        }
-                        else if (val == sGroupPolicies[GROUP_POLICY::EACH_FILE])
-                        {
-                            _groupPolicy = GROUP_POLICY::EACH_FILE;
-                            if (_debug)
-                                _log(tr("Group Policy: one group per File"));
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::DISP_PROGRESS])
-                    {
-                        val = val.toLower();
-                        if (val == "bar")
-                        {
-                            _dispProgressBar = true;
-                            qDebug() << "Display progressbar bar\n";
-                        }
-                        else if (val == "files")
-                        {
-                            _dispFilesPosting = true;
-                            qDebug() << "Display Files when start posting\n";
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::MSG_ID])
-                    {
-                        sArticleIdSignature = val.toStdString();
-                    }
-                    else if (opt == sOptionNames[Opt::ARTICLE_SIZE])
-                    {
-                        int nb = val.toInt(&ok);
-                        if (ok && nb > 0)
-                            sArticleSize = nb;
-                        else
-                            err += tr("ARTICLE_SIZE must be a positive integer") + QLatin1Char('\n');
-                    }
-                    else if (opt == sOptionNames[Opt::NB_RETRY])
-                    {
-                        ushort nb = val.toUShort(&ok);
-                        if (ok)
-                            NntpArticle::setNbMaxRetry(nb);
-                    }
-                    else if (opt == sOptionNames[Opt::FROM])
-                    {
-                        QRegularExpression email("\\w+@\\w+\\.\\w+");
-                        if (!email.match(val).hasMatch())
-                            val += "@ngPost.com";
-                        val = escapeXML(val);
-                        _from = val.toStdString();
-                        _saveFrom = true;
-                    }
-                    else if (opt == sOptionNames[Opt::GEN_FROM])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                        {
-                            _genFrom = true;
-                            if (_debug)
-                                _cout << tr("Generate new random poster for each post") << "\n" << MB_FLUSH;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::GROUPS])
-                        updateGroups(val);
-
-                    else if (opt == sOptionNames[Opt::LANG])
-                        changeLanguage(val.toLower());
-
-                    else if (opt == sOptionNames[Opt::SHUTDOWN_CMD])
-                        _shutdownCmd = val;
-
-                    else if (opt == sOptionNames[Opt::PROXY_SOCKS5])
-                    {
-                        QRegularExpression regExp(sProxyStrRegExp,  QRegularExpression::CaseInsensitiveOption);
-                        QRegularExpressionMatch match = regExp.match(val);
-                        if (match.hasMatch())
-                        {
-                            _proxyUrl = val;
-                            // "^(([^:]+):([^@]+)@)?([\\w\\.\\-_]+):(\\d+)$";
-                            QString user  = match.captured(2);
-                            QString pass  = match.captured(3);
-                            QString host  = match.captured(4);
-                            ushort  port  = match.captured(5).toUShort();
-                            _proxySocks5 = QNetworkProxy(QNetworkProxy::Socks5Proxy, host, port, user, pass);
-                            QNetworkProxy::setApplicationProxy(_proxySocks5);
-                        }
-                        else
-                            err += tr("Error parsing Proxy Socks5 parameters. The syntax should be: %1").arg(sProxyStrRegExp);
-
-                    }
-
-                    else if (opt == sOptionNames[Opt::NZB_POST_CMD])
-                        _nzbPostCmd << val;
-
-                    else if (opt == sOptionNames[Opt::POST_INFO_TEMPLATE])
-                    {
-                        _postInfoTemplate        = val;
-                        _postInfoTemplateFromCli = false;
-                    }
-                    else if (opt == sOptionNames[Opt::POST_INFO_OUTPUT])
-                    {
-                        if (val.trimmed().isEmpty())
-                            err += tr("POST_INFO_OUTPUT can't be empty\n");
-                        else {
-                            _postInfoOutput = val;
-                            _postInfoOutputFromCli = false;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::POST_INFO_ONLY_ON_SUCCESS])
-                        _postInfoOnlySuccess = (val.toLower() == "true");
-                    else if (opt == sOptionNames[Opt::POST_CMD_TIMEOUT])
-                    {
-                        bool ok = false;
-                        int nb = val.toInt(&ok);
-                        if (ok && nb >= 0)
-                            _postCmdTimeoutSec = nb;
-                        else
-                            err += tr("POST_CMD_TIMEOUT must be a number of seconds (0 = no limit)\n");
-                    }
-                    else if (opt == sOptionNames[Opt::POST_CMD_FAIL_IS_ERROR])
-                        _postCmdFailIsError = (val.toLower() == "true");
-                    else if (opt == sOptionNames[Opt::POST_CMD_EXPOSE_PASSWORD])
-                        _postCmdExposePassword = (val.toLower() == "true");
-                    else if (opt == sOptionNames[Opt::NZB_UPLOAD_TIMEOUT])
-                    {
-                        bool ok = false;
-                        int nb = val.toInt(&ok);
-                        if (ok && nb >= 0)
-                            _nzbUploadTimeoutSec = nb;
-                        else
-                            err += tr("NZB_UPLOAD_TIMEOUT must be a number of seconds (0 = no limit)\n");
-                    }
-
-                    else if (opt == sOptionNames[Opt::INPUT_DIR])
-                        _inputDir = val;
-
-                    else if (opt == sOptionNames[Opt::POST_HISTORY])
-                        _setPostHistoryFile(val, err);
-
-                    else if (opt == sOptionNames[Opt::FIELD_SEPARATOR])
-                        _historyFieldSeparator = val;
-
-                    else if (opt == sOptionNames[Opt::POST_DB])
-                        _postDbFile = val;
-
-                    else if (opt == sOptionNames[Opt::HISTORY_STORE_PASSWORDS])
-                        _historyStorePasswords = val.toLower() == "true";
-
-                    // compression section
-
-#ifdef __USE_TMP_RAM__
-                    else if (opt == sOptionNames[Opt::TMP_RAM])
-                    {
-                        _ramPath = val;
-                        QFileInfo fi(_ramPath);
-                        if (!fi.isDir())
-                            err += QString("%1 %2\n").arg(sOptionNames[Opt::TMP_RAM].toUpper()).arg(tr("should be a directory!..."));
-                        else if (!fi.isWritable())
-                            err += QString("%1 %2\n").arg(sOptionNames[Opt::TMP_RAM].toUpper()).arg(tr("should be writable!..."));
-                        else
-                        {
-                            _storage = new QStorageInfo(_ramPath);
-
-                            if (useHMI() || !_quiet)
-                                _log(tr("Using RAM Storage %1, root: %2, type: %3, size: %4, available: %5").arg(
-                                         _ramPath).arg(
-                                         _storage->rootPath()).arg(
-                                         QString(_storage->fileSystemType())).arg(
-                                         PostingJob::humanSize(static_cast<double>(_storage->bytesTotal()))).arg(
-                                         PostingJob::humanSize(static_cast<double>(_storage->bytesAvailable()))));
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::TMP_RAM_RATIO])
-                    {
-                        double ratio = val.toDouble(&ok);
-                        if (!ok || ratio < sRamRatioMin || ratio > sRamRatioMax)
-                            err += QString("%1 %2\n").arg(
-                                        sOptionNames[Opt::TMP_RAM_RATIO].toUpper()).arg(
-                                        tr("should be a ratio between %1 and %2").arg(sRamRatioMin).arg(sRamRatioMax));
-                        else
-                            _ramRatio = ratio;
-                    }
-#endif
-                    else if (opt == sOptionNames[Opt::TMP_DIR])
-                        _tmpPath = val;
-                    else if (opt == sOptionNames[Opt::RAR_PATH])
-                        _rarPath = val;
-                    else if (opt == sOptionNames[Opt::RAR_PASS])
-                    {
-                        _rarPassFixed = val;
-                        _rarPass      = val;
-                    }
-                    else if (opt == sOptionNames[Opt::RAR_EXTRA])
-                        _rarArgs = val;
-                    else if (opt == sOptionNames[Opt::RAR_SIZE])
-                    {
-                        uint nb = val.toUInt(&ok);
-                        if (ok)
-                            _rarSize = nb;
-                    }
-                    else if (opt == sOptionNames[Opt::RAR_MAX])
-                    {
-                        _useRarMax = true;
-                        uint nb = val.toUInt(&ok);
-                        if (ok)
-                            _rarMax = nb;
-                    }
-                    else if (opt == sOptionNames[Opt::KEEP_RAR])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                        {
-                            _keepRar        = true;
-                            _keepRarDefault = true;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::AUTO_COMPRESS])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            legacyAutoCompress = true;
-                        if (useHMI())
-                            _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please click SAVE to update your conf and then go check it."));
-                        else if (!_quiet)
-                            _log(tr("obsolete keyword AUTO_COMPRESS, you should use PACK instead, please refer to the conf example: %1").arg(
-                                     "https://github.com/Hydro74000/ngPost/blob/master/ngPost.conf.example#L140"));
-                    }
-                    else if (opt == sOptionNames[Opt::PACK])
-                    {
-                        val = val.toLower();
-                        parsedPack = true;
-                        QStringList packKeywords = val.split(","), wrongKeywords,
-                                parsedKeywords,
-                                allowedKeywords = defaultPackKeywords();
-                        for (auto it = packKeywords.cbegin(), itEnd = packKeywords.cend(); it != itEnd; ++it)
-                        {
-                            QString keyWord = (*it).trimmed();
-                            if (allowedKeywords.contains(keyWord))
-                                parsedKeywords << keyWord;
-                            else
-                                wrongKeywords << keyWord.toUpper();
-                        }
-
-                        if (wrongKeywords.size())
-                            err += tr("Wrong keywords for PACK: %1. It should be a subset of (%2)").arg(
-                                        wrongKeywords.join(", "), allowedKeywords.join(", ").toUpper());
-                        else
-                        {
-                            _packAutoKeywords = parsedKeywords;
-                            if (useHMI())
-                                enableAutoPacking();
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::RAR_NO_ROOT_FOLDER])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            _rarNoRootFolder = true;
-                    }
-
-                    else if (opt == sOptionNames[Opt::PAR2_PCT])
-                    {
-                        uint nb = val.toUInt(&ok);
-                        if (ok)
-                            _par2Pct = nb;
-                    }
-                    else if (opt == sOptionNames[Opt::PAR2_PATH])
-                    {
-                        if (!val.isEmpty())
-                        {
-                            QFileInfo fi(val);
-                            if (fi.exists() && fi.isFile() && fi.isExecutable())
-                            {
-                                _par2Path       = val;
-                                _par2PathConfig = val;
-                            }
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::PAR2_ARGS])
-                        _par2Args = val;
-                    else if (opt == sOptionNames[Opt::LENGTH_NAME])
-                    {
-                        uint nb = val.toUInt(&ok);
-                        if (ok)
-                            _lengthName = nb;
-                    }
-                    else if (opt == sOptionNames[Opt::LENGTH_PASS])
-                    {
-                        uint nb = val.toUInt(&ok);
-                        if (ok)
-                            _lengthPass = nb;
-                    }
-
-
-
-
-
-                    // Server Section under
-                    else if (opt == sOptionNames[Opt::HOST])
-                    {
-                        serverParams->host = val;
-                    }
-                    else if (opt == sOptionNames[Opt::PORT])
-                    {
-                        ushort nb = val.toUShort(&ok);
-                        if (ok)
-                            serverParams->port = nb;
-
-                    }
-                    else if (opt == sOptionNames[Opt::SSL])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                        {
-                            serverParams->useSSL = true;
-                            if (serverParams->port == NntpServerParams::sDefaultPort)
-                                serverParams->port = NntpServerParams::sDefaultSslPort;
-                        }
-                    }
-                    else if (opt == sOptionNames[Opt::ENABLED])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            serverParams->enabled = true;
-                        else
-                            serverParams->enabled = false;
-                    }
-                    else if (opt == sOptionNames[Opt::NZBCHECK])
-                    {
-                        val = val.toLower();
-                        if (val == "true" || val == "on" || val == "1")
-                            serverParams->nzbCheck = true;
-                        else
-                            serverParams->nzbCheck = false;
-                    }
-                    else if (opt == sOptionNames[Opt::SERVER_USE_VPN].toLower())
-                    {
-                        val = val.toLower();
-                        serverParams->useVpn =
-                            (val == "true" || val == "on" || val == "1");
-                    }
-                    else if (opt == sOptionNames[Opt::USER])
-                    {
-                        serverParams->user = val.toStdString();
-                        serverParams->auth = true;
-                    }
-                    else if (opt == sOptionNames[Opt::PASS])
-                    {
-                        serverParams->pass = val.toStdString();
-                        serverParams->auth = true;
-                    }
-                    else if (opt == sOptionNames[Opt::CONNECTION])
-                    {
-                        int nb = val.toInt(&ok);
-                        if (ok)
-                            serverParams->nbCons = nb;
-                    }               
-                }
-            }
+    // Only the file saveConfig() writes can be merged with it later: a -c
+    // configuration is read, never written back.
+    _configBelief.clear();
+    _configKeptForRestart.clear();
+    _configSections.clear();
+    if (isDefaultConfig) {
+        QFile snapshot(fileInfo.absoluteFilePath());
+        if (snapshot.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QString const text = QString::fromUtf8(snapshot.readAll());
+            _configBelief = topLevelSettings(text);
+            _configSections = sectionsText(text);
         }
-        // Flush any trailing [vpn_profile] block (no [section] header after it).
-        flushVpnProfile();
-        file.close();
     }
 
-    if (legacyAutoCompress && !parsedPack)
-    {
+    _readConfigFile(fileInfo, state, err);
+
+    _settleConfigToolNames(state);
+
+    const bool par2Requested = _resolveConfigTools(state);
+
+    _validateConfigPar2Args(par2Requested);
+
+    // --par2_path replaces this choice for the run, and says so itself.
+    _applyPar2Fallback(par2Requested && !_par2PathOnCommandLine);
+
+    if (state.legacyAutoCompress && !state.parsedPack) {
         _packAutoKeywords = defaultPackKeywords();
         enableAutoPacking();
     }
 
-    // Phase 4 — legacy single-profile config (VPN_BACKEND + VPN_CONFIG_PATH).
-    // Migrate it into a "Default" profile by copying the .ovpn/.conf into
-    // <configDir>/vpn/ if no [vpn_profile] block was found.
-    if (parsedVpnProfiles.isEmpty() && !legacyVpnConfigPath.isEmpty())
-    {
-        QFileInfo legacy(legacyVpnConfigPath);
-        if (legacy.exists() && legacy.isFile())
-        {
-            const QString vpnBase = QDir(_loadedConfigDir.isEmpty()
-                                             ? PathHelper::configDir()
-                                             : _loadedConfigDir)
-                                        .filePath(QStringLiteral("vpn"));
-            QDir().mkpath(vpnBase);
-            QString destName  = legacy.fileName();
-            QString destPath  = QDir(vpnBase).filePath(destName);
-            if (!QFile::exists(destPath))
-                QFile::copy(legacyVpnConfigPath, destPath);
-            VpnProfile p;
-            p.name           = QStringLiteral("Default");
-            bool ok = false;
-            VpnManager::Backend b = VpnManager::backendFromString(legacyVpnBackend, &ok);
-            p.backend        = ok ? b : VpnManager::Backend::OpenVPN;
-            p.configFileName = destName;
-            p.configBaseDir  = _loadedConfigDir;
-            p.hasAuth        = false; // legacy didn't track creds
-            parsedVpnProfiles << p;
-            parsedActiveVpnProfile = p.name;
-            if (useHMI() || !_quiet)
-                _log(tr("VPN: migrated legacy VPN_CONFIG_PATH into profile 'Default'"));
-        }
-    }
-
-    if (_vpnManager)
-        _vpnManager->setProfilesFromConfig(parsedVpnProfiles, parsedActiveVpnProfile);
+    _applyConfigVpnProfiles(state);
 
     if (err.isEmpty())
         _ensurePostHistoryHeader();
@@ -3970,6 +5224,8 @@ void NgPost::_syntax(char *appName)
           << tr("Syntax: ") << app << " (options)* (-i <file or folder> | --auto <folder> | --monitor <folder>)+\n";
     for (const QCommandLineOption & opt : sCmdOptions)
     {
+        if (!VpnManager::vpnPlatformSupported() && _isVpnOverrideOption(opt))
+            continue;
         if (opt.valueName() == sOptionNames[Opt::SERVER])
             _cout << "\n// " << tr("you can provide servers in one string using -S and/or split the parameters for ONE SINGLE server (this will overwrite the configuration file)") << "\n";
         else if (opt.valueName() == sOptionNames[Opt::TMP_DIR])
@@ -4252,13 +5508,25 @@ QString NgPost::parseDefaultConfig()
 
     QString conf = PathHelper::configFilePath();
 
+    // After the migrations, so the copies they just made are covered too, and
+    // before anything reads the credentials out of the file. An installation
+    // predating this is left at whatever mode it was first written with --
+    // 0644 under a standard umask, and there are 0777 ones in the wild.
+    PathHelper::SecretsHardeningResult const hardening = PathHelper::hardenConfigSecrets();
+    for (QString const &path : hardening.repaired)
+        _log(tr("Restricted '%1' to your account: it holds your credentials and was "
+                "readable by other users of this machine")
+                     .arg(path));
+    for (QString const &problem : hardening.unrepairable)
+        _error(tr("Warning: %1").arg(problem));
+
     QString err;
     QFileInfo defaultConf(conf);
     if (defaultConf.exists() && defaultConf.isFile())
     {
         if (!_quiet)
             _cout << tr("Using default config file: %1").arg(conf) << "\n" << MB_FLUSH;
-        err = _parseConfig(conf);
+        err = _parseConfig(conf, true);
     }
     else
         qCritical() << "The default config file doesn't exist: " << conf;
@@ -4297,10 +5565,22 @@ bool NgPost::_confirmMasterSwitchWithoutVpnProfileIfNeeded()
 #endif
 }
 
+bool NgPost::_confirmPostingAdmission()
+{
+    const quint64 generation = _postingCancelGeneration;
+    // Admission can run a nested event loop. A stop remains binding even if
+    // every canceled job has finished before the user answers the dialog.
+    return !_cancelingAll && _confirmMasterSwitchWithoutVpnProfileIfNeeded()
+        && generation == _postingCancelGeneration;
+}
+
 bool NgPost::startPostingJob(PostingJob *job)
 {
+    const auto notify = qScopeGuard([this] { emit postingStateChanged(); });
+    // Admission may open a VPN dialog before this job enters _pendingJobs or
+    // _activeJob. Its nested event loop must not allow shutdown in that gap.
+    const auto admission = holdShutdown();
     _lastPostingStartCanceled = false;
-
 #ifdef __DEBUG__
 qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
          << ", file: " << job->nzbName();
@@ -4314,7 +5594,7 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
     }
 #endif
 
-    if (!_confirmMasterSwitchWithoutVpnProfileIfNeeded()) {
+    if (!_confirmPostingAdmission()) {
         _lastPostingStartCanceled = true;
         _discardUnstartedJob(job);
         return false;
@@ -4330,8 +5610,10 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
     //            another action re-triggers a queue advance (typically the
     //            stateChanged(Connected) listener).
     VpnManager::Admission adm = VpnManager::Admission::Proceed;
-    if (_vpnManager)
-        adm = _vpnManager->admitJob(_nntpServers);
+    if (_vpnManager) {
+        job->_vpnRequired = _vpnManager->jobNeedsVpn(_nntpServers);
+        adm = _vpnManager->admitJob(_nntpServers, job->_vpnRequired);
+    }
 
     if (adm == VpnManager::Admission::Blocked
         || adm == VpnManager::Admission::Wait) {
@@ -4346,21 +5628,17 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::startPostingJob] job: " << job
         return false;
     }
 
-    if (_activeJob)
-    {
+    if (_activeJob || _queuePaused) {
         _pendingJobs << job;
         if (_preparePacking)
         {
-            if (_activeJob->isPacked() && !_packingJob)
+            if (_activeJob && _activeJob->isPacked() && !_packingJob)
                 _prepareNextPacking();
         }
         return false;
-    }
-    else
-    {
-        if (_vpnManager)
-            _vpnManager->retainForJob();
+    } else {
         _activeJob = job;
+        _retainVpnForJob(_activeJob);
         emit job->startPosting(true);
         return true;
     }
@@ -4384,6 +5662,22 @@ void NgPost::_discardUnstartedJob(PostingJob *job)
     job->deleteLater();
 }
 
+void NgPost::_retainVpnForJob(PostingJob *job)
+{
+    if (!job || !_vpnManager || !job->_vpnRequired || job->_vpnRetained)
+        return;
+    _vpnManager->retainForJob();
+    job->_vpnRetained = true;
+}
+
+void NgPost::_releaseVpnForJob(PostingJob *job)
+{
+    if (!job || !_vpnManager || !job->_vpnRetained)
+        return;
+    job->_vpnRetained = false;
+    _vpnManager->releaseForJob();
+}
+
 #ifdef __DEBUG__
 void NgPost::_dumpParams() const
 {
@@ -4405,6 +5699,7 @@ void NgPost::_dumpParams() const
              << " policy: " << sGroupPolicies[_groupPolicy].toUpper()
              << "\narticleSize: " << sArticleSize
              << ", obfuscate articles: " << _obfuscateArticles
+             << ", obfuscate file name: " << _obfuscateFileName
              << ", disp progress bar: " << _dispProgressBar
              << ", disp posting files: " << _dispFilesPosting
              << ", logInFile (GUI only): " << (_logFile == nullptr ? "NO" : "YES")
@@ -4429,13 +5724,493 @@ void NgPost::_dumpParams() const
 
 void NgPost::_showVersionASCII() const
 {
-    _cout << sNgPostASCII
-          << "                          v" << sVersion << "\n\n"
-          << PostingJob::sslSupportInfo()  << "\n"
+    _cout << sNgPostASCII << "                          v" << sVersion << "\n\n"
+          << PostingJob::sslSupportInfo() << "\n"
           << MB_FLUSH;
 }
 
-void NgPost::saveConfig()
+void NgPost::_writeConfigGeneral(QTextStream &stream)
+{
+    // clang-format off
+    // One stream line per line of the file: the layout mirrors what is written.
+    stream << tr("# ngPost configuration file") << "\n"
+           << "#\n"
+           << "#\n"
+           << "\n"
+           << tr("## Lang for the app. Currently supported: EN, FR, ES, DE, NL, PT, ZH") << "\n"
+           << "lang = " << _lang.toUpper() << "\n"
+           << "\n"
+           << tr("## use Proxy (only Socks5 type!)") << "\n"
+           << (_proxyUrl.isEmpty()  ? "#PROXY_SOCKS5 = user:pass@192.168.1.1:5555" : _proxyUrl)  << "\n"
+           << "\n"
+           << tr("## destination folder for all your nzb") << "\n"
+           << tr("## if you don't put anything, the nzb will be generated in the folder of ngPost on Windows and in /tmp on Linux") << "\n"
+           << tr("## this will be overwritten if you use the option -o with the full path of the nzb") << "\n"
+           << "nzbPath  = " << (_nzbPath.isEmpty() ? _nzbPathConf : _nzbPath) << "\n"
+           << "\n"
+           << tr("## Shutdown command to switch off the computer when ngPost is done with all its queued posting") << "\n"
+           << tr("## this should mainly used with the auto posting") << "\n"
+           << tr("## you could use whatever script instead (like to send a mail...)") << "\n"
+           << tr("## the three lines below are for Windows, Linux and macOS, in that order;")
+           << "\n"
+           << tr("## the last two need sudo rights without a password. Uncomment one as it is:")
+           << "\n"
+           << tr("## anything after the = is the command, including a note in parentheses.")
+           << "\n"
+           << "#SHUTDOWN_CMD = shutdown /s /f /t 0\n"
+           << "#SHUTDOWN_CMD = sudo -n /sbin/poweroff\n"
+           << "#SHUTDOWN_CMD = sudo -n shutdown -h now\n"
+           << "SHUTDOWN_CMD = " << _shutdownCmd << "\n"
+           << "\n"
+           << tr("## upload the nzb to a specific URL") << "\n"
+           << tr("## only http, https or ftp (neither ftps or sftp are supported)") << "\n"
+           << tr("#NZB_UPLOAD_URL = ftp://user:pass@url_or_ip:21") << "\n"
+           << (_urlNzbUploadStr.isEmpty() ? QString() : QString("NZB_UPLOAD_URL = %1\n").arg(_urlNzbUpload->url()))
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigPostCommands(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## execute a command or script at the end of each post (see examples)") << "\n"
+           << tr("## you can use several post commands by defining several NZB_POST_CMD") << "\n"
+           << tr("## here is the list of the available variables") << "\n"
+           << "" ;
+    for (PostInfoTemplate::FieldDoc const &field : PostInfoTemplate::fields())
+        stream << "##   " << QString::fromLatin1(field.placeholder).leftJustified(22)
+               << ": "
+               << QCoreApplication::translate("PostInfoTemplate", field.description)
+               << "\n";
+    stream << "##   " << QString(QStringLiteral("__date:<format>__")).leftJustified(22)
+           << ": " << tr("date of the post, ex: __date:dd/MM/yyyy__") << "\n"
+           << "##   " << QString(QStringLiteral("__meta:<name>__")).leftJustified(22)
+           << ": " << tr("one of your own fields (--post_meta, or --meta to publish it too)")
+           << "\n"
+           << "#\n"
+           << "#NZB_POST_CMD = scp \"__nzbPath__\" myBox.com:~/nzbs/\n"
+           << "#NZB_POST_CMD = zip \"__nzbPath__.zip\" \"__nzbPath__\"\n"
+           << "#NZB_POST_CMD = ~/scripts/postNZB.sh \"__nzbPath__\" \"__groups__\" __rarName__ __rarPass__ __sizeInByte__ __nbFiles__ __nbArticles__ __nbArticlesFailed__\n"
+           << "#NZB_POST_CMD = mysql -h localhost -D myDB -u myUser -pmyPass-e \"INSERT INTO POST (release, rarName, rarPass, size) VALUES('__nzbName__', '__rarName__', '__rarPass__', '__sizeInByte__')\"\n"
+           << "#NZB_POST_CMD = cmd.exe /C move \"__nzbPath__\" \"C:\\ngPost\\nzb\\__nzbName__{{__rarPass__}}.nzb\"\n"
+           << "#NZB_POST_CMD = curl -X POST -F \"file=@__nzbPath__\" -F \"api=12345\" -F \"cat=45\" -F \"private=no\" https://usenet.com/post-api\n"
+           << "" ;
+    for (const QString &nzbPostCmd : _nzbPostCmd)
+        stream << "NZB_POST_CMD = " << nzbPostCmd << "\n";
+    stream << "\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigPostInfo(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## write a post info file next to the nzb after each post") << "\n"
+           << tr("## you give the model, ngPost fills in the blanks: it knows no index format") << "\n"
+           << tr("## the model can live anywhere you can read, the file anywhere you can write") << "\n"
+           << tr("## a bare file name means \"next to this file\"; write the full path otherwise") << "\n"
+           << "#POST_INFO_TEMPLATE = my_record_sheet.txt\n"
+           << (_postInfoTemplate.isEmpty()
+                   ? QString()
+                   : QString("POST_INFO_TEMPLATE = %1\n").arg(_postInfoTemplate))
+           << "\n"
+           << tr("## where to write it (the variables above work here too)") << "\n"
+           << (_postInfoOutput == QString(sDefaultPostInfoOutput) ? "#" : "")
+           << "POST_INFO_OUTPUT = " << _postInfoOutput << "\n"
+           << "\n"
+           << tr("## by default no post info file is written for a failed or partial post,") << "\n"
+           << tr("## which is what you want when an index imports them automatically") << "\n"
+           << (_postInfoOnlySuccess ? "#" : "") << "POST_INFO_ONLY_ON_SUCCESS = "
+           << (_postInfoOnlySuccess ? "true" : "false") << "\n"
+           << "\n"
+           << tr("## kill a post command that hangs, in seconds (0 = wait forever)") << "\n"
+           << tr("## ngPost waits for its post commands before quitting, so a stuck one") << "\n"
+           << tr("## keeps it alive; Ctrl+C always interrupts") << "\n"
+           << (_postCmdTimeoutSec == 0 ? "#" : "") << "POST_CMD_TIMEOUT = "
+           << (_postCmdTimeoutSec == 0 ? 300 : _postCmdTimeoutSec) << "\n"
+           << "\n"
+           << tr("## same for the nzb upload, which would otherwise block the exit") << "\n"
+           << (_nzbUploadTimeoutSec == sDefaultNzbUploadTimeoutSec ? "#" : "")
+           << "NZB_UPLOAD_TIMEOUT = " << _nzbUploadTimeoutSec << "\n"
+           << "\n"
+           << tr("## a post command that fails is reported but does not fail the run;") << "\n"
+           << tr("## set this to true if you automate and want a non zero exit code") << "\n"
+           << (_postCmdFailIsError ? "" : "#") << "POST_CMD_FAIL_IS_ERROR = true\n"
+           << "\n"
+           << tr("## the archive password is never put in the environment nor in the json") << "\n"
+           << tr("## given to a post command; __rarPass__ in the arguments still works") << "\n"
+           << (_postCmdExposePassword ? "" : "#") << "POST_CMD_EXPOSE_PASSWORD = true\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigMonitoring(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## nzb files are normally all created in nzbPath") << "\n"
+           << tr("## but using this option, the nzb of each monitoring folder will be stored in their own folder (created in nzbPath)") << "\n"
+           << (_monitor_nzb_folders  ? "" : "#") << "MONITOR_NZB_FOLDERS = true\n"
+           << "\n"
+           << tr("## for monitoring, extension file filter for new incoming files (coma separated, no dot)") << "\n"
+           << (_monitorExtensions.isEmpty()  ? "#" : "") << "MONITOR_EXTENSIONS = "
+           << (_monitorExtensions.isEmpty() ? "mkv,mp4,avi,zip,tar,gz,iso" : _monitorExtensions.join(",")) << "\n"
+           << "\n"
+           << tr("## for monitoring, ignore new incoming folders") << "\n"
+           << (_monitorIgnoreDir  ? "" : "#") << "MONITOR_IGNORE_DIR = true\n"
+           << tr("## for monitoring, delay to check the size of an incoming file/folder to make sure it is fully arrived before posting it") << "\n"
+           << tr("## must be between 1sec and 120sec (otherwise default: 1sec)") << "\n"
+           << "MONITOR_SEC_DELAY_SCAN = "  << _monitorSecDelayScan << "\n"
+           << "\n\n"
+           << tr("## Default folder to open to select files from the HMI") << "\n"
+           << "inputDir = " << _inputDir << "\n"
+           << "\n"
+           << tr("## History posting file") << "\n"
+           << tr("## each succesful post will append a line with the date, the file name, the archive name, the password...") << "\n"
+           << (_postHistoryFile.isEmpty()  ? "#" : "") <<"POST_HISTORY = "
+           << (_postHistoryFile.isEmpty()  ? "/nzb/ngPost_history.csv" : _postHistoryFile) << "\n"
+           << "\n"
+           << tr("## Character used to separate fields in the history posting file") << "\n"
+           << (_historyFieldSeparator == QString(sDefaultFieldSeparator) ? "#" : "") << "FIELD_SEPARATOR = " << _historyFieldSeparator << "\n"
+           << "\n"
+           << tr("## Structured SQLite history database") << "\n"
+           << "POST_DB = " << _postDbFile << "\n"
+           << tr("## Store archive passwords in the structured history database") << "\n"
+           << "HISTORY_STORE_PASSWORDS = " << (_historyStorePasswords ? "true" : "false") << "\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigPosting(QTextStream &stream)
+{
+    // clang-format off
+    stream << "GROUPS   = " << _grpList.join(",") << "\n"
+           << "\n"
+           << tr("## If you give several Groups (comma separated) you've 3 policies for posting:") << "\n"
+           << tr("##    ALL       : everything is posted on ALL the Groups") << "\n"
+           << tr("##    EACH_POST : each Post will be posted on a random Group from the list") << "\n"
+           << tr("##    EACH_FILE : each File will be posted on a random Group from the list") << "\n"
+           << "GROUP_POLICY = " << sGroupPolicies[_groupPolicy].toUpper()
+           << "\n"
+           << "\n"
+           << tr("## uncomment the next line if you want a fixed uploader email (in the nzb and in the header of each articles)") << "\n"
+           << tr("## if you let it commented, we'll generate ONE random email for all the posts of the session") << "\n"
+           << (_saveFrom  ? "" : "#") << "FROM = " << _from.c_str() << "\n"
+           << "\n"
+           << tr("## Generate new random poster for each post (--auto or --monitor)") << "\n"
+           << tr("## if this option is set the FROM email just above will be ignored") << "\n"
+           << (_genFrom  ? "" : "#") << "GEN_FROM = true" << "\n"
+           << "\n"
+           << "\n"
+           << tr("## uncomment the next line to limit the number of threads,  (by default it'll use the number of cores)") << "\n"
+           << tr("## all the connections are spread equally on those posting threads") << "\n"
+           << "thread  =  " << _nbThreads << "\n"
+           << "\n"
+           << "\n"
+           << tr("## How to display progressbar in command line: NONE, BAR, FILES") << "\n"
+           << (_dispProgressBar  ? "" : "#") << "DISP_Progress = BAR\n"
+           << (_dispFilesPosting ? "" : "#") << "DISP_Progress = FILES\n"
+           << "\n"
+           << "\n"
+           << tr("## suffix of the msg_id for all the articles (cf nzb file)") << "\n"
+           << (sArticleIdSignature == "ngPost" ? "#msg_id  =  ngPost\n" : QString("msg_id  =  %1\n").arg(sArticleIdSignature.c_str()))
+           << "\n"
+           << tr("## article size (default 700k)") << "\n"
+           << "article_size = " << sArticleSize << "\n"
+           << "\n"
+           << tr("## number of retry to post an Article in case of failure (probably due to an already existing msg-id)") << "\n"
+           << "retry = " << NntpArticle::nbMaxTrySending() << "\n"
+           << "\n"
+           << "\n"
+           << tr("## uncomment the following line to obfuscate the subjects of each Article") << "\n"
+           << tr("## /!\\ CAREFUL you won't find your post if you lose the nzb file /!\\") << "\n"
+           << tr("## 'filename' renames the input files with a random name before compressing") << "\n"
+           << tr("## them, so the archive carries no original name. Both can be asked at once.") << "\n"
+           << (_obfuscateArticles || _obfuscateFileName ? "" : "#") << "obfuscate = "
+           << _obfuscationKinds() << "\n"
+           << "\n"
+           << tr("## remove accents and special characters from the nzb file names") << "\n"
+           << (_removeAccentsOnNzbFileName  ? "" : "#") << "NZB_RM_ACCENTS = true\n"
+           << "\n"
+           << tr("## close Quick Post Tabs when posted successfully (for the GUI)") << "\n"
+           << (_autoCloseTabs  ? "" : "#") << "AUTO_CLOSE_TABS = true\n"
+           << "\n"
+           << tr("## check GitHub (Hydro74000/ngPost) for a new ngPost release at each GUI start") << "\n"
+           << "CHECK_FOR_UPDATES = " << (_checkForUpdates ? "true" : "false") << "\n"
+           << "\n"
+           << tr("## User interface zoom percentage (80 to 150, default 100)") << "\n"
+           << "UI_ZOOM = " << _uiZoom << "\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigVpn(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## tunnel selected ngPost connections through an embedded VPN") << "\n"
+           << tr("## the VPN affects ngPost only; the rest of the system is unchanged") << "\n"
+           << "VPN_AUTO_CONNECT = " << (_vpnManager && _vpnManager->autoConnect() ? "true" : "false") << "\n"
+           << "VPN_ACTIVE_PROFILE = " << (_vpnManager ? _vpnManager->activeProfileName() : QString()) << "\n"
+           << tr("## CLI only: wait for the machine-wide VPN lease (0 fails immediately; range 0..1440)") << "\n"
+           << "VPN_LEASE_WAIT_MINUTES = " << (_vpnManager ? _vpnManager->leaseWaitMinutes() : 5) << "\n"
+           << tr("## VPN recovery attempts (0 = unlimited; range 0..1000)") << "\n"
+           << "VPN_RECOVERY_MAX_ATTEMPTS = " << (_vpnManager ? _vpnManager->recoveryMaxAttempts() : 0) << "\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigTransfer(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## when obfuscating file names, keep the .nfo extension visible") << "\n"
+           << (_keepNfoExtension ? "" : "#") << "KEEP_NFO_EXTENSION = true\n"
+           << "\n"
+           << tr("## copy the .nfo file (if present in the original files) next to the generated nzb") << "\n"
+           << (_copyNfoWithNzb ? "" : "#") << "NZB_COPY_NFO = true\n"
+           << "\n"
+           << tr("## auto-post (--auto / --monitor): if a posted file has a sibling .nfo") << "\n"
+           << tr("## (same name, different extension) next to it, include that .nfo in the same post") << "\n"
+           << (_autoIncludeNfo ? "" : "#") << "AUTO_INCLUDE_NFO = true\n"
+           << "\n"
+           << "\n"
+           << tr("## Time to wait (seconds) before trying to resume a Post automatically in case of loss of Network (min: %1)").arg(
+                  sDefaultResumeWaitInSec) << "\n"
+           << "RESUME_WAIT = " << _waitDurationBeforeAutoResume << "\n"
+           << "\n"
+           << tr("## By default, ngPost tries to resume a Post if the network is down.") << "\n"
+           << tr("## it won't stop trying until the network is back and the post is finished properly") << "\n"
+           << tr("## disabling auto-resume still preserves unconfirmed articles as unknown") << "\n"
+           << (_tryResumePostWhenConnectionLost  ? "#" : "") << "NO_RESUME_AUTO = true\n"
+           << "\n"
+           << tr("## if there is no activity on a connection it will be closed and restarted") << "\n"
+           << tr("## The duration is in second, default: %1, min: %2)").arg(sDefaultSocketTimeOut/1000).arg(sMinSocketTimeOut/1000) << "\n"
+           << "SOCK_TIMEOUT = " << _socketTimeOut / 1000 << "\n"
+           << "\n"
+           << tr("## when several Posts are queued, prepare the packing of the next Post while uploading the current one") << "\n"
+           << (_preparePacking ? "" : "#") << "PREPARE_PACKING = true" << "\n"
+           << "\n"
+           << tr("## For GUI ONLY, save the logs in a file (to debug potential crashes)") << "\n"
+           << tr("## ngPost.log is written in the ngPost configuration folder") << "\n"
+           << tr("## The log is overwritten each time ngPost is launched") << "\n"
+           << tr("## => after a crash, please SAVE the log before relaunching ngPost") << "\n"
+           << (_logStream != nullptr ? "" : "#") << "LOG_IN_FILE = true" << "\n"
+           << "\n"
+           << "\n"
+           << "\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigPacking(QTextStream &stream)
+{
+    // clang-format off
+    stream << "##############################################################\n"
+           << "##           Compression and par2 section                   ##\n"
+           << "##############################################################\n"
+           << "\n"
+           << tr("## Shortcut for automatic packing for both GUI and CMD using --pack") << "\n"
+           << tr("## coma separated list using the keywords COMPRESS, GEN_NAME, GEN_PASS and GEN_PAR2") << "\n"
+           << tr("## For Auto posting and Monitoring if you don't use COMPRESS you need GEN_PA2") << "\n"
+           << tr("#PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2") << "\n"
+           << tr("#PACK = GEN_PAR2") << "\n";
+    // Rebuild the PACK keyword list from the current per-job flag state
+    // each time we save, otherwise toggling Compress / Generate Par2 in
+    // the GUI never propagates to the on-disk PACK = ... line and the
+    // user's choice silently rolls back to whatever was loaded.
+    if (_packAuto) {
+        _packAutoKeywords.clear();
+        if (_doCompress) _packAutoKeywords << sOptionNames[Opt::COMPRESS];
+        if (_genName)    _packAutoKeywords << sOptionNames[Opt::GEN_NAME];
+        if (_genPass)    _packAutoKeywords << sOptionNames[Opt::GEN_PASS];
+        if (_doPar2)     _packAutoKeywords << sOptionNames[Opt::GEN_PAR2];
+    }
+    stream << (_packAuto && _packAutoKeywords.size() ? QString("PACK = %1\n").arg(_packAutoKeywords.join(", ").toUpper()) : "")
+           << "\n"
+           << tr("## use the same Password for all your Posts using compression") << "\n"
+      #ifdef __USE_HMI__
+           << (_hmi?(_hmi->useFixedPassword()?"":"#"):(_rarPassFixed.isEmpty()  ? "#" : ""))
+      #else
+           << (_rarPassFixed.isEmpty()  ? "#" : "")
+      #endif
+           << "RAR_PASS = " << (_rarPassFixed.isEmpty()  ? "yourPassword" : _rarPassFixed) << "\n"
+           << "\n"
+           << tr("## temporary folder where the compressed files and par2 will be stored") << "\n"
+           << tr("## so we can post directly a compressed (obfuscated or not) archive of the selected files") << "\n"
+           << tr("## /!\\ The directory MUST HAVE WRITE PERMISSION /!\\") << "\n"
+           << tr("## this is set for Linux environment, Windows users MUST change it") << "\n"
+           << "TMP_DIR = " << _tmpPath << "\n"
+           << "\n";
+#ifdef __USE_TMP_RAM__
+    stream << tr("## temporary folder with size constraint, typically a tmpfs partition") << "\n"
+           << tr("## the size of a post multiply by TMP_RAM_RATIO must available on the disk") << "\n"
+           << tr("## otherwise ngPost will use TMP_DIR (with no check there)") << "\n"
+           << tr("## (uncomment and define TMP_RAM to activate the feature, make sure the path is writable)") << "\n"
+           << (_ramPath.isEmpty() ? "#" : "") << "TMP_RAM = " << (_ramPath.isEmpty() ? "/mnt/ngPost_tmpfs" : _ramPath) << "\n"
+           << "\n"
+           << tr("## Ratio used on the source files size to compensate the par2 generation") << "\n"
+           << tr("## min is 10% to be sure (so 1.1), max 2.0") << "\n"
+           << "TMP_RAM_RATIO = " << _ramRatio << "\n"
+           << "\n";
+#endif
+    // clang-format on
+}
+
+void NgPost::_writeConfigArchive(QTextStream &stream)
+{
+    // clang-format off
+    stream << "RAR_TOOL = " << _rarTool << "\n"
+           << (_rarPathMode == externaltool::PathMode::Automatic && !_rarPathConfig.isEmpty()
+                   ? QString() : QString("RAR_SOURCE = %1\n").arg(externaltool::modeName(_rarPathMode)))
+           << tr("## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.") << "\n"
+           << (!_rarPathConfig.isEmpty() ? QString("RAR_PATH = %1\n").arg(_rarPathConfig) : QString())
+           << "\n"
+           << tr("## RAR EXTRA options (the first 'a' and '-idp' will be added automatically)") << "\n"
+           << tr("## -hp will be added if you use a password with --gen_pass, --rar_pass or using the HMI") << "\n"
+           << tr("## -v42m will be added with --rar_size or using the HMI") << "\n"
+           << tr("## you could change the compression level, lock the archive, add redundancy...") << "\n"
+           << tr("## the first line below is for rar, the second for 7-zip:") << "\n"
+           << "#RAR_EXTRA = -ep1 -m0 -k -rr5p\n"
+           << "#RAR_EXTRA = -mx0 -mhe=on\n"
+           << (_rarArgs.isEmpty() ? "" : QString("RAR_EXTRA = %1\n").arg(_rarArgs) )
+           << "\n"
+           << tr("## RAR volume size in MiB (1 MiB = 1048576 bytes; 0 means no split without RAR_MAX)") << "\n"
+           << tr("## feel free to change the value or to comment the next line if you don't want to split the archive") << "\n"
+           << "RAR_SIZE = " << _rarSize << "\n"
+           << "\n"
+           << tr("## Optional maximum number of archive volumes; commented means no limit.") << "\n"
+           << tr("## When enabled, this limit takes priority over RAR_SIZE if a larger volume size is needed.") << "\n"
+           << tr("## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.") << "\n"
+           << (_useRarMax ? "" : "#") << "RAR_MAX = " << _rarMax << "\n"
+           << "\n"
+           << tr("##  keep rar folder after posting (otherwise it is automatically deleted uppon successful post)") << "\n"
+           << (_keepRarDefault ? "" : "#") << "KEEP_RAR = true\n"
+           << "\n"
+           << "## " << tr("Remove root (parent) folder when compressing Folders using RAR") << "\n"
+           << (_rarNoRootFolder  ? "" : "#") << "RAR_NO_ROOT_FOLDER = true\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigPar2(QTextStream &stream)
+{
+    // clang-format off
+    stream << tr("## par2 redundancy percentage (0 by default meaning NO par2 generation)") << "\n"
+           << "PAR2_PCT = " << _par2PctDefault << "\n"
+           << "PAR2_TOOL = " << par2::toolName(_par2Tool) << "\n"
+           << (_par2PathMode == externaltool::PathMode::Automatic && !_par2PathConfig.isEmpty()
+                   ? QString() : QString("PAR2_SOURCE = %1\n").arg(externaltool::modeName(_par2PathMode)))
+           << "\n"
+           << tr("## Automatic paths use the selected tool from the current bundle or the system. Custom paths must point to an executable.") << "\n";
+    if (!_par2PathConfig.isEmpty())
+        stream << "PAR2_PATH = " << _par2PathConfig << "\n";
+#if defined(Q_OS_WIN) || defined(WIN32) || defined(__MINGW64__)
+    stream << "#PAR2_PATH = <your_path>parpar.exe\n"
+           << "#PAR2_PATH = <your_path>par2j64.exe\n";
+#else
+    stream << "#PAR2_PATH = /usr/bin/par2\n"
+           << "#PAR2_PATH = <your_path>/parpar\n";
+#endif
+    stream << "\n"
+           << tr("## fixed parameters for the par2 (or alternative) command") << "\n"
+           << tr("## The PAR2 Settings window of the GUI owns this line and rewrites it from its "
+                 "fields, so editing it here does not last.")
+           << "\n"
+           << (_par2Args.isEmpty() ? "" : QString("PAR2_ARGS = %1\n").arg(_par2Args))
+           << "\n"
+           << tr("## Your own arguments: uncomment one line below and ngPost runs it instead of")
+           << "\n"
+           << tr("## PAR2_ARGS, without ever rewriting it. Only the redundancy of each post is")
+           << "\n"
+           << tr("## replaced. Comment it again to go back to the PAR2 Settings fields.") << "\n"
+           << tr("## Write it for the tool PAR2_TOOL selects: one rejects the switches of another.")
+           << "\n"
+           << tr("## the three lines below are for ParPar, par2cmdline and MultiPar, in that")
+           << "\n"
+           << tr("## order. Uncomment one as it is: everything after the = is passed to the")
+           << "\n"
+           << tr("## tool, a note in parentheses included.") << "\n"
+           << "#PAR2_ARGS_CUSTOM = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q\n"
+           << "#PAR2_ARGS_CUSTOM = c -l -m1024 -r8 -s768000\n"
+           << "#PAR2_ARGS_CUSTOM = c /rr8 /sn3000 /rd3 /ls2 /lr260000000\n"
+           << (_par2ArgsCustom.isEmpty()
+                   ? ""
+                   : QString("PAR2_ARGS_CUSTOM = %1\n").arg(_par2ArgsCustom))
+           << "\n"
+           << tr("## PAR2 slice size in bytes, used by --check to weigh a loss against the")
+           << "\n"
+           << tr("## recovery blocks. Without it the check infers one and refuses to declare")
+           << "\n"
+           << tr("## a post beyond repair.") << "\n"
+           << "#PAR2_BLOCK_SIZE = 768000\n"
+           << (_par2BlockSize > 0 ? QString("PAR2_BLOCK_SIZE = %1\n").arg(_par2BlockSize) : "")
+           << "\n"
+           << "\n"
+           << tr("## length of the random generated archive's file name") << "\n"
+           << "LENGTH_NAME = " << _lengthName << "\n"
+           << "\n"
+           << tr("## length of the random archive's passsword") << "\n"
+           << "LENGTH_PASS = "<< _lengthPassDefault << "\n"
+           << "\n"
+           << "\n"
+           << "\n"
+           << "\n"
+           << "##############################################################\n"
+           << "##                   servers section                        ##\n"
+           << "##############################################################\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigServers(QTextStream &stream)
+{
+    // clang-format off
+    for (NntpServerParams *param : _nntpServers)
+    {
+        stream << "[server]\n"
+               << "host = " << param->host << "\n"
+               << "port = " << param->port << "\n"
+               << "ssl  = " << (param->useSSL ? "true" : "false") << "\n"
+               << "user = " << param->user.c_str() << "\n"
+               << "pass = " << param->pass.c_str() << "\n"
+               << "connection = " << param->nbCons << "\n"
+               << "enabled = " << (param->enabled ? "true":"false") << "\n"
+               << "nzbCheck = " << (param->nzbCheck ? "true":"false") << "\n"
+               << "useVpn = " << (param->useVpn ? "true":"false") << "\n"
+               << "\n\n";
+    }
+    stream << tr("## You can add as many server if you have several providers by adding other \"server\" sections") << "\n"
+           << "#[server]\n"
+           << "#host = news.otherprovider.com\n"
+           << "#port = 563\n"
+           << "#ssl  = true\n"
+           << "#user = myOtherUser\n"
+           << "#pass = myOtherPass\n"
+           << "#connection = 15\n"
+           << "#enabled = false\n"
+           << "#nzbCheck = false\n"
+           << "\n";
+    // clang-format on
+}
+
+void NgPost::_writeConfigVpnProfiles(QTextStream &stream)
+{
+    // clang-format off
+    // Phase 4 — VPN profiles. The config files themselves live under
+    // <configDir>/vpn/; we only persist metadata here. Credentials are
+    // never saved in this file (keychain or inline-in-ovpn only).
+    if (_vpnManager) {
+        for (VpnProfile const &p : _vpnManager->profiles()) {
+            stream << "[vpn_profile]\n"
+                   << "name        = " << p.name << "\n"
+                   << "backend     = " << VpnManager::backendToString(p.backend) << "\n"
+                   << "config_file = " << p.configFileName << "\n"
+                   << "has_auth    = " << (p.hasAuth ? "true" : "false") << "\n"
+                   << "\n";
+        }
+    }
+    // clang-format on
+}
+
+void NgPost::saveConfig(bool silent)
 {
 #ifdef __USE_HMI__
     if (_hmi)
@@ -4444,394 +6219,67 @@ void NgPost::saveConfig()
 
     QString conf = PathHelper::configFilePath();
 
+    // Opened before the text is built, as it always was: when the folder refuses a
+    // new file, the configuration is left alone and the writer -- which asks the
+    // windows for more than updateConfigFromUi() above took -- does not run.
     QSaveFile file(conf);
-    if (file.open(QIODevice::WriteOnly|QIODevice::Text))
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
+        return;
+    }
+
+    // Built in memory: this text is what ngPost holds, and the file may have
+    // been edited since it was read. _mergeExternalConfigEdits() folds those
+    // edits into it, so nothing needs to be copied aside.
+    QString text;
     {
-        QTextStream stream(&file);
-        stream << tr("# ngPost configuration file") << "\n"
-               << "#\n"
-               << "#\n"
-               << "\n"
-               << tr("## Lang for the app. Currently supported: EN, FR, ES, DE, NL, PT, ZH") << "\n"
-               << "lang = " << _lang.toUpper() << "\n"
-               << "\n"
-               << tr("## use Proxy (only Socks5 type!)") << "\n"
-               << (_proxyUrl.isEmpty()  ? "#PROXY_SOCKS5 = user:pass@192.168.1.1:5555" : _proxyUrl)  << "\n"
-               << "\n"
-               << tr("## destination folder for all your nzb") << "\n"
-               << tr("## if you don't put anything, the nzb will be generated in the folder of ngPost on Windows and in /tmp on Linux") << "\n"
-               << tr("## this will be overwritten if you use the option -o with the full path of the nzb") << "\n"
-               << "nzbPath  = " << (_nzbPath.isEmpty() ? _nzbPathConf : _nzbPath) << "\n"
-               << "\n"
-               << tr("## Shutdown command to switch off the computer when ngPost is done with all its queued posting") << "\n"
-               << tr("## this should mainly used with the auto posting") << "\n"
-               << tr("## you could use whatever script instead (like to send a mail...)") << "\n"
-               << tr("#SHUTDOWN_CMD = shutdown /s /f /t 0  (Windows)") << "\n"
-               << tr("#SHUTDOWN_CMD = sudo -n /sbin/poweroff  (Linux, make sure poweroff has sudo rights without any password or change the command)") << "\n"
-               << tr("#SHUTDOWN_CMD = sudo -n shutdown -h now (MacOS, same make sure you've sudo rights)") << "\n"
-               << "SHUTDOWN_CMD = " << _shutdownCmd << "\n"
-               << "\n"
-               << tr("## upload the nzb to a specific URL") << "\n"
-               << tr("## only http, https or ftp (neither ftps or sftp are supported)") << "\n"
-               << tr("#NZB_UPLOAD_URL = ftp://user:pass@url_or_ip:21") << "\n"
-               << (_urlNzbUploadStr.isEmpty() ? QString() : QString("NZB_UPLOAD_URL = %1\n").arg(_urlNzbUpload->url()))
-               << "\n"
-               << tr("## execute a command or script at the end of each post (see examples)") << "\n"
-               << tr("## you can use several post commands by defining several NZB_POST_CMD") << "\n"
-               << tr("## here is the list of the available variables") << "\n"
-               << "" ;
-        for (PostInfoTemplate::FieldDoc const &field : PostInfoTemplate::fields())
-            stream << "##   " << QString::fromLatin1(field.placeholder).leftJustified(22)
-                   << ": "
-                   << QCoreApplication::translate("PostInfoTemplate", field.description)
-                   << "\n";
-        stream << "##   " << QString(QStringLiteral("__date:<format>__")).leftJustified(22)
-               << ": " << tr("date of the post, ex: __date:dd/MM/yyyy__") << "\n"
-               << "##   " << QString(QStringLiteral("__meta:<name>__")).leftJustified(22)
-               << ": " << tr("one of your own fields (--post_meta, or --meta to publish it too)")
-               << "\n"
-               << "#\n"
-               << "#NZB_POST_CMD = scp \"__nzbPath__\" myBox.com:~/nzbs/\n"
-               << "#NZB_POST_CMD = zip \"__nzbPath__.zip\" \"__nzbPath__\"\n"
-               << "#NZB_POST_CMD = ~/scripts/postNZB.sh \"__nzbPath__\" \"__groups__\" __rarName__ __rarPass__ __sizeInByte__ __nbFiles__ __nbArticles__ __nbArticlesFailed__\n"
-               << "#NZB_POST_CMD = mysql -h localhost -D myDB -u myUser -pmyPass-e \"INSERT INTO POST (release, rarName, rarPass, size) VALUES('__nzbName__', '__rarName__', '__rarPass__', '__sizeInByte__')\"\n"
-               << "#NZB_POST_CMD = cmd.exe /C move \"__nzbPath__\" \"C:\\ngPost\\nzb\\__nzbName__{{__rarPass__}}.nzb\"\n"
-               << "#NZB_POST_CMD = curl -X POST -F \"file=@__nzbPath__\" -F \"api=12345\" -F \"cat=45\" -F \"private=no\" https://usenet.com/post-api\n"
-               << "" ;
-        for (const QString &nzbPostCmd : _nzbPostCmd)
-            stream << "NZB_POST_CMD = " << nzbPostCmd << "\n";
-        stream << "\n"
-               << "\n"
-               << tr("## write a post info file next to the nzb after each post") << "\n"
-               << tr("## you give the model, ngPost fills in the blanks: it knows no index format") << "\n"
-               << tr("## the model can live anywhere you can read, the file anywhere you can write") << "\n"
-               << tr("## a bare file name means \"next to this file\"; write the full path otherwise") << "\n"
-               << "#POST_INFO_TEMPLATE = my_record_sheet.txt\n"
-               << (_postInfoTemplate.isEmpty()
-                       ? QString()
-                       : QString("POST_INFO_TEMPLATE = %1\n").arg(_postInfoTemplate))
-               << "\n"
-               << tr("## where to write it (the variables above work here too)") << "\n"
-               << (_postInfoOutput == QString(sDefaultPostInfoOutput) ? "#" : "")
-               << "POST_INFO_OUTPUT = " << _postInfoOutput << "\n"
-               << "\n"
-               << tr("## by default no post info file is written for a failed or partial post,") << "\n"
-               << tr("## which is what you want when an index imports them automatically") << "\n"
-               << (_postInfoOnlySuccess ? "#" : "") << "POST_INFO_ONLY_ON_SUCCESS = "
-               << (_postInfoOnlySuccess ? "true" : "false") << "\n"
-               << "\n"
-               << tr("## kill a post command that hangs, in seconds (0 = wait forever)") << "\n"
-               << tr("## ngPost waits for its post commands before quitting, so a stuck one") << "\n"
-               << tr("## keeps it alive; Ctrl+C always interrupts") << "\n"
-               << (_postCmdTimeoutSec == 0 ? "#" : "") << "POST_CMD_TIMEOUT = "
-               << (_postCmdTimeoutSec == 0 ? 300 : _postCmdTimeoutSec) << "\n"
-               << "\n"
-               << tr("## same for the nzb upload, which would otherwise block the exit") << "\n"
-               << (_nzbUploadTimeoutSec == sDefaultNzbUploadTimeoutSec ? "#" : "")
-               << "NZB_UPLOAD_TIMEOUT = " << _nzbUploadTimeoutSec << "\n"
-               << "\n"
-               << tr("## a post command that fails is reported but does not fail the run;") << "\n"
-               << tr("## set this to true if you automate and want a non zero exit code") << "\n"
-               << (_postCmdFailIsError ? "" : "#") << "POST_CMD_FAIL_IS_ERROR = true\n"
-               << "\n"
-               << tr("## the archive password is never put in the environment nor in the json") << "\n"
-               << tr("## given to a post command; __rarPass__ in the arguments still works") << "\n"
-               << (_postCmdExposePassword ? "" : "#") << "POST_CMD_EXPOSE_PASSWORD = true\n"
-               << "\n"
-               << tr("## nzb files are normally all created in nzbPath") << "\n"
-               << tr("## but using this option, the nzb of each monitoring folder will be stored in their own folder (created in nzbPath)") << "\n"
-               << (_monitor_nzb_folders  ? "" : "#") << "MONITOR_NZB_FOLDERS = true\n"
-               << "\n"
-               << tr("## for monitoring, extension file filter for new incoming files (coma separated, no dot)") << "\n"
-               << (_monitorExtensions.isEmpty()  ? "#" : "") << "MONITOR_EXTENSIONS = "
-               << (_monitorExtensions.isEmpty() ? "mkv,mp4,avi,zip,tar,gz,iso" : _monitorExtensions.join(",")) << "\n"
-               << "\n"
-               << tr("## for monitoring, ignore new incoming folders") << "\n"
-               << (_monitorIgnoreDir  ? "" : "#") << "MONITOR_IGNORE_DIR = true\n"
-               << tr("## for monitoring, delay to check the size of an incoming file/folder to make sure it is fully arrived before posting it") << "\n"
-               << tr("## must be between 1sec and 120sec (otherwise default: 1sec)") << "\n"
-               << "MONITOR_SEC_DELAY_SCAN = "  << _monitorSecDelayScan << "\n"
-               << "\n\n"
-               << tr("## Default folder to open to select files from the HMI") << "\n"
-               << "inputDir = " << _inputDir << "\n"
-               << "\n"
-               << tr("## History posting file") << "\n"
-               << tr("## each succesful post will append a line with the date, the file name, the archive name, the password...") << "\n"
-               << (_postHistoryFile.isEmpty()  ? "#" : "") <<"POST_HISTORY = "
-               << (_postHistoryFile.isEmpty()  ? "/nzb/ngPost_history.csv" : _postHistoryFile) << "\n"
-               << "\n"
-               << tr("## Character used to separate fields in the history posting file") << "\n"
-               << (_historyFieldSeparator == QString(sDefaultFieldSeparator) ? "#" : "") << "FIELD_SEPARATOR = " << _historyFieldSeparator << "\n"
-               << "\n"
-               << tr("## Structured SQLite history database") << "\n"
-               << "POST_DB = " << _postDbFile << "\n"
-               << tr("## Store archive passwords in the structured history database") << "\n"
-               << "HISTORY_STORE_PASSWORDS = " << (_historyStorePasswords ? "true" : "false") << "\n"
-               << "\n"
-               << "GROUPS   = " << _grpList.join(",") << "\n"
-               << "\n"
-               << tr("## If you give several Groups (comma separated) you've 3 policies for posting:") << "\n"
-               << tr("##    ALL       : everything is posted on ALL the Groups") << "\n"
-               << tr("##    EACH_POST : each Post will be posted on a random Group from the list") << "\n"
-               << tr("##    EACH_FILE : each File will be posted on a random Group from the list") << "\n"
-               << "GROUP_POLICY = " << sGroupPolicies[_groupPolicy].toUpper()
-               << "\n"
-               << "\n"
-               << tr("## uncomment the next line if you want a fixed uploader email (in the nzb and in the header of each articles)") << "\n"
-               << tr("## if you let it commented, we'll generate ONE random email for all the posts of the session") << "\n"
-               << (_saveFrom  ? "" : "#") << "FROM = " << _from.c_str() << "\n"
-               << "\n"
-               << tr("## Generate new random poster for each post (--auto or --monitor)") << "\n"
-               << tr("## if this option is set the FROM email just above will be ignored") << "\n"
-               << (_genFrom  ? "" : "#") << "GEN_FROM = true" << "\n"
-               << "\n"
-               << "\n"
-               << tr("## uncomment the next line to limit the number of threads,  (by default it'll use the number of cores)") << "\n"
-               << tr("## all the connections are spread equally on those posting threads") << "\n"
-               << "thread  =  " << _nbThreads << "\n"
-               << "\n"
-               << "\n"
-               << tr("## How to display progressbar in command line: NONE, BAR, FILES") << "\n"
-               << (_dispProgressBar  ? "" : "#") << "DISP_Progress = BAR\n"
-               << (_dispFilesPosting ? "" : "#") << "DISP_Progress = FILES\n"
-               << "\n"
-               << "\n"
-               << tr("## suffix of the msg_id for all the articles (cf nzb file)") << "\n"
-               << (sArticleIdSignature == "ngPost" ? "#msg_id  =  ngPost\n" : QString("msg_id  =  %1\n").arg(sArticleIdSignature.c_str()))
-               << "\n"
-               << tr("## article size (default 700k)") << "\n"
-               << "article_size = " << sArticleSize << "\n"
-               << "\n"
-               << tr("## number of retry to post an Article in case of failure (probably due to an already existing msg-id)") << "\n"
-               << "retry = " << NntpArticle::nbMaxTrySending() << "\n"
-               << "\n"
-               << "\n"
-               << tr("## uncomment the following line to obfuscate the subjects of each Article") << "\n"
-               << tr("## /!\\ CAREFUL you won't find your post if you lose the nzb file /!\\") << "\n"
-               << (_obfuscateArticles ? "" : "#") << "obfuscate = article\n"
-               << "\n"
-               << tr("## remove accents and special characters from the nzb file names") << "\n"
-               << (_removeAccentsOnNzbFileName  ? "" : "#") << "NZB_RM_ACCENTS = true\n"
-               << "\n"
-               << tr("## close Quick Post Tabs when posted successfully (for the GUI)") << "\n"
-               << (_autoCloseTabs  ? "" : "#") << "AUTO_CLOSE_TABS = true\n"
-               << "\n"
-               << tr("## check once a day for a new ngPost release on GitHub (Hydro74000/ngPost)") << "\n"
-               << "CHECK_FOR_UPDATES = " << (_checkForUpdates ? "true" : "false") << "\n"
-               << tr("## (internal) last update check timestamp, epoch seconds \xe2\x80\x94 managed automatically") << "\n"
-               << "LAST_UPDATE_CHECK = " << _lastUpdateCheckEpoch << "\n"
-               << "\n"
-               << tr("## tunnel ngPost connections through an embedded VPN (Linux v1)") << "\n"
-               << tr("## the VPN affects ngPost only; the rest of the system is unchanged") << "\n"
-               << "VPN_AUTO_CONNECT = " << (_vpnManager && _vpnManager->autoConnect() ? "true" : "false") << "\n"
-               << "VPN_ACTIVE_PROFILE = " << (_vpnManager ? _vpnManager->activeProfileName() : QString()) << "\n"
-               << "\n"
-               << tr("## when obfuscating file names, keep the .nfo extension visible") << "\n"
-               << (_keepNfoExtension ? "" : "#") << "KEEP_NFO_EXTENSION = true\n"
-               << "\n"
-               << tr("## copy the .nfo file (if present in the original files) next to the generated nzb") << "\n"
-               << (_copyNfoWithNzb ? "" : "#") << "NZB_COPY_NFO = true\n"
-               << "\n"
-               << tr("## auto-post (--auto / --monitor): if a posted file has a sibling .nfo") << "\n"
-               << tr("## (same name, different extension) next to it, include that .nfo in the same post") << "\n"
-               << (_autoIncludeNfo ? "" : "#") << "AUTO_INCLUDE_NFO = true\n"
-               << "\n"
-               << "\n"
-               << tr("## Time to wait (seconds) before trying to resume a Post automatically in case of loss of Network (min: %1)").arg(
-                      sDefaultResumeWaitInSec) << "\n"
-               << "RESUME_WAIT = " << _waitDurationBeforeAutoResume << "\n"
-               << "\n"
-               << tr("## By default, ngPost tries to resume a Post if the network is down.") << "\n"
-               << tr("## it won't stop trying until the network is back and the post is finished properly") << "\n"
-               << tr("## you can disable this feature and thus stop a post when you loose the network") << "\n"
-               << (_tryResumePostWhenConnectionLost  ? "#" : "") << "NO_RESUME_AUTO = true\n"
-               << "\n"
-               << tr("## if there is no activity on a connection it will be closed and restarted") << "\n"
-               << tr("## The duration is in second, default: %1, min: %2)").arg(sDefaultSocketTimeOut/1000).arg(sMinSocketTimeOut/1000) << "\n"
-               << "SOCK_TIMEOUT = " << _socketTimeOut / 1000 << "\n"
-               << "\n"
-               << tr("## when several Posts are queued, prepare the packing of the next Post while uploading the current one") << "\n"
-               << (_preparePacking ? "" : "#") << "PREPARE_PACKING = true" << "\n"
-               << "\n"
-               << tr("## For GUI ONLY, save the logs in a file (to debug potential crashes)") << "\n"
-               << tr("## ~/ngPost.log on Linux and MacOS, in the executable folder for Windows") << "\n"
-               << tr("## The log is overwritten each time ngPost is launched") << "\n"
-               << tr("## => after a crash, please SAVE the log before relaunching ngPost") << "\n"
-               << (_logStream != nullptr ? "" : "#") << "LOG_IN_FILE = true" << "\n"
-               << "\n"
-               << "\n"
-               << "\n"
-               << "\n"
-               << "##############################################################\n"
-               << "##           Compression and par2 section                   ##\n"
-               << "##############################################################\n"
-               << "\n"
-               << tr("## Shortcut for automatic packing for both GUI and CMD using --pack") << "\n"
-               << tr("## coma separated list using the keywords COMPRESS, GEN_NAME, GEN_PASS and GEN_PAR2") << "\n"
-               << tr("## For Auto posting and Monitoring if you don't use COMPRESS you need GEN_PA2") << "\n"
-               << tr("#PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2") << "\n"
-               << tr("#PACK = GEN_PAR2") << "\n";
-        // Rebuild the PACK keyword list from the current per-job flag state
-        // each time we save, otherwise toggling Compress / Generate Par2 in
-        // the GUI never propagates to the on-disk PACK = ... line and the
-        // user's choice silently rolls back to whatever was loaded.
-        if (_packAuto) {
-            _packAutoKeywords.clear();
-            if (_doCompress) _packAutoKeywords << sOptionNames[Opt::COMPRESS];
-            if (_genName)    _packAutoKeywords << sOptionNames[Opt::GEN_NAME];
-            if (_genPass)    _packAutoKeywords << sOptionNames[Opt::GEN_PASS];
-            if (_doPar2)     _packAutoKeywords << sOptionNames[Opt::GEN_PAR2];
-        }
-        stream << (_packAuto && _packAutoKeywords.size() ? QString("PACK = %1\n").arg(_packAutoKeywords.join(", ").toUpper()) : "")
-               << "\n"
-               << tr("## use the same Password for all your Posts using compression") << "\n"
-          #ifdef __USE_HMI__
-               << (_hmi?(_hmi->useFixedPassword()?"":"#"):(_rarPassFixed.isEmpty()  ? "#" : ""))
-          #else
-               << (_rarPassFixed.isEmpty()  ? "#" : "")
-          #endif
-               << "RAR_PASS = " << (_rarPassFixed.isEmpty()  ? "yourPassword" : _rarPassFixed) << "\n"
-               << "\n"
-               << tr("## temporary folder where the compressed files and par2 will be stored") << "\n"
-               << tr("## so we can post directly a compressed (obfuscated or not) archive of the selected files") << "\n"
-               << tr("## /!\\ The directory MUST HAVE WRITE PERMISSION /!\\") << "\n"
-               << tr("## this is set for Linux environment, Windows users MUST change it") << "\n"
-               << "TMP_DIR = " << _tmpPath << "\n"
-               << "\n";
-#ifdef __USE_TMP_RAM__
-        stream << tr("## temporary folder with size constraint, typically a tmpfs partition") << "\n"
-               << tr("## the size of a post multiply by TMP_RAM_RATIO must available on the disk") << "\n"
-               << tr("## otherwise ngPost will use TMP_DIR (with no check there)") << "\n"
-               << tr("## (uncomment and define TMP_RAM to activate the feature, make sure the path is writable)") << "\n"
-               << (_ramPath.isEmpty() ? "#" : "") << "TMP_RAM = " << (_ramPath.isEmpty() ? "/mnt/ngPost_tmpfs" : _ramPath) << "\n"
-               << "\n"
-               << tr("## Ratio used on the source files size to compensate the par2 generation") << "\n"
-               << tr("## min is 10% to be sure (so 1.1), max 2.0") << "\n"
-               << "TMP_RAM_RATIO = " << _ramRatio << "\n"
-               << "\n";
-#endif
-        stream << tr("## RAR or 7zip absolute file path (external application)") << "\n"
-               << tr("## /!\\ The file MUST EXIST and BE EXECUTABLE /!\\") << "\n"
-               << tr("## this is set for Linux environment, Windows users MUST change it") << "\n"
-               << "RAR_PATH = " << _rarPath << "\n"
-               << "\n"
-               << tr("## RAR EXTRA options (the first 'a' and '-idp' will be added automatically)") << "\n"
-               << tr("## -hp will be added if you use a password with --gen_pass, --rar_pass or using the HMI") << "\n"
-               << tr("## -v42m will be added with --rar_size or using the HMI") << "\n"
-               << tr("## you could change the compression level, lock the archive, add redundancy...") << "\n"
-               << "#RAR_EXTRA = -ep1 -m0 -k -rr5p\n"
-               << "#RAR_EXTRA = -mx0 -mhe=on   (for 7-zip)\n"
-               << (_rarArgs.isEmpty() ? "" : QString("RAR_EXTRA = %1\n").arg(_rarArgs) )
-               << "\n"
-               << tr("## size in MB of the RAR volumes (0 by default meaning NO split)") << "\n"
-               << tr("## feel free to change the value or to comment the next line if you don't want to split the archive") << "\n"
-               << "RAR_SIZE = " << _rarSize << "\n"
-               << "\n"
-               << tr("## maximum number of archive volumes") << "\n"
-               << tr("## we'll use RAR_SIZE except if it genereates too many volumes") << "\n"
-               << tr("## in that case we'll update rar_size to be <size of post> / rar_max") << "\n"
-               << (_useRarMax ? "" : "#") << "RAR_MAX = " << _rarMax << "\n"
-               << "\n"
-               << tr("##  keep rar folder after posting (otherwise it is automatically deleted uppon successful post)") << "\n"
-               << (_keepRarDefault ? "" : "#") << "KEEP_RAR = true\n"
-               << "\n"
-               << "## " << tr("Remove root (parent) folder when compressing Folders using RAR") << "\n"
-               << (_rarNoRootFolder  ? "" : "#") << "RAR_NO_ROOT_FOLDER = true\n"
-               << "\n"
-               << tr("## par2 redundancy percentage (0 by default meaning NO par2 generation)") << "\n"
-               << "PAR2_PCT = " << _par2Pct << "\n"
-               << "\n"
-               << tr("## par2 (or alternative) absolute file path") << "\n"
-               << tr("## this is only useful if you compile from source (as par2 is included on Windows and the AppImage)") << "\n"
-               << tr("## or if you wish to use an alternative to par2 (for exemple Multipar on Windows)") << "\n"
-               << tr("## (in that case, you may need to set also PAR2_ARGS)") << "\n";
-        if (!_par2PathConfig.isEmpty())
-            stream << "PAR2_PATH = " << _par2PathConfig << "\n";
-#if defined(WIN32) || defined(__MINGW64__)
-        stream << "#PAR2_PATH = <your_path>parpar.exe\n"
-               << "#PAR2_PATH = <your_path>par2j64.exe\n";
-#else
-        stream << "#PAR2_PATH = /usr/bin/par2\n"
-               << "#PAR2_PATH = <your_path>/parpar\n";
-#endif
-        stream << "\n"
-               << tr("## fixed parameters for the par2 (or alternative) command") << "\n"
-               << tr("## you could for exemple use Multipar on Windows") << "\n"
-               << "#PAR2_ARGS = -s1M --auto-slice-size -r1n*0.6 -m2048M -p1l --progress stdout -q   (for parpar)\n"
-               << "#PAR2_ARGS = c -l -m1024 -r8 -s768000                 (for par2cmdline)\n"
-               << "#PAR2_ARGS = create /rr8 /lc40 /lr /rd2 /ss768000     (for Multipar)\n"
-               << (_par2Args.isEmpty() ? "" : QString("PAR2_ARGS = %1\n").arg(_par2Args))
-               << "\n"
-               << "\n"
-               << tr("## length of the random generated archive's file name") << "\n"
-               << "LENGTH_NAME = " << _lengthName << "\n"
-               << "\n"
-               << tr("## length of the random archive's passsword") << "\n"
-               << "LENGTH_PASS = "<< _lengthPass << "\n"
-               << "\n"
-               << "\n"
-               << "\n"
-               << "\n"
-               << "##############################################################\n"
-               << "##                   servers section                        ##\n"
-               << "##############################################################\n"
-               << "\n";
-
-        for (NntpServerParams *param : _nntpServers)
-        {
-            stream << "[server]\n"
-                   << "host = " << param->host << "\n"
-                   << "port = " << param->port << "\n"
-                   << "ssl  = " << (param->useSSL ? "true" : "false") << "\n"
-                   << "user = " << param->user.c_str() << "\n"
-                   << "pass = " << param->pass.c_str() << "\n"
-                   << "connection = " << param->nbCons << "\n"
-                   << "enabled = " << (param->enabled ? "true":"false") << "\n"
-                   << "nzbCheck = " << (param->nzbCheck ? "true":"false") << "\n"
-                   << "useVpn = " << (param->useVpn ? "true":"false") << "\n"
-                   << "\n\n";
-        }
-        stream << tr("## You can add as many server if you have several providers by adding other \"server\" sections") << "\n"
-               << "#[server]\n"
-               << "#host = news.otherprovider.com\n"
-               << "#port = 563\n"
-               << "#ssl  = true\n"
-               << "#user = myOtherUser\n"
-               << "#pass = myOtherPass\n"
-               << "#connection = 15\n"
-               << "#enabled = false\n"
-               << "#nzbCheck = false\n"
-               << "\n";
-
-        // Phase 4 — VPN profiles. The config files themselves live under
-        // <configDir>/vpn/; we only persist metadata here. Credentials are
-        // never saved in this file (keychain or inline-in-ovpn only).
-        if (_vpnManager) {
-            for (VpnProfile const &p : _vpnManager->profiles()) {
-                stream << "[vpn_profile]\n"
-                       << "name        = " << p.name << "\n"
-                       << "backend     = " << VpnManager::backendToString(p.backend) << "\n"
-                       << "config_file = " << p.configFileName << "\n"
-                       << "has_auth    = " << (p.hasAuth ? "true" : "false") << "\n"
-                       << "\n";
-            }
-        }
-
+        QTextStream stream(&text);
+        _writeConfigGeneral(stream);
+        _writeConfigPostCommands(stream);
+        _writeConfigPostInfo(stream);
+        _writeConfigMonitoring(stream);
+        _writeConfigPosting(stream);
+        _writeConfigVpn(stream);
+        _writeConfigTransfer(stream);
+        _writeConfigPacking(stream);
+        _writeConfigArchive(stream);
+        _writeConfigPar2(stream);
+        _writeConfigServers(stream);
+        _writeConfigVpnProfiles(stream);
         stream.flush();
         if (stream.status() != QTextStream::Ok) {
+            _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
+            return;
+        }
+    }
+
+    QMap<QString, QString> const belief = _mergeExternalConfigEdits(text);
+    {
+        QTextStream out(&file);
+        out << text;
+        out.flush();
+        if (out.status() != QTextStream::Ok) {
             file.cancelWriting();
             _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
             return;
         }
-        if (!file.commit()) {
-            _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
-            return;
-        }
-        _log(tr("the config '%1' file has been updated").arg(conf));
     }
-    else
+    if (!file.commit()) {
         _error(tr("Error: Couldn't write default configuration file: %1").arg(conf));
-
+        return;
+    }
+    // QSaveFile keeps the permissions of the file it replaced, and gives a
+    // brand new one 0666 minus the umask. Either way it is the NNTP and
+    // proxy credentials plus the fixed archive password sitting in a file
+    // every other account on this machine can read.
+    if (!PathHelper::restrictToOwner(conf))
+        _error(tr("Warning: '%1' holds your credentials but could not be restricted to "
+                  "you; anyone with an account on this machine may be able to read it")
+                   .arg(conf));
+    _configBelief = belief;
+    _configSections = sectionsText(text);
+    if (!silent)
+        _log(tr("the config '%1' file has been updated").arg(conf));
 }
 
 void NgPost::setDelFilesAfterPosted(bool delFiles)
@@ -4849,11 +6297,11 @@ void NgPost::addMonitoringFolder(const QString &dirPath)
         _folderMonitor->addFolder(dirPath);
 }
 
-const QString NgPost::sNgPostASCII = QString("\
-                   __________               __\n\
-       ____    ____\\______   \\____  _______/  |_\n\
-      /    \\  / ___\\|     ___/  _ \\/  ___/\\   __\\\n\
-     |   |  \\/ /_/  >    |  (  <_> )___ \\  |  |\n\
-     |___|  /\\___  /|____|   \\____/____  > |__|\n\
-          \\//_____/                    \\/\n\
-");
+const QString NgPost::sNgPostASCII = QString(
+    "                   __________               __\n"
+    "       ____    ____\\______   \\____  _______/  |_\n"
+    "      /    \\  / ___\\|     ___/  _ \\/  ___/\\   __\\\n"
+    "     |   |  \\/ /_/  >    |  (  <_> )___ \\  |  |\n"
+    "     |___|  /\\___  /|____|   \\____/____  > |__|\n"
+    "          \\//_____/                    \\/\n"
+    "             ---   b y   H y d r o   ---\n");

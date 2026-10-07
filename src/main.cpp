@@ -243,11 +243,22 @@ int main(int argc, char* argv[])
         auto *sn = new QSocketNotifier(sSigPipe[0], QSocketNotifier::Read, app);
         QObject::connect(sn, &QSocketNotifier::activated, app,
             [](QSocketDescriptor fd, QSocketNotifier::Type) {
-                // Drain the pipe — several signals could pile up between two
-                // event-loop ticks. Stop on EAGAIN.
-                unsigned char s;
-                while (::read(static_cast<int>(fd), &s, 1) == 1)
-                    dispatchSignal(static_cast<int>(s));
+                // Drain the pipe — several signals can pile up between two
+                // event-loop ticks — with one bounded read rather than an
+                // open-ended byte-at-a-time loop. read() never returns more
+                // than sizeof(buf), so the dispatch below is bounded by
+                // construction; the notifier is level-triggered, so anything
+                // still queued comes back on the next tick. That bound is what
+                // keeps a signal flood (a process spamming SIGUSR1, a user
+                // leaning on Ctrl-C) from starving the event loop — each byte
+                // costs a cout + flush, so an unbounded loop can be fed faster
+                // than it drains. A negative or zero return leaves the loop
+                // body unexecuted, which is the wanted behaviour for both
+                // EAGAIN (pipe empty) and EOF (write end gone).
+                unsigned char buf[32];
+                ssize_t const n = ::read(int(fd), buf, sizeof buf); // flawfinder: ignore
+                for (ssize_t i = 0; i < n; ++i)
+                    dispatchSignal(static_cast<int>(buf[i]));
             });
         // Safe to unblock on the main thread now: the kernel will deliver
         // signals here (workers have them blocked), the handler writes a byte
@@ -275,19 +286,39 @@ int main(int argc, char* argv[])
         {
             exitCode = app->startEventLoop();
 
+            // The exit code of --check is a verdict, not a count: 0 complete,
+            // 1 articles missing, 3 inconclusive. It used to be the raw number
+            // of missing articles, which POSIX truncates modulo 256 -- 256
+            // missing articles reported success.
             if (app->nzbCheck())
-                exitCode = app->nbMissingArticles();
+                exitCode = app->nzbCheckExitCode();
+        }
+        else if (app->nzbCheck())
+        {
+            // A TLS preflight failure happens after the NZB was parsed but
+            // before the event loop. It still needs a real check verdict and,
+            // with --check_json, its promised machine-readable report.
+            app->reportNzbCheckSslUnavailable();
+            exitCode = app->nzbCheckExitCode();
         }
 #ifdef __DEBUG__
-        std::cout << app->appName() << " closed properly!\n";
-        std::cout.flush();
+        if (!app->stdoutIsData()) {
+            std::cout << app->appName() << " closed properly!\n";
+            std::cout.flush();
+        }
 #endif
     }
     else
     {
+        // A --check that could not even start still owes the caller its
+        // verdict: 3, not a silent 0.
+        if (app->nzbCheck())
+            exitCode = app->nzbCheckExitCode();
 #ifdef __DEBUG__
-        std::cout << "Nothing to do...\n";
-        std::cout.flush();
+        if (!app->stdoutIsData()) {
+            std::cout << "Nothing to do...\n";
+            std::cout.flush();
+        }
 #endif
     }
 

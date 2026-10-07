@@ -10,15 +10,19 @@
 #ifndef VPNMANAGER_H
 #define VPNMANAGER_H
 
+#include "VpnBackend.h"
+#include "VpnPlatform.h"
+
+#include <QByteArray>
 #include <QHostAddress>
 #include <QList>
 #include <QObject>
 #include <QString>
 
 #include <functional>
+#include <optional>
 
 class QTimer;
-class VpnBackend;
 struct NntpServerParams;
 struct VpnProfile;
 
@@ -26,11 +30,16 @@ class VpnManager : public QObject
 {
     Q_OBJECT
 public:
-    enum class State { Disabled, Starting, Connected, Stopping, Failed };
+    enum class State { Disabled, Starting, Connected, LeaseBusy, Reconnecting, Stopping, Failed };
     Q_ENUM(State)
 
     enum class Backend { OpenVPN, WireGuard };
     Q_ENUM(Backend)
+
+    using FailureKind = VpnFailureKind;
+
+    enum class VpnHealth { Healthy, Suspect, RecoveringInternally, Restarting };
+    Q_ENUM(VpnHealth)
 
     //! Reason why a job cannot start despite needing the VPN.
     enum class JobBlockReason {
@@ -38,7 +47,11 @@ public:
         HelperNotInstalled,
         NoConfigSelected,
         ConfigUnreadable,
-        VpnFailed               //!< VPN attempted to start but failed
+        VpnFailed,              //!< VPN attempted to start but failed
+        LeaseBusy,
+        HelperOutdated,
+        UnattributedVpnState,
+        RecoveryExhausted
     };
     Q_ENUM(JobBlockReason)
 
@@ -47,6 +60,9 @@ public:
 
     bool          start();
     void          stop();
+    //! User-initiated stop. Unlike shutdown teardown, this first turns any
+    //! active VPN job into a durable User pause.
+    void          disconnectByUser();
     State         state() const { return _state; }
     QHostAddress  tunIp() const { return _tunIp; }
     QString       tunInterface() const { return _tunIface; }
@@ -69,12 +85,20 @@ public:
     bool          forceAllConnectionsThroughVpn() const;
     bool          autoConnect() const { return _autoConnect; }
     bool          isConnected() const { return _state == State::Connected; }
+    VpnHealth     health() const { return _health; }
     //! True when the master switch is enabled but would be ignored because the
     //! VPN helper/prerequisites are present while no usable active profile is
     //! selected/configured. GUI callers use this to warn before posting direct.
     bool          shouldConfirmMasterSwitchWithoutProfile(QString *detail = nullptr) const;
 
     void setAutoConnect(bool v);
+    void setLeaseWaitMinutes(int minutes);
+    int leaseWaitMinutes() const { return _leaseWaitMinutes; }
+    int effectiveLeaseWaitMinutes() const { return _cliMode ? _leaseWaitMinutes : 0; }
+    void setRecoveryMaxAttempts(int attempts);
+    int recoveryMaxAttempts() const { return _recoveryMaxAttempts; }
+    void setCliMode(bool cli) { _cliMode = cli; }
+    static QString currentProcessStartTime();
 
     //! Convenience getters that read from the active profile, used by older
     //! call sites awaiting the profile-aware UI rework. Return defaults if
@@ -94,9 +118,10 @@ public:
     //! Update an existing profile by name. The profile's `name` may change;
     //! `oldName` identifies the entry to replace.
     using ConfigRollback = std::function<bool()>;
-    bool updateProfile(QString const &oldName, VpnProfile const &p,
+    bool updateProfile(QString const &oldName,
+                       VpnProfile const &p,
                        bool configFileChanged = true,
-                       ConfigRollback restorePreviousConfig = {});
+                       const ConfigRollback &restorePreviousConfig = {});
     //! Remove a profile by name. Also deletes its config file from
     //! <configDir>/vpn/ and removes credentials from the keychain.
     bool removeProfile(QString const &name);
@@ -126,13 +151,35 @@ public:
     static QString     helperLauncherProgram();
     static QStringList helperLauncherPrefixArgs();
 
+#ifdef Q_OS_WIN
+    //! The Program Files roots to search, most specific first. "C:/Program
+    //! Files" is not a given -- Windows can live on another drive, and a
+    //! 32-bit process under WOW64 sees different values -- so the environment
+    //! is the authority and the C: literals are only a last resort.
+    static QStringList windowsProgramFilesRoots();
+#endif
+
     //! Canonical install location for the privileged helper. The polkit rule
     //! whitelists this exact path so the rule and the installer agree.
     static constexpr const char *kInstalledHelperPath =
         "/var/lib/ngpost/ngpost-vpn-helper.sh";
 
-    //! Did the user run "Install" at some point on this machine?
+    //! Is the installed helper current (wire v2, security revision 4 on Linux)?
     bool isHelperInstalled() const;
+
+    //! Does this build carry a native VPN integration at all? Compile-time,
+    //! and the single question every VPN affordance asks: the GUI hides its
+    //! controls on a false answer, and job admission never forms a VPN
+    //! requirement it could not satisfy. Distinct from vpnFeatureAvailable(),
+    //! which asks the runtime question "is it usable right now".
+    static constexpr bool vpnPlatformSupported()
+    {
+#if defined(NGPOST_VPN_SUPPORTED)
+        return true;
+#else
+        return false;
+#endif
+    }
 
     //! True when the VPN feature can actually be used on this platform, i.e. a
     //! helper we can spawn is reachable. This is the capability gate shared by
@@ -157,7 +204,9 @@ public:
     //! Async, fire-and-forget cleanup of any stale state from a previous run
     //! that died without going through the normal teardown. No-op (and no
     //! prompt) if the helper isn't installed.
-    void runStartupCleanup();
+    void runStartupStaleCleanup();
+    void runStartupCleanup() { runStartupStaleCleanup(); }
+    bool cleanupUnattributed(bool confirmed);
 
 #if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
     //! Windows-only: register a WireGuard tunnel as a service via the
@@ -170,16 +219,30 @@ public:
 #endif
 
 #ifdef NGPOST_TESTING
+    void setHelperInstalledForTest(bool installed) { _testHelperInstalled = installed; }
     //! Narrow dependency injection used by the portable profile-transaction
     //! tests. On Windows it also guarantees that tests never trigger UAC.
     using WireGuardServiceHook = std::function<bool(QString const &)>;
     void setWireGuardServiceHooksForTest(WireGuardServiceHook registerHook,
                                          WireGuardServiceHook unregisterHook);
+    bool reportWindowsWireGuardUninstallResultForTest(int code) {
+        return _reportWindowsWireGuardUninstallResult(code);
+    }
+    bool reportWindowsWireGuardInstallResultForTest(int code) {
+        return _reportWindowsWireGuardInstallResult(code);
+    }
     //! Install a fake backend and the state needed to exercise terminal-signal
     //! cleanup without launching a helper or a Windows service.
     void setBackendForTest(VpnBackend *backend, State state = State::Starting);
     bool hasBackendForTest() const { return _currentBackend != nullptr; }
     void setAutoStartedByJobForTest(bool value) { _autoStartedByJob = value; }
+    void setBackendStartInProgressForTest(bool value) { _backendStartInProgress = value; }
+    bool finishBackendStartForTest(bool started) { return _finishBackendStart(started); }
+    void setRuntimeAuthFileForTest(QString const &path) { _runtimeAuthFilePath = path; }
+    void shredRuntimeAuthFileForTest() { _shredRuntimeAuthFile(); }
+    static bool linuxOwnerManifestForTest(QByteArray bytes, qint64 *ownerPid,
+                                          QString *ownerStart);
+    static bool helperDeclaresProtocol2ForTest(QByteArray const &prefix);
 #endif
 
     //! VPN orchestration.
@@ -200,8 +263,12 @@ public:
 
     //! Decide whether a job can start now. Side-effect: if VPN is needed but
     //! Disabled, kicks off `start()` asynchronously and returns Wait. Emits
-    //! `vpnRequiredButUnavailable` if Blocked.
+    //! `vpnRequiredButUnavailable` if Blocked. `vpnRequirementFrozen` keeps a
+    //! queued/resumed job fail-closed if the live configuration changes after
+    //! that job originally entered the queue.
     Admission admitJob(QList<NntpServerParams *> const &activeServers);
+    Admission admitJob(QList<NntpServerParams *> const &activeServers,
+                       bool vpnRequirementFrozen);
 
     //! Track that a job holds the tunnel open. Cancels any pending auto-
     //! disconnect timer.
@@ -211,6 +278,9 @@ public:
     //! the VPN was auto-started, schedule auto-disconnect after the grace
     //! window.
     void releaseForJob();
+    bool retryVpn();
+    void requestRecovery(FailureKind reason);
+    bool hasActiveVpnJobs() const { return _activeJobsNeedingVpn > 0; }
 
     //! Was the tunnel started by the auto-connect mechanism (vs. user click)?
     bool isAutoStarted() const { return _autoStartedByJob; }
@@ -239,41 +309,109 @@ signals:
     //! A job is being held back because the VPN is required but unavailable.
     //! GUI catches this and shows a popup; the job stays in queue.
     void vpnRequiredButUnavailable(JobBlockReason reason, QString const &detail);
+    void vpnInterrupted(FailureKind reason);
+    void recoveryExhausted(FailureKind reason);
+    void manualDisconnectRequested();
+    void unattributedVpnStateDetected(QString const &diagnostic, bool legacyOwnerActive);
 
 private slots:
     void onBackendReady(QString const &iface, QHostAddress const &ip,
                         QHostAddress const &dns);
-    void onBackendFailed(QString const &reason);
-    void onBackendStopped();
+    void onBackendTerminated(BackendTermination const &termination);
+    void onBackendStopPending(QString const &detail);
+    void onBackendHealthChanged(VpnBackendHealth health, QString const &reason);
+    void onBackendRestartReady(quint64 attemptId, QString const &iface,
+                               QHostAddress const &ip, QHostAddress const &dns);
+    void onBackendRestartFailed(quint64 attemptId, FailureKind failure,
+                                QString const &detail);
     void onAutoDisconnectTimeout();
     //! Wait until the reported tunnel IP is usable for source binding before
     //! emitting Connected.
     void _pollTunIpAvailability();
 
 private:
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
+    bool _reportWindowsWireGuardInstallResult(int code);
+    bool _reportWindowsWireGuardUninstallResult(int code);
+#endif
     void _setState(State s);
     void _instantiateBackend();
+    void _connectBackend();
+    bool _finishBackendStart(bool started);
     void _destroyBackend();
-    //! Detach all terminal signals before stopping so a synchronous `stopped`
-    //! cannot re-enter VpnManager and destroy the same backend twice.
-    void _stopAndDestroyBackend();
+    //! False means shutdown is pending: keep signals/ownership and invoke
+    //! resume only after confirmed termination. Other backends detach before
+    //! synchronous cleanup. The caller must not continue on false.
+    bool _stopAndDestroyBackend(std::function<void()> resume = {});
+    std::function<void()> _pendingBackendCleanup;
     //! Zero out + delete the short-lived auth-user-pass file we wrote for
     //! the current openvpn invocation, if any.
     void _shredRuntimeAuthFile();
     void _cancelAutoDisconnect();
     //! Declare the tunnel up once `_tunIp` is confirmed usable.
     void _completeReady();
+    void _setHealth(VpnHealth health);
+    void _scheduleExternalRestart(FailureKind reason);
+    void _performExternalRestart();
+    void _resumeExternalRestart();
+    bool _consumeRecoveryAttempt();
+#ifdef Q_OS_WIN
+    bool _acquireWindowsLease(QString *detail);
+    void _releaseWindowsLease();
+    bool _publishWindowsOwner(Backend backend, QString *detail);
+    QString _windowsOwnerDiagnostic() const;
+    void _cleanupStaleWindowsState();
+#endif
+#ifdef Q_OS_LINUX
+    void _runLinuxStalePreflight();
+    void _cleanupStaleLinuxSession(QString const &manifestPath);
+    void _reportUnattributedLinuxState(bool ifaceExists,
+                                       bool ruleExists,
+                                       bool routeExists,
+                                       bool legacyPidExists);
+#endif
+#if defined(Q_OS_WIN) || defined(NGPOST_TESTING)
+    bool _refreshWireGuardServices(QString const &oldName,
+                                   VpnProfile const &oldProfile,
+                                   VpnProfile const &p,
+                                   bool configFileChanged,
+                                   ConfigRollback const &restorePreviousConfig);
+    bool _reinstallWireGuardService(QString const &service,
+                                    QString const &oldConfig,
+                                    QString const &newConfig,
+                                    bool restoreConfigFirst,
+                                    ConfigRollback const &restorePreviousConfig);
+    bool _replaceWireGuardService(QString const &oldService,
+                                  QString const &newService,
+                                  QString const &newConfig);
+#endif
+    //! Starting, up, reconnecting or stopping: a tunnel exists or is on its way.
+    bool _tunnelInUse() const;
+    void _resumeAfterConfirmedStop();
+    void _finishRequestedStop();
+    bool _recoverFromTermination(BackendTermination const &termination);
+    void _finishFailedTermination(BackendTermination const &termination);
+    QStringList _vpnServerNames(QList<NntpServerParams *> const &servers) const;
+    void _warnIgnoredMasterSwitch();
+    JobBlockReason _diagnoseVpnBlock(QString *detail) const;
+    Admission _startForAdmittedJob();
+    void _finishRecoveryExhausted(FailureKind reason, QString const &detail);
+    void _clearTunnelIdentity();
+    JobBlockReason _blockReasonForFailure(FailureKind failure) const;
     //! True when a VPN profile is selected and its config file can be read.
     bool _activeProfileUsable(QString *detail = nullptr) const;
 
     bool         _autoConnect;
     State        _state;
+    VpnHealth    _health;
     QHostAddress _tunIp;
     QString      _tunIface;
     QHostAddress _dnsServer;
     VpnBackend  *_currentBackend;
     bool         _backendStartInProgress;
     bool         _backendFailedDuringStart;
+    quint64      _nextRunId;
+    quint64      _currentAttemptId;
 
     // Pending-ready bookkeeping while the reported tunnel IP becomes usable.
     QTimer      *_tunPollTimer;
@@ -294,7 +432,22 @@ private:
     int     _activeJobsNeedingVpn; //!< how many jobs hold the tunnel open
     QTimer *_autoDisconnectTimer;
 
+    bool    _cliMode;
+    int     _leaseWaitMinutes;
+    int     _recoveryMaxAttempts;
+    int     _recoveryAttempts;
+    int     _externalRecoveryAttempts;
+    bool    _recoveryActive;
+    FailureKind _recoveryReason;
+    QTimer *_recoveryTimer;
+    QTimer *_healthyResetTimer;
+
+#ifdef Q_OS_WIN
+    void *_windowsLeaseHandle;
+#endif
+
 #ifdef NGPOST_TESTING
+    std::optional<bool> _testHelperInstalled;
     WireGuardServiceHook _testRegisterWireGuardService;
     WireGuardServiceHook _testUnregisterWireGuardService;
 #endif

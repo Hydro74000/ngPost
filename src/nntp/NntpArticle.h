@@ -9,6 +9,8 @@
 #include <QtGlobal>
 #include <QUuid>
 #include <QObject>
+
+#include <memory>
 class NntpFile;
 class NntpConnection;
 
@@ -32,14 +34,16 @@ class NntpArticle : public QObject
 private:
     NntpFile  *_nntpFile; //!< original file
     const uint _part;     //!< part of the original file
-    QUuid      _id;       //!< to generate a unique Message-ID for the Header
+    QUuid _uuid;          //!< to generate a unique Message-ID for the Header
 
     const std::string *_from;    //!< NNTP header From (owned by PostingJob)
-    char *_subject;              //!< NNTP header Subject (if defined it won't be obfuscated)
-    char *_body;                 //!< full body of the Article with the yEnc header
+    std::unique_ptr<char[]> _subject; //!< NNTP header Subject (if defined it won't be obfuscated)
+    std::unique_ptr<char[]> _body;    //!< full body of the Article with the yEnc header
 
     const qint64 _filePos;   //!< position in the File (for yEnc header)
     const qint64 _fileBytes; //!< bytes of the original file that are encoded
+    qint64 _bodySize;        //!< size of the article body once yEnc encoded (what the nzb must advertise)
+    qint64 _bodyWireSize;    //!< bytes of _body to write on the socket, "." terminator included
 
     ushort _nbTrySending;
 
@@ -57,14 +61,16 @@ public:
 
     void yEncBody(const char data[]);
 
-    ~NntpArticle();
+    //! Upper bound on what Yenc::encode writes for \a nbBytes of input, its
+    //! trailing NUL included. yEncBody() sizes its single allocation with it;
+    //! exposed so the encoder and the bound can be fuzzed against each other.
+    static size_t yEncWorstCaseSize(qint64 nbBytes);
+
+    ~NntpArticle() override;
 
     QString str() const;
 
     bool tryResend();
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-    inline void resetNbTrySending();
-#endif
 
     void write(NntpConnection *con, const std::string &idSignature);
     inline void freeMemory();
@@ -72,7 +78,6 @@ public:
     void dumpToFile(const QString &path, const std::string &articleIdSignature);
 
     std::string header(const std::string &idSignature) const;
-    inline std::string body() const;
     inline QString id() const;
     inline uint part() const;
     inline NntpFile *nntpFile() const;
@@ -82,6 +87,7 @@ public:
     inline bool isFirstArticle() const;
 
     inline quint64 size() const;
+    inline qint64 nzbBytes() const;
 
     inline void genNewId();
 
@@ -92,25 +98,15 @@ public:
 
 };
 
-#ifdef __RELEASE_ARTICLES_WHEN_CON_FAILS__
-void NntpArticle::resetNbTrySending() { _nbTrySending = 0; }
-#endif
-
 void NntpArticle::freeMemory()
 {
-    if (_subject)
-    {
-        delete[] _subject;
-        _subject = nullptr;
-    }
+    _subject.reset();
     if (_body)
     {
-        delete[] _body;
-        _body = nullptr;
+        _body.reset();
+        _bodyWireSize = 0;
     }
 }
-
-std::string NntpArticle::body() const { return _body; }
 
 QString NntpArticle::id() const { return _msgId; }
 uint NntpArticle::part() const{ return _part; }
@@ -121,7 +117,21 @@ qint64 NntpArticle::fileBytes() const { return _fileBytes; }
 bool NntpArticle::isFirstArticle() const { return _part == 1; }
 
 quint64 NntpArticle::size() const { return static_cast<quint64>(_fileBytes); }
-void NntpArticle::genNewId() { _id = QUuid::createUuid(); }
+
+//! What the <segment bytes="..."> attribute of the nzb must carry: the size of
+//! the article as the server stores it, i.e. the yEnc encoded body with its
+//! =ybegin/=ypart/=yend lines -- NOT the size of the raw data it decodes to
+//! (_fileBytes), which is some 2-3% smaller and made every client under-report
+//! the download size. Falls back to _fileBytes for an article that was never
+//! encoded, so the attribute can never be written as 0.
+qint64 NntpArticle::nzbBytes() const { return _bodySize > 0 ? _bodySize : _fileBytes; }
+void NntpArticle::genNewId()
+{
+    _uuid = QUuid::createUuid();
+    // id() exposes the fully materialised wire Message-ID. It must not keep
+    // reporting the value from an ambiguous attempt after the UUID changes.
+    _msgId.clear();
+}
 
 void NntpArticle::overwriteMsgId(const QString &serverMsgID){ _msgId = serverMsgID; }
 

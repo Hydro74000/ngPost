@@ -22,6 +22,7 @@
 #include <QString>
 #include <QVector>
 
+class QVBoxLayout;
 class QCheckBox;
 class QComboBox;
 class QLabel;
@@ -79,6 +80,11 @@ private slots:
     void onAccept();
 
 private:
+    void _buildTemplateControls(QVBoxLayout *root);
+    void _buildOutputControls(QVBoxLayout *root);
+    void _buildModelPanel(QVBoxLayout *root);
+    void _buildFieldsPanel(QVBoxLayout *root);
+
     // ---- the model, i.e. the file ---------------------------------------
     void _loadModel();
     void _fillModelTable();

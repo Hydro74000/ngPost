@@ -1,0 +1,28 @@
+# Static analysis the CI enforces (quality.yml). A narrow profile on purpose:
+# checks that find defects, not a style of their own -- .clang-format owns the
+# style, and a noisy profile gets silenced instead of read.
+#
+# Left out, after reviewing every site they reported on 2026-09-19:
+# - bugprone-easily-swappable-parameters: flags most two-argument functions.
+# - bugprone-narrowing-conversions: 61 sites, none a defect -- qsizetype
+#   (64-bit since Qt 6) stored in an int for small lists and indexOf() results,
+#   and qint64 turned into double for display.
+# - bugprone-throwing-static-initialization: static Qt objects (QString,
+#   QRegularExpression) can only throw std::bad_alloc before main().
+# - performance-enum-size, clang-analyzer-optin.performance.Padding: shrinking
+#   an enum or reordering a struct saves bytes nobody counts here.
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  clang-analyzer-*,
+  modernize-use-nullptr,
+  modernize-use-override,
+  readability-misleading-indentation,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-throwing-static-initialization,
+  -performance-enum-size,
+  -clang-analyzer-optin.performance.Padding
+# Our headers only: Qt's and the moc output are not ours to fix.
+HeaderFilterRegex: '/src/[^/]+(/[^/]+)*\.h$'

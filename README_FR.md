@@ -20,7 +20,7 @@ Voici la liste des principales fonctionnalités et atouts de ngPost:
   - multi-langues (Français, Allemand, Anglais, Chinois, Espagnol, Néerlandais, Portugais)
   - ...
 
-![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3.png)
+![ngPost v5.6 en cours de transfert multi-onglets](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_posting_fr.png)
 
 
 [Les versions pour chacun des OS sont disponibles ici](https://github.com/Hydro74000/ngPost/releases), pour Linux 64 bits, Windows 64 bits et macOS. Aucun paquet Raspbian récent n'est actuellement produit.
@@ -44,7 +44,7 @@ Sinon vous pouvez éditer le fichier à la main. Il vous faut remplir:
   - groups (liste des groupes sur lesquels vous postez)
   - TMP_DIR (dossier temporaire pour les archives et par2)
   - RAR_PATH (chemin d'accès complet de l'éxécutable RAR ou 7zip)
-  - VPN_AUTO_CONNECT, VPN_BACKEND et VPN_CONFIG_PATH si vous utilisez le tunnel VPN intégré
+  - VPN_AUTO_CONNECT, VPN_ACTIVE_PROFILE et une section vpn_profile si vous utilisez le tunnel VPN intégré
   - useVpn dans chaque section Server pour indiquer si ce serveur doit passer par le VPN
   - la ou les sections Server
 
@@ -93,6 +93,7 @@ Syntaxe: ngPost (options)* (-i <file or folder> | --auto <folder> | --monitor <f
 	-i or --input      : fichier(s) ou dossier(s) à poster. Post rapide. Si dossier, son contenu sera posté (sans recursivité)
 	-o or --output     : chemin complet du fichier nzb
 	-x or --obfuscate  : obfuscation des Articles. ATTENTION, avec cette option, il est impossible de (re)trouver un post sans le fichier nzb
+	--obfuscate_filename : renomme les fichiers source avec un nom aléatoire avant de les compresser, ainsi l'archive ne porte pas le nom d'origine (à utiliser avec --compress). Équivaut à `obfuscate = filename` dans la configuration
 	-g or --groups     : liste de newsgroup où poster (séparés par une virgule et sans espaces)
 	-m or --meta       : extra metadata (typiquement "password=azerty42"). pour poster des archives avec mot de passe (fait avant ngPost)
 	-f or --from       : posteur si vous ne voulez pas un généré aléatoirement
@@ -159,6 +160,8 @@ L'onglet **Nouveau** permet de créer d'autres Post Rapides.<br />
 
 L'onglet **Historique** regroupe trois sous-onglets :
 
+![Historique ngPost v5.6](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_history_fr.png)
+
 **Sous-onglet Historique** (recherche, filtres, détail)
 - Recherche par nom, chemin NZB ou nom d'archive.
 - Filtres : statut, présence d'un mot de passe, présence d'erreurs, plage de dates, newsgroup.
@@ -185,6 +188,8 @@ La reprise repose sur la base SQLite : les articles confirmés par le serveur so
 
 Le bouton **VPN...** ouvre les paramètres du tunnel VPN. Cette fonctionnalité est disponible sous Linux et Windows et permet de faire passer seulement les connexions NNTP de ngPost par un tunnel OpenVPN ou WireGuard, sans modifier la route par défaut du système et sans impacter les autres applications.<br/>
 
+![Configuration VPN](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_vpn_fr.png)
+
 La première utilisation nécessite l'installation du helper privilégié via **Install**. L'installation passe par `pkexec`/Polkit, installe les scripts dans `/var/lib/ngpost` et crée une règle Polkit limitée à l'utilisateur courant et au helper VPN de ngPost. Une fois installé, les boutons **Connect** et **Disconnect** ne redemandent plus le mot de passe.<br/>
 
 Ensuite:
@@ -195,18 +200,33 @@ Ensuite:
 
 Quand un serveur est marqué **Use VPN**, ngPost lie ses sockets NNTP à l'adresse IP du tunnel. Si le VPN est requis mais indisponible, ngPost refuse de poster ou de vérifier les articles via ce serveur plutôt que de sortir hors VPN. Le tunnel démarré automatiquement est arrêté après un court délai lorsque la file de posts est vide.<br/>
 
+Le tunnel intégré est exclusif à la machine. En CLI, ngPost attend par défaut cinq minutes que le bail soit libéré et affiche les PID du propriétaire ; l'IHM ne vole jamais le bail. Sous Linux, l'état de session vit uniquement dans `/run` et une ressource sans propriétaire v2 n'est jamais supprimée automatiquement. Pendant une reprise VPN, aucun nouvel article n'est envoyé. Un article sans réponse NNTP définitive devient `unknown` et reste reprenable, tandis qu'une pause demandée par l'utilisateur n'est jamais annulée automatiquement.<br/>
+
+Si ngPost signale des ressources VPN non attribuées, vérifiez d'abord qu'aucune autre instance — y compris une ancienne version — n'est en train de poster. Le nettoyage CLI explicite est `ngPost --vpn-cleanup-unattributed --yes` et peut interrompre un tunnel hérité encore actif. Les identifiants OpenVPN sont transmis au helper privilégié par son entrée standard et ne sont matérialisés que dans le répertoire de session `/run` protégé.<br/>
+
 Les clefs de configuration correspondantes sont:
 <pre>
 VPN_AUTO_CONNECT = false
-VPN_BACKEND = openvpn
-VPN_CONFIG_PATH = /chemin/vers/vpn.ovpn
+VPN_ACTIVE_PROFILE = Mon VPN
+VPN_LEASE_WAIT_MINUTES = 5
+VPN_RECOVERY_MAX_ATTEMPTS = 0
+
+[vpn_profile]
+name = Mon VPN
+backend = openvpn
+config_file = profil.ovpn
+has_auth = false
 
 [server]
 useVpn = true
 </pre>
 
+`VPN_LEASE_WAIT_MINUTES` est réservé au CLI (`0..1440`, `0` échoue immédiatement). `VPN_RECOVERY_MAX_ATTEMPTS` vaut `0` pour une reprise illimitée ou `1..1000` pour borner le run. Dans un conteneur Linux, le VPN exige un `/run` en tmpfs, par exemple `--tmpfs /run:rw,nosuid,nodev,mode=755` ; sinon ngPost échoue avant toute commande réseau.<br/>
+
 
 #### le Post Rapide:
+ 
+![ngPost v5.6 - Post Rapide au repos](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_fr.png)
 
 C'est assez intuitif... Ajoutez des fichiers / dossiers dans la liste en:
   - cliquant sur les boutons **Choisir Fichiers** ou **Choisir Dossier**
@@ -220,7 +240,7 @@ Puis il suffit de cliquer sur **Poster Fichiers**
 
 #### le mode auto:
 
-![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3_auto_fr.png)
+![ngPost_v5.6](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_auto_fr.png)
 
 - choisissez le **Dossier auto** (par défaut, c'est le inputDir du fichier de configuration)
 - cliquez sur **Scanner**
@@ -236,7 +256,7 @@ L'interface graphique sautera sur le Post Rapide courant.<br/>
 
 #### le mode surveillance:
 
-![ngPost_v4.3](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v4.3_monitor_fr.png)
+![ngPost_v5.6](https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/ngPost_v5.6_auto_fr.png)
 
 - choisissez le **Dossier auto** (par défaut, c'est le inputDir du fichier de configuration)
 - choisissez le **filtre sur les extensions** (ex: mp4,mkv,avi sans espaces) et si vous voulez poster les dossiers
@@ -375,9 +395,9 @@ Si vous shouhaitez le traduire dans une autre langue, c'est très simple (Qt fou
 - all ngPost users ;)
 
 
-### Donations
-Je suis Freelance (auto-entrepreneur) depuis fin 2019, travaillant sur plusieurs projets perso. Si vous utilisez ngPost et que vous souhaitez contribuer à l'effort et sa future évolution, merci de penser à faire une petite donation.<br/>
-<br/>
-<a href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=W2C236U6JNTUA&item_name=ngPost&currency_code=EUR"><img align="left" src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="ex0days"></a>
- ou en Bitcoin à cette adresse: **3BGbnvnnBCCqrGuq1ytRqUMciAyMXjXAv6**
-<img align="right" align="bottom" width="120" height="120" src="https://raw.githubusercontent.com/Hydro74000/ngPost/master/pics/btc_qr.gif" alt="ngPost_QR">
+### ☕ Soutenir le projet
+
+ngPost est un logiciel libre, gratuit et sans publicité, maintenu avec passion. Si l'application vous fait gagner du temps ou vous rend service au quotidien, vous pouvez soutenir son développement :
+- [Offrez un café au développeur via PayPal](https://paypal.me/ngpost) pour encourager les futures versions et le maintien des protocoles.
+- Laissez une étoile ⭐ sur le dépôt GitHub pour faire connaître le projet.
+- Partagez vos retours, signalements de bugs ou suggestions d'améliorations.
