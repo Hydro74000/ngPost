@@ -8745,12 +8745,17 @@ QString followedPath(int i)
     return QStringLiteral("/path/to/follow_%1.bin").arg(i, 3, 10, QChar('0'));
 }
 
+bool rowShown(QListWidget *list, int row)
+{
+    return list->viewport()->rect().contains(list->visualItemRect(list->item(row)));
+}
+
 //! The row is in sight, about the middle of the list: centring snaps to whole rows.
 bool rowCentred(QListWidget *list, int row)
 {
     const QRect rect = list->visualItemRect(list->item(row));
     const QRect area = list->viewport()->rect();
-    return area.contains(rect) && qAbs(rect.center().y() - area.center().y()) <= rect.height();
+    return rowShown(list, row) && qAbs(rect.center().y() - area.center().y()) <= rect.height();
 }
 
 //! A shown main window on its Quick Post #1 tab, whose list holds 200 files.
@@ -8837,16 +8842,21 @@ void TestMainWindow::quick_post_list_scrolls_only_on_the_shown_tab()
     auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
     QScrollBar *bar = filesList->verticalScrollBar();
 
+    // Near the top a row cannot be centred: the list stops at its first row, and
+    // how many it shows depends on the platform's font. In sight is all it can do.
     quick->setPosting();
     for (int i = 0; i < 10; ++i)
         quick->onFilePosted(followedPath(i), 10, 0);
-    QVERIFY(rowCentred(filesList, 10));
+    QVERIFY(rowShown(filesList, 10));
+    for (int i = 10; i < 100; ++i)
+        quick->onFilePosted(followedPath(i), 10, 0);
+    QVERIFY(rowCentred(filesList, 100));
 
     // In a background tab the list is only recoloured, never scrolled.
     tabs->setCurrentIndex(0);
     QVERIFY(!filesList->isVisible());
     const int backgroundValue = bar->value();
-    for (int i = 10; i < 150; ++i)
+    for (int i = 100; i < 150; ++i)
         quick->onFilePosted(followedPath(i), 10, 0);
     QCOMPARE(bar->value(), backgroundValue);
     QCOMPARE(filesList->item(150)->foreground().color(), window->sPostingColor);
