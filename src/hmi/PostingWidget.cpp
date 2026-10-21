@@ -56,6 +56,10 @@
 namespace
 {
 
+//! Set on a file once posted: files finish out of order, and a name may well
+//! contain what the "[n ok]" suffix says.
+constexpr int kFilePostedRole = Qt::UserRole;
+
 //! The switches the PACK keywords ask of a post, all off while PACK is.
 struct PackingChoice
 {
@@ -132,7 +136,8 @@ void PostingWidget::onFilePosted(const QString &filePath, uint nbArticles, uint 
 void PostingWidget::_handleFilePosted(const QString &filePath, uint nbArticles, uint nbFailed)
 {
     int const nbFiles = _ui->filesList->count();
-    for (int i = 0; i < nbFiles; ++i) {
+    // Every file above the one in progress is posted already.
+    for (int i = qMax(0, _ui->filesList->followedRow()); i < nbFiles; ++i) {
         QListWidgetItem *item = _ui->filesList->item(i);
         if (item && item->text() == filePath) {
             QColor color(_hmi->sDoneOKColor);
@@ -146,8 +151,9 @@ void PostingWidget::_handleFilePosted(const QString &filePath, uint nbArticles, 
                     color = _hmi->sArticlesFailedColor;
             }
             item->setForeground(color);
+            item->setData(kFilePostedRole, true);
             if (!_highlightFirstPendingFile())
-                _ui->filesList->scrollToItem(item, QAbstractItemView::EnsureVisible);
+                _ui->filesList->followItem(item);
             break;
         }
     }
@@ -1117,14 +1123,11 @@ void PostingWidget::_attachResumeJob(PostingJob *job, const QFileInfoList &files
 bool PostingWidget::_highlightFirstPendingFile()
 {
     int const nbFiles = _ui->filesList->count();
-    for (int i = 0; i < nbFiles; ++i) {
+    for (int i = qMax(0, _ui->filesList->followedRow()); i < nbFiles; ++i) {
         QListWidgetItem *item = _ui->filesList->item(i);
-        if (!item)
-            continue;
-        const QString &text = item->text();
-        if (!text.contains(QLatin1String(" ok]")) && !text.contains(QLatin1String(" err / "))) {
+        if (item && !item->data(kFilePostedRole).toBool()) {
             item->setForeground(_hmi->sPostingColor);
-            _ui->filesList->scrollToItem(item, QAbstractItemView::EnsureVisible);
+            _ui->filesList->followItem(item);
             return true;
         }
     }
@@ -1133,6 +1136,7 @@ bool PostingWidget::_highlightFirstPendingFile()
 
 void PostingWidget::_clearActivePostingHighlights()
 {
+    _ui->filesList->followItem(nullptr);
     int const nbFiles = _ui->filesList->count();
     const QColor normalColor = postingTextColor();
     for (int i = 0; i < nbFiles; ++i) {

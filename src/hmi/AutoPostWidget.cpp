@@ -386,14 +386,12 @@ void AutoPostWidget::onGenPar2Toggled(bool checked)
 #include "PostingJob.h"
 void AutoPostWidget::onMonitorJobStart()
 {
-    _handleMonitorJobStart();
+    updateStartedJob(static_cast<PostingJob *>(sender())->getFirstOriginalFile());
 }
 
-void AutoPostWidget::_handleMonitorJobStart()
+void AutoPostWidget::updateStartedJob(const QString &path)
 {
-    PostingJob *job = static_cast<PostingJob*>(sender());
-
-    QString srcPath = QString("- %1").arg(job->getFirstOriginalFile());
+    QString srcPath = QString("- %1").arg(path);
     int nbFiles = _ui->filesList->count();
     for (int i = _currentPostIdx; i < nbFiles; ++i)
     {
@@ -401,7 +399,7 @@ void AutoPostWidget::_handleMonitorJobStart()
         if (item->text() == srcPath)
         {
             item->setForeground(_hmi->sPostingColor);
-            _ui->filesList->scrollToItem(item, QAbstractItemView::EnsureVisible);
+            _ui->filesList->followItem(item);
             _currentPostIdx = i;
             break;
         }
@@ -495,7 +493,7 @@ void AutoPostWidget::_handleFinishedJob(const QString &path,
             }
             item->setData(Qt::UserRole, false);
             item->setForeground(color);
-            _ui->filesList->scrollToItem(item, QAbstractItemView::EnsureVisible);
+            // No scroll: the next job's start brings the list there.
             break;
         }
     }

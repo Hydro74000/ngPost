@@ -506,6 +506,9 @@ private slots:
     void ui_zoom_control_adjusts_font_and_persists_setting();
     void ui_zoom_is_saved_without_a_log_line();
     void posting_widget_and_auto_post_auto_scroll_to_active_files();
+    void quick_post_list_follows_the_file_in_progress();
+    void quick_post_list_scrolls_only_on_the_shown_tab();
+    void auto_post_list_follows_the_started_job();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -8641,4 +8644,169 @@ void TestMainWindow::posting_widget_and_auto_post_auto_scroll_to_active_files()
     autoWidget->updateFinishedJob(QStringLiteral("/test/folder_10"), 5, 5, 0);
     QCOMPARE(autoList->item(11)->foreground().color(), window->sDoneOKColor);
     QVERIFY(autoList->item(11)->text().contains(QStringLiteral("[5 ok]")));
+}
+
+namespace
+{
+QString followedPath(int i)
+{
+    return QStringLiteral("/path/to/follow_%1.bin").arg(i, 3, 10, QChar('0'));
+}
+
+//! The row is in sight, about the middle of the list: centring snaps to whole rows.
+bool rowCentred(QListWidget *list, int row)
+{
+    const QRect rect = list->visualItemRect(list->item(row));
+    const QRect area = list->viewport()->rect();
+    return area.contains(rect) && qAbs(rect.center().y() - area.center().y()) <= rect.height();
+}
+
+//! A shown main window on its Quick Post #1 tab, whose list holds 200 files.
+QListWidget *showQuickPostWithManyFiles(MainWindow *window, PostingWidget **quick)
+{
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    *quick = tabs ? qobject_cast<PostingWidget *>(tabs->widget(2)) : nullptr;
+    if (!*quick)
+        return nullptr;
+    tabs->setCurrentWidget(*quick);
+    window->resize(1000, 700);
+    window->show();
+    if (!QTest::qWaitForWindowExposed(window))
+        return nullptr;
+    auto *filesList = (*quick)->findChild<QListWidget *>("filesList");
+    for (int i = 0; filesList && i < 200; ++i)
+        filesList->addItem(followedPath(i));
+    return filesList;
+}
+} // namespace
+
+void TestMainWindow::quick_post_list_follows_the_file_in_progress()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    MainWindow *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    PostingWidget *quick = nullptr;
+    QListWidget *filesList = showQuickPostWithManyFiles(window, &quick);
+    QVERIFY(filesList);
+    QScrollBar *bar = filesList->verticalScrollBar();
+
+    quick->setPosting();
+    for (int i = 0; i < 100; ++i)
+        quick->onFilePosted(followedPath(i), 10, 0);
+    QCOMPARE(filesList->item(100)->foreground().color(), window->sPostingColor);
+    QVERIFY(rowCentred(filesList, 100));
+
+    // Files finish out of order: the first one still going stays the one shown.
+    quick->onFilePosted(followedPath(102), 10, 0);
+    QCOMPARE(filesList->item(100)->foreground().color(), window->sPostingColor);
+    quick->onFilePosted(followedPath(100), 10, 0);
+    quick->onFilePosted(followedPath(101), 10, 0);
+    QCOMPARE(filesList->item(102)->foreground().color(), window->sDoneOKColor);
+    QCOMPARE(filesList->item(103)->foreground().color(), window->sPostingColor);
+    QVERIFY(rowCentred(filesList, 103));
+
+    // The user scrolls back to the top: the list stays there...
+    bar->triggerAction(QAbstractSlider::SliderToMinimum);
+    QCOMPARE(bar->value(), 0);
+    quick->onFilePosted(followedPath(103), 10, 0);
+    QCOMPARE(filesList->item(104)->foreground().color(), window->sPostingColor);
+    QCOMPARE(bar->value(), 0);
+    // ...and follows again once the file in progress is back in sight.
+    filesList->scrollToItem(filesList->item(104));
+    quick->onFilePosted(followedPath(104), 10, 0);
+    QVERIFY(rowCentred(filesList, 105));
+}
+
+void TestMainWindow::quick_post_list_scrolls_only_on_the_shown_tab()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    MainWindow *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    PostingWidget *quick = nullptr;
+    QListWidget *filesList = showQuickPostWithManyFiles(window, &quick);
+    QVERIFY(filesList);
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    QScrollBar *bar = filesList->verticalScrollBar();
+
+    quick->setPosting();
+    for (int i = 0; i < 10; ++i)
+        quick->onFilePosted(followedPath(i), 10, 0);
+    QVERIFY(rowCentred(filesList, 10));
+
+    // In a background tab the list is only recoloured, never scrolled.
+    tabs->setCurrentIndex(0);
+    QVERIFY(!filesList->isVisible());
+    const int backgroundValue = bar->value();
+    for (int i = 10; i < 150; ++i)
+        quick->onFilePosted(followedPath(i), 10, 0);
+    QCOMPARE(bar->value(), backgroundValue);
+    QCOMPARE(filesList->item(150)->foreground().color(), window->sPostingColor);
+
+    // Back on the tab, it shows the file in progress at once.
+    tabs->setCurrentWidget(quick);
+    QVERIFY(filesList->isVisible());
+    QVERIFY(rowCentred(filesList, 150));
+
+    // Even after the user had scrolled away: that position is stale by then.
+    bar->triggerAction(QAbstractSlider::SliderToMinimum);
+    quick->onFilePosted(followedPath(150), 10, 0);
+    QCOMPARE(bar->value(), 0);
+    tabs->setCurrentIndex(0);
+    tabs->setCurrentWidget(quick);
+    QVERIFY(rowCentred(filesList, 151));
+}
+
+void TestMainWindow::auto_post_list_follows_the_started_job()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    MainWindow *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    QVERIFY(tabs);
+    AutoPostWidget *autoWidget = window->autoWidget();
+    QVERIFY(autoWidget);
+    auto *autoList = autoWidget->findChild<QListWidget *>("filesList");
+    QVERIFY(autoList);
+    tabs->setCurrentWidget(autoWidget);
+    window->resize(1000, 700);
+    window->show();
+    QVERIFY(QTest::qWaitForWindowExposed(window));
+    autoList->addItem(QStringLiteral("Monitoring /test"));
+    for (int i = 0; i < 200; ++i)
+        autoList->addItem(QStringLiteral("- /test/folder_%1").arg(i));
+    QScrollBar *bar = autoList->verticalScrollBar();
+
+    autoWidget->updateStartedJob(QStringLiteral("/test/folder_120"));
+    QCOMPARE(autoList->item(121)->foreground().color(), window->sPostingColor);
+    QVERIFY(rowCentred(autoList, 121));
+
+    // A finished job is recoloured where it is: the next start moves the list.
+    const int startedValue = bar->value();
+    autoWidget->updateFinishedJob(QStringLiteral("/test/folder_120"), 5, 5, 0);
+    QCOMPARE(autoList->item(121)->foreground().color(), window->sDoneOKColor);
+    QCOMPARE(bar->value(), startedValue);
+
+    // Nothing scrolls while the Auto tab is in the background.
+    tabs->setCurrentIndex(2);
+    QVERIFY(!autoList->isVisible());
+    autoWidget->updateStartedJob(QStringLiteral("/test/folder_160"));
+    QCOMPARE(autoList->item(161)->foreground().color(), window->sPostingColor);
+    QCOMPARE(bar->value(), startedValue);
+    tabs->setCurrentWidget(autoWidget);
+    QVERIFY(rowCentred(autoList, 161));
 }

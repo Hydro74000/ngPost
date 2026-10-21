@@ -773,7 +773,7 @@
 48	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onEditPostInfo()
 6	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onGenPar2Toggled( bool checked)
 61	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onGenQuickPosts()
-17	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onMonitorJobStart()
+4	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onMonitorJobStart()
 76	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onMonitoringClicked()
 1	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onPostInfoToggled( bool checked)
 15	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onScanAutoDirClicked()
@@ -1133,7 +1133,7 @@
 1	src/hmi/PostingWidget.h	PostingWidget::jobNumber() const
 1	src/hmi/PostingWidget.h	PostingWidget::postInfoMeta() const
 1	src/hmi/PostingWidget.h	PostingWidget::postInfoTemplateOverride() const
-8	src/hmi/SignedListWidget.cpp	SignedListWidget::SignedListWidget( QWidget * parent)
+12	src/hmi/SignedListWidget.cpp	SignedListWidget::SignedListWidget( QWidget * parent)
 7	src/hmi/SignedListWidget.cpp	SignedListWidget::addPath( const QString & path , bool isDir)
 11	src/hmi/SignedListWidget.cpp	SignedListWidget::addPathIfNotInList( const QString & path , int lastIndexToCheck , bool isDir)
 5	src/hmi/SignedListWidget.cpp	SignedListWidget::clear2()
@@ -1142,7 +1142,7 @@
 9	src/hmi/SignedListWidget.cpp	SignedListWidget::mousePressEvent( QMouseEvent * e)
 8	src/hmi/SignedListWidget.cpp	SignedListWidget::onDeleteSelectedItems()
 10	src/hmi/SignedListWidget.cpp	SignedListWidget::removeItemWidget2( QListWidgetItem * item)
-9	src/hmi/SignedListWidget.cpp	SignedListWidget::resizeEvent( QResizeEvent * e)
+11	src/hmi/SignedListWidget.cpp	SignedListWidget::resizeEvent( QResizeEvent * e)
 5	src/hmi/SignedListWidget.cpp	SignedListWidget::setSignature( const QString & str)
 13	src/hmi/StartupTabBar.cpp	StartupTabBar::StartupTabBar( QWidget * parent)
 9	src/hmi/StartupTabBar.cpp	StartupTabBar::_retranslate()

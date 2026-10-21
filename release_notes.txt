@@ -112,6 +112,11 @@ the NNTP streaming pipeline and SQLite history store.
     Compression Settings. A default password no longer silently replaces a random
     one. The choice is saved as AUTO_PASS; without it, the default password still
     wins, else GEN_PASS draws one.
+- Files List Follows the Post (issue #23):
+  * The Quick Post and Auto Posting lists keep the file in progress centred. Files
+    finish out of order: the list follows the first one still being posted.
+  * Only the tab on screen scrolls; a background tab catches up when shown. A list
+    the user scrolled elsewhere stays put until the file in progress is back in sight.
 - Collapsible Posting Log Pane:
   * Transparent overlay toggle button anchored beside the tab bar to collapse
     and restore the posting log splitter.
@@ -483,6 +488,12 @@ sécurité VPN et de l'isolation des identifiants.
     plus en silence un mot de passe aléatoire. Le choix est enregistré dans
     AUTO_PASS ; sans lui, le mot de passe par défaut l'emporte toujours, sinon
     GEN_PASS en tire un.
+- La liste des fichiers suit le post (issue #23) :
+  * Les listes du Post Rapide et du Post Auto gardent centré le fichier en cours. Les
+    fichiers se terminent dans le désordre : la liste suit le premier encore en envoi.
+  * Seul l'onglet affiché défile ; un onglet en arrière-plan se recale dès qu'il est
+    affiché. Une liste que l'utilisateur a fait défiler ailleurs reste en place tant
+    que le fichier en cours n'est pas revenu à l'écran.
 - Volet rétractable du journal de post (Posting Log) :
   * Bouton transparent repliable ancré à côté des onglets pour masquer/afficher
     le séparateur de journal.
