@@ -357,6 +357,22 @@ Será irreversible...</translation>
         <source>Global (%1 %)</source>
         <translation>Global (%1 %)</translation>
     </message>
+    <message>
+        <source>no password</source>
+        <translation>sin contraseña</translation>
+    </message>
+    <message>
+        <source>random password</source>
+        <translation>contraseña aleatoria</translation>
+    </message>
+    <message>
+        <source>default password</source>
+        <translation>contraseña predeterminada</translation>
+    </message>
+    <message>
+        <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
+        <translation>contraseña de los archivos: ninguna, una aleatoria o la contraseña predeterminada de la Configuración de compresión</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -4544,6 +4560,18 @@ Su archivo de configuración activo es:
         <location line="+1"/>
         <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
         <translation>## El tamaño se calcula con redondeo a partir de los archivos; RAR_SIZE no se reescribe en este archivo.</translation>
+    </message>
+    <message>
+        <source>AUTO_PASS must be none, random or default.</source>
+        <translation>AUTO_PASS debe ser none, random o default.</translation>
+    </message>
+    <message>
+        <source>## password of the archives of the GUI&apos;s Auto Posting: none, random or default</source>
+        <translation>## contraseña de los archivos de la publicación automática de la GUI: none, random o default</translation>
+    </message>
+    <message>
+        <source>## (not set: the default password above, else a random one if PACK has GEN_PASS)</source>
+        <translation>## (sin definir: la contraseña predeterminada de arriba, si no una aleatoria si PACK contiene GEN_PASS)</translation>
     </message>
 </context>
 <context>

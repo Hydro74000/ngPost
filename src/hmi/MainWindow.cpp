@@ -2653,6 +2653,7 @@ void MainWindow::onCompressionSettingsClicked()
     QString const pass = dlg.fixedPassword();
     if (!pass.isEmpty())
         onRarPassUpdated(pass);
+    _autoPostTab->refreshPasswordChoices();
 }
 
 void MainWindow::onAutoCompressToggled(bool checked)

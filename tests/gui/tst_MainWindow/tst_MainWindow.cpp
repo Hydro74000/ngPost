@@ -50,6 +50,7 @@
 #include <QSettings>
 #include <QSignalSpy>
 #include <QSpinBox>
+#include <QStandardItemModel>
 #include <QTabWidget>
 #include <QTabBar>
 #include <QDateTime>
@@ -457,6 +458,13 @@ private slots:
     //! configured packing back, default password included, not the last post's.
     void default_quick_post_reset_restores_the_configured_packing_data();
     void default_quick_post_reset_restores_the_configured_packing();
+
+    //! Auto Posting chooses its archive password: none, a random one or the
+    //! default one, which no longer overrides the other two (AUTO_PASS).
+    void auto_posting_chooses_the_archive_password_data();
+    void auto_posting_chooses_the_archive_password();
+    void auto_posting_password_choice_is_read_from_the_configuration_data();
+    void auto_posting_password_choice_is_read_from_the_configuration();
 
     //! "Keep the archives" is a default held by the dialog: a new tab starts
     //! with it, and the choice a single post makes must not rewrite it.
@@ -2044,6 +2052,120 @@ void TestMainWindow::default_quick_post_reset_restores_the_configured_packing()
         QVERIFY(!pass->text().isEmpty() && pass->text() != QStringLiteral("typed-for-one-post"));
     else
         QCOMPARE(pass->text(), fixedPass);
+}
+
+void TestMainWindow::auto_posting_chooses_the_archive_password_data()
+{
+    QTest::addColumn<int>("row");
+    QTest::addColumn<QString>("saved");
+    QTest::newRow("no password") << 0 << QStringLiteral("\nAUTO_PASS = none\n");
+    QTest::newRow("random password") << 1 << QStringLiteral("\nAUTO_PASS = random\n");
+    // What an absent AUTO_PASS gives already: nothing to write.
+    QTest::newRow("default password") << 2 << QStringLiteral("\n#AUTO_PASS = random\n");
+}
+
+void TestMainWindow::auto_posting_chooses_the_archive_password()
+{
+    QFETCH(int, row);
+    QFETCH(QString, saved);
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost,
+                                    QStringLiteral("GROUPS = alt.binaries.test\n"
+                                                   "PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2\n"
+                                                   "RAR_PASS = hunter2\n"),
+                                    &err);
+    QVERIFY2(window, qPrintable(err));
+    auto *automatic = window->findChild<AutoPostWidget *>();
+    QVERIFY(automatic);
+    auto *choice = automatic->findChild<QComboBox *>(QStringLiteral("passModeCB"));
+    auto *length = automatic->findChild<QSpinBox *>(QStringLiteral("passLengthSB"));
+    auto *files = automatic->findChild<QListWidget *>(QStringLiteral("filesList"));
+    QVERIFY(choice && length && files);
+    // Without AUTO_PASS, what ngPost always did: the default password.
+    QCOMPARE(choice->currentIndex(), 2);
+    choice->setCurrentIndex(row);
+    QCOMPARE(length->isEnabled(), row == 1);
+
+    // Generate Posts hands each new tab the chosen password, not the default one.
+    automatic->findChild<QCheckBox *>(QStringLiteral("startJobsCB"))->setChecked(false);
+    QFile source(sandbox.rootPath() + QStringLiteral("/source.bin"));
+    QVERIFY(source.open(QIODevice::WriteOnly));
+    source.write("auto password");
+    source.close();
+    files->addItem(source.fileName());
+    QVERIFY(QMetaObject::invokeMethod(automatic, "onGenQuickPosts"));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    auto *post = qobject_cast<PostingWidget *>(tabs->widget(tabs->count() - 1));
+    QVERIFY(post && post != tabs->widget(2));
+    auto *passCB = post->findChild<QCheckBox *>(QStringLiteral("nzbPassCB"));
+    QString const pass = post->findChild<QLineEdit *>(QStringLiteral("nzbPassEdit"))->text();
+    // The same password reaches a monitored file.
+    QString const monitored = ngPost.autoArchivePassword();
+    if (row == 0) {
+        QVERIFY(!passCB->isChecked() && pass.isEmpty() && monitored.isEmpty());
+    } else if (row == 1) {
+        QVERIFY(passCB->isChecked());
+        QVERIFY(!pass.isEmpty() && pass != QStringLiteral("hunter2"));
+        QVERIFY(!monitored.isEmpty() && monitored != QStringLiteral("hunter2"));
+    } else {
+        QVERIFY(passCB->isChecked());
+        QCOMPARE(pass, QStringLiteral("hunter2"));
+        QCOMPARE(monitored, QStringLiteral("hunter2"));
+    }
+
+    ngPost.saveConfig();
+    QFile conf(PathHelper::configFilePath());
+    QVERIFY(conf.open(QIODevice::ReadOnly | QIODevice::Text));
+    QString const content = QString::fromUtf8(conf.readAll());
+    QVERIFY2(content.contains(saved), qPrintable(content));
+    if (row == 2)
+        QVERIFY2(!content.contains(QStringLiteral("\nAUTO_PASS")), qPrintable(content));
+}
+
+void TestMainWindow::auto_posting_password_choice_is_read_from_the_configuration_data()
+{
+    QTest::addColumn<QString>("conf");
+    QTest::addColumn<int>("row"); // -1: the configuration is refused
+    const QString pack = QStringLiteral("PACK = COMPRESS, GEN_PASS\n");
+    const QString fixed = QStringLiteral("RAR_PASS = hunter2\n");
+    QTest::newRow("none over a default password") << pack + fixed + "AUTO_PASS = none\n" << 0;
+    QTest::newRow("random over a default password") << pack + fixed + "AUTO_PASS = Random\n" << 1;
+    QTest::newRow("absent, GEN_PASS") << pack << 1;
+    QTest::newRow("default without one") << pack + "AUTO_PASS = default\n" << 1;
+    QTest::newRow("unknown value") << pack + "AUTO_PASS = sometimes\n" << -1;
+}
+
+void TestMainWindow::auto_posting_password_choice_is_read_from_the_configuration()
+{
+    QFETCH(QString, conf);
+    QFETCH(int, row);
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n" + conf, &err);
+    if (row < 0) {
+        QVERIFY(!window);
+        QVERIFY2(err.contains(QStringLiteral("AUTO_PASS")), qPrintable(err));
+        return;
+    }
+    QVERIFY2(window, qPrintable(err));
+    auto *automatic = window->findChild<AutoPostWidget *>();
+    QVERIFY(automatic);
+    auto *choice = automatic->findChild<QComboBox *>(QStringLiteral("passModeCB"));
+    QVERIFY(choice);
+    QCOMPARE(choice->currentIndex(), row);
+    // The default password can only be chosen while there is one.
+    auto *rows = qobject_cast<QStandardItemModel *>(choice->model());
+    QVERIFY(rows);
+    QCOMPARE(rows->item(2)->isEnabled(), conf.contains(QStringLiteral("RAR_PASS")));
 }
 
 void TestMainWindow::keep_archives_default_is_owned_by_the_dialog()

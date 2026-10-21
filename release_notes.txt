@@ -106,6 +106,12 @@ the NNTP streaming pipeline and SQLite history store.
 - Inline Clipboard Copy Actions:
   * Quick-copy buttons with animated tooltips added to generated NZB name and
     archive password fields.
+- Auto Posting Archive Password:
+  * The Auto Posting tab chooses the password of its archives, for its posts and
+    for folder monitoring: none, a random one, or the default password of the
+    Compression Settings. A default password no longer silently replaces a random
+    one. The choice is saved as AUTO_PASS; without it, the default password still
+    wins, else GEN_PASS draws one.
 - Collapsible Posting Log Pane:
   * Transparent overlay toggle button anchored beside the tab bar to collapse
     and restore the posting log splitter.
@@ -211,6 +217,9 @@ the NNTP streaming pipeline and SQLite history store.
 - Default Tab Closure Logic:
   * Hardened tab closure on default Quick Post tab to cleanly reset inputs rather
     than producing invalid UI states.
+  * Emptied after its post, Quick Post #1 takes the configured options back:
+    compression, PAR2, password, redundancy and archive keeping. The default
+    password is no longer replaced by a random one, there nor by "Remove All".
 - Wayland & Offscreen Splitter Fixes:
   * Resolved splitter mouse-grab and resizing issues under Wayland and KDE Breeze.
 - PAR2 Empty Output Detection:
@@ -467,6 +476,13 @@ sécurité VPN et de l'isolation des identifiants.
 - Boutons de copie rapide dans le presse-papiers :
   * Boutons de copie inline avec infobulle et confirmation visuelle pour le nom du
     fichier NZB et le mot de passe de l'archive.
+- Mot de passe des archives du Post Auto :
+  * L'onglet Post Auto choisit le mot de passe de ses archives, pour ses posts comme
+    pour la surveillance de dossier : aucun, un aléatoire, ou le mot de passe par
+    défaut du « Paramétrage Compression ». Le mot de passe par défaut ne remplace
+    plus en silence un mot de passe aléatoire. Le choix est enregistré dans
+    AUTO_PASS ; sans lui, le mot de passe par défaut l'emporte toujours, sinon
+    GEN_PASS en tire un.
 - Volet rétractable du journal de post (Posting Log) :
   * Bouton transparent repliable ancré à côté des onglets pour masquer/afficher
     le séparateur de journal.
@@ -582,6 +598,9 @@ sécurité VPN et de l'isolation des identifiants.
 - Fermeture propre de l'onglet de post par défaut :
   * Réinitialisation cohérente des contrôles de l'onglet par défaut au lieu de
     laisser des états d'interface invalides.
+  * Vidé après son post, le Post Rapide #1 reprend les options de la configuration :
+    compression, PAR2, mot de passe, redondance et conservation des archives. Le mot
+    de passe par défaut n'y est plus remplacé par un aléatoire, ni par « Supprimer tout ».
 - Correctifs pour Wayland et environnements offscreen :
   * Correction du redimensionnement du panneau de log et des conflits de capture
     souris sous Wayland et KDE Breeze.

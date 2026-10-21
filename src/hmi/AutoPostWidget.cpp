@@ -31,6 +31,35 @@
 #include <QMessageBox>
 #include <QKeyEvent>
 #include <QMimeData>
+#include <QStandardItemModel>
+
+namespace
+{
+
+//! The rows of the password choice, in the order of AutoPostWidget.ui.
+enum PassRow {
+    kNoPass,
+    kRandomPass,
+    kDefaultPass
+};
+
+NgPost::AutoPass passChoice(QComboBox const *box)
+{
+    switch (box->currentIndex()) {
+    case kRandomPass: return NgPost::AutoPass::Random;
+    case kDefaultPass: return NgPost::AutoPass::Default;
+    default: return NgPost::AutoPass::None;
+    }
+}
+
+void setPassChoice(QComboBox *box, NgPost::AutoPass pass)
+{
+    box->setCurrentIndex(pass == NgPost::AutoPass::Random        ? kRandomPass
+                             : pass == NgPost::AutoPass::Default ? kDefaultPass
+                                                                 : kNoPass);
+}
+
+} // namespace
 
 AutoPostWidget::AutoPostWidget(NgPost *ngPost, MainWindow *hmi) :
     QWidget(hmi),
@@ -72,6 +101,10 @@ void AutoPostWidget::init()
     connect(_ui->scanAutoDirButton, &QAbstractButton::clicked, this, &AutoPostWidget::onScanAutoDirClicked);
     connect(_ui->compressCB,        &QAbstractButton::toggled, this, &AutoPostWidget::onCompressToggled);
     connect(_ui->par2CB,            &QAbstractButton::toggled, this, &AutoPostWidget::onGenPar2Toggled);
+    connect(_ui->passModeCB,
+            &QComboBox::currentIndexChanged,
+            this,
+            &AutoPostWidget::onPassChoiceChanged);
 
     setPackingAuto(_ngPost->_packAuto, _ngPost->_packAutoKeywords);
     // setPackingAuto() only emits toggled() when a box actually changes, so the
@@ -153,6 +186,9 @@ Press the Scan button and remove what you don't want to post ;)\n\
                                      _postInfoOutput,
                                      _postInfoMeta);
         quickPostWidget->genNameAndPassword(_ngPost->_genName, _ngPost->_genPass, _ngPost->_doPar2);
+        // The password this tab chose, not the one a posting tab would draw.
+        if (_ngPost->_doCompress)
+            quickPostWidget->setNzbPassword(_ngPost->autoArchivePassword());
 
         if (startPost)
             quickPostWidget->postFiles(false);
@@ -249,7 +285,7 @@ void AutoPostWidget::onMonitoringClicked()
     {
         _ui->genNameCB->setEnabled(false);
         _ui->nameLengthSB->setEnabled(false);
-        _ui->genPassCB->setEnabled(false);
+        _ui->passModeCB->setEnabled(false);
         _ui->passLengthSB->setEnabled(false);
         _ui->keepRarCB->setEnabled(false);
         _ui->redundancySB->setEnabled(false);
@@ -311,10 +347,17 @@ void AutoPostWidget::updatePackingDependents()
                         tr("generate a random name for the archive"), needsCompress);
     setDependentEnabled(_ui->nameLengthSB, compress,
                         tr("length of the random archive name"), needsCompress);
-    setDependentEnabled(_ui->genPassCB, compress,
-                        tr("generate a random password for the archive or use the fixed one"), needsCompress);
-    setDependentEnabled(_ui->passLengthSB, compress,
-                        tr("length of the random archive password"), needsCompress);
+    setDependentEnabled(_ui->passModeCB,
+                        compress,
+                        tr("password of the archives: none, a random one, or the default password "
+                           "of the Compression Settings"),
+                        needsCompress);
+    bool const random = passChoice(_ui->passModeCB) == NgPost::AutoPass::Random;
+    setDependentEnabled(_ui->passLengthSB,
+                        compress && random,
+                        tr("length of the random archive password"),
+                        compress ? tr("requires: %1").arg(_ui->passModeCB->itemText(kRandomPass))
+                                 : needsCompress);
     setDependentEnabled(_ui->keepRarCB, compress,
                         tr("by default archives and par2 files are deleted uppon post success but you can choose to keep them"),
                         needsCompress);
@@ -385,7 +428,11 @@ void AutoPostWidget::udatePostingParams()
     // fetch compression settings
     _ngPost->_doCompress = _ui->compressCB->isChecked();
     _ngPost->_genName    = _ngPost->_doCompress ? _ui->genNameCB->isChecked() : false;
-    _ngPost->_genPass    = _ngPost->_doCompress ? _ui->genPassCB->isChecked() : false;
+    _ngPost->_autoPass = passChoice(_ui->passModeCB);
+    // GEN_PASS is also the draw of the posting tabs: the default password,
+    // which does not draw, leaves it as the configuration has it.
+    if (_ngPost->_autoPass != NgPost::AutoPass::Default)
+        _ngPost->_genPass = _ngPost->_doCompress && _ngPost->_autoPass == NgPost::AutoPass::Random;
     _ngPost->_doPar2     = _ui->par2CB->isChecked();
     _ngPost->_packAuto   = _ngPost->_doCompress || _ngPost->_doPar2;
 
@@ -491,11 +538,38 @@ void AutoPostWidget::setPackingAuto(bool enabled, const QStringList &keys){
     }
     _ui->compressCB->setChecked(compress);
     _ui->genNameCB->setChecked(genName);
-    _ui->genPassCB->setChecked(genPass);
+    // The choice saved as AUTO_PASS, else what an absent one has always meant.
+    NgPost::AutoPass pass = _ngPost->_autoPass;
+    if (pass == NgPost::AutoPass::Unset)
+        pass = !_ngPost->_rarPassFixed.isEmpty() ? NgPost::AutoPass::Default
+            : genPass                            ? NgPost::AutoPass::Random
+                                                 : NgPost::AutoPass::None;
+    setPassChoice(_ui->passModeCB, pass);
+    refreshPasswordChoices();
     _ui->par2CB->setChecked(doPar2);
     onCompressToggled(compress);
 }
 
+void AutoPostWidget::refreshPasswordChoices()
+{
+    // The default password can only be chosen while there is one. Gone, the
+    // choice falls back to what GEN_PASS gives, never to a password nobody set.
+    bool const hasDefault = !_ngPost->_rarPassFixed.isEmpty();
+    auto *rows = qobject_cast<QStandardItemModel *>(_ui->passModeCB->model());
+    if (QStandardItem *row = rows ? rows->item(kDefaultPass) : nullptr)
+        row->setEnabled(hasDefault);
+    if (!hasDefault && passChoice(_ui->passModeCB) == NgPost::AutoPass::Default)
+        setPassChoice(_ui->passModeCB,
+                      _ngPost->_genPass ? NgPost::AutoPass::Random : NgPost::AutoPass::None);
+}
+
+void AutoPostWidget::onPassChoiceChanged()
+{
+    // The controls stay greyed while monitoring; the choice itself only moves
+    // there when the default password goes away.
+    if (!_isMonitoring)
+        updatePackingDependents();
+}
 
 
 void AutoPostWidget::handleKeyEvent(QKeyEvent *keyEvent)

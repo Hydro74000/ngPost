@@ -359,6 +359,22 @@ Bestanden worden definitief verwijderd...</translation>
         <source>Global (%1 %)</source>
         <translation>Globaal (%1 %)</translation>
     </message>
+    <message>
+        <source>no password</source>
+        <translation>geen wachtwoord</translation>
+    </message>
+    <message>
+        <source>random password</source>
+        <translation>willekeurig wachtwoord</translation>
+    </message>
+    <message>
+        <source>default password</source>
+        <translation>standaardwachtwoord</translation>
+    </message>
+    <message>
+        <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
+        <translation>wachtwoord van de archieven: geen, een willekeurig, of het standaardwachtwoord van de Compressie-instellingen</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -4548,6 +4564,18 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <location line="+1"/>
         <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
         <translation>## De grootte wordt berekend uit de bronnen met afronding; RAR_SIZE wordt niet herschreven.</translation>
+    </message>
+    <message>
+        <source>AUTO_PASS must be none, random or default.</source>
+        <translation>AUTO_PASS moet none, random of default zijn.</translation>
+    </message>
+    <message>
+        <source>## password of the archives of the GUI&apos;s Auto Posting: none, random or default</source>
+        <translation>## wachtwoord van de archieven van Auto Posting in de GUI: none, random of default</translation>
+    </message>
+    <message>
+        <source>## (not set: the default password above, else a random one if PACK has GEN_PASS)</source>
+        <translation>## (niet ingesteld: het standaardwachtwoord hierboven, anders een willekeurig als PACK GEN_PASS bevat)</translation>
     </message>
 </context>
 <context>

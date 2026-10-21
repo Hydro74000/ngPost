@@ -481,10 +481,11 @@ void PostingJob::_createHistoryRecord()
             rec.passwordOrigin = QStringLiteral("absent");
         else if (_rarPass.isEmpty())
             rec.passwordOrigin = QStringLiteral("declared");
-        else if (_ngPost->_genPass && _ngPost->_rarPassFixed.isEmpty())
-            rec.passwordOrigin = QStringLiteral("generated");
-        else if (!_ngPost->_rarPassFixed.isEmpty())
+        else if (_rarPass == _ngPost->_rarPassFixed)
             rec.passwordOrigin = QStringLiteral("fixed");
+        // Auto Posting may draw one while a default password exists.
+        else if (_ngPost->_genPass)
+            rec.passwordOrigin = QStringLiteral("generated");
         else
             rec.passwordOrigin = QStringLiteral("provided");
         rec.from = QString::fromStdString(_from);

@@ -357,6 +357,22 @@ It will be irreversible...</source>
         <source>Global (%1 %)</source>
         <translation>全局（%1 %）</translation>
     </message>
+    <message>
+        <source>no password</source>
+        <translation>无密码</translation>
+    </message>
+    <message>
+        <source>random password</source>
+        <translation>随机密码</translation>
+    </message>
+    <message>
+        <source>default password</source>
+        <translation>默认密码</translation>
+    </message>
+    <message>
+        <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
+        <translation>压缩文件密码：无、随机密码，或压缩设置中的默认密码</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -4544,6 +4560,18 @@ Your active configuration file is:
         <location line="+1"/>
         <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
         <translation>## 根据源文件大小计算并取整；不会改写此文件中的 RAR_SIZE。</translation>
+    </message>
+    <message>
+        <source>AUTO_PASS must be none, random or default.</source>
+        <translation>AUTO_PASS 必须为 none、random 或 default。</translation>
+    </message>
+    <message>
+        <source>## password of the archives of the GUI&apos;s Auto Posting: none, random or default</source>
+        <translation>## 图形界面自动发帖的压缩文件密码：none、random 或 default</translation>
+    </message>
+    <message>
+        <source>## (not set: the default password above, else a random one if PACK has GEN_PASS)</source>
+        <translation>## （未设置：使用上面的默认密码，否则当 PACK 包含 GEN_PASS 时使用随机密码）</translation>
     </message>
 </context>
 <context>

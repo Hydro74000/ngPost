@@ -986,7 +986,8 @@ void PostingWidget::retranslate()
 
 void PostingWidget::setNzbPassword(const QString &pass)
 {
-    _ui->nzbPassCB->setChecked(true);
+    // No password is an unticked box: ticked over an empty field would be a lie.
+    _ui->nzbPassCB->setChecked(!pass.isEmpty());
     _ui->nzbPassEdit->setText(pass);
 }
 

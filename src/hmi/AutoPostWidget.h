@@ -79,6 +79,8 @@ public:
     void retranslate();
 
     void setPackingAuto(bool enabled, const QStringList &keys);
+    //! Offers the default password only while one is configured.
+    void refreshPasswordChoices();
 
     void refreshPendingColors();
 
@@ -111,6 +113,7 @@ private slots:
     void onAddMonitoringFolder();
     void onCompressToggled(bool checked);
     void onGenPar2Toggled(bool checked);
+    void onPassChoiceChanged();
 };
 
 #endif // AUTOPOSTWIDGET_H

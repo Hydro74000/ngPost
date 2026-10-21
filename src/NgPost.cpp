@@ -182,6 +182,7 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::GEN_PASS,     "gen_pass"},
     {Opt::RAR_NAME,     "rar_name"},
     {Opt::RAR_PASS,     "rar_pass"},
+    {Opt::AUTO_PASS,    "auto_pass"},
     {Opt::LENGTH_NAME,  "length_name"},
     {Opt::LENGTH_PASS,  "length_pass"},
 
@@ -1952,10 +1953,7 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
         if (_genName)
             _rarName = randomName(_lengthName);
 
-        if (_genPass) // shall we gen password?
-            _rarPass = randomPass(_lengthPass);
-        if (!_rarPassFixed.isEmpty()) // rar pass fixed would take other
-            _rarPass = _rarPassFixed;
+        _rarPass = autoArchivePassword();
         if (!_rarPass.isEmpty())
             _declaredPassword.clear(); // the real archive password wins
     }
@@ -2563,6 +2561,25 @@ void NgPost::_error(const QString &error, NgPost::ERROR_CODE code)
 QString NgPost::randomPass(uint length) const
 {
     return RandomToken::secret(length);
+}
+
+NgPost::AutoPass NgPost::implicitAutoPass() const
+{
+    if (!_rarPassFixed.isEmpty())
+        return AutoPass::Default;
+    return _genPass ? AutoPass::Random : AutoPass::None;
+}
+
+QString NgPost::autoArchivePassword() const
+{
+    // AUTO_PASS is the choice of the Auto Posting tab: the command line keeps
+    // --gen_pass and --rar_pass, whose rule is the implicit one.
+    AutoPass choice = useHMI() ? _autoPass : AutoPass::Unset;
+    if (choice == AutoPass::Unset || (choice == AutoPass::Default && _rarPassFixed.isEmpty()))
+        choice = implicitAutoPass();
+    if (choice == AutoPass::Default)
+        return _rarPassFixed;
+    return choice == AutoPass::Random ? randomPass(_lengthPass) : QString();
 }
 
 void NgPost::closeAllPostingJobs()
@@ -3833,6 +3850,22 @@ QStringList const &NgPost::vpnProfileKeys()
     return keys;
 }
 
+//! The values of AUTO_PASS. Unset has none: it is the absent line.
+static QMap<NgPost::AutoPass, QString> const &autoPassNames()
+{
+    static QMap<NgPost::AutoPass, QString> const names{
+        { NgPost::AutoPass::None, QStringLiteral("none") },
+        { NgPost::AutoPass::Random, QStringLiteral("random") },
+        { NgPost::AutoPass::Default, QStringLiteral("default") }
+    };
+    return names;
+}
+
+static NgPost::AutoPass autoPassFromName(QString const &name)
+{
+    return autoPassNames().key(name.trimmed().toLower(), NgPost::AutoPass::Unset);
+}
+
 //! Walk a configuration text the way _parseConfig() reads it, and sort each
 //! "key = value" line: a setting, or a line of the block it stands in. Blocks do
 //! not end: a [server] block owns the server keys that follow it, a
@@ -4632,6 +4665,12 @@ bool NgPost::_parseConfigArchiveKey(const QString &opt,
     else if (opt == sOptionNames[Opt::RAR_PASS]) {
         _rarPassFixed = val;
         _rarPass = val;
+    } else if (opt == sOptionNames[Opt::AUTO_PASS]) {
+        AutoPass const choice = autoPassFromName(val);
+        if (choice == AutoPass::Unset)
+            err += tr("AUTO_PASS must be none, random or default.") + QLatin1Char('\n');
+        else
+            _autoPass = choice;
     } else if (opt == sOptionNames[Opt::RAR_EXTRA])
         _rarArgs = val;
     else if (opt == sOptionNames[Opt::RAR_SIZE]) {
@@ -6023,6 +6062,9 @@ void NgPost::_writeConfigPacking(QTextStream &stream)
         if (_genPass)    _packAutoKeywords << sOptionNames[Opt::GEN_PASS];
         if (_doPar2)     _packAutoKeywords << sOptionNames[Opt::GEN_PAR2];
     }
+    // Written only when it changes something: absent, the Auto Posting password
+    // follows the default password and GEN_PASS when they change.
+    bool const autoPassSet = _autoPass != AutoPass::Unset && _autoPass != implicitAutoPass();
     stream << (_packAuto && _packAutoKeywords.size() ? QString("PACK = %1\n").arg(_packAutoKeywords.join(", ").toUpper()) : "")
            << "\n"
            << tr("## use the same Password for all your Posts using compression") << "\n"
@@ -6032,6 +6074,11 @@ void NgPost::_writeConfigPacking(QTextStream &stream)
            << (_rarPassFixed.isEmpty()  ? "#" : "")
       #endif
            << "RAR_PASS = " << (_rarPassFixed.isEmpty()  ? "yourPassword" : _rarPassFixed) << "\n"
+           << "\n"
+           << tr("## password of the archives of the GUI's Auto Posting: none, random or default") << "\n"
+           << tr("## (not set: the default password above, else a random one if PACK has GEN_PASS)") << "\n"
+           << (autoPassSet ? "" : "#") << "AUTO_PASS = "
+           << autoPassNames().value(autoPassSet ? _autoPass : AutoPass::Random) << "\n"
            << "\n"
            << tr("## temporary folder where the compressed files and par2 will be stored") << "\n"
            << tr("## so we can post directly a compressed (obfuscated or not) archive of the selected files") << "\n"

@@ -210,13 +210,25 @@
         <number>1</number>
        </property>
        <item>
-        <widget class="QCheckBox" name="genPassCB">
-         <property name="toolTip">
-          <string>generate a random password for the archive or use the fixed one</string>
+        <widget class="QComboBox" name="passModeCB">
+         <property name="sizeAdjustPolicy">
+          <enum>QComboBox::SizeAdjustPolicy::AdjustToContents</enum>
          </property>
-         <property name="text">
-          <string>generate random password</string>
-         </property>
+         <item>
+          <property name="text">
+           <string>no password</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>random password</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>default password</string>
+          </property>
+         </item>
         </widget>
        </item>
        <item>

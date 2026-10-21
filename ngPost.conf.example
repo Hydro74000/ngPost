@@ -291,6 +291,10 @@ LOG_IN_FILE = true
 ## use the same Password for all your Posts using compression
 #RAR_PASS = myPassword
 
+## password of the archives of the GUI's Auto Posting: none, random or default
+## (not set: the default password above, else a random one if PACK has GEN_PASS)
+#AUTO_PASS = random
+
 ## temporary folder where the compressed files and par2 will be stored
 ## so we can post directly a compressed (obfuscated or not) archive of the selected files
 ## /!\ The directory MUST HAVE WRITE PERMISSION /!\

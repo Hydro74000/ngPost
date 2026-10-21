@@ -172,6 +172,7 @@ public:
         LENGTH_PASS,
         RAR_NAME,
         RAR_PASS,
+        AUTO_PASS,
         RAR_NO_ROOT_FOLDER,
         AUTO_CLOSE_TABS,
         KEEP_NFO_EXTENSION,
@@ -222,6 +223,16 @@ public:
         DRY_RUN,
         YES,
         JSON
+    };
+
+    //! The password of the archives the GUI's Auto Posting builds (AUTO_PASS).
+    //! Unset keeps the rule of the command line: the default password wins,
+    //! else GEN_PASS draws one.
+    enum class AutoPass {
+        Unset,
+        None,
+        Random,
+        Default
     };
 
 private:
@@ -383,6 +394,7 @@ private:
     QString _rarName;
     QString _rarPass;
     QString _rarPassFixed;
+    AutoPass _autoPass = AutoPass::Unset;
 
     QString _inputDir;
 
@@ -682,6 +694,11 @@ public:
 
     inline QString randomFrom(ushort length = 13) const;
     QString randomPass(uint length = 13) const;
+    //! What AUTO_PASS gives while it is not set: the default password when
+    //! there is one, else a draw when GEN_PASS asks for it.
+    AutoPass implicitAutoPass() const;
+    //! The password of a new Auto Posting archive, AUTO_PASS applied in the GUI.
+    QString autoArchivePassword() const;
     QString randomName(uint length = 13) const { return RandomToken::publicName(length); }
 
     inline QList<QString> languages() const;

@@ -358,6 +358,22 @@ Es wird nicht mehr rückgängig zu machen sein...</translation>
         <source>Global (%1 %)</source>
         <translation>Global (%1 %)</translation>
     </message>
+    <message>
+        <source>no password</source>
+        <translation>kein Passwort</translation>
+    </message>
+    <message>
+        <source>random password</source>
+        <translation>Zufallspasswort</translation>
+    </message>
+    <message>
+        <source>default password</source>
+        <translation>Standardpasswort</translation>
+    </message>
+    <message>
+        <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
+        <translation>Passwort der Archive: keines, ein zufälliges oder das Standardpasswort der Komprimierungseinstellungen</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -4544,6 +4560,18 @@ Ihre aktive Konfigurationsdatei ist:
         <location line="+1"/>
         <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
         <translation>## Die Größe wird aus der Quellgröße mit Rundung berechnet; RAR_SIZE wird nicht überschrieben.</translation>
+    </message>
+    <message>
+        <source>AUTO_PASS must be none, random or default.</source>
+        <translation>AUTO_PASS muss none, random oder default sein.</translation>
+    </message>
+    <message>
+        <source>## password of the archives of the GUI&apos;s Auto Posting: none, random or default</source>
+        <translation>## Passwort der Archive des Auto-Postings der GUI: none, random oder default</translation>
+    </message>
+    <message>
+        <source>## (not set: the default password above, else a random one if PACK has GEN_PASS)</source>
+        <translation>## (nicht gesetzt: das Standardpasswort oben, sonst ein zufälliges, wenn PACK GEN_PASS enthält)</translation>
     </message>
 </context>
 <context>

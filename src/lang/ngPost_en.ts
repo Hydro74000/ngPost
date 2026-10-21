@@ -351,6 +351,22 @@ It will be irreversible...</source>
         <source>Global (%1 %)</source>
         <translation>Global (%1 %)</translation>
     </message>
+    <message>
+        <source>no password</source>
+        <translation>no password</translation>
+    </message>
+    <message>
+        <source>random password</source>
+        <translation>random password</translation>
+    </message>
+    <message>
+        <source>default password</source>
+        <translation>default password</translation>
+    </message>
+    <message>
+        <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
+        <translation>password of the archives: none, a random one, or the default password of the Compression Settings</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -4521,6 +4537,18 @@ One thing does change for such a script: the old configuration file has no POST_
         <location line="+1"/>
         <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
         <translation>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</translation>
+    </message>
+    <message>
+        <source>AUTO_PASS must be none, random or default.</source>
+        <translation>AUTO_PASS must be none, random or default.</translation>
+    </message>
+    <message>
+        <source>## password of the archives of the GUI&apos;s Auto Posting: none, random or default</source>
+        <translation>## password of the archives of the GUI&apos;s Auto Posting: none, random or default</translation>
+    </message>
+    <message>
+        <source>## (not set: the default password above, else a random one if PACK has GEN_PASS)</source>
+        <translation>## (not set: the default password above, else a random one if PACK has GEN_PASS)</translation>
     </message>
 </context>
 <context>
