@@ -343,6 +343,11 @@ void AutoPostWidget::onGenPar2Toggled(bool checked)
 #include "PostingJob.h"
 void AutoPostWidget::onMonitorJobStart()
 {
+    _handleMonitorJobStart();
+}
+
+void AutoPostWidget::_handleMonitorJobStart()
+{
     PostingJob *job = static_cast<PostingJob*>(sender());
 
     QString srcPath = QString("- %1").arg(job->getFirstOriginalFile());
@@ -353,6 +358,7 @@ void AutoPostWidget::onMonitorJobStart()
         if (item->text() == srcPath)
         {
             item->setForeground(_hmi->sPostingColor);
+            _ui->filesList->scrollToItem(item, QAbstractItemView::EnsureVisible);
             _currentPostIdx = i;
             break;
         }
@@ -415,6 +421,14 @@ void AutoPostWidget::udatePostingParams()
 
 void AutoPostWidget::updateFinishedJob(const QString &path, uint nbArticles, uint nbUploaded, uint nbFailed)
 {
+    _handleFinishedJob(path, nbArticles, nbUploaded, nbFailed);
+}
+
+void AutoPostWidget::_handleFinishedJob(const QString &path,
+                                        uint nbArticles,
+                                        uint nbUploaded,
+                                        uint nbFailed)
+{
     QString srcPath = QString("- %1").arg(path);
     int nbFiles = _ui->filesList->count();
     for (int i = 1; i < nbFiles; ++i) {
@@ -434,6 +448,7 @@ void AutoPostWidget::updateFinishedJob(const QString &path, uint nbArticles, uin
             }
             item->setData(Qt::UserRole, false);
             item->setForeground(color);
+            _ui->filesList->scrollToItem(item, QAbstractItemView::EnsureVisible);
             break;
         }
     }

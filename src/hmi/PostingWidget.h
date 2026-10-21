@@ -194,6 +194,17 @@ private:
     bool _fileAlreadyInList(const QString &fileName, int currentNbFiles) const;
     void _setupCopyActions();
     void _copyToClipboard(QAction *action, QLineEdit *edit);
+    void _handleFilePosted(const QString &filePath, uint nbArticles, uint nbFailed);
+    void _setArchiveFilesAndHighlight(const QStringList &paths);
+    void _activatePosting();
+    void _handlePostingJobDone();
+    void _attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted);
+    bool _highlightFirstPendingFile();
+    void _clearActivePostingHighlights();
+    //! The configured password when there is one, else a draw if \a genPass.
+    void _renewArchivePassword(bool genPass);
+    //! Back to the packing options the configuration gives a new tab.
+    void _restoreConfiguredOptions();
 
     QAction *_copyCompressNameAction = nullptr;
     QAction *_copyPassAction = nullptr;

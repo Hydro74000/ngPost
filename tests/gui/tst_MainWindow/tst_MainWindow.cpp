@@ -453,6 +453,11 @@ private slots:
     //! still reach the posting tabs, which is the whole point of it.
     void default_archive_password_still_reaches_the_posting_tabs();
 
+    //! Emptied by auto close after its post, the default Quick Post tab gets the
+    //! configured packing back, default password included, not the last post's.
+    void default_quick_post_reset_restores_the_configured_packing_data();
+    void default_quick_post_reset_restores_the_configured_packing();
+
     //! "Keep the archives" is a default held by the dialog: a new tab starts
     //! with it, and the choice a single post makes must not rewrite it.
     void keep_archives_default_is_owned_by_the_dialog();
@@ -492,6 +497,7 @@ private slots:
     void log_box_restores_width_after_restart();
     void ui_zoom_control_adjusts_font_and_persists_setting();
     void ui_zoom_is_saved_without_a_log_line();
+    void posting_widget_and_auto_post_auto_scroll_to_active_files();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
     //! requires the row's QPushButton to receive a real mouse event;
@@ -1970,6 +1976,74 @@ void TestMainWindow::default_archive_password_still_reaches_the_posting_tabs()
     QCOMPARE(nzbPassEdit->text(), QStringLiteral("hunter2"));
     QVERIFY(window->useFixedPassword());
     QCOMPARE(window->fixedArchivePassword(), QStringLiteral("hunter2"));
+}
+
+void TestMainWindow::default_quick_post_reset_restores_the_configured_packing_data()
+{
+    QTest::addColumn<QString>("fixedPass");
+    QTest::newRow("default password") << QStringLiteral("hunter2");
+    QTest::newRow("drawn password") << QString();
+}
+
+void TestMainWindow::default_quick_post_reset_restores_the_configured_packing()
+{
+    QFETCH(QString, fixedPass);
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString conf = QStringLiteral("GROUPS = alt.binaries.test\n"
+                                  "PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2\n");
+    if (!fixedPass.isEmpty())
+        conf += QStringLiteral("RAR_PASS = %1\n").arg(fixedPass);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, conf, &err);
+    QVERIFY2(window, qPrintable(err));
+
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    QVERIFY(tabs);
+    auto *quick = qobject_cast<PostingWidget *>(tabs->widget(2));
+    QVERIFY(quick);
+    auto *compress = quick->findChild<QCheckBox *>(QStringLiteral("compressCB"));
+    auto *par2 = quick->findChild<QCheckBox *>(QStringLiteral("par2CB"));
+    auto *passCB = quick->findChild<QCheckBox *>(QStringLiteral("nzbPassCB"));
+    auto *pass = quick->findChild<QLineEdit *>(QStringLiteral("nzbPassEdit"));
+    auto *name = quick->findChild<QLineEdit *>(QStringLiteral("compressNameEdit"));
+    auto *redundancy = quick->findChild<QSpinBox *>(QStringLiteral("redundancySB"));
+    auto *clear = quick->findChild<QPushButton *>(QStringLiteral("clearFilesButton"));
+    QVERIFY(compress && par2 && passCB && pass && name && redundancy && clear);
+    QVERIFY(compress->isChecked() && par2->isChecked() && passCB->isChecked());
+    QVERIFY(!pass->text().isEmpty());
+    if (!fixedPass.isEmpty())
+        QCOMPARE(pass->text(), fixedPass);
+
+    // Clear starts a new post under PACK: a new draw, never over the default.
+    const QString opened = pass->text();
+    clear->click();
+    if (fixedPass.isEmpty())
+        QVERIFY(!pass->text().isEmpty() && pass->text() != opened);
+    else
+        QCOMPARE(pass->text(), fixedPass);
+
+    // The choices of one post, written into NgPost the way a post does.
+    pass->setText(QStringLiteral("typed-for-one-post"));
+    par2->setChecked(false);
+    redundancy->setValue(42);
+    compress->setChecked(false);
+    quick->udatePostingParams();
+
+    // Auto close cannot close the default tab: it empties it for the next post.
+    window->closeTab(quick);
+    QVERIFY(compress->isChecked());
+    QVERIFY(par2->isChecked());
+    QVERIFY(passCB->isChecked());
+    QCOMPARE(redundancy->value(), -1);
+    QVERIFY(!name->text().isEmpty());
+    if (fixedPass.isEmpty())
+        QVERIFY(!pass->text().isEmpty() && pass->text() != QStringLiteral("typed-for-one-post"));
+    else
+        QCOMPARE(pass->text(), fixedPass);
 }
 
 void TestMainWindow::keep_archives_default_is_owned_by_the_dialog()
@@ -8382,4 +8456,67 @@ void TestMainWindow::ui_zoom_is_saved_without_a_log_line()
     // Every other save still says so.
     ngPost.saveConfig();
     QCOMPARE(log->toPlainText().count(announce), announced + 1);
+}
+
+void TestMainWindow::posting_widget_and_auto_post_auto_scroll_to_active_files()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString error;
+    MainWindow *window = bootWindow(ngPost, "GROUPS = alt.binaries.test\n", &error);
+    QVERIFY2(window, qPrintable(error));
+
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    QVERIFY(tabs);
+    auto *quick = qobject_cast<PostingWidget *>(tabs->widget(2));
+    QVERIFY(quick);
+    auto *filesList = quick->findChild<QListWidget *>("filesList");
+    QVERIFY(filesList);
+
+    // Populate with 25 files
+    for (int i = 0; i < 25; ++i)
+        filesList->addItem(QStringLiteral("/path/to/test_file_%1.bin").arg(i, 2, 10, QChar('0')));
+
+    QCOMPARE(filesList->count(), 25);
+
+    // setPosting(): first file should become highlighted in sPostingColor
+    quick->setPosting();
+    QCOMPARE(filesList->item(0)->foreground().color(), window->sPostingColor);
+
+    // File 0 completes: file 0 turns green and file 1 becomes sPostingColor
+    quick->onFilePosted(QStringLiteral("/path/to/test_file_00.bin"), 10, 0);
+    QCOMPARE(filesList->item(0)->foreground().color(), window->sDoneOKColor);
+    QVERIFY(filesList->item(0)->text().contains(QStringLiteral("[10 ok]")));
+    QCOMPARE(filesList->item(1)->foreground().color(), window->sPostingColor);
+
+    // Simulate completion of files 1 through 23
+    for (int i = 1; i < 24; ++i) {
+        quick->onFilePosted(QStringLiteral("/path/to/test_file_%1.bin").arg(i, 2, 10, QChar('0')),
+                            10,
+                            0);
+    }
+    // File 24 should now be highlighted
+    QCOMPARE(filesList->item(24)->foreground().color(), window->sPostingColor);
+    QVERIFY(filesList->item(24)->text().contains(QStringLiteral("test_file_24.bin")));
+
+    // Finish the last file
+    quick->onFilePosted(QStringLiteral("/path/to/test_file_24.bin"), 10, 0);
+    QCOMPARE(filesList->item(24)->foreground().color(), window->sDoneOKColor);
+
+    // AutoPostWidget test
+    auto *autoWidget = window->autoWidget();
+    QVERIFY(autoWidget);
+    auto *autoList = autoWidget->findChild<QListWidget *>("filesList");
+    QVERIFY(autoList);
+    autoList->addItem(QStringLiteral("Monitoring /test"));
+    for (int i = 0; i < 15; ++i)
+        autoList->addItem(QStringLiteral("- /test/folder_%1").arg(i));
+
+    // Test updateFinishedJob
+    autoWidget->updateFinishedJob(QStringLiteral("/test/folder_10"), 5, 5, 0);
+    QCOMPARE(autoList->item(11)->foreground().color(), window->sDoneOKColor);
+    QVERIFY(autoList->item(11)->text().contains(QStringLiteral("[5 ok]")));
 }

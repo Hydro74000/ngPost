@@ -98,6 +98,9 @@ private:
     //! replaying their coupling (compress off forces PAR2 on, and back).
     void updatePackingDependents();
 
+    void _handleMonitorJobStart();
+    void _handleFinishedJob(const QString &path, uint nbArticles, uint nbUploaded, uint nbFailed);
+
 private slots:
     void onSelectFilesClicked();
     void onGenQuickPosts();
