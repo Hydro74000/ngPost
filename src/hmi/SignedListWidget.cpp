@@ -31,7 +31,8 @@ SignedListWidget::SignedListWidget(QWidget *parent) :
     _folderIcon(":/icons/folder.png")
 {
     //    installEventFilter(this);
-    // Only user moves (wheel, drag, arrows) trigger an action: scrollTo() does not.
+    // Only user moves on the scroll bar or the wheel trigger an action: scrollTo()
+    // does not. Keys are caught in keyPressEvent().
     connect(verticalScrollBar(), &QAbstractSlider::actionTriggered, this, [this] {
         _scrolledAway = true;
     });
@@ -144,7 +145,11 @@ void SignedListWidget::keyPressEvent(QKeyEvent *e)
         e->accept();
         return;
     }
+    const int position = verticalScrollBar()->value();
     QListWidget::keyPressEvent(e);
+    // Home, Page Down...: no scroll bar action, but the user went to look too.
+    if (verticalScrollBar()->value() != position)
+        _scrolledAway = true;
 }
 
 void SignedListWidget::mousePressEvent(QMouseEvent *e)

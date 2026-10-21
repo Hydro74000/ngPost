@@ -765,14 +765,14 @@
 1	src/hmi/AutoPostWidget.cpp	AutoPostWidget::deleteFilesOncePosted() const
 12	src/hmi/AutoPostWidget.cpp	AutoPostWidget::handleDropEvent( QDropEvent * e)
 16	src/hmi/AutoPostWidget.cpp	AutoPostWidget::handleKeyEvent( QKeyEvent * keyEvent)
-51	src/hmi/AutoPostWidget.cpp	AutoPostWidget::init()
+55	src/hmi/AutoPostWidget.cpp	AutoPostWidget::init()
 8	src/hmi/AutoPostWidget.cpp	AutoPostWidget::newFileToProcess( const QFileInfo & fileInfo)
 18	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onAddMonitoringFolder()
 6	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onCompressToggled( bool checked)
 8	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onDelFilesToggled( bool checked)
 48	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onEditPostInfo()
 6	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onGenPar2Toggled( bool checked)
-61	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onGenQuickPosts()
+63	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onGenQuickPosts()
 4	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onMonitorJobStart()
 76	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onMonitoringClicked()
 1	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onPostInfoToggled( bool checked)
@@ -1133,12 +1133,12 @@
 1	src/hmi/PostingWidget.h	PostingWidget::jobNumber() const
 1	src/hmi/PostingWidget.h	PostingWidget::postInfoMeta() const
 1	src/hmi/PostingWidget.h	PostingWidget::postInfoTemplateOverride() const
-12	src/hmi/SignedListWidget.cpp	SignedListWidget::SignedListWidget( QWidget * parent)
+13	src/hmi/SignedListWidget.cpp	SignedListWidget::SignedListWidget( QWidget * parent)
 7	src/hmi/SignedListWidget.cpp	SignedListWidget::addPath( const QString & path , bool isDir)
 11	src/hmi/SignedListWidget.cpp	SignedListWidget::addPathIfNotInList( const QString & path , int lastIndexToCheck , bool isDir)
 5	src/hmi/SignedListWidget.cpp	SignedListWidget::clear2()
 10	src/hmi/SignedListWidget.cpp	SignedListWidget::eventFilter( QObject * obj , QEvent * event)
-10	src/hmi/SignedListWidget.cpp	SignedListWidget::keyPressEvent( QKeyEvent * e)
+14	src/hmi/SignedListWidget.cpp	SignedListWidget::keyPressEvent( QKeyEvent * e)
 9	src/hmi/SignedListWidget.cpp	SignedListWidget::mousePressEvent( QMouseEvent * e)
 8	src/hmi/SignedListWidget.cpp	SignedListWidget::onDeleteSelectedItems()
 10	src/hmi/SignedListWidget.cpp	SignedListWidget::removeItemWidget2( QListWidgetItem * item)

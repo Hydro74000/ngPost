@@ -465,6 +465,8 @@ private slots:
     void auto_posting_chooses_the_archive_password();
     void auto_posting_password_choice_is_read_from_the_configuration_data();
     void auto_posting_password_choice_is_read_from_the_configuration();
+    void auto_posting_password_choice_is_saved_from_any_tab();
+    void generated_auto_posts_all_keep_the_password_length();
 
     //! "Keep the archives" is a default held by the dialog: a new tab starts
     //! with it, and the choice a single post makes must not rewrite it.
@@ -2169,6 +2171,96 @@ void TestMainWindow::auto_posting_password_choice_is_read_from_the_configuration
     auto *rows = qobject_cast<QStandardItemModel *>(choice->model());
     QVERIFY(rows);
     QCOMPARE(rows->item(2)->isEnabled(), conf.contains(QStringLiteral("RAR_PASS")));
+}
+
+void TestMainWindow::auto_posting_password_choice_is_saved_from_any_tab()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost,
+                                    QStringLiteral("GROUPS = alt.binaries.test\n"
+                                                   "PACK = COMPRESS, GEN_NAME, GEN_PASS\n"
+                                                   "RAR_PASS = hunter2\n"),
+                                    &err);
+    QVERIFY2(window, qPrintable(err));
+    auto *automatic = window->findChild<AutoPostWidget *>();
+    QVERIFY(automatic);
+    auto *choice = automatic->findChild<QComboBox *>(QStringLiteral("passModeCB"));
+    QVERIFY(choice);
+    QCOMPARE(choice->currentIndex(), 2);
+
+    // The user picks "none", then saves with Quick Post #1 in front.
+    choice->setCurrentIndex(0);
+    emit choice->activated(0);
+    window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"))->setCurrentIndex(2);
+    ngPost.saveConfig();
+    QFile conf(PathHelper::configFilePath());
+    QVERIFY(conf.open(QIODevice::ReadOnly | QIODevice::Text));
+    QString const content = QString::fromUtf8(conf.readAll());
+    // Else the default password would be back at the next start.
+    QVERIFY2(content.contains(QStringLiteral("\nAUTO_PASS = none\n")), qPrintable(content));
+}
+
+void TestMainWindow::generated_auto_posts_all_keep_the_password_length()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString suffix =
+#ifdef Q_OS_WIN
+        ".exe";
+#else
+        "";
+#endif
+    const QString broken = sandbox.rootPath() + "/ngpost-recording-fail" + suffix;
+    QVERIFY(QFile::copy(QCoreApplication::applicationFilePath(), broken));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    // The archiver fails: the posts start, then stop before any transfer.
+    MainWindow *window = bootWindow(
+        ngPost,
+        QString("GROUPS = alt.binaries.test\nthread = 1\nnzbPath = %1\nLENGTH_PASS = 15\n"
+                "TMP_DIR = %1\nRAR_SOURCE = custom\nRAR_PATH = %2\n"
+                "[server]\nhost = 127.0.0.1\nport = %3\nssl = false\nconnection = 1\n")
+            .arg(sandbox.rootPath(), broken)
+            .arg(mock.port()),
+        &err);
+    QVERIFY2(window, qPrintable(err));
+    auto *automatic = window->findChild<AutoPostWidget *>();
+    QVERIFY(automatic);
+    automatic->findChild<QCheckBox *>(QStringLiteral("compressCB"))->setChecked(true);
+    automatic->findChild<QCheckBox *>(QStringLiteral("par2CB"))->setChecked(false);
+    automatic->findChild<QComboBox *>(QStringLiteral("passModeCB"))->setCurrentIndex(1);
+    automatic->findChild<QSpinBox *>(QStringLiteral("passLengthSB"))->setValue(37);
+    automatic->findChild<QCheckBox *>(QStringLiteral("startJobsCB"))->setChecked(true);
+    auto *files = automatic->findChild<QListWidget *>(QStringLiteral("filesList"));
+    for (int i = 0; i < 2; ++i) {
+        QFile source(sandbox.rootPath() + QString("/source-%1.bin").arg(i));
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        source.write("password length");
+        source.close();
+        files->addItem(source.fileName());
+    }
+    QVERIFY(QMetaObject::invokeMethod(automatic, "onGenQuickPosts"));
+
+    // The first post started wrote its tab's LENGTH_PASS over the shared one:
+    // the second must still get the length chosen here.
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    QCOMPARE(tabs->count(), 5);
+    auto *first = qobject_cast<PostingWidget *>(tabs->widget(3));
+    auto *second = qobject_cast<PostingWidget *>(tabs->widget(4));
+    QVERIFY(first && second);
+    for (PostingWidget *post : { first, second })
+        QCOMPARE(post->findChild<QLineEdit *>(QStringLiteral("nzbPassEdit"))->text().size(), 37);
+    QTRY_VERIFY(!ngPost.hasPostingJobs() && first->isPostingFinished()
+                && second->isPostingFinished());
 }
 
 void TestMainWindow::keep_archives_default_is_owned_by_the_dialog()
@@ -8720,6 +8812,13 @@ void TestMainWindow::quick_post_list_follows_the_file_in_progress()
     filesList->scrollToItem(filesList->item(104));
     quick->onFilePosted(followedPath(104), 10, 0);
     QVERIFY(rowCentred(filesList, 105));
+
+    // Keys move the list as well: Home goes to look at the first files.
+    QTest::keyClick(filesList, Qt::Key_Home);
+    QCOMPARE(bar->value(), 0);
+    quick->onFilePosted(followedPath(105), 10, 0);
+    QCOMPARE(filesList->item(106)->foreground().color(), window->sPostingColor);
+    QCOMPARE(bar->value(), 0);
 }
 
 void TestMainWindow::quick_post_list_scrolls_only_on_the_shown_tab()

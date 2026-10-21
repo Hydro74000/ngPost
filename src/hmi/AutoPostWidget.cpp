@@ -105,6 +105,10 @@ void AutoPostWidget::init()
             &QComboBox::currentIndexChanged,
             this,
             &AutoPostWidget::onPassChoiceChanged);
+    // Kept as soon as the user picks it: a save only reads the tab in front.
+    connect(_ui->passModeCB, &QComboBox::activated, this, [this] {
+        _ngPost->_autoPass = passChoice(_ui->passModeCB);
+    });
 
     setPackingAuto(_ngPost->_packAuto, _ngPost->_packAutoKeywords);
     // setPackingAuto() only emits toggled() when a box actually changes, so the
@@ -161,11 +165,13 @@ Press the Scan button and remove what you don't want to post ;)\n\
 
     _hmi->updateServers();
     _hmi->updateParams();
-    udatePostingParams();
 
     bool startPost = _ui->startJobsCB->isChecked();
     for (const QFileInfo &file : files)
     {
+        // For every post, as for a monitored file: the previous post wrote its
+        // tab's values (password length...) over the shared ones.
+        udatePostingParams();
         // "copy nfo alongside other files": a lone .nfo that has a sibling is not
         // posted on its own, and any other file pulls in its sibling .nfo so both
         // end up in the same post (udatePostingParams() above refreshed the flag)

@@ -70,7 +70,7 @@ private:
     QIcon   _fileIcon;
     QIcon   _folderIcon;
     QPersistentModelIndex _followed;
-    //! Set when the user moves the scroll bar, cleared when following resumes.
+    //! Set when the user scrolls (bar, wheel, keys), cleared when following resumes.
     bool _scrolledAway = false;
 };
 
