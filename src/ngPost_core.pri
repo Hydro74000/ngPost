@@ -36,7 +36,7 @@ linux:!android: QT += dbus
 # ahead of the newest stable tag: with VERSION behind, v5.5-unstable sorted
 # below the released v5.5.1 and the update check offered stable to devel users
 # while never offering them the build they had just published.
-VERSION = 5.6
+VERSION = 5.7
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 # The exact release this binary was built as, e.g. "v5.5" or
