@@ -368,8 +368,11 @@ void AutoPostWidget::updatePackingDependents()
     if (_isMonitoring) {
         QWidget *const frozen[] = { _ui->genNameCB,    _ui->nameLengthSB, _ui->passModeCB,
                                     _ui->passLengthSB, _ui->keepRarCB,    _ui->redundancySB };
+        // Null-safe like setDependentEnabled() above, or clang-analyzer takes
+        // its guard as a hint that one of them may be missing.
         for (QWidget *widget : frozen)
-            widget->setEnabled(false);
+            if (widget)
+                widget->setEnabled(false);
     }
 }
 

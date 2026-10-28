@@ -786,7 +786,7 @@
 30	src/hmi/AutoPostWidget.cpp	AutoPostWidget::setPackingAuto( bool enabled , const QStringList & keys)
 42	src/hmi/AutoPostWidget.cpp	AutoPostWidget::udatePostingParams()
 25	src/hmi/AutoPostWidget.cpp	AutoPostWidget::updateFinishedJob( const QString & path , uint nbArticles , uint nbUploaded , uint nbFailed)
-37	src/hmi/AutoPostWidget.cpp	AutoPostWidget::updatePackingDependents()
+40	src/hmi/AutoPostWidget.cpp	AutoPostWidget::updatePackingDependents()
 4	src/hmi/AutoPostWidget.cpp	AutoPostWidget::~AutoPostWidget()
 14	src/hmi/CheckBoxCenterWidget.cpp	CheckBoxCenterWidget::CheckBoxCenterWidget( QWidget * parent , bool isChecked)
 1	src/hmi/CheckBoxCenterWidget.cpp	CheckBoxCenterWidget::isChecked() const
