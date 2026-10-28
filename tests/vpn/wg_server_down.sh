@@ -12,7 +12,8 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-if [ -f "$STATE_DIR/$IFACE.conf" ] && ip link show "$IFACE" >/dev/null 2>&1; then
-    wg-quick down "$STATE_DIR/$IFACE.conf" || true
+if [ -f "/etc/wireguard/$IFACE.conf" ] && ip link show "$IFACE" >/dev/null 2>&1; then
+    wg-quick down "$IFACE" || true
 fi
+rm -f "/etc/wireguard/$IFACE.conf"
 echo "WG_SERVER_DOWN iface=$IFACE state_dir=$STATE_DIR"

@@ -21,6 +21,9 @@
 #   client.addr        Client tunnel IP (eg. 10.42.0.2)
 #   listen.port        UDP port the server is bound to (eg. 51820)
 #
+# wg-quick reads a copy of server.conf from /etc/wireguard/$IFACE.conf:
+# Ubuntu 26.04 confines it there with AppArmor. wg_server_down.sh removes it.
+#
 # Run:    sudo STATE_DIR=/tmp/ngpost-wg tests/vpn/wg_server_up.sh
 # Teardown: sudo STATE_DIR=/tmp/ngpost-wg tests/vpn/wg_server_down.sh
 
@@ -96,13 +99,14 @@ echo "$LISTEN_PORT"    > "$STATE_DIR/listen.port"
 # sure ours matches $IFACE. We also kill any pre-existing instance to
 # tolerate flakey teardown across CI re-runs.
 if ip link show "$IFACE" >/dev/null 2>&1; then
-    wg-quick down "$STATE_DIR/server.conf" 2>/dev/null || true
+    wg-quick down "$IFACE" 2>/dev/null || true
 fi
 
-# wg-quick refuses paths whose basename != iface name. Copy/link so the
-# basename matches.
-cp "$STATE_DIR/server.conf" "$STATE_DIR/$IFACE.conf"
-wg-quick up "$STATE_DIR/$IFACE.conf"
+# Given a bare name, wg-quick takes /etc/wireguard/<name>.conf: the one place
+# its AppArmor profile lets it read, and the name it gives the interface.
+install -d -m 700 /etc/wireguard
+install -m 600 "$STATE_DIR/server.conf" "/etc/wireguard/$IFACE.conf"
+wg-quick up "$IFACE"
 
 # The test binary runs unprivileged after this script returns. Keep server
 # secrets root-only, but hand back the client config and metadata it must

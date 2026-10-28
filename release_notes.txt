@@ -240,6 +240,10 @@ the NNTP streaming pipeline and SQLite history store.
     and its "Start Quick Post" button stays greyed: it is not posted again from
     this tab. "Remove All" empties the tab for a new post. A stopped post, or one
     whose preparation failed, takes files again.
+- WireGuard on Ubuntu 26.04:
+  * Ubuntu 26.04 confines wg(8) with AppArmor to files under /etc/wireguard. The
+    VPN helper now hands it the tunnel configuration through a pipe, as wg-quick
+    does, and the keys stay in the volatile /run folder.
 - One Packing at a Time (PREPARE_PACKING):
   * Posts queued by "Post all tabs" while the VPN was connecting, or while the
     queue was paused, had the first two compressed at the same time. The next
@@ -661,6 +665,10 @@ sécurité VPN et de l'isolation des identifiants.
     son bouton « Démarrer le Post Rapide » reste grisé : il n'est pas reposté depuis
     cet onglet. « Supprimer tout » vide l'onglet pour un nouveau post. Un post
     arrêté, ou dont la préparation a échoué, accepte de nouveau des fichiers.
+- WireGuard sous Ubuntu 26.04 :
+  * Ubuntu 26.04 restreint wg(8) par AppArmor aux fichiers de /etc/wireguard. Le
+    helper VPN lui transmet désormais la configuration du tunnel par un tube, comme
+    le fait wg-quick, et les clés restent dans le dossier volatile /run.
 - Une seule préparation à la fois (PREPARE_PACKING) :
   * Les posts mis en file par « Poster tous les onglets » pendant la connexion du
     VPN, ou pendant une pause de la file, voyaient les deux premiers compressés en
