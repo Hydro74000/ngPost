@@ -45,8 +45,8 @@
     </message>
     <message>
         <location line="+29"/>
-        <source>Monitor extension filter: </source>
-        <translation>Monitor-Erweiterungsfilter: </translation>
+        <source>Extensions:</source>
+        <translation>Erweiterungen:</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -146,8 +146,8 @@
     </message>
     <message>
         <location line="+3"/>
-        <source>delete files once posted (only for Monitoring)</source>
-        <translation>Daten nach dem Post löschen (nur für das Monitoring)</translation>
+        <source>delete files once posted</source>
+        <translation>Daten nach dem Post löschen</translation>
     </message>
     <message>
         <location line="+24"/>
@@ -373,6 +373,26 @@ Es wird nicht mehr rückgängig zu machen sein...</translation>
     <message>
         <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
         <translation>Passwort der Archive: keines, ein zufälliges oder das Standardpasswort der Komprimierungseinstellungen</translation>
+    </message>
+    <message>
+        <source>Scan the folder</source>
+        <translation>Ordner scannen</translation>
+    </message>
+    <message>
+        <source>Monitor the folder</source>
+        <translation>Ordnerüberwachung</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>Ordner hinzufügen</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;Compression&lt;/b&gt;:</source>
+        <translation>&lt;b&gt;Komprimierung&lt;/b&gt;:</translation>
+    </message>
+    <message>
+        <source>Folder and posts</source>
+        <translation>Ordner und Posts</translation>
     </message>
 </context>
 <context>
@@ -6928,8 +6948,8 @@ Setzen Sie PAR2_SOURCE = custom und korrigieren Sie PAR2_PATH in der Konfigurati
     <message>
         <location line="-33"/>
         <location filename="../hmi/PostingWidget.cpp" line="+7"/>
-        <source>generate the par2 (the compress option must be selected)</source>
-        <translation>Die Par2 erzeugen (die Option &quot;Komprimieren&quot; muss gewählt werden)</translation>
+        <source>generate the par2 of this post, with or without compression</source>
+        <translation>Die Par2 dieses Posts erzeugen, mit oder ohne Komprimierung</translation>
     </message>
     <message>
         <location line="+30"/>
@@ -7107,6 +7127,10 @@ Manche Usenet-Indexe verlangen eine.</translation>
     <message>
         <source>Could not remove the archives of the stopped post: %1</source>
         <translation>Die Archive des gestoppten Posts konnten nicht entfernt werden: %1</translation>
+    </message>
+    <message>
+        <source>requires: %1 or %2</source>
+        <translation>erfordert: %1 oder %2</translation>
     </message>
 </context>
 <context>

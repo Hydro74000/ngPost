@@ -27,6 +27,7 @@
 #include "NgPost.h"
 #include "FoldersMonitorForNewFiles.h"
 #include <QFileDialog>
+#include <QFrame>
 #include <QDebug>
 #include <QMessageBox>
 #include <QKeyEvent>
@@ -134,6 +135,12 @@ void AutoPostWidget::init()
     _ui->extensionFilterEdit->setText(_ngPost->_monitorExtensions.isEmpty()? "" : _ngPost->_monitorExtensions.join(","));
     _ui->dirAllowedCB->setChecked(!_ngPost->_monitorIgnoreDir);
     _ui->copyNfoCB->setChecked(_ngPost->_autoIncludeNfo);
+
+    _ui->folderBox->setStyleSheet(MainWindow::sGroupBoxStyle);
+    _ui->scanBox->setStyleSheet(MainWindow::sGroupBoxStyle);
+    _ui->monitorBox->setStyleSheet(MainWindow::sGroupBoxStyle);
+    // Irreversible: marked like the delete buttons of the history.
+    _ui->delFilesCB->setStyleSheet(QStringLiteral("QCheckBox { color: #dd4444; }"));
 }
 
 
@@ -273,31 +280,15 @@ void AutoPostWidget::onMonitoringClicked()
 
     _ui->autoDirEdit->setEnabled(_isMonitoring);
     _ui->autoDirButton->setEnabled(_isMonitoring);
-    _ui->latestFilesFirstCB->setEnabled(_isMonitoring);
-    _ui->scanAutoDirButton->setEnabled(_isMonitoring);
+    // The other mode as a whole, title included, so it reads as unavailable.
+    _ui->scanBox->setEnabled(_isMonitoring);
 
     _ui->compressCB->setEnabled(_isMonitoring);
     _ui->par2CB->setEnabled(_isMonitoring);
-//    _ui->delFilesCB->setEnabled(_isMonitoring);
-
-    _ui->startJobsCB->setEnabled(_isMonitoring);
-    _ui->postButton->setEnabled(_isMonitoring);
 
     _isMonitoring = !_isMonitoring;
-    // While monitoring, the packing options are frozen; otherwise they answer
-    // to their own switch again, so let the handlers decide rather than
-    // leaving a control enabled with nothing to act on.
-    if (_isMonitoring)
-    {
-        _ui->genNameCB->setEnabled(false);
-        _ui->nameLengthSB->setEnabled(false);
-        _ui->passModeCB->setEnabled(false);
-        _ui->passLengthSB->setEnabled(false);
-        _ui->keepRarCB->setEnabled(false);
-        _ui->redundancySB->setEnabled(false);
-    }
-    else
-        updatePackingDependents();
+    // Frozen while monitoring, answering to their own switch otherwise.
+    updatePackingDependents();
 
     _ui->addMonitoringFolderButton->setEnabled(_isMonitoring);
 
@@ -364,15 +355,22 @@ void AutoPostWidget::updatePackingDependents()
                         tr("length of the random archive password"),
                         compress ? tr("requires: %1").arg(_ui->passModeCB->itemText(kRandomPass))
                                  : needsCompress);
-    setDependentEnabled(_ui->keepRarCB, compress,
-                        tr("by default archives and par2 files are deleted uppon post success but you can choose to keep them"),
-                        needsCompress);
+    PostingWidget::showKeepArchivesRule(_ui->keepRarCB, _ui->compressCB, _ui->par2CB);
 
     setDependentEnabled(
         _ui->redundancySB,
         _ui->par2CB->isChecked(),
         tr("Using the PAR2 arguments of the configuration: %1").arg(_ngPost->par2ArgsInUse()),
         tr("requires: %1").arg(_ui->par2CB->text()));
+
+    // Every new file of a monitored folder reads these: frozen until it stops,
+    // whatever calls this meanwhile (a language change, new PAR2 defaults).
+    if (_isMonitoring) {
+        QWidget *const frozen[] = { _ui->genNameCB,    _ui->nameLengthSB, _ui->passModeCB,
+                                    _ui->passLengthSB, _ui->keepRarCB,    _ui->redundancySB };
+        for (QWidget *widget : frozen)
+            widget->setEnabled(false);
+    }
 }
 
 void AutoPostWidget::onCompressToggled(bool checked)
@@ -510,6 +508,9 @@ bool AutoPostWidget::deleteFilesOncePosted() const { return _ui->delFilesCB->isC
 void AutoPostWidget::retranslate()
 {
     _ui->retranslateUi(this);
+    // retranslateUi() puts back the .ui text, which is the idle one.
+    if (_isMonitoring)
+        _ui->monitorButton->setText(tr("Stop Monitoring"));
     refreshPar2Default();
     // retranslateUi() has just reset the tooltips to the plain .ui text, which
     // drops what a greyed control is waiting for. Rebuild both halves.
@@ -609,24 +610,27 @@ void AutoPostWidget::handleDropEvent(QDropEvent *e)
 
 void AutoPostWidget::_buildPostInfoRow()
 {
-    QHBoxLayout *row = new QHBoxLayout();
-    row->setContentsMargins(6, 0, 6, 0);
-
     _postInfoCB = new QCheckBox(this);
     _postInfoCB->setObjectName(QStringLiteral("autoPostInfoCB"));
     _postInfoCB->setChecked(!_ngPost->postInfoTemplatePath().isEmpty());
-    row->addWidget(_postInfoCB);
 
     _postInfoButton = new QPushButton(this);
     _postInfoButton->setObjectName(QStringLiteral("autoPostInfoButton"));
     _postInfoButton->setEnabled(_postInfoCB->isChecked());
-    row->addWidget(_postInfoButton);
-    row->addStretch();
 
     connect(_postInfoCB, &QCheckBox::toggled, this, &AutoPostWidget::onPostInfoToggled);
     connect(_postInfoButton, &QAbstractButton::clicked, this, &AutoPostWidget::onEditPostInfo);
 
-    _ui->verticalLayout->insertLayout(_ui->verticalLayout->count() - 1, row);
+    // Like the nfo, the sheet goes with every post the folder gives, in either
+    // mode: it sits on the folder line, as on line A of a posting tab.
+    QFrame *sep = new QFrame(this);
+    sep->setFrameShape(QFrame::VLine);
+    sep->setFrameShadow(QFrame::Sunken);
+    _ui->autoDirLayout->addWidget(sep);
+    _ui->autoDirLayout->addWidget(_postInfoCB);
+    _ui->autoDirLayout->addWidget(_postInfoButton);
+    _ui->autoDirLayout->setStretchFactor(_ui->autoDirEdit, 1);
+
     retranslatePostInfoTexts();
 }
 

@@ -237,6 +237,13 @@ bool PostingWidget::_isSubmitted() const
     return _postingJob || _state != STATE::IDLE;
 }
 
+QString PostingWidget::_archivePassword() const
+{
+    if (!_ui->compressCB->isChecked() || !_ui->nzbPassCB->isChecked())
+        return QString();
+    return _ui->nzbPassEdit->text();
+}
+
 bool PostingWidget::acceptsFiles() const
 {
     // The job took a copy of the list when it was submitted: a file added
@@ -609,9 +616,11 @@ void PostingWidget::resetForNextPost()
 
 void PostingWidget::onCompressCB(bool checked)
 {
-    // Everything here only means something while ngPost is the one building the
-    // archive, so it follows the box. Each greyed control now says what it is
-    // waiting for: a greyed box with no explanation was reported as a broken one.
+    // The archive settings only mean something while ngPost is the one building
+    // the archive, so they follow the box. Each greyed control now says what it
+    // is waiting for: a greyed box with no explanation was reported as a broken
+    // one. PAR2 is not among them: it can protect the files as they are
+    // (Request #102).
     QString const needsCompress = tr("requires: %1").arg(_ui->compressCB->text());
 
     setDependentEnabled(_ui->compressNameEdit, checked,
@@ -619,35 +628,43 @@ void PostingWidget::onCompressCB(bool checked)
     setDependentEnabled(_ui->nameLengthSB, checked,
                         tr("length of the archive name drawn by the dice button (config LENGTH_NAME)"),
                         needsCompress);
-    setDependentEnabled(_ui->genCompressName, checked,
-                        tr("generate random archive name"), needsCompress);
-    setDependentEnabled(_ui->keepRarCB, checked,
-                        tr("by default archives and par2 files are deleted uppon post success but you can choose to keep them"),
+    setDependentEnabled(_ui->genCompressName,
+                        checked,
+                        tr("generate random archive name"),
                         needsCompress);
-    setDependentEnabled(_ui->nzbPassCB, checked,
-                        tr("This should be the password of the archive you're posting"), needsCompress);
-    setDependentEnabled(_ui->par2CB, checked,
-                        tr("generate the par2 (the compress option must be selected)"), needsCompress);
+    setDependentEnabled(_ui->nzbPassCB,
+                        checked,
+                        tr("This should be the password of the archive you're posting"),
+                        needsCompress);
 
-    // The password field and the redundancy have a switch of their own on top
-    // of this one, so they answer to both.
+    // The password field has a switch of its own on top of this one, so it
+    // answers to both. Keep Archives answers to this box or to PAR2.
     onNzbPassToggled(_ui->nzbPassCB->isChecked());
     onPar2CB(_ui->par2CB->isChecked());
 }
 
 void PostingWidget::onPar2CB(bool checked)
 {
-    // Same rule: the redundancy percentage answers to PAR2, which itself
-    // answers to the compression of this post.
-    bool const compress = _ui->compressCB->isChecked();
-    QString const needs = compress ? tr("requires: %1").arg(_ui->par2CB->text())
-                                   : tr("requires: %1").arg(_ui->compressCB->text());
-
     setDependentEnabled(
         _ui->redundancySB,
-        checked && compress,
+        checked,
         tr("Using the PAR2 arguments of the configuration: %1").arg(_ngPost->par2ArgsInUse()),
-        needs);
+        tr("requires: %1").arg(_ui->par2CB->text()));
+
+    showKeepArchivesRule(_ui->keepRarCB, _ui->compressCB, _ui->par2CB);
+}
+
+void PostingWidget::showKeepArchivesRule(QCheckBox *keepRar,
+                                         const QCheckBox *compress,
+                                         const QCheckBox *par2)
+{
+    // Archives or PAR2 volumes alone: whatever a post generates is deleted after
+    // it unless kept.
+    setDependentEnabled(keepRar,
+                        compress->isChecked() || par2->isChecked(),
+                        tr("by default archives and par2 files are deleted uppon post success but "
+                           "you can choose to keep them"),
+                        tr("requires: %1 or %2").arg(compress->text(), par2->text()));
 }
 
 void PostingWidget::onGenCompressName()
@@ -838,10 +855,7 @@ void PostingWidget::udatePostingParams()
     // NgPost members with its own copy so the last active tab silently won.
     _ngPost->_doCompress = _ui->compressCB->isChecked();
     _ngPost->_rarName    = _ui->compressNameEdit->text();
-    if (_ui->nzbPassCB->isChecked())
-        _ngPost->_rarPass = _ui->nzbPassEdit->text().toLocal8Bit();
-    else
-        _ngPost->_rarPass = QString();
+    _ngPost->_rarPass = _archivePassword();
     _ngPost->_lengthName = static_cast<uint>(_ui->nameLengthSB->value());
     _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
     // fetch par2 settings
@@ -973,8 +987,7 @@ PostInfoData PostingWidget::_postInfoPreview() const
     }
 
     postData.rarName = _ui->compressNameEdit->text();
-    if (_ui->nzbPassCB->isChecked())
-        postData.rarPass = _ui->nzbPassEdit->text();
+    postData.rarPass = _archivePassword();
 
     postData.groups = _ngPost->groups();
     // Left empty when ngPost draws a poster at random: showing one sample

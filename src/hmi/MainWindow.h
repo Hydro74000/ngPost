@@ -307,6 +307,8 @@ public:
     static const QColor  sDoneKOColor;
     static const QString sDoneKOIcon;
     static const QColor  sArticlesFailedColor;
+    //! Shared with the Auto Posting tab, whose two modes are boxed the same way.
+    static const QString sGroupBoxStyle;
 
     bool isDarkMode() const;
     QColor pendingColor() const;
@@ -498,7 +500,6 @@ private:
     QFont _baseFont;
 
 
-    static const QString sGroupBoxStyle;
     static const QString sTabWidgetStyle;
 
 };

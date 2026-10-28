@@ -18,364 +18,374 @@
     <widget class="SignedListWidget" name="filesList"/>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="autoDirLayout">
-     <item>
-      <widget class="QLabel" name="autoDirLbl">
-       <property name="text">
-        <string>&lt;b&gt;Auto Dir&lt;/b&gt; path: </string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="autoDirEdit">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>200</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="toolTip">
-        <string>Auto Dir path</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="autoDirButton">
-       <property name="maximumSize">
-        <size>
-         <width>30</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="toolTip">
-        <string>select the Auto Directory</string>
-       </property>
-       <property name="text">
-        <string>...</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="addMonitoringFolderButton">
-       <property name="maximumSize">
-        <size>
-         <width>35</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="toolTip">
-        <string>add another folder to monitor (you must be in monitoring already)</string>
-       </property>
-       <property name="text">
-        <string/>
-       </property>
-       <property name="icon">
-        <iconset resource="../resources/resources.qrc">
-         <normaloff>:/icons/plus.png</normaloff>:/icons/plus.png</iconset>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer_5">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout">
-       <item>
-        <widget class="QLabel" name="extentionFilterLbl">
-         <property name="text">
-          <string>Monitor extension filter: </string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="extensionFilterEdit">
-         <property name="toolTip">
-          <string>Add monitoring extension filter (coma separated, not dot, no space, ex: mkv,mp4,avi,iso,tar)</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="dirAllowedCB">
-         <property name="toolTip">
-          <string>shall we post incoming folders</string>
-         </property>
-         <property name="text">
-          <string>post Folders</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="copyNfoCB">
-         <property name="toolTip">
-          <string>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</string>
-         </property>
-         <property name="text">
-          <string>copy nfo alongside other files</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="latestFilesFirstCB">
-       <property name="toolTip">
-        <string>Show latest files first (otherwise it'll be sorted by names)</string>
-       </property>
-       <property name="text">
-        <string>latest files first</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="scanAutoDirButton">
-       <property name="toolTip">
-        <string>Scan the Auto directory. Delete manually the files/folder you don't want to post (using DEL)</string>
-       </property>
-       <property name="text">
-        <string> Scan</string>
-       </property>
-       <property name="icon">
-        <iconset resource="../resources/resources.qrc">
-         <normaloff>:/icons/scanFolder.png</normaloff>:/icons/scanFolder.png</iconset>
-       </property>
-      </widget>
-     </item>
-    </layout>
+    <widget class="QGroupBox" name="folderBox">
+     <property name="title">
+      <string>Folder and posts</string>
+     </property>
+     <layout class="QVBoxLayout" name="folderBoxLayout">
+      <item>
+       <layout class="QHBoxLayout" name="autoDirLayout">
+        <item>
+         <widget class="QLabel" name="autoDirLbl">
+          <property name="text">
+           <string>&lt;b&gt;Auto Dir&lt;/b&gt; path: </string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="autoDirEdit">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>200</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>Auto Dir path</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="autoDirButton">
+          <property name="maximumSize">
+           <size>
+            <width>30</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>select the Auto Directory</string>
+          </property>
+          <property name="text">
+           <string>...</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QFrame" name="sepDirNfo">
+          <property name="frameShape">
+           <enum>QFrame::Shape::VLine</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Sunken</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="copyNfoCB">
+          <property name="toolTip">
+           <string>When a posted file has a sibling .nfo (same name, different extension) next to it, include that .nfo in the same post (the lone .nfo is not posted separately)</string>
+          </property>
+          <property name="text">
+           <string>copy nfo alongside other files</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="packingLayout">
+        <item>
+         <widget class="QLabel" name="packingLbl">
+          <property name="text">
+           <string>&lt;b&gt;Compression&lt;/b&gt;:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="compressCB">
+          <property name="text">
+           <string>compress</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QFrame" name="sepName">
+          <property name="frameShape">
+           <enum>QFrame::Shape::VLine</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Sunken</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="genNameLayout">
+          <property name="spacing">
+           <number>1</number>
+          </property>
+          <item>
+           <widget class="QCheckBox" name="genNameCB">
+            <property name="toolTip">
+             <string>generate a random name for the archive</string>
+            </property>
+            <property name="text">
+             <string>generate random name</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="nameLengthSB">
+            <property name="toolTip">
+             <string>length of the random archive name</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QFrame" name="sepPass">
+          <property name="frameShape">
+           <enum>QFrame::Shape::VLine</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Sunken</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="compressOptionsLayout">
+          <property name="spacing">
+           <number>1</number>
+          </property>
+          <item>
+           <widget class="QComboBox" name="passModeCB">
+            <property name="sizeAdjustPolicy">
+             <enum>QComboBox::SizeAdjustPolicy::AdjustToContents</enum>
+            </property>
+            <item>
+             <property name="text">
+              <string>no password</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>random password</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>default password</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="passLengthSB">
+            <property name="toolTip">
+             <string>length of the random archive password</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QFrame" name="sepPar2">
+          <property name="frameShape">
+           <enum>QFrame::Shape::VLine</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Sunken</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="par2CB">
+          <property name="toolTip">
+           <string>generate par2</string>
+          </property>
+          <property name="text">
+           <string>generate par2</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="redundancySB">
+          <property name="maximumSize">
+           <size>
+            <width>70</width>
+            <height>16777215</height>
+           </size>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QFrame" name="sepKeepRar">
+          <property name="frameShape">
+           <enum>QFrame::Shape::VLine</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Sunken</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="keepRarCB">
+          <property name="toolTip">
+           <string>by default archives and par2 files are deleted uppon post success but you can choose to keep them</string>
+          </property>
+          <property name="text">
+           <string>keep archives</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="packingSpacer">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="optionsLayout">
+    <layout class="QHBoxLayout" name="modesLayout" stretch="1,1">
      <item>
-      <widget class="QCheckBox" name="compressCB">
-       <property name="text">
-        <string>compress</string>
+      <widget class="QGroupBox" name="scanBox">
+       <property name="title">
+        <string>Scan the folder</string>
        </property>
-      </widget>
-     </item>
-     <item>
-      <layout class="QHBoxLayout" name="genNameLayout">
-       <property name="spacing">
-        <number>1</number>
-       </property>
-       <item>
-        <widget class="QCheckBox" name="genNameCB">
-         <property name="toolTip">
-          <string>generate a random name for the archive</string>
-         </property>
-         <property name="text">
-          <string>generate random name</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QSpinBox" name="nameLengthSB">
-         <property name="toolTip">
-          <string>length of the random archive name</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <layout class="QHBoxLayout" name="compressOptionsLayout">
-       <property name="spacing">
-        <number>1</number>
-       </property>
-       <item>
-        <widget class="QComboBox" name="passModeCB">
-         <property name="sizeAdjustPolicy">
-          <enum>QComboBox::SizeAdjustPolicy::AdjustToContents</enum>
-         </property>
-         <item>
-          <property name="text">
-           <string>no password</string>
+       <layout class="QGridLayout" name="scanGrid" columnstretch="1,0">
+        <item row="0" column="0">
+         <widget class="QCheckBox" name="latestFilesFirstCB">
+          <property name="toolTip">
+           <string>Show latest files first (otherwise it'll be sorted by names)</string>
           </property>
-         </item>
-         <item>
           <property name="text">
-           <string>random password</string>
+           <string>latest files first</string>
           </property>
-         </item>
-         <item>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QPushButton" name="scanAutoDirButton">
+          <property name="toolTip">
+           <string>Scan the Auto directory. Delete manually the files/folder you don't want to post (using DEL)</string>
+          </property>
           <property name="text">
-           <string>default password</string>
+           <string> Scan</string>
           </property>
-         </item>
-        </widget>
-       </item>
-       <item>
-        <widget class="QSpinBox" name="passLengthSB">
-         <property name="toolTip">
-          <string>length of the random archive password</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="keepRarCB">
-       <property name="toolTip">
-        <string>by default archives and par2 files are deleted uppon post success but you can choose to keep them</string>
-       </property>
-       <property name="text">
-        <string>keep archives</string>
-       </property>
+          <property name="icon">
+           <iconset resource="../resources/resources.qrc">
+            <normaloff>:/icons/scanFolder.png</normaloff>:/icons/scanFolder.png</iconset>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QCheckBox" name="startJobsCB">
+          <property name="toolTip">
+           <string>start all posts when generating them</string>
+          </property>
+          <property name="text">
+           <string>start all Posts</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QPushButton" name="postButton">
+          <property name="toolTip">
+           <string>Generate Quick Posting Tabs for each file/folder</string>
+          </property>
+          <property name="toolTipDuration">
+           <number>-5</number>
+          </property>
+          <property name="text">
+           <string>Generate Posts</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../resources/resources.qrc">
+            <normaloff>:/icons/ngPost.png</normaloff>:/icons/ngPost.png</iconset>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </widget>
      </item>
      <item>
-      <spacer name="horizontalSpacer_2">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
+      <widget class="QGroupBox" name="monitorBox">
+       <property name="title">
+        <string>Monitor the folder</string>
        </property>
-       <property name="sizeType">
-        <enum>QSizePolicy::Policy::Preferred</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="par2CB">
-       <property name="toolTip">
-        <string>generate par2</string>
-       </property>
-       <property name="text">
-        <string>generate par2</string>
-       </property>
+       <layout class="QGridLayout" name="monitorGrid" columnstretch="1,0">
+        <item row="0" column="0">
+         <layout class="QHBoxLayout" name="filterLayout">
+          <item>
+           <widget class="QLabel" name="extentionFilterLbl">
+            <property name="text">
+             <string>Extensions:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="extensionFilterEdit">
+            <property name="toolTip">
+             <string>Add monitoring extension filter (coma separated, not dot, no space, ex: mkv,mp4,avi,iso,tar)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="dirAllowedCB">
+            <property name="toolTip">
+             <string>shall we post incoming folders</string>
+            </property>
+            <property name="text">
+             <string>post Folders</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item row="0" column="1">
+         <widget class="QPushButton" name="monitorButton">
+          <property name="text">
+           <string>Monitor Folder</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../resources/resources.qrc">
+            <normaloff>:/icons/monitor.png</normaloff>:/icons/monitor.png</iconset>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QCheckBox" name="delFilesCB">
+          <property name="toolTip">
+           <string>delete files/folders once they have been successfully posted (careful with that it's irreversible!!!)</string>
+          </property>
+          <property name="text">
+           <string>delete files once posted</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QPushButton" name="addMonitoringFolderButton">
+          <property name="toolTip">
+           <string>add another folder to monitor (you must be in monitoring already)</string>
+          </property>
+          <property name="text">
+           <string>Add folder</string>
+          </property>
+          <property name="icon">
+           <iconset resource="../resources/resources.qrc">
+            <normaloff>:/icons/plus.png</normaloff>:/icons/plus.png</iconset>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="redundancySB">
-       <property name="maximumSize">
-        <size>
-         <width>70</width>
-         <height>16777215</height>
-        </size>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer_4">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="delFilesCB">
-       <property name="toolTip">
-        <string>delete files/folders once they have been successfully posted (careful with that it's irreversible!!!)</string>
-       </property>
-       <property name="text">
-        <string>delete files once posted (only for Monitoring)</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="postLayout">
-     <item>
-      <spacer name="horizontalSpacer_14">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QPushButton" name="monitorButton">
-       <property name="text">
-        <string>Monitor Folder</string>
-       </property>
-       <property name="icon">
-        <iconset resource="../resources/resources.qrc">
-         <normaloff>:/icons/monitor.png</normaloff>:/icons/monitor.png</iconset>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="startJobsCB">
-       <property name="toolTip">
-        <string>start all posts when generating them</string>
-       </property>
-       <property name="text">
-        <string>start all Posts</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="postButton">
-       <property name="toolTip">
-        <string>Generate Quick Posting Tabs for each file/folder</string>
-       </property>
-       <property name="toolTipDuration">
-        <number>-5</number>
-       </property>
-       <property name="text">
-        <string>Generate Posts</string>
-       </property>
-       <property name="icon">
-        <iconset resource="../resources/resources.qrc">
-         <normaloff>:/icons/ngPost.png</normaloff>:/icons/ngPost.png</iconset>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer_15">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
      </item>
     </layout>
    </item>

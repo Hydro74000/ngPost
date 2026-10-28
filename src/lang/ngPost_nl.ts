@@ -46,8 +46,8 @@
     </message>
     <message>
         <location line="+29"/>
-        <source>Monitor extension filter: </source>
-        <translation>Monitor extensie filter: </translation>
+        <source>Extensions:</source>
+        <translation>Extensies:</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -147,8 +147,8 @@
     </message>
     <message>
         <location line="+3"/>
-        <source>delete files once posted (only for Monitoring)</source>
-        <translation>verwijder bestanden die  zijn gepost (alleen voor monitoring)</translation>
+        <source>delete files once posted</source>
+        <translation>verwijder bestanden die zijn gepost</translation>
     </message>
     <message>
         <location line="+24"/>
@@ -374,6 +374,26 @@ Bestanden worden definitief verwijderd...</translation>
     <message>
         <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
         <translation>wachtwoord van de archieven: geen, een willekeurig, of het standaardwachtwoord van de Compressie-instellingen</translation>
+    </message>
+    <message>
+        <source>Scan the folder</source>
+        <translation>Map scannen</translation>
+    </message>
+    <message>
+        <source>Monitor the folder</source>
+        <translation>Map monitoren</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>Map toevoegen</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;Compression&lt;/b&gt;:</source>
+        <translation>&lt;b&gt;Compressie&lt;/b&gt;:</translation>
+    </message>
+    <message>
+        <source>Folder and posts</source>
+        <translation>Map en posts</translation>
     </message>
 </context>
 <context>
@@ -6932,8 +6952,8 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
     <message>
         <location line="-33"/>
         <location filename="../hmi/PostingWidget.cpp" line="+7"/>
-        <source>generate the par2 (the compress option must be selected)</source>
-        <translation>genereer par2 (de compressie-optie moet geselecteerd zijn)</translation>
+        <source>generate the par2 of this post, with or without compression</source>
+        <translation>genereer par2 voor deze post, met of zonder compressie</translation>
     </message>
     <message>
         <location line="+30"/>
@@ -7112,6 +7132,10 @@ Sommige Usenet-indexen vragen erom.</translation>
     <message>
         <source>Could not remove the archives of the stopped post: %1</source>
         <translation>De archieven van de gestopte post konden niet worden verwijderd: %1</translation>
+    </message>
+    <message>
+        <source>requires: %1 or %2</source>
+        <translation>vereist: %1 of %2</translation>
     </message>
 </context>
 <context>

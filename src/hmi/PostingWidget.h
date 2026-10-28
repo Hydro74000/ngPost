@@ -79,6 +79,9 @@ private:
                          const QFileInfoList &files) const;
     //! From the submission until the job is over, queued and paused included.
     bool _isSubmitted() const;
+    //! The password this post announces: the one of the archive ngPost builds,
+    //! so none without compression, even if the greyed box is still ticked.
+    QString _archivePassword() const;
     //! Greys what would change the list while it is not this tab's to change.
     void _refreshFileControls();
     void _refreshPostButton();
@@ -159,6 +162,11 @@ public:
     static void loadObfuscationLengths(QSpinBox *nameLength,
                                        QSpinBox *passLength,
                                        const NgPost *ngPost);
+    //! Keep Archives keeps whatever a post generates, its archives or its PAR2
+    //! volumes alone, so it waits for either box. The Auto tab shares it.
+    static void showKeepArchivesRule(QCheckBox *keepRar,
+                                     const QCheckBox *compress,
+                                     const QCheckBox *par2);
     void setPar2PercentageOverride(int percentage);
     bool hasPar2PercentageOverride() const;
 

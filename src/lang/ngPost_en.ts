@@ -45,8 +45,8 @@
     </message>
     <message>
         <location line="+29"/>
-        <source>Monitor extension filter: </source>
-        <translation></translation>
+        <source>Extensions:</source>
+        <translation>Extensions:</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -146,8 +146,8 @@
     </message>
     <message>
         <location line="+3"/>
-        <source>delete files once posted (only for Monitoring)</source>
-        <translation></translation>
+        <source>delete files once posted</source>
+        <translation>delete files once posted</translation>
     </message>
     <message>
         <location line="+24"/>
@@ -366,6 +366,26 @@ It will be irreversible...</source>
     <message>
         <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
         <translation>password of the archives: none, a random one, or the default password of the Compression Settings</translation>
+    </message>
+    <message>
+        <source>Scan the folder</source>
+        <translation>Scan the folder</translation>
+    </message>
+    <message>
+        <source>Monitor the folder</source>
+        <translation>Monitor the folder</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>Add folder</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;Compression&lt;/b&gt;:</source>
+        <translation>&lt;b&gt;Compression&lt;/b&gt;:</translation>
+    </message>
+    <message>
+        <source>Folder and posts</source>
+        <translation>Folder and posts</translation>
     </message>
 </context>
 <context>
@@ -6894,8 +6914,8 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
     <message>
         <location line="-33"/>
         <location filename="../hmi/PostingWidget.cpp" line="+7"/>
-        <source>generate the par2 (the compress option must be selected)</source>
-        <translation></translation>
+        <source>generate the par2 of this post, with or without compression</source>
+        <translation>generate the par2 of this post, with or without compression</translation>
     </message>
     <message>
         <location line="+30"/>
@@ -7073,6 +7093,10 @@ Some Usenet indexes ask for one.</translation>
     <message>
         <source>Could not remove the archives of the stopped post: %1</source>
         <translation>Could not remove the archives of the stopped post: %1</translation>
+    </message>
+    <message>
+        <source>requires: %1 or %2</source>
+        <translation>requires: %1 or %2</translation>
     </message>
 </context>
 <context>

@@ -158,6 +158,15 @@ the NNTP streaming pipeline and SQLite history store.
   * Progress header label decoupled from active tab view: continuously displays
     the task actively transferring in the background.
   * High-contrast styling and visual queue badges for pending tabs.
+- Auto Posting Tab Layout:
+  * The controls are grouped by use. A "Folder and posts" box holds what both
+    modes share: the folder, what every post of it gets (sibling nfo, post info
+    file), and the "Compression" line, which matches the Quick Post one.
+  * "Scan the folder" and "Monitor the folder" each have a box, with their own
+    options next to their button. The Scan box is greyed as a whole while a folder
+    is monitored.
+  * "delete files once posted" moved to the Monitor box and is shown in red. The
+    "+" that adds a monitored folder is now an "Add folder" button.
 - Unified External Tool Resolution (ExternalToolResolver):
   * Deterministic search prioritizing bundled tools shipped alongside ngPost
     before scanning system PATH.
@@ -181,6 +190,19 @@ the NNTP streaming pipeline and SQLite history store.
 
 --- Bug Fixes (Corrections / Fix) ---
 
+- PAR2 Without Compression on Quick Post Tabs:
+  * "Gen PAR2" is no longer greyed when "Compress this post" is off: PAR2 can
+    protect the files as they are, as in the Auto Posting tab and the command
+    line. The greyed box still applied when ticked and could not be unticked,
+    for instance on the tabs that Auto Posting generates without compression.
+  * "Keep Archives" also follows PAR2 alone, whose volumes it keeps, on both tabs.
+  * A post without compression no longer announces an archive password in its
+    NZB: the greyed "Archive password" box, still ticked from the defaults, was
+    applied all the same.
+- Auto Posting Language Change While Monitoring:
+  * Changing the interface language, or the PAR2 defaults, while a folder is
+    monitored no longer re-enables the packing options frozen for the run, and
+    the button keeps reading "Stop Monitoring".
 - Staging Recovery on Preparation Failure:
   * Restores original source files back into the GUI tab and cleans up temporary
     compression directories if archive preparation fails before transfer starts.
@@ -547,6 +569,17 @@ sécurité VPN et de l'isolation des identifiants.
   * Découplage de l'étiquette de progression : indique en permanence le post en cours
     de transfert en arrière-plan, indépendamment de l'onglet affiché à l'écran.
   * Style contrasté et badge lumineux indiquant clairement les onglets en attente.
+- Disposition de l'onglet Post Auto :
+  * Les commandes sont regroupées par usage. Un cadre « Dossier et posts » réunit
+    ce que les deux modes partagent : le dossier, ce que reçoit chacun de ses posts
+    (nfo voisin, fiche de post) et la ligne « Compression », qui reprend celle du
+    Post Rapide.
+  * « Scanner le dossier » et « Surveiller le dossier » ont chacun leur cadre, avec
+    leurs options à côté de leur bouton. Le cadre Scanner est grisé en entier tant
+    qu'un dossier est surveillé.
+  * « supprimer fichiers après post » passe dans le cadre Surveiller et s'affiche en
+    rouge. Le « + » qui ajoute un dossier surveillé devient un bouton « Ajouter un
+    dossier ».
 - Résolution unifiée des outils externes (ExternalToolResolver) :
   * Ordre de recherche déterministe privilégiant les binaires fournis à côté
     d'ngPost avant le PATH système.
@@ -571,6 +604,21 @@ sécurité VPN et de l'isolation des identifiants.
 
 --- Corrections (Fix) ---
 
+- PAR2 sans compression dans les onglets de Post Rapide :
+  * « Générer PAR2 » n'est plus grisé quand « Compresser ce post » est décoché : le
+    PAR2 peut protéger les fichiers tels quels, comme dans le Post Auto et en
+    ligne de commande. Grisée mais cochée, la case s'appliquait quand même sans
+    pouvoir être décochée, par exemple sur les onglets générés par le Post Auto
+    sans compression.
+  * « Garder les archives » suit aussi le PAR2 seul, dont il garde les volumes,
+    dans les deux onglets.
+  * Un post sans compression n'annonce plus de mot de passe d'archive dans son
+    NZB : la case « Mot de passe de l'archive » grisée, restée cochée par les
+    réglages par défaut, s'appliquait quand même.
+- Changement de langue pendant la surveillance du Post Auto :
+  * Changer la langue de l'interface, ou les réglages PAR2 par défaut, pendant la
+    surveillance d'un dossier ne réactive plus les options de conditionnement
+    figées pour la session, et le bouton affiche toujours « Stop Surveillance ».
 - Restauration des fichiers en cas d'échec de préparation :
   * Restauration automatique des fichiers sources dans l'onglet de post et nettoyage
     du dossier temporaire si la compression ou la préparation échoue avant le début

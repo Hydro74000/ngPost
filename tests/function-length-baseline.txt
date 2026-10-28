@@ -760,12 +760,12 @@
 19	src/history/ResumePlanner.cpp	passwordDeclaredInNzb( const QString & path)
 4	src/history/ResumePlanner.cpp	splitStoredGroups( const QString & groups)
 13	src/hmi/AutoPostWidget.cpp	AutoPostWidget::AutoPostWidget( NgPost * ngPost , MainWindow * hmi)
-22	src/hmi/AutoPostWidget.cpp	AutoPostWidget::_buildPostInfoRow()
+25	src/hmi/AutoPostWidget.cpp	AutoPostWidget::_buildPostInfoRow()
 10	src/hmi/AutoPostWidget.cpp	AutoPostWidget::_postInfoPreview() const
 1	src/hmi/AutoPostWidget.cpp	AutoPostWidget::deleteFilesOncePosted() const
 12	src/hmi/AutoPostWidget.cpp	AutoPostWidget::handleDropEvent( QDropEvent * e)
 16	src/hmi/AutoPostWidget.cpp	AutoPostWidget::handleKeyEvent( QKeyEvent * keyEvent)
-55	src/hmi/AutoPostWidget.cpp	AutoPostWidget::init()
+61	src/hmi/AutoPostWidget.cpp	AutoPostWidget::init()
 8	src/hmi/AutoPostWidget.cpp	AutoPostWidget::newFileToProcess( const QFileInfo & fileInfo)
 18	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onAddMonitoringFolder()
 6	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onCompressToggled( bool checked)
@@ -774,19 +774,19 @@
 6	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onGenPar2Toggled( bool checked)
 63	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onGenQuickPosts()
 4	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onMonitorJobStart()
-76	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onMonitoringClicked()
+60	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onMonitoringClicked()
 1	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onPostInfoToggled( bool checked)
 15	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onScanAutoDirClicked()
 11	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onSelectAutoDirClicked()
 14	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onSelectFilesClicked()
 6	src/hmi/AutoPostWidget.cpp	AutoPostWidget::refreshPar2Default()
 8	src/hmi/AutoPostWidget.cpp	AutoPostWidget::refreshPendingColors()
-15	src/hmi/AutoPostWidget.cpp	AutoPostWidget::retranslate()
+18	src/hmi/AutoPostWidget.cpp	AutoPostWidget::retranslate()
 10	src/hmi/AutoPostWidget.cpp	AutoPostWidget::retranslatePostInfoTexts()
 30	src/hmi/AutoPostWidget.cpp	AutoPostWidget::setPackingAuto( bool enabled , const QStringList & keys)
 42	src/hmi/AutoPostWidget.cpp	AutoPostWidget::udatePostingParams()
 25	src/hmi/AutoPostWidget.cpp	AutoPostWidget::updateFinishedJob( const QString & path , uint nbArticles , uint nbUploaded , uint nbFailed)
-30	src/hmi/AutoPostWidget.cpp	AutoPostWidget::updatePackingDependents()
+37	src/hmi/AutoPostWidget.cpp	AutoPostWidget::updatePackingDependents()
 4	src/hmi/AutoPostWidget.cpp	AutoPostWidget::~AutoPostWidget()
 14	src/hmi/CheckBoxCenterWidget.cpp	CheckBoxCenterWidget::CheckBoxCenterWidget( QWidget * parent , bool isChecked)
 1	src/hmi/CheckBoxCenterWidget.cpp	CheckBoxCenterWidget::isChecked() const
@@ -1075,7 +1075,7 @@
 9	src/hmi/PostingWidget.cpp	PostingWidget::_fileAlreadyInList( const QString & fileName , int currentNbFiles) const
 24	src/hmi/PostingWidget.cpp	PostingWidget::_fillJobOptions( PostingJobOptions & options , const QString & nzbPath , const QFileInfoList & files) const
 8	src/hmi/PostingWidget.cpp	PostingWidget::_isStoppedAttemptNzb( const QString & nzbPath) const
-40	src/hmi/PostingWidget.cpp	PostingWidget::_postInfoPreview() const
+39	src/hmi/PostingWidget.cpp	PostingWidget::_postInfoPreview() const
 38	src/hmi/PostingWidget.cpp	PostingWidget::_setupCopyActions()
 18	src/hmi/PostingWidget.cpp	PostingWidget::_stoppedAttemptIsReplaceable() const
 18	src/hmi/PostingWidget.cpp	PostingWidget::_supersedeStoppedAttempt()
@@ -1093,14 +1093,14 @@
 6	src/hmi/PostingWidget.cpp	PostingWidget::onArchiveFileNames( const QStringList & paths)
 5	src/hmi/PostingWidget.cpp	PostingWidget::onArticlesNumber( int nbArticles)
 29	src/hmi/PostingWidget.cpp	PostingWidget::onClearFilesClicked()
-27	src/hmi/PostingWidget.cpp	PostingWidget::onCompressCB( bool checked)
+28	src/hmi/PostingWidget.cpp	PostingWidget::onCompressCB( bool checked)
 52	src/hmi/PostingWidget.cpp	PostingWidget::onEditPostInfo()
 24	src/hmi/PostingWidget.cpp	PostingWidget::onFilePosted( const QString & filePath , uint nbArticles , uint nbFailed)
 4	src/hmi/PostingWidget.cpp	PostingWidget::onGenCompressName()
 4	src/hmi/PostingWidget.cpp	PostingWidget::onGenNzbPassword()
 12	src/hmi/PostingWidget.cpp	PostingWidget::onNzbFileClicked()
 16	src/hmi/PostingWidget.cpp	PostingWidget::onNzbPassToggled( bool checked)
-14	src/hmi/PostingWidget.cpp	PostingWidget::onPar2CB( bool checked)
+10	src/hmi/PostingWidget.cpp	PostingWidget::onPar2CB( bool checked)
 4	src/hmi/PostingWidget.cpp	PostingWidget::onPostFiles()
 4	src/hmi/PostingWidget.cpp	PostingWidget::onPostInfoToggled( bool checked)
 24	src/hmi/PostingWidget.cpp	PostingWidget::onPostingJobDone()
@@ -1122,7 +1122,7 @@
 11	src/hmi/PostingWidget.cpp	PostingWidget::setPostInfo( bool enabled , const QString & templateOverride , const QString & outputOverride , const QMap<QString,MetaValue> & meta)
 7	src/hmi/PostingWidget.cpp	PostingWidget::setPosting()
 6	src/hmi/PostingWidget.cpp	PostingWidget::showPar2Default( QSpinBox * box , uint percentage)
-28	src/hmi/PostingWidget.cpp	PostingWidget::udatePostingParams()
+25	src/hmi/PostingWidget.cpp	PostingWidget::udatePostingParams()
 4	src/hmi/PostingWidget.cpp	PostingWidget::writesPostInfoFile() const
 9	src/hmi/PostingWidget.cpp	PostingWidget::~PostingWidget()
 1	src/hmi/PostingWidget.h	PostingWidget::displayNumber() const

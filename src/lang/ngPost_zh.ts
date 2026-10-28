@@ -45,8 +45,8 @@
     </message>
     <message>
         <location line="+29"/>
-        <source>Monitor extension filter: </source>
-        <translation>监测文件类型: </translation>
+        <source>Extensions:</source>
+        <translation>文件类型:</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -146,8 +146,8 @@
     </message>
     <message>
         <location line="+3"/>
-        <source>delete files once posted (only for Monitoring)</source>
-        <translation>发布成功时删除文件（仅适用监视功能）</translation>
+        <source>delete files once posted</source>
+        <translation>发布成功时删除文件</translation>
     </message>
     <message>
         <location line="+24"/>
@@ -372,6 +372,26 @@ It will be irreversible...</source>
     <message>
         <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
         <translation>压缩文件密码：无、随机密码，或压缩设置中的默认密码</translation>
+    </message>
+    <message>
+        <source>Scan the folder</source>
+        <translation>扫描文件夹</translation>
+    </message>
+    <message>
+        <source>Monitor the folder</source>
+        <translation>文件夹监视</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>添加文件夹</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;Compression&lt;/b&gt;:</source>
+        <translation>&lt;b&gt;压缩&lt;/b&gt;:</translation>
+    </message>
+    <message>
+        <source>Folder and posts</source>
+        <translation>文件夹与发布</translation>
     </message>
 </context>
 <context>
@@ -6928,8 +6948,8 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
     <message>
         <location line="-33"/>
         <location filename="../hmi/PostingWidget.cpp" line="+7"/>
-        <source>generate the par2 (the compress option must be selected)</source>
-        <translation>生成par2文件（必须使用压缩选项）</translation>
+        <source>generate the par2 of this post, with or without compression</source>
+        <translation>为此发布生成par2文件（压缩与否均可）</translation>
     </message>
     <message>
         <location line="+30"/>
@@ -7108,6 +7128,10 @@ Some Usenet indexes ask for one.</source>
     <message>
         <source>Could not remove the archives of the stopped post: %1</source>
         <translation>无法删除已停止发布的压缩包：%1</translation>
+    </message>
+    <message>
+        <source>requires: %1 or %2</source>
+        <translation>需要：%1 或 %2</translation>
     </message>
 </context>
 <context>

@@ -42,6 +42,7 @@
 #include <QComboBox>
 #include <QFile>
 #include <QFileDialog>
+#include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -430,6 +431,15 @@ private slots:
     //! settings it commands, which is what makes a greyed one legible.
     void posting_tab_lines_are_in_the_new_order();
 
+    //! The Auto Posting tab reads like a posting tab down to its packing line,
+    //! then splits by mode: what only Scan uses and what only Monitor uses each
+    //! sit in their own box, next to the button they serve.
+    void auto_tab_groups_its_controls_by_mode();
+
+    //! While a folder is monitored the Scan box is greyed as a whole, so the
+    //! mode that is off reads as off instead of as four broken controls.
+    void auto_tab_monitoring_greys_the_scan_box();
+
     //! The compression paths, the volume size and the default password are
     //! configuration, not per post choices: they live in one dialog and no
     //! longer in every tab, where each copy overwrote the others.
@@ -440,10 +450,15 @@ private slots:
     void compression_settings_dialog_persists_on_validation();
 
     //! Reported bug: "Limit RAR Number" and "Keep Archives" could not be
-    //! modified any more. They are greyed on purpose — without compression
-    //! ngPost builds nothing to limit or to keep — but a greyed control with
-    //! no explanation reads as a broken one, so each says what it waits for.
+    //! modified any more. They are greyed on purpose — without compression or
+    //! PAR2 ngPost builds nothing to limit or to keep — but a greyed control
+    //! with no explanation reads as a broken one, so each says what it waits
+    //! for. PAR2 itself never waits for the compression.
     void greyed_controls_say_what_they_need();
+
+    //! The archive password greys with the compression but stays ticked. A post
+    //! that builds no archive must not announce one in its nzb all the same.
+    void uncompressed_post_announces_no_password();
 
     //! retranslateUi() resets tooltips to the plain .ui text. The requirement
     //! must come back with the new language instead of being silently lost.
@@ -1428,14 +1443,16 @@ void TestMainWindow::save_config_persists_rar_max_and_par2_pct()
     QVERIFY(compress);
     QVERIFY(par2);
 
-    // The redundancy percentage follows PAR2, which itself follows the
+    // The redundancy percentage follows PAR2 alone: PAR2 does not need the
     // compression of this post (see greyed_controls_say_what_they_need).
     compress->setChecked(false);
     par2->setChecked(false);
     QVERIFY(!redundancy->isEnabled());
 
-    compress->setChecked(true);
     par2->setChecked(true);
+    QVERIFY(redundancy->isEnabled());
+
+    compress->setChecked(true);
     QVERIFY(redundancy->isEnabled());
 
     // The volume limit is a configuration value now: it is set in the dialog,
@@ -1750,6 +1767,128 @@ void TestMainWindow::posting_tab_lines_are_in_the_new_order()
     QVERIFY(!quickTab->findChild<QCheckBox *>(QStringLiteral("rarMaxCB")));
 }
 
+void TestMainWindow::auto_tab_groups_its_controls_by_mode()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
+    QVERIFY2(window, qPrintable(err));
+    AutoPostWidget *autoTab = window->autoWidget();
+    QVERIFY(autoTab);
+
+    auto *column = autoTab->findChild<QVBoxLayout *>(QStringLiteral("verticalLayout"));
+    QVERIFY2(column, "verticalLayout not found on the auto tab");
+
+    QStringList order;
+    for (int i = 0; i < column->count(); ++i)
+        order << itemName(column->itemAt(i));
+
+    const QStringList expected{
+        QStringLiteral("filesList"),
+        QStringLiteral("folderBox"),   // what both modes share
+        QStringLiteral("modesLayout"), // Scan and Monitor, side by side
+    };
+    QCOMPARE(order, expected);
+
+    // The shared box holds the folder line, then how each post is packed, as on a
+    // posting tab.
+    auto *folderBox = autoTab->findChild<QGroupBox *>(QStringLiteral("folderBox"));
+    QVERIFY(folderBox);
+    auto *shared = folderBox->findChild<QVBoxLayout *>(QStringLiteral("folderBoxLayout"));
+    QVERIFY(shared);
+    QStringList lines;
+    for (int i = 0; i < shared->count(); ++i)
+        lines << itemName(shared->itemAt(i));
+    QCOMPARE(lines,
+             QStringList({ QStringLiteral("autoDirLayout"), QStringLiteral("packingLayout") }));
+
+    // Its packing line is named, as the folder line is, rather than opening on a bare box.
+    auto *packing = autoTab->findChild<QHBoxLayout *>(QStringLiteral("packingLayout"));
+    QVERIFY(packing);
+    QCOMPARE(itemName(packing->itemAt(0)), QStringLiteral("packingLbl"));
+
+    auto *scanBox = autoTab->findChild<QGroupBox *>(QStringLiteral("scanBox"));
+    auto *monitorBox = autoTab->findChild<QGroupBox *>(QStringLiteral("monitorBox"));
+    QVERIFY(scanBox && monitorBox);
+    const auto inBox = [autoTab](QGroupBox *box, const char *name) {
+        QWidget *widget = autoTab->findChild<QWidget *>(QString::fromLatin1(name));
+        return widget && box->isAncestorOf(widget);
+    };
+    for (const char *name :
+         { "latestFilesFirstCB", "scanAutoDirButton", "startJobsCB", "postButton" })
+        QVERIFY2(inBox(scanBox, name), name);
+    for (const char *name : { "extensionFilterEdit",
+                              "dirAllowedCB",
+                              "delFilesCB",
+                              "monitorButton",
+                              "addMonitoringFolderButton" })
+        QVERIFY2(inBox(monitorBox, name), name);
+
+    // What every post of the folder gets, in either mode, is on the folder line.
+    auto *folderLine = autoTab->findChild<QHBoxLayout *>(QStringLiteral("autoDirLayout"));
+    QVERIFY(folderLine);
+    for (const char *name : { "copyNfoCB", "autoPostInfoCB", "autoPostInfoButton" }) {
+        QWidget *widget = autoTab->findChild<QWidget *>(QString::fromLatin1(name));
+        QVERIFY2(widget && folderLine->indexOf(widget) >= 0, name);
+    }
+}
+
+void TestMainWindow::auto_tab_monitoring_greys_the_scan_box()
+{
+    HomeSandbox sandbox;
+    // Before ngPost: its destructor stops the monitoring before the folder goes.
+    QTemporaryDir watched;
+    QVERIFY(watched.isValid());
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
+    QVERIFY2(window, qPrintable(err));
+    AutoPostWidget *autoTab = window->autoWidget();
+    QVERIFY(autoTab);
+
+    auto *scanBox = autoTab->findChild<QGroupBox *>(QStringLiteral("scanBox"));
+    auto *generate = autoTab->findChild<QPushButton *>(QStringLiteral("postButton"));
+    auto *monitor = autoTab->findChild<QPushButton *>(QStringLiteral("monitorButton"));
+    auto *addFolder = autoTab->findChild<QPushButton *>(
+        QStringLiteral("addMonitoringFolderButton"));
+    QVERIFY(scanBox && generate && monitor && addFolder);
+
+    // Monitoring through the GUI needs compression and a readable folder.
+    autoTab->findChild<QLineEdit *>(QStringLiteral("autoDirEdit"))->setText(watched.path());
+    autoTab->findChild<QCheckBox *>(QStringLiteral("compressCB"))->setChecked(true);
+    QVERIFY(scanBox->isEnabled());
+    QVERIFY(!addFolder->isEnabled());
+
+    monitor->click();
+    QCOMPARE(monitor->text(), AutoPostWidget::tr("Stop Monitoring"));
+    QVERIFY2(!scanBox->isEnabled(), "the Scan box must be greyed while monitoring");
+    QVERIFY(!generate->isEnabled());
+    QVERIFY(addFolder->isEnabled());
+
+    // A language change reloads the .ui texts and the packing rules: the button
+    // must still say what it does, and the frozen options must stay frozen.
+    autoTab->retranslate();
+    QCOMPARE(monitor->text(), AutoPostWidget::tr("Stop Monitoring"));
+    for (const char *name :
+         { "genNameCB", "nameLengthSB", "passModeCB", "keepRarCB", "redundancySB" }) {
+        QWidget *frozen = autoTab->findChild<QWidget *>(QString::fromLatin1(name));
+        QVERIFY2(frozen && !frozen->isEnabled(), name);
+    }
+
+    monitor->click();
+    QCOMPARE(monitor->text(), AutoPostWidget::tr("Monitor Folder"));
+    QVERIFY(scanBox->isEnabled());
+    QVERIFY(generate->isEnabled());
+    QVERIFY(!addFolder->isEnabled());
+}
+
 void TestMainWindow::compression_settings_dialog_owns_the_configuration_widgets()
 {
     HomeSandbox sandbox;
@@ -1841,24 +1980,37 @@ void TestMainWindow::greyed_controls_say_what_they_need()
     QVERIFY(compress && par2 && keepRar && nzbPass && nzbPassEd && redundancy);
 
     compress->setChecked(false);
+    par2->setChecked(false);
 
-    // Nothing on the packing line means anything while this post is not
-    // compressed, so the whole line follows that one box.
+    // The archive settings mean nothing while this post is not compressed, so
+    // they follow that one box. Keep Archives also keeps the PAR2 volumes, so
+    // it waits for either.
     QVERIFY(!keepRar->isEnabled());
     QVERIFY(!nzbPass->isEnabled());
     QVERIFY(!nzbPassEd->isEnabled());
-    QVERIFY(!par2->isEnabled());
     QVERIFY(!redundancy->isEnabled());
+    // PAR2 can protect the files as they are (Request #102): never greyed by
+    // the compression, and its help says so instead of the opposite.
+    QVERIFY(par2->isEnabled());
+    QVERIFY2(!par2->toolTip().contains(QStringLiteral("must be selected")),
+             qPrintable(par2->toolTip()));
 
     // The point of the change: a greyed control names its switch, so the user
     // is not left with a dead box and no way to find out why.
     QVERIFY2(keepRar->toolTip().contains(compress->text()), qPrintable(keepRar->toolTip()));
+    QVERIFY2(keepRar->toolTip().contains(par2->text()), qPrintable(keepRar->toolTip()));
     QVERIFY2(nzbPass->toolTip().contains(compress->text()), qPrintable(nzbPass->toolTip()));
-    QVERIFY2(par2->toolTip().contains(compress->text()), qPrintable(par2->toolTip()));
-    QVERIFY2(redundancy->toolTip().contains(compress->text()), qPrintable(redundancy->toolTip()));
+    QVERIFY2(redundancy->toolTip().contains(par2->text()), qPrintable(redundancy->toolTip()));
     // and it keeps the help it already carried.
     QVERIFY2(keepRar->toolTip().contains(QStringLiteral("deleted uppon post success")),
              qPrintable(keepRar->toolTip()));
+
+    // PAR2 alone: its volumes are generated, so they can be kept.
+    par2->setChecked(true);
+    QVERIFY(keepRar->isEnabled());
+    QVERIFY(redundancy->isEnabled());
+    QVERIFY(!nzbPass->isEnabled());
+    par2->setChecked(false);
 
     compress->setChecked(true);
 
@@ -1884,6 +2036,39 @@ void TestMainWindow::greyed_controls_say_what_they_need()
     QVERIFY(redundancy->isEnabled());
 }
 
+void TestMainWindow::uncompressed_post_announces_no_password()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, QStringLiteral("GROUPS = alt.binaries.test\n"), &err);
+    QVERIFY2(window, qPrintable(err));
+
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    QVERIFY(tabs);
+    auto *quickTab = qobject_cast<PostingWidget *>(tabs->widget(2));
+    QVERIFY(quickTab);
+    auto *compress = quickTab->findChild<QCheckBox *>(QStringLiteral("compressCB"));
+    auto *nzbPass = quickTab->findChild<QCheckBox *>(QStringLiteral("nzbPassCB"));
+    auto *nzbPassEd = quickTab->findChild<QLineEdit *>(QStringLiteral("nzbPassEdit"));
+    QVERIFY(compress && nzbPass && nzbPassEd);
+
+    compress->setChecked(true);
+    nzbPass->setChecked(true);
+    nzbPassEd->setText(QStringLiteral("hunter2"));
+    QCOMPARE(quickTab->_postInfoPreview().rarPass, QStringLiteral("hunter2"));
+
+    // PAR2 alone or plain files: the box is greyed, still ticked, and ignored.
+    compress->setChecked(false);
+    QVERIFY(nzbPass->isChecked());
+    QVERIFY(!nzbPass->isEnabled());
+    QVERIFY2(quickTab->_postInfoPreview().rarPass.isEmpty(),
+             qPrintable(quickTab->_postInfoPreview().rarPass));
+}
+
 void TestMainWindow::state_tooltips_survive_a_language_change()
 {
     HomeSandbox sandbox;
@@ -1901,10 +2086,13 @@ void TestMainWindow::state_tooltips_survive_a_language_change()
     QVERIFY(quickTab);
 
     auto *compress = quickTab->findChild<QCheckBox *>(QStringLiteral("compressCB"));
+    auto *par2 = quickTab->findChild<QCheckBox *>(QStringLiteral("par2CB"));
     auto *keepRar = quickTab->findChild<QCheckBox *>(QStringLiteral("keepRarCB"));
-    QVERIFY(compress && keepRar);
+    QVERIFY(compress && par2 && keepRar);
 
+    // Keep Archives waits for compression or PAR2: neither is on.
     compress->setChecked(false);
+    par2->setChecked(false);
     QVERIFY(!keepRar->toolTip().isEmpty());
 
     // retranslateUi() resets every tooltip to the plain .ui text. Before the
@@ -1946,9 +2134,11 @@ void TestMainWindow::auto_post_tab_greys_the_same_controls_as_a_posting_tab()
 
     // This tab forces PAR2 on when compression goes off (it cannot post folders
     // without one of the two), so PAR2 is asserted separately from compression.
+    // Keep Archives follows the posting tab's rule: compression or PAR2, whose
+    // volumes it keeps as well.
     compress->setChecked(false);
-    QVERIFY(!keepRar->isEnabled());
-    QVERIFY2(keepRar->toolTip().contains(compress->text()), qPrintable(keepRar->toolTip()));
+    QVERIFY(par2->isChecked());
+    QVERIFY(keepRar->isEnabled());
 
     compress->setChecked(true);
     QVERIFY(keepRar->isEnabled());
