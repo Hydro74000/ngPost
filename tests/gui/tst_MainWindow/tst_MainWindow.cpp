@@ -26,6 +26,9 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QCheckBox>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
 #include <QToolButton>
 #include <QSplitter>
 #include <QStyle>
@@ -510,6 +513,8 @@ private slots:
     void posting_widget_and_auto_post_auto_scroll_to_active_files();
     void quick_post_list_follows_the_file_in_progress();
     void quick_post_list_scrolls_only_on_the_shown_tab();
+    void quick_post_files_are_locked_until_the_post_is_stopped();
+    void quick_post_files_stay_locked_once_posted();
     void auto_post_list_follows_the_started_job();
 
     //! Phase 4 follow-up: a click-driven "delete row" test belongs here but
@@ -8873,6 +8878,162 @@ void TestMainWindow::quick_post_list_scrolls_only_on_the_shown_tab()
     tabs->setCurrentIndex(0);
     tabs->setCurrentWidget(quick);
     QVERIFY(rowCentred(filesList, 151));
+}
+
+namespace
+{
+// Drag events go straight to the window's handlers: QApplication::notify reads
+// the drag manager's current target, which only a real drag sets.
+bool dragEnterAccepted(MainWindow *window, const QString &path)
+{
+    QMimeData mime;
+    mime.setUrls({ QUrl::fromLocalFile(path) });
+    QDragEnterEvent enter(QPoint(10, 10), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+    static_cast<QObject *>(window)->event(&enter);
+    return enter.isAccepted();
+}
+
+void dropOnWindow(MainWindow *window, const QString &path)
+{
+    QMimeData mime;
+    mime.setUrls({ QUrl::fromLocalFile(path) });
+    QDropEvent drop(QPointF(10, 10), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+    static_cast<QObject *>(window)->event(&drop);
+}
+
+//! Tries every way of changing \a post's list with \a extra: none may.
+void verifyFilesLocked(MainWindow *window,
+                       PostingWidget *post,
+                       const QString &extra,
+                       bool clearable)
+{
+    window->findChild<QTabWidget *>("postTabWidget")->setCurrentWidget(post);
+    auto *list = post->findChild<QListWidget *>("filesList");
+    const int rows = list->count();
+    QVERIFY(rows > 0);
+    QVERIFY(!post->acceptsFiles());
+    QVERIFY(!post->findChild<QPushButton *>("selectFilesButton")->isEnabled());
+    QVERIFY(!post->findChild<QPushButton *>("selectFolderButton")->isEnabled());
+    QCOMPARE(post->findChild<QPushButton *>("clearFilesButton")->isEnabled(), clearable);
+
+    QVERIFY(!dragEnterAccepted(window, extra));
+    dropOnWindow(window, extra);
+    post->addPath(extra, rows);
+    QApplication::clipboard()->setText(extra);
+    QKeyEvent paste(QEvent::KeyPress, Qt::Key_V, Qt::ControlModifier);
+    post->handleKeyEvent(&paste);
+    list->item(0)->setSelected(true);
+    QTest::keyClick(list, Qt::Key_Delete);
+    QKeyEvent remove(QEvent::KeyPress, Qt::Key_Delete, Qt::NoModifier);
+    post->handleKeyEvent(&remove);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::MetaCall);
+    QCOMPARE(list->count(), rows);
+}
+}
+
+void TestMainWindow::quick_post_files_are_locked_until_the_post_is_stopped()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "300" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(sandbox.rootPath(), mock.port()), &err);
+    QVERIFY2(window, qPrintable(err));
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *active = qobject_cast<PostingWidget *>(tabs->widget(2));
+    auto *queued = window->addNewQuickTab();
+    const QString extra = sandbox.rootPath() + "/extra.bin";
+    QFile extraFile(extra);
+    QVERIFY(extraFile.open(QIODevice::WriteOnly));
+    extraFile.write("extra");
+    extraFile.close();
+    for (auto *post : { active, queued }) {
+        const QString path = sandbox.rootPath() + QString("/big%1.bin").arg(post->jobNumber());
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(QByteArray(4 * 1024 * 1024, 'a'));
+        file.close();
+        post->addPath(path, 0);
+        post->onPostFiles();
+    }
+    QTRY_VERIFY_WITH_TIMEOUT(!mock.receivedArticles().isEmpty(), 10000);
+    // The job took its list when submitted: queued, running or paused alike.
+    verifyFilesLocked(window, active, extra, false);
+    verifyFilesLocked(window, queued, extra, false);
+    ngPost.pause();
+    QVERIFY(ngPost.isPaused());
+    verifyFilesLocked(window, active, extra, false);
+    if (QTest::currentTestFailed())
+        return;
+    // Stop and Cancel stay at hand.
+    QVERIFY(active->findChild<QPushButton *>("postButton")->isEnabled());
+    QVERIFY(queued->findChild<QPushButton *>("postButton")->isEnabled());
+
+    // Stopped for good, the post can start over: its list is the user's again.
+    ngPost.resume();
+    active->findChild<QPushButton *>("postButton")->click();
+    QTRY_VERIFY_WITH_TIMEOUT(active->isPostingFinished(), 10000);
+    QVERIFY(active->acceptsFiles());
+    QVERIFY(active->findChild<QPushButton *>("selectFilesButton")->isEnabled());
+    QVERIFY(active->findChild<QPushButton *>("clearFilesButton")->isEnabled());
+    QVERIFY(active->findChild<QPushButton *>("postButton")->isEnabled());
+    tabs->setCurrentWidget(active);
+    QVERIFY(dragEnterAccepted(window, extra));
+    auto *list = active->findChild<QListWidget *>("filesList");
+    active->addPath(extra, list->count());
+    QCOMPARE(list->count(), 2);
+    ngPost.cancelAllPostingJobs();
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs(), 10000);
+    QTRY_VERIFY(queued->acceptsFiles());
+}
+
+void TestMainWindow::quick_post_files_stay_locked_once_posted()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString err;
+    auto *window = bootWindow(ngPost, shutdownTestConfig(root, mock.port()), &err);
+    QVERIFY2(window, qPrintable(err));
+    auto *post = qobject_cast<PostingWidget *>(
+        window->findChild<QTabWidget *>("postTabWidget")->widget(2));
+    QVERIFY(addShutdownTestFile(post, root + "/posted.bin"));
+    QFile extra(root + "/extra.bin");
+    QVERIFY(extra.open(QIODevice::WriteOnly));
+    extra.write("extra");
+    extra.close();
+    post->postFiles(true);
+    QTRY_VERIFY_WITH_TIMEOUT(post->isPostingFinished(), 15000);
+    QCOMPARE(mock.receivedArticles().size(), 1);
+
+    // Done, the list is the record of what was posted: this tab won't post it again.
+    verifyFilesLocked(window, post, root + "/extra.bin", true);
+    if (QTest::currentTestFailed())
+        return;
+    QVERIFY(!post->canSubmit());
+    QVERIFY(!post->findChild<QPushButton *>("postButton")->isEnabled());
+    post->postFiles(true);
+    QVERIFY(!post->isPosting());
+    QCOMPARE(mock.receivedArticles().size(), 1);
+
+    // Emptying it is how a finished tab serves again; the default one never closes.
+    post->findChild<QPushButton *>("clearFilesButton")->click();
+    QVERIFY(post->acceptsFiles());
+    QVERIFY(post->findChild<QPushButton *>("selectFilesButton")->isEnabled());
+    QVERIFY(post->findChild<QPushButton *>("postButton")->isEnabled());
+    QVERIFY(dragEnterAccepted(window, root + "/extra.bin"));
+    dropOnWindow(window, root + "/extra.bin");
+    QCOMPARE(post->findChild<QListWidget *>("filesList")->count(), 1);
+    QVERIFY(post->canSubmit());
 }
 
 void TestMainWindow::auto_post_list_follows_the_started_job()

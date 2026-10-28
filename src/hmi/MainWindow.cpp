@@ -753,7 +753,9 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 #include <QMimeData>
 void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 {
-    if (e->mimeData()->hasUrls())
+    // Refused up front, so the cursor says what the drop would not do.
+    auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->currentWidget());
+    if (e->mimeData()->hasUrls() && (!post || post->acceptsFiles()))
         e->acceptProposedAction();
 }
 

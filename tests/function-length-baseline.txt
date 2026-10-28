@@ -904,7 +904,7 @@
 13	src/hmi/MainWindow.cpp	MainWindow::clearJobTab( QWidget * postWidget)
 63	src/hmi/MainWindow.cpp	MainWindow::closeEvent( QCloseEvent * event)
 21	src/hmi/MainWindow.cpp	MainWindow::closeTab( PostingWidget * postWidget)
-5	src/hmi/MainWindow.cpp	MainWindow::dragEnterEvent( QDragEnterEvent * e)
+7	src/hmi/MainWindow.cpp	MainWindow::dragEnterEvent( QDragEnterEvent * e)
 8	src/hmi/MainWindow.cpp	MainWindow::dropEvent( QDropEvent * e)
 17	src/hmi/MainWindow.cpp	MainWindow::eventFilter( QObject * obj , QEvent * event)
 4	src/hmi/MainWindow.cpp	MainWindow::fixedArchivePassword() const
@@ -1066,7 +1066,7 @@
 13	src/hmi/PostingControlIcon.cpp	PostingControlIcon::colors( Glyph glyph , bool dark)
 18	src/hmi/PostingControlIcon.cpp	PostingControlIcon::drawGlyph( QPainter & painter , Glyph glyph)
 22	src/hmi/PostingControlIcon.cpp	PostingControlIcon::icon( Glyph glyph , bool dark)
-27	src/hmi/PostingWidget.cpp	PostingWidget::PostingWidget( NgPost * ngPost , MainWindow * hmi , uint jobNumber)
+32	src/hmi/PostingWidget.cpp	PostingWidget::PostingWidget( NgPost * ngPost , MainWindow * hmi , uint jobNumber)
 24	src/hmi/PostingWidget.cpp	PostingWidget::_armResubmission( const PostingJob * job)
 13	src/hmi/PostingWidget.cpp	PostingWidget::_buildFilesList( QFileInfoList & files , bool & hasFolder)
 32	src/hmi/PostingWidget.cpp	PostingWidget::_buildPostInfoRow()
@@ -1074,18 +1074,17 @@
 19	src/hmi/PostingWidget.cpp	PostingWidget::_copyToClipboard( QAction * action , QLineEdit * edit)
 9	src/hmi/PostingWidget.cpp	PostingWidget::_fileAlreadyInList( const QString & fileName , int currentNbFiles) const
 24	src/hmi/PostingWidget.cpp	PostingWidget::_fillJobOptions( PostingJobOptions & options , const QString & nzbPath , const QFileInfoList & files) const
-4	src/hmi/PostingWidget.cpp	PostingWidget::_hasPreparedFiles() const
 8	src/hmi/PostingWidget.cpp	PostingWidget::_isStoppedAttemptNzb( const QString & nzbPath) const
 40	src/hmi/PostingWidget.cpp	PostingWidget::_postInfoPreview() const
 38	src/hmi/PostingWidget.cpp	PostingWidget::_setupCopyActions()
 18	src/hmi/PostingWidget.cpp	PostingWidget::_stoppedAttemptIsReplaceable() const
 18	src/hmi/PostingWidget.cpp	PostingWidget::_supersedeStoppedAttempt()
-16	src/hmi/PostingWidget.cpp	PostingWidget::addPath( const QString & path , int currentNbFiles , int isDir)
+19	src/hmi/PostingWidget.cpp	PostingWidget::addPath( const QString & path , int currentNbFiles , int isDir)
 21	src/hmi/PostingWidget.cpp	PostingWidget::attachResumeJob( PostingJob * job , const QFileInfoList & files , bool hasStarted)
 4	src/hmi/PostingWidget.cpp	PostingWidget::canSubmit() const
 15	src/hmi/PostingWidget.cpp	PostingWidget::genNameAndPassword( bool genName , bool genPass , bool doPar2)
 9	src/hmi/PostingWidget.cpp	PostingWidget::handleDropEvent( QDropEvent * e)
-52	src/hmi/PostingWidget.cpp	PostingWidget::handleKeyEvent( QKeyEvent * keyEvent)
+55	src/hmi/PostingWidget.cpp	PostingWidget::handleKeyEvent( QKeyEvent * keyEvent)
 4	src/hmi/PostingWidget.cpp	PostingWidget::hasPar2PercentageOverride() const
 56	src/hmi/PostingWidget.cpp	PostingWidget::init()
 5	src/hmi/PostingWidget.cpp	PostingWidget::isBlank() const
@@ -1093,7 +1092,7 @@
 5	src/hmi/PostingWidget.cpp	PostingWidget::nzbFolder() const
 6	src/hmi/PostingWidget.cpp	PostingWidget::onArchiveFileNames( const QStringList & paths)
 5	src/hmi/PostingWidget.cpp	PostingWidget::onArticlesNumber( int nbArticles)
-25	src/hmi/PostingWidget.cpp	PostingWidget::onClearFilesClicked()
+29	src/hmi/PostingWidget.cpp	PostingWidget::onClearFilesClicked()
 27	src/hmi/PostingWidget.cpp	PostingWidget::onCompressCB( bool checked)
 52	src/hmi/PostingWidget.cpp	PostingWidget::onEditPostInfo()
 24	src/hmi/PostingWidget.cpp	PostingWidget::onFilePosted( const QString & filePath , uint nbArticles , uint nbFailed)
@@ -1105,13 +1104,13 @@
 4	src/hmi/PostingWidget.cpp	PostingWidget::onPostFiles()
 4	src/hmi/PostingWidget.cpp	PostingWidget::onPostInfoToggled( bool checked)
 24	src/hmi/PostingWidget.cpp	PostingWidget::onPostingJobDone()
-12	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFilesClicked()
+15	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFilesClicked()
 12	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFolderClicked()
-76	src/hmi/PostingWidget.cpp	PostingWidget::postFiles( bool updateMainParams)
+79	src/hmi/PostingWidget.cpp	PostingWidget::postFiles( bool updateMainParams)
 15	src/hmi/PostingWidget.cpp	PostingWidget::postingTextColor() const
 7	src/hmi/PostingWidget.cpp	PostingWidget::previewFiles() const
 6	src/hmi/PostingWidget.cpp	PostingWidget::refreshPar2Default()
-12	src/hmi/PostingWidget.cpp	PostingWidget::refreshPostingState()
+11	src/hmi/PostingWidget.cpp	PostingWidget::refreshPostingState()
 22	src/hmi/PostingWidget.cpp	PostingWidget::resetForNextPost()
 18	src/hmi/PostingWidget.cpp	PostingWidget::retranslate()
 10	src/hmi/PostingWidget.cpp	PostingWidget::retranslatePostInfoTexts()
@@ -1140,7 +1139,7 @@
 10	src/hmi/SignedListWidget.cpp	SignedListWidget::eventFilter( QObject * obj , QEvent * event)
 14	src/hmi/SignedListWidget.cpp	SignedListWidget::keyPressEvent( QKeyEvent * e)
 9	src/hmi/SignedListWidget.cpp	SignedListWidget::mousePressEvent( QMouseEvent * e)
-8	src/hmi/SignedListWidget.cpp	SignedListWidget::onDeleteSelectedItems()
+10	src/hmi/SignedListWidget.cpp	SignedListWidget::onDeleteSelectedItems()
 10	src/hmi/SignedListWidget.cpp	SignedListWidget::removeItemWidget2( QListWidgetItem * item)
 11	src/hmi/SignedListWidget.cpp	SignedListWidget::resizeEvent( QResizeEvent * e)
 5	src/hmi/SignedListWidget.cpp	SignedListWidget::setSignature( const QString & str)

@@ -77,7 +77,11 @@ private:
     void _fillJobOptions(PostingJobOptions &options,
                          const QString &nzbPath,
                          const QFileInfoList &files) const;
-    bool _hasPreparedFiles() const;
+    //! From the submission until the job is over, queued and paused included.
+    bool _isSubmitted() const;
+    //! Greys what would change the list while it is not this tab's to change.
+    void _refreshFileControls();
+    void _refreshPostButton();
     bool _isStoppedAttemptNzb(const QString &nzbPath) const;
     bool _stoppedAttemptIsReplaceable() const;
 
@@ -110,6 +114,10 @@ public:
 
     inline bool isPosting() const;
     inline bool isPostingFinished() const;
+    //! False while a post holds the list, and for good once one ran to its end:
+    //! only a post that can start over (stopped, or failed before any
+    //! transfer) takes files again. Emptying the tab frees it.
+    bool acceptsFiles() const;
     inline MainWindow *hmi() const;
 
     void udatePostingParams();

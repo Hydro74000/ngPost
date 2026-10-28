@@ -209,6 +209,15 @@ the NNTP streaming pipeline and SQLite history store.
     (stopped ones included); No leaves them as they are. Saving no longer records
     the NZB folder of the tab on screen as NZB_PATH.
   * Used kernel rename calls to prevent silent cross-filesystem file copies (EXDEV).
+- Quick Post Files Locked Once Posted:
+  * Once a post is submitted (queued, running, paused or stopping), its tab no
+    longer takes files by drag and drop, paste or the Select buttons, and its list
+    can no longer be changed with Delete or "Remove All". The post had taken its
+    list when submitted: a file added afterwards was shown but never posted.
+  * A post that ran to its end keeps its list as the record of what was posted,
+    and its "Start Quick Post" button stays greyed: it is not posted again from
+    this tab. "Remove All" empties the tab for a new post. A stopped post, or one
+    whose preparation failed, takes files again.
 - One Packing at a Time (PREPARE_PACKING):
   * Posts queued by "Post all tabs" while the VPN was connecting, or while the
     queue was paused, had the first two compressed at the same time. The next
@@ -594,6 +603,16 @@ sécurité VPN et de l'isolation des identifiants.
     L'enregistrement n'inscrit plus comme NZB_PATH le dossier NZB de l'onglet affiché.
   * Utilisation d'appels de renommage atomiques au niveau du noyau pour empêcher
     les copies complètes silencieuses lors de déplacements entre partitions (EXDEV).
+- Liste des fichiers verrouillée une fois le post lancé :
+  * Dès qu'un post est lancé (en file d'attente, en cours, en pause ou en cours
+    d'arrêt), son onglet n'accepte plus de fichiers par glisser-déposer, collage ou
+    les boutons « Choisir Fichiers » / « Choisir Dossier », et sa liste ne se modifie
+    plus avec Suppr ou « Supprimer tout ». Le post avait pris sa liste au lancement :
+    un fichier ajouté ensuite était affiché mais jamais posté.
+  * Un post allé à son terme garde sa liste comme trace de ce qui a été posté, et
+    son bouton « Démarrer le Post Rapide » reste grisé : il n'est pas reposté depuis
+    cet onglet. « Supprimer tout » vide l'onglet pour un nouveau post. Un post
+    arrêté, ou dont la préparation a échoué, accepte de nouveau des fichiers.
 - Une seule préparation à la fois (PREPARE_PACKING) :
   * Les posts mis en file par « Poster tous les onglets » pendant la connexion du
     VPN, ou pendant une pause de la file, voyaient les deux premiers compressés en

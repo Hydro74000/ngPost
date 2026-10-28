@@ -43,6 +43,8 @@ public:
     void followItem(QListWidgetItem *item);
     //! Row of the followed item, -1 when none.
     int followedRow() const;
+    //! While false, Delete and Backspace leave the rows alone.
+    void setEditable(bool editable) { _editable = editable; }
 
 signals:
     void rightClick();
@@ -72,6 +74,7 @@ private:
     QPersistentModelIndex _followed;
     //! Set when the user scrolls (bar, wheel, keys), cleared when following resumes.
     bool _scrolledAway = false;
+    bool _editable = true;
 };
 
 

@@ -108,6 +108,11 @@ PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber)
     connect(_ui->filesList->model(), &QAbstractItemModel::rowsInserted, this, &PostingWidget::submissionEligibilityChanged);
     connect(_ui->filesList->model(), &QAbstractItemModel::rowsRemoved, this, &PostingWidget::submissionEligibilityChanged);
     connect(_ui->filesList->model(), &QAbstractItemModel::modelReset, this, &PostingWidget::submissionEligibilityChanged);
+    // Emitted on every change of the post's state as well as of the list.
+    connect(this,
+            &PostingWidget::submissionEligibilityChanged,
+            this,
+            &PostingWidget::_refreshFileControls);
     _buildPostInfoRow();
     connect(_ui->postButton, &QAbstractButton::clicked, this, &PostingWidget::onPostFiles);
     connect(_ui->nzbPassCB,  &QAbstractButton::toggled, this, &PostingWidget::onNzbPassToggled);
@@ -211,7 +216,7 @@ void PostingWidget::_handlePostingJobDone()
 
 bool PostingWidget::canSubmit() const
 {
-    return _state == STATE::IDLE && !_postingJob && _hasPreparedFiles();
+    return acceptsFiles() && _ui->filesList->count() > 0;
 }
 
 QString PostingWidget::nzbFolder() const
@@ -227,9 +232,36 @@ void PostingWidget::setNzbFolder(const QString &folder)
         _ui->nzbFileEdit->setText(QDir(folder).filePath(QFileInfo(nzb).fileName()));
 }
 
-bool PostingWidget::_hasPreparedFiles() const
+bool PostingWidget::_isSubmitted() const
 {
-    return (!_postingFinished || _resubmittable) && _ui->filesList->count() > 0;
+    return _postingJob || _state != STATE::IDLE;
+}
+
+bool PostingWidget::acceptsFiles() const
+{
+    // The job took a copy of the list when it was submitted: a file added
+    // afterwards would never be posted, yet be shown as part of the post.
+    return !_isSubmitted() && (!_postingFinished || _resubmittable);
+}
+
+void PostingWidget::_refreshFileControls()
+{
+    bool const accepts = acceptsFiles();
+    _ui->selectFilesButton->setEnabled(accepts);
+    _ui->selectFolderButton->setEnabled(accepts);
+    _ui->filesList->setEditable(accepts);
+    // A finished tab is emptied to serve again: the default one cannot close.
+    _ui->clearFilesButton->setEnabled(!_isSubmitted());
+    _refreshPostButton();
+}
+
+void PostingWidget::_refreshPostButton()
+{
+    // Submitted, the button stops the post. Idle, it starts one only where files
+    // are taken: a post that ran to its end is not posted again from this tab.
+    bool const usable = _isSubmitted() ? !(_postingJob && _postingJob->cancelRequested())
+                                       : acceptsFiles();
+    _ui->postButton->setEnabled(usable && !_ngPost->_cancelingAll);
 }
 
 bool PostingWidget::isBlank() const
@@ -299,6 +331,9 @@ void PostingWidget::postFiles(bool updateMainParams)
 {
     if (_state == STATE::IDLE)
     {
+        // Greyed button or not, a post that ran to its end is not posted again.
+        if (!acceptsFiles())
+            return;
         if (_ui->filesList->count() == 0)
         {
             _hmi->logError(tr("There are no selected files to post..."));
@@ -466,6 +501,9 @@ void PostingWidget::onGenNzbPassword()
 
 void PostingWidget::onSelectFilesClicked()
 {
+    // The right click on the list lands here too, button greyed or not.
+    if (!acceptsFiles())
+        return;
     const auto shutdownHold = _ngPost->holdShutdown();
     QStringList files = QFileDialog::getOpenFileNames(
                 this,
@@ -492,7 +530,11 @@ void PostingWidget::onSelectFolderClicked()
 
 void PostingWidget::onClearFilesClicked()
 {
-    if (!_postingJob) _postingFinished = false;
+    // Also reached when the list is emptied: during a post this would wipe its
+    // NZB name, its post information and its tab mark.
+    if (_isSubmitted())
+        return;
+    _postingFinished = false;
     _ui->filesList->clear2();
     // The post information describes the post that was there; leaving it would
     // hand the title of one post to the next one queued in this tab.
@@ -629,6 +671,9 @@ void PostingWidget::onNzbFileClicked()
 void PostingWidget::handleKeyEvent(QKeyEvent *keyEvent)
 {
     qDebug() << "[PostingWidget::handleKeyEvent] key event: " << keyEvent->key();
+    // Delete and paste are the only keys handled here.
+    if (!acceptsFiles())
+        return;
 
     if(keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Backspace)
     {
@@ -1015,9 +1060,12 @@ void PostingWidget::setPackingAuto(bool enabled, const QStringList &keys)
 
 void PostingWidget::addPath(const QString &path, int currentNbFiles, int isDir)
 {
+    // Every way of adding comes here: drop, paste, file and folder pickers.
+    if (!acceptsFiles())
+        return;
     if (_ui->filesList->addPathIfNotInList(path, currentNbFiles, isDir))
     {
-        if (!_postingJob) _postingFinished = false;
+        _postingFinished = false;
         emit submissionEligibilityChanged();
         QFileInfo fileInfo(path);
         if (_ui->nzbFileEdit->text().isEmpty())
@@ -1059,12 +1107,11 @@ QColor PostingWidget::postingTextColor() const
 void PostingWidget::refreshPostingState()
 {
     const bool submitted = _postingJob && !_postingFinished;
-    const bool stopping = submitted && _postingJob->cancelRequested();
     const bool active = submitted && _ngPost->_activeJob == _postingJob;
     _ui->postButton->setText(!submitted   ? tr("Start Quick Post #%1").arg(displayNumber())
                                  : active ? tr("Stop Posting")
                                           : tr("Cancel Posting"));
-    _ui->postButton->setEnabled(!stopping && !_ngPost->_cancelingAll);
+    _refreshPostButton();
     const QIcon icon = (submitted && !active) ? _hmi->pendingIcon() : QIcon();
     _hmi->updateJobTab(this, postingTextColor(), icon);
 }

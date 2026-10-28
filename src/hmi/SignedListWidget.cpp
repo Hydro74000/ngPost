@@ -109,6 +109,8 @@ void SignedListWidget::clear2()
 
 void SignedListWidget::onDeleteSelectedItems()
 {
+    if (!_editable)
+        return;
     for (QListWidgetItem *item : selectedItems())
     {
         removeItemWidget2(item);
