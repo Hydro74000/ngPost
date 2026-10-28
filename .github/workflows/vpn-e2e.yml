@@ -25,11 +25,13 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install dependencies
+        # polkitd + pkexec replace policykit-1, a transitional package that
+        # Ubuntu 26.04 no longer ships; both exist on 24.04 as well.
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake libsecret-1-dev \
                                   wireguard-tools openvpn iproute2 \
-                                  iptables python3 policykit-1 dbus-x11 \
+                                  iptables python3 polkitd pkexec dbus-x11 \
                                   libxkbcommon-x11-0
 
       - name: Install Qt
