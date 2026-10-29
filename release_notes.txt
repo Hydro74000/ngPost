@@ -167,6 +167,22 @@ the NNTP streaming pipeline and SQLite history store.
     is monitored.
   * "delete files once posted" moved to the Monitor box and is shown in red. The
     "+" that adds a monitored folder is now an "Add folder" button.
+- Auto Posting Options of Its Own:
+  * The Auto Posting tab keeps its own options: compression, random name, PAR2,
+    password, name and password lengths, "Keep Archives" and redundancy. They are
+    saved whichever tab is in front and restored at the next start (AUTO_PACK,
+    AUTO_LENGTH_NAME, AUTO_LENGTH_PASS, AUTO_KEEP_RAR, AUTO_PAR2_PCT and
+    AUTO_PASS). A configuration without them starts from what the tab used to
+    show, written at the first save; changing the Quick Post defaults afterwards
+    no longer changes it.
+  * The posts that "Generate Posts" prepares now get all of these options, its
+    "Keep Archives", lengths and redundancy included, not only monitored files.
+- Default Options of New Quick Posts:
+  * The Compression Settings window shows what every new or emptied Quick Post
+    starts with: compression, a random archive name and its length, a random
+    password and its length, PAR2 repair files. Its title is the "Enable
+    compression by default on posts" box of the main window, which it switches
+    as well. A random password is greyed while the default password is enabled.
 - Unified External Tool Resolution (ExternalToolResolver):
   * Deterministic search prioritizing bundled tools shipped alongside ngPost
     before scanning system PATH.
@@ -199,6 +215,17 @@ the NNTP streaming pipeline and SQLite history store.
   * A post without compression no longer announces an archive password in its
     NZB: the greyed "Archive password" box, still ticked from the defaults, was
     applied all the same.
+- New Quick Posts Named After Their NZB:
+  * After the Auto Posting tab had posted without compression or without a
+    random name, or after a save with that tab in front, new and emptied Quick
+    Posts no longer drew a random archive name and took the name of the NZB.
+    The Auto Posting tab no longer changes the Quick Post defaults.
+  * Saving with a post in front no longer writes what that post ticked into the
+    defaults (PACK) and the name length (LENGTH_NAME). A configuration altered
+    that way keeps its values: check them once in Compression Settings.
+  * With "default password" chosen in the Auto Posting tab and no default
+    password any more, its archives get a random password, whatever the Quick
+    Post defaults say.
 - Auto Posting Language Change While Monitoring:
   * Changing the interface language, or the PAR2 defaults, while a folder is
     monitored no longer re-enables the packing options frozen for the run, and
@@ -584,6 +611,25 @@ sécurité VPN et de l'isolation des identifiants.
   * « supprimer fichiers après post » passe dans le cadre Surveiller et s'affiche en
     rouge. Le « + » qui ajoute un dossier surveillé devient un bouton « Ajouter un
     dossier ».
+- Options propres à l'onglet Post Auto :
+  * L'onglet Post Auto garde ses propres options : compression, nom aléatoire,
+    PAR2, mot de passe, longueurs du nom et du mot de passe, « Garder les
+    archives » et redondance. Elles sont sauvegardées quel que soit l'onglet
+    affiché et retrouvées au démarrage suivant (AUTO_PACK, AUTO_LENGTH_NAME,
+    AUTO_LENGTH_PASS, AUTO_KEEP_RAR, AUTO_PAR2_PCT et AUTO_PASS). Une
+    configuration qui ne les a pas démarre sur ce que l'onglet affichait jusque-là,
+    écrit à la première sauvegarde ; changer ensuite les réglages par défaut des
+    Posts Rapides ne le modifie plus.
+  * Les posts que prépare « Créer Posts » reçoivent désormais toutes ces options,
+    y compris « Garder les archives », les longueurs et la redondance, et plus
+    seulement les fichiers surveillés.
+- Options par défaut des nouveaux Posts Rapides :
+  * La fenêtre Paramétrage Compression indique avec quoi démarre chaque Post
+    Rapide nouveau ou vidé : compression, nom d'archive aléatoire et sa longueur,
+    mot de passe aléatoire et sa longueur, fichiers de réparation PAR2. Son titre
+    est la case « Activer la compression par défaut sur les posts » de la fenêtre
+    principale, qu'elle coche ou décoche aussi. Le mot de passe aléatoire est
+    grisé tant que le mot de passe par défaut est activé.
 - Résolution unifiée des outils externes (ExternalToolResolver) :
   * Ordre de recherche déterministe privilégiant les binaires fournis à côté
     d'ngPost avant le PATH système.
@@ -619,6 +665,19 @@ sécurité VPN et de l'isolation des identifiants.
   * Un post sans compression n'annonce plus de mot de passe d'archive dans son
     NZB : la case « Mot de passe de l'archive » grisée, restée cochée par les
     réglages par défaut, s'appliquait quand même.
+- Nouveaux Posts Rapides nommés comme leur NZB :
+  * Après un passage de l'onglet Post Auto sans compression ou sans nom aléatoire,
+    ou après une sauvegarde faite avec cet onglet affiché, les Posts Rapides
+    nouveaux ou vidés ne tiraient plus de nom d'archive aléatoire et prenaient le
+    nom du NZB. L'onglet Post Auto ne modifie plus les réglages par défaut des
+    Posts Rapides.
+  * Sauvegarder avec un post affiché n'écrit plus ce que ce post a coché dans les
+    réglages par défaut (PACK) ni dans la longueur des noms (LENGTH_NAME). Une
+    configuration modifiée ainsi garde ses valeurs : vérifiez-les une fois dans
+    Paramétrage Compression.
+  * Avec « mot de passe par défaut » choisi dans l'onglet Post Auto et plus aucun
+    mot de passe par défaut, ses archives reçoivent un mot de passe aléatoire,
+    quels que soient les réglages par défaut des Posts Rapides.
 - Changement de langue pendant la surveillance du Post Auto :
   * Changer la langue de l'interface, ou les réglages PAR2 par défaut, pendant la
     surveillance d'un dossier ne réactive plus les options de conditionnement

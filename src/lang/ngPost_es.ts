@@ -554,6 +554,58 @@ Introduzca un número entero de MiB entre 0 y 1000000 (0 desactiva la división 
         <source>Cancel</source>
         <translation>Cancelar</translation>
     </message>
+    <message>
+        <source>Same switch as the box of the main window. Unticked, a new post starts with nothing ticked (config PACK).</source>
+        <translation>El mismo interruptor que la casilla de la ventana principal. Desmarcado, una nueva publicación empieza sin nada marcado (config PACK).</translation>
+    </message>
+    <message>
+        <source>Enable compression by default on posts</source>
+        <translation>Activar la compresión por defecto en los posts</translation>
+    </message>
+    <message>
+        <source>Every new Quick Post, and every Quick Post you empty, starts with the options ticked here. Each post can still change them in its own tab. The Auto Posting tab keeps its own options, set in that tab.</source>
+        <translation>Cada nueva Publicación Rápida, y cada Publicación Rápida que vacíe, empieza con las opciones marcadas aquí. Cada publicación puede cambiarlas en su propia pestaña. La pestaña de Publicación Automática conserva sus propias opciones, ajustadas en esa pestaña.</translation>
+    </message>
+    <message>
+        <source>Compress the files into an archive</source>
+        <translation>Comprimir los ficheros en un archivo</translation>
+    </message>
+    <message>
+        <source>hides the name of the files: the archive gets random letters instead of the name of the first file</source>
+        <translation>oculta el nombre de los ficheros: el archivo recibe letras aleatorias en lugar del nombre del primer fichero</translation>
+    </message>
+    <message>
+        <source>Give the archive a random name</source>
+        <translation>Dar un nombre aleatorio al archivo</translation>
+    </message>
+    <message>
+        <source>Length:</source>
+        <translation>Longitud:</translation>
+    </message>
+    <message>
+        <source>length of the random archive names, also drawn by the dice button of a post (config LENGTH_NAME)</source>
+        <translation>longitud de los nombres de archivo aleatorios, también generados con el botón del dado de una publicación (config LENGTH_NAME)</translation>
+    </message>
+    <message>
+        <source>Protect the archive with a random password</source>
+        <translation>Proteger el archivo con una contraseña aleatoria</translation>
+    </message>
+    <message>
+        <source>length of the random archive passwords, the same as the one of the default password above (config LENGTH_PASS)</source>
+        <translation>longitud de las contraseñas de archivo aleatorias, la misma que la de la contraseña predeterminada de arriba (config LENGTH_PASS)</translation>
+    </message>
+    <message>
+        <source>repair files that let a download be fixed when part of it is missing (their amount comes from the PAR2 settings)</source>
+        <translation>ficheros de reparación que permiten arreglar una descarga incompleta (su cantidad viene de los ajustes PAR2)</translation>
+    </message>
+    <message>
+        <source>Add PAR2 repair files</source>
+        <translation>Añadir ficheros de reparación PAR2</translation>
+    </message>
+    <message>
+        <source>Not used while the default archive password is enabled: every post gets that one.</source>
+        <translation>No se usa mientras la contraseña de archivo predeterminada está activada: cada publicación recibe esa.</translation>
+    </message>
 </context>
 <context>
     <name>ExternalToolPathWidget</name>
@@ -724,10 +776,10 @@ Introduzca un número entero de MiB entre 0 y 1000000 (0 desactiva la división 
     </message>
     <message>
         <location line="+44"/>
-        <source>Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.
-Unlike the per post box, this choice is saved.</source>
-        <translation>Prepara cada post con las opciones de empaquetado de la línea PACK: compresión, nombre de archivo aleatorio, contraseña aleatoria y par2.
-A diferencia de la casilla por post, esta elección se guarda.</translation>
+        <source>Every new Quick Post starts with the options chosen in the Compression Settings: compression, a random archive name, a random password, PAR2 repair files.
+The Auto Posting tab keeps its own options. Unlike the per post box, this choice is saved.</source>
+        <translation>Cada nueva Publicación Rápida empieza con las opciones elegidas en la Configuración de compresión: compresión, nombre de archivo aleatorio, contraseña aleatoria, ficheros de reparación PAR2.
+La pestaña de Publicación Automática conserva sus propias opciones. A diferencia de la casilla de cada publicación, esta elección se guarda.</translation>
     </message>
     <message>
         <location line="+14"/>
@@ -848,8 +900,8 @@ A diferencia de la casilla por post, esta elección se guarda.</translation>
     </message>
     <message>
         <location line="+7"/>
-        <source>Where the archives are built, with which rar, in which volume size, and under which default password</source>
-        <translation>Dónde se crean los archivos, con qué rar, con qué tamaño de volumen y con qué contraseña predeterminada</translation>
+        <source>Where the archives are built, with which rar, in which volume size, under which default password, and the options every new Quick Post starts with</source>
+        <translation>Dónde se crean los archivos, con qué rar, con qué tamaño de volumen, con qué contraseña predeterminada y con qué opciones empieza cada nueva Publicación Rápida</translation>
     </message>
     <message>
         <location line="+82"/>
@@ -4592,6 +4644,34 @@ Su archivo de configuración activo es:
     <message>
         <source>## (not set: the default password above, else a random one if PACK has GEN_PASS)</source>
         <translation>## (sin definir: la contraseña predeterminada de arriba, si no una aleatoria si PACK contiene GEN_PASS)</translation>
+    </message>
+    <message>
+        <source>## (in the GUI: the posting tabs, the Auto Posting tab has its own AUTO_PACK)</source>
+        <translation>## (en la interfaz: las pestañas de publicación; la Publicación Automática tiene su propio AUTO_PACK)</translation>
+    </message>
+    <message>
+        <source>## packing of the GUI&apos;s Auto Posting, apart from PACK: COMPRESS, GEN_NAME and GEN_PAR2</source>
+        <translation>## empaquetado de la Publicación Automática de la interfaz, aparte de PACK: COMPRESS, GEN_NAME y GEN_PAR2</translation>
+    </message>
+    <message>
+        <source>## (at least COMPRESS or GEN_PAR2; its password is AUTO_PASS above)</source>
+        <translation>## (al menos COMPRESS o GEN_PAR2; su contraseña es AUTO_PASS, arriba)</translation>
+    </message>
+    <message>
+        <source>## length of its random archive names and passwords</source>
+        <translation>## longitud de sus nombres de archivo y contraseñas aleatorios</translation>
+    </message>
+    <message>
+        <source>## keep its archives and par2 files after a successful post</source>
+        <translation>## conservar sus archivos y ficheros par2 tras una publicación correcta</translation>
+    </message>
+    <message>
+        <source>## its par2 redundancy percentage (not set: the PAR2 settings below)</source>
+        <translation>## su porcentaje de redundancia par2 (sin definir: los ajustes PAR2 de más abajo)</translation>
+    </message>
+    <message>
+        <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
+        <translation>Palabras clave incorrectas para AUTO_PACK: %1. Debe ser un subconjunto de (COMPRESS, GEN_NAME, GEN_PAR2); la contraseña de la Publicación Automática es AUTO_PASS.</translation>
     </message>
 </context>
 <context>

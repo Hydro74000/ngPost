@@ -3,8 +3,6 @@
 # Every existing function is pinned; new functions may have at most 100 lines.
 # Decreases/removals are free. Increases require an explicit reviewed decision.
 # No baseline entry or source function may exceed 200 lines.
-# 2026-10-06: counts adjusted for clang-format 18 on changes since the rules
-# were introduced; increases reflect line wrapping only, without added logic.
 # Format: length<TAB>source<TAB>normalized signature; platform duplicates use max.
 13	src/ArticleBuilder.cpp	ArticleBuilder::ArticleBuilder( Poster * poster , QObject * parent)
 19	src/ArticleBuilder.cpp	ArticleBuilder::getNextArticle( const QString & threadName)
@@ -38,13 +36,13 @@
 4	src/FoldersMonitorForNewFiles.h	FoldersMonitorForNewFiles::writeLockWaitMsForTest( ushort maxRetries , ulong sleepMs)
 148	src/NgPost.cpp	NgPost::NgPost( int & argc , char * argv [ ])
 28	src/NgPost.cpp	NgPost::_addMeta( const QString & keyValue , MetaScope scope)
-55	src/NgPost.cpp	NgPost::_adoptConfigValue( QString const & key , QString const & value)
+58	src/NgPost.cpp	NgPost::_adoptConfigValue( QString const & key , QString const & value)
 28	src/NgPost.cpp	NgPost::_applyCliConfigOverrides( const QCommandLineParser & parser)
 34	src/NgPost.cpp	NgPost::_applyConfigVpnProfiles( ConfigParseState & state)
 39	src/NgPost.cpp	NgPost::_applyPar2Fallback( bool announce)
 19	src/NgPost.cpp	NgPost::_autoIsBundledNfo( const QFileInfo & fileInfo) const
 18	src/NgPost.cpp	NgPost::_autoSiblingNfo( const QFileInfo & fileInfo) const
-35	src/NgPost.cpp	NgPost::_baseJobOptions() const
+37	src/NgPost.cpp	NgPost::_baseJobOptions() const
 71	src/NgPost.cpp	NgPost::_collectCliInputFiles( const QCommandLineParser & parser , QList<QFileInfo> & filesToUpload , QStringList & rawInputPaths)
 30	src/NgPost.cpp	NgPost::_confirmMasterSwitchWithoutVpnProfileIfNeeded()
 8	src/NgPost.cpp	NgPost::_confirmPostingAdmission()
@@ -68,6 +66,7 @@
 133	src/NgPost.cpp	NgPost::_mergeExternalConfigEdits( QString & text)
 9	src/NgPost.cpp	NgPost::_obfuscationKinds() const
 11	src/NgPost.cpp	NgPost::_onPostingJobEnded( const PostingJob * job)
+28	src/NgPost.cpp	NgPost::_packMonitoredPost( PostingJobOptions & options)
 25	src/NgPost.cpp	NgPost::_parseCliArchiveNameOptions( const QCommandLineParser & parser)
 33	src/NgPost.cpp	NgPost::_parseCliArchiveOptions( const QCommandLineParser & parser)
 33	src/NgPost.cpp	NgPost::_parseCliArticleOptions( const QCommandLineParser & parser)
@@ -83,13 +82,14 @@
 45	src/NgPost.cpp	NgPost::_parseCliServerList( const QCommandLineParser & parser)
 64	src/NgPost.cpp	NgPost::_parseCliSingleServer( const QCommandLineParser & parser)
 37	src/NgPost.cpp	NgPost::_parseCliVpnOptions( const QCommandLineParser & parser)
-72	src/NgPost.cpp	NgPost::_parseConfig( const QString & configPath , bool isDefaultConfig)
+74	src/NgPost.cpp	NgPost::_parseConfig( const QString & configPath , bool isDefaultConfig)
 48	src/NgPost.cpp	NgPost::_parseConfigArchiveKey( const QString & opt , QString val , ConfigParseState & state , QString & err)
 45	src/NgPost.cpp	NgPost::_parseConfigArticleKey( const QString & opt , QString val)
+57	src/NgPost.cpp	NgPost::_parseConfigAutoPostKey( const QString & opt , const QString & val , ConfigParseState & state , QString & err)
 38	src/NgPost.cpp	NgPost::_parseConfigDisplayKey( const QString & opt , QString val)
 20	src/NgPost.cpp	NgPost::_parseConfigHistoryKey( const QString & opt , const QString & val , QString & err)
 58	src/NgPost.cpp	NgPost::_parseConfigIdentityKey( const QString & opt , QString val , QString & err)
-36	src/NgPost.cpp	NgPost::_parseConfigKey( const QString & opt , const QString & val , ConfigParseState & state , QString & err)
+38	src/NgPost.cpp	NgPost::_parseConfigKey( const QString & opt , const QString & val , ConfigParseState & state , QString & err)
 43	src/NgPost.cpp	NgPost::_parseConfigNfoKey( const QString & opt , QString val)
 46	src/NgPost.cpp	NgPost::_parseConfigPackingKey( const QString & opt , QString val , ConfigParseState & state , QString & err)
 42	src/NgPost.cpp	NgPost::_parseConfigPar2Key( const QString & opt , const QString & val , ConfigParseState & state , QString & err)
@@ -99,7 +99,7 @@
 34	src/NgPost.cpp	NgPost::_parseConfigVpnKey( const QString & opt , QString val , ConfigParseState & state)
 54	src/NgPost.cpp	NgPost::_parseServerKey( const QString & opt , QString val , ConfigParseState & state)
 20	src/NgPost.cpp	NgPost::_parseVpnProfileKey( const QString & opt , QString val , ConfigParseState & state)
-52	src/NgPost.cpp	NgPost::_post( const QFileInfo & fileInfo , const QString & monitorFolder)
+38	src/NgPost.cpp	NgPost::_post( const QFileInfo & fileInfo , const QString & monitorFolder)
 35	src/NgPost.cpp	NgPost::_prepareCliOutput( const QCommandLineParser & parser)
 10	src/NgPost.cpp	NgPost::_prepareNextPacking()
 34	src/NgPost.cpp	NgPost::_printHistory( bool jsonOutput)
@@ -121,6 +121,7 @@
 23	src/NgPost.cpp	NgPost::_scanConfigLanguage( QFile & file)
 18	src/NgPost.cpp	NgPost::_setNzbUploadUrl( const QString & url , QString & error)
 16	src/NgPost.cpp	NgPost::_setPostHistoryFile( const QString & path , QString & error)
+24	src/NgPost.cpp	NgPost::_settleAutoPacking( const ConfigParseState & state)
 25	src/NgPost.cpp	NgPost::_settleConfigToolNames( ConfigParseState & state)
 6	src/NgPost.cpp	NgPost::_showVersionASCII() const
 79	src/NgPost.cpp	NgPost::_startCliNzbCheck( const QCommandLineParser & parser)
@@ -133,9 +134,10 @@
 19	src/NgPost.cpp	NgPost::_validateConfigPar2Args( bool par2Requested)
 27	src/NgPost.cpp	NgPost::_warnIfConfigWasAdoptedFrom( const QString & confPath)
 35	src/NgPost.cpp	NgPost::_writeConfigArchive( QTextStream & stream)
+27	src/NgPost.cpp	NgPost::_writeConfigAutoPosting( QTextStream & stream)
 40	src/NgPost.cpp	NgPost::_writeConfigGeneral( QTextStream & stream)
 35	src/NgPost.cpp	NgPost::_writeConfigMonitoring( QTextStream & stream)
-61	src/NgPost.cpp	NgPost::_writeConfigPacking( QTextStream & stream)
+53	src/NgPost.cpp	NgPost::_writeConfigPacking( QTextStream & stream)
 69	src/NgPost.cpp	NgPost::_writeConfigPar2( QTextStream & stream)
 31	src/NgPost.cpp	NgPost::_writeConfigPostCommands( QTextStream & stream)
 41	src/NgPost.cpp	NgPost::_writeConfigPostInfo( QTextStream & stream)
@@ -145,6 +147,8 @@
 14	src/NgPost.cpp	NgPost::_writeConfigVpn( QTextStream & stream)
 18	src/NgPost.cpp	NgPost::_writeConfigVpnProfiles( QTextStream & stream)
 5	src/NgPost.cpp	NgPost::addMonitoringFolder( const QString & dirPath)
+9	src/NgPost.cpp	NgPost::autoArchivePassword() const
+12	src/NgPost.cpp	NgPost::autoPassChoice() const
 16	src/NgPost.cpp	NgPost::cancelAllPostingJobs()
 8	src/NgPost.cpp	NgPost::changeLanguage( const QString & lang)
 9	src/NgPost.cpp	NgPost::checkForNewVersion()
@@ -156,10 +160,12 @@
 10	src/NgPost.cpp	NgPost::flushConnectionRetries()
 17	src/NgPost.cpp	NgPost::hasMonitoringPostingJobs() const
 5	src/NgPost.cpp	NgPost::ignoreMonitorPath( const QString & absolutePath)
+6	src/NgPost.cpp	NgPost::implicitAutoPass() const
 5	src/NgPost.cpp	NgPost::isKnownSetting( QString const & key)
 7	src/NgPost.cpp	NgPost::isPaused() const
 13	src/NgPost.cpp	NgPost::isSecretSetting( QString const & key)
 71	src/NgPost.cpp	NgPost::maybeFinishApplication()
+7	src/NgPost.cpp	NgPost::monitoredPostOptionsForTest( const QFileInfo & file)
 4	src/NgPost.cpp	NgPost::nbMissingArticles() const
 4	src/NgPost.cpp	NgPost::nzbCheckExitCode() const
 18	src/NgPost.cpp	NgPost::nzbPath( const QString & monitorFolder)
@@ -193,6 +199,7 @@
 6	src/NgPost.cpp	NgPost::sectionsText( QString const & text)
 8	src/NgPost.cpp	NgPost::setDelFilesAfterPosted( bool delFiles)
 23	src/NgPost.cpp	NgPost::setNzbName( const QFileInfo & fileInfo)
+21	src/NgPost.cpp	NgPost::setPackingDefaults( bool enabled , const QStringList & keywords)
 5	src/NgPost.cpp	NgPost::setShutdownWhenDone( bool enabled)
 19	src/NgPost.cpp	NgPost::splitMetaPair( const QString & keyValue , QString * key , QString * value)
 53	src/NgPost.cpp	NgPost::startHMI()
@@ -204,6 +211,8 @@
 7	src/NgPost.cpp	NgPost::updateGroups( const QString & groups)
 8	src/NgPost.cpp	NgPost::vpnProfileKeys()
 52	src/NgPost.cpp	NgPost::~NgPost()
+4	src/NgPost.cpp	autoPassFromName( QString const & name)
+9	src/NgPost.cpp	autoPassNames()
 17	src/NgPost.cpp	removeTopLevelLine( QString & text , QString const & key)
 47	src/NgPost.cpp	setTopLevelValue( QString & text , QString const & key , QString const & value , QString const & insertedHeader)
 38	src/NgPost.cpp	splitConfigText( QString const & text , QStringList const & serverKeys , QStringList const & profileKeys , QMap<QString,QString> * settings , QStringList * sections)
@@ -761,43 +770,51 @@
 4	src/history/ResumePlanner.cpp	splitStoredGroups( const QString & groups)
 13	src/hmi/AutoPostWidget.cpp	AutoPostWidget::AutoPostWidget( NgPost * ngPost , MainWindow * hmi)
 25	src/hmi/AutoPostWidget.cpp	AutoPostWidget::_buildPostInfoRow()
-10	src/hmi/AutoPostWidget.cpp	AutoPostWidget::_postInfoPreview() const
+29	src/hmi/AutoPostWidget.cpp	AutoPostWidget::_handleFinishedJob( const QString & path , uint nbArticles , uint nbUploaded , uint nbFailed)
+13	src/hmi/AutoPostWidget.cpp	AutoPostWidget::_postInfoPreview() const
 1	src/hmi/AutoPostWidget.cpp	AutoPostWidget::deleteFilesOncePosted() const
 12	src/hmi/AutoPostWidget.cpp	AutoPostWidget::handleDropEvent( QDropEvent * e)
 16	src/hmi/AutoPostWidget.cpp	AutoPostWidget::handleKeyEvent( QKeyEvent * keyEvent)
-61	src/hmi/AutoPostWidget.cpp	AutoPostWidget::init()
+69	src/hmi/AutoPostWidget.cpp	AutoPostWidget::init()
 8	src/hmi/AutoPostWidget.cpp	AutoPostWidget::newFileToProcess( const QFileInfo & fileInfo)
 18	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onAddMonitoringFolder()
 6	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onCompressToggled( bool checked)
 8	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onDelFilesToggled( bool checked)
 48	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onEditPostInfo()
 6	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onGenPar2Toggled( bool checked)
-63	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onGenQuickPosts()
+62	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onGenQuickPosts()
 4	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onMonitorJobStart()
 60	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onMonitoringClicked()
+7	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onPassChoiceChanged()
 1	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onPostInfoToggled( bool checked)
 15	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onScanAutoDirClicked()
 11	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onSelectAutoDirClicked()
 14	src/hmi/AutoPostWidget.cpp	AutoPostWidget::onSelectFilesClicked()
 6	src/hmi/AutoPostWidget.cpp	AutoPostWidget::refreshPar2Default()
+11	src/hmi/AutoPostWidget.cpp	AutoPostWidget::refreshPasswordChoices()
 8	src/hmi/AutoPostWidget.cpp	AutoPostWidget::refreshPendingColors()
 18	src/hmi/AutoPostWidget.cpp	AutoPostWidget::retranslate()
 10	src/hmi/AutoPostWidget.cpp	AutoPostWidget::retranslatePostInfoTexts()
-30	src/hmi/AutoPostWidget.cpp	AutoPostWidget::setPackingAuto( bool enabled , const QStringList & keys)
-42	src/hmi/AutoPostWidget.cpp	AutoPostWidget::udatePostingParams()
-25	src/hmi/AutoPostWidget.cpp	AutoPostWidget::updateFinishedJob( const QString & path , uint nbArticles , uint nbUploaded , uint nbFailed)
+33	src/hmi/AutoPostWidget.cpp	AutoPostWidget::udatePostingParams()
+4	src/hmi/AutoPostWidget.cpp	AutoPostWidget::updateFinishedJob( const QString & path , uint nbArticles , uint nbUploaded , uint nbFailed)
 40	src/hmi/AutoPostWidget.cpp	AutoPostWidget::updatePackingDependents()
+16	src/hmi/AutoPostWidget.cpp	AutoPostWidget::updateStartedJob( const QString & path)
 4	src/hmi/AutoPostWidget.cpp	AutoPostWidget::~AutoPostWidget()
+8	src/hmi/AutoPostWidget.cpp	passChoice( QComboBox const * box)
+6	src/hmi/AutoPostWidget.cpp	setPassChoice( QComboBox * box , NgPost :: AutoPass pass)
 14	src/hmi/CheckBoxCenterWidget.cpp	CheckBoxCenterWidget::CheckBoxCenterWidget( QWidget * parent , bool isChecked)
 1	src/hmi/CheckBoxCenterWidget.cpp	CheckBoxCenterWidget::isChecked() const
 1	src/hmi/CheckBoxCenterWidget.cpp	CheckBoxCenterWidget::setChecked( bool checked)
-81	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::CompressionSettingsDialog( NgPost * ngPost , QWidget * parent)
-57	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::accept()
+86	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::CompressionSettingsDialog( NgPost * ngPost , QWidget * parent)
+15	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::_applyNewPostsOptions()
+30	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::_loadNewPostsOptions()
+58	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::accept()
 8	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::event( QEvent * event)
 4	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::fixedPassword() const
 11	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::onCompressPathClicked()
 4	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::onGenPass()
-6	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::onPassToggled( bool checked)
+7	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::onPassToggled( bool checked)
+15	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::refreshNewPostsOptions()
 17	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::updateVolumeHelp()
 1	src/hmi/CompressionSettingsDialog.cpp	CompressionSettingsDialog::~CompressionSettingsDialog()
 13	src/hmi/DependentControl.h	setDependentEnabled( QWidget * widget , bool enabled , QString const & help , QString const & requirement)
@@ -951,11 +968,12 @@
 4	src/hmi/MainWindow.cpp	MainWindow::pendingIconPath( bool dark)
 12	src/hmi/MainWindow.cpp	MainWindow::refreshJobLabel()
 6	src/hmi/MainWindow.cpp	MainWindow::resizeEvent( QResizeEvent * event)
+8	src/hmi/MainWindow.cpp	MainWindow::setPackingDefaultsEnabled( bool enabled)
 12	src/hmi/MainWindow.cpp	MainWindow::setTab( QWidget * postWidget)
 10	src/hmi/MainWindow.cpp	MainWindow::showEvent( QShowEvent * event)
 4	src/hmi/MainWindow.cpp	MainWindow::toBeImplemented()
 6	src/hmi/MainWindow.cpp	MainWindow::updateAutoPostingParams()
-26	src/hmi/MainWindow.cpp	MainWindow::updateConfigFromUi()
+19	src/hmi/MainWindow.cpp	MainWindow::updateConfigFromUi()
 13	src/hmi/MainWindow.cpp	MainWindow::updateJobTab( QWidget * postWidget , const QColor & color , const QIcon & icon , const QString & tooltip)
 41	src/hmi/MainWindow.cpp	MainWindow::updateParams()
 14	src/hmi/MainWindow.cpp	MainWindow::updatePostAllButton()
@@ -1067,43 +1085,57 @@
 18	src/hmi/PostingControlIcon.cpp	PostingControlIcon::drawGlyph( QPainter & painter , Glyph glyph)
 22	src/hmi/PostingControlIcon.cpp	PostingControlIcon::icon( Glyph glyph , bool dark)
 32	src/hmi/PostingWidget.cpp	PostingWidget::PostingWidget( NgPost * ngPost , MainWindow * hmi , uint jobNumber)
+9	src/hmi/PostingWidget.cpp	PostingWidget::_activatePosting()
+6	src/hmi/PostingWidget.cpp	PostingWidget::_archivePassword() const
 24	src/hmi/PostingWidget.cpp	PostingWidget::_armResubmission( const PostingJob * job)
+23	src/hmi/PostingWidget.cpp	PostingWidget::_attachResumeJob( PostingJob * job , const QFileInfoList & files , bool hasStarted)
 13	src/hmi/PostingWidget.cpp	PostingWidget::_buildFilesList( QFileInfoList & files , bool & hasFolder)
 32	src/hmi/PostingWidget.cpp	PostingWidget::_buildPostInfoRow()
+11	src/hmi/PostingWidget.cpp	PostingWidget::_clearActivePostingHighlights()
 15	src/hmi/PostingWidget.cpp	PostingWidget::_confirmNzbOverwrite( const QString & nzbPath)
 19	src/hmi/PostingWidget.cpp	PostingWidget::_copyToClipboard( QAction * action , QLineEdit * edit)
 9	src/hmi/PostingWidget.cpp	PostingWidget::_fileAlreadyInList( const QString & fileName , int currentNbFiles) const
-24	src/hmi/PostingWidget.cpp	PostingWidget::_fillJobOptions( PostingJobOptions & options , const QString & nzbPath , const QFileInfoList & files) const
+33	src/hmi/PostingWidget.cpp	PostingWidget::_fillJobOptions( PostingJobOptions & options , const QString & nzbPath , const QFileInfoList & files) const
+25	src/hmi/PostingWidget.cpp	PostingWidget::_handleFilePosted( const QString & filePath , uint nbArticles , uint nbFailed)
+25	src/hmi/PostingWidget.cpp	PostingWidget::_handlePostingJobDone()
+13	src/hmi/PostingWidget.cpp	PostingWidget::_highlightFirstPendingFile()
 8	src/hmi/PostingWidget.cpp	PostingWidget::_isStoppedAttemptNzb( const QString & nzbPath) const
+4	src/hmi/PostingWidget.cpp	PostingWidget::_isSubmitted() const
 39	src/hmi/PostingWidget.cpp	PostingWidget::_postInfoPreview() const
+10	src/hmi/PostingWidget.cpp	PostingWidget::_refreshFileControls()
+8	src/hmi/PostingWidget.cpp	PostingWidget::_refreshPostButton()
+8	src/hmi/PostingWidget.cpp	PostingWidget::_renewArchivePassword( bool genPass)
+16	src/hmi/PostingWidget.cpp	PostingWidget::_restoreConfiguredOptions()
+7	src/hmi/PostingWidget.cpp	PostingWidget::_setArchiveFilesAndHighlight( const QStringList & paths)
 38	src/hmi/PostingWidget.cpp	PostingWidget::_setupCopyActions()
 18	src/hmi/PostingWidget.cpp	PostingWidget::_stoppedAttemptIsReplaceable() const
 18	src/hmi/PostingWidget.cpp	PostingWidget::_supersedeStoppedAttempt()
+6	src/hmi/PostingWidget.cpp	PostingWidget::acceptsFiles() const
 19	src/hmi/PostingWidget.cpp	PostingWidget::addPath( const QString & path , int currentNbFiles , int isDir)
-21	src/hmi/PostingWidget.cpp	PostingWidget::attachResumeJob( PostingJob * job , const QFileInfoList & files , bool hasStarted)
+17	src/hmi/PostingWidget.cpp	PostingWidget::applyAutoPacking()
+4	src/hmi/PostingWidget.cpp	PostingWidget::attachResumeJob( PostingJob * job , const QFileInfoList & files , bool hasStarted)
 4	src/hmi/PostingWidget.cpp	PostingWidget::canSubmit() const
-15	src/hmi/PostingWidget.cpp	PostingWidget::genNameAndPassword( bool genName , bool genPass , bool doPar2)
 9	src/hmi/PostingWidget.cpp	PostingWidget::handleDropEvent( QDropEvent * e)
 55	src/hmi/PostingWidget.cpp	PostingWidget::handleKeyEvent( QKeyEvent * keyEvent)
 4	src/hmi/PostingWidget.cpp	PostingWidget::hasPar2PercentageOverride() const
-56	src/hmi/PostingWidget.cpp	PostingWidget::init()
+51	src/hmi/PostingWidget.cpp	PostingWidget::init()
 5	src/hmi/PostingWidget.cpp	PostingWidget::isBlank() const
 9	src/hmi/PostingWidget.cpp	PostingWidget::loadObfuscationLengths( QSpinBox * nameLength , QSpinBox * passLength , const NgPost * ngPost)
 5	src/hmi/PostingWidget.cpp	PostingWidget::nzbFolder() const
-6	src/hmi/PostingWidget.cpp	PostingWidget::onArchiveFileNames( const QStringList & paths)
+4	src/hmi/PostingWidget.cpp	PostingWidget::onArchiveFileNames( const QStringList & paths)
 5	src/hmi/PostingWidget.cpp	PostingWidget::onArticlesNumber( int nbArticles)
 29	src/hmi/PostingWidget.cpp	PostingWidget::onClearFilesClicked()
 28	src/hmi/PostingWidget.cpp	PostingWidget::onCompressCB( bool checked)
 52	src/hmi/PostingWidget.cpp	PostingWidget::onEditPostInfo()
-24	src/hmi/PostingWidget.cpp	PostingWidget::onFilePosted( const QString & filePath , uint nbArticles , uint nbFailed)
+4	src/hmi/PostingWidget.cpp	PostingWidget::onFilePosted( const QString & filePath , uint nbArticles , uint nbFailed)
 4	src/hmi/PostingWidget.cpp	PostingWidget::onGenCompressName()
-4	src/hmi/PostingWidget.cpp	PostingWidget::onGenNzbPassword()
+5	src/hmi/PostingWidget.cpp	PostingWidget::onGenNzbPassword()
 12	src/hmi/PostingWidget.cpp	PostingWidget::onNzbFileClicked()
 16	src/hmi/PostingWidget.cpp	PostingWidget::onNzbPassToggled( bool checked)
 10	src/hmi/PostingWidget.cpp	PostingWidget::onPar2CB( bool checked)
 4	src/hmi/PostingWidget.cpp	PostingWidget::onPostFiles()
 4	src/hmi/PostingWidget.cpp	PostingWidget::onPostInfoToggled( bool checked)
-24	src/hmi/PostingWidget.cpp	PostingWidget::onPostingJobDone()
+4	src/hmi/PostingWidget.cpp	PostingWidget::onPostingJobDone()
 15	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFilesClicked()
 12	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFolderClicked()
 79	src/hmi/PostingWidget.cpp	PostingWidget::postFiles( bool updateMainParams)
@@ -1120,11 +1152,13 @@
 15	src/hmi/PostingWidget.cpp	PostingWidget::setPackingAuto( bool enabled , const QStringList & keys)
 4	src/hmi/PostingWidget.cpp	PostingWidget::setPar2PercentageOverride( int percentage)
 11	src/hmi/PostingWidget.cpp	PostingWidget::setPostInfo( bool enabled , const QString & templateOverride , const QString & outputOverride , const QMap<QString,MetaValue> & meta)
-7	src/hmi/PostingWidget.cpp	PostingWidget::setPosting()
+4	src/hmi/PostingWidget.cpp	PostingWidget::setPosting()
+12	src/hmi/PostingWidget.cpp	PostingWidget::showKeepArchivesRule( QCheckBox * keepRar , const QCheckBox * compress , const QCheckBox * par2)
 6	src/hmi/PostingWidget.cpp	PostingWidget::showPar2Default( QSpinBox * box , uint percentage)
-25	src/hmi/PostingWidget.cpp	PostingWidget::udatePostingParams()
+14	src/hmi/PostingWidget.cpp	PostingWidget::udatePostingParams()
 4	src/hmi/PostingWidget.cpp	PostingWidget::writesPostInfoFile() const
 9	src/hmi/PostingWidget.cpp	PostingWidget::~PostingWidget()
+18	src/hmi/PostingWidget.cpp	packingChoice( bool enabled , const QStringList & keys)
 1	src/hmi/PostingWidget.h	PostingWidget::displayNumber() const
 1	src/hmi/PostingWidget.h	PostingWidget::hmi() const
 1	src/hmi/PostingWidget.h	PostingWidget::isPosting() const
@@ -1133,16 +1167,21 @@
 1	src/hmi/PostingWidget.h	PostingWidget::postInfoMeta() const
 1	src/hmi/PostingWidget.h	PostingWidget::postInfoTemplateOverride() const
 13	src/hmi/SignedListWidget.cpp	SignedListWidget::SignedListWidget( QWidget * parent)
+4	src/hmi/SignedListWidget.cpp	SignedListWidget::_isShown( const QModelIndex & index) const
 7	src/hmi/SignedListWidget.cpp	SignedListWidget::addPath( const QString & path , bool isDir)
 11	src/hmi/SignedListWidget.cpp	SignedListWidget::addPathIfNotInList( const QString & path , int lastIndexToCheck , bool isDir)
 5	src/hmi/SignedListWidget.cpp	SignedListWidget::clear2()
 10	src/hmi/SignedListWidget.cpp	SignedListWidget::eventFilter( QObject * obj , QEvent * event)
+13	src/hmi/SignedListWidget.cpp	SignedListWidget::followItem( QListWidgetItem * item)
+4	src/hmi/SignedListWidget.cpp	SignedListWidget::followedRow() const
 14	src/hmi/SignedListWidget.cpp	SignedListWidget::keyPressEvent( QKeyEvent * e)
 9	src/hmi/SignedListWidget.cpp	SignedListWidget::mousePressEvent( QMouseEvent * e)
 10	src/hmi/SignedListWidget.cpp	SignedListWidget::onDeleteSelectedItems()
 10	src/hmi/SignedListWidget.cpp	SignedListWidget::removeItemWidget2( QListWidgetItem * item)
 11	src/hmi/SignedListWidget.cpp	SignedListWidget::resizeEvent( QResizeEvent * e)
 5	src/hmi/SignedListWidget.cpp	SignedListWidget::setSignature( const QString & str)
+8	src/hmi/SignedListWidget.cpp	SignedListWidget::showEvent( QShowEvent * e)
+1	src/hmi/SignedListWidget.h	SignedListWidget::setEditable( bool editable)
 13	src/hmi/StartupTabBar.cpp	StartupTabBar::StartupTabBar( QWidget * parent)
 9	src/hmi/StartupTabBar.cpp	StartupTabBar::_retranslate()
 6	src/hmi/StartupTabBar.cpp	StartupTabBar::changeEvent( QEvent * event)

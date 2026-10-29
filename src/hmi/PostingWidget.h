@@ -88,6 +88,10 @@ private:
     bool _isStoppedAttemptNzb(const QString &nzbPath) const;
     bool _stoppedAttemptIsReplaceable() const;
 
+    //! The last password ngPost drew for this tab: the history tells a drawn
+    //! password from a typed one.
+    QString _drawnPassword;
+
     // Post info file, per post. One discreet checkbox on the tab; everything
     // else lives in a dialog, because a posting tab is about posting.
     QCheckBox   *_postInfoCB;
@@ -107,7 +111,10 @@ public:
     void attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted);
 
     void init();
-    void genNameAndPassword(bool genName, bool genPass, bool doPar2);
+    //! Takes the packing of the Auto Posting tab (its AUTO_* settings) in place
+    //! of the defaults of a new tab. Before any file is added: without a random
+    //! archive name, the first file gives its own.
+    void applyAutoPacking();
     inline uint jobNumber() const;
 
     void handleDropEvent(QDropEvent *e);

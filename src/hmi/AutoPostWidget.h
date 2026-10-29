@@ -79,7 +79,6 @@ public:
 
     void retranslate();
 
-    void setPackingAuto(bool enabled, const QStringList &keys);
     //! Offers the default password only while one is configured.
     void refreshPasswordChoices();
 

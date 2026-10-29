@@ -189,6 +189,137 @@ This is the default every new post starts with; each post can still decide other
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="newPostsBox">
+     <property name="toolTip">
+      <string>Same switch as the box of the main window. Unticked, a new post starts with nothing ticked (config PACK).</string>
+     </property>
+     <property name="title">
+      <string>Enable compression by default on posts</string>
+     </property>
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <layout class="QVBoxLayout" name="newPostsLayout">
+      <item>
+       <widget class="QLabel" name="newPostsHelpLabel">
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="text">
+         <string>Every new Quick Post, and every Quick Post you empty, starts with the options ticked here. Each post can still change them in its own tab. The Auto Posting tab keeps its own options, set in that tab.</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="compressDefaultCB">
+        <property name="text">
+         <string>Compress the files into an archive</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="nameDefaultLayout">
+        <item>
+         <widget class="QCheckBox" name="genNameDefaultCB">
+          <property name="toolTip">
+           <string>hides the name of the files: the archive gets random letters instead of the name of the first file</string>
+          </property>
+          <property name="text">
+           <string>Give the archive a random name</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="nameDefaultSpacer">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QLabel" name="nameLengthDefaultLbl">
+          <property name="text">
+           <string>Length:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="nameLengthDefaultSB">
+          <property name="maximumSize">
+           <size>
+            <width>60</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>length of the random archive names, also drawn by the dice button of a post (config LENGTH_NAME)</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="passDefaultLayout">
+        <item>
+         <widget class="QCheckBox" name="genPassDefaultCB">
+          <property name="text">
+           <string>Protect the archive with a random password</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="passDefaultSpacer">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QLabel" name="passLengthDefaultLbl">
+          <property name="text">
+           <string>Length:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSpinBox" name="passLengthDefaultSB">
+          <property name="maximumSize">
+           <size>
+            <width>60</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>length of the random archive passwords, the same as the one of the default password above (config LENGTH_PASS)</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="par2DefaultCB">
+        <property name="toolTip">
+         <string>repair files that let a download be fixed when part of it is missing (their amount comes from the PAR2 settings)</string>
+        </property>
+        <property name="text">
+         <string>Add PAR2 repair files</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
       <enum>Qt::Orientation::Vertical</enum>

@@ -46,9 +46,13 @@ private slots:
     void onGenPass();
     void onPassToggled(bool checked);
     void updateVolumeHelp();
+    void refreshNewPostsOptions();
 
 private:
     bool event(QEvent *event) override;
+    //! The options every new posting tab starts with (PACK, LENGTH_NAME).
+    void _loadNewPostsOptions();
+    void _applyNewPostsOptions();
     bool _layoutReady = false;
     Ui::CompressionSettingsDialog *_ui;
     NgPost                        *_ngPost;

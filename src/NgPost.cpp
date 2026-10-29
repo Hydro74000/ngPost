@@ -183,6 +183,11 @@ const QMap<NgPost::Opt, QString> NgPost::sOptionNames =
     {Opt::RAR_NAME,     "rar_name"},
     {Opt::RAR_PASS,     "rar_pass"},
     {Opt::AUTO_PASS,    "auto_pass"},
+    {Opt::AUTO_PACK,    "auto_pack"},
+    {Opt::AUTO_LENGTH_NAME, "auto_length_name"},
+    {Opt::AUTO_LENGTH_PASS, "auto_length_pass"},
+    {Opt::AUTO_KEEP_RAR,    "auto_keep_rar"},
+    {Opt::AUTO_PAR2_PCT,    "auto_par2_pct"},
     {Opt::LENGTH_NAME,  "length_name"},
     {Opt::LENGTH_PASS,  "length_pass"},
 
@@ -1946,21 +1951,11 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
     if (!nzbFilePath.endsWith(".nzb"))
         nzbFilePath += ".nzb";
 
-    _rarName = _nzbName;
-    _rarPass = "";
-    if (_doCompress)
-    {
-        if (_genName)
-            _rarName = randomName(_lengthName);
+    PostingJobOptions options = _baseJobOptions();
+    _packMonitoredPost(options);
 
-        _rarPass = autoArchivePassword();
-        if (!_rarPass.isEmpty())
-            _declaredPassword.clear(); // the real archive password wins
-    }
-
-    qDebug() << "Start posting job for " << _nzbName
-             << " with rar_name: " << _rarName
-             << " and archive password set: " << !_rarPass.isEmpty()
+    qDebug() << "Start posting job for " << _nzbName << " with rar_name: " << options.rarName
+             << " and archive password set: " << !options.rarPass.isEmpty()
              << " (auto delete: " << _delAuto << ")";
 
     QFileInfoList postFiles{fileInfo};
@@ -1972,11 +1967,49 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
                  .arg(nfo.fileName(), fileInfo.fileName()));
     }
 
-    PostingJobOptions options = _baseJobOptions();
     options.nzbFilePath       = nzbFilePath;
     options.files             = postFiles;
     options.inputPaths        = QStringList{ fileInfo.absoluteFilePath() };
     startPostingJob(new PostingJob(this, options));
+}
+
+#ifdef NGPOST_TESTING
+PostingJobOptions NgPost::monitoredPostOptionsForTest(const QFileInfo &file)
+{
+    setNzbName(file);
+    PostingJobOptions options = _baseJobOptions();
+    _packMonitoredPost(options);
+    return options;
+}
+#endif
+
+void NgPost::_packMonitoredPost(PostingJobOptions &options)
+{
+    bool genName = _genName;
+    if (useHMI()) {
+        // The Auto Posting tab's own settings: what a posting tab or PACK left
+        // in the shared ones is none of this post's business.
+        options.doCompress = _autoPacking.compress;
+        options.doPar2 = _autoPacking.doPar2;
+        options.keepRar = _autoPacking.keepRar;
+        options.par2Pct = _autoPacking.par2Pct < 0 ? _par2PctDefault
+                                                   : static_cast<uint>(_autoPacking.par2Pct);
+        options.lengthName = _autoPacking.lengthName;
+        genName = _autoPacking.genName;
+    }
+    options.rarName = _nzbName;
+    options.rarPass.clear();
+    options.passwordGenerated = false;
+    if (!options.doCompress)
+        return;
+    if (genName)
+        options.rarName = randomName(options.lengthName);
+    options.rarPass = autoArchivePassword();
+    options.passwordGenerated = autoPassChoice() == AutoPass::Random;
+    if (!options.rarPass.isEmpty()) {
+        _declaredPassword.clear(); // the real archive password wins
+        options.declaredPassword.clear();
+    }
 }
 
 bool NgPost::splitMetaPair(const QString &keyValue, QString *key, QString *value)
@@ -2139,6 +2172,8 @@ PostingJobOptions NgPost::_baseJobOptions() const
     opt.doPar2            = _doPar2;
     opt.rarName           = _rarName;
     opt.rarPass           = _rarPass;
+    opt.passwordGenerated = _genPass;
+    opt.lengthName = _lengthName;
     opt.keepRar           = _keepRar;
     opt.delFilesAfterPost = _delAuto;
     opt.overwriteNzb      = false;
@@ -2570,16 +2605,49 @@ NgPost::AutoPass NgPost::implicitAutoPass() const
     return _genPass ? AutoPass::Random : AutoPass::None;
 }
 
-QString NgPost::autoArchivePassword() const
+NgPost::AutoPass NgPost::autoPassChoice() const
 {
     // AUTO_PASS is the choice of the Auto Posting tab: the command line keeps
     // --gen_pass and --rar_pass, whose rule is the implicit one.
-    AutoPass choice = useHMI() ? _autoPass : AutoPass::Unset;
-    if (choice == AutoPass::Unset || (choice == AutoPass::Default && _rarPassFixed.isEmpty()))
-        choice = implicitAutoPass();
+    if (!useHMI() || _autoPass == AutoPass::Unset)
+        return implicitAutoPass();
+    // The tab asked for a protected archive and the default password is gone
+    // since: a random one keeps it protected, PACK has no say in it any more.
+    if (_autoPass == AutoPass::Default && _rarPassFixed.isEmpty())
+        return AutoPass::Random;
+    return _autoPass;
+}
+
+QString NgPost::autoArchivePassword() const
+{
+    AutoPass const choice = autoPassChoice();
     if (choice == AutoPass::Default)
         return _rarPassFixed;
-    return choice == AutoPass::Random ? randomPass(_lengthPass) : QString();
+    if (choice != AutoPass::Random)
+        return QString();
+    return randomPass(useHMI() ? _autoPacking.lengthPass : _lengthPass);
+}
+
+void NgPost::setPackingDefaults(bool enabled, const QStringList &keywords)
+{
+    // Applying them resets the boxes of the tabs in front: only when they
+    // change, or saving a volume size would undo what a post had ticked.
+    auto const asSet = [](QStringList const &list) {
+        return QSet<QString>(list.cbegin(), list.cend());
+    };
+    bool const changed = enabled != _packAuto
+        || (enabled && asSet(keywords) != asSet(_packAutoKeywords));
+    _packAutoKeywords = keywords;
+    if (!changed)
+        return;
+#ifdef __USE_HMI__
+    // The switch of the main window is what every save reads PACK's state from.
+    if (_hmi) {
+        _hmi->setPackingDefaultsEnabled(enabled);
+        return;
+    }
+#endif
+    enableAutoPacking(enabled);
 }
 
 void NgPost::closeAllPostingJobs()
@@ -4007,10 +4075,9 @@ bool NgPost::_adoptConfigValue(QString const &key, QString const &value)
     // engine or a VPN profile is resolved once, at startup: taking one here
     // would leave _par2Path, the engine fallback or the tunnel pointing at the
     // previous choice, which is worse than waiting for the next start.
-    // Nor a value a window owns: saveConfig() starts by reading LENGTH_NAME back
-    // from the spin box of the posting tab in front, so taking it here would
-    // last until the next save and quietly revert the file with it. LENGTH_PASS
-    // is the dialog's default, which no tab writes: that one can be taken.
+    // Nor a value a window owns, which the next save would read back from it and
+    // quietly revert the file with: the Auto Posting tab's AUTO_* lines.
+    // LENGTH_NAME and LENGTH_PASS are defaults, which no tab writes.
     // Read exactly as _parseConfig() reads it, so adopting a line and restarting
     // on it give the same state: 0 is a value (no par2, no split), and what the
     // parser refuses -- a word, a number too large for the type -- is refused
@@ -4045,7 +4112,11 @@ bool NgPost::_adoptConfigValue(QString const &key, QString const &value)
         return number(_rarSize);
     else if (key == sOptionNames[Opt::LENGTH_PASS])
         return number(_lengthPassDefault);
-    else if (key == sOptionNames[Opt::UI_ZOOM])
+    else if (key == sOptionNames[Opt::LENGTH_NAME]) {
+        if (!number(_lengthNameDefault))
+            return false;
+        _lengthName = _lengthNameDefault;
+    } else if (key == sOptionNames[Opt::UI_ZOOM])
         return number(_uiZoom);
     else if (key == sOptionNames[Opt::PAR2_PCT]) {
         uint percentage = 0;
@@ -4239,6 +4310,11 @@ struct NgPost::ConfigParseState
     QString legacyVpnBackend;
     bool parsedPack = false;
     bool legacyAutoCompress = false;
+    // The Auto Posting settings the file has; the others are settled after it.
+    bool parsedAutoPack = false;
+    bool parsedAutoLengthName = false;
+    bool parsedAutoLengthPass = false;
+    bool parsedAutoKeepRar = false;
     std::optional<QString> rarToolLine;
     std::optional<QString> rarSourceLine;
     std::optional<QString> par2ToolLine;
@@ -4744,6 +4820,89 @@ bool NgPost::_parseConfigPackingKey(const QString &opt,
     return true;
 }
 
+bool NgPost::_parseConfigAutoPostKey(const QString &opt,
+                                     const QString &val,
+                                     ConfigParseState &state,
+                                     QString &err)
+{
+    bool ok = false;
+    if (opt == sOptionNames[Opt::AUTO_PACK]) {
+        // PACK's keywords but GEN_PASS: AUTO_PASS is the password of the tab,
+        // and a second setting could only disagree with it.
+        bool compress = false, genName = false, doPar2 = false;
+        QStringList wrongKeywords;
+        for (QString const &key : val.toLower().split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+            QString const keyWord = key.trimmed();
+            if (keyWord == sOptionNames[Opt::COMPRESS])
+                compress = true;
+            else if (keyWord == sOptionNames[Opt::GEN_NAME])
+                genName = true;
+            else if (keyWord == sOptionNames[Opt::GEN_PAR2])
+                doPar2 = true;
+            else if (!keyWord.isEmpty())
+                wrongKeywords << keyWord.toUpper();
+        }
+        if (!wrongKeywords.isEmpty()) {
+            err += tr("Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, "
+                      "GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.")
+                       .arg(wrongKeywords.join(", "))
+                + QLatin1Char('\n');
+            return true;
+        }
+        _autoPacking.compress = compress;
+        _autoPacking.genName = genName;
+        _autoPacking.doPar2 = doPar2;
+        state.parsedAutoPack = true;
+    } else if (opt == sOptionNames[Opt::AUTO_LENGTH_NAME]) {
+        uint const nb = val.toUInt(&ok);
+        if (ok) {
+            _autoPacking.lengthName = nb;
+            state.parsedAutoLengthName = true;
+        }
+    } else if (opt == sOptionNames[Opt::AUTO_LENGTH_PASS]) {
+        uint const nb = val.toUInt(&ok);
+        if (ok) {
+            _autoPacking.lengthPass = nb;
+            state.parsedAutoLengthPass = true;
+        }
+    } else if (opt == sOptionNames[Opt::AUTO_KEEP_RAR]) {
+        QString const keep = val.toLower();
+        _autoPacking.keepRar = keep == "true" || keep == "on" || keep == "1";
+        state.parsedAutoKeepRar = true;
+    } else if (opt == sOptionNames[Opt::AUTO_PAR2_PCT]) {
+        uint const nb = val.toUInt(&ok);
+        if (ok && nb <= 100)
+            _autoPacking.par2Pct = static_cast<int>(nb);
+    } else
+        return false;
+    return true;
+}
+
+void NgPost::_settleAutoPacking(const ConfigParseState &state)
+{
+    // Before AUTO_PACK the tab started from PACK, when its switch was on.
+    if (!state.parsedAutoPack) {
+        auto const packs = [this](Opt keyword) {
+            return _packAuto && _packAutoKeywords.contains(sOptionNames[keyword]);
+        };
+        _autoPacking.compress = packs(Opt::COMPRESS);
+        _autoPacking.genName = packs(Opt::GEN_NAME);
+        _autoPacking.doPar2 = packs(Opt::GEN_PAR2);
+    }
+    // The tab never posts files that are neither compressed nor given par2.
+    if (!_autoPacking.compress && !_autoPacking.doPar2)
+        _autoPacking.doPar2 = true;
+    if (!state.parsedAutoLengthName)
+        _autoPacking.lengthName = _lengthNameDefault;
+    if (!state.parsedAutoLengthPass)
+        _autoPacking.lengthPass = _lengthPassDefault;
+    if (!state.parsedAutoKeepRar)
+        _autoPacking.keepRar = _keepRarDefault;
+    // Written at the next save with the rest, so PACK stops deciding it.
+    if (_autoPass == AutoPass::Unset)
+        _autoPass = implicitAutoPass();
+}
+
 bool NgPost::_parseConfigPar2Key(const QString &opt,
                                  const QString &val,
                                  ConfigParseState &state,
@@ -4777,7 +4936,7 @@ bool NgPost::_parseConfigPar2Key(const QString &opt,
     } else if (opt == sOptionNames[Opt::LENGTH_NAME]) {
         uint nb = val.toUInt(&ok);
         if (ok)
-            _lengthName = nb;
+            _lengthName = _lengthNameDefault = nb;
     } else if (opt == sOptionNames[Opt::LENGTH_PASS]) {
         uint nb = val.toUInt(&ok);
         if (ok)
@@ -4872,6 +5031,8 @@ void NgPost::_parseConfigKey(const QString &opt,
     if (_parseConfigArchiveKey(opt, val, state, err))
         return;
     if (_parseConfigPackingKey(opt, val, state, err))
+        return;
+    if (_parseConfigAutoPostKey(opt, val, state, err))
         return;
     if (_parseConfigPar2Key(opt, val, state, err))
         return;
@@ -5202,6 +5363,7 @@ QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
 
     ConfigParseState state;
 
+    _autoPacking = AutoPacking();
     _par2ArgsCustom.clear();
     _par2ToolFallback = par2::Tool::Auto;
     _par2PathConfig.clear();
@@ -5239,6 +5401,7 @@ QString NgPost::_parseConfig(const QString &configPath, bool isDefaultConfig)
         _packAutoKeywords = defaultPackKeywords();
         enableAutoPacking();
     }
+    _settleAutoPacking(state);
 
     _applyConfigVpnProfiles(state);
 
@@ -6047,24 +6210,14 @@ void NgPost::_writeConfigPacking(QTextStream &stream)
            << "##############################################################\n"
            << "\n"
            << tr("## Shortcut for automatic packing for both GUI and CMD using --pack") << "\n"
+           << tr("## (in the GUI: the posting tabs, the Auto Posting tab has its own AUTO_PACK)") << "\n"
            << tr("## coma separated list using the keywords COMPRESS, GEN_NAME, GEN_PASS and GEN_PAR2") << "\n"
            << tr("## For Auto posting and Monitoring if you don't use COMPRESS you need GEN_PA2") << "\n"
            << tr("#PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2") << "\n"
            << tr("#PACK = GEN_PAR2") << "\n";
-    // Rebuild the PACK keyword list from the current per-job flag state
-    // each time we save, otherwise toggling Compress / Generate Par2 in
-    // the GUI never propagates to the on-disk PACK = ... line and the
-    // user's choice silently rolls back to whatever was loaded.
-    if (_packAuto) {
-        _packAutoKeywords.clear();
-        if (_doCompress) _packAutoKeywords << sOptionNames[Opt::COMPRESS];
-        if (_genName)    _packAutoKeywords << sOptionNames[Opt::GEN_NAME];
-        if (_genPass)    _packAutoKeywords << sOptionNames[Opt::GEN_PASS];
-        if (_doPar2)     _packAutoKeywords << sOptionNames[Opt::GEN_PAR2];
-    }
-    // Written only when it changes something: absent, the Auto Posting password
-    // follows the default password and GEN_PASS when they change.
-    bool const autoPassSet = _autoPass != AutoPass::Unset && _autoPass != implicitAutoPass();
+    // PACK is what the Compression settings dialog and the switch of the main
+    // window say, never what the post in front happens to tick: that used to
+    // rewrite it with the choices of one post, or of the Auto Posting tab.
     stream << (_packAuto && _packAutoKeywords.size() ? QString("PACK = %1\n").arg(_packAutoKeywords.join(", ").toUpper()) : "")
            << "\n"
            << tr("## use the same Password for all your Posts using compression") << "\n"
@@ -6077,10 +6230,12 @@ void NgPost::_writeConfigPacking(QTextStream &stream)
            << "\n"
            << tr("## password of the archives of the GUI's Auto Posting: none, random or default") << "\n"
            << tr("## (not set: the default password above, else a random one if PACK has GEN_PASS)") << "\n"
-           << (autoPassSet ? "" : "#") << "AUTO_PASS = "
-           << autoPassNames().value(autoPassSet ? _autoPass : AutoPass::Random) << "\n"
+           << "AUTO_PASS = "
+           << autoPassNames().value(_autoPass == AutoPass::Unset ? implicitAutoPass() : _autoPass)
            << "\n"
-           << tr("## temporary folder where the compressed files and par2 will be stored") << "\n"
+           << "\n";
+    _writeConfigAutoPosting(stream);
+    stream << tr("## temporary folder where the compressed files and par2 will be stored") << "\n"
            << tr("## so we can post directly a compressed (obfuscated or not) archive of the selected files") << "\n"
            << tr("## /!\\ The directory MUST HAVE WRITE PERMISSION /!\\") << "\n"
            << tr("## this is set for Linux environment, Windows users MUST change it") << "\n"
@@ -6098,6 +6253,34 @@ void NgPost::_writeConfigPacking(QTextStream &stream)
            << "TMP_RAM_RATIO = " << _ramRatio << "\n"
            << "\n";
 #endif
+    // clang-format on
+}
+
+void NgPost::_writeConfigAutoPosting(QTextStream &stream)
+{
+    // Always written: the tab keeps what it was given, whatever PACK, LENGTH_*,
+    // KEEP_RAR or the default password become afterwards.
+    QStringList pack;
+    if (_autoPacking.compress)
+        pack << sOptionNames[Opt::COMPRESS];
+    if (_autoPacking.genName)
+        pack << sOptionNames[Opt::GEN_NAME];
+    if (_autoPacking.doPar2)
+        pack << sOptionNames[Opt::GEN_PAR2];
+    bool const par2Default = _autoPacking.par2Pct < 0;
+    // clang-format off
+    stream << tr("## packing of the GUI's Auto Posting, apart from PACK: COMPRESS, GEN_NAME and GEN_PAR2") << "\n"
+           << tr("## (at least COMPRESS or GEN_PAR2; its password is AUTO_PASS above)") << "\n"
+           << "AUTO_PACK = " << pack.join(", ").toUpper() << "\n"
+           << tr("## length of its random archive names and passwords") << "\n"
+           << "AUTO_LENGTH_NAME = " << _autoPacking.lengthName << "\n"
+           << "AUTO_LENGTH_PASS = " << _autoPacking.lengthPass << "\n"
+           << tr("## keep its archives and par2 files after a successful post") << "\n"
+           << "AUTO_KEEP_RAR = " << (_autoPacking.keepRar ? "true" : "false") << "\n"
+           << tr("## its par2 redundancy percentage (not set: the PAR2 settings below)") << "\n"
+           << (par2Default ? "#" : "") << "AUTO_PAR2_PCT = "
+           << (par2Default ? _par2PctDefault : static_cast<uint>(_autoPacking.par2Pct)) << "\n"
+           << "\n";
     // clang-format on
 }
 
@@ -6192,7 +6375,7 @@ void NgPost::_writeConfigPar2(QTextStream &stream)
            << "\n"
            << "\n"
            << tr("## length of the random generated archive's file name") << "\n"
-           << "LENGTH_NAME = " << _lengthName << "\n"
+           << "LENGTH_NAME = " << _lengthNameDefault << "\n"
            << "\n"
            << tr("## length of the random archive's passsword") << "\n"
            << "LENGTH_PASS = "<< _lengthPassDefault << "\n"

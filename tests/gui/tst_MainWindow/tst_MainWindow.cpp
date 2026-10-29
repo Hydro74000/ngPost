@@ -142,9 +142,8 @@ private slots:
     //! The parser reads a setting wherever it stands, below the [server] blocks
     //! included -- where appending a line puts it. The merge must read it there too.
     void a_setting_appended_below_the_servers_is_merged();
-    //! The tab in front writes the name length back on every save, so an edit
-    //! of it waits for a restart; the password length is the dialog's default,
-    //! which no tab writes, so an edit of it is taken. Neither may be reverted.
+    //! Both lengths are defaults of the Compression settings, which no tab
+    //! writes: an edit of either is taken, and neither may be reverted.
     void lengths_edited_in_the_file_are_not_reverted_by_the_tabs();
     //! A redundancy or arguments taken from the file show in the posting tabs,
     //! as they do when the PAR2 Settings window changes them.
@@ -492,6 +491,23 @@ private slots:
     //! Same for the password length: the save the dialog triggers used to read
     //! the tab in front back into ngPost and write its length instead.
     void password_length_default_is_owned_by_the_dialog();
+
+    //! The Auto Posting tab has its own settings: whatever it does, a new or
+    //! emptied Quick Post still starts with the configured defaults, and
+    //! saving with it in front no longer rewrites PACK.
+    void auto_posting_tab_never_changes_new_quick_posts();
+    //! Nor does the post in front: a choice made for one post stays with it.
+    void quick_post_choices_never_rewrite_the_defaults();
+    //! The Auto Posting settings are saved whichever tab is in front and read
+    //! back at the next start; a configuration without them starts from PACK.
+    void auto_posting_settings_survive_a_restart();
+    void auto_pack_is_checked_when_read_data();
+    void auto_pack_is_checked_when_read();
+    //! A monitored file is packed by the Auto Posting settings alone.
+    void monitored_posts_use_the_auto_posting_settings();
+    //! The Compression settings choose what a new Quick Post starts with, and
+    //! saving them leaves the post in front alone when that did not change.
+    void compression_settings_choose_what_new_posts_start_with();
 
     //! The history columns belong to the user: every one of them answers to the
     //! mouse -- the name column was a Stretch section the header sized itself,
@@ -2260,8 +2276,9 @@ void TestMainWindow::auto_posting_chooses_the_archive_password_data()
     QTest::addColumn<QString>("saved");
     QTest::newRow("no password") << 0 << QStringLiteral("\nAUTO_PASS = none\n");
     QTest::newRow("random password") << 1 << QStringLiteral("\nAUTO_PASS = random\n");
-    // What an absent AUTO_PASS gives already: nothing to write.
-    QTest::newRow("default password") << 2 << QStringLiteral("\n#AUTO_PASS = random\n");
+    // Written even when it is what an absent AUTO_PASS would give: the tab
+    // keeps it whatever PACK becomes.
+    QTest::newRow("default password") << 2 << QStringLiteral("\nAUTO_PASS = default\n");
 }
 
 void TestMainWindow::auto_posting_chooses_the_archive_password()
@@ -2323,8 +2340,6 @@ void TestMainWindow::auto_posting_chooses_the_archive_password()
     QVERIFY(conf.open(QIODevice::ReadOnly | QIODevice::Text));
     QString const content = QString::fromUtf8(conf.readAll());
     QVERIFY2(content.contains(saved), qPrintable(content));
-    if (row == 2)
-        QVERIFY2(!content.contains(QStringLiteral("\nAUTO_PASS")), qPrintable(content));
 }
 
 void TestMainWindow::auto_posting_password_choice_is_read_from_the_configuration_data()
@@ -5185,8 +5200,9 @@ void TestMainWindow::lengths_edited_in_the_file_are_not_reverted_by_the_tabs()
         QString text = configText();
         QVERIFY2(text.contains("LENGTH_NAME = 22\n"), qPrintable(text));
         QVERIFY2(text.contains("LENGTH_PASS = 15\n"), qPrintable(text));
-        text.replace("LENGTH_NAME = 22", "LENGTH_NAME = 30");
-        text.replace("LENGTH_PASS = 15", "LENGTH_PASS = 20");
+        // At the start of a line: AUTO_LENGTH_NAME and AUTO_LENGTH_PASS stay.
+        text.replace("\nLENGTH_NAME = 22", "\nLENGTH_NAME = 30");
+        text.replace("\nLENGTH_PASS = 15", "\nLENGTH_PASS = 20");
         QFile file(conf);
         QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text));
         QVERIFY(file.write(text.toUtf8()) > 0);
@@ -5200,19 +5216,15 @@ void TestMainWindow::lengths_edited_in_the_file_are_not_reverted_by_the_tabs()
     QVERIFY2(saved.contains("LENGTH_NAME = 30\n"), qPrintable(saved));
     QVERIFY2(saved.contains("LENGTH_PASS = 20\n"), qPrintable(saved));
     const QString log = window->findChild<QTextBrowser *>("logBrowser")->toPlainText();
-    QVERIFY2(log.contains("used only after a restart: length_name"), qPrintable(log));
-    QVERIFY2(!log.contains("taken from your file: length_name"), qPrintable(log));
-    QVERIFY2(log.contains("taken from your file: length_pass"), qPrintable(log));
-    // This run keeps the name length its tabs show and post with...
-    const auto boxes = window->findChildren<QSpinBox *>("nameLengthSB");
-    QVERIFY(!boxes.isEmpty());
-    for (QSpinBox *box : boxes)
-        QCOMPARE(box->value(), 22);
-    // ...and the dialog now offers the password length of the file.
+    QVERIFY2(log.contains("taken from your file: length_name, length_pass"), qPrintable(log));
+    QVERIFY2(!log.contains("used only after a restart"), qPrintable(log));
+    // A tab opened afterwards starts from them, and the dialog offers them.
+    PostingWidget *fresh = window->addNewQuickTab();
+    QCOMPARE(fresh->findChild<QSpinBox *>("nameLengthSB")->value(), 30);
+    QCOMPARE(fresh->findChild<QSpinBox *>("passLengthSB")->value(), 20);
     CompressionSettingsDialog dialog(&ngPost, window);
-    auto *length = dialog.findChild<QSpinBox *>("rarLengthSB");
-    QVERIFY(length);
-    QCOMPARE(length->value(), 20);
+    QCOMPARE(dialog.findChild<QSpinBox *>("nameLengthDefaultSB")->value(), 30);
+    QCOMPARE(dialog.findChild<QSpinBox *>("rarLengthSB")->value(), 20);
 }
 
 void TestMainWindow::parity_settings_taken_from_the_file_reach_the_posting_tabs()
@@ -9269,4 +9281,356 @@ void TestMainWindow::auto_post_list_follows_the_started_job()
     QCOMPARE(bar->value(), startedValue);
     tabs->setCurrentWidget(autoWidget);
     QVERIFY(rowCentred(autoList, 161));
+}
+
+namespace
+{
+
+//! The configuration file as ngPost last wrote it.
+QString savedConfiguration()
+{
+    QFile file(PathHelper::configFilePath());
+    return file.open(QIODevice::ReadOnly | QIODevice::Text) ? QString::fromUtf8(file.readAll())
+                                                            : QString();
+}
+
+//! A file to post, whose archive would be named "My.Release" after it.
+QString releaseFile(HomeSandbox const &sandbox)
+{
+    QString const path = sandbox.rootPath() + QStringLiteral("/My.Release.mkv");
+    QFile file(path);
+    if (file.open(QIODevice::WriteOnly))
+        file.write("release");
+    return path;
+}
+
+bool isTicked(QWidget const *parent, char const *name)
+{
+    auto const *box = parent->findChild<QAbstractButton *>(QLatin1String(name));
+    return box && box->isChecked();
+}
+
+} // namespace
+
+void TestMainWindow::auto_posting_tab_never_changes_new_quick_posts()
+{
+    HomeSandbox sandbox;
+    QString const release = releaseFile(sandbox);
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost,
+                                    QStringLiteral(
+                                        "GROUPS = alt.binaries.test\n"
+                                        "PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2\n"),
+                                    &err);
+    QVERIFY2(window, qPrintable(err));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    auto *quick = qobject_cast<PostingWidget *>(tabs->widget(2));
+    AutoPostWidget *automatic = window->autoWidget();
+    QVERIFY(quick && automatic);
+
+    // PAR2 alone and no random name in the Auto Posting tab, a Generate Posts
+    // run, then a save with that tab in front.
+    automatic->findChild<QCheckBox *>(QStringLiteral("compressCB"))->setChecked(false);
+    automatic->findChild<QCheckBox *>(QStringLiteral("genNameCB"))->setChecked(false);
+    automatic->findChild<QCheckBox *>(QStringLiteral("startJobsCB"))->setChecked(false);
+    automatic->findChild<QListWidget *>(QStringLiteral("filesList"))->addItem(release);
+    QVERIFY(QMetaObject::invokeMethod(automatic, "onGenQuickPosts"));
+    auto *generated = qobject_cast<PostingWidget *>(tabs->widget(tabs->count() - 1));
+    QVERIFY(generated && generated != quick);
+    QVERIFY(!isTicked(generated, "compressCB"));
+    QVERIFY(isTicked(generated, "par2CB"));
+    tabs->setCurrentWidget(automatic);
+    ngPost.saveConfig();
+    QString const saved = savedConfiguration();
+    QVERIFY2(saved.contains(QStringLiteral("\nPACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2\n")),
+             qPrintable(saved));
+    QVERIFY2(saved.contains(QStringLiteral("\nAUTO_PACK = GEN_PAR2\n")), qPrintable(saved));
+
+    // A new tab and an emptied one: compressed, under a random name.
+    quick->findChild<QPushButton *>(QStringLiteral("clearFilesButton"))->click();
+    for (PostingWidget *post : { window->addNewQuickTab(), quick }) {
+        auto *name = post->findChild<QLineEdit *>(QStringLiteral("compressNameEdit"));
+        QVERIFY(isTicked(post, "compressCB") && isTicked(post, "par2CB"));
+        QVERIFY(!name->text().isEmpty());
+        post->addPath(release, 0);
+        QVERIFY2(name->text() != QStringLiteral("My.Release"), qPrintable(name->text()));
+    }
+}
+
+void TestMainWindow::quick_post_choices_never_rewrite_the_defaults()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost,
+                                    QStringLiteral("GROUPS = alt.binaries.test\n"
+                                                   "PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2\n"
+                                                   "LENGTH_NAME = 20\n"),
+                                    &err);
+    QVERIFY2(window, qPrintable(err));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    auto *quick = qobject_cast<PostingWidget *>(tabs->widget(2));
+    QVERIFY(quick);
+    tabs->setCurrentWidget(quick);
+    quick->findChild<QCheckBox *>(QStringLiteral("compressCB"))->setChecked(false);
+    quick->findChild<QCheckBox *>(QStringLiteral("par2CB"))->setChecked(false);
+    quick->findChild<QSpinBox *>(QStringLiteral("nameLengthSB"))->setValue(40);
+    ngPost.saveConfig();
+    QString const saved = savedConfiguration();
+    QVERIFY2(saved.contains(QStringLiteral("\nPACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2\n")),
+             qPrintable(saved));
+    QVERIFY2(saved.contains(QStringLiteral("\nLENGTH_NAME = 20\n")), qPrintable(saved));
+
+    PostingWidget *next = window->addNewQuickTab();
+    QVERIFY(isTicked(next, "compressCB") && isTicked(next, "par2CB"));
+    QCOMPARE(next->findChild<QSpinBox *>(QStringLiteral("nameLengthSB"))->value(), 20);
+    QCOMPARE(next->findChild<QLineEdit *>(QStringLiteral("compressNameEdit"))->text().size(), 20);
+}
+
+void TestMainWindow::auto_posting_settings_survive_a_restart()
+{
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    QString saved;
+    {
+        NgPost ngPost(argc, argv);
+        QString err;
+        // Written before the Auto Posting tab had settings of its own.
+        MainWindow *window = bootWindow(ngPost,
+                                        QStringLiteral("GROUPS = alt.binaries.test\n"
+                                                       "PACK = COMPRESS, GEN_PASS\n"
+                                                       "LENGTH_NAME = 20\n"
+                                                       "LENGTH_PASS = 16\n"
+                                                       "KEEP_RAR = true\n"),
+                                        &err);
+        QVERIFY2(window, qPrintable(err));
+        AutoPostWidget *automatic = window->autoWidget();
+        auto *nameLength = automatic->findChild<QSpinBox *>(QStringLiteral("nameLengthSB"));
+        auto *passLength = automatic->findChild<QSpinBox *>(QStringLiteral("passLengthSB"));
+        auto *redundancy = automatic->findChild<QSpinBox *>(QStringLiteral("redundancySB"));
+        auto *pass = automatic->findChild<QComboBox *>(QStringLiteral("passModeCB"));
+        QVERIFY(nameLength && passLength && redundancy && pass);
+        // What it used to take from PACK and the defaults.
+        QVERIFY(isTicked(automatic, "compressCB"));
+        QVERIFY(!isTicked(automatic, "genNameCB"));
+        QVERIFY(!isTicked(automatic, "par2CB"));
+        QVERIFY(isTicked(automatic, "keepRarCB"));
+        QCOMPARE(nameLength->value(), 20);
+        QCOMPARE(passLength->value(), 16);
+        QCOMPARE(redundancy->value(), -1);
+        QCOMPARE(pass->currentIndex(), 1);
+
+        automatic->findChild<QCheckBox *>(QStringLiteral("genNameCB"))->setChecked(true);
+        automatic->findChild<QCheckBox *>(QStringLiteral("par2CB"))->setChecked(true);
+        automatic->findChild<QCheckBox *>(QStringLiteral("keepRarCB"))->setChecked(false);
+        nameLength->setValue(30);
+        passLength->setValue(25);
+        redundancy->setValue(12);
+        pass->setCurrentIndex(0);
+        // Saved with a Quick Post in front.
+        window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"))->setCurrentIndex(2);
+        ngPost.saveConfig();
+        saved = savedConfiguration();
+    }
+    QStringList const expected{ QStringLiteral("\nAUTO_PACK = COMPRESS, GEN_NAME, GEN_PAR2\n"),
+                                QStringLiteral("\nAUTO_LENGTH_NAME = 30\n"),
+                                QStringLiteral("\nAUTO_LENGTH_PASS = 25\n"),
+                                QStringLiteral("\nAUTO_KEEP_RAR = false\n"),
+                                QStringLiteral("\nAUTO_PAR2_PCT = 12\n"),
+                                QStringLiteral("\nAUTO_PASS = none\n"),
+                                QStringLiteral("\nPACK = COMPRESS, GEN_PASS\n"),
+                                QStringLiteral("\nLENGTH_NAME = 20\n"),
+                                QStringLiteral("\nLENGTH_PASS = 16\n"),
+                                QStringLiteral("\nKEEP_RAR = true\n") };
+    for (QString const &line : expected)
+        QVERIFY2(saved.contains(line), qPrintable(line + saved));
+
+    // PACK and the defaults changed since: the tab keeps its own settings.
+    saved.replace(QStringLiteral("\nPACK = COMPRESS, GEN_PASS\n"),
+                  QStringLiteral("\nPACK = GEN_PAR2\n"));
+    saved.replace(QStringLiteral("\nKEEP_RAR = true\n"), QStringLiteral("\n"));
+    // bootWindow() only runs the harmless shutdown command of the tests.
+    saved.remove(QRegularExpression(QStringLiteral("\nSHUTDOWN_CMD = [^\n]*")));
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost, saved, &err);
+    QVERIFY2(window, qPrintable(err));
+    AutoPostWidget *automatic = window->autoWidget();
+    QVERIFY(isTicked(automatic, "compressCB"));
+    QVERIFY(isTicked(automatic, "genNameCB"));
+    QVERIFY(isTicked(automatic, "par2CB"));
+    QVERIFY(!isTicked(automatic, "keepRarCB"));
+    QCOMPARE(automatic->findChild<QSpinBox *>(QStringLiteral("nameLengthSB"))->value(), 30);
+    QCOMPARE(automatic->findChild<QSpinBox *>(QStringLiteral("passLengthSB"))->value(), 25);
+    QCOMPARE(automatic->findChild<QSpinBox *>(QStringLiteral("redundancySB"))->value(), 12);
+    QCOMPARE(automatic->findChild<QComboBox *>(QStringLiteral("passModeCB"))->currentIndex(), 0);
+}
+
+void TestMainWindow::auto_pack_is_checked_when_read_data()
+{
+    QTest::addColumn<QString>("autoPack");
+    QTest::addColumn<bool>("accepted");
+    QTest::addColumn<bool>("compress");
+    QTest::addColumn<bool>("par2");
+    QTest::newRow("compress and par2")
+        << QStringLiteral("COMPRESS, GEN_PAR2") << true << true << true;
+    QTest::newRow("lower case") << QStringLiteral("compress") << true << true << false;
+    // Neither: the tab never posts files bare, as when its boxes are clicked.
+    QTest::newRow("name alone") << QStringLiteral("GEN_NAME") << true << false << true;
+    QTest::newRow("password is AUTO_PASS")
+        << QStringLiteral("COMPRESS, GEN_PASS") << false << false << false;
+    QTest::newRow("unknown") << QStringLiteral("COMPRESS, ZIP") << false << false << false;
+}
+
+void TestMainWindow::auto_pack_is_checked_when_read()
+{
+    QFETCH(QString, autoPack);
+    QFETCH(bool, accepted);
+    QFETCH(bool, compress);
+    QFETCH(bool, par2);
+    HomeSandbox sandbox;
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost,
+                                    QStringLiteral("GROUPS = alt.binaries.test\n"
+                                                   "PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2\n"
+                                                   "AUTO_PACK = %1\n")
+                                        .arg(autoPack),
+                                    &err);
+    if (!accepted) {
+        QVERIFY(!window);
+        QVERIFY2(err.contains(QStringLiteral("AUTO_PACK")), qPrintable(err));
+        return;
+    }
+    QVERIFY2(window, qPrintable(err));
+    QCOMPARE(isTicked(window->autoWidget(), "compressCB"), compress);
+    QCOMPARE(isTicked(window->autoWidget(), "par2CB"), par2);
+}
+
+void TestMainWindow::monitored_posts_use_the_auto_posting_settings()
+{
+    HomeSandbox sandbox;
+    QString const release = releaseFile(sandbox);
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost,
+                                    QStringLiteral("GROUPS = alt.binaries.test\n"
+                                                   "PACK = GEN_PAR2\n"
+                                                   "LENGTH_NAME = 20\n"
+                                                   "AUTO_PACK = COMPRESS, GEN_NAME\n"
+                                                   "AUTO_PASS = random\n"
+                                                   "AUTO_LENGTH_NAME = 31\n"
+                                                   "AUTO_LENGTH_PASS = 27\n"
+                                                   "AUTO_KEEP_RAR = true\n"
+                                                   "AUTO_PAR2_PCT = 9\n"),
+                                    &err);
+    QVERIFY2(window, qPrintable(err));
+    // The post in front, with choices of its own, is saved first: that used to
+    // write them where a monitored file read its packing.
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    auto *quick = qobject_cast<PostingWidget *>(tabs->widget(2));
+    tabs->setCurrentWidget(quick);
+    quick->findChild<QSpinBox *>(QStringLiteral("nameLengthSB"))->setValue(12);
+    quick->findChild<QCheckBox *>(QStringLiteral("keepRarCB"))->setChecked(false);
+    ngPost.saveConfig();
+    window->updateAutoPostingParams(); // what every monitored file does first
+
+    PostingJobOptions const options = ngPost.monitoredPostOptionsForTest(QFileInfo(release));
+    QVERIFY(options.doCompress);
+    QVERIFY(!options.doPar2);
+    QVERIFY(options.keepRar);
+    QCOMPARE(options.par2Pct, 9u);
+    QCOMPARE(options.lengthName, 31u);
+    QCOMPARE(options.rarName.size(), 31);
+    QCOMPARE(options.rarPass.size(), 27);
+    QVERIFY(options.passwordGenerated);
+}
+
+void TestMainWindow::compression_settings_choose_what_new_posts_start_with()
+{
+    HomeSandbox sandbox;
+    QString const release = releaseFile(sandbox);
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    QString err;
+    MainWindow *window = bootWindow(ngPost,
+                                    QStringLiteral(
+                                        "GROUPS = alt.binaries.test\n"
+                                        "PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2\n"),
+                                    &err);
+    QVERIFY2(window, qPrintable(err));
+    auto *tabs = window->findChild<QTabWidget *>(QStringLiteral("postTabWidget"));
+    AutoPostWidget *automatic = window->autoWidget();
+
+    // Saved for something else, the dialog leaves the post in front alone.
+    PostingWidget *post = window->addNewQuickTab();
+    tabs->setCurrentWidget(post);
+    post->findChild<QCheckBox *>(QStringLiteral("par2CB"))->setChecked(false);
+    {
+        CompressionSettingsDialog dlg(&ngPost, window);
+        auto *group = dlg.findChild<QGroupBox *>(QStringLiteral("newPostsBox"));
+        QVERIFY(group && group->isChecked());
+        QVERIFY(isTicked(&dlg, "compressDefaultCB") && isTicked(&dlg, "genNameDefaultCB"));
+        QVERIFY(isTicked(&dlg, "genPassDefaultCB") && isTicked(&dlg, "par2DefaultCB"));
+        dlg.accept();
+    }
+    QVERIFY(!isTicked(post, "par2CB"));
+
+    {
+        CompressionSettingsDialog dlg(&ngPost, window);
+        dlg.findChild<QCheckBox *>(QStringLiteral("genNameDefaultCB"))->setChecked(false);
+        dlg.findChild<QCheckBox *>(QStringLiteral("par2DefaultCB"))->setChecked(false);
+        dlg.findChild<QSpinBox *>(QStringLiteral("nameLengthDefaultSB"))->setValue(25);
+        dlg.accept();
+    }
+    QString saved = savedConfiguration();
+    QVERIFY2(saved.contains(QStringLiteral("\nPACK = COMPRESS, GEN_PASS\n")), qPrintable(saved));
+    QVERIFY2(saved.contains(QStringLiteral("\nLENGTH_NAME = 25\n")), qPrintable(saved));
+    QVERIFY2(saved.contains(QStringLiteral("\nAUTO_PACK = COMPRESS, GEN_NAME, GEN_PAR2\n")),
+             qPrintable(saved));
+    // A new post is compressed under the name of its file, without PAR2...
+    PostingWidget *next = window->addNewQuickTab();
+    QVERIFY(isTicked(next, "compressCB") && isTicked(next, "nzbPassCB"));
+    QVERIFY(!isTicked(next, "par2CB"));
+    QCOMPARE(next->findChild<QSpinBox *>(QStringLiteral("nameLengthSB"))->value(), 25);
+    next->addPath(release, 0);
+    QCOMPARE(next->findChild<QLineEdit *>(QStringLiteral("compressNameEdit"))->text(),
+             QStringLiteral("My.Release"));
+    // ...while the Auto Posting tab keeps its own options.
+    QVERIFY(isTicked(automatic, "genNameCB") && isTicked(automatic, "par2CB"));
+
+    // The group unticked is the box of the main window unticked.
+    {
+        CompressionSettingsDialog dlg(&ngPost, window);
+        dlg.findChild<QGroupBox *>(QStringLiteral("newPostsBox"))->setChecked(false);
+        dlg.accept();
+    }
+    QVERIFY(!window->hasAutoCompress());
+    saved = savedConfiguration();
+    QVERIFY2(!saved.contains(QStringLiteral("\nPACK = ")), qPrintable(saved));
+
+    // A random password is not offered while the default one is what posts get.
+    CompressionSettingsDialog dlg(&ngPost, window);
+    dlg.findChild<QGroupBox *>(QStringLiteral("newPostsBox"))->setChecked(true);
+    auto *random = dlg.findChild<QCheckBox *>(QStringLiteral("genPassDefaultCB"));
+    QVERIFY(random->isEnabled());
+    dlg.findChild<QCheckBox *>(QStringLiteral("rarPassCB"))->setChecked(true);
+    QVERIFY(!random->isEnabled());
 }
