@@ -564,8 +564,8 @@ void PostingWidget::onClearFilesClicked()
     _stoppedAttempt = {};
     if (_hmi->hasAutoCompress())
     {
-        // Drawn again for it, as PACK asks. NgPost's own flags would not do:
-        // every post writes its choices into them (udatePostingParams).
+        // Drawn again for it, as PACK asks: the defaults of a new post, as in
+        // init(), whatever the last post of this tab ticked.
         PackingChoice const pack = packingChoice(true, _ngPost->_packAutoKeywords);
         if (pack.genName)
             onGenCompressName();
@@ -587,8 +587,8 @@ void PostingWidget::_renewArchivePassword(bool genPass)
 void PostingWidget::_restoreConfiguredOptions()
 {
     // What the last post changed goes back to the configuration, as when the
-    // tab opens. The packing switches come from the PACK keywords, for the
-    // reason above; a default password goes with every compressed post.
+    // tab opens. The packing switches come from the PACK keywords, as in
+    // init(); a default password goes with every compressed post.
     loadObfuscationLengths(_ui->nameLengthSB, _ui->passLengthSB, _ngPost);
     _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
     _ui->redundancySB->setValue(-1);
@@ -840,10 +840,10 @@ void PostingWidget::applyAutoPacking()
     _ui->compressNameEdit->clear();
     if (packing.compress && packing.genName)
         onGenCompressName();
+    // Whatever init() drew is gone: only a random choice is a drawn password.
     QString const pass = packing.compress ? _ngPost->autoArchivePassword() : QString();
     setNzbPassword(pass);
-    if (_ngPost->autoPassChoice() == NgPost::AutoPass::Random)
-        _drawnPassword = pass;
+    _drawnPassword = _ngPost->autoPassChoice() == NgPost::AutoPass::Random ? pass : QString();
 }
 
 

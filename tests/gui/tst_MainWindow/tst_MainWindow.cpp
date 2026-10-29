@@ -9626,11 +9626,17 @@ void TestMainWindow::compression_settings_choose_what_new_posts_start_with()
     saved = savedConfiguration();
     QVERIFY2(!saved.contains(QStringLiteral("\nPACK = ")), qPrintable(saved));
 
-    // A random password is not offered while the default one is what posts get.
+    // Unticked, the lengths stay editable: the dice buttons of a post use them.
     CompressionSettingsDialog dlg(&ngPost, window);
-    dlg.findChild<QGroupBox *>(QStringLiteral("newPostsBox"))->setChecked(true);
-    auto *random = dlg.findChild<QCheckBox *>(QStringLiteral("genPassDefaultCB"));
-    QVERIFY(random->isEnabled());
+    auto *group = dlg.findChild<QGroupBox *>(QStringLiteral("newPostsBox"));
+    auto *drawn = dlg.findChild<QCheckBox *>(QStringLiteral("genPassDefaultCB"));
+    QVERIFY(!group->isChecked() && !drawn->isEnabled());
+    QVERIFY(dlg.findChild<QSpinBox *>(QStringLiteral("nameLengthDefaultSB"))->isEnabled());
+    QVERIFY(dlg.findChild<QSpinBox *>(QStringLiteral("passLengthDefaultSB"))->isEnabled());
+    // A random password is not offered while the default one is what posts get.
+    group->setChecked(true);
+    QVERIFY(drawn->isEnabled());
     dlg.findChild<QCheckBox *>(QStringLiteral("rarPassCB"))->setChecked(true);
-    QVERIFY(!random->isEnabled());
+    QVERIFY(!drawn->isEnabled());
+    QVERIFY(dlg.findChild<QSpinBox *>(QStringLiteral("passLengthDefaultSB"))->isEnabled());
 }

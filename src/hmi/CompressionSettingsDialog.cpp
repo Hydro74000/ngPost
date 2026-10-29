@@ -172,7 +172,6 @@ void CompressionSettingsDialog::accept()
     // The default, like KEEP_RAR above: saveConfig() reads the length of the
     // tab in front into _lengthPass, and used to write that one instead.
     _ngPost->_lengthPassDefault = static_cast<uint>(_ui->rarLengthSB->value());
-    _applyNewPostsOptions();
 
     // A ticked box over an empty field is not a password: everything else in
     // ngPost reads an empty _rarPassFixed as "no default password", so the two
@@ -181,6 +180,8 @@ void CompressionSettingsDialog::accept()
     _ngPost->_rarPassFixed = pass;
     if (!pass.isEmpty())
         _ngPost->_rarPass = pass;
+    // After the password: the tabs it resets take the default password as it now is.
+    _applyNewPostsOptions();
 
     _ngPost->saveConfig();
 
@@ -267,15 +268,20 @@ void CompressionSettingsDialog::refreshNewPostsOptions()
     // An unticked group greys everything in it; a ticked default password is
     // what every post gets, so a random one would never be drawn.
     bool const options = _ui->newPostsBox->isChecked();
-    bool const random = !_ui->rarPassCB->isChecked();
+    bool const drawn = !_ui->rarPassCB->isChecked();
     setDependentEnabled(_ui->genPassDefaultCB,
-                        options && random,
+                        options && drawn,
                         QString(),
-                        random ? QString()
-                               : tr("Not used while the default archive password is enabled: "
-                                    "every post gets that one."));
-    _ui->passLengthDefaultSB->setEnabled(options && random);
-    _ui->passLengthDefaultLbl->setEnabled(options && random);
+                        drawn ? QString()
+                              : tr("Not used while the default archive password is enabled: "
+                                   "every post gets that one."));
+    // Except the lengths: the dice buttons of every post draw with them too,
+    // whether new posts are prepared or not.
+    for (QWidget *length : { static_cast<QWidget *>(_ui->nameLengthDefaultLbl),
+                             static_cast<QWidget *>(_ui->nameLengthDefaultSB),
+                             static_cast<QWidget *>(_ui->passLengthDefaultLbl),
+                             static_cast<QWidget *>(_ui->passLengthDefaultSB) })
+        length->setEnabled(true);
 }
 
 void CompressionSettingsDialog::_applyNewPostsOptions()

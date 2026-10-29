@@ -4880,11 +4880,14 @@ bool NgPost::_parseConfigAutoPostKey(const QString &opt,
 
 void NgPost::_settleAutoPacking(const ConfigParseState &state)
 {
-    // Before AUTO_PACK the tab started from PACK, when its switch was on.
+    // Before AUTO_PACK the tab started from the PACK line, which turns its
+    // switch on in the GUI. Read from the line rather than from that switch,
+    // which the command line leaves off, so that both settle the same values.
+    bool const packLine = state.parsedPack || state.legacyAutoCompress;
+    auto const packs = [this, packLine](Opt keyword) {
+        return packLine && _packAutoKeywords.contains(sOptionNames[keyword]);
+    };
     if (!state.parsedAutoPack) {
-        auto const packs = [this](Opt keyword) {
-            return _packAuto && _packAutoKeywords.contains(sOptionNames[keyword]);
-        };
         _autoPacking.compress = packs(Opt::COMPRESS);
         _autoPacking.genName = packs(Opt::GEN_NAME);
         _autoPacking.doPar2 = packs(Opt::GEN_PAR2);
@@ -4900,7 +4903,9 @@ void NgPost::_settleAutoPacking(const ConfigParseState &state)
         _autoPacking.keepRar = _keepRarDefault;
     // Written at the next save with the rest, so PACK stops deciding it.
     if (_autoPass == AutoPass::Unset)
-        _autoPass = implicitAutoPass();
+        _autoPass = !_rarPassFixed.isEmpty() ? AutoPass::Default
+            : packs(Opt::GEN_PASS)           ? AutoPass::Random
+                                             : AutoPass::None;
 }
 
 bool NgPost::_parseConfigPar2Key(const QString &opt,
