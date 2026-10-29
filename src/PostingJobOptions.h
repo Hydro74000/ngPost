@@ -92,6 +92,11 @@ struct PostingJobOptions
     bool    doPar2     = false; //!< an ORDER: true means "run par2 now"
     QString rarName;
     QString rarPass;
+    //! rarPass was drawn at random, rather than typed or the default password.
+    bool passwordGenerated = false;
+    //! Length of the random names given to the files when they are obfuscated
+    //! (NgPost::sDefaultLengthName unless the post says otherwise).
+    uint lengthName = 17;
     bool    keepRar          = false;
     bool    delFilesAfterPost = false;
     bool    overwriteNzb      = true;

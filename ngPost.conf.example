@@ -283,6 +283,7 @@ LOG_IN_FILE = true
 ##############################################################
 
 ## Shortcut for automatic packing for both GUI and CMD using --pack
+## (in the GUI: the posting tabs, the Auto Posting tab has its own AUTO_PACK)
 ## coma separated list using the keywords COMPRESS, GEN_NAME, GEN_PASS and GEN_PAR2
 ## For Auto posting and Monitoring if you don't use COMPRESS you need GEN_PA2
 #PACK = COMPRESS, GEN_NAME, GEN_PASS, GEN_PAR2
@@ -294,6 +295,18 @@ LOG_IN_FILE = true
 ## password of the archives of the GUI's Auto Posting: none, random or default
 ## (not set: the default password above, else a random one if PACK has GEN_PASS)
 #AUTO_PASS = random
+
+## packing of the GUI's Auto Posting, apart from PACK: COMPRESS, GEN_NAME and GEN_PAR2
+## (at least COMPRESS or GEN_PAR2; its password is AUTO_PASS above)
+## ngPost writes these lines itself, from what the Auto Posting tab shows
+#AUTO_PACK = COMPRESS, GEN_NAME, GEN_PAR2
+## length of its random archive names and passwords
+#AUTO_LENGTH_NAME = 22
+#AUTO_LENGTH_PASS = 15
+## keep its archives and par2 files after a successful post
+#AUTO_KEEP_RAR = false
+## its par2 redundancy percentage (not set: the PAR2 settings below)
+#AUTO_PAR2_PCT = 10
 
 ## temporary folder where the compressed files and par2 will be stored
 ## so we can post directly a compressed (obfuscated or not) archive of the selected files

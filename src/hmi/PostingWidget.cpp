@@ -428,6 +428,15 @@ void PostingWidget::_fillJobOptions(PostingJobOptions &options,
     // the GUI already asked about overwriting, and never deletes the sources
     options.overwriteNzb = true;
     options.delFilesAfterPost = false;
+    options.doCompress = _ui->compressCB->isChecked();
+    options.doPar2 = _ui->par2CB->isChecked();
+    options.rarName = _ui->compressNameEdit->text();
+    options.rarPass = _archivePassword();
+    options.passwordGenerated = !options.rarPass.isEmpty() && options.rarPass == _drawnPassword;
+    options.lengthName = static_cast<uint>(_ui->nameLengthSB->value());
+    int const redundancy = _ui->redundancySB->value();
+    options.par2Pct = redundancy < 0 ? _ngPost->_par2PctDefault : static_cast<uint>(redundancy);
+    options.keepRar = _ui->keepRarCB->isChecked();
     // per post, deliberately not copied into the NgPost globals
     // The fields belong to the post info feature as a whole: with the box
     // unticked there is no sheet, and nothing to publish in the nzb either.
@@ -503,7 +512,8 @@ void PostingWidget::onNzbPassToggled(bool checked)
 
 void PostingWidget::onGenNzbPassword()
 {
-    _ui->nzbPassEdit->setText(_ngPost->randomPass(static_cast<uint>(_ui->passLengthSB->value())));
+    _drawnPassword = _ngPost->randomPass(static_cast<uint>(_ui->passLengthSB->value()));
+    _ui->nzbPassEdit->setText(_drawnPassword);
 }
 
 void PostingWidget::onSelectFilesClicked()
@@ -554,8 +564,8 @@ void PostingWidget::onClearFilesClicked()
     _stoppedAttempt = {};
     if (_hmi->hasAutoCompress())
     {
-        // Drawn again for it, as PACK asks. NgPost's own flags would not do:
-        // every post writes its choices into them (udatePostingParams).
+        // Drawn again for it, as PACK asks: the defaults of a new post, as in
+        // init(), whatever the last post of this tab ticked.
         PackingChoice const pack = packingChoice(true, _ngPost->_packAutoKeywords);
         if (pack.genName)
             onGenCompressName();
@@ -577,8 +587,8 @@ void PostingWidget::_renewArchivePassword(bool genPass)
 void PostingWidget::_restoreConfiguredOptions()
 {
     // What the last post changed goes back to the configuration, as when the
-    // tab opens. The packing switches come from the PACK keywords, for the
-    // reason above; a default password goes with every compressed post.
+    // tab opens. The packing switches come from the PACK keywords, as in
+    // init(); a default password goes with every compressed post.
     loadObfuscationLengths(_ui->nameLengthSB, _ui->passLengthSB, _ngPost);
     _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
     _ui->redundancySB->setValue(-1);
@@ -804,39 +814,36 @@ void PostingWidget::init()
     connect(_ui->nzbFileButton,     &QAbstractButton::clicked, this, &PostingWidget::onNzbFileClicked);
 
 
-    onCompressCB(_ngPost->_doCompress);
+    // A new post starts from the defaults the user configured, as Remove All
+    // does, never from what the last post or the Auto Posting tab left behind.
+    PackingChoice const pack = packingChoice(_hmi->hasAutoCompress(), _ngPost->_packAutoKeywords);
+    onCompressCB(pack.compress);
     onPar2CB(_ui->par2CB->isChecked());
-    if (_ngPost->_doCompress)
-        _ui->compressCB->setChecked(true);
-    if (_ngPost->_genName)
+    _ui->compressCB->setChecked(pack.compress);
+    if (pack.genName)
         onGenCompressName();
-    if (_ngPost->_genPass)
-    {
+    if (pack.genPass)
         _ui->nzbPassCB->setChecked(true);
-        onGenNzbPassword();
-    }
-    if (_ngPost->_doPar2)
-        _ui->par2CB->setChecked(true);
-
-    QString fixedPass = _hmi->fixedArchivePassword();
-    if (!fixedPass.isEmpty())
-        _ui->nzbPassEdit->setText(fixedPass);
+    _renewArchivePassword(pack.genPass);
+    _ui->par2CB->setChecked(pack.doPar2);
 }
 
-void PostingWidget::genNameAndPassword(bool genName, bool genPass, bool doPar2)
+void PostingWidget::applyAutoPacking()
 {
-    _ui->compressCB->setChecked(_ngPost->_doCompress);
-    if (genName)
+    NgPost::AutoPacking const &packing = _ngPost->_autoPacking;
+    _ui->compressCB->setChecked(packing.compress);
+    _ui->par2CB->setChecked(packing.doPar2);
+    _ui->keepRarCB->setChecked(packing.keepRar);
+    _ui->nameLengthSB->setValue(static_cast<int>(packing.lengthName));
+    _ui->passLengthSB->setValue(static_cast<int>(packing.lengthPass));
+    setPar2PercentageOverride(packing.par2Pct);
+    _ui->compressNameEdit->clear();
+    if (packing.compress && packing.genName)
         onGenCompressName();
-    if (genPass && _ngPost->_rarPassFixed.isEmpty())
-    {
-        _ui->nzbPassCB->setChecked(true);        
-        onGenNzbPassword();
-    }
-    if (doPar2)
-        _ui->par2CB->setChecked(true);
-
-    _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
+    // Whatever init() drew is gone: only a random choice is a drawn password.
+    QString const pass = packing.compress ? _ngPost->autoArchivePassword() : QString();
+    setNzbPassword(pass);
+    _drawnPassword = _ngPost->autoPassChoice() == NgPost::AutoPass::Random ? pass : QString();
 }
 
 
@@ -849,20 +856,9 @@ void PostingWidget::udatePostingParams()
     if (!_ui->nzbFileEdit->text().isEmpty())
         _ngPost->setNzbName(QFileInfo(_ui->nzbFileEdit->text()));
 
-    // fetch compression settings. The compression paths and the volume size are
-    // NOT read here any more: they are configuration, they live in the
-    // Compression settings dialog, and every tab used to overwrite the same
-    // NgPost members with its own copy so the last active tab silently won.
-    _ngPost->_doCompress = _ui->compressCB->isChecked();
-    _ngPost->_rarName    = _ui->compressNameEdit->text();
-    _ngPost->_rarPass = _archivePassword();
-    _ngPost->_lengthName = static_cast<uint>(_ui->nameLengthSB->value());
-    _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
-    // fetch par2 settings
-    _ngPost->_doPar2  = _ui->par2CB->isChecked();
-    _ngPost->_par2Pct = (_ui->redundancySB->value() < 0 ? _ngPost->_par2PctDefault : static_cast<uint>(_ui->redundancySB->value()));
-
-    _ngPost->_keepRar = _ui->keepRarCB->isChecked();
+    // The packing of this post is not written here any more: it goes with its
+    // job options (_fillJobOptions). Written into NgPost, it became what the
+    // next new tab started with, what the Auto Posting used, and PACK on disk.
 
     _ngPost->_copyNfoWithNzb = _ui->copyNfoWithNzbCB->isChecked();
 }
@@ -1219,7 +1215,7 @@ void PostingWidget::loadObfuscationLengths(QSpinBox *nameLength,
                                            const NgPost *ngPost)
 {
     nameLength->setRange(5, 50);
-    nameLength->setValue(static_cast<int>(ngPost->_lengthName));
+    nameLength->setValue(static_cast<int>(ngPost->_lengthNameDefault));
     passLength->setRange(5, 50);
     passLength->setValue(static_cast<int>(ngPost->_lengthPassDefault));
 }

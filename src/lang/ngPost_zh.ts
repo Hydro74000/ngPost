@@ -554,6 +554,58 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
+    <message>
+        <source>Same switch as the box of the main window. Unticked, a new post starts with nothing ticked (config PACK).</source>
+        <translation>与主窗口中的复选框是同一个开关。取消勾选时，新发布开始时不勾选任何选项（配置 PACK）。</translation>
+    </message>
+    <message>
+        <source>Enable compression by default on posts</source>
+        <translation>默认对发布启用压缩</translation>
+    </message>
+    <message>
+        <source>Every new Quick Post, and every Quick Post you empty, starts with the options ticked here. Each post can still change them in its own tab. The Auto Posting tab keeps its own options, set in that tab.</source>
+        <translation>每个新的快速发布，以及每个被清空的快速发布，都会以此处勾选的选项开始。每个发布仍可在自己的标签页中更改这些选项。自动发布标签页保留自己的选项，在该标签页中设置。</translation>
+    </message>
+    <message>
+        <source>Compress the files into an archive</source>
+        <translation>将文件压缩为压缩包</translation>
+    </message>
+    <message>
+        <source>hides the name of the files: the archive gets random letters instead of the name of the first file</source>
+        <translation>隐藏文件名：压缩包使用随机字母，而不是第一个文件的名称</translation>
+    </message>
+    <message>
+        <source>Give the archive a random name</source>
+        <translation>为压缩包使用随机名称</translation>
+    </message>
+    <message>
+        <source>Length:</source>
+        <translation>长度：</translation>
+    </message>
+    <message>
+        <source>length of the random archive names, also drawn by the dice button of a post (config LENGTH_NAME)</source>
+        <translation>随机压缩包名称的长度，也用于发布中的骰子按钮（配置 LENGTH_NAME）</translation>
+    </message>
+    <message>
+        <source>Protect the archive with a random password</source>
+        <translation>使用随机密码保护压缩包</translation>
+    </message>
+    <message>
+        <source>length of the random archive passwords, the same as the one of the default password above (config LENGTH_PASS)</source>
+        <translation>随机压缩包密码的长度，与上方默认密码的长度相同（配置 LENGTH_PASS）</translation>
+    </message>
+    <message>
+        <source>repair files that let a download be fixed when part of it is missing (their amount comes from the PAR2 settings)</source>
+        <translation>修复文件，可在下载缺失部分内容时进行修复（其数量取决于 PAR2 设置）</translation>
+    </message>
+    <message>
+        <source>Add PAR2 repair files</source>
+        <translation>添加 PAR2 修复文件</translation>
+    </message>
+    <message>
+        <source>Not used while the default archive password is enabled: every post gets that one.</source>
+        <translation>启用默认压缩包密码时不使用：每个发布都会使用该默认密码。</translation>
+    </message>
 </context>
 <context>
     <name>ExternalToolPathWidget</name>
@@ -714,10 +766,10 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
     </message>
     <message>
         <location line="+44"/>
-        <source>Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.
-Unlike the per post box, this choice is saved.</source>
-        <translation>用 PACK 配置行的打包选项预设每个发布：压缩、随机压缩包名、随机密码和 par2。
-与单个发布的复选框不同，此选择会被保存。</translation>
+        <source>Every new Quick Post starts with the options chosen in the Compression Settings: compression, a random archive name, a random password, PAR2 repair files.
+The Auto Posting tab keeps its own options. Unlike the per post box, this choice is saved.</source>
+        <translation>每个新的快速发布都会以压缩设置中选择的选项开始：压缩、随机压缩包名称、随机密码、PAR2 修复文件。
+自动发布标签页保留自己的选项。与每个发布的复选框不同，此选择会被保存。</translation>
     </message>
     <message>
         <location line="+14"/>
@@ -848,8 +900,8 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+7"/>
-        <source>Where the archives are built, with which rar, in which volume size, and under which default password</source>
-        <translation>压缩包在何处创建、使用哪个 rar、分卷大小以及默认密码</translation>
+        <source>Where the archives are built, with which rar, in which volume size, under which default password, and the options every new Quick Post starts with</source>
+        <translation>压缩包在何处创建、使用哪个 rar、分卷大小、默认密码，以及每个新的快速发布开始时的选项</translation>
     </message>
     <message>
         <location line="+82"/>
@@ -4592,6 +4644,34 @@ Your active configuration file is:
     <message>
         <source>## (not set: the default password above, else a random one if PACK has GEN_PASS)</source>
         <translation>## （未设置：使用上面的默认密码，否则当 PACK 包含 GEN_PASS 时使用随机密码）</translation>
+    </message>
+    <message>
+        <source>## (in the GUI: the posting tabs, the Auto Posting tab has its own AUTO_PACK)</source>
+        <translation>## （图形界面中：用于发布标签页；自动发布标签页有自己的 AUTO_PACK）</translation>
+    </message>
+    <message>
+        <source>## packing of the GUI&apos;s Auto Posting, apart from PACK: COMPRESS, GEN_NAME and GEN_PAR2</source>
+        <translation>## 图形界面自动发布的打包设置，独立于 PACK：COMPRESS、GEN_NAME 和 GEN_PAR2</translation>
+    </message>
+    <message>
+        <source>## (at least COMPRESS or GEN_PAR2; its password is AUTO_PASS above)</source>
+        <translation>## （至少需要 COMPRESS 或 GEN_PAR2；其密码由上方的 AUTO_PASS 设置）</translation>
+    </message>
+    <message>
+        <source>## length of its random archive names and passwords</source>
+        <translation>## 其随机压缩包名称和密码的长度</translation>
+    </message>
+    <message>
+        <source>## keep its archives and par2 files after a successful post</source>
+        <translation>## 发布成功后保留其压缩包和 par2 文件</translation>
+    </message>
+    <message>
+        <source>## its par2 redundancy percentage (not set: the PAR2 settings below)</source>
+        <translation>## 其 par2 冗余百分比（未设置时：使用下方的 PAR2 设置）</translation>
+    </message>
+    <message>
+        <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
+        <translation>AUTO_PACK 的关键字错误：%1。应为 (COMPRESS, GEN_NAME, GEN_PAR2) 的子集；自动发布的密码由 AUTO_PASS 设置。</translation>
     </message>
 </context>
 <context>

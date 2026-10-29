@@ -345,8 +345,8 @@
            <item>
             <widget class="QCheckBox" name="autoCompressCB">
              <property name="toolTip">
-              <string>Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.
-Unlike the per post box, this choice is saved.</string>
+              <string>Every new Quick Post starts with the options chosen in the Compression Settings: compression, a random archive name, a random password, PAR2 repair files.
+The Auto Posting tab keeps its own options. Unlike the per post box, this choice is saved.</string>
              </property>
              <property name="text">
               <string>Enable compression by default on posts</string>
@@ -356,7 +356,7 @@ Unlike the per post box, this choice is saved.</string>
            <item>
             <widget class="QPushButton" name="compressionSettingsBtn">
              <property name="toolTip">
-              <string>Where the archives are built, with which rar, in which volume size, and under which default password</string>
+              <string>Where the archives are built, with which rar, in which volume size, under which default password, and the options every new Quick Post starts with</string>
              </property>
              <property name="text">
               <string>Compression Settings</string>

@@ -83,10 +83,12 @@ AutoPostWidget::~AutoPostWidget()
 
 void AutoPostWidget::init()
 {
-    _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
+    // Its own settings (AUTO_*): neither PACK nor the defaults of a posting tab.
+    NgPost::AutoPacking const &packing = _ngPost->_autoPacking;
+    _ui->keepRarCB->setChecked(packing.keepRar);
 
     _ui->redundancySB->setRange(-1, 100);
-    _ui->redundancySB->setValue(-1);
+    _ui->redundancySB->setValue(packing.par2Pct);
     refreshPar2Default();
     connect(_ngPost, &NgPost::par2DefaultsChanged, this, &AutoPostWidget::refreshPar2Default, Qt::UniqueConnection);
     // The label that carried the unit is gone with the row it lived on, so the
@@ -95,6 +97,8 @@ void AutoPostWidget::init()
 
     _ui->autoDirEdit->setText(_ngPost->_inputDir);
     PostingWidget::loadObfuscationLengths(_ui->nameLengthSB, _ui->passLengthSB, _ngPost);
+    _ui->nameLengthSB->setValue(static_cast<int>(packing.lengthName));
+    _ui->passLengthSB->setValue(static_cast<int>(packing.lengthPass));
 
     _ui->filesList->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
@@ -111,8 +115,12 @@ void AutoPostWidget::init()
         _ngPost->_autoPass = passChoice(_ui->passModeCB);
     });
 
-    setPackingAuto(_ngPost->_packAuto, _ngPost->_packAutoKeywords);
-    // setPackingAuto() only emits toggled() when a box actually changes, so the
+    _ui->compressCB->setChecked(packing.compress);
+    _ui->genNameCB->setChecked(packing.genName);
+    setPassChoice(_ui->passModeCB, _ngPost->autoPassChoice());
+    refreshPasswordChoices();
+    _ui->par2CB->setChecked(packing.doPar2);
+    // setChecked() only emits toggled() when a box actually changes, so the
     // dependents are refreshed here rather than trusting a signal that may not
     // have fired. The coupling side effects of the handlers are deliberately
     // not replayed: opening the tab must not tick PAR2 on the user's behalf.
@@ -190,18 +198,17 @@ Press the Scan button and remove what you don't want to post ;)\n\
         if (nfo.isFile())
             postFiles << nfo;
 
-        PostingWidget *quickPostWidget = _hmi->addNewQuickTab(postFiles);
-        quickPostWidget->init();
-        quickPostWidget->setPar2PercentageOverride(_ui->redundancySB->value());
+        // This tab's packing, archive password included, before the files:
+        // without a random archive name, the first file gives its own.
+        PostingWidget *quickPostWidget = _hmi->addNewQuickTab();
+        quickPostWidget->applyAutoPacking();
+        for (const QFileInfo &postFile : postFiles)
+            quickPostWidget->addPath(postFile.absoluteFilePath(), 0, postFile.isDir());
         // One choice for the whole run: every post it launches gets it.
         quickPostWidget->setPostInfo(_postInfoCB && _postInfoCB->isChecked(),
                                      _postInfoTemplate,
                                      _postInfoOutput,
                                      _postInfoMeta);
-        quickPostWidget->genNameAndPassword(_ngPost->_genName, _ngPost->_genPass, _ngPost->_doPar2);
-        // The password this tab chose, not the one a posting tab would draw.
-        if (_ngPost->_doCompress)
-            quickPostWidget->setNzbPassword(_ngPost->autoArchivePassword());
 
         if (startPost)
             quickPostWidget->postFiles(false);
@@ -430,25 +437,18 @@ void AutoPostWidget::onSelectFilesClicked()
 
 void AutoPostWidget::udatePostingParams()
 {
-    // fetch compression settings
-    _ngPost->_doCompress = _ui->compressCB->isChecked();
-    _ngPost->_genName    = _ngPost->_doCompress ? _ui->genNameCB->isChecked() : false;
+    // Its own settings only (AUTO_*). It used to write the shared packing
+    // flags, which the posting tabs start from and PACK was saved from: the
+    // last Auto Posting run decided what a new posting tab looked like.
+    NgPost::AutoPacking &packing = _ngPost->_autoPacking;
+    packing.compress = _ui->compressCB->isChecked();
+    packing.genName = _ui->genNameCB->isChecked();
+    packing.doPar2 = _ui->par2CB->isChecked();
+    packing.lengthName = static_cast<uint>(_ui->nameLengthSB->value());
+    packing.lengthPass = static_cast<uint>(_ui->passLengthSB->value());
+    packing.keepRar = _ui->keepRarCB->isChecked();
+    packing.par2Pct = _ui->redundancySB->value();
     _ngPost->_autoPass = passChoice(_ui->passModeCB);
-    // GEN_PASS is also the draw of the posting tabs: the default password,
-    // which does not draw, leaves it as the configuration has it.
-    if (_ngPost->_autoPass != NgPost::AutoPass::Default)
-        _ngPost->_genPass = _ngPost->_doCompress && _ngPost->_autoPass == NgPost::AutoPass::Random;
-    _ngPost->_doPar2     = _ui->par2CB->isChecked();
-    _ngPost->_packAuto   = _ngPost->_doCompress || _ngPost->_doPar2;
-
-    // The compression paths and the volume size belong to the Compression
-    // settings dialog now: this tab used to hold a second copy of them and
-    // overwrite whatever a posting tab had just written.
-    _ngPost->_lengthName = static_cast<uint>(_ui->nameLengthSB->value());
-    _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
-
-    // fetch par2 settings
-    _ngPost->_par2Pct = (_ui->redundancySB->value() < 0 ? _ngPost->_par2PctDefault : static_cast<uint>(_ui->redundancySB->value()));
 
     QFileInfo inputDir(_ui->autoDirEdit->text());
     if (inputDir.exists() && inputDir.isDir() && inputDir.isWritable())
@@ -466,9 +466,7 @@ void AutoPostWidget::udatePostingParams()
     }
 
     _ngPost->_monitorIgnoreDir = !_ui->dirAllowedCB->isChecked();
-    _ngPost->_autoIncludeNfo   = _ui->copyNfoCB->isChecked();
-
-    _ngPost->_keepRar = _ui->keepRarCB->isChecked();
+    _ngPost->_autoIncludeNfo = _ui->copyNfoCB->isChecked();
 }
 
 void AutoPostWidget::updateFinishedJob(const QString &path, uint nbArticles, uint nbUploaded, uint nbFailed)
@@ -527,48 +525,16 @@ void AutoPostWidget::retranslate()
                                    tr("Bare in mind you can select items in the list and press DEL to remove them")));
 }
 
-void AutoPostWidget::setPackingAuto(bool enabled, const QStringList &keys){
-    bool compress = false, genName = false, genPass = false, doPar2 = false;
-    if (enabled)
-    {
-        for (auto it = keys.cbegin(), itEnd = keys.cend(); it != itEnd; ++it)
-        {
-            QString keyWord = (*it).toLower();
-            if (keyWord == NgPost::optionName(NgPost::Opt::COMPRESS))
-                compress = true;
-            else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_NAME))
-                genName = true;
-            else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_PASS))
-                genPass = true;
-            else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_PAR2))
-                doPar2 = true;
-        }
-    }
-    _ui->compressCB->setChecked(compress);
-    _ui->genNameCB->setChecked(genName);
-    // The choice saved as AUTO_PASS, else what an absent one has always meant.
-    NgPost::AutoPass pass = _ngPost->_autoPass;
-    if (pass == NgPost::AutoPass::Unset)
-        pass = !_ngPost->_rarPassFixed.isEmpty() ? NgPost::AutoPass::Default
-            : genPass                            ? NgPost::AutoPass::Random
-                                                 : NgPost::AutoPass::None;
-    setPassChoice(_ui->passModeCB, pass);
-    refreshPasswordChoices();
-    _ui->par2CB->setChecked(doPar2);
-    onCompressToggled(compress);
-}
-
 void AutoPostWidget::refreshPasswordChoices()
 {
     // The default password can only be chosen while there is one. Gone, the
-    // choice falls back to what GEN_PASS gives, never to a password nobody set.
+    // archives stay protected by a random one, never by a password nobody set.
     bool const hasDefault = !_ngPost->_rarPassFixed.isEmpty();
     auto *rows = qobject_cast<QStandardItemModel *>(_ui->passModeCB->model());
     if (QStandardItem *row = rows ? rows->item(kDefaultPass) : nullptr)
         row->setEnabled(hasDefault);
     if (!hasDefault && passChoice(_ui->passModeCB) == NgPost::AutoPass::Default)
-        setPassChoice(_ui->passModeCB,
-                      _ngPost->_genPass ? NgPost::AutoPass::Random : NgPost::AutoPass::None);
+        setPassChoice(_ui->passModeCB, NgPost::AutoPass::Random);
 }
 
 void AutoPostWidget::onPassChoiceChanged()
@@ -658,7 +624,10 @@ PostInfoData AutoPostWidget::_postInfoPreview() const
     postData.groups = _ngPost->groups();
     if (!_ngPost->_genFrom && !_ngPost->_from.empty())
         postData.nzbPoster = QString::fromStdString(_ngPost->_from);
-    postData.par2Pct = _ngPost->_doPar2 ? static_cast<int>(_ngPost->_par2Pct) : -1;
+    int const redundancy = _ui->redundancySB->value();
+    postData.par2Pct = !_ui->par2CB->isChecked() ? -1
+        : redundancy < 0                         ? static_cast<int>(_ngPost->_par2PctDefault)
+                                                 : redundancy;
     return postData;
 }
 

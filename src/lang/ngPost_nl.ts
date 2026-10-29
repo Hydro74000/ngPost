@@ -556,6 +556,58 @@ Voer een geheel aantal MiB tussen 0 en 1000000 in (0 schakelt splitsen alleen ui
         <source>Cancel</source>
         <translation>Annuleren</translation>
     </message>
+    <message>
+        <source>Same switch as the box of the main window. Unticked, a new post starts with nothing ticked (config PACK).</source>
+        <translation>Dezelfde schakelaar als het vakje in het hoofdvenster. Uitgevinkt begint een nieuwe post zonder aangevinkte opties (config PACK).</translation>
+    </message>
+    <message>
+        <source>Enable compression by default on posts</source>
+        <translation>Compressie standaard inschakelen voor posts</translation>
+    </message>
+    <message>
+        <source>Every new Quick Post, and every Quick Post you empty, starts with the options ticked here. Each post can still change them in its own tab. The Auto Posting tab keeps its own options, set in that tab.</source>
+        <translation>Elke nieuwe Quick Post, en elke Quick Post die u leegmaakt, begint met de hier aangevinkte opties. Elke post kan ze nog wijzigen in zijn eigen tabblad. Het Auto Posting-tabblad houdt zijn eigen opties, ingesteld in dat tabblad.</translation>
+    </message>
+    <message>
+        <source>Compress the files into an archive</source>
+        <translation>De bestanden in een archief comprimeren</translation>
+    </message>
+    <message>
+        <source>hides the name of the files: the archive gets random letters instead of the name of the first file</source>
+        <translation>verbergt de naam van de bestanden: het archief krijgt willekeurige letters in plaats van de naam van het eerste bestand</translation>
+    </message>
+    <message>
+        <source>Give the archive a random name</source>
+        <translation>Het archief een willekeurige naam geven</translation>
+    </message>
+    <message>
+        <source>Length:</source>
+        <translation>Lengte:</translation>
+    </message>
+    <message>
+        <source>length of the random archive names, also drawn by the dice button of a post (config LENGTH_NAME)</source>
+        <translation>lengte van de willekeurige archiefnamen, ook getrokken met de dobbelsteenknop van een post (config LENGTH_NAME)</translation>
+    </message>
+    <message>
+        <source>Protect the archive with a random password</source>
+        <translation>Het archief beveiligen met een willekeurig wachtwoord</translation>
+    </message>
+    <message>
+        <source>length of the random archive passwords, the same as the one of the default password above (config LENGTH_PASS)</source>
+        <translation>lengte van de willekeurige archiefwachtwoorden, dezelfde als die van het standaardwachtwoord hierboven (config LENGTH_PASS)</translation>
+    </message>
+    <message>
+        <source>repair files that let a download be fixed when part of it is missing (their amount comes from the PAR2 settings)</source>
+        <translation>herstelbestanden waarmee een onvolledige download gerepareerd kan worden (de hoeveelheid komt uit de PAR2-instellingen)</translation>
+    </message>
+    <message>
+        <source>Add PAR2 repair files</source>
+        <translation>PAR2-herstelbestanden toevoegen</translation>
+    </message>
+    <message>
+        <source>Not used while the default archive password is enabled: every post gets that one.</source>
+        <translation>Niet gebruikt zolang het standaard archiefwachtwoord is ingeschakeld: elke post krijgt dat wachtwoord.</translation>
+    </message>
 </context>
 <context>
     <name>ExternalToolPathWidget</name>
@@ -716,10 +768,10 @@ Voer een geheel aantal MiB tussen 0 en 1000000 in (0 schakelt splitsen alleen ui
     </message>
     <message>
         <location line="+44"/>
-        <source>Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.
-Unlike the per post box, this choice is saved.</source>
-        <translation>Bereidt elke post voor met de inpakopties van de PACK-configuratieregel: compressie, een willekeurige archiefnaam, een willekeurig wachtwoord en de par2.
-Anders dan het vakje per post wordt deze keuze bewaard.</translation>
+        <source>Every new Quick Post starts with the options chosen in the Compression Settings: compression, a random archive name, a random password, PAR2 repair files.
+The Auto Posting tab keeps its own options. Unlike the per post box, this choice is saved.</source>
+        <translation>Elke nieuwe Quick Post begint met de opties gekozen in de Compressie-instellingen: compressie, willekeurige archiefnaam, willekeurig wachtwoord, PAR2-herstelbestanden.
+Het Auto Posting-tabblad houdt zijn eigen opties. Anders dan het vakje per post wordt deze keuze opgeslagen.</translation>
     </message>
     <message>
         <location line="+14"/>
@@ -850,8 +902,8 @@ Anders dan het vakje per post wordt deze keuze bewaard.</translation>
     </message>
     <message>
         <location line="+7"/>
-        <source>Where the archives are built, with which rar, in which volume size, and under which default password</source>
-        <translation>Waar de archieven worden gemaakt, met welke rar, in welke volumegrootte en met welk standaardwachtwoord</translation>
+        <source>Where the archives are built, with which rar, in which volume size, under which default password, and the options every new Quick Post starts with</source>
+        <translation>Waar de archieven worden gemaakt, met welke rar, in welke volumegrootte, met welk standaardwachtwoord en met welke opties elke nieuwe Quick Post begint</translation>
     </message>
     <message>
         <location line="+82"/>
@@ -4596,6 +4648,34 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <source>## (not set: the default password above, else a random one if PACK has GEN_PASS)</source>
         <translation>## (niet ingesteld: het standaardwachtwoord hierboven, anders een willekeurig als PACK GEN_PASS bevat)</translation>
+    </message>
+    <message>
+        <source>## (in the GUI: the posting tabs, the Auto Posting tab has its own AUTO_PACK)</source>
+        <translation>## (in de GUI: de post-tabbladen; het Auto Posting-tabblad heeft zijn eigen AUTO_PACK)</translation>
+    </message>
+    <message>
+        <source>## packing of the GUI&apos;s Auto Posting, apart from PACK: COMPRESS, GEN_NAME and GEN_PAR2</source>
+        <translation>## inpakken van Auto Posting in de GUI, los van PACK: COMPRESS, GEN_NAME en GEN_PAR2</translation>
+    </message>
+    <message>
+        <source>## (at least COMPRESS or GEN_PAR2; its password is AUTO_PASS above)</source>
+        <translation>## (minstens COMPRESS of GEN_PAR2; het wachtwoord is AUTO_PASS hierboven)</translation>
+    </message>
+    <message>
+        <source>## length of its random archive names and passwords</source>
+        <translation>## lengte van de willekeurige archiefnamen en wachtwoorden</translation>
+    </message>
+    <message>
+        <source>## keep its archives and par2 files after a successful post</source>
+        <translation>## de archieven en par2-bestanden bewaren na een geslaagde post</translation>
+    </message>
+    <message>
+        <source>## its par2 redundancy percentage (not set: the PAR2 settings below)</source>
+        <translation>## het par2-redundantiepercentage (niet ingesteld: de PAR2-instellingen hieronder)</translation>
+    </message>
+    <message>
+        <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
+        <translation>Verkeerde sleutelwoorden voor AUTO_PACK: %1. Het moet een deelverzameling zijn van (COMPRESS, GEN_NAME, GEN_PAR2); het wachtwoord van Auto Posting is AUTO_PASS.</translation>
     </message>
 </context>
 <context>
