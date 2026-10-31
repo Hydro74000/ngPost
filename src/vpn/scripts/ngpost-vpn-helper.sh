@@ -1224,7 +1224,10 @@ start_wireguard() {
     fi
     publish_manifest interface_created || return 1
     prepare_wg_config || { LAST_ERROR="cannot prepare WireGuard config"; return 1; }
-    "$WG_BIN" setconf "$WG_IFACE" "$WG_SETCONF_FILE" >> "$LOG_FILE" 2>&1 || { LAST_ERROR="wg setconf failed"; return 1; }
+    # Through a pipe, as wg-quick does: AppArmor confines wg(8) to /etc/wireguard
+    # on Ubuntu 26.04, so it may not open this file itself. A plain redirection
+    # would not do either: an inherited file is checked against that profile too.
+    "$WG_BIN" setconf "$WG_IFACE" <(cat "$WG_SETCONF_FILE") >> "$LOG_FILE" 2>&1 || { LAST_ERROR="wg setconf failed"; return 1; }
     TUN_IP=$(sed -n '/^[[:space:]]*\[Interface\]/,/^[[:space:]]*\[/p' "$SESSION_CONFIG" | awk -F= 'tolower($1) ~ /^[[:space:]]*address/ {gsub(/[[:space:]]/,"",$2);split($2,a,"[,/]");print a[1];exit}')
     DNS_IP=$(sed -n '/^[[:space:]]*\[Interface\]/,/^[[:space:]]*\[/p' "$SESSION_CONFIG" | awk -F= 'tolower($1) ~ /^[[:space:]]*dns/ {gsub(/[[:space:]]/,"",$2);split($2,a,",");print a[1];exit}')
     [ -n "$TUN_IP" ] || { LAST_ERROR="no IPv4 Address in WireGuard config"; return 1; }

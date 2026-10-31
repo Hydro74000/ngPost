@@ -10,6 +10,7 @@
 #include "CompressionSettingsDialog.h"
 #include "ui_CompressionSettingsDialog.h"
 
+#include "DependentControl.h"
 #include "ExternalToolPathWidget.h"
 #include "NgPost.h"
 #include "WrappedLabels.h"
@@ -83,6 +84,7 @@ CompressionSettingsDialog::CompressionSettingsDialog(NgPost *ngPost, QWidget *pa
 
     _ui->rarLengthSB->setRange(5, 50);
     _ui->rarLengthSB->setValue(static_cast<int>(_ngPost->_lengthPassDefault));
+    _loadNewPostsOptions();
 
     // Issue #48: the text first, so the toggled handler has something to push.
     _ui->rarPassEdit->setText(_ngPost->_rarPassFixed);
@@ -95,6 +97,10 @@ CompressionSettingsDialog::CompressionSettingsDialog(NgPost *ngPost, QWidget *pa
             &CompressionSettingsDialog::onCompressPathClicked);
     connect(_ui->genPass,            &QAbstractButton::clicked, this, &CompressionSettingsDialog::onGenPass);
     connect(_ui->rarPassCB,          &QAbstractButton::toggled, this, &CompressionSettingsDialog::onPassToggled);
+    connect(_ui->newPostsBox,
+            &QGroupBox::toggled,
+            this,
+            &CompressionSettingsDialog::refreshNewPostsOptions);
     connect(_ui->buttonBox,          &QDialogButtonBox::accepted, this, &CompressionSettingsDialog::accept);
     connect(_ui->buttonBox,          &QDialogButtonBox::rejected, this, &QDialog::reject);
     _ui->buttonBox->button(QDialogButtonBox::Save)->setText(tr("Save"));
@@ -174,6 +180,8 @@ void CompressionSettingsDialog::accept()
     _ngPost->_rarPassFixed = pass;
     if (!pass.isEmpty())
         _ngPost->_rarPass = pass;
+    // After the password: the tabs it resets take the default password as it now is.
+    _applyNewPostsOptions();
 
     _ngPost->saveConfig();
 
@@ -221,4 +229,73 @@ void CompressionSettingsDialog::onPassToggled(bool checked)
     _ui->rarPassEdit->setEnabled(checked);
     _ui->rarLengthSB->setEnabled(checked);
     _ui->genPass->setEnabled(checked);
+    refreshNewPostsOptions();
+}
+
+void CompressionSettingsDialog::_loadNewPostsOptions()
+{
+    // What a new posting tab starts with: PACK and its switch in the main
+    // window. A switch that was never on shows what turning it on would give.
+    QStringList const &keywords = _ngPost->_packAutoKeywords.isEmpty()
+        ? NgPost::defaultPackKeywords()
+        : _ngPost->_packAutoKeywords;
+    auto const packs = [&keywords](NgPost::Opt keyword) {
+        return keywords.contains(NgPost::optionName(keyword));
+    };
+    _ui->newPostsBox->setChecked(_ngPost->_packAuto);
+    _ui->compressDefaultCB->setChecked(packs(NgPost::Opt::COMPRESS));
+    _ui->genNameDefaultCB->setChecked(packs(NgPost::Opt::GEN_NAME));
+    _ui->genPassDefaultCB->setChecked(packs(NgPost::Opt::GEN_PASS));
+    _ui->par2DefaultCB->setChecked(packs(NgPost::Opt::GEN_PAR2));
+    _ui->nameLengthDefaultSB->setRange(5, 50);
+    _ui->nameLengthDefaultSB->setValue(static_cast<int>(_ngPost->_lengthNameDefault));
+    // One length for every random password, shown where it is used: next to
+    // the default password, or next to the random one when that is off.
+    _ui->passLengthDefaultSB->setRange(5, 50);
+    _ui->passLengthDefaultSB->setValue(_ui->rarLengthSB->value());
+    connect(_ui->rarLengthSB,
+            &QSpinBox::valueChanged,
+            _ui->passLengthDefaultSB,
+            &QSpinBox::setValue);
+    connect(_ui->passLengthDefaultSB,
+            &QSpinBox::valueChanged,
+            _ui->rarLengthSB,
+            &QSpinBox::setValue);
+}
+
+void CompressionSettingsDialog::refreshNewPostsOptions()
+{
+    // An unticked group greys everything in it; a ticked default password is
+    // what every post gets, so a random one would never be drawn.
+    bool const options = _ui->newPostsBox->isChecked();
+    bool const drawn = !_ui->rarPassCB->isChecked();
+    setDependentEnabled(_ui->genPassDefaultCB,
+                        options && drawn,
+                        QString(),
+                        drawn ? QString()
+                              : tr("Not used while the default archive password is enabled: "
+                                   "every post gets that one."));
+    // Except the lengths: the dice buttons of every post draw with them too,
+    // whether new posts are prepared or not.
+    for (QWidget *length : { static_cast<QWidget *>(_ui->nameLengthDefaultLbl),
+                             static_cast<QWidget *>(_ui->nameLengthDefaultSB),
+                             static_cast<QWidget *>(_ui->passLengthDefaultLbl),
+                             static_cast<QWidget *>(_ui->passLengthDefaultSB) })
+        length->setEnabled(true);
+}
+
+void CompressionSettingsDialog::_applyNewPostsOptions()
+{
+    QStringList keywords;
+    if (_ui->compressDefaultCB->isChecked())
+        keywords << NgPost::optionName(NgPost::Opt::COMPRESS);
+    if (_ui->genNameDefaultCB->isChecked())
+        keywords << NgPost::optionName(NgPost::Opt::GEN_NAME);
+    if (_ui->genPassDefaultCB->isChecked())
+        keywords << NgPost::optionName(NgPost::Opt::GEN_PASS);
+    if (_ui->par2DefaultCB->isChecked())
+        keywords << NgPost::optionName(NgPost::Opt::GEN_PAR2);
+    _ngPost->_lengthNameDefault = static_cast<uint>(_ui->nameLengthDefaultSB->value());
+    // Nothing ticked is the switch turned off: an empty PACK means nothing.
+    _ngPost->setPackingDefaults(_ui->newPostsBox->isChecked() && !keywords.isEmpty(), keywords);
 }

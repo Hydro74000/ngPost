@@ -72,13 +72,15 @@ public:
     void udatePostingParams();
 
     void newFileToProcess(const QFileInfo &fileInfo);
+    void updateStartedJob(const QString &path);
     void updateFinishedJob(const QString &path, uint nbArticles, uint nbUploaded, uint nbFailed);
 
     bool deleteFilesOncePosted() const;
 
     void retranslate();
 
-    void setPackingAuto(bool enabled, const QStringList &keys);
+    //! Offers the default password only while one is configured.
+    void refreshPasswordChoices();
 
     void refreshPendingColors();
 
@@ -98,6 +100,8 @@ private:
     //! replaying their coupling (compress off forces PAR2 on, and back).
     void updatePackingDependents();
 
+    void _handleFinishedJob(const QString &path, uint nbArticles, uint nbUploaded, uint nbFailed);
+
 private slots:
     void onSelectFilesClicked();
     void onGenQuickPosts();
@@ -108,6 +112,7 @@ private slots:
     void onAddMonitoringFolder();
     void onCompressToggled(bool checked);
     void onGenPar2Toggled(bool checked);
+    void onPassChoiceChanged();
 };
 
 #endif // AUTOPOSTWIDGET_H

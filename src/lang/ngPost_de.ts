@@ -45,8 +45,8 @@
     </message>
     <message>
         <location line="+29"/>
-        <source>Monitor extension filter: </source>
-        <translation>Monitor-Erweiterungsfilter: </translation>
+        <source>Extensions:</source>
+        <translation>Erweiterungen:</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -146,8 +146,8 @@
     </message>
     <message>
         <location line="+3"/>
-        <source>delete files once posted (only for Monitoring)</source>
-        <translation>Daten nach dem Post löschen (nur für das Monitoring)</translation>
+        <source>delete files once posted</source>
+        <translation>Daten nach dem Post löschen</translation>
     </message>
     <message>
         <location line="+24"/>
@@ -358,6 +358,42 @@ Es wird nicht mehr rückgängig zu machen sein...</translation>
         <source>Global (%1 %)</source>
         <translation>Global (%1 %)</translation>
     </message>
+    <message>
+        <source>no password</source>
+        <translation>kein Passwort</translation>
+    </message>
+    <message>
+        <source>random password</source>
+        <translation>Zufallspasswort</translation>
+    </message>
+    <message>
+        <source>default password</source>
+        <translation>Standardpasswort</translation>
+    </message>
+    <message>
+        <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
+        <translation>Passwort der Archive: keines, ein zufälliges oder das Standardpasswort der Komprimierungseinstellungen</translation>
+    </message>
+    <message>
+        <source>Scan the folder</source>
+        <translation>Ordner scannen</translation>
+    </message>
+    <message>
+        <source>Monitor the folder</source>
+        <translation>Ordnerüberwachung</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>Ordner hinzufügen</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;Compression&lt;/b&gt;:</source>
+        <translation>&lt;b&gt;Komprimierung&lt;/b&gt;:</translation>
+    </message>
+    <message>
+        <source>Folder and posts</source>
+        <translation>Ordner und Posts</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -518,6 +554,58 @@ Geben Sie eine ganze Zahl in MiB zwischen 0 und 1000000 ein (0 deaktiviert die A
         <location line="+54"/>
         <source>Cancel</source>
         <translation>Abbrechen</translation>
+    </message>
+    <message>
+        <source>Same switch as the box of the main window. Unticked, a new post starts with nothing ticked (config PACK).</source>
+        <translation>Derselbe Schalter wie das Kästchen im Hauptfenster. Ohne Haken startet ein neuer Post ohne angehakte Optionen (Konfiguration PACK).</translation>
+    </message>
+    <message>
+        <source>Enable compression by default on posts</source>
+        <translation>Komprimierung standardmäßig für Posts aktivieren</translation>
+    </message>
+    <message>
+        <source>Every new Quick Post, and every Quick Post you empty, starts with the options ticked here. Each post can still change them in its own tab. The Auto Posting tab keeps its own options, set in that tab.</source>
+        <translation>Jeder neue Quick Post und jeder Quick Post, den Sie leeren, startet mit den hier angehakten Optionen. Jeder Post kann sie in seinem eigenen Tab noch ändern. Der Auto-Posting-Tab behält seine eigenen Optionen, die in diesem Tab eingestellt werden.</translation>
+    </message>
+    <message>
+        <source>Compress the files into an archive</source>
+        <translation>Dateien in ein Archiv komprimieren</translation>
+    </message>
+    <message>
+        <source>hides the name of the files: the archive gets random letters instead of the name of the first file</source>
+        <translation>verbirgt den Namen der Dateien: das Archiv erhält zufällige Buchstaben statt des Namens der ersten Datei</translation>
+    </message>
+    <message>
+        <source>Give the archive a random name</source>
+        <translation>Dem Archiv einen zufälligen Namen geben</translation>
+    </message>
+    <message>
+        <source>Length:</source>
+        <translation>Länge:</translation>
+    </message>
+    <message>
+        <source>length of the random archive names, also drawn by the dice button of a post (config LENGTH_NAME)</source>
+        <translation>Länge der zufälligen Archivnamen, auch für den Würfel-Knopf eines Posts (Konfiguration LENGTH_NAME)</translation>
+    </message>
+    <message>
+        <source>Protect the archive with a random password</source>
+        <translation>Das Archiv mit einem zufälligen Passwort schützen</translation>
+    </message>
+    <message>
+        <source>length of the random archive passwords, the same as the one of the default password above (config LENGTH_PASS)</source>
+        <translation>Länge der zufälligen Archivpasswörter, dieselbe wie beim Standardpasswort oben (Konfiguration LENGTH_PASS)</translation>
+    </message>
+    <message>
+        <source>repair files that let a download be fixed when part of it is missing (their amount comes from the PAR2 settings)</source>
+        <translation>Reparaturdateien, mit denen ein unvollständiger Download repariert werden kann (ihre Menge kommt aus den PAR2-Einstellungen)</translation>
+    </message>
+    <message>
+        <source>Add PAR2 repair files</source>
+        <translation>PAR2-Reparaturdateien hinzufügen</translation>
+    </message>
+    <message>
+        <source>Not used while the default archive password is enabled: every post gets that one.</source>
+        <translation>Nicht verwendet, solange das Standard-Archivpasswort aktiviert ist: jeder Post erhält dieses.</translation>
     </message>
 </context>
 <context>
@@ -700,10 +788,10 @@ Geben Sie eine ganze Zahl in MiB zwischen 0 und 1000000 ein (0 deaktiviert die A
     </message>
     <message>
         <location line="+44"/>
-        <source>Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.
-Unlike the per post box, this choice is saved.</source>
-        <translation>Rüstet jeden Post mit den Packoptionen der PACK-Konfigurationszeile aus: Komprimierung, zufälliger Archivname, zufälliges Passwort und par2.
-Anders als das Kästchen pro Post wird diese Wahl gespeichert.</translation>
+        <source>Every new Quick Post starts with the options chosen in the Compression Settings: compression, a random archive name, a random password, PAR2 repair files.
+The Auto Posting tab keeps its own options. Unlike the per post box, this choice is saved.</source>
+        <translation>Jeder neue Quick Post startet mit den in den Komprimierungseinstellungen gewählten Optionen: Komprimierung, zufälliger Archivname, zufälliges Passwort, PAR2-Reparaturdateien.
+Der Auto-Posting-Tab behält seine eigenen Optionen. Anders als das Kästchen pro Post wird diese Wahl gespeichert.</translation>
     </message>
     <message>
         <location line="+14"/>
@@ -813,8 +901,8 @@ Anders als das Kästchen pro Post wird diese Wahl gespeichert.</translation>
     </message>
     <message>
         <location line="+7"/>
-        <source>Where the archives are built, with which rar, in which volume size, and under which default password</source>
-        <translation>Wo die Archive erstellt werden, mit welchem rar, in welcher Volumengröße und mit welchem Standardpasswort</translation>
+        <source>Where the archives are built, with which rar, in which volume size, under which default password, and the options every new Quick Post starts with</source>
+        <translation>Wo die Archive erstellt werden, mit welchem rar, in welcher Volumengröße, mit welchem Standardpasswort und mit welchen Optionen jeder neue Quick Post startet</translation>
     </message>
     <message>
         <location line="+82"/>
@@ -4545,6 +4633,46 @@ Ihre aktive Konfigurationsdatei ist:
         <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
         <translation>## Die Größe wird aus der Quellgröße mit Rundung berechnet; RAR_SIZE wird nicht überschrieben.</translation>
     </message>
+    <message>
+        <source>AUTO_PASS must be none, random or default.</source>
+        <translation>AUTO_PASS muss none, random oder default sein.</translation>
+    </message>
+    <message>
+        <source>## password of the archives of the GUI&apos;s Auto Posting: none, random or default</source>
+        <translation>## Passwort der Archive des Auto-Postings der GUI: none, random oder default</translation>
+    </message>
+    <message>
+        <source>## (not set: the default password above, else a random one if PACK has GEN_PASS)</source>
+        <translation>## (nicht gesetzt: das Standardpasswort oben, sonst ein zufälliges, wenn PACK GEN_PASS enthält)</translation>
+    </message>
+    <message>
+        <source>## (in the GUI: the posting tabs, the Auto Posting tab has its own AUTO_PACK)</source>
+        <translation>## (in der GUI: die Post-Tabs; der Auto-Posting-Tab hat sein eigenes AUTO_PACK)</translation>
+    </message>
+    <message>
+        <source>## packing of the GUI&apos;s Auto Posting, apart from PACK: COMPRESS, GEN_NAME and GEN_PAR2</source>
+        <translation>## Packen des Auto-Postings der GUI, unabhängig von PACK: COMPRESS, GEN_NAME und GEN_PAR2</translation>
+    </message>
+    <message>
+        <source>## (at least COMPRESS or GEN_PAR2; its password is AUTO_PASS above)</source>
+        <translation>## (mindestens COMPRESS oder GEN_PAR2; sein Passwort ist AUTO_PASS oben)</translation>
+    </message>
+    <message>
+        <source>## length of its random archive names and passwords</source>
+        <translation>## Länge seiner zufälligen Archivnamen und Passwörter</translation>
+    </message>
+    <message>
+        <source>## keep its archives and par2 files after a successful post</source>
+        <translation>## seine Archive und par2-Dateien nach einem erfolgreichen Post behalten</translation>
+    </message>
+    <message>
+        <source>## its par2 redundancy percentage (not set: the PAR2 settings below)</source>
+        <translation>## sein par2-Redundanzprozentsatz (nicht gesetzt: die PAR2-Einstellungen weiter unten)</translation>
+    </message>
+    <message>
+        <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
+        <translation>Falsche Schlüsselwörter für AUTO_PACK: %1. Erlaubt ist eine Auswahl aus (COMPRESS, GEN_NAME, GEN_PAR2); das Passwort des Auto-Postings ist AUTO_PASS.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -6900,8 +7028,8 @@ Setzen Sie PAR2_SOURCE = custom und korrigieren Sie PAR2_PATH in der Konfigurati
     <message>
         <location line="-33"/>
         <location filename="../hmi/PostingWidget.cpp" line="+7"/>
-        <source>generate the par2 (the compress option must be selected)</source>
-        <translation>Die Par2 erzeugen (die Option &quot;Komprimieren&quot; muss gewählt werden)</translation>
+        <source>generate the par2 of this post, with or without compression</source>
+        <translation>Die Par2 dieses Posts erzeugen, mit oder ohne Komprimierung</translation>
     </message>
     <message>
         <location line="+30"/>
@@ -7079,6 +7207,10 @@ Manche Usenet-Indexe verlangen eine.</translation>
     <message>
         <source>Could not remove the archives of the stopped post: %1</source>
         <translation>Die Archive des gestoppten Posts konnten nicht entfernt werden: %1</translation>
+    </message>
+    <message>
+        <source>requires: %1 or %2</source>
+        <translation>erfordert: %1 oder %2</translation>
     </message>
 </context>
 <context>

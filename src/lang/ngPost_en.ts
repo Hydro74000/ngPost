@@ -45,8 +45,8 @@
     </message>
     <message>
         <location line="+29"/>
-        <source>Monitor extension filter: </source>
-        <translation></translation>
+        <source>Extensions:</source>
+        <translation>Extensions:</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -146,8 +146,8 @@
     </message>
     <message>
         <location line="+3"/>
-        <source>delete files once posted (only for Monitoring)</source>
-        <translation></translation>
+        <source>delete files once posted</source>
+        <translation>delete files once posted</translation>
     </message>
     <message>
         <location line="+24"/>
@@ -351,6 +351,42 @@ It will be irreversible...</source>
         <source>Global (%1 %)</source>
         <translation>Global (%1 %)</translation>
     </message>
+    <message>
+        <source>no password</source>
+        <translation>no password</translation>
+    </message>
+    <message>
+        <source>random password</source>
+        <translation>random password</translation>
+    </message>
+    <message>
+        <source>default password</source>
+        <translation>default password</translation>
+    </message>
+    <message>
+        <source>password of the archives: none, a random one, or the default password of the Compression Settings</source>
+        <translation>password of the archives: none, a random one, or the default password of the Compression Settings</translation>
+    </message>
+    <message>
+        <source>Scan the folder</source>
+        <translation>Scan the folder</translation>
+    </message>
+    <message>
+        <source>Monitor the folder</source>
+        <translation>Monitor the folder</translation>
+    </message>
+    <message>
+        <source>Add folder</source>
+        <translation>Add folder</translation>
+    </message>
+    <message>
+        <source>&lt;b&gt;Compression&lt;/b&gt;:</source>
+        <translation>&lt;b&gt;Compression&lt;/b&gt;:</translation>
+    </message>
+    <message>
+        <source>Folder and posts</source>
+        <translation>Folder and posts</translation>
+    </message>
 </context>
 <context>
     <name>CompressionSettingsDialog</name>
@@ -509,6 +545,58 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
         <location line="+54"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>Same switch as the box of the main window. Unticked, a new post starts with nothing ticked (config PACK).</source>
+        <translation>Same switch as the box of the main window. Unticked, a new post starts with nothing ticked (config PACK).</translation>
+    </message>
+    <message>
+        <source>Enable compression by default on posts</source>
+        <translation>Enable compression by default on posts</translation>
+    </message>
+    <message>
+        <source>Every new Quick Post, and every Quick Post you empty, starts with the options ticked here. Each post can still change them in its own tab. The Auto Posting tab keeps its own options, set in that tab.</source>
+        <translation>Every new Quick Post, and every Quick Post you empty, starts with the options ticked here. Each post can still change them in its own tab. The Auto Posting tab keeps its own options, set in that tab.</translation>
+    </message>
+    <message>
+        <source>Compress the files into an archive</source>
+        <translation>Compress the files into an archive</translation>
+    </message>
+    <message>
+        <source>hides the name of the files: the archive gets random letters instead of the name of the first file</source>
+        <translation>hides the name of the files: the archive gets random letters instead of the name of the first file</translation>
+    </message>
+    <message>
+        <source>Give the archive a random name</source>
+        <translation>Give the archive a random name</translation>
+    </message>
+    <message>
+        <source>Length:</source>
+        <translation>Length:</translation>
+    </message>
+    <message>
+        <source>length of the random archive names, also drawn by the dice button of a post (config LENGTH_NAME)</source>
+        <translation>length of the random archive names, also drawn by the dice button of a post (config LENGTH_NAME)</translation>
+    </message>
+    <message>
+        <source>Protect the archive with a random password</source>
+        <translation>Protect the archive with a random password</translation>
+    </message>
+    <message>
+        <source>length of the random archive passwords, the same as the one of the default password above (config LENGTH_PASS)</source>
+        <translation>length of the random archive passwords, the same as the one of the default password above (config LENGTH_PASS)</translation>
+    </message>
+    <message>
+        <source>repair files that let a download be fixed when part of it is missing (their amount comes from the PAR2 settings)</source>
+        <translation>repair files that let a download be fixed when part of it is missing (their amount comes from the PAR2 settings)</translation>
+    </message>
+    <message>
+        <source>Add PAR2 repair files</source>
+        <translation>Add PAR2 repair files</translation>
+    </message>
+    <message>
+        <source>Not used while the default archive password is enabled: every post gets that one.</source>
+        <translation>Not used while the default archive password is enabled: every post gets that one.</translation>
     </message>
 </context>
 <context>
@@ -669,9 +757,10 @@ Enter a whole number of MiB between 0 and 1000000 (0 disables splitting only whe
     </message>
     <message>
         <location line="+44"/>
-        <source>Arms every post with the packing options of the PACK config line: compression, a random archive name, a random password and the par2.
-Unlike the per post box, this choice is saved.</source>
-        <translation></translation>
+        <source>Every new Quick Post starts with the options chosen in the Compression Settings: compression, a random archive name, a random password, PAR2 repair files.
+The Auto Posting tab keeps its own options. Unlike the per post box, this choice is saved.</source>
+        <translation>Every new Quick Post starts with the options chosen in the Compression Settings: compression, a random archive name, a random password, PAR2 repair files.
+The Auto Posting tab keeps its own options. Unlike the per post box, this choice is saved.</translation>
     </message>
     <message>
         <location line="+14"/>
@@ -781,8 +870,8 @@ Unlike the per post box, this choice is saved.</source>
     </message>
     <message>
         <location line="+7"/>
-        <source>Where the archives are built, with which rar, in which volume size, and under which default password</source>
-        <translation></translation>
+        <source>Where the archives are built, with which rar, in which volume size, under which default password, and the options every new Quick Post starts with</source>
+        <translation>Where the archives are built, with which rar, in which volume size, under which default password, and the options every new Quick Post starts with</translation>
     </message>
     <message>
         <location line="+33"/>
@@ -4522,6 +4611,46 @@ One thing does change for such a script: the old configuration file has no POST_
         <source>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</source>
         <translation>## The size is calculated from the source size with rounding; RAR_SIZE in this file is not rewritten.</translation>
     </message>
+    <message>
+        <source>AUTO_PASS must be none, random or default.</source>
+        <translation>AUTO_PASS must be none, random or default.</translation>
+    </message>
+    <message>
+        <source>## password of the archives of the GUI&apos;s Auto Posting: none, random or default</source>
+        <translation>## password of the archives of the GUI&apos;s Auto Posting: none, random or default</translation>
+    </message>
+    <message>
+        <source>## (not set: the default password above, else a random one if PACK has GEN_PASS)</source>
+        <translation>## (not set: the default password above, else a random one if PACK has GEN_PASS)</translation>
+    </message>
+    <message>
+        <source>## (in the GUI: the posting tabs, the Auto Posting tab has its own AUTO_PACK)</source>
+        <translation>## (in the GUI: the posting tabs, the Auto Posting tab has its own AUTO_PACK)</translation>
+    </message>
+    <message>
+        <source>## packing of the GUI&apos;s Auto Posting, apart from PACK: COMPRESS, GEN_NAME and GEN_PAR2</source>
+        <translation>## packing of the GUI&apos;s Auto Posting, apart from PACK: COMPRESS, GEN_NAME and GEN_PAR2</translation>
+    </message>
+    <message>
+        <source>## (at least COMPRESS or GEN_PAR2; its password is AUTO_PASS above)</source>
+        <translation>## (at least COMPRESS or GEN_PAR2; its password is AUTO_PASS above)</translation>
+    </message>
+    <message>
+        <source>## length of its random archive names and passwords</source>
+        <translation>## length of its random archive names and passwords</translation>
+    </message>
+    <message>
+        <source>## keep its archives and par2 files after a successful post</source>
+        <translation>## keep its archives and par2 files after a successful post</translation>
+    </message>
+    <message>
+        <source>## its par2 redundancy percentage (not set: the PAR2 settings below)</source>
+        <translation>## its par2 redundancy percentage (not set: the PAR2 settings below)</translation>
+    </message>
+    <message>
+        <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
+        <translation>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -6866,8 +6995,8 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
     <message>
         <location line="-33"/>
         <location filename="../hmi/PostingWidget.cpp" line="+7"/>
-        <source>generate the par2 (the compress option must be selected)</source>
-        <translation></translation>
+        <source>generate the par2 of this post, with or without compression</source>
+        <translation>generate the par2 of this post, with or without compression</translation>
     </message>
     <message>
         <location line="+30"/>
@@ -7045,6 +7174,10 @@ Some Usenet indexes ask for one.</translation>
     <message>
         <source>Could not remove the archives of the stopped post: %1</source>
         <translation>Could not remove the archives of the stopped post: %1</translation>
+    </message>
+    <message>
+        <source>requires: %1 or %2</source>
+        <translation>requires: %1 or %2</translation>
     </message>
 </context>
 <context>

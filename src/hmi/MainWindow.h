@@ -282,6 +282,9 @@ public:
 
     bool useFixedPassword() const;
     bool hasAutoCompress() const;
+    //! Sets the switch of the posting tabs' default packing and applies it, as
+    //! a click would, even when only the options behind it changed.
+    void setPackingDefaultsEnabled(bool enabled);
 
 
     bool hasFinishedPosts() const;
@@ -307,6 +310,8 @@ public:
     static const QColor  sDoneKOColor;
     static const QString sDoneKOIcon;
     static const QColor  sArticlesFailedColor;
+    //! Shared with the Auto Posting tab, whose two modes are boxed the same way.
+    static const QString sGroupBoxStyle;
 
     bool isDarkMode() const;
     QColor pendingColor() const;
@@ -498,7 +503,6 @@ private:
     QFont _baseFont;
 
 
-    static const QString sGroupBoxStyle;
     static const QString sTabWidgetStyle;
 
 };

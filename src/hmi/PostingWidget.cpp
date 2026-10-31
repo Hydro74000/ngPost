@@ -53,6 +53,42 @@
 
 #include <utility>
 
+namespace
+{
+
+//! Set on a file once posted: files finish out of order, and a name may well
+//! contain what the "[n ok]" suffix says.
+constexpr int kFilePostedRole = Qt::UserRole;
+
+//! The switches the PACK keywords ask of a post, all off while PACK is.
+struct PackingChoice
+{
+    bool compress = false;
+    bool genName = false;
+    bool genPass = false;
+    bool doPar2 = false;
+};
+
+PackingChoice packingChoice(bool enabled, const QStringList &keys)
+{
+    PackingChoice choice;
+    if (!enabled)
+        return choice;
+    for (const QString &key : keys) {
+        QString const keyWord = key.toLower();
+        if (keyWord == NgPost::optionName(NgPost::Opt::COMPRESS))
+            choice.compress = true;
+        else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_NAME))
+            choice.genName = true;
+        else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_PASS))
+            choice.genPass = true;
+        else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_PAR2))
+            choice.doPar2 = true;
+    }
+    return choice;
+}
+
+} // namespace
 
 PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber)
     : QWidget(hmi)
@@ -72,6 +108,11 @@ PostingWidget::PostingWidget(NgPost *ngPost, MainWindow *hmi, uint jobNumber)
     connect(_ui->filesList->model(), &QAbstractItemModel::rowsInserted, this, &PostingWidget::submissionEligibilityChanged);
     connect(_ui->filesList->model(), &QAbstractItemModel::rowsRemoved, this, &PostingWidget::submissionEligibilityChanged);
     connect(_ui->filesList->model(), &QAbstractItemModel::modelReset, this, &PostingWidget::submissionEligibilityChanged);
+    // Emitted on every change of the post's state as well as of the list.
+    connect(this,
+            &PostingWidget::submissionEligibilityChanged,
+            this,
+            &PostingWidget::_refreshFileControls);
     _buildPostInfoRow();
     connect(_ui->postButton, &QAbstractButton::clicked, this, &PostingWidget::onPostFiles);
     connect(_ui->nzbPassCB,  &QAbstractButton::toggled, this, &PostingWidget::onNzbPassToggled);
@@ -94,17 +135,20 @@ PostingWidget::~PostingWidget()
 
 void PostingWidget::onFilePosted(const QString &filePath, uint nbArticles, uint nbFailed)
 {
-    int nbFiles = _ui->filesList->count();
-    for (int i = 0 ; i < nbFiles ; ++i)
-    {
+    _handleFilePosted(filePath, nbArticles, nbFailed);
+}
+
+void PostingWidget::_handleFilePosted(const QString &filePath, uint nbArticles, uint nbFailed)
+{
+    int const nbFiles = _ui->filesList->count();
+    // Every file above the one in progress is posted already.
+    for (int i = qMax(0, _ui->filesList->followedRow()); i < nbFiles; ++i) {
         QListWidgetItem *item = _ui->filesList->item(i);
-        if (item->text() == filePath)
-        {
+        if (item && item->text() == filePath) {
             QColor color(_hmi->sDoneOKColor);
             if (nbFailed == 0)
                 item->setText(QString("%1 [%2 ok]").arg(filePath).arg(nbArticles));
-            else
-            {
+            else {
                 item->setText(QString("%1 [%2 err / %3]").arg(filePath).arg(nbFailed).arg(nbArticles));
                 if (nbFailed == nbArticles)
                     color = _hmi->sDoneKOColor;
@@ -112,6 +156,9 @@ void PostingWidget::onFilePosted(const QString &filePath, uint nbArticles, uint 
                     color = _hmi->sArticlesFailedColor;
             }
             item->setForeground(color);
+            item->setData(kFilePostedRole, true);
+            if (!_highlightFirstPendingFile())
+                _ui->filesList->followItem(item);
             break;
         }
     }
@@ -119,9 +166,15 @@ void PostingWidget::onFilePosted(const QString &filePath, uint nbArticles, uint 
 
 void PostingWidget::onArchiveFileNames(const QStringList &paths)
 {
+    _setArchiveFilesAndHighlight(paths);
+}
+
+void PostingWidget::_setArchiveFilesAndHighlight(const QStringList &paths)
+{
     _ui->filesList->clear();
-    for (const QString & path : paths)
+    for (const QString &path : paths)
         _ui->filesList->addPath(path);
+    _highlightFirstPendingFile();
 }
 
 void PostingWidget::onArticlesNumber(int nbArticles)
@@ -131,6 +184,11 @@ void PostingWidget::onArticlesNumber(int nbArticles)
 }
 
 void PostingWidget::onPostingJobDone()
+{
+    _handlePostingJobDone();
+}
+
+void PostingWidget::_handlePostingJobDone()
 {
     // Both postingFinished and noMoreConnection can notify the same completion.
     if (!_postingJob)
@@ -152,12 +210,13 @@ void PostingWidget::onPostingJobDone()
         _hmi->clearJobTab(this);
 
     _armResubmission(job);
+    _clearActivePostingHighlights();
     setIDLE();
 }
 
 bool PostingWidget::canSubmit() const
 {
-    return _state == STATE::IDLE && !_postingJob && _hasPreparedFiles();
+    return acceptsFiles() && _ui->filesList->count() > 0;
 }
 
 QString PostingWidget::nzbFolder() const
@@ -173,9 +232,43 @@ void PostingWidget::setNzbFolder(const QString &folder)
         _ui->nzbFileEdit->setText(QDir(folder).filePath(QFileInfo(nzb).fileName()));
 }
 
-bool PostingWidget::_hasPreparedFiles() const
+bool PostingWidget::_isSubmitted() const
 {
-    return (!_postingFinished || _resubmittable) && _ui->filesList->count() > 0;
+    return _postingJob || _state != STATE::IDLE;
+}
+
+QString PostingWidget::_archivePassword() const
+{
+    if (!_ui->compressCB->isChecked() || !_ui->nzbPassCB->isChecked())
+        return QString();
+    return _ui->nzbPassEdit->text();
+}
+
+bool PostingWidget::acceptsFiles() const
+{
+    // The job took a copy of the list when it was submitted: a file added
+    // afterwards would never be posted, yet be shown as part of the post.
+    return !_isSubmitted() && (!_postingFinished || _resubmittable);
+}
+
+void PostingWidget::_refreshFileControls()
+{
+    bool const accepts = acceptsFiles();
+    _ui->selectFilesButton->setEnabled(accepts);
+    _ui->selectFolderButton->setEnabled(accepts);
+    _ui->filesList->setEditable(accepts);
+    // A finished tab is emptied to serve again: the default one cannot close.
+    _ui->clearFilesButton->setEnabled(!_isSubmitted());
+    _refreshPostButton();
+}
+
+void PostingWidget::_refreshPostButton()
+{
+    // Submitted, the button stops the post. Idle, it starts one only where files
+    // are taken: a post that ran to its end is not posted again from this tab.
+    bool const usable = _isSubmitted() ? !(_postingJob && _postingJob->cancelRequested())
+                                       : acceptsFiles();
+    _ui->postButton->setEnabled(usable && !_ngPost->_cancelingAll);
 }
 
 bool PostingWidget::isBlank() const
@@ -245,6 +338,9 @@ void PostingWidget::postFiles(bool updateMainParams)
 {
     if (_state == STATE::IDLE)
     {
+        // Greyed button or not, a post that ran to its end is not posted again.
+        if (!acceptsFiles())
+            return;
         if (_ui->filesList->count() == 0)
         {
             _hmi->logError(tr("There are no selected files to post..."));
@@ -332,6 +428,15 @@ void PostingWidget::_fillJobOptions(PostingJobOptions &options,
     // the GUI already asked about overwriting, and never deletes the sources
     options.overwriteNzb = true;
     options.delFilesAfterPost = false;
+    options.doCompress = _ui->compressCB->isChecked();
+    options.doPar2 = _ui->par2CB->isChecked();
+    options.rarName = _ui->compressNameEdit->text();
+    options.rarPass = _archivePassword();
+    options.passwordGenerated = !options.rarPass.isEmpty() && options.rarPass == _drawnPassword;
+    options.lengthName = static_cast<uint>(_ui->nameLengthSB->value());
+    int const redundancy = _ui->redundancySB->value();
+    options.par2Pct = redundancy < 0 ? _ngPost->_par2PctDefault : static_cast<uint>(redundancy);
+    options.keepRar = _ui->keepRarCB->isChecked();
     // per post, deliberately not copied into the NgPost globals
     // The fields belong to the post info feature as a whole: with the box
     // unticked there is no sheet, and nothing to publish in the nzb either.
@@ -407,11 +512,15 @@ void PostingWidget::onNzbPassToggled(bool checked)
 
 void PostingWidget::onGenNzbPassword()
 {
-    _ui->nzbPassEdit->setText(_ngPost->randomPass(static_cast<uint>(_ui->passLengthSB->value())));
+    _drawnPassword = _ngPost->randomPass(static_cast<uint>(_ui->passLengthSB->value()));
+    _ui->nzbPassEdit->setText(_drawnPassword);
 }
 
 void PostingWidget::onSelectFilesClicked()
 {
+    // The right click on the list lands here too, button greyed or not.
+    if (!acceptsFiles())
+        return;
     const auto shutdownHold = _ngPost->holdShutdown();
     QStringList files = QFileDialog::getOpenFileNames(
                 this,
@@ -438,7 +547,11 @@ void PostingWidget::onSelectFolderClicked()
 
 void PostingWidget::onClearFilesClicked()
 {
-    if (!_postingJob) _postingFinished = false;
+    // Also reached when the list is emptied: during a post this would wipe its
+    // NZB name, its post information and its tab mark.
+    if (_isSubmitted())
+        return;
+    _postingFinished = false;
     _ui->filesList->clear2();
     // The post information describes the post that was there; leaving it would
     // hand the title of one post to the next one queued in this tab.
@@ -451,11 +564,41 @@ void PostingWidget::onClearFilesClicked()
     _stoppedAttempt = {};
     if (_hmi->hasAutoCompress())
     {
-        onGenCompressName();
-        onGenNzbPassword();
+        // Drawn again for it, as PACK asks: the defaults of a new post, as in
+        // init(), whatever the last post of this tab ticked.
+        PackingChoice const pack = packingChoice(true, _ngPost->_packAutoKeywords);
+        if (pack.genName)
+            onGenCompressName();
+        _renewArchivePassword(pack.genPass);
     }
 
     _hmi->clearJobTab(this);
+}
+
+void PostingWidget::_renewArchivePassword(bool genPass)
+{
+    // The default password of the configuration is never replaced by a draw.
+    if (_hmi->useFixedPassword())
+        _ui->nzbPassEdit->setText(_ngPost->_rarPassFixed);
+    else if (genPass)
+        onGenNzbPassword();
+}
+
+void PostingWidget::_restoreConfiguredOptions()
+{
+    // What the last post changed goes back to the configuration, as when the
+    // tab opens. The packing switches come from the PACK keywords, as in
+    // init(); a default password goes with every compressed post.
+    loadObfuscationLengths(_ui->nameLengthSB, _ui->passLengthSB, _ngPost);
+    _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
+    _ui->redundancySB->setValue(-1);
+    PackingChoice const pack = packingChoice(_hmi->hasAutoCompress(), _ngPost->_packAutoKeywords);
+    _ui->compressCB->setChecked(pack.compress);
+    _ui->par2CB->setChecked(pack.doPar2);
+    _ui->nzbPassCB->setChecked(pack.genPass || _hmi->useFixedPassword());
+    // The last post's password stays with it: the emptying draws a new one.
+    _ui->nzbPassEdit->setText(_hmi->fixedArchivePassword());
+    _postInfoCB->setChecked(!_ngPost->postInfoTemplatePath().isEmpty());
 }
 
 void PostingWidget::resetForNextPost()
@@ -474,16 +617,20 @@ void PostingWidget::resetForNextPost()
     if (_state != STATE::IDLE)
         return;
 
-    // Same emptying as the Clear button, decorations included.
+    // The configuration first, so that the same emptying as the Clear button,
+    // decorations included, draws the next archive name and password with it.
+    _restoreConfiguredOptions();
     onClearFilesClicked();
     _postingFinished = false;
 }
 
 void PostingWidget::onCompressCB(bool checked)
 {
-    // Everything here only means something while ngPost is the one building the
-    // archive, so it follows the box. Each greyed control now says what it is
-    // waiting for: a greyed box with no explanation was reported as a broken one.
+    // The archive settings only mean something while ngPost is the one building
+    // the archive, so they follow the box. Each greyed control now says what it
+    // is waiting for: a greyed box with no explanation was reported as a broken
+    // one. PAR2 is not among them: it can protect the files as they are
+    // (Request #102).
     QString const needsCompress = tr("requires: %1").arg(_ui->compressCB->text());
 
     setDependentEnabled(_ui->compressNameEdit, checked,
@@ -491,35 +638,43 @@ void PostingWidget::onCompressCB(bool checked)
     setDependentEnabled(_ui->nameLengthSB, checked,
                         tr("length of the archive name drawn by the dice button (config LENGTH_NAME)"),
                         needsCompress);
-    setDependentEnabled(_ui->genCompressName, checked,
-                        tr("generate random archive name"), needsCompress);
-    setDependentEnabled(_ui->keepRarCB, checked,
-                        tr("by default archives and par2 files are deleted uppon post success but you can choose to keep them"),
+    setDependentEnabled(_ui->genCompressName,
+                        checked,
+                        tr("generate random archive name"),
                         needsCompress);
-    setDependentEnabled(_ui->nzbPassCB, checked,
-                        tr("This should be the password of the archive you're posting"), needsCompress);
-    setDependentEnabled(_ui->par2CB, checked,
-                        tr("generate the par2 (the compress option must be selected)"), needsCompress);
+    setDependentEnabled(_ui->nzbPassCB,
+                        checked,
+                        tr("This should be the password of the archive you're posting"),
+                        needsCompress);
 
-    // The password field and the redundancy have a switch of their own on top
-    // of this one, so they answer to both.
+    // The password field has a switch of its own on top of this one, so it
+    // answers to both. Keep Archives answers to this box or to PAR2.
     onNzbPassToggled(_ui->nzbPassCB->isChecked());
     onPar2CB(_ui->par2CB->isChecked());
 }
 
 void PostingWidget::onPar2CB(bool checked)
 {
-    // Same rule: the redundancy percentage answers to PAR2, which itself
-    // answers to the compression of this post.
-    bool const compress = _ui->compressCB->isChecked();
-    QString const needs = compress ? tr("requires: %1").arg(_ui->par2CB->text())
-                                   : tr("requires: %1").arg(_ui->compressCB->text());
-
     setDependentEnabled(
         _ui->redundancySB,
-        checked && compress,
+        checked,
         tr("Using the PAR2 arguments of the configuration: %1").arg(_ngPost->par2ArgsInUse()),
-        needs);
+        tr("requires: %1").arg(_ui->par2CB->text()));
+
+    showKeepArchivesRule(_ui->keepRarCB, _ui->compressCB, _ui->par2CB);
+}
+
+void PostingWidget::showKeepArchivesRule(QCheckBox *keepRar,
+                                         const QCheckBox *compress,
+                                         const QCheckBox *par2)
+{
+    // Archives or PAR2 volumes alone: whatever a post generates is deleted after
+    // it unless kept.
+    setDependentEnabled(keepRar,
+                        compress->isChecked() || par2->isChecked(),
+                        tr("by default archives and par2 files are deleted uppon post success but "
+                           "you can choose to keep them"),
+                        tr("requires: %1 or %2").arg(compress->text(), par2->text()));
 }
 
 void PostingWidget::onGenCompressName()
@@ -543,6 +698,9 @@ void PostingWidget::onNzbFileClicked()
 void PostingWidget::handleKeyEvent(QKeyEvent *keyEvent)
 {
     qDebug() << "[PostingWidget::handleKeyEvent] key event: " << keyEvent->key();
+    // Delete and paste are the only keys handled here.
+    if (!acceptsFiles())
+        return;
 
     if(keyEvent->key() == Qt::Key_Delete || keyEvent->key() == Qt::Key_Backspace)
     {
@@ -656,39 +814,36 @@ void PostingWidget::init()
     connect(_ui->nzbFileButton,     &QAbstractButton::clicked, this, &PostingWidget::onNzbFileClicked);
 
 
-    onCompressCB(_ngPost->_doCompress);
+    // A new post starts from the defaults the user configured, as Remove All
+    // does, never from what the last post or the Auto Posting tab left behind.
+    PackingChoice const pack = packingChoice(_hmi->hasAutoCompress(), _ngPost->_packAutoKeywords);
+    onCompressCB(pack.compress);
     onPar2CB(_ui->par2CB->isChecked());
-    if (_ngPost->_doCompress)
-        _ui->compressCB->setChecked(true);
-    if (_ngPost->_genName)
+    _ui->compressCB->setChecked(pack.compress);
+    if (pack.genName)
         onGenCompressName();
-    if (_ngPost->_genPass)
-    {
+    if (pack.genPass)
         _ui->nzbPassCB->setChecked(true);
-        onGenNzbPassword();
-    }
-    if (_ngPost->_doPar2)
-        _ui->par2CB->setChecked(true);
-
-    QString fixedPass = _hmi->fixedArchivePassword();
-    if (!fixedPass.isEmpty())
-        _ui->nzbPassEdit->setText(fixedPass);
+    _renewArchivePassword(pack.genPass);
+    _ui->par2CB->setChecked(pack.doPar2);
 }
 
-void PostingWidget::genNameAndPassword(bool genName, bool genPass, bool doPar2)
+void PostingWidget::applyAutoPacking()
 {
-    _ui->compressCB->setChecked(_ngPost->_doCompress);
-    if (genName)
+    NgPost::AutoPacking const &packing = _ngPost->_autoPacking;
+    _ui->compressCB->setChecked(packing.compress);
+    _ui->par2CB->setChecked(packing.doPar2);
+    _ui->keepRarCB->setChecked(packing.keepRar);
+    _ui->nameLengthSB->setValue(static_cast<int>(packing.lengthName));
+    _ui->passLengthSB->setValue(static_cast<int>(packing.lengthPass));
+    setPar2PercentageOverride(packing.par2Pct);
+    _ui->compressNameEdit->clear();
+    if (packing.compress && packing.genName)
         onGenCompressName();
-    if (genPass && _ngPost->_rarPassFixed.isEmpty())
-    {
-        _ui->nzbPassCB->setChecked(true);        
-        onGenNzbPassword();
-    }
-    if (doPar2)
-        _ui->par2CB->setChecked(true);
-
-    _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
+    // Whatever init() drew is gone: only a random choice is a drawn password.
+    QString const pass = packing.compress ? _ngPost->autoArchivePassword() : QString();
+    setNzbPassword(pass);
+    _drawnPassword = _ngPost->autoPassChoice() == NgPost::AutoPass::Random ? pass : QString();
 }
 
 
@@ -701,23 +856,9 @@ void PostingWidget::udatePostingParams()
     if (!_ui->nzbFileEdit->text().isEmpty())
         _ngPost->setNzbName(QFileInfo(_ui->nzbFileEdit->text()));
 
-    // fetch compression settings. The compression paths and the volume size are
-    // NOT read here any more: they are configuration, they live in the
-    // Compression settings dialog, and every tab used to overwrite the same
-    // NgPost members with its own copy so the last active tab silently won.
-    _ngPost->_doCompress = _ui->compressCB->isChecked();
-    _ngPost->_rarName    = _ui->compressNameEdit->text();
-    if (_ui->nzbPassCB->isChecked())
-        _ngPost->_rarPass = _ui->nzbPassEdit->text().toLocal8Bit();
-    else
-        _ngPost->_rarPass = QString();
-    _ngPost->_lengthName = static_cast<uint>(_ui->nameLengthSB->value());
-    _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
-    // fetch par2 settings
-    _ngPost->_doPar2  = _ui->par2CB->isChecked();
-    _ngPost->_par2Pct = (_ui->redundancySB->value() < 0 ? _ngPost->_par2PctDefault : static_cast<uint>(_ui->redundancySB->value()));
-
-    _ngPost->_keepRar = _ui->keepRarCB->isChecked();
+    // The packing of this post is not written here any more: it goes with its
+    // job options (_fillJobOptions). Written into NgPost, it became what the
+    // next new tab started with, what the Auto Posting used, and PACK on disk.
 
     _ngPost->_copyNfoWithNzb = _ui->copyNfoWithNzbCB->isChecked();
 }
@@ -842,8 +983,7 @@ PostInfoData PostingWidget::_postInfoPreview() const
     }
 
     postData.rarName = _ui->compressNameEdit->text();
-    if (_ui->nzbPassCB->isChecked())
-        postData.rarPass = _ui->nzbPassEdit->text();
+    postData.rarPass = _archivePassword();
 
     postData.groups = _ngPost->groups();
     // Left empty when ngPost draws a poster at random: showing one sample
@@ -906,52 +1046,35 @@ void PostingWidget::retranslate()
 
 void PostingWidget::setNzbPassword(const QString &pass)
 {
-    _ui->nzbPassCB->setChecked(true);
+    // No password is an unticked box: ticked over an empty field would be a lie.
+    _ui->nzbPassCB->setChecked(!pass.isEmpty());
     _ui->nzbPassEdit->setText(pass);
 }
 
 void PostingWidget::setPackingAuto(bool enabled, const QStringList &keys)
 {
-    bool compress = false, genName = false, genPass = false, doPar2 = false;
-    if (enabled)
-    {
-        for (auto it = keys.cbegin(), itEnd = keys.cend(); it != itEnd; ++it)
-        {
-            QString keyWord = (*it).toLower();
-            if (keyWord == NgPost::optionName(NgPost::Opt::COMPRESS))
-                compress = true;
-            else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_NAME))
-                genName = true;
-            else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_PASS))
-                genPass = true;
-            else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_PAR2))
-                doPar2 = true;
-        }
-    }
-    _ui->nzbPassCB->setChecked(genPass);
-    _ui->compressCB->setChecked(compress);
-    _ui->par2CB->setChecked(doPar2);
+    PackingChoice const pack = packingChoice(enabled, keys);
+    _ui->nzbPassCB->setChecked(pack.genPass);
+    _ui->compressCB->setChecked(pack.compress);
+    _ui->par2CB->setChecked(pack.doPar2);
 
 
-    if (compress)
-    {
+    if (pack.compress) {
         if (_ui->nzbPassEdit->text().isEmpty())
-        {
-            if (_hmi->useFixedPassword())
-                _ui->nzbPassEdit->setText(_ngPost->_rarPassFixed);
-            else if (genPass)
-                onGenNzbPassword();
-        }
-        if (genName && _ui->compressNameEdit->text().isEmpty())
+            _renewArchivePassword(pack.genPass);
+        if (pack.genName && _ui->compressNameEdit->text().isEmpty())
             onGenCompressName();
     }
 }
 
 void PostingWidget::addPath(const QString &path, int currentNbFiles, int isDir)
 {
+    // Every way of adding comes here: drop, paste, file and folder pickers.
+    if (!acceptsFiles())
+        return;
     if (_ui->filesList->addPathIfNotInList(path, currentNbFiles, isDir))
     {
-        if (!_postingJob) _postingFinished = false;
+        _postingFinished = false;
         emit submissionEligibilityChanged();
         QFileInfo fileInfo(path);
         if (_ui->nzbFileEdit->text().isEmpty())
@@ -993,12 +1116,11 @@ QColor PostingWidget::postingTextColor() const
 void PostingWidget::refreshPostingState()
 {
     const bool submitted = _postingJob && !_postingFinished;
-    const bool stopping = submitted && _postingJob->cancelRequested();
     const bool active = submitted && _ngPost->_activeJob == _postingJob;
     _ui->postButton->setText(!submitted   ? tr("Start Quick Post #%1").arg(displayNumber())
                                  : active ? tr("Stop Posting")
                                           : tr("Cancel Posting"));
-    _ui->postButton->setEnabled(!stopping && !_ngPost->_cancelingAll);
+    _refreshPostButton();
     const QIcon icon = (submitted && !active) ? _hmi->pendingIcon() : QIcon();
     _hmi->updateJobTab(this, postingTextColor(), icon);
 }
@@ -1012,13 +1134,25 @@ void PostingWidget::setIDLE()
 
 void PostingWidget::setPosting()
 {
-    _hmi->updateJobTab(this, _hmi->sPostingColor, QIcon(_hmi->sPostingIcon), _postingJob->nzbName());
+    _activatePosting();
+}
+
+void PostingWidget::_activatePosting()
+{
+    const QString nzbName = _postingJob ? _postingJob->nzbName() : QString();
+    _hmi->updateJobTab(this, _hmi->sPostingColor, QIcon(_hmi->sPostingIcon), nzbName);
     _ui->postButton->setText(tr("Stop Posting"));
     _state = STATE::POSTING;
+    _highlightFirstPendingFile();
     emit submissionEligibilityChanged();
 }
 
 void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted)
+{
+    _attachResumeJob(job, files, hasStarted);
+}
+
+void PostingWidget::_attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted)
 {
     if (!job)
         return;
@@ -1037,7 +1171,35 @@ void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files,
                        hasStarted ? _hmi->sPostingColor : _hmi->pendingColor(),
                        hasStarted ? QIcon(_hmi->sPostingIcon) : _hmi->pendingIcon(),
                        job->nzbName());
+    if (hasStarted)
+        _highlightFirstPendingFile();
     emit submissionEligibilityChanged();
+}
+
+bool PostingWidget::_highlightFirstPendingFile()
+{
+    int const nbFiles = _ui->filesList->count();
+    for (int i = qMax(0, _ui->filesList->followedRow()); i < nbFiles; ++i) {
+        QListWidgetItem *item = _ui->filesList->item(i);
+        if (item && !item->data(kFilePostedRole).toBool()) {
+            item->setForeground(_hmi->sPostingColor);
+            _ui->filesList->followItem(item);
+            return true;
+        }
+    }
+    return false;
+}
+
+void PostingWidget::_clearActivePostingHighlights()
+{
+    _ui->filesList->followItem(nullptr);
+    int const nbFiles = _ui->filesList->count();
+    const QColor normalColor = postingTextColor();
+    for (int i = 0; i < nbFiles; ++i) {
+        QListWidgetItem *item = _ui->filesList->item(i);
+        if (item && item->foreground().color() == _hmi->sPostingColor)
+            item->setForeground(normalColor);
+    }
 }
 
 
@@ -1053,7 +1215,7 @@ void PostingWidget::loadObfuscationLengths(QSpinBox *nameLength,
                                            const NgPost *ngPost)
 {
     nameLength->setRange(5, 50);
-    nameLength->setValue(static_cast<int>(ngPost->_lengthName));
+    nameLength->setValue(static_cast<int>(ngPost->_lengthNameDefault));
     passLength->setRange(5, 50);
     passLength->setValue(static_cast<int>(ngPost->_lengthPassDefault));
 }

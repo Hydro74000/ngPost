@@ -481,10 +481,11 @@ void PostingJob::_createHistoryRecord()
             rec.passwordOrigin = QStringLiteral("absent");
         else if (_rarPass.isEmpty())
             rec.passwordOrigin = QStringLiteral("declared");
-        else if (_ngPost->_genPass && _ngPost->_rarPassFixed.isEmpty())
-            rec.passwordOrigin = QStringLiteral("generated");
-        else if (!_ngPost->_rarPassFixed.isEmpty())
+        else if (_rarPass == _ngPost->_rarPassFixed)
             rec.passwordOrigin = QStringLiteral("fixed");
+        // Auto Posting may draw one while a default password exists.
+        else if (_options.passwordGenerated)
+            rec.passwordOrigin = QStringLiteral("generated");
         else
             rec.passwordOrigin = QStringLiteral("provided");
         rec.from = QString::fromStdString(_from);
@@ -1435,7 +1436,7 @@ void PostingJob::_obfuscateInputFileNames(QString const &tmpFolder, QString cons
 
     _files.clear();
     for (const QFileInfo &fileInfo : _originalFiles) {
-        QString randomBase = _ngPost->randomName(_ngPost->_lengthName);
+        QString randomBase = _ngPost->randomName(_options.lengthName);
         if (_ngPost->_keepNfoExtension
             && fileInfo.suffix().compare("nfo", Qt::CaseInsensitive) == 0)
             randomBase += ".nfo";

@@ -655,6 +655,15 @@ bool MainWindow::hasAutoCompress() const
     return _ui->autoCompressCB->isChecked();
 }
 
+void MainWindow::setPackingDefaultsEnabled(bool enabled)
+{
+    {
+        const QSignalBlocker blocker(_ui->autoCompressCB);
+        _ui->autoCompressCB->setChecked(enabled);
+    }
+    onAutoCompressToggled(enabled);
+}
+
 #include <QGraphicsDropShadowEffect>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -753,7 +762,9 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 #include <QMimeData>
 void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 {
-    if (e->mimeData()->hasUrls())
+    // Refused up front, so the cursor says what the drop would not do.
+    auto *post = qobject_cast<PostingWidget *>(_ui->postTabWidget->currentWidget());
+    if (e->mimeData()->hasUrls() && (!post || post->acceptsFiles()))
         e->acceptProposedAction();
 }
 
@@ -1483,21 +1494,14 @@ void MainWindow::updateConfigFromUi()
     if (!_quickJobTab || !_autoPostTab)
         return;
 
-    int currentTabIdx = _ui->postTabWidget->currentIndex();
-    if (currentTabIdx == kQuickPostTab)
-        _quickJobTab->udatePostingParams();
-    else if (currentTabIdx == kAutoPostTab)
-        _autoPostTab->udatePostingParams();
-    else
-    {
-        PostingWidget *postWidget = _getPostWidget(currentTabIdx);
-        if (postWidget)
-            postWidget->udatePostingParams();
-    }
-
-    const bool signalsWereBlocked = _ui->autoCompressCB->blockSignals(true);
-    _ui->autoCompressCB->setChecked(_ngPost->_packAuto);
-    _ui->autoCompressCB->blockSignals(signalsWereBlocked);
+    // Whichever tab is in front: the Auto Posting tab only writes its own
+    // settings, so a save no longer depends on where the user stands.
+    _autoPostTab->udatePostingParams();
+    int const currentTabIdx = _ui->postTabWidget->currentIndex();
+    PostingWidget *postWidget = currentTabIdx == kQuickPostTab ? _quickJobTab
+                                                               : _getPostWidget(currentTabIdx);
+    if (postWidget)
+        postWidget->udatePostingParams();
 }
 
 QString MainWindow::fixedArchivePassword() const
@@ -2653,12 +2657,13 @@ void MainWindow::onCompressionSettingsClicked()
     QString const pass = dlg.fixedPassword();
     if (!pass.isEmpty())
         onRarPassUpdated(pass);
+    _autoPostTab->refreshPasswordChoices();
 }
 
 void MainWindow::onAutoCompressToggled(bool checked)
 {
+    // The defaults of the posting tabs only: the Auto Posting tab has its own.
     _ngPost->enableAutoPacking(checked);
-    _autoPostTab->setPackingAuto(checked, _ngPost->_packAutoKeywords);
     if (!_quickJobTab->isPosting())
         _quickJobTab->setPackingAuto(checked, _ngPost->_packAutoKeywords);
     PostingWidget *currentQuickPost = _getPostWidget(_ui->postTabWidget->currentIndex());

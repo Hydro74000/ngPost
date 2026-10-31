@@ -172,6 +172,12 @@ public:
         LENGTH_PASS,
         RAR_NAME,
         RAR_PASS,
+        AUTO_PASS,
+        AUTO_PACK,
+        AUTO_LENGTH_NAME,
+        AUTO_LENGTH_PASS,
+        AUTO_KEEP_RAR,
+        AUTO_PAR2_PCT,
         RAR_NO_ROOT_FOLDER,
         AUTO_CLOSE_TABS,
         KEEP_NFO_EXTENSION,
@@ -222,6 +228,31 @@ public:
         DRY_RUN,
         YES,
         JSON
+    };
+
+    //! The password of the archives the GUI's Auto Posting builds (AUTO_PASS).
+    //! Unset keeps the rule of the command line: the default password wins,
+    //! else GEN_PASS draws one.
+    enum class AutoPass {
+        Unset,
+        None,
+        Random,
+        Default
+    };
+
+    //! What the GUI's Auto Posting tab does to every post it makes (AUTO_PACK,
+    //! AUTO_LENGTH_NAME, AUTO_LENGTH_PASS, AUTO_KEEP_RAR, AUTO_PAR2_PCT; its
+    //! password is AUTO_PASS). Edited by that tab only: PACK and the posting
+    //! tabs never change it, and it never changes them.
+    struct AutoPacking
+    {
+        bool compress = false;
+        bool genName = false;
+        bool doPar2 = false;
+        uint lengthName = 17;
+        uint lengthPass = 13;
+        bool keepRar = false;
+        int par2Pct = -1; //!< below 0: the PAR2 settings of the configuration
     };
 
 private:
@@ -373,7 +404,10 @@ private:
     bool _genName;
     bool _genPass;
 
-    uint _lengthName;
+    uint _lengthName; //!< what the command line uses; LENGTH_NAME is _lengthNameDefault
+    //! What a new posting tab starts with and what LENGTH_NAME holds on disk,
+    //! like _lengthPassDefault: no tab writes it, so no save quietly rewrites it.
+    uint _lengthNameDefault = sDefaultLengthName;
     uint _lengthPass; //!< what THIS post uses, refreshed from its tab before each job
     //! What a new tab starts with, what the Compression settings dialog edits
     //! and what LENGTH_PASS holds on disk. Kept apart from _lengthPass, as
@@ -383,6 +417,8 @@ private:
     QString _rarName;
     QString _rarPass;
     QString _rarPassFixed;
+    AutoPass _autoPass = AutoPass::Unset;
+    AutoPacking _autoPacking;
 
     QString _inputDir;
 
@@ -650,6 +686,8 @@ public:
         return true;
     }
     int shutdownStartCountForTest() const { return _shutdownStartCount; }
+    //! What a monitored \a file would be posted with, without posting it.
+    PostingJobOptions monitoredPostOptionsForTest(const QFileInfo &file);
     int shutdownRecheckCountForTest() const { return _shutdownRecheckCount; }
     bool shutdownInProgressForTest() const { return _shutdownProc != nullptr; }
     //! Read back what the configuration parsing produced, so a test can check
@@ -682,6 +720,17 @@ public:
 
     inline QString randomFrom(ushort length = 13) const;
     QString randomPass(uint length = 13) const;
+    //! What AUTO_PASS gives while it is not set: the default password when
+    //! there is one, else a draw when GEN_PASS asks for it.
+    AutoPass implicitAutoPass() const;
+    //! The password of a new Auto Posting archive, AUTO_PASS applied in the GUI.
+    QString autoArchivePassword() const;
+    //! AUTO_PASS as a post applies it: a default password that no longer
+    //! exists gives a random one, never a password nobody chose.
+    AutoPass autoPassChoice() const;
+    //! The defaults of a new posting tab, PACK and its switch in the main
+    //! window, as the Compression settings dialog sets them.
+    void setPackingDefaults(bool enabled, const QStringList &keywords);
     QString randomName(uint length = 13) const { return RandomToken::publicName(length); }
 
     inline QList<QString> languages() const;
@@ -888,6 +937,9 @@ private:
     void _loadTanslators();
 
     void _post(const QFileInfo &fileInfo, const QString &monitorFolder = "");
+    //! The packing of a monitored post: the Auto Posting tab's in the GUI, the
+    //! command line's otherwise.
+    void _packMonitoredPost(PostingJobOptions &options);
     void _finishPosting();
     void _discardUnstartedJob(PostingJob *job);
     void _retainVpnForJob(PostingJob *job);
@@ -953,6 +1005,7 @@ private:
     void _writeConfigVpn(QTextStream &stream);
     void _writeConfigTransfer(QTextStream &stream);
     void _writeConfigPacking(QTextStream &stream);
+    void _writeConfigAutoPosting(QTextStream &stream);
     void _writeConfigArchive(QTextStream &stream);
     void _writeConfigPar2(QTextStream &stream);
     void _writeConfigServers(QTextStream &stream);
@@ -1006,6 +1059,13 @@ private:
                                 QString val,
                                 ConfigParseState &state,
                                 QString &err);
+    bool _parseConfigAutoPostKey(const QString &opt,
+                                 const QString &val,
+                                 ConfigParseState &state,
+                                 QString &err);
+    //! Gives the Auto Posting tab what the configuration left unsaid: what it
+    //! did before it had settings of its own, so an upgrade changes nothing.
+    void _settleAutoPacking(const ConfigParseState &state);
     bool _parseConfigPar2Key(const QString &opt,
                              const QString &val,
                              ConfigParseState &state,

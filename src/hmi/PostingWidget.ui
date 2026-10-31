@@ -290,7 +290,7 @@
      <item>
       <widget class="QCheckBox" name="par2CB">
        <property name="toolTip">
-        <string>generate the par2 (the compress option must be selected)</string>
+        <string>generate the par2 of this post, with or without compression</string>
        </property>
        <property name="text">
         <string>Gen PAR2</string>

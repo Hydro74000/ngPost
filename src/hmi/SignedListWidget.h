@@ -37,6 +37,15 @@ public:
 
     void removeItemWidget2(QListWidgetItem *item);
 
+    //! Keeps \a item (the file in progress) centred, unless the user scrolled
+    //! it out of sight. A hidden list, a background tab, only records it and
+    //! catches up when shown. nullptr stops following.
+    void followItem(QListWidgetItem *item);
+    //! Row of the followed item, -1 when none.
+    int followedRow() const;
+    //! While false, Delete and Backspace leave the rows alone.
+    void setEditable(bool editable) { _editable = editable; }
+
 signals:
     void rightClick();
     void empty();
@@ -49,16 +58,23 @@ public slots:
 
 protected:
     void resizeEvent(QResizeEvent *e) override;
+    void showEvent(QShowEvent *e) override;
     void mousePressEvent(QMouseEvent * e) override;
     void keyPressEvent(QKeyEvent *e) override;
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 
 private:
+    bool _isShown(const QModelIndex &index) const;
+
     QLabel *_asciiLbl;
     QSize   _sizeAscii;
     QIcon   _fileIcon;
     QIcon   _folderIcon;
+    QPersistentModelIndex _followed;
+    //! Set when the user scrolls (bar, wheel, keys), cleared when following resumes.
+    bool _scrolledAway = false;
+    bool _editable = true;
 };
 
 

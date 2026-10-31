@@ -77,9 +77,20 @@ private:
     void _fillJobOptions(PostingJobOptions &options,
                          const QString &nzbPath,
                          const QFileInfoList &files) const;
-    bool _hasPreparedFiles() const;
+    //! From the submission until the job is over, queued and paused included.
+    bool _isSubmitted() const;
+    //! The password this post announces: the one of the archive ngPost builds,
+    //! so none without compression, even if the greyed box is still ticked.
+    QString _archivePassword() const;
+    //! Greys what would change the list while it is not this tab's to change.
+    void _refreshFileControls();
+    void _refreshPostButton();
     bool _isStoppedAttemptNzb(const QString &nzbPath) const;
     bool _stoppedAttemptIsReplaceable() const;
+
+    //! The last password ngPost drew for this tab: the history tells a drawn
+    //! password from a typed one.
+    QString _drawnPassword;
 
     // Post info file, per post. One discreet checkbox on the tab; everything
     // else lives in a dialog, because a posting tab is about posting.
@@ -100,7 +111,10 @@ public:
     void attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted);
 
     void init();
-    void genNameAndPassword(bool genName, bool genPass, bool doPar2);
+    //! Takes the packing of the Auto Posting tab (its AUTO_* settings) in place
+    //! of the defaults of a new tab. Before any file is added: without a random
+    //! archive name, the first file gives its own.
+    void applyAutoPacking();
     inline uint jobNumber() const;
 
     void handleDropEvent(QDropEvent *e);
@@ -110,6 +124,10 @@ public:
 
     inline bool isPosting() const;
     inline bool isPostingFinished() const;
+    //! False while a post holds the list, and for good once one ran to its end:
+    //! only a post that can start over (stopped, or failed before any
+    //! transfer) takes files again. Emptying the tab frees it.
+    bool acceptsFiles() const;
     inline MainWindow *hmi() const;
 
     void udatePostingParams();
@@ -151,6 +169,11 @@ public:
     static void loadObfuscationLengths(QSpinBox *nameLength,
                                        QSpinBox *passLength,
                                        const NgPost *ngPost);
+    //! Keep Archives keeps whatever a post generates, its archives or its PAR2
+    //! volumes alone, so it waits for either box. The Auto tab shares it.
+    static void showKeepArchivesRule(QCheckBox *keepRar,
+                                     const QCheckBox *compress,
+                                     const QCheckBox *par2);
     void setPar2PercentageOverride(int percentage);
     bool hasPar2PercentageOverride() const;
 
@@ -194,6 +217,17 @@ private:
     bool _fileAlreadyInList(const QString &fileName, int currentNbFiles) const;
     void _setupCopyActions();
     void _copyToClipboard(QAction *action, QLineEdit *edit);
+    void _handleFilePosted(const QString &filePath, uint nbArticles, uint nbFailed);
+    void _setArchiveFilesAndHighlight(const QStringList &paths);
+    void _activatePosting();
+    void _handlePostingJobDone();
+    void _attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted);
+    bool _highlightFirstPendingFile();
+    void _clearActivePostingHighlights();
+    //! The configured password when there is one, else a draw if \a genPass.
+    void _renewArchivePassword(bool genPass);
+    //! Back to the packing options the configuration gives a new tab.
+    void _restoreConfiguredOptions();
 
     QAction *_copyCompressNameAction = nullptr;
     QAction *_copyPassAction = nullptr;

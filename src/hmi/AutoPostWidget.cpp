@@ -27,10 +27,40 @@
 #include "NgPost.h"
 #include "FoldersMonitorForNewFiles.h"
 #include <QFileDialog>
+#include <QFrame>
 #include <QDebug>
 #include <QMessageBox>
 #include <QKeyEvent>
 #include <QMimeData>
+#include <QStandardItemModel>
+
+namespace
+{
+
+//! The rows of the password choice, in the order of AutoPostWidget.ui.
+enum PassRow {
+    kNoPass,
+    kRandomPass,
+    kDefaultPass
+};
+
+NgPost::AutoPass passChoice(QComboBox const *box)
+{
+    switch (box->currentIndex()) {
+    case kRandomPass: return NgPost::AutoPass::Random;
+    case kDefaultPass: return NgPost::AutoPass::Default;
+    default: return NgPost::AutoPass::None;
+    }
+}
+
+void setPassChoice(QComboBox *box, NgPost::AutoPass pass)
+{
+    box->setCurrentIndex(pass == NgPost::AutoPass::Random        ? kRandomPass
+                             : pass == NgPost::AutoPass::Default ? kDefaultPass
+                                                                 : kNoPass);
+}
+
+} // namespace
 
 AutoPostWidget::AutoPostWidget(NgPost *ngPost, MainWindow *hmi) :
     QWidget(hmi),
@@ -53,10 +83,12 @@ AutoPostWidget::~AutoPostWidget()
 
 void AutoPostWidget::init()
 {
-    _ui->keepRarCB->setChecked(_ngPost->_keepRarDefault);
+    // Its own settings (AUTO_*): neither PACK nor the defaults of a posting tab.
+    NgPost::AutoPacking const &packing = _ngPost->_autoPacking;
+    _ui->keepRarCB->setChecked(packing.keepRar);
 
     _ui->redundancySB->setRange(-1, 100);
-    _ui->redundancySB->setValue(-1);
+    _ui->redundancySB->setValue(packing.par2Pct);
     refreshPar2Default();
     connect(_ngPost, &NgPost::par2DefaultsChanged, this, &AutoPostWidget::refreshPar2Default, Qt::UniqueConnection);
     // The label that carried the unit is gone with the row it lived on, so the
@@ -65,6 +97,8 @@ void AutoPostWidget::init()
 
     _ui->autoDirEdit->setText(_ngPost->_inputDir);
     PostingWidget::loadObfuscationLengths(_ui->nameLengthSB, _ui->passLengthSB, _ngPost);
+    _ui->nameLengthSB->setValue(static_cast<int>(packing.lengthName));
+    _ui->passLengthSB->setValue(static_cast<int>(packing.lengthPass));
 
     _ui->filesList->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
@@ -72,9 +106,21 @@ void AutoPostWidget::init()
     connect(_ui->scanAutoDirButton, &QAbstractButton::clicked, this, &AutoPostWidget::onScanAutoDirClicked);
     connect(_ui->compressCB,        &QAbstractButton::toggled, this, &AutoPostWidget::onCompressToggled);
     connect(_ui->par2CB,            &QAbstractButton::toggled, this, &AutoPostWidget::onGenPar2Toggled);
+    connect(_ui->passModeCB,
+            &QComboBox::currentIndexChanged,
+            this,
+            &AutoPostWidget::onPassChoiceChanged);
+    // Kept as soon as the user picks it: a save only reads the tab in front.
+    connect(_ui->passModeCB, &QComboBox::activated, this, [this] {
+        _ngPost->_autoPass = passChoice(_ui->passModeCB);
+    });
 
-    setPackingAuto(_ngPost->_packAuto, _ngPost->_packAutoKeywords);
-    // setPackingAuto() only emits toggled() when a box actually changes, so the
+    _ui->compressCB->setChecked(packing.compress);
+    _ui->genNameCB->setChecked(packing.genName);
+    setPassChoice(_ui->passModeCB, _ngPost->autoPassChoice());
+    refreshPasswordChoices();
+    _ui->par2CB->setChecked(packing.doPar2);
+    // setChecked() only emits toggled() when a box actually changes, so the
     // dependents are refreshed here rather than trusting a signal that may not
     // have fired. The coupling side effects of the handlers are deliberately
     // not replayed: opening the tab must not tick PAR2 on the user's behalf.
@@ -97,6 +143,12 @@ void AutoPostWidget::init()
     _ui->extensionFilterEdit->setText(_ngPost->_monitorExtensions.isEmpty()? "" : _ngPost->_monitorExtensions.join(","));
     _ui->dirAllowedCB->setChecked(!_ngPost->_monitorIgnoreDir);
     _ui->copyNfoCB->setChecked(_ngPost->_autoIncludeNfo);
+
+    _ui->folderBox->setStyleSheet(MainWindow::sGroupBoxStyle);
+    _ui->scanBox->setStyleSheet(MainWindow::sGroupBoxStyle);
+    _ui->monitorBox->setStyleSheet(MainWindow::sGroupBoxStyle);
+    // Irreversible: marked like the delete buttons of the history.
+    _ui->delFilesCB->setStyleSheet(QStringLiteral("QCheckBox { color: #dd4444; }"));
 }
 
 
@@ -128,11 +180,13 @@ Press the Scan button and remove what you don't want to post ;)\n\
 
     _hmi->updateServers();
     _hmi->updateParams();
-    udatePostingParams();
 
     bool startPost = _ui->startJobsCB->isChecked();
     for (const QFileInfo &file : files)
     {
+        // For every post, as for a monitored file: the previous post wrote its
+        // tab's values (password length...) over the shared ones.
+        udatePostingParams();
         // "copy nfo alongside other files": a lone .nfo that has a sibling is not
         // posted on its own, and any other file pulls in its sibling .nfo so both
         // end up in the same post (udatePostingParams() above refreshed the flag)
@@ -144,15 +198,17 @@ Press the Scan button and remove what you don't want to post ;)\n\
         if (nfo.isFile())
             postFiles << nfo;
 
-        PostingWidget *quickPostWidget = _hmi->addNewQuickTab(postFiles);
-        quickPostWidget->init();
-        quickPostWidget->setPar2PercentageOverride(_ui->redundancySB->value());
+        // This tab's packing, archive password included, before the files:
+        // without a random archive name, the first file gives its own.
+        PostingWidget *quickPostWidget = _hmi->addNewQuickTab();
+        quickPostWidget->applyAutoPacking();
+        for (const QFileInfo &postFile : postFiles)
+            quickPostWidget->addPath(postFile.absoluteFilePath(), 0, postFile.isDir());
         // One choice for the whole run: every post it launches gets it.
         quickPostWidget->setPostInfo(_postInfoCB && _postInfoCB->isChecked(),
                                      _postInfoTemplate,
                                      _postInfoOutput,
                                      _postInfoMeta);
-        quickPostWidget->genNameAndPassword(_ngPost->_genName, _ngPost->_genPass, _ngPost->_doPar2);
 
         if (startPost)
             quickPostWidget->postFiles(false);
@@ -231,31 +287,15 @@ void AutoPostWidget::onMonitoringClicked()
 
     _ui->autoDirEdit->setEnabled(_isMonitoring);
     _ui->autoDirButton->setEnabled(_isMonitoring);
-    _ui->latestFilesFirstCB->setEnabled(_isMonitoring);
-    _ui->scanAutoDirButton->setEnabled(_isMonitoring);
+    // The other mode as a whole, title included, so it reads as unavailable.
+    _ui->scanBox->setEnabled(_isMonitoring);
 
     _ui->compressCB->setEnabled(_isMonitoring);
     _ui->par2CB->setEnabled(_isMonitoring);
-//    _ui->delFilesCB->setEnabled(_isMonitoring);
-
-    _ui->startJobsCB->setEnabled(_isMonitoring);
-    _ui->postButton->setEnabled(_isMonitoring);
 
     _isMonitoring = !_isMonitoring;
-    // While monitoring, the packing options are frozen; otherwise they answer
-    // to their own switch again, so let the handlers decide rather than
-    // leaving a control enabled with nothing to act on.
-    if (_isMonitoring)
-    {
-        _ui->genNameCB->setEnabled(false);
-        _ui->nameLengthSB->setEnabled(false);
-        _ui->genPassCB->setEnabled(false);
-        _ui->passLengthSB->setEnabled(false);
-        _ui->keepRarCB->setEnabled(false);
-        _ui->redundancySB->setEnabled(false);
-    }
-    else
-        updatePackingDependents();
+    // Frozen while monitoring, answering to their own switch otherwise.
+    updatePackingDependents();
 
     _ui->addMonitoringFolderButton->setEnabled(_isMonitoring);
 
@@ -311,19 +351,36 @@ void AutoPostWidget::updatePackingDependents()
                         tr("generate a random name for the archive"), needsCompress);
     setDependentEnabled(_ui->nameLengthSB, compress,
                         tr("length of the random archive name"), needsCompress);
-    setDependentEnabled(_ui->genPassCB, compress,
-                        tr("generate a random password for the archive or use the fixed one"), needsCompress);
-    setDependentEnabled(_ui->passLengthSB, compress,
-                        tr("length of the random archive password"), needsCompress);
-    setDependentEnabled(_ui->keepRarCB, compress,
-                        tr("by default archives and par2 files are deleted uppon post success but you can choose to keep them"),
+    setDependentEnabled(_ui->passModeCB,
+                        compress,
+                        tr("password of the archives: none, a random one, or the default password "
+                           "of the Compression Settings"),
                         needsCompress);
+    bool const random = passChoice(_ui->passModeCB) == NgPost::AutoPass::Random;
+    setDependentEnabled(_ui->passLengthSB,
+                        compress && random,
+                        tr("length of the random archive password"),
+                        compress ? tr("requires: %1").arg(_ui->passModeCB->itemText(kRandomPass))
+                                 : needsCompress);
+    PostingWidget::showKeepArchivesRule(_ui->keepRarCB, _ui->compressCB, _ui->par2CB);
 
     setDependentEnabled(
         _ui->redundancySB,
         _ui->par2CB->isChecked(),
         tr("Using the PAR2 arguments of the configuration: %1").arg(_ngPost->par2ArgsInUse()),
         tr("requires: %1").arg(_ui->par2CB->text()));
+
+    // Every new file of a monitored folder reads these: frozen until it stops,
+    // whatever calls this meanwhile (a language change, new PAR2 defaults).
+    if (_isMonitoring) {
+        QWidget *const frozen[] = { _ui->genNameCB,    _ui->nameLengthSB, _ui->passModeCB,
+                                    _ui->passLengthSB, _ui->keepRarCB,    _ui->redundancySB };
+        // Null-safe like setDependentEnabled() above, or clang-analyzer takes
+        // its guard as a hint that one of them may be missing.
+        for (QWidget *widget : frozen)
+            if (widget)
+                widget->setEnabled(false);
+    }
 }
 
 void AutoPostWidget::onCompressToggled(bool checked)
@@ -343,9 +400,12 @@ void AutoPostWidget::onGenPar2Toggled(bool checked)
 #include "PostingJob.h"
 void AutoPostWidget::onMonitorJobStart()
 {
-    PostingJob *job = static_cast<PostingJob*>(sender());
+    updateStartedJob(static_cast<PostingJob *>(sender())->getFirstOriginalFile());
+}
 
-    QString srcPath = QString("- %1").arg(job->getFirstOriginalFile());
+void AutoPostWidget::updateStartedJob(const QString &path)
+{
+    QString srcPath = QString("- %1").arg(path);
     int nbFiles = _ui->filesList->count();
     for (int i = _currentPostIdx; i < nbFiles; ++i)
     {
@@ -353,6 +413,7 @@ void AutoPostWidget::onMonitorJobStart()
         if (item->text() == srcPath)
         {
             item->setForeground(_hmi->sPostingColor);
+            _ui->filesList->followItem(item);
             _currentPostIdx = i;
             break;
         }
@@ -376,21 +437,18 @@ void AutoPostWidget::onSelectFilesClicked()
 
 void AutoPostWidget::udatePostingParams()
 {
-    // fetch compression settings
-    _ngPost->_doCompress = _ui->compressCB->isChecked();
-    _ngPost->_genName    = _ngPost->_doCompress ? _ui->genNameCB->isChecked() : false;
-    _ngPost->_genPass    = _ngPost->_doCompress ? _ui->genPassCB->isChecked() : false;
-    _ngPost->_doPar2     = _ui->par2CB->isChecked();
-    _ngPost->_packAuto   = _ngPost->_doCompress || _ngPost->_doPar2;
-
-    // The compression paths and the volume size belong to the Compression
-    // settings dialog now: this tab used to hold a second copy of them and
-    // overwrite whatever a posting tab had just written.
-    _ngPost->_lengthName = static_cast<uint>(_ui->nameLengthSB->value());
-    _ngPost->_lengthPass = static_cast<uint>(_ui->passLengthSB->value());
-
-    // fetch par2 settings
-    _ngPost->_par2Pct = (_ui->redundancySB->value() < 0 ? _ngPost->_par2PctDefault : static_cast<uint>(_ui->redundancySB->value()));
+    // Its own settings only (AUTO_*). It used to write the shared packing
+    // flags, which the posting tabs start from and PACK was saved from: the
+    // last Auto Posting run decided what a new posting tab looked like.
+    NgPost::AutoPacking &packing = _ngPost->_autoPacking;
+    packing.compress = _ui->compressCB->isChecked();
+    packing.genName = _ui->genNameCB->isChecked();
+    packing.doPar2 = _ui->par2CB->isChecked();
+    packing.lengthName = static_cast<uint>(_ui->nameLengthSB->value());
+    packing.lengthPass = static_cast<uint>(_ui->passLengthSB->value());
+    packing.keepRar = _ui->keepRarCB->isChecked();
+    packing.par2Pct = _ui->redundancySB->value();
+    _ngPost->_autoPass = passChoice(_ui->passModeCB);
 
     QFileInfo inputDir(_ui->autoDirEdit->text());
     if (inputDir.exists() && inputDir.isDir() && inputDir.isWritable())
@@ -408,12 +466,18 @@ void AutoPostWidget::udatePostingParams()
     }
 
     _ngPost->_monitorIgnoreDir = !_ui->dirAllowedCB->isChecked();
-    _ngPost->_autoIncludeNfo   = _ui->copyNfoCB->isChecked();
-
-    _ngPost->_keepRar = _ui->keepRarCB->isChecked();
+    _ngPost->_autoIncludeNfo = _ui->copyNfoCB->isChecked();
 }
 
 void AutoPostWidget::updateFinishedJob(const QString &path, uint nbArticles, uint nbUploaded, uint nbFailed)
+{
+    _handleFinishedJob(path, nbArticles, nbUploaded, nbFailed);
+}
+
+void AutoPostWidget::_handleFinishedJob(const QString &path,
+                                        uint nbArticles,
+                                        uint nbUploaded,
+                                        uint nbFailed)
 {
     QString srcPath = QString("- %1").arg(path);
     int nbFiles = _ui->filesList->count();
@@ -434,6 +498,7 @@ void AutoPostWidget::updateFinishedJob(const QString &path, uint nbArticles, uin
             }
             item->setData(Qt::UserRole, false);
             item->setForeground(color);
+            // No scroll: the next job's start brings the list there.
             break;
         }
     }
@@ -444,6 +509,9 @@ bool AutoPostWidget::deleteFilesOncePosted() const { return _ui->delFilesCB->isC
 void AutoPostWidget::retranslate()
 {
     _ui->retranslateUi(this);
+    // retranslateUi() puts back the .ui text, which is the idle one.
+    if (_isMonitoring)
+        _ui->monitorButton->setText(tr("Stop Monitoring"));
     refreshPar2Default();
     // retranslateUi() has just reset the tooltips to the plain .ui text, which
     // drops what a greyed control is waiting for. Rebuild both halves.
@@ -457,30 +525,25 @@ void AutoPostWidget::retranslate()
                                    tr("Bare in mind you can select items in the list and press DEL to remove them")));
 }
 
-void AutoPostWidget::setPackingAuto(bool enabled, const QStringList &keys){
-    bool compress = false, genName = false, genPass = false, doPar2 = false;
-    if (enabled)
-    {
-        for (auto it = keys.cbegin(), itEnd = keys.cend(); it != itEnd; ++it)
-        {
-            QString keyWord = (*it).toLower();
-            if (keyWord == NgPost::optionName(NgPost::Opt::COMPRESS))
-                compress = true;
-            else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_NAME))
-                genName = true;
-            else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_PASS))
-                genPass = true;
-            else if (keyWord == NgPost::optionName(NgPost::Opt::GEN_PAR2))
-                doPar2 = true;
-        }
-    }
-    _ui->compressCB->setChecked(compress);
-    _ui->genNameCB->setChecked(genName);
-    _ui->genPassCB->setChecked(genPass);
-    _ui->par2CB->setChecked(doPar2);
-    onCompressToggled(compress);
+void AutoPostWidget::refreshPasswordChoices()
+{
+    // The default password can only be chosen while there is one. Gone, the
+    // archives stay protected by a random one, never by a password nobody set.
+    bool const hasDefault = !_ngPost->_rarPassFixed.isEmpty();
+    auto *rows = qobject_cast<QStandardItemModel *>(_ui->passModeCB->model());
+    if (QStandardItem *row = rows ? rows->item(kDefaultPass) : nullptr)
+        row->setEnabled(hasDefault);
+    if (!hasDefault && passChoice(_ui->passModeCB) == NgPost::AutoPass::Default)
+        setPassChoice(_ui->passModeCB, NgPost::AutoPass::Random);
 }
 
+void AutoPostWidget::onPassChoiceChanged()
+{
+    // The controls stay greyed while monitoring; the choice itself only moves
+    // there when the default password goes away.
+    if (!_isMonitoring)
+        updatePackingDependents();
+}
 
 
 void AutoPostWidget::handleKeyEvent(QKeyEvent *keyEvent)
@@ -516,24 +579,27 @@ void AutoPostWidget::handleDropEvent(QDropEvent *e)
 
 void AutoPostWidget::_buildPostInfoRow()
 {
-    QHBoxLayout *row = new QHBoxLayout();
-    row->setContentsMargins(6, 0, 6, 0);
-
     _postInfoCB = new QCheckBox(this);
     _postInfoCB->setObjectName(QStringLiteral("autoPostInfoCB"));
     _postInfoCB->setChecked(!_ngPost->postInfoTemplatePath().isEmpty());
-    row->addWidget(_postInfoCB);
 
     _postInfoButton = new QPushButton(this);
     _postInfoButton->setObjectName(QStringLiteral("autoPostInfoButton"));
     _postInfoButton->setEnabled(_postInfoCB->isChecked());
-    row->addWidget(_postInfoButton);
-    row->addStretch();
 
     connect(_postInfoCB, &QCheckBox::toggled, this, &AutoPostWidget::onPostInfoToggled);
     connect(_postInfoButton, &QAbstractButton::clicked, this, &AutoPostWidget::onEditPostInfo);
 
-    _ui->verticalLayout->insertLayout(_ui->verticalLayout->count() - 1, row);
+    // Like the nfo, the sheet goes with every post the folder gives, in either
+    // mode: it sits on the folder line, as on line A of a posting tab.
+    QFrame *sep = new QFrame(this);
+    sep->setFrameShape(QFrame::VLine);
+    sep->setFrameShadow(QFrame::Sunken);
+    _ui->autoDirLayout->addWidget(sep);
+    _ui->autoDirLayout->addWidget(_postInfoCB);
+    _ui->autoDirLayout->addWidget(_postInfoButton);
+    _ui->autoDirLayout->setStretchFactor(_ui->autoDirEdit, 1);
+
     retranslatePostInfoTexts();
 }
 
@@ -558,7 +624,10 @@ PostInfoData AutoPostWidget::_postInfoPreview() const
     postData.groups = _ngPost->groups();
     if (!_ngPost->_genFrom && !_ngPost->_from.empty())
         postData.nzbPoster = QString::fromStdString(_ngPost->_from);
-    postData.par2Pct = _ngPost->_doPar2 ? static_cast<int>(_ngPost->_par2Pct) : -1;
+    int const redundancy = _ui->redundancySB->value();
+    postData.par2Pct = !_ui->par2CB->isChecked() ? -1
+        : redundancy < 0                         ? static_cast<int>(_ngPost->_par2PctDefault)
+                                                 : redundancy;
     return postData;
 }
 

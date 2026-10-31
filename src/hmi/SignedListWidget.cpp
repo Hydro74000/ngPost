@@ -22,6 +22,7 @@
 #include <QLabel>
 #include <QKeyEvent>
 #include <QResizeEvent>
+#include <QScrollBar>
 
 SignedListWidget::SignedListWidget(QWidget *parent) :
     QListWidget(parent),
@@ -29,7 +30,36 @@ SignedListWidget::SignedListWidget(QWidget *parent) :
     _fileIcon(":/icons/file.png"),
     _folderIcon(":/icons/folder.png")
 {
-//    installEventFilter(this);
+    //    installEventFilter(this);
+    // Only user moves on the scroll bar or the wheel trigger an action: scrollTo()
+    // does not. Keys are caught in keyPressEvent().
+    connect(verticalScrollBar(), &QAbstractSlider::actionTriggered, this, [this] {
+        _scrolledAway = true;
+    });
+}
+
+void SignedListWidget::followItem(QListWidgetItem *item)
+{
+    const QPersistentModelIndex previous = _followed;
+    _followed = item ? QPersistentModelIndex(indexFromItem(item)) : QPersistentModelIndex();
+    // Nothing to compute for a background tab: showEvent catches up.
+    if (!_followed.isValid() || !isVisible())
+        return;
+    // The user went to look elsewhere: follow again once the row is back in sight.
+    if (_scrolledAway && previous.isValid() && !_isShown(previous))
+        return;
+    _scrolledAway = false;
+    scrollTo(_followed, PositionAtCenter);
+}
+
+int SignedListWidget::followedRow() const
+{
+    return _followed.isValid() ? _followed.row() : -1;
+}
+
+bool SignedListWidget::_isShown(const QModelIndex &index) const
+{
+    return viewport()->rect().intersects(visualRect(index));
 }
 
 
@@ -79,6 +109,8 @@ void SignedListWidget::clear2()
 
 void SignedListWidget::onDeleteSelectedItems()
 {
+    if (!_editable)
+        return;
     for (QListWidgetItem *item : selectedItems())
     {
         removeItemWidget2(item);
@@ -94,6 +126,17 @@ void SignedListWidget::resizeEvent(QResizeEvent *e)
                            listSize.height() - _sizeAscii.height(),
                            _sizeAscii.width(),
                            _sizeAscii.height());
+    if (_followed.isValid() && isVisible() && !_scrolledAway)
+        scrollTo(_followed, PositionAtCenter);
+}
+
+void SignedListWidget::showEvent(QShowEvent *e)
+{
+    QListWidget::showEvent(e);
+    // Back on this tab: the post went on meanwhile, the old position is stale.
+    _scrolledAway = false;
+    if (_followed.isValid())
+        scrollTo(_followed, PositionAtCenter);
 }
 
 void SignedListWidget::keyPressEvent(QKeyEvent *e)
@@ -104,7 +147,11 @@ void SignedListWidget::keyPressEvent(QKeyEvent *e)
         e->accept();
         return;
     }
+    const int position = verticalScrollBar()->value();
     QListWidget::keyPressEvent(e);
+    // Home, Page Down...: no scroll bar action, but the user went to look too.
+    if (verticalScrollBar()->value() != position)
+        _scrolledAway = true;
 }
 
 void SignedListWidget::mousePressEvent(QMouseEvent *e)
