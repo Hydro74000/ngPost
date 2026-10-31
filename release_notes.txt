@@ -9,6 +9,229 @@
 
 
 ####################################################
+###       Release: ngPost v5.7                   ###
+###       date:    2026/10/31                    ###
+####################################################
+
+ngPost v5.7 is a feature, reliability, and ergonomics release.
+It introduces dedicated and independent compression/packing options for the
+Auto Posting tab, customizable archive password selection for automated posts,
+a reorganized Auto Posting layout with dedicated Scan and Monitor sections,
+automatic file list follow-through that keeps the in-progress file centered,
+file list locking during active posts to prevent accidental edits, PAR2 parity
+generation on raw uncompressed files from Quick Post tabs, clean defaults reset
+on tab clearance, and compatibility fixes for WireGuard under Ubuntu 26.04 AppArmor.
+
+====================================================
+1. FUNCTIONAL CHANGES (Partie fonctionnelle)
+====================================================
+
+--- New features and Removals (Nouveautés et suppressions) ---
+
+- Auto Posting Options of Its Own:
+  * The Auto Posting tab keeps its own options: compression, random name, PAR2,
+    password, name and password lengths, "Keep Archives" and redundancy. They are
+    saved whichever tab is in front and restored at the next start (AUTO_PACK,
+    AUTO_LENGTH_NAME, AUTO_LENGTH_PASS, AUTO_KEEP_RAR, AUTO_PAR2_PCT and
+    AUTO_PASS). A configuration without them starts from what the tab used to
+    show, written at the first save; changing the Quick Post defaults afterwards
+    no longer changes it.
+  * The posts that "Generate Posts" prepares now get all of these options, its
+    "Keep Archives", lengths and redundancy included, not only monitored files.
+
+- Auto Posting Archive Password:
+  * The Auto Posting tab chooses the password of its archives, for its posts and
+    for folder monitoring: none, a random one, or the default password of the
+    Compression Settings. A default password no longer silently replaces a random
+    one. The choice is saved as AUTO_PASS; without it, the default password still
+    wins, else GEN_PASS draws one.
+
+- Auto Posting Tab Layout:
+  * The controls are grouped by use. A "Folder and posts" box holds what both
+    modes share: the folder, what every post of it gets (sibling nfo, post info
+    file), and the "Compression" line, which matches the Quick Post one.
+  * "Scan the folder" and "Monitor the folder" each have a box, with their own
+    options next to their button. The Scan box is greyed as a whole while a folder
+    is monitored.
+  * "delete files once posted" moved to the Monitor box and is shown in red. The
+    "+" that adds a monitored folder is now an "Add folder" button.
+
+- Default Options of New Quick Posts:
+  * The Compression Settings window shows what every new or emptied Quick Post
+    starts with: compression, a random archive name and its length, a random
+    password and its length, PAR2 repair files. Its title is the "Enable
+    compression by default on posts" box of the main window, which it switches
+    as well. A random password is greyed while the default password is enabled.
+
+- Files List Follows the Post (issue #23):
+  * The Quick Post and Auto Posting lists keep the file in progress centred. Files
+    finish out of order: the list follows the first one still being posted.
+  * Only the tab on screen scrolls; a background tab catches up when shown. A list
+    the user scrolled elsewhere stays put until the file in progress is back in sight.
+
+- Quick Post Files Locked Once Posted:
+  * Once a post is submitted (queued, running, paused or stopping), its tab no
+    longer takes files by drag and drop, paste or the Select buttons, and its list
+    can no longer be changed with Delete or "Remove all". A post took its list on
+    start: a file added afterwards was shown but never posted.
+  * A post that finished keeps its list to show what was posted, and its Start
+    Quick Post button stays greyed: it is not re-posted from that tab. "Remove
+    all" clears the tab for a new post. A post that was stopped, or whose
+    preparation failed, takes files again.
+
+--- Bug Fixes (Corrections / Fix) ---
+
+- PAR2 Without Compression on Quick Post Tabs:
+  * "Gen PAR2" is no longer greyed when "Compress this post" is off: PAR2 can
+    protect the files as they are, as in the Auto Posting tab and the command
+    line. The greyed box still applied when ticked and could not be unticked,
+    for instance on the tabs that Auto Posting generates without compression.
+  * "Keep Archives" also follows PAR2 alone, whose volumes it keeps, on both tabs.
+  * A post without compression no longer announces an archive password in its
+    NZB: the greyed "Archive password" box, still ticked from the defaults, was
+    applied all the same.
+
+- New Quick Posts Named After Their NZB:
+  * After the Auto Posting tab had posted without compression or without a
+    random name, or after a save with that tab in front, new and emptied Quick
+    Posts no longer drew a random archive name and took the name of the NZB.
+    The Auto Posting tab no longer changes the Quick Post defaults.
+  * Saving with a post in front no longer writes what that post ticked into the
+    defaults (PACK) and the name length (LENGTH_NAME). A configuration altered
+    that way keeps its values: check them once in Compression Settings.
+  * With "default password" chosen in the Auto Posting tab and no default
+    password any more, its archives get a random password, whatever the Quick
+    Post defaults say.
+
+- Reset of Default Quick Post Tab:
+  * Emptied after its post, Quick Post #1 takes the options of the configuration:
+    compression, PAR2, password, redundancy and keeping archives. The default
+    password is no longer replaced with a random one, nor by "Remove all".
+
+- Auto Posting Language Change While Monitoring:
+  * Changing the interface language, or the PAR2 defaults, while a folder is
+    monitored no longer re-enables the packing options frozen for the run, and
+    the button keeps reading "Stop Monitoring".
+
+- WireGuard on Ubuntu 26.04:
+  * Ubuntu 26.04 confines wg(8) with AppArmor to files in /etc/wireguard. The VPN
+    helper now pipes the tunnel configuration into it, as wg-quick does, and keys
+    stay in volatile /run.
+
+====================================================
+Notes de version (Français) :
+====================================================
+
+ngPost v5.7 est une version axée sur l'indépendance des réglages de post, le suivi
+automatique du défilement, la sécurisation des listes et de la file d'attente, ainsi
+que la robustesse réseau.
+
+--- Nouveautés et suppressions ---
+
+- Options propres à l'onglet Post Auto :
+  * L'onglet Post Auto garde ses propres options : compression, nom aléatoire,
+    PAR2, mot de passe, longueurs du nom et du mot de passe, « Garder les
+    archives » et redondance. Elles sont sauvegardées quel que soit l'onglet
+    affiché et retrouvées au démarrage suivant (AUTO_PACK, AUTO_LENGTH_NAME,
+    AUTO_LENGTH_PASS, AUTO_KEEP_RAR, AUTO_PAR2_PCT et AUTO_PASS). Une
+    configuration qui ne les a pas démarre sur ce que l'onglet affichait jusque-là,
+    écrit à la première sauvegarde ; changer ensuite les réglages par défaut des
+    Posts Rapides ne le modifie plus.
+  * Les posts que prépare « Créer Posts » reçoivent désormais toutes ces options,
+    y compris « Garder les archives », les longueurs et la redondance, et plus
+    seulement les fichiers surveillés.
+
+- Mot de passe d'archive dans le Post Auto :
+  * L'onglet Post Auto choisit le mot de passe de ses archives, pour ses posts
+    et pour la surveillance de dossier : aucun, un mot de passe aléatoire ou le
+    mot de passe par défaut de Paramétrage Compression. Un mot de passe par défaut
+    n'écrase plus silencieusement un mot de passe aléatoire. Le choix est sauvegardé
+    comme AUTO_PASS ; sans lui, le mot de passe par défaut l'emporte toujours,
+    sinon GEN_PASS en tire un.
+
+- Disposition de l'onglet Post Auto :
+  * Les commandes sont regroupées par usage. Un cadre « Dossier et posts » réunit
+    ce que les deux modes partagent : le dossier, ce que reçoit chacun de ses posts
+    (nfo voisin, fiche de post) et la ligne « Compression », qui reprend celle du
+    Post Rapide.
+  * « Scanner le dossier » et « Surveiller le dossier » ont chacun leur cadre, avec
+    leurs options à côté de leur bouton. Le cadre Scanner est grisé en entier tant
+    qu'un dossier est surveillé.
+  * « supprimer fichiers après post » passe dans le cadre Surveiller et s'affiche en
+    rouge. Le « + » qui ajoute un dossier surveillé devient un bouton « Ajouter un
+    dossier ».
+
+- Options par défaut des nouveaux Posts Rapides :
+  * La fenêtre Paramétrage Compression indique avec quoi démarre chaque Post
+    Rapide nouveau ou vidé : compression, nom d'archive aléatoire et sa longueur,
+    mot de passe aléatoire et sa longueur, fichiers de réparation PAR2. Son titre
+    est la case « Activer la compression par défaut sur les posts » de la fenêtre
+    principale, qu'elle coche ou décoche aussi. Le mot de passe aléatoire est
+    grisé tant que le mot de passe par défaut est activé.
+
+- La liste des fichiers suit le post (issue #23) :
+  * Les listes de Post Rapide et de Post Auto gardent le fichier en cours centré.
+    Les fichiers se terminent dans le désordre : la liste suit le premier en cours
+    de post.
+  * Seul l'onglet affiché défile ; un onglet d'arrière-plan rattrape son retard dès
+    qu'il est affiché. Une liste que l'utilisateur a fait défiler ailleurs ne bouge
+    plus tant que le fichier en cours n'est pas revenu en vue.
+
+- Liste des fichiers verrouillée une fois le post lancé :
+  * Dès qu'un post est lancé (en file d'attente, en cours, en pause ou en cours
+    d'arrêt), son onglet n'accepte plus de fichiers par glisser-déposer, collage ou
+    les boutons « Choisir Fichiers » / « Choisir Dossier », et sa liste ne se modifie
+    plus avec Suppr ou « Supprimer tout ». Le post avait pris sa liste au lancement :
+    un fichier ajouté ensuite était affiché mais jamais posté.
+  * Un post allé à son terme garde sa liste comme trace de ce qui a été posté, et
+    son bouton « Démarrer le Post Rapide » reste grisé : il n'est pas reposté depuis
+    cet onglet. « Supprimer tout » vide l'onglet pour un nouveau post. Un post
+    arrêté, ou dont la préparation a échoué, accepte de nouveau des fichiers.
+
+--- Corrections (Fix) ---
+
+- PAR2 sans compression dans les onglets de Post Rapide :
+  * « Générer PAR2 » n'est plus grisé quand « Compresser ce post » est décoché : le
+    PAR2 peut protéger les fichiers tels quels, comme dans le Post Auto et en
+    ligne de commande. Grisée mais cochée, la case s'appliquait quand même sans
+    pouvoir être décochée, par exemple sur les onglets générés par le Post Auto
+    sans compression.
+  * « Garder les archives » suit aussi le PAR2 seul, dont il garde les volumes,
+    dans les deux onglets.
+  * Un post sans compression n'annonce plus de mot de passe d'archive dans son
+    NZB : la case « Mot de passe de l'archive » grisée, restée cochée par les
+    réglages par défaut, s'appliquait quand même.
+
+- Nouveaux Posts Rapides nommés comme leur NZB :
+  * Après un passage de l'onglet Post Auto sans compression ou sans nom aléatoire,
+    ou après une sauvegarde faite avec cet onglet affiché, les Posts Rapides
+    nouveaux ou vidés ne tiraient plus de nom d'archive aléatoire et prenaient le
+    nom du NZB. L'onglet Post Auto ne modifie plus les réglages par défaut des
+    Posts Rapides.
+  * Sauvegarder avec un post affiché n'écrit plus ce que ce post a coché dans les
+    réglages par défaut (PACK) ni dans la longueur des noms (LENGTH_NAME). Une
+    configuration modifiée ainsi garde ses valeurs : vérifiez-les une fois dans
+    Paramétrage Compression.
+  * Avec « mot de passe par défaut » choisi dans l'onglet Post Auto et plus aucun
+    mot de passe par défaut, ses archives reçoivent un mot de passe aléatoire,
+    quels que soient les réglages par défaut des Posts Rapides.
+
+- Remise à zéro propre du Post Rapide par défaut :
+  * Vidé après son post, le Post Rapide #1 reprend les options de la configuration :
+    compression, PAR2, mot de passe, redondance et conservation des archives. Le mot
+    de passe par défaut n'y est plus remplacé par un aléatoire, ni par « Supprimer tout ».
+
+- Changement de langue pendant la surveillance du Post Auto :
+  * Changer la langue de l'interface, ou les réglages PAR2 par défaut, pendant la
+    surveillance d'un dossier ne réactive plus les options de conditionnement
+    figées pour la session, et le bouton affiche toujours « Stop Surveillance ».
+
+- WireGuard sous Ubuntu 26.04 :
+  * Ubuntu 26.04 restreint wg(8) par AppArmor aux fichiers de /etc/wireguard. Le
+    helper VPN lui transmet désormais la configuration du tunnel par un tube, comme
+    le fait wg-quick, et les clés restent dans le dossier volatile /run.
+
+####################################################
 ###       Release: ngPost v5.6                   ###
 ###       date:    2026/09/23                    ###
 ####################################################
@@ -106,17 +329,6 @@ the NNTP streaming pipeline and SQLite history store.
 - Inline Clipboard Copy Actions:
   * Quick-copy buttons with animated tooltips added to generated NZB name and
     archive password fields.
-- Auto Posting Archive Password:
-  * The Auto Posting tab chooses the password of its archives, for its posts and
-    for folder monitoring: none, a random one, or the default password of the
-    Compression Settings. A default password no longer silently replaces a random
-    one. The choice is saved as AUTO_PASS; without it, the default password still
-    wins, else GEN_PASS draws one.
-- Files List Follows the Post (issue #23):
-  * The Quick Post and Auto Posting lists keep the file in progress centred. Files
-    finish out of order: the list follows the first one still being posted.
-  * Only the tab on screen scrolls; a background tab catches up when shown. A list
-    the user scrolled elsewhere stays put until the file in progress is back in sight.
 - Collapsible Posting Log Pane:
   * Transparent overlay toggle button anchored beside the tab bar to collapse
     and restore the posting log splitter.
@@ -158,31 +370,6 @@ the NNTP streaming pipeline and SQLite history store.
   * Progress header label decoupled from active tab view: continuously displays
     the task actively transferring in the background.
   * High-contrast styling and visual queue badges for pending tabs.
-- Auto Posting Tab Layout:
-  * The controls are grouped by use. A "Folder and posts" box holds what both
-    modes share: the folder, what every post of it gets (sibling nfo, post info
-    file), and the "Compression" line, which matches the Quick Post one.
-  * "Scan the folder" and "Monitor the folder" each have a box, with their own
-    options next to their button. The Scan box is greyed as a whole while a folder
-    is monitored.
-  * "delete files once posted" moved to the Monitor box and is shown in red. The
-    "+" that adds a monitored folder is now an "Add folder" button.
-- Auto Posting Options of Its Own:
-  * The Auto Posting tab keeps its own options: compression, random name, PAR2,
-    password, name and password lengths, "Keep Archives" and redundancy. They are
-    saved whichever tab is in front and restored at the next start (AUTO_PACK,
-    AUTO_LENGTH_NAME, AUTO_LENGTH_PASS, AUTO_KEEP_RAR, AUTO_PAR2_PCT and
-    AUTO_PASS). A configuration without them starts from what the tab used to
-    show, written at the first save; changing the Quick Post defaults afterwards
-    no longer changes it.
-  * The posts that "Generate Posts" prepares now get all of these options, its
-    "Keep Archives", lengths and redundancy included, not only monitored files.
-- Default Options of New Quick Posts:
-  * The Compression Settings window shows what every new or emptied Quick Post
-    starts with: compression, a random archive name and its length, a random
-    password and its length, PAR2 repair files. Its title is the "Enable
-    compression by default on posts" box of the main window, which it switches
-    as well. A random password is greyed while the default password is enabled.
 - Unified External Tool Resolution (ExternalToolResolver):
   * Deterministic search prioritizing bundled tools shipped alongside ngPost
     before scanning system PATH.
@@ -206,30 +393,6 @@ the NNTP streaming pipeline and SQLite history store.
 
 --- Bug Fixes (Corrections / Fix) ---
 
-- PAR2 Without Compression on Quick Post Tabs:
-  * "Gen PAR2" is no longer greyed when "Compress this post" is off: PAR2 can
-    protect the files as they are, as in the Auto Posting tab and the command
-    line. The greyed box still applied when ticked and could not be unticked,
-    for instance on the tabs that Auto Posting generates without compression.
-  * "Keep Archives" also follows PAR2 alone, whose volumes it keeps, on both tabs.
-  * A post without compression no longer announces an archive password in its
-    NZB: the greyed "Archive password" box, still ticked from the defaults, was
-    applied all the same.
-- New Quick Posts Named After Their NZB:
-  * After the Auto Posting tab had posted without compression or without a
-    random name, or after a save with that tab in front, new and emptied Quick
-    Posts no longer drew a random archive name and took the name of the NZB.
-    The Auto Posting tab no longer changes the Quick Post defaults.
-  * Saving with a post in front no longer writes what that post ticked into the
-    defaults (PACK) and the name length (LENGTH_NAME). A configuration altered
-    that way keeps its values: check them once in Compression Settings.
-  * With "default password" chosen in the Auto Posting tab and no default
-    password any more, its archives get a random password, whatever the Quick
-    Post defaults say.
-- Auto Posting Language Change While Monitoring:
-  * Changing the interface language, or the PAR2 defaults, while a folder is
-    monitored no longer re-enables the packing options frozen for the run, and
-    the button keeps reading "Stop Monitoring".
 - Staging Recovery on Preparation Failure:
   * Restores original source files back into the GUI tab and cleans up temporary
     compression directories if archive preparation fails before transfer starts.
@@ -258,19 +421,6 @@ the NNTP streaming pipeline and SQLite history store.
     (stopped ones included); No leaves them as they are. Saving no longer records
     the NZB folder of the tab on screen as NZB_PATH.
   * Used kernel rename calls to prevent silent cross-filesystem file copies (EXDEV).
-- Quick Post Files Locked Once Posted:
-  * Once a post is submitted (queued, running, paused or stopping), its tab no
-    longer takes files by drag and drop, paste or the Select buttons, and its list
-    can no longer be changed with Delete or "Remove All". The post had taken its
-    list when submitted: a file added afterwards was shown but never posted.
-  * A post that ran to its end keeps its list as the record of what was posted,
-    and its "Start Quick Post" button stays greyed: it is not posted again from
-    this tab. "Remove All" empties the tab for a new post. A stopped post, or one
-    whose preparation failed, takes files again.
-- WireGuard on Ubuntu 26.04:
-  * Ubuntu 26.04 confines wg(8) with AppArmor to files under /etc/wireguard. The
-    VPN helper now hands it the tunnel configuration through a pipe, as wg-quick
-    does, and the keys stay in the volatile /run folder.
 - One Packing at a Time (PREPARE_PACKING):
   * Posts queued by "Post all tabs" while the VPN was connecting, or while the
     queue was paused, had the first two compressed at the same time. The next
@@ -284,9 +434,6 @@ the NNTP streaming pipeline and SQLite history store.
 - Default Tab Closure Logic:
   * Hardened tab closure on default Quick Post tab to cleanly reset inputs rather
     than producing invalid UI states.
-  * Emptied after its post, Quick Post #1 takes the configured options back:
-    compression, PAR2, password, redundancy and archive keeping. The default
-    password is no longer replaced by a random one, there nor by "Remove All".
 - Wayland & Offscreen Splitter Fixes:
   * Resolved splitter mouse-grab and resizing issues under Wayland and KDE Breeze.
 - PAR2 Empty Output Detection:
@@ -543,19 +690,6 @@ sécurité VPN et de l'isolation des identifiants.
 - Boutons de copie rapide dans le presse-papiers :
   * Boutons de copie inline avec infobulle et confirmation visuelle pour le nom du
     fichier NZB et le mot de passe de l'archive.
-- Mot de passe des archives du Post Auto :
-  * L'onglet Post Auto choisit le mot de passe de ses archives, pour ses posts comme
-    pour la surveillance de dossier : aucun, un aléatoire, ou le mot de passe par
-    défaut du « Paramétrage Compression ». Le mot de passe par défaut ne remplace
-    plus en silence un mot de passe aléatoire. Le choix est enregistré dans
-    AUTO_PASS ; sans lui, le mot de passe par défaut l'emporte toujours, sinon
-    GEN_PASS en tire un.
-- La liste des fichiers suit le post (issue #23) :
-  * Les listes du Post Rapide et du Post Auto gardent centré le fichier en cours. Les
-    fichiers se terminent dans le désordre : la liste suit le premier encore en envoi.
-  * Seul l'onglet affiché défile ; un onglet en arrière-plan se recale dès qu'il est
-    affiché. Une liste que l'utilisateur a fait défiler ailleurs reste en place tant
-    que le fichier en cours n'est pas revenu à l'écran.
 - Volet rétractable du journal de post (Posting Log) :
   * Bouton transparent repliable ancré à côté des onglets pour masquer/afficher
     le séparateur de journal.
@@ -600,36 +734,6 @@ sécurité VPN et de l'isolation des identifiants.
   * Découplage de l'étiquette de progression : indique en permanence le post en cours
     de transfert en arrière-plan, indépendamment de l'onglet affiché à l'écran.
   * Style contrasté et badge lumineux indiquant clairement les onglets en attente.
-- Disposition de l'onglet Post Auto :
-  * Les commandes sont regroupées par usage. Un cadre « Dossier et posts » réunit
-    ce que les deux modes partagent : le dossier, ce que reçoit chacun de ses posts
-    (nfo voisin, fiche de post) et la ligne « Compression », qui reprend celle du
-    Post Rapide.
-  * « Scanner le dossier » et « Surveiller le dossier » ont chacun leur cadre, avec
-    leurs options à côté de leur bouton. Le cadre Scanner est grisé en entier tant
-    qu'un dossier est surveillé.
-  * « supprimer fichiers après post » passe dans le cadre Surveiller et s'affiche en
-    rouge. Le « + » qui ajoute un dossier surveillé devient un bouton « Ajouter un
-    dossier ».
-- Options propres à l'onglet Post Auto :
-  * L'onglet Post Auto garde ses propres options : compression, nom aléatoire,
-    PAR2, mot de passe, longueurs du nom et du mot de passe, « Garder les
-    archives » et redondance. Elles sont sauvegardées quel que soit l'onglet
-    affiché et retrouvées au démarrage suivant (AUTO_PACK, AUTO_LENGTH_NAME,
-    AUTO_LENGTH_PASS, AUTO_KEEP_RAR, AUTO_PAR2_PCT et AUTO_PASS). Une
-    configuration qui ne les a pas démarre sur ce que l'onglet affichait jusque-là,
-    écrit à la première sauvegarde ; changer ensuite les réglages par défaut des
-    Posts Rapides ne le modifie plus.
-  * Les posts que prépare « Créer Posts » reçoivent désormais toutes ces options,
-    y compris « Garder les archives », les longueurs et la redondance, et plus
-    seulement les fichiers surveillés.
-- Options par défaut des nouveaux Posts Rapides :
-  * La fenêtre Paramétrage Compression indique avec quoi démarre chaque Post
-    Rapide nouveau ou vidé : compression, nom d'archive aléatoire et sa longueur,
-    mot de passe aléatoire et sa longueur, fichiers de réparation PAR2. Son titre
-    est la case « Activer la compression par défaut sur les posts » de la fenêtre
-    principale, qu'elle coche ou décoche aussi. Le mot de passe aléatoire est
-    grisé tant que le mot de passe par défaut est activé.
 - Résolution unifiée des outils externes (ExternalToolResolver) :
   * Ordre de recherche déterministe privilégiant les binaires fournis à côté
     d'ngPost avant le PATH système.
@@ -654,34 +758,6 @@ sécurité VPN et de l'isolation des identifiants.
 
 --- Corrections (Fix) ---
 
-- PAR2 sans compression dans les onglets de Post Rapide :
-  * « Générer PAR2 » n'est plus grisé quand « Compresser ce post » est décoché : le
-    PAR2 peut protéger les fichiers tels quels, comme dans le Post Auto et en
-    ligne de commande. Grisée mais cochée, la case s'appliquait quand même sans
-    pouvoir être décochée, par exemple sur les onglets générés par le Post Auto
-    sans compression.
-  * « Garder les archives » suit aussi le PAR2 seul, dont il garde les volumes,
-    dans les deux onglets.
-  * Un post sans compression n'annonce plus de mot de passe d'archive dans son
-    NZB : la case « Mot de passe de l'archive » grisée, restée cochée par les
-    réglages par défaut, s'appliquait quand même.
-- Nouveaux Posts Rapides nommés comme leur NZB :
-  * Après un passage de l'onglet Post Auto sans compression ou sans nom aléatoire,
-    ou après une sauvegarde faite avec cet onglet affiché, les Posts Rapides
-    nouveaux ou vidés ne tiraient plus de nom d'archive aléatoire et prenaient le
-    nom du NZB. L'onglet Post Auto ne modifie plus les réglages par défaut des
-    Posts Rapides.
-  * Sauvegarder avec un post affiché n'écrit plus ce que ce post a coché dans les
-    réglages par défaut (PACK) ni dans la longueur des noms (LENGTH_NAME). Une
-    configuration modifiée ainsi garde ses valeurs : vérifiez-les une fois dans
-    Paramétrage Compression.
-  * Avec « mot de passe par défaut » choisi dans l'onglet Post Auto et plus aucun
-    mot de passe par défaut, ses archives reçoivent un mot de passe aléatoire,
-    quels que soient les réglages par défaut des Posts Rapides.
-- Changement de langue pendant la surveillance du Post Auto :
-  * Changer la langue de l'interface, ou les réglages PAR2 par défaut, pendant la
-    surveillance d'un dossier ne réactive plus les options de conditionnement
-    figées pour la session, et le bouton affiche toujours « Stop Surveillance ».
 - Restauration des fichiers en cas d'échec de préparation :
   * Restauration automatique des fichiers sources dans l'onglet de post et nettoyage
     du dossier temporaire si la compression ou la préparation échoue avant le début
@@ -714,20 +790,6 @@ sécurité VPN et de l'isolation des identifiants.
     L'enregistrement n'inscrit plus comme NZB_PATH le dossier NZB de l'onglet affiché.
   * Utilisation d'appels de renommage atomiques au niveau du noyau pour empêcher
     les copies complètes silencieuses lors de déplacements entre partitions (EXDEV).
-- Liste des fichiers verrouillée une fois le post lancé :
-  * Dès qu'un post est lancé (en file d'attente, en cours, en pause ou en cours
-    d'arrêt), son onglet n'accepte plus de fichiers par glisser-déposer, collage ou
-    les boutons « Choisir Fichiers » / « Choisir Dossier », et sa liste ne se modifie
-    plus avec Suppr ou « Supprimer tout ». Le post avait pris sa liste au lancement :
-    un fichier ajouté ensuite était affiché mais jamais posté.
-  * Un post allé à son terme garde sa liste comme trace de ce qui a été posté, et
-    son bouton « Démarrer le Post Rapide » reste grisé : il n'est pas reposté depuis
-    cet onglet. « Supprimer tout » vide l'onglet pour un nouveau post. Un post
-    arrêté, ou dont la préparation a échoué, accepte de nouveau des fichiers.
-- WireGuard sous Ubuntu 26.04 :
-  * Ubuntu 26.04 restreint wg(8) par AppArmor aux fichiers de /etc/wireguard. Le
-    helper VPN lui transmet désormais la configuration du tunnel par un tube, comme
-    le fait wg-quick, et les clés restent dans le dossier volatile /run.
 - Une seule préparation à la fois (PREPARE_PACKING) :
   * Les posts mis en file par « Poster tous les onglets » pendant la connexion du
     VPN, ou pendant une pause de la file, voyaient les deux premiers compressés en
@@ -743,9 +805,6 @@ sécurité VPN et de l'isolation des identifiants.
 - Fermeture propre de l'onglet de post par défaut :
   * Réinitialisation cohérente des contrôles de l'onglet par défaut au lieu de
     laisser des états d'interface invalides.
-  * Vidé après son post, le Post Rapide #1 reprend les options de la configuration :
-    compression, PAR2, mot de passe, redondance et conservation des archives. Le mot
-    de passe par défaut n'y est plus remplacé par un aléatoire, ni par « Supprimer tout ».
 - Correctifs pour Wayland et environnements offscreen :
   * Correction du redimensionnement du panneau de log et des conflits de capture
     souris sous Wayland et KDE Breeze.
