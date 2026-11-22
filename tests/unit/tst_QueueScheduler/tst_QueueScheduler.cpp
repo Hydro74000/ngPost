@@ -145,6 +145,9 @@ private slots:
         const qint64 b = f.add(QStringLiteral("b"), true);
         settle();
         QCOMPARE(f.state(a), Lifecycle::Posting);
+        QCOMPARE(f.state(b), Lifecycle::Queued); // anticipation waits for the real start
+        QVERIFY(f.executor.ackTransferStarted(a));
+        settle();
         QCOMPARE(f.state(b), Lifecycle::Preparing);
         f.finishPreparation(b);
         QCOMPARE(f.state(b), Lifecycle::Prepared);
@@ -185,6 +188,8 @@ private slots:
         const qint64 b = f.add(QStringLiteral("b"), true);
         const qint64 c = f.add(QStringLiteral("c"), true);
         settle();
+        QVERIFY(f.executor.ackTransferStarted(a));
+        settle();
         QCOMPARE(f.state(b), Lifecycle::Preparing);
         QVERIFY(f.queue.postNext({ c }, f.queue.view()).ok()); // c overtakes b
         settle();
@@ -205,6 +210,8 @@ private slots:
         const qint64 a = f.add(QStringLiteral("a"));
         const qint64 b = f.add(QStringLiteral("b"), true);
         const qint64 c = f.add(QStringLiteral("c"), true);
+        settle();
+        QVERIFY(f.executor.ackTransferStarted(a));
         settle();
         QCOMPARE(f.state(b), Lifecycle::Preparing); // speculative
         QVERIFY(f.queue.postNow(c, f.queue.view()).ok());

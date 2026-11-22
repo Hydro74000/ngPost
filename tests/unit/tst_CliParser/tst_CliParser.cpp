@@ -2753,6 +2753,13 @@ void TestCliParser::blocked_vpn_admission_exits_without_hanging_or_history_ghost
     const QList<PostHistoryStore::PostSummary> posts =
         store.listPosts(QString(), QString(), false, &error);
     QVERIFY2(error.isEmpty(), qPrintable(error));
+    if (qEnvironmentVariable("NGPOST_QUEUE_ENGINE") == QLatin1String("1")) {
+        // The queue admits durably first: the post is kept, blocked, never
+        // half written nor sent (plan_queue.md, lot C3).
+        QCOMPARE(posts.size(), 1);
+        QCOMPARE(posts.first().status, QStringLiteral("queued"));
+        return;
+    }
     QVERIFY(posts.isEmpty());
 }
 

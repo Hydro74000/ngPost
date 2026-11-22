@@ -4693,6 +4693,10 @@ Your active configuration file is:
         <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
         <translation>AUTO_PACK 的关键字错误：%1。应为 (COMPRESS, GEN_NAME, GEN_PAR2) 的子集；自动发布的密码由 AUTO_PASS 设置。</translation>
     </message>
+    <message>
+        <source>Some posts could not be sent and remain in the queue.</source>
+        <translation>部分帖子未能发送，仍保留在队列中。</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>

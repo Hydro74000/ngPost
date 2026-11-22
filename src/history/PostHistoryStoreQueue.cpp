@@ -190,6 +190,24 @@ QString restoreState(Domain domain)
     return domain == Domain::Deferred ? QStringLiteral("deferred") : QStringLiteral("session");
 }
 
+//! post_runs.state for @p entry. A preparation being stopped transferred
+//! nothing: it is still a preparation, cancelled if it leaves.
+QString runState(const QueueEntry &entry)
+{
+    switch (entry.lifecycle) {
+    case Lifecycle::Queued: return QStringLiteral("queued");
+    case Lifecycle::Preparing:
+    case Lifecycle::Prepared: return QStringLiteral("preparing");
+    case Lifecycle::Posting: return QStringLiteral("posting");
+    case Lifecycle::Quiescing:
+        return entry.slot == Slot::Preparation ? QStringLiteral("preparing")
+                                               : QStringLiteral("settling");
+    case Lifecycle::Finalizing:
+    case Lifecycle::Recovering: return QStringLiteral("settling");
+    }
+    return QStringLiteral("queued");
+}
+
 QVariant nullString()
 {
     return QVariant(QMetaType::fromType<QString>());
@@ -338,6 +356,11 @@ bool PostHistoryStore::_applyQueueTransaction(QSqlDatabase &db,
             return false;
         }
     }
+    for (QueueEntry entry : transaction.existingAdmissions) {
+        if (!_admitExistingQueueEntry(db, entry, &result.error))
+            return false;
+        result.runs.insert(entry.postId, { entry.runId, entry.runNo });
+    }
     for (qint64 postId : transaction.renewRuns) {
         QueueCommit::Run renewed;
         if (!_renewQueueRun(db, postId, &renewed.runId, &renewed.runNo, &result.error))
@@ -419,6 +442,45 @@ bool PostHistoryStore::_admitQueueEntry(QSqlDatabase &db, QueueEntry &entry, QSt
                 error))
         return false;
     return _writeQueueEntry(db, entry, true, error);
+}
+
+//! A post of the history queued again: its next run, its owner, its queue row.
+//! Its status and its earlier results stay as they are until it transfers.
+bool PostHistoryStore::_admitExistingQueueEntry(QSqlDatabase &db, QueueEntry &entry, QString *error)
+{
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT (SELECT COALESCE(MAX(run_no), 0) + 1 FROM post_runs WHERE "
+                             "post_id=p.id) FROM posts p WHERE p.id=? AND (p.owner_id IS NULL "
+                             "OR p.owner_id=?)"));
+    q.addBindValue(entry.postId);
+    q.addBindValue(_ownerId);
+    if (!q.exec() || !q.next()) {
+        if (error)
+            *error = q.lastError().text().isEmpty()
+                ? QStringLiteral("post %1 is unknown or owned by another session").arg(entry.postId)
+                : q.lastError().text();
+        return false;
+    }
+    entry.runNo = q.value(0).toInt();
+    entry.runId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    return run(db,
+               QStringLiteral("INSERT INTO post_runs(run_id, post_id, run_no, created_at, state) "
+                              "VALUES(?, ?, ?, ?, 'queued')"),
+               { entry.runId, entry.postId, entry.runNo, _now() },
+               error)
+        && run(db,
+               QStringLiteral("INSERT OR IGNORE INTO post_info(post_id) VALUES(?)"),
+               { entry.postId },
+               error)
+        && run(db,
+               QStringLiteral("UPDATE post_info SET current_run_id=? WHERE post_id=?"),
+               { entry.runId, entry.postId },
+               error)
+        && run(db,
+               QStringLiteral("UPDATE posts SET owner_id=? WHERE id=?"),
+               { _ownerId.isEmpty() ? nullString() : QVariant(_ownerId), entry.postId },
+               error)
+        && _writeQueueEntry(db, entry, true, error);
 }
 
 //! Current and retained sets are recorded; a set the entry let go of is
@@ -544,6 +606,16 @@ bool PostHistoryStore::_writeQueueEntry(QSqlDatabase &db,
                 { entry.postId },
                 error))
         return false;
+    // The run follows its entry until it has a result.
+    const QString state = runState(entry);
+    if (!run(
+            db,
+            QStringLiteral(
+                "UPDATE post_runs SET state=?, started_at=CASE WHEN ?='posting' THEN "
+                "COALESCE(started_at, ?) ELSE started_at END WHERE run_id=? AND result_recorded=0"),
+            { state, state, _now(), entry.runId },
+            error))
+        return false;
     return insert || _mirrorQueuedPost(db, entry, error);
 }
 
@@ -632,7 +704,19 @@ bool PostHistoryStore::_renewQueueRun(QSqlDatabase &db,
 //! and is released; a started one keeps its history and its resumability.
 bool PostHistoryStore::_retireQueueEntry(QSqlDatabase &db, qint64 postId, QString *error)
 {
+    // A run that transferred ends with the outcome its post recorded.
     return run(db,
+               QStringLiteral(
+                   "UPDATE post_runs SET state='terminal', result=(SELECT CASE status WHEN "
+                   "'success' THEN 'success' WHEN 'partial' THEN 'partial' WHEN 'cancelled' THEN "
+                   "'cancelled' ELSE 'failed' END FROM posts WHERE id=?), result_recorded=1, "
+                   "end_cause=(SELECT CASE status WHEN 'cancelled' THEN 'user_stop' ELSE 'normal' "
+                   "END FROM posts WHERE id=?), finished_at=? WHERE run_id=(SELECT run_id FROM "
+                   "post_queue WHERE post_id=?) AND result_recorded=0 AND state IN "
+                   "('posting','settling')"),
+               { postId, postId, _now(), postId },
+               error)
+        && run(db,
                QStringLiteral(
                    "UPDATE post_runs SET state='terminal', result='cancelled', result_recorded=1, "
                    "end_cause='abandon', finished_at=? WHERE run_id=(SELECT run_id FROM post_queue "
@@ -644,6 +728,8 @@ bool PostHistoryStore::_retireQueueEntry(QSqlDatabase &db, qint64 postId, QStrin
                               "WHERE id=? AND status='queued'"),
                { _now(), postId },
                error)
+        // Out of the queue, a post belongs to no session any more.
+        && run(db, QStringLiteral("UPDATE posts SET owner_id=NULL WHERE id=?"), { postId }, error)
         && run(db,
                QStringLiteral("DELETE FROM post_queue_intents WHERE target_post_id=?"),
                { postId },

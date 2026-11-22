@@ -58,6 +58,10 @@ private:
     NgPost            *_ngPost;
     const uint         _jobNumber;
     PostingJob        *_postingJob;
+    //! Queue engine: the post this tab submitted, before and while it has a
+    //! runtime; its sources, to give them back if it leaves the queue unsent.
+    qint64 _queuedPostId = 0;
+    QStringList _queuedInputPaths;
     STATE              _state;
     bool               _postingFinished;
     //! A finished post this tab may submit again from scratch: its preparation
@@ -109,6 +113,13 @@ public:
     void setIDLE();
     void setPosting();
     void attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted);
+    //! Queue engine: a resume of the History tab, queued for this tab.
+    void attachQueuedResume(qint64 postId, const QString &nzbPath, const QFileInfoList &files);
+    //! Queue engine: the runtime of this tab's post is about to transfer.
+    void bindQueueRuntime(PostingJob *job);
+    //! Queue engine: this tab's post left the queue without transferring.
+    void onQueuedPostRemoved();
+    qint64 queuedPostId() const { return _queuedPostId; }
 
     void init();
     //! Takes the packing of the Auto Posting tab (its AUTO_* settings) in place
@@ -222,6 +233,9 @@ private:
     void _activatePosting();
     void _handlePostingJobDone();
     void _attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted);
+    void _submitToQueue(const PostingJobOptions &options,
+                        const QString &nzbPath,
+                        const QFileInfoList &files);
     bool _highlightFirstPendingFile();
     void _clearActivePostingHighlights();
     //! The configured password when there is one, else a draw if \a genPass.
@@ -234,7 +248,10 @@ private:
 };
 
 uint PostingWidget::jobNumber() const { return _jobNumber; }
-bool PostingWidget::isPosting() const { return _postingJob != nullptr; }
+bool PostingWidget::isPosting() const
+{
+    return _postingJob != nullptr || _queuedPostId != 0;
+}
 bool PostingWidget::isPostingFinished() const { return _postingFinished; }
 
 MainWindow *PostingWidget::hmi() const { return _hmi; }

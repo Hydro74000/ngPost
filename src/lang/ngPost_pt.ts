@@ -4692,6 +4692,10 @@ O seu ficheiro de configuração activo é:
         <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
         <translation>Palavras-chave erradas para AUTO_PACK: %1. Deve ser um subconjunto de (COMPRESS, GEN_NAME, GEN_PAR2); a palavra-passe da Postagem Automática é AUTO_PASS.</translation>
     </message>
+    <message>
+        <source>Some posts could not be sent and remain in the queue.</source>
+        <translation>Algumas postagens não puderam ser enviadas e permanecem na fila.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>

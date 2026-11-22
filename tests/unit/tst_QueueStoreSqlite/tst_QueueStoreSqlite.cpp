@@ -242,6 +242,50 @@ private slots:
                  QStringLiteral("cancelled"));
     }
 
+    void aResumeQueuesTheSamePostUnderItsNextRun()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        const qint64 b = f.add(QStringLiteral("b"));
+        QVERIFY(f.queue->remove({ a, b }, RemovePolicy::Default, f.queue->view()).ok());
+        f.scalar(QStringLiteral("UPDATE posts SET status='partial' WHERE id=?"), { a });
+        f.scalar(QStringLiteral("UPDATE posts SET owner_id='owner-B' WHERE id=?"), { b });
+
+        PersistedQueueOptions o = makeOptions(QStringLiteral("a"));
+        o.job.resumeHistoryPostId = a;
+        QVERIFY(f.queue->enqueueExisting(a, o, Origin::Resume).ok());
+        const QueueEntry *entry = f.queue->find(a);
+        QVERIFY(entry);
+        QCOMPARE(entry->runNo, 2);
+        QVERIFY(entry->transferManifestEngaged);
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM post_runs WHERE post_id=?"), { a })
+                     .toInt(),
+                 2);
+        // The earlier outcome stays until the resume really transfers.
+        QCOMPARE(f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { a }).toString(),
+                 QStringLiteral("partial"));
+        QCOMPARE(
+            f.scalar(QStringLiteral("SELECT owner_id FROM posts WHERE id=?"), { a }).toString(),
+            QStringLiteral("owner-A"));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT current_run_id FROM post_info WHERE post_id=?"),
+                          { a })
+                     .toString(),
+                 entry->runId);
+        QCOMPARE(f.queue->enqueueExisting(a, o, Origin::Resume).errorCode,
+                 QStringLiteral("already_queued"));
+        // Another live session's post is not taken.
+        QVERIFY(
+            !f.queue->enqueueExisting(b, makeOptions(QStringLiteral("b")), Origin::Resume).ok());
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM post_runs WHERE post_id=?"), { b })
+                     .toInt(),
+                 1);
+
+        PostQueue reloaded(f.adapter.get(), QStringLiteral("queue-A"));
+        QVERIFY(reloaded.load());
+        QVERIFY(reloaded.find(a));
+        QCOMPARE(reloaded.find(a)->runId, entry->runId);
+    }
+
     void aFailingTransactionLeavesNothing()
     {
         Fixture f;
@@ -369,6 +413,71 @@ private slots:
         QCOMPARE(
             f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { mine }).toString(),
             QStringLiteral("posting")); // still in a queue: never declared cancelled
+    }
+
+    void legacyCleanupSparesLockedOwners()
+    {
+        Fixture f;
+        auto other = std::make_unique<OwnerLock>(f.dir.filePath(QStringLiteral("history.sqlite")));
+        QVERIFY(other->acquire());
+        f.store->setOwnerId(other->ownerId());
+        const qint64 theirs = f.add(QStringLiteral("theirs"));
+        QVERIFY(f.store->markPostStarted(theirs));
+        // Out of any queue: only its owner's lock protects it now.
+        f.scalar(QStringLiteral("DELETE FROM post_queue WHERE post_id=?"), { theirs });
+        f.store->setOwnerId({}); // a second session, through the historical entry point
+        QString error;
+        QVERIFY2(f.store->markPostCrashedArticlesUnknown(&error), qPrintable(error));
+        QCOMPARE(
+            f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { theirs }).toString(),
+            QStringLiteral("posting"));
+        other.reset(); // that session ended without cleaning up
+        QVERIFY2(f.store->markPostCrashedArticlesUnknown(&error), qPrintable(error));
+        QCOMPARE(
+            f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { theirs }).toString(),
+            QStringLiteral("cancelled"));
+    }
+
+    void aTransferredRunEndsWithItsPostOutcome()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue->engineActivate(a));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT state FROM post_runs WHERE post_id=?"), { a })
+                     .toString(),
+                 QStringLiteral("posting"));
+        QVERIFY(!f.scalar(QStringLiteral("SELECT started_at FROM post_runs WHERE post_id=?"), { a })
+                     .isNull());
+        f.scalar(QStringLiteral("UPDATE posts SET status='success' WHERE id=?"), { a });
+        QVERIFY(f.queue->engineRetire(a));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT result FROM post_runs WHERE post_id=?"), { a })
+                     .toString(),
+                 QStringLiteral("success"));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT state FROM post_runs WHERE post_id=?"), { a })
+                     .toString(),
+                 QStringLiteral("terminal"));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT end_cause FROM post_runs WHERE post_id=?"), { a })
+                     .toString(),
+                 QStringLiteral("normal"));
+    }
+
+    void aStoppedPreparationIsCancelled()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        QVERIFY(f.queue->engineBeginPreparation(
+            a,
+            { QStringLiteral("g1"), 1, 0, 0, QStringLiteral("/tmp") }));
+        QVERIFY(f.queue->engineSetLifecycle(a, Lifecycle::Quiescing, Slot::Preparation));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT state FROM post_runs WHERE post_id=?"), { a })
+                     .toString(),
+                 QStringLiteral("preparing")); // nothing was transferred
+        QVERIFY(f.queue->engineRetire(a));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT result FROM post_runs WHERE post_id=?"), { a })
+                     .toString(),
+                 QStringLiteral("cancelled"));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { a }).toString(),
+                 QStringLiteral("cancelled"));
     }
 
     void aDeadOwnersQueueIsClaimedInOrder()

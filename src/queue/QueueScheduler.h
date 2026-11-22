@@ -141,6 +141,7 @@ private:
     QString _technicalReason;
     QList<std::function<bool()>> _waitingWrites; //!< acknowledgements not yet durable
     QSet<qint64> _stuck; //!< runtimes whose stop is not proven: they keep their slot
+    QSet<QString> _startedRuns; //!< runs whose transfer really started
 };
 
 } // namespace queue

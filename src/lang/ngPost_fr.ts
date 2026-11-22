@@ -4683,6 +4683,10 @@ Votre fichier de configuration actif est :
         <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
         <translation>Mots-clés incorrects pour AUTO_PACK : %1. Ce doit être une partie de (COMPRESS, GEN_NAME, GEN_PAR2) ; le mot de passe du Post Auto se règle avec AUTO_PASS.</translation>
     </message>
+    <message>
+        <source>Some posts could not be sent and remain in the queue.</source>
+        <translation>Certains posts n’ont pas pu être envoyés et restent dans la file.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>

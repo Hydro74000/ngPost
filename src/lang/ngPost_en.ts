@@ -4671,6 +4671,10 @@ One thing does change for such a script: the old configuration file has no POST_
         <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
         <translation>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</translation>
     </message>
+    <message>
+        <source>Some posts could not be sent and remain in the queue.</source>
+        <translation>Some posts could not be sent and remain in the queue.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>

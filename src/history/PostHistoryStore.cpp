@@ -6,6 +6,7 @@
 //========================================================================
 
 #include "history/PostHistoryStore.h"
+#include "queue/OwnerLock.h"
 
 #include <QFile>
 #include <QFileInfo>
@@ -1726,15 +1727,31 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
     return true;
 }
 
+//! Sessions whose lock is still held next to the database, this one included:
+//! their posts are theirs, whatever a crashed run left elsewhere. An owner
+//! whose vitality cannot be told is spared too.
+QStringList PostHistoryStore::liveOwners() const
+{
+    QStringList live;
+    if (!_ownerId.isEmpty())
+        live << _ownerId;
+    if (_dbPath.isEmpty())
+        return live;
+    for (const QString &owner : queue::OwnerLock::ownersOnDisk(_dbPath))
+        if (owner != _ownerId
+            && queue::OwnerLock::probe(_dbPath, owner) != queue::OwnerLock::Vitality::Dead)
+            live << owner;
+    return live;
+}
+
 bool PostHistoryStore::markPostCrashedArticlesUnknown(QString *error)
 {
-    // Kept for the legacy paths: no owner is known to be alive.
-    return normalizeInterruptedPosts({}, error);
+    return normalizeInterruptedPosts(liveOwners(), error);
 }
 
 bool PostHistoryStore::cleanupInvalidResumePosts(QString *error)
 {
-    return cleanupInvalidResumePosts({}, error);
+    return cleanupInvalidResumePosts(liveOwners(), error);
 }
 
 namespace {

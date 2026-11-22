@@ -209,6 +209,7 @@ void PostingJobExecutor::activate(qint64 postId, const QString &runId, const QSt
         connect(job, ended, this, [this, postId, job, runId] {
             onTransferEnded(postId, job, runId);
         }, Qt::QueuedConnection);
+    emit runtimeActivated(postId, job);
     job->activateTransfer(_manifests.take(key(postId, runId, setId)));
 }
 
@@ -222,6 +223,7 @@ void PostingJobExecutor::onTransferEnded(qint64 postId, PostingJob *job, const Q
     runtime.ended = true;
     const bool success = job->hasPostFinishedSuccessfully();
     const bool localEndOk = !job->historyDataUnreliable();
+    emit runtimeEnded(postId, job);
     releaseRuntime(postId);
     emit transferFinished(postId, runId, success);
     emit finalized(postId,

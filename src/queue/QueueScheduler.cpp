@@ -31,6 +31,10 @@ QueueScheduler::QueueScheduler(PostQueue *queue,
             &QueueScheduler::onRuntimeActionRequested);
     connect(_queue, &PostQueue::pausedChanged, this, &QueueScheduler::onPausedChanged);
     connect(_executor, &QueueExecutor::stepFinished, this, &QueueScheduler::onStepFinished);
+    connect(_executor, &QueueExecutor::transferStarted, this, [this](qint64, const QString &runId) {
+        _startedRuns.insert(runId);
+        scheduleReevaluate(); // what comes next may now be prepared
+    });
     connect(_executor, &QueueExecutor::transferFinished, this, &QueueScheduler::onTransferFinished);
     connect(_executor, &QueueExecutor::finalized, this, &QueueScheduler::onFinalized);
     connect(_executor, &QueueExecutor::quiesced, this, &QueueScheduler::onQuiesced);
@@ -74,11 +78,16 @@ void QueueScheduler::reevaluate()
     handleIntent();
     if (_queue->isPaused())
         return; // a running step finishes; nothing new starts, not even a preparation
+    // The head first: anticipation never delays a transfer that can start.
+    activateHead();
+    if (_technicalPause)
+        return; // a write just failed: not one more decision
     if (const QueueEntry *prep = _queue->entryInSlot(Slot::Preparation))
         continuePreparation(*prep);
     else
         startPreparation();
-    activateHead();
+    if (!_technicalPause)
+        activateHead(); // a preparation that could not start may leave the head ready
 }
 
 bool QueueScheduler::isCurrent(qint64 postId, const QString &runId) const
@@ -204,6 +213,10 @@ const QueueEntry *QueueScheduler::requiredPreparation() const
 
 const QueueEntry *QueueScheduler::speculativePreparation() const
 {
+    // Anticipation waits for the current transfer to have really started.
+    const QueueEntry *active = _queue->activeEntry();
+    if (active && !_startedRuns.contains(active->runId))
+        return nullptr;
     for (qint64 id : _queue->order(Domain::Session)) {
         const QueueEntry *entry = _queue->find(id);
         if (entry->isEligible() && entry->lifecycle == Lifecycle::Queued

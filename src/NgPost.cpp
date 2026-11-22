@@ -19,6 +19,8 @@
 #include "history/PostHistoryStore.h"
 #include "history/ResumePlanner.h"
 #include "postinfo/PostInfoTemplate.h"
+#include "queue/PostQueue.h"
+#include "queue/QueueScheduler.h"
 #include "utils/PathHelper.h"
 #include "utils/UpdateChecker.h"
 #include "vpn/VpnManager.h"
@@ -560,7 +562,10 @@ void NgPost::_initVpnManager()
                 }
                 return;
             }
-            _startNextPostingJob();
+            if (_queueScheduler)
+                _queueScheduler->reevaluate(); // the head waited for the tunnel
+            else
+                _startNextPostingJob();
             emit postingStateChanged();
             return;
         }
@@ -650,6 +655,7 @@ void NgPost::_startMonitoring(const QString &folderPath)
 
 void NgPost::_stopMonitoring()
 {
+    ++_monitorGeneration;
     if (_folderMonitor)
     {
         _folderMonitor->stopListening();
@@ -668,6 +674,13 @@ NgPost::~NgPost()
     _log("Destuction NgPost...");
 #endif
 
+    // Queue engine: monitor and runtimes before the history they write to,
+    // the owner lock after it (plan_queue.md §3.6).
+    if (_queueEngine) {
+        _stopMonitoring();
+        _stopQueueRuntimes();
+    }
+
     if (_logStream){
         delete _logStream;
         delete _logFile;
@@ -678,6 +691,7 @@ NgPost::~NgPost()
 
     delete _historyService;
     _historyService = nullptr;
+    _releaseQueueOwner();
 
     _stopMonitoring();
 
@@ -1198,9 +1212,17 @@ bool NgPost::_resumePostFromHistory(const QString &ids, bool dryRun, bool assume
         if (groups.isEmpty())
             groups = getPostingGroups();
 
-        PostingJob *job = new PostingJob(
-            this, ResumePlanner::jobOptions(_baseJobOptions(), details, nzbPath, groups, resumePlan, from()));
-        startPostingJob(job);
+        const PostingJobOptions options = ResumePlanner::jobOptions(_baseJobOptions(),
+                                                                    details,
+                                                                    nzbPath,
+                                                                    groups,
+                                                                    resumePlan,
+                                                                    from());
+        if (_queueEngine) {
+            if (!admitResume(postId, options, queue::Origin::Resume).accepted)
+                continue;
+        } else
+            startPostingJob(new PostingJob(this, options));
         scheduled = true;
     }
     return scheduled;
@@ -1251,6 +1273,28 @@ bool NgPost::resumePostGui(qint64 postId, PostingWidget *widget, QString *error)
     QList<QString> groups = details.post.groups.split(',', Qt::SkipEmptyParts);
     if (groups.isEmpty())
         groups = getPostingGroups();
+
+    if (_queueEngine) {
+        const QueueAdmission admission = admitResume(postId,
+                                                     ResumePlanner::jobOptions(_baseJobOptions(),
+                                                                               details,
+                                                                               nzbPath,
+                                                                               groups,
+                                                                               resumePlan,
+                                                                               from()),
+                                                     queue::Origin::Resume,
+                                                     widget);
+        if (!admission.accepted) {
+            if (error)
+                *error = admission.error;
+            return false;
+        }
+#ifdef __USE_HMI__
+        if (widget)
+            widget->attachQueuedResume(admission.postId, nzbPath, resumePlan.files);
+#endif
+        return true;
+    }
 
     PostingJob *job = new PostingJob(
         this,
@@ -1785,8 +1829,21 @@ void NgPost::maybeFinishApplication()
         return;
     }
 
-    if (_shutdownHolds || _activeJob || !_pendingJobs.isEmpty())
+    if (_shutdownHolds || _activeJob || !_pendingJobs.isEmpty() || _queueCanProgress()
+        || !_admissionRetries.isEmpty())
         return;
+    if (_queueHasWork()) {
+        // Only blocked or held posts are left: the GUI keeps them for the user;
+        // a command line run ends in error and leaves them in the queue.
+        if (useHMI())
+            return;
+        if (!_queueLeftBlocked) {
+            _queueLeftBlocked = true;
+            if (_err == ERROR_CODE::NONE)
+                _err = ERROR_CODE::COMPLETED_WITH_ERRORS;
+            _error(tr("Some posts could not be sent and remain in the queue."));
+        }
+    }
     if (_postCmdRunner && !_postCmdRunner->isIdle()) {
         if (!_waitingForPostCmds) {
             _waitingForPostCmds = true;
@@ -1840,8 +1897,8 @@ bool NgPost::isPaused() const
 {
     if (_queuePaused || (_activeJob && _activeJob->isPaused()))
         return true;
-    else
-        return false;
+    // A queue write failed: Resume is what tries it again.
+    return _queueScheduler && _queueScheduler->isTechnicallyPaused();
 }
 
 void NgPost::pause()
@@ -1850,6 +1907,8 @@ void NgPost::pause()
         return;
     _queuePaused = true;
     const auto notify = qScopeGuard([this] { emit postingStateChanged(); });
+    if (_postQueue)
+        _postQueue->setPaused(true); // nothing new starts, not even a preparation
     if (_activeJob)
     {
         _activeJob->pause(PostingJob::PauseReason::User);
@@ -1861,9 +1920,13 @@ void NgPost::resume()
     if (_cancelingAll)
         return;
     const auto notify = qScopeGuard([this] { emit postingStateChanged(); });
+    if (_queueScheduler && _queueScheduler->isTechnicallyPaused())
+        _queueScheduler->retryAfterTechnicalPause();
     if (!_resumeActiveJob())
         return;
     _queuePaused = false;
+    if (_postQueue)
+        _postQueue->setPaused(false);
     _startNextPostingJob();
     if (_preparePacking && !_packingJob && _activeJob && _activeJob->isPacked())
         _prepareNextPacking();
@@ -1970,7 +2033,15 @@ void NgPost::_post(const QFileInfo &fileInfo, const QString &monitorFolder)
     options.nzbFilePath       = nzbFilePath;
     options.files             = postFiles;
     options.inputPaths        = QStringList{ fileInfo.absoluteFilePath() };
-    startPostingJob(new PostingJob(this, options));
+    if (!_queueEngine) {
+        startPostingJob(new PostingJob(this, options));
+        return;
+    }
+    const QString path = fileInfo.absoluteFilePath();
+    if (admitPost(options, queue::Origin::Auto).accepted || _lastPostingStartCanceled)
+        _admissionRetries.remove(path);
+    else
+        _retryMonitoredAdmission(fileInfo, monitorFolder); // the watcher will not report it again
 }
 
 #ifdef NGPOST_TESTING
@@ -2303,41 +2374,7 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
 #endif
     if (job == _activeJob)
     {
-#ifdef __USE_HMI__
-        if (_hmi && !job->widget())
-            _hmi->autoWidget()->updateFinishedJob(job->getFirstOriginalFile(),
-                                                  job->nbArticlesTotal(),
-                                                  job->nbArticlesUploaded(),
-                                                  job->nbArticlesFailed());
-#endif
-
-        if (_activeJob->hasPostFinished() && !_postHistoryFile.isEmpty())
-        {
-            QFile hist(_postHistoryFile);
-            if (hist.open(QIODevice::WriteOnly|QIODevice::Append|QIODevice::Text))
-            {
-                QTextStream stream(&hist);
-                stream << QDateTime::currentDateTime().toString("yyyy/MM/dd hh:mm:ss")
-                       << _historyFieldSeparator << _activeJob->nzbName()
-                       << _historyFieldSeparator << _activeJob->postSize()
-                       << _historyFieldSeparator << _activeJob->avgSpeed();
-                if (_activeJob->hasCompressed())
-                    stream << _historyFieldSeparator << _activeJob->rarName()
-                           << _historyFieldSeparator << _activeJob->rarPass();
-                else
-                    stream << _historyFieldSeparator << _historyFieldSeparator;
-
-                stream << _historyFieldSeparator << _activeJob->groups()
-                       << _historyFieldSeparator << _activeJob->from()
-                       << "\n" << MB_FLUSH;
-                hist.close();
-            }
-        }
-
-#ifdef __USE_HMI__
-        if (_hmi && _autoCloseTabs && _activeJob->hasPostFinishedSuccessfully())
-            _hmi->closeTab(_activeJob->widget());
-#endif
+        _recordFinishedJob(job);
 
         PostingJob *finishedJob = _activeJob;
         _activeJob = nullptr;
@@ -2366,6 +2403,42 @@ qDebug() << "[MB_TRACE][Issue#82][NgPost::onPostingJobFinished] job: " << job
         _pendingJobs.removeOne(job);
         job->deleteLater();
     }
+}
+
+void NgPost::_recordFinishedJob(PostingJob *job)
+{
+#ifdef __USE_HMI__
+    if (_hmi && !job->widget())
+        _hmi->autoWidget()->updateFinishedJob(job->getFirstOriginalFile(),
+                                              job->nbArticlesTotal(),
+                                              job->nbArticlesUploaded(),
+                                              job->nbArticlesFailed());
+#endif
+
+    if (job->hasPostFinished() && !_postHistoryFile.isEmpty()) {
+        QFile hist(_postHistoryFile);
+        if (hist.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+            QTextStream stream(&hist);
+            stream << QDateTime::currentDateTime().toString("yyyy/MM/dd hh:mm:ss")
+                   << _historyFieldSeparator << job->nzbName() << _historyFieldSeparator
+                   << job->postSize() << _historyFieldSeparator << job->avgSpeed();
+            if (job->hasCompressed())
+                stream << _historyFieldSeparator << job->rarName() << _historyFieldSeparator
+                       << job->rarPass();
+            else
+                stream << _historyFieldSeparator << _historyFieldSeparator;
+
+            stream << _historyFieldSeparator << job->groups() << _historyFieldSeparator
+                   << job->from() << "\n"
+                   << MB_FLUSH;
+            hist.close();
+        }
+    }
+
+#ifdef __USE_HMI__
+    if (_hmi && _autoCloseTabs && job->hasPostFinishedSuccessfully())
+        _hmi->closeTab(job->widget());
+#endif
 }
 
 void NgPost::_startNextPostingJob()
@@ -2672,6 +2745,35 @@ void NgPost::cancelAllPostingJobs()
     for (PostingJob *job : _pendingJobs)
         if (!job->cancelRequested())
             emit job->stopPosting();
+    if (_queueEngine) {
+        // Refused admissions waiting for a retry are cancelled too, even
+        // when the queue itself could not be built.
+        _admissionRetries.clear();
+        ++_monitorGeneration;
+    }
+    if (_queueEngine && !_postQueue) {
+        _cancelingAll = false; // nothing was admitted: nothing else to stop
+        emit postingStateChanged();
+        return;
+    }
+    if (_postQueue) {
+        // Paused first (the active transfer with it), then by id in one
+        // command: nothing starts in between. The queue is resumed once it is
+        // empty (_ensureQueueEngine()).
+        _postQueue->setPaused(true);
+        if (!_removeQueuedPosts(false)) {
+            // Not all written: nothing may start or go on against the request,
+            // and Cancel can be asked again.
+            _cancelingAll = false;
+            _queuePaused = true;
+        } else if (!hasPostingJobs()) {
+            _cancelingAll = false; // nothing was left to stop
+            _queuePaused = false;
+            _postQueue->setPaused(false);
+        }
+        emit postingStateChanged();
+        return; // the active entry stops through the queue
+    }
     if (_activeJob && !_activeJob->cancelRequested())
         emit _activeJob->stopPosting();
     emit postingStateChanged();
@@ -2685,6 +2787,17 @@ void NgPost::stopActivePostingForResume()
 
 void NgPost::closeAllMonitoringJobs()
 {
+    if (_postQueue) {
+        ++_monitorGeneration; // admissions still waiting to be retried are dropped
+        _admissionRetries.clear();
+        if (!_removeQueuedPosts(true)) {
+            // Not all written: no Auto post may run, or go on transferring,
+            // once monitoring is stopped. The pause holds the active one too.
+            _postQueue->setPaused(true);
+            _queuePaused = true;
+        }
+        return;
+    }
     auto it = _pendingJobs.begin();
     while (it != _pendingJobs.end())
     {
@@ -2711,6 +2824,12 @@ void NgPost::closeAllMonitoringJobs()
 
 bool NgPost::hasMonitoringPostingJobs() const
 {
+    if (_postQueue) {
+        for (const queue::QueueEntry &entry : _postQueue->snapshot(queue::Domain::Session))
+            if (entry.origin == queue::Origin::Auto)
+                return true;
+        return false;
+    }
     if (_activeJob)
     {
         if (!_activeJob->widget())
@@ -3809,7 +3928,13 @@ bool NgPost::_startCliPosting(const QCommandLineParser &parser,
         options.nzbFilePath       = nzbFilePath;
         options.files             = filesToUpload;
         options.inputPaths        = rawInputPaths;
-        startPostingJob(new PostingJob(this, options));
+        if (_queueEngine) {
+            // Refused: nothing would ever end the event loop of this run.
+            if (!admitPost(options, queue::Origin::Cli).accepted && _autoDirs.isEmpty()
+                && !isMonitoring)
+                return false;
+        } else
+            startPostingJob(new PostingJob(this, options));
     }
 
     if (_autoDirs.size())
@@ -3822,7 +3947,10 @@ bool NgPost::_startCliPosting(const QCommandLineParser &parser,
         }
     }
 
-
+    // Whatever was refused, the event loop that starts now looks once at what
+    // is left: nothing means the end of the run, with its error code.
+    if (_queueEngine)
+        QMetaObject::invokeMethod(this, &NgPost::maybeFinishApplication, Qt::QueuedConnection);
     return true;
 }
 

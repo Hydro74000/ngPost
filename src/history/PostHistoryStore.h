@@ -367,8 +367,11 @@ public:
                             qint64 bytes,
                             QString *error = nullptr);
     bool applyArticleEvents(const QList<ArticleEvent> &events, QString *error = nullptr);
+    //! Normalize what crashed runs left, sparing the posts of live owners
+    //! (liveOwners()).
     bool markPostCrashedArticlesUnknown(QString *error = nullptr);
     bool cleanupInvalidResumePosts(QString *error = nullptr);
+    QStringList liveOwners() const;
 
     // Primary query with full filter support.
     QList<PostSummary> listPosts(const ListFilter &filter, QString *error = nullptr);
@@ -465,6 +468,7 @@ private:
                                 const queue::QueueTransaction &transaction,
                                 queue::QueueCommit &result);
     bool _admitQueueEntry(QSqlDatabase &db, queue::QueueEntry &entry, QString *error);
+    bool _admitExistingQueueEntry(QSqlDatabase &db, queue::QueueEntry &entry, QString *error);
     bool _writeQueueEntry(QSqlDatabase &db,
                           const queue::QueueEntry &entry,
                           bool insert,

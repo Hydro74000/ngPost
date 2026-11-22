@@ -27,4 +27,5 @@ SUBDIRS = \
     tst_PostQueue \
     tst_QueueScheduler \
     tst_QueueStoreSqlite \
-    tst_PostingJobExecutor
+    tst_PostingJobExecutor \
+    tst_NgPostQueue

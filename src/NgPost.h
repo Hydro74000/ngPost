@@ -8,7 +8,9 @@
 #ifndef NGPOST_H
 #define NGPOST_H
 #include "PostingJobOptions.h"
+#include "PostingJobOptionsCodec.h"
 #include "history/PostHistoryStore.h"
+#include "queue/QueueTypes.h"
 #include "par2/Par2Settings.h"
 #include "tools/ExternalToolResolver.h"
 #include "utils/LogTimestamp.h"
@@ -20,9 +22,11 @@
 #include <QCommandLineOption>
 #include <QDir>
 #include <QFileInfo>
+#include <QHash>
 #include <QMutex>
 #include <QNetworkAccessManager>
 #include <QNetworkProxy>
+#include <QPointer>
 #include <QProcess>
 #include <QQueue>
 #include <QScopeGuard>
@@ -50,6 +54,16 @@ class UpdateChecker;
 class VpnManager;
 class PostHistoryService;
 class PostCmdRunner;
+class PostingJobExecutor;
+class ServiceQueueStore;
+struct JobExecutionContext;
+namespace queue
+{
+class OwnerLock;
+class PostQueue;
+class QueueScheduler;
+struct QueueEntry;
+} // namespace queue
 
 #define NB_ARTICLES_TO_PREPARE_PER_CONNECTION 3
 
@@ -428,6 +442,16 @@ private:
     PostingJob *_packingJob;
     bool _queuePaused = false;
     const bool _queueEngine = qEnvironmentVariable("NGPOST_QUEUE_ENGINE") == QLatin1String("1");
+    bool _queueLeftBlocked = false; //!< the command line run said it once
+    // The queue engine (NgPostQueue.cpp), built by _ensureQueueEngine().
+    queue::OwnerLock *_ownerLock = nullptr;
+    ServiceQueueStore *_queueStore = nullptr;
+    queue::PostQueue *_postQueue = nullptr;
+    PostingJobExecutor *_queueExecutor = nullptr;
+    queue::QueueScheduler *_queueScheduler = nullptr;
+#ifdef __USE_HMI__
+    QHash<qint64, QPointer<PostingWidget>> _queueViews; //!< post id -> its tab
+#endif
     bool _cancelingAll = false;
     quint64 _postingCancelGeneration = 0;
     bool _resumeActiveJob();
@@ -474,7 +498,34 @@ private:
     void _resetShutdownCompletion();
     void _releaseShutdownHold();
     void _onPostingJobEnded(const PostingJob *job);
+    //! The traces a finished transfer leaves: post history file, Auto tab, tab
+    //! closing. Shared by the job queue and the queue engine.
+    void _recordFinishedJob(PostingJob *job);
+
+    bool _ensureQueueEngine();
+    void _stopQueueRuntimes();
+    void _releaseQueueOwner();
+    PersistedQueueOptions _queueRecipe(const PostingJobOptions &options) const;
+    PostingJob *_createQueueRuntime(const queue::QueueEntry &entry,
+                                    const JobExecutionContext &context);
+    void _onQueueRuntimeActivated(qint64 postId, PostingJob *job);
+    void _onQueueRuntimeEnded(qint64 postId, PostingJob *job);
+    //! Entries remain in the session queue, whatever their state.
+    bool _queueHasWork() const;
+    //! Removes, in one command, every entry (or every Auto one) that may be
+    //! removed now; false when the queue refused to write it.
+    bool _removeQueuedPosts(bool monitoredOnly);
+    quint64 _monitorGeneration = 0;        //!< bumped when monitoring stops
+    QHash<QString, int> _admissionRetries; //!< monitored path -> failed admissions
+    static constexpr int kMaxAdmissionRetries = 5;
+    int _admissionRetryBaseMs = 1000; //!< doubled at each retry, 30 s at most
+    //! A monitored file the queue refused: asked again later, the watcher
+    //! having already counted it as seen.
+    void _retryMonitoredAdmission(const QFileInfo &fileInfo, const QString &monitorFolder);
+    //! Something will still happen without the user: not only blocked or held.
+    bool _queueCanProgress() const;
 #ifdef NGPOST_TESTING
+    bool _queueEngineUnavailableForTest = false;
     int _shutdownStartCount = 0;
     int _shutdownRecheckCount = 0;
     QString _allowedShutdownCmdForTest;
@@ -688,6 +739,16 @@ public:
     }
     int shutdownStartCountForTest() const { return _shutdownStartCount; }
     bool ensureHistoryStoreForTest() { return _ensureHistoryStore(); }
+    void postMonitoredForTest(const QFileInfo &file) { _post(file, QString()); }
+    void setAdmissionRetryBaseMsForTest(int ms) { _admissionRetryBaseMs = ms; }
+    int pendingAdmissionRetriesForTest() const { return int(_admissionRetries.size()); }
+    bool cancelingAllForTest() const { return _cancelingAll; }
+    //! The queue engine cannot be built, as with an unusable database.
+    void setQueueEngineUnavailableForTest(bool unavailable)
+    {
+        _queueEngineUnavailableForTest = unavailable;
+    }
+    queue::QueueScheduler *queueSchedulerForTest() const { return _queueScheduler; }
     //! What a monitored \a file would be posted with, without posting it.
     PostingJobOptions monitoredPostOptionsForTest(const QFileInfo &file);
     int shutdownRecheckCountForTest() const { return _shutdownRecheckCount; }
@@ -905,6 +966,30 @@ public:
     //! Internal switch of the queue engine (lot C3), read once per instance from
     //! NGPOST_QUEUE_ENGINE=1. Off, posts follow the historical job queue.
     bool queueEngineEnabled() const { return _queueEngine; }
+
+    //! Answer of a queue admission: refused, or the post id it now has.
+    struct QueueAdmission
+    {
+        bool accepted = false;
+        qint64 postId = 0;
+        QString error;
+    };
+    //! A new post enters the queue (queue engine only); @p view follows it.
+    QueueAdmission admitPost(const PostingJobOptions &options,
+                             queue::Origin origin,
+                             int tabNumber = 0,
+                             PostingWidget *view = nullptr);
+    //! A post of the history enters the queue again to be resumed.
+    QueueAdmission admitResume(qint64 postId,
+                               const PostingJobOptions &options,
+                               queue::Origin origin,
+                               PostingWidget *view = nullptr);
+    queue::PostQueue *postQueue() const { return _postQueue; }
+
+private:
+    QueueAdmission _queueAdmitted(const queue::QueueCommandResult &result, PostingWidget *view);
+    bool _queueAdmissionConfirmed(QueueAdmission *admission);
+
 
 signals:
     void postingStateChanged();
@@ -1326,7 +1411,7 @@ bool NgPost::isPosting() const
 }
 bool NgPost::hasPostingJobs() const
 {
-    return (_activeJob || _pendingJobs.size()) ? true : false;
+    return _activeJob || !_pendingJobs.isEmpty() || _queueHasWork() || !_admissionRetries.isEmpty();
 }
 
 bool NgPost::debugMode() const

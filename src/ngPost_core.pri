@@ -135,6 +135,7 @@ SOURCES += \
         $$PWD/history/ServiceQueueStore.cpp \
         $$PWD/history/ResumePlanner.cpp \
         $$PWD/NgPost.cpp \
+        $$PWD/NgPostQueue.cpp \
         $$PWD/NntpCheckCon.cpp \
         $$PWD/NntpConnection.cpp \
         $$PWD/NzbCheck.cpp \

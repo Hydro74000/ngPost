@@ -248,6 +248,7 @@ public:
     PostingJob(NgPost *ngPost,
                const PostingJobOptions &options,
                const JobExecutionContext &context,
+               PostingWidget *postWidget = nullptr,
                QObject *parent = nullptr);
     ~PostingJob() override;
 

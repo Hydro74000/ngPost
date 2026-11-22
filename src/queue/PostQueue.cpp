@@ -253,6 +253,10 @@ bool PostQueue::apply(const QueueTransaction &transaction, QueueCommit *result)
         _entries.insert(entry.postId, entry);
         changedIds << entry.postId;
     }
+    for (const QueueEntry &entry : transaction.existingAdmissions) {
+        _entries.insert(entry.postId, entry);
+        changedIds << entry.postId;
+    }
     for (auto it = commit.runs.cbegin(); it != commit.runs.cend(); ++it) {
         QueueEntry &entry = _entries[it.key()];
         entry.runId = it.value().runId;
@@ -354,6 +358,30 @@ QueueCommandResult PostQueue::submit(const PersistedQueueOptions &options,
     if (options.sources.isEmpty())
         return QueueCommandResult::rejected(QStringLiteral("no_source"));
     return admitEntry(newEntry(options, origin, tabNumber));
+}
+
+QueueCommandResult PostQueue::enqueueExisting(qint64 postId,
+                                              const PersistedQueueOptions &options,
+                                              Origin origin,
+                                              int tabNumber)
+{
+    if (postId <= 0)
+        return QueueCommandResult::rejected(QStringLiteral("unknown_post"));
+    if (_entries.contains(postId))
+        return QueueCommandResult::rejected(QStringLiteral("already_queued"));
+    QueueEntry entry = newEntry(options, origin, tabNumber);
+    entry.postId = postId;
+    // What is left to send was decided by the transfer manifest: no packing.
+    entry.transferManifestEngaged = true;
+    QList<qint64> newOrder = order(Domain::Session);
+    newOrder << postId;
+    QueueTransaction tx;
+    tx.existingAdmissions << entry;
+    tx.orders << orderUpdate(resolve(Domain::Session, {}), newOrder);
+    QueueCommit commit;
+    if (!apply(tx, &commit))
+        return QueueCommandResult::rejected(QStringLiteral("store_failed"), commit.error);
+    return QueueCommandResult::done({ postId });
 }
 
 QString PostQueue::duplicateNzbPath(const QString &path) const

@@ -363,6 +363,23 @@ private slots:
         QCOMPARE(f.queue.order().size(), 2); // they leave only once their runtime confirmed
     }
 
+    void resumeEntersUnderANewRun()
+    {
+        Fixture f;
+        const PersistedQueueOptions o = makeOptions(QStringLiteral("r"), true, true);
+        const QueueCommandResult admitted = f.queue.enqueueExisting(77, o, Origin::Resume);
+        QVERIFY(admitted.ok());
+        QCOMPARE(admitted.postIds, QList<qint64>{ 77 });
+        const QueueEntry *entry = f.queue.find(77);
+        QVERIFY(entry);
+        QCOMPARE(entry->runNo, 1);
+        QVERIFY(entry->transferManifestEngaged);
+        QVERIFY(entry->isReady()); // a resume never packs again
+        QCOMPARE(f.queue.order(), QList<qint64>{ 77 });
+        QCOMPARE(f.queue.enqueueExisting(77, o, Origin::Resume).errorCode,
+                 QStringLiteral("already_queued"));
+    }
+
     void interruptionRenewsTheRunOnce()
     {
         Fixture f;

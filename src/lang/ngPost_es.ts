@@ -4693,6 +4693,10 @@ Su archivo de configuración activo es:
         <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
         <translation>Palabras clave incorrectas para AUTO_PACK: %1. Debe ser un subconjunto de (COMPRESS, GEN_NAME, GEN_PAR2); la contraseña de la Publicación Automática es AUTO_PASS.</translation>
     </message>
+    <message>
+        <source>Some posts could not be sent and remain in the queue.</source>
+        <translation>Algunas publicaciones no se pudieron enviar y permanecen en la cola.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>

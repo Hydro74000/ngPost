@@ -66,6 +66,12 @@ public:
     //! What the preparation of (post, run, set) left, if it is still held.
     PreparedManifest manifest(qint64 postId, const QString &runId, const QString &setId) const;
 
+signals:
+    //! A runtime is about to transfer, before its first byte: views connect here.
+    void runtimeActivated(qint64 postId, PostingJob *job);
+    //! The transfer of @p job ended; it is still alive during this signal only.
+    void runtimeEnded(qint64 postId, PostingJob *job);
+
 private:
     enum class Phase {
         Preparing,

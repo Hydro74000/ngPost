@@ -72,6 +72,11 @@ public:
     QueueCommandResult submit(const PersistedQueueOptions &options,
                               Origin origin,
                               int tabNumber = 0);
+    //! A post of the history comes back for a resume: same post, next run.
+    QueueCommandResult enqueueExisting(qint64 postId,
+                                       const PersistedQueueOptions &options,
+                                       Origin origin,
+                                       int tabNumber = 0);
     QueueCommandResult move(const QList<qint64> &ids, int targetIndex, const QueueView &seen);
     QueueCommandResult moveToEdge(const QList<qint64> &ids, Edge edge, const QueueView &seen);
     QueueCommandResult postNext(const QList<qint64> &ids, const QueueView &seen);

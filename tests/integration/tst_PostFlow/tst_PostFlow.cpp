@@ -26,6 +26,8 @@
 #include <QJsonObject>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QRegularExpression>
 #include <QSet>
 #include <QStandardPaths>
@@ -253,6 +255,11 @@ private slots:
     //! it -- in CLI mode, not only under --debug. A job output pasted into a
     //! bug report carried the archive password with it.
     void archive_password_never_reaches_the_output();
+
+    //! The queue engine (NGPOST_QUEUE_ENGINE=1, lot C3) posts a packed post
+    //! through the queue: prepared, transferred, retired, and its history row
+    //! is the one the admission wrote.
+    void queue_engine_posts_a_packed_post_through_the_queue();
 };
 
 void TestPostFlow::initTestCase()
@@ -1284,6 +1291,110 @@ void TestPostFlow::archive_password_never_reaches_the_output()
     QVERIFY2(out.contains(QStringLiteral("-hp********")),
              qPrintable(QStringLiteral("the command line was logged without the mask, so this "
                                        "test is not looking at the line it thinks:\n%1").arg(out)));
+#endif
+}
+
+void TestPostFlow::queue_engine_posts_a_packed_post_through_the_queue()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("the fake rar/par2 tools are shell scripts");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString root = sandbox.rootPath();
+    QVERIFY(writeFakeTool(root + "/fakerar",
+                          QStringLiteral(
+                              "#!/bin/sh\n"
+                              "for a in \"$@\"; do case \"$a\" in *.rar) t=\"$a\";; esac; done\n"
+                              "head -c 50000 /dev/zero > \"$t\"\n"
+                              "exit 0\n")));
+    QVERIFY(writeFakeTool(root + "/fakepar2",
+                          QStringLiteral(
+                              "#!/bin/sh\n"
+                              "for a in \"$@\"; do case \"$a\" in *.par2) t=\"$a\";; esac; done\n"
+                              "head -c 5000 /dev/zero > \"$t\"\n"
+                              "exit 0\n")));
+    const QString inPath = root + QStringLiteral("/queued.bin");
+    {
+        QFile in(inPath);
+        QVERIFY(in.open(QIODevice::WriteOnly));
+        in.write(QByteArray(5000, 'q'));
+    }
+    const QString nzbDir = root + QStringLiteral("/nzb");
+    QVERIFY(QDir().mkpath(nzbDir));
+    const QString dbPath = root + QStringLiteral("/history.sqlite");
+    const QString confPath = root + QStringLiteral("/ngPost.conf");
+    {
+        QFile conf(confPath);
+        QVERIFY(conf.open(QIODevice::WriteOnly | QIODevice::Text));
+        QTextStream s(&conf);
+        s << "nzbPath = " << nzbDir << "\n"
+          << "TMP_DIR = " << root << "\n"
+          << "POST_DB = " << dbPath << "\n"
+          << "RAR_PATH = " << root << "/fakerar\n"
+          << "PAR2_PATH = " << root << "/fakepar2\n"
+          << "PAR2_PCT = 8\n"
+          << "PACK = compress,gen_par2\n"
+          << "[server]\n"
+          << "host = 127.0.0.1\n"
+          << "port = " << mock.port() << "\n"
+          << "ssl = false\n"
+          << "connection = 1\n"
+          << "enabled = true\n"
+          << "nzbcheck = false\n";
+    }
+
+    const QByteArray previous = qgetenv("NGPOST_QUEUE_ENGINE");
+    qputenv("NGPOST_QUEUE_ENGINE", "1");
+    QString out;
+    const int code = runNgPost(_bin,
+                               { "-c",
+                                 confPath,
+                                 "-i",
+                                 inPath,
+                                 "-g",
+                                 "alt.binaries.test",
+                                 "--quiet",
+                                 "--pack",
+                                 "--disp_progress",
+                                 "none" },
+                               sandbox.rootPath(),
+                               out);
+    if (previous.isNull())
+        qunsetenv("NGPOST_QUEUE_ENGINE");
+    else
+        qputenv("NGPOST_QUEUE_ENGINE", previous);
+    QVERIFY2(code == 0,
+             qPrintable(QStringLiteral("ngPost exit=%1, output:\n%2").arg(code).arg(out)));
+
+    const QStringList nzbs = QDir(nzbDir).entryList({ QStringLiteral("*.nzb") }, QDir::Files);
+    QCOMPARE(nzbs.size(), 1);
+    QFile nzb(nzbDir + QLatin1Char('/') + nzbs.first());
+    QVERIFY(nzb.open(QIODevice::ReadOnly));
+    const QByteArray xml = nzb.readAll();
+    QVERIFY2(xml.contains(".rar") && xml.contains(".par2"), xml.constData());
+    QVERIFY2(!xml.contains("queued.bin"), "the original file was posted instead of its archive");
+
+    const QString connection = QStringLiteral("queue-engine-probe");
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        db.setDatabaseName(dbPath);
+        QVERIFY(db.open());
+        auto scalar = [&db](const QString &sql) {
+            QSqlQuery q(db);
+            return q.exec(sql) && q.next() ? q.value(0) : QVariant();
+        };
+        QCOMPARE(scalar(QStringLiteral("SELECT COUNT(*) FROM posts")).toInt(), 1);
+        QCOMPARE(scalar(QStringLiteral("SELECT status FROM posts")).toString(),
+                 QStringLiteral("success"));
+        QVERIFY(scalar(QStringLiteral("SELECT owner_id FROM posts")).isNull());
+        QCOMPARE(scalar(QStringLiteral("SELECT COUNT(*) FROM post_runs")).toInt(), 1);
+        QCOMPARE(scalar(QStringLiteral("SELECT result FROM post_runs")).toString(),
+                 QStringLiteral("success"));
+        QCOMPARE(scalar(QStringLiteral("SELECT COUNT(*) FROM post_queue")).toInt(), 0);
+    }
+    QSqlDatabase::removeDatabase(connection);
 #endif
 }
 

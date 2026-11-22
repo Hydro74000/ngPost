@@ -4697,6 +4697,10 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <source>Wrong keywords for AUTO_PACK: %1. It should be a subset of (COMPRESS, GEN_NAME, GEN_PAR2); the password of the Auto Posting is AUTO_PASS.</source>
         <translation>Verkeerde sleutelwoorden voor AUTO_PACK: %1. Het moet een deelverzameling zijn van (COMPRESS, GEN_NAME, GEN_PAR2); het wachtwoord van Auto Posting is AUTO_PASS.</translation>
     </message>
+    <message>
+        <source>Some posts could not be sent and remain in the queue.</source>
+        <translation>Sommige posts konden niet worden verzonden en blijven in de wachtrij.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>

@@ -28,6 +28,7 @@
 #include "PostingJob.h"
 #include "history/PostHistoryService.h"
 #include "nntp/NntpFile.h"
+#include "queue/PostQueue.h"
 
 #include <QCheckBox>
 #include <QDebug>
@@ -200,6 +201,7 @@ void PostingWidget::_handlePostingJobDone()
     PostingJob *job = std::exchange(_postingJob, nullptr);
     disconnect(job);
     _postingFinished = true;
+    _queuedPostId = 0;
 
     if (job->nbArticlesTotal() > 0) {
         if (job->nbArticlesFailed() > 0)
@@ -273,7 +275,7 @@ void PostingWidget::_refreshPostButton()
 
 bool PostingWidget::isBlank() const
 {
-    return _state == STATE::IDLE && !_postingJob && !_postingFinished
+    return _state == STATE::IDLE && !_postingJob && !_queuedPostId && !_postingFinished
         && _ui->filesList->count() == 0;
 }
 
@@ -380,6 +382,10 @@ void PostingWidget::postFiles(bool updateMainParams)
             nzbPath += ".nzb";
         if (!_confirmNzbOverwrite(nzbPath))
             return;
+        if (_ngPost->queueEngineEnabled()) {
+            _submitToQueue(options, nzbPath, files);
+            return;
+        }
         // Before the job exists: an active one may compress at once.
         _supersedeStoppedAttempt();
 
@@ -409,7 +415,13 @@ void PostingWidget::postFiles(bool updateMainParams)
     else  if (_state == STATE::POSTING)
     {
         _state = STATE::STOPPING;
-        emit _postingJob->stopPosting();
+        if (_queuedPostId && _ngPost->postQueue()) {
+            // Through the queue: a running transfer stops, a waiting post leaves.
+            queue::PostQueue *queue = _ngPost->postQueue();
+            if (!queue->remove({ _queuedPostId }, queue::RemovePolicy::Default, queue->view()).ok())
+                _state = STATE::POSTING;
+        } else if (_postingJob)
+            emit _postingJob->stopPosting();
         emit submissionEligibilityChanged();
     }
 }
@@ -457,6 +469,8 @@ bool PostingWidget::_stoppedAttemptIsReplaceable() const
     qint64 const id = _stoppedAttempt.historyPostId;
     if (!id)
         return true;
+    if (_ngPost->postQueue() && _ngPost->postQueue()->find(id))
+        return false; // queued again, for a resume
     QList<PostingJob *> jobs(_ngPost->_pendingJobs.cbegin(), _ngPost->_pendingJobs.cend());
     jobs << _ngPost->_activeJob;
     for (PostingJob const *job : jobs)
@@ -1099,11 +1113,12 @@ bool PostingWidget::_fileAlreadyInList(const QString &fileName, int currentNbFil
 
 QColor PostingWidget::postingTextColor() const
 {
-    const bool submitted = _postingJob && !_postingFinished;
-    const bool stopping = submitted && _postingJob->cancelRequested();
-    const bool active = submitted && _ngPost->_activeJob == _postingJob;
+    const bool submitted = (_postingJob || _queuedPostId) && !_postingFinished;
+    const bool stopping = submitted
+        && (_state == STATE::STOPPING || (_postingJob && _postingJob->cancelRequested()));
+    const bool active = submitted && _postingJob && _ngPost->_activeJob == _postingJob;
     const bool paused = submitted && !stopping
-        && (_ngPost->_queuePaused || _postingJob->isPaused());
+        && (_ngPost->_queuePaused || (_postingJob && _postingJob->isPaused()));
     const QPalette theme = _hmi->palette();
     const bool dark = theme.color(QPalette::Window).lightness() < 128;
     if (paused)
@@ -1115,8 +1130,8 @@ QColor PostingWidget::postingTextColor() const
 
 void PostingWidget::refreshPostingState()
 {
-    const bool submitted = _postingJob && !_postingFinished;
-    const bool active = submitted && _ngPost->_activeJob == _postingJob;
+    const bool submitted = (_postingJob || _queuedPostId) && !_postingFinished;
+    const bool active = submitted && _postingJob && _ngPost->_activeJob == _postingJob;
     _ui->postButton->setText(!submitted   ? tr("Start Quick Post #%1").arg(displayNumber())
                                  : active ? tr("Stop Posting")
                                           : tr("Cancel Posting"));
@@ -1145,6 +1160,76 @@ void PostingWidget::_activatePosting()
     _state = STATE::POSTING;
     _highlightFirstPendingFile();
     emit submissionEligibilityChanged();
+}
+
+void PostingWidget::_submitToQueue(const PostingJobOptions &options,
+                                   const QString &nzbPath,
+                                   const QFileInfoList &files)
+{
+    PostingJobOptions filled = options;
+    _fillJobOptions(filled, nzbPath, files);
+    const NgPost::QueueAdmission admission = _ngPost->admitPost(filled,
+                                                                queue::Origin::Quick,
+                                                                jobNumber(),
+                                                                this);
+    if (!admission.accepted)
+        return; // the form stays as it is: nothing was submitted
+    // Durable now: a stopped attempt of this tab may give way. The queue
+    // starts nothing before the event loop runs again.
+    _supersedeStoppedAttempt();
+    _queuedPostId = admission.postId;
+    _queuedInputPaths = filled.inputPaths;
+    _postingFinished = false;
+    _resubmittable = false;
+    _state = STATE::POSTING;
+    _ui->postButton->setText(tr("Cancel Posting"));
+    _hmi->updateJobTab(this,
+                       _hmi->pendingColor(),
+                       _hmi->pendingIcon(),
+                       QFileInfo(filled.nzbFilePath).fileName());
+    emit submissionEligibilityChanged();
+}
+
+void PostingWidget::attachQueuedResume(qint64 postId,
+                                       const QString &nzbPath,
+                                       const QFileInfoList &files)
+{
+    _ui->filesList->clear2();
+    for (const QFileInfo &file : files)
+        _ui->filesList->addPath(file.absoluteFilePath(), file.isDir());
+    _queuedPostId = postId;
+    _queuedInputPaths.clear();
+    _postingFinished = false;
+    _state = STATE::POSTING;
+    _ui->nzbFileEdit->setText(nzbPath);
+    _ui->postButton->setText(tr("Cancel Posting"));
+    _hmi->updateJobTab(this,
+                       _hmi->pendingColor(),
+                       _hmi->pendingIcon(),
+                       QFileInfo(nzbPath).fileName());
+    emit submissionEligibilityChanged();
+}
+
+void PostingWidget::bindQueueRuntime(PostingJob *job)
+{
+    _postingJob = job; // the executor's: this tab only follows it
+    _activatePosting();
+}
+
+void PostingWidget::onQueuedPostRemoved()
+{
+    if (!_queuedPostId || _postingJob)
+        return; // a transfer ends through onPostingJobDone()
+    _queuedPostId = 0;
+    _postingFinished = false;
+    // A preparation may have shown its archives: the sources come back.
+    if (!_queuedInputPaths.isEmpty()) {
+        _ui->filesList->clear2();
+        for (const QString &path : std::as_const(_queuedInputPaths))
+            _ui->filesList->addPath(path, QFileInfo(path).isDir());
+    }
+    _hmi->clearJobTab(this);
+    setIDLE();
 }
 
 void PostingWidget::attachResumeJob(PostingJob *job, const QFileInfoList &files, bool hasStarted)

@@ -40,6 +40,9 @@ struct QueueTransaction
     //! store assigns the real id and the first run, and the same placeholder may
     //! appear in orders.
     QList<QueueEntry> upserts;
+    //! Posts already in the history entering the queue again (a resume): the
+    //! store attaches their next run.
+    QList<QueueEntry> existingAdmissions;
     //! Entries leaving the queue (the post itself stays in the history).
     QList<qint64> removals;
     //! Post ids whose current run ends as interrupted and gets a successor run.
@@ -51,8 +54,8 @@ struct QueueTransaction
 
     bool isEmpty() const
     {
-        return upserts.isEmpty() && removals.isEmpty() && renewRuns.isEmpty() && orders.isEmpty()
-            && !setIntent && dropIntentId.isEmpty();
+        return upserts.isEmpty() && existingAdmissions.isEmpty() && removals.isEmpty()
+            && renewRuns.isEmpty() && orders.isEmpty() && !setIntent && dropIntentId.isEmpty();
     }
 };
 
@@ -66,7 +69,7 @@ struct QueueCommit
         QString runId;
         int runNo = 0;
     };
-    //! post id -> run now attached to its entry (admissions and renewals)
+    //! post id -> run now attached to its entry (admissions, resumes and renewals)
     QHash<qint64, Run> runs;
 
     bool ok() const { return error.isEmpty(); }

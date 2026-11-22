@@ -25,6 +25,11 @@ QString InMemoryQueueStore::validate(const QueueTransaction &transaction) const
     QSet<qint64> known(_entries.keyBegin(), _entries.keyEnd());
     for (const QueueEntry &entry : transaction.upserts)
         known.insert(entry.postId);
+    for (const QueueEntry &entry : transaction.existingAdmissions) {
+        if (entry.postId <= 0 || _entries.contains(entry.postId))
+            return QStringLiteral("resume_not_admissible");
+        known.insert(entry.postId);
+    }
     for (qint64 id : transaction.removals)
         known.remove(id);
     for (qint64 id : transaction.renewRuns)
@@ -64,6 +69,12 @@ QueueCommit InMemoryQueueStore::commit(const QueueTransaction &transaction)
             result.assignedIds.insert(placeholder, entry.postId);
             result.runs.insert(entry.postId, { entry.runId, entry.runNo });
         }
+        _entries.insert(entry.postId, entry);
+    }
+    for (QueueEntry entry : transaction.existingAdmissions) {
+        entry.runNo = ++_runNumbers[entry.postId];
+        entry.runId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        result.runs.insert(entry.postId, { entry.runId, entry.runNo });
         _entries.insert(entry.postId, entry);
     }
     for (qint64 id : transaction.renewRuns) {

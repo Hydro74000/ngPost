@@ -268,8 +268,9 @@ PostingJob::PostingJob(NgPost *ngPost,
 PostingJob::PostingJob(NgPost *ngPost,
                        const PostingJobOptions &options,
                        const JobExecutionContext &context,
+                       PostingWidget *postWidget,
                        QObject *parent)
-    : PostingJob(ngPost, options, nullptr, parent, &context)
+    : PostingJob(ngPost, options, postWidget, parent, &context)
 {
 }
 
@@ -925,9 +926,14 @@ bool PostingJob::runPreparationStep(queue::PrepStep step)
     if (!_stepDriven) {
         _stepDriven = true;
         _logStart();
-        // As onStartPosting(): the .nfo is found before packing changes _files.
+        // As onStartPosting(): the .nfo is found before packing changes _files,
+        // and every tool is checked before a long compression starts.
         if (_ngPost->_copyNfoWithNzb && !_nzbFilePath.isEmpty())
             _resolveNfoSource();
+        if ((_doCompress && !_canCompress(false)) || (_doPar2 && !_canGenPar2(false))) {
+            _finishStep(step, false, {}); // the reason is already in the log
+            return false;
+        }
     }
     switch (step) {
     case queue::PrepStep::Compress:
