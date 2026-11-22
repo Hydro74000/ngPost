@@ -59,7 +59,7 @@ tst_Par2Settings              17  Linux
 tst_PathHelper                45  Linux
 tst_PostFlow                  29  Linux
 tst_PostHistory               48  Linux
-tst_PostInfoTemplate          36  Linux
+tst_PostInfoTemplate          37  Linux
 tst_PostQueue                 27  Linux
 tst_PostingJobOptionsCodec    27  Linux
 tst_QueuePanel                10  Linux
@@ -98,7 +98,7 @@ tst_Par2Settings              17  Darwin
 tst_PathHelper                45  Darwin
 tst_PostFlow                  25  Darwin
 tst_PostHistory               48  Darwin
-tst_PostInfoTemplate          36  Darwin
+tst_PostInfoTemplate          37  Darwin
 tst_PostQueue                 27  Darwin
 tst_PostingJobOptionsCodec    27  Darwin
 tst_QueuePanel                10  Darwin
@@ -135,7 +135,7 @@ tst_Par2Settings              18  Windows
 tst_PathHelper                38  Windows
 tst_PostFlow                  18  Windows
 tst_PostHistory               48  Windows
-tst_PostInfoTemplate          34  Windows
+tst_PostInfoTemplate          35  Windows
 tst_PostQueue                 27  Windows
 tst_PostingJobOptionsCodec    27  Windows
 tst_QueuePanel                10  Windows

@@ -1743,7 +1743,8 @@ void NgPost::doNzbPostCMD(PostingJob *job)
     // before they are done.
     _postCmdRunner->enqueue(job->postInfoData(),
                             _nzbPostCmd,
-                            _urlNzbUpload ? *_urlNzbUpload : QUrl());
+                            _urlNzbUpload ? *_urlNzbUpload : QUrl(),
+                            job->isQueueRuntime() ? job->executionContext().runId : QString());
 }
 
 //! The only place allowed to end the run. It waits for the posts, for the

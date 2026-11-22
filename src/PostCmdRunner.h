@@ -45,8 +45,12 @@ public:
     void setSettings(Settings const &settings);
 
     //! Queues the end of one post. Everything needed is copied: the job that
-    //! produced it is deleted long before its commands are done.
-    void enqueue(PostInfoData const &data, QStringList const &commands, QUrl const &uploadUrl);
+    //! produced it is deleted long before its commands are done. Returns the
+    //! task id; 0 when there was nothing to do, which taskFinished() reports too.
+    quint64 enqueue(PostInfoData const &data,
+                    QStringList const &commands,
+                    QUrl const &uploadUrl,
+                    QString const &runId = {});
 
     //! Nothing left to upload and nothing left to run.
     bool isIdle() const;
@@ -61,6 +65,10 @@ signals:
     //! The queue just drained: whoever waits to quit or to shut down the
     //! machine can now go ahead.
     void idle();
+    //! Exactly once per enqueue(), whatever happens to it: done (@p ok false if
+    //! a command or the upload failed), cancelled before or while running, or
+    //! empty (task id 0). The post it served may let go of what it held.
+    void taskFinished(qint64 postId, QString runId, quint64 taskId, bool ok);
 
 private slots:
     void onUploadDone();
@@ -78,6 +86,9 @@ private:
         QUrl         uploadUrl;
         Settings     settings; //!< immutable snapshot taken when the task is queued
         QString      jsonPath; //!< temporary, deleted when the task is over
+        QString runId;
+        quint64 id = 0;
+        bool failed = false;
     };
 
     void _startNextTask();
@@ -120,6 +131,7 @@ private:
     BoundedOutput _stdout;
     BoundedOutput _stderr;
     bool          _canceled = false;
+    quint64 _lastTaskId = 0;
 };
 
 #endif // POSTCMDRUNNER_H

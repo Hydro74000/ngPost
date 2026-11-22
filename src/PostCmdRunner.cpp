@@ -7,6 +7,8 @@
 
 #include <QCoreApplication>
 #include <QDir>
+
+#include <utility>
 #include <QFile>
 #include <QProcess>
 #include <QSaveFile>
@@ -84,22 +86,32 @@ PostCmdRunner::~PostCmdRunner() { cancelAll(); }
 
 void PostCmdRunner::setSettings(Settings const &settings) { _settings = settings; }
 
-void PostCmdRunner::enqueue(PostInfoData const &data,
-                            QStringList const  &commands,
-                            QUrl const         &uploadUrl)
+quint64 PostCmdRunner::enqueue(PostInfoData const &data,
+                               QStringList const &commands,
+                               QUrl const &uploadUrl,
+                               QString const &runId)
 {
-    if (commands.isEmpty() && uploadUrl.isEmpty())
-        return;
+    if (commands.isEmpty() && uploadUrl.isEmpty()) {
+        // Nothing to run: said all the same, once, after the caller returned.
+        const qint64 postId = data.historyPostId;
+        QMetaObject::invokeMethod(this, [this, postId, runId] {
+            emit taskFinished(postId, runId, 0, true);
+        }, Qt::QueuedConnection);
+        return 0;
+    }
 
     Task task;
     task.data      = data; // a copy: the job is deleted well before we are done
     task.commands  = commands;
     task.uploadUrl = uploadUrl;
     task.settings  = _settings;
+    task.runId = runId;
+    task.id = ++_lastTaskId;
     _queue.enqueue(task);
 
     if (!_hasCurrent)
         _startNextTask();
+    return task.id;
 }
 
 bool PostCmdRunner::isIdle() const { return !_hasCurrent && _queue.isEmpty(); }
@@ -110,7 +122,8 @@ void PostCmdRunner::cancelAll()
         return;
 
     _canceled = true;
-    _queue.clear();
+    // Each task dropped is reported, so that its post lets go of what it held.
+    const QQueue<Task> dropped = std::exchange(_queue, {});
     _timer->stop();
 
     if (_process) {
@@ -130,8 +143,11 @@ void PostCmdRunner::cancelAll()
         if (!_current.jsonPath.isEmpty())
             QFile::remove(_current.jsonPath);
         _hasCurrent = false;
-        _current    = Task();
+        const Task current = std::exchange(_current, Task());
+        emit taskFinished(current.data.historyPostId, current.runId, current.id, false);
     }
+    for (const Task &task : dropped)
+        emit taskFinished(task.data.historyPostId, task.runId, task.id, false);
     _canceled = false;
     emit idle();
 }
@@ -174,6 +190,7 @@ void PostCmdRunner::_startUpload()
     _uploader = new FileUploader(_netMgr, _current.data.nzbPath);
     connect(_uploader, &FileUploader::error, this, [this](QString const &msg) {
         // Same reporting as before: an upload failure marks the run in error.
+        _current.failed = true;
         emit error(msg);
     });
     connect(_uploader, &FileUploader::log, this, [this](QString const &msg, bool) {
@@ -201,8 +218,10 @@ void PostCmdRunner::_finishUpload(QString const &errorMsg)
         _uploader->deleteLater();
         _uploader = nullptr;
     }
-    if (!errorMsg.isEmpty())
+    if (!errorMsg.isEmpty()) {
+        _current.failed = true; // a timed out upload did not deliver the nzb
         emit error(errorMsg);
+    }
 
     if (_canceled)
         return;
@@ -386,6 +405,7 @@ void PostCmdRunner::onTimeout()
 
 void PostCmdRunner::_reportFailure(QString const &msg)
 {
+    _current.failed = true;
     if (_current.settings.failIsError)
         emit error(msg);
     else
@@ -396,8 +416,9 @@ void PostCmdRunner::_finishTask()
 {
     if (!_current.jsonPath.isEmpty())
         QFile::remove(_current.jsonPath);
-    _current    = Task();
+    const Task done = std::exchange(_current, Task());
     _hasCurrent = false;
+    emit taskFinished(done.data.historyPostId, done.runId, done.id, !done.failed);
     _startNextTask();
 }
 

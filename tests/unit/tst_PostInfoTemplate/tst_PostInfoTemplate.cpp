@@ -22,6 +22,8 @@
 
 #include "FileUploader.h"
 #include "PostCmdRunner.h"
+
+#include <QTcpServer>
 #include "postinfo/PostInfoTemplate.h"
 
 class TestPostInfoTemplate : public QObject
@@ -126,6 +128,9 @@ private slots:
     //! Settings belong to the queued post: changing the runner afterwards
     //! must not alter its timeout, secret exposure or failure policy.
     void post_command_runner_snapshots_settings_per_task();
+    //! Each task is reported once with its post and attempt, done, failed,
+    //! empty or cancelled: the queue releases a post on that word only.
+    void post_command_runner_reports_each_task_once();
 
     //! QNetworkReply::abort may synchronously emit finished(). Releasing a
     //! timed-out upload must therefore be reentrancy-safe and close the NZB.
@@ -1210,6 +1215,121 @@ void TestPostInfoTemplate::post_command_runner_timeout_and_start_failure()
         logs += row.at(0).toString() + QLatin1Char('\n');
     QVERIFY2(logs.contains(QStringLiteral("timed out"), Qt::CaseInsensitive), qPrintable(logs));
     QVERIFY2(logs.contains(QStringLiteral("could not run"), Qt::CaseInsensitive), qPrintable(logs));
+}
+
+void TestPostInfoTemplate::post_command_runner_reports_each_task_once()
+{
+    const QString python = pythonExecutable();
+    if (python.isEmpty())
+        QSKIP("Python is required for the cross-platform hook fixture");
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString script = writeRunnerScript(dir);
+    QVERIFY(!script.isEmpty());
+    const QString marker = dir.filePath(QStringLiteral("tasks.txt"));
+    const auto command = [&](QString const &mode) {
+        return QStringLiteral("%1 %2 %3 %4")
+            .arg(quotedCommandArg(python),
+                 quotedCommandArg(script),
+                 mode,
+                 quotedCommandArg(marker));
+    };
+
+    PostInfoData a = sampleData();
+    a.historyPostId = 11;
+    PostInfoData b = a;
+    b.historyPostId = 12;
+    PostInfoData c = a;
+    c.historyPostId = 13;
+
+    QNetworkAccessManager network;
+    PostCmdRunner runner(network);
+    PostCmdRunner::Settings settings;
+    settings.cmdTimeoutSec = 10;
+    runner.setSettings(settings);
+    QSignalSpy finished(&runner, &PostCmdRunner::taskFinished);
+
+    const quint64 done = runner.enqueue(a,
+                                        { command(QStringLiteral("second")) },
+                                        QUrl(),
+                                        QStringLiteral("run-a"));
+    const quint64 failed = runner.enqueue(b,
+                                          { QStringLiteral(
+                                              "ngpost-command-that-does-not-exist-11") },
+                                          QUrl(),
+                                          QStringLiteral("run-b"));
+    QCOMPARE(runner.enqueue(c, {}, QUrl(), QStringLiteral("run-c")), quint64(0));
+    QVERIFY(done && failed && done != failed);
+    QTRY_VERIFY_WITH_TIMEOUT(runner.isIdle() && finished.size() == 3, 15000);
+    QHash<quint64, QList<QVariant>> byTask;
+    for (const QList<QVariant> &row : finished)
+        byTask.insert(row.at(2).toULongLong(), row);
+    QCOMPARE(byTask.value(done).at(0).toLongLong(), qint64(11));
+    QCOMPARE(byTask.value(done).at(1).toString(), QStringLiteral("run-a"));
+    QVERIFY(byTask.value(done).at(3).toBool());
+    QCOMPARE(byTask.value(failed).at(0).toLongLong(), qint64(12));
+    QVERIFY(!byTask.value(failed).at(3).toBool());
+    QCOMPARE(byTask.value(0).at(0).toLongLong(), qint64(13)); // nothing to run, said all the same
+    QVERIFY(byTask.value(0).at(3).toBool());
+
+    // Cancelled while running, and while waiting: each said once, as not done.
+    finished.clear();
+    const quint64 running = runner.enqueue(a,
+                                           { command(QStringLiteral("sleep")) },
+                                           QUrl(),
+                                           QStringLiteral("run-d"));
+    const quint64 waiting = runner.enqueue(b,
+                                           { command(QStringLiteral("second")) },
+                                           QUrl(),
+                                           QStringLiteral("run-e"));
+    QTest::qWait(300);
+    runner.cancelAll();
+    QCOMPARE(finished.size(), 2);
+    QSet<quint64> cancelled;
+    for (const QList<QVariant> &row : finished) {
+        QVERIFY(!row.at(3).toBool());
+        cancelled.insert(row.at(2).toULongLong());
+    }
+    QCOMPARE(cancelled, (QSet<quint64>{ running, waiting }));
+    QTest::qWait(300);
+    QCOMPARE(finished.size(), 2); // and never again
+
+    // An upload that fails, or never answers, is not a task done.
+    const QString nzb = dir.filePath(QStringLiteral("post.nzb"));
+    {
+        QFile file(nzb);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("<nzb/>");
+    }
+    PostInfoData uploaded = a;
+    uploaded.nzbPath = nzb;
+    quint16 closedPort = 0;
+    {
+        QTcpServer probe;
+        QVERIFY(probe.listen(QHostAddress::LocalHost));
+        closedPort = probe.serverPort();
+    }
+    QTcpServer silent; // accepts, never answers
+    QVERIFY(silent.listen(QHostAddress::LocalHost));
+    settings.uploadTimeoutSec = 1;
+    runner.setSettings(settings);
+    finished.clear();
+    const quint64 refused = runner.enqueue(
+        uploaded,
+        {},
+        QUrl(QStringLiteral("http://127.0.0.1:%1/up").arg(closedPort)),
+        QStringLiteral("run-f"));
+    const quint64 timedOut = runner.enqueue(
+        uploaded,
+        {},
+        QUrl(QStringLiteral("http://127.0.0.1:%1/up").arg(silent.serverPort())),
+        QStringLiteral("run-g"));
+    QTRY_VERIFY_WITH_TIMEOUT(finished.size() == 2, 20000);
+    for (const QList<QVariant> &row : finished) {
+        QVERIFY(QSet<quint64>({ refused, timedOut }).contains(row.at(2).toULongLong()));
+        QVERIFY2(!row.at(3).toBool(), qPrintable(row.at(1).toString()));
+    }
 }
 
 void TestPostInfoTemplate::post_command_runner_snapshots_settings_per_task()

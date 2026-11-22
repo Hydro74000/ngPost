@@ -156,7 +156,7 @@
 10	src/NgPost.cpp	NgPost::checkSupportSSL()
 34	src/NgPost.cpp	NgPost::closeAllMonitoringJobs()
 9	src/NgPost.cpp	NgPost::closeAllPostingJobs()
-18	src/NgPost.cpp	NgPost::doNzbPostCMD( PostingJob * job)
+19	src/NgPost.cpp	NgPost::doNzbPostCMD( PostingJob * job)
 38	src/NgPost.cpp	NgPost::exportPostInfoGui( qint64 postId , const QString & templatePath , const QString & outPath , bool includePassword , QString * error , bool * incomplete , QStringList * warnings)
 10	src/NgPost.cpp	NgPost::flushConnectionRetries()
 21	src/NgPost.cpp	NgPost::hasMonitoringPostingJobs() const
@@ -443,16 +443,16 @@
 6	src/PostCmdRunner.cpp	PostCmdRunner::BoundedOutput::clear()
 14	src/PostCmdRunner.cpp	PostCmdRunner::BoundedOutput::toString() const
 11	src/PostCmdRunner.cpp	PostCmdRunner::PostCmdRunner( QNetworkAccessManager & netMgr , QObject * parent)
-8	src/PostCmdRunner.cpp	PostCmdRunner::_finishTask()
-20	src/PostCmdRunner.cpp	PostCmdRunner::_finishUpload( QString const & errorMsg)
+9	src/PostCmdRunner.cpp	PostCmdRunner::_finishTask()
+22	src/PostCmdRunner.cpp	PostCmdRunner::_finishUpload( QString const & errorMsg)
 4	src/PostCmdRunner.cpp	PostCmdRunner::_redact( QString const & text) const
-7	src/PostCmdRunner.cpp	PostCmdRunner::_reportFailure( QString const & msg)
+8	src/PostCmdRunner.cpp	PostCmdRunner::_reportFailure( QString const & msg)
 59	src/PostCmdRunner.cpp	PostCmdRunner::_runNextCommand()
 32	src/PostCmdRunner.cpp	PostCmdRunner::_startNextTask()
-16	src/PostCmdRunner.cpp	PostCmdRunner::_startUpload()
+17	src/PostCmdRunner.cpp	PostCmdRunner::_startUpload()
 38	src/PostCmdRunner.cpp	PostCmdRunner::_writeJsonFile( PostInfoData const & data , Settings const & settings , QString * error) const
-31	src/PostCmdRunner.cpp	PostCmdRunner::cancelAll()
-17	src/PostCmdRunner.cpp	PostCmdRunner::enqueue( PostInfoData const & data , QStringList const & commands , QUrl const & uploadUrl)
+35	src/PostCmdRunner.cpp	PostCmdRunner::cancelAll()
+27	src/PostCmdRunner.cpp	PostCmdRunner::enqueue( PostInfoData const & data , QStringList const & commands , QUrl const & uploadUrl , QString const & runId)
 1	src/PostCmdRunner.cpp	PostCmdRunner::isIdle() const
 36	src/PostCmdRunner.cpp	PostCmdRunner::onProcessError()
 35	src/PostCmdRunner.cpp	PostCmdRunner::onProcessFinished( int exitCode , int exitStatus)
