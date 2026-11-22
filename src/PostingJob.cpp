@@ -832,59 +832,112 @@ void PostingJob::onStartPosting(bool isActiveJob)
     }
 
     if (_doCompress) {
-#ifdef __USE_TMP_RAM__
-        if (_ngPost->useTmpRam()) {
-            qint64 sourceSize = 0;
-            for (const QFileInfo &fi : _files)
-                sourceSize += NgPost::recursiveSize(fi);
-
-            double sourceSizeWithRatio = _ngPost->ramRatio() * sourceSize,
-                   availableSize = static_cast<double>(_ngPost->ramAvailable());
-            if (sourceSizeWithRatio < availableSize) {
-                _tmpPath = _ngPost->_ramPath;
-                _log(tr("Using TMP_RAM path as temporary folder. Post size: %1")
-                         .arg(humanSize(static_cast<double>(sourceSize))));
-            } else {
-                _error(tr("Couldn't use TMP_RAM as there is not enough space: %1 available for a "
-                          "Post with ratio of %2")
-                           .arg(humanSize(availableSize))
-                           .arg(humanSize(sourceSizeWithRatio)));
-            }
-        }
-#endif
-
+        _chooseTmpPath(false);
 #ifdef __DEBUG__
         _log("[PostingJob::onStartPosting] Starting compression...");
 #endif
         if (!startCompressFiles(_rarPath, _tmpPath, _rarName, _rarPass, _rarSize))
             _abortBeforeTransfer();
     } else if (_doPar2) {
-#ifdef __USE_TMP_RAM__
-        if (_ngPost->useTmpRam()) {
-            qint64 sourceSize = 0;
-            for (const QFileInfo &fi : _files)
-                sourceSize += NgPost::recursiveSize(fi);
-
-            double par2Size = (_ngPost->ramRatio() - 1) * sourceSize,
-                   availableSize = static_cast<double>(_ngPost->ramAvailable());
-            if (par2Size < availableSize) {
-                _tmpPath = _ngPost->_ramPath;
-                _log(tr("Using TMP_RAM path as temporary folder for par2. Post size: %1")
-                         .arg(humanSize(static_cast<double>(sourceSize))));
-            } else {
-                _error(tr("Couldn't use TMP_RAM as there is not enough space: %1 available for a "
-                          "par2 volume using TMP_RAM_RATIO of %2")
-                           .arg(humanSize(availableSize))
-                           .arg(humanSize(par2Size)));
-            }
-        }
-#endif
+        _chooseTmpPath(true);
         if (!startGenPar2(_tmpPath, _rarName, _par2Pct))
             _abortBeforeTransfer();
     } else {
         _packed = true;
         _postFiles();
     }
+}
+
+void PostingJob::_chooseTmpPath(bool par2Only)
+{
+#ifdef __USE_TMP_RAM__
+    if (!_ngPost->useTmpRam())
+        return;
+    qint64 sourceSize = 0;
+    for (const QFileInfo &fi : _files)
+        sourceSize += NgPost::recursiveSize(fi);
+    const double ratio = par2Only ? _ngPost->ramRatio() - 1 : _ngPost->ramRatio();
+    const double needed = ratio * static_cast<double>(sourceSize);
+    const double available = static_cast<double>(_ngPost->ramAvailable());
+    if (needed < available) {
+        _tmpPath = _ngPost->_ramPath;
+        _log((par2Only ? tr("Using TMP_RAM path as temporary folder for par2. Post size: %1")
+                       : tr("Using TMP_RAM path as temporary folder. Post size: %1"))
+                 .arg(humanSize(static_cast<double>(sourceSize))));
+    } else if (par2Only) {
+        _error(tr("Couldn't use TMP_RAM as there is not enough space: %1 available for a "
+                  "par2 volume using TMP_RAM_RATIO of %2")
+                   .arg(humanSize(available))
+                   .arg(humanSize(needed)));
+    } else {
+        _error(tr("Couldn't use TMP_RAM as there is not enough space: %1 available for a "
+                  "Post with ratio of %2")
+                   .arg(humanSize(available))
+                   .arg(humanSize(needed)));
+    }
+#else
+    Q_UNUSED(par2Only)
+#endif
+}
+
+bool PostingJob::runPreparationStep(queue::PrepStep step)
+{
+    if (!_stepDriven) {
+        _stepDriven = true;
+        // As onStartPosting(): the .nfo is found before packing changes _files.
+        if (_ngPost->_copyNfoWithNzb && !_nzbFilePath.isEmpty())
+            _resolveNfoSource();
+    }
+    switch (step) {
+    case queue::PrepStep::Compress:
+        _chooseTmpPath(false);
+        if (_canCompress(false)
+            && startCompressFiles(_rarPath, _tmpPath, _rarName, _rarPass, _rarSize))
+            return true;
+        _finishStep(step, false, {}); // the reason is already in the log
+        return false;
+    case queue::PrepStep::Par2:
+        if (!_compressedThisRun)
+            _chooseTmpPath(true);
+        if (_canGenPar2(false) && startGenPar2(_tmpPath, _rarName, _par2Pct))
+            return true;
+        _finishStep(step, false, {}); // the reason is already in the log
+        return false;
+    case queue::PrepStep::Collect:
+        // NFO copies and the explicit list of files to publish, once: a later
+        // activation posts exactly this list.
+        if (!_collected) {
+            _copyNfoToArchive();
+            _collectPackedFiles();
+            _collected = true;
+        }
+        _packed = true;
+        _finishStep(step, true, {});
+        return true;
+    }
+    return false;
+}
+
+void PostingJob::_finishStep(queue::PrepStep step, bool ok, const QString &error)
+{
+    qint64 bytes = 0;
+    if (ok) {
+        const qint64 total = _compressDirBytes();
+        bytes = std::max<qint64>(0, total - _bytesReported);
+        _bytesReported = std::max(total, _bytesReported);
+    }
+    QMetaObject::invokeMethod(this, [this, step, ok, error, bytes] {
+        emit preparationStepFinished(step, ok, error, bytes);
+    }, Qt::QueuedConnection);
+}
+
+qint64 PostingJob::_compressDirBytes() const
+{
+    qint64 total = 0;
+    if (_compressDir)
+        for (const QFileInfo &file : _compressDir->entryInfoList(QDir::Files))
+            total += file.size();
+    return total;
 }
 
 #include "Poster.h"
@@ -903,9 +956,11 @@ void PostingJob::_postFiles()
         _originalDirectory = fileDir.absolutePath();
     }
 
-    _copyNfoToArchive();
-
-    _collectPackedFiles();
+    if (!_collected) {
+        _copyNfoToArchive();
+        _collectPackedFiles();
+        _collected = true;
+    }
 
     if (!_initPosting()) {
         _abortBeforeTransfer(_resumeFromHistory);
@@ -2433,7 +2488,7 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
     return true;
 }
 
-void PostingJob::onCompressionFinished(int exitCode)
+void PostingJob::onCompressionFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     if (_finishIfCanceled())
         return;
@@ -2457,11 +2512,26 @@ void PostingJob::onCompressionFinished(int exitCode)
         _error(tr("Some source files are still under their obfuscated name; ngPost will try "
                   "again when the job ends. The post itself is unaffected."));
 
-    if (exitCode != 0) {
+    const bool failed = exitCode != 0 || exitStatus != QProcess::NormalExit;
+    if (_stepDriven) {
+        // The queue decides what comes next: PAR2, collection or a retry.
+        QString error;
+        if (failed) {
+            error = tr("Error during compression: %1").arg(exitCode);
+            _error(error);
+            _cleanCompressDir();
+        } else
+            _compressedThisRun = true;
+        _cleanExtProc();
+        _finishStep(queue::PrepStep::Compress, !failed, error);
+        return;
+    }
+    if (failed) {
         _error(tr("Error during compression: %1").arg(exitCode));
         _cleanCompressDir();
         _abortBeforeTransfer();
     } else {
+        _compressedThisRun = true;
         if (_doPar2) {
             disconnect(_extProc,
                        static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(
@@ -2498,7 +2568,9 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
     QString archiveTmpFolder = QString("%1/%2").arg(tmpFolder, archiveName);
 
     // we've already compressed => we gen par2 for the files in the archive folder
-    if (_extProc) {
+    if (_compressedThisRun) {
+        if (!_extProc)
+            _createExtProc();
         if (useParPar && (args.isEmpty() || args.last().trimmed() != "-o"))
             args << "-o";
         args << QString("%1/%2.par2").arg(archiveTmpFolder, archiveName);
@@ -2588,7 +2660,7 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
     return true;
 }
 
-void PostingJob::onGenPar2Finished(int exitCode)
+void PostingJob::onGenPar2Finished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     if (_finishIfCanceled())
         return;
@@ -2603,16 +2675,25 @@ void PostingJob::onGenPar2Finished(int exitCode)
     // recovery file as proof that parity generation actually succeeded.
     bool const wrote = !_compressDir
         || !_compressDir->entryList({ QStringLiteral("*.par2") }, QDir::Files).isEmpty();
-    if (exitCode != 0 || !wrote) {
-        if (exitCode != 0)
-            _error(tr("Error during par2 generation: %1").arg(exitCode));
-        else
-            _error(tr("The par2 tool ended without an error but wrote no par2 file, so nothing "
-                      "is posted. Its arguments are probably written for another tool: check "
-                      "them against PAR2_TOOL."));
+    const bool failed = exitCode != 0 || exitStatus != QProcess::NormalExit;
+    QString error;
+    if (failed)
+        error = tr("Error during par2 generation: %1").arg(exitCode);
+    else if (!wrote)
+        error = tr("The par2 tool ended without an error but wrote no par2 file, so nothing "
+                   "is posted. Its arguments are probably written for another tool: check "
+                   "them against PAR2_TOOL.");
+    if (!error.isEmpty()) {
+        _error(error);
         _cleanCompressDir();
+    }
+    if (_stepDriven) {
+        _finishStep(queue::PrepStep::Par2, error.isEmpty(), error);
+        return;
+    }
+    if (!error.isEmpty())
         _abortBeforeTransfer();
-    } else {
+    else {
         _packed = true;
         if (this == _ngPost->_activeJob)
             _postFiles();
@@ -2690,14 +2771,20 @@ void PostingJob::onExtProcError(QProcess::ProcessError error)
     // library must terminate this job, rather than leaving it packing forever.
     if (error != QProcess::FailedToStart || !_extProc)
         return;
-    _error(tr("Could not start external tool %1: %2")
-               .arg(_extProc->program(), _extProc->errorString()));
+    const QString message = tr("Could not start external tool %1: %2")
+                                .arg(_extProc->program(), _extProc->errorString());
+    _error(message);
     if (!_restoreObfuscatedFileNames())
         _error(tr("Some source files are still under their obfuscated name; ngPost will try "
                   "again when the job ends."));
+    const bool par2 = _extProcIsPar2;
     _cleanExtProc();
     if (_compressDir)
         _cleanCompressDir();
+    if (_stepDriven) {
+        _finishStep(par2 ? queue::PrepStep::Par2 : queue::PrepStep::Compress, false, message);
+        return;
+    }
     _abortBeforeTransfer();
 }
 

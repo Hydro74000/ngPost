@@ -21,6 +21,7 @@
 #ifndef POSTINGJOB_H
 #define POSTINGJOB_H
 #include "PostingJobOptions.h"
+#include "queue/QueueTypes.h"
 #include "utils/Macros.h"
 
 #include <QDateTime>
@@ -166,6 +167,10 @@ private:
     AtomicBool _noMoreFiles;
 
     bool _postStarted;
+    bool _stepDriven = false;        //!< see setStepDriven()
+    bool _compressedThisRun = false; //!< compression ended well: PAR2 covers the archive
+    bool _collected = false;         //!< files to publish already collected
+    qint64 _bytesReported = 0;       //!< temporary bytes already reported by steps
     bool _packed;
     bool _postFinished;
 
@@ -349,6 +354,15 @@ public:
     { return _unrestoredOriginals(stillObfuscated); }
 #endif
 
+public:
+    //! Queue-driven mode (plan_queue.md §3.4): the scheduler runs each
+    //! preparation step and starts the transfer itself, so the end of a step no
+    //! longer chains into the next one. Off, the job keeps its historical flow.
+    void setStepDriven(bool driven) { _stepDriven = driven; }
+    bool isStepDriven() const { return _stepDriven; }
+    //! Starts @p step; its end is reported by preparationStepFinished().
+    bool runPreparationStep(queue::PrepStep step);
+
 signals:
     void pauseChanged();
     void startPosting(
@@ -365,6 +379,9 @@ signals:
     void filePosted(QString filePath, uint nbArticles, uint nbFailed);
 
     void packingDone();
+    //! Queue-driven mode: one preparation step ended. @p bytes is what this
+    //! step added to the temporary folder, not the folder's total.
+    void preparationStepFinished(queue::PrepStep step, bool ok, const QString &error, qint64 bytes);
 
 public slots:
     void onStopPosting(); //!< for HMI
@@ -381,8 +398,8 @@ private slots:
     void onExtProcReadyReadStandardError();
     void onExtProcError(QProcess::ProcessError error);
 
-    void onCompressionFinished(int exitCode);
-    void onGenPar2Finished(int exitCode);
+    void onCompressionFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onGenPar2Finished(int exitCode, QProcess::ExitStatus exitStatus);
 
     void onResumeTriggered();
 
@@ -391,6 +408,12 @@ private slots:
 #endif
 
 private:
+    //! TMP_RAM when the post fits in it, for an archive or a parity-only post.
+    void _chooseTmpPath(bool par2Only);
+    //! Reports the end of a preparation step, queued so the caller's decision
+    //! is never re-entered.
+    void _finishStep(queue::PrepStep step, bool ok, const QString &error);
+    qint64 _compressDirBytes() const;
     void _log(const QString &aMsg, bool newline = true) const; //!< log function for QString
     void _error(const QString &error) const;
     //! What this job alone knows, before the history consolidates it.
