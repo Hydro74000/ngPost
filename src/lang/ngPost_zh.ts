@@ -2247,6 +2247,26 @@ Write their NZB file to %2 instead of their current folder?</source>
         <translation>等待发布的标签页：%1。
 将它们的 NZB 文件写入 %2，而不是当前文件夹？</translation>
     </message>
+    <message>
+        <source>Add files to the queue</source>
+        <translation>将文件添加到队列</translation>
+    </message>
+    <message>
+        <source>Blocked posts: show the queue</source>
+        <translation>已阻塞的发布：显示队列</translation>
+    </message>
+    <message>
+        <source>Queue (%1)</source>
+        <translation>队列 (%1)</translation>
+    </message>
+    <message>
+        <source>Show or fold the queue (Ctrl+Shift+Q)</source>
+        <translation>显示或折叠队列 (Ctrl+Shift+Q)</translation>
+    </message>
+    <message>
+        <source>ngPost queue</source>
+        <translation>ngPost 队列</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -8467,6 +8487,324 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
         <location line="-17"/>
         <source>this profile carries a key ngPost has not reviewed</source>
         <translation>此配置包含 ngPost 尚未审核的键</translation>
+    </message>
+</context>
+<context>
+    <name>QueuePanel</name>
+    <message>
+        <source>Posts: %1 (%2 held, %3 blocked) · %4 left · temporary files: %5</source>
+        <translation>发布：%1（%2 个已暂停，%3 个已阻塞）· 剩余 %4 · 临时文件：%5</translation>
+    </message>
+    <message>
+        <source>, which keeps sending while it is prepared</source>
+        <translation>，其在准备期间仍继续发送</translation>
+    </message>
+    <message>
+        <source>Add files…</source>
+        <translation>添加文件…</translation>
+    </message>
+    <message>
+        <source>Another post is already waiting to be posted now.</source>
+        <translation>已有另一个发布在等待立即发布。</translation>
+    </message>
+    <message>
+        <source>Detach into a window</source>
+        <translation>分离到独立窗口</translation>
+    </message>
+    <message>
+        <source>Don&apos;t ask again</source>
+        <translation>不再询问</translation>
+    </message>
+    <message>
+        <source>Duplicate</source>
+        <translation>复制</translation>
+    </message>
+    <message>
+        <source>Edit…</source>
+        <translation>编辑…</translation>
+    </message>
+    <message>
+        <source>Enlarge or reduce the queue</source>
+        <translation>放大或缩小队列</translation>
+    </message>
+    <message>
+        <source>Fold the queue</source>
+        <translation>折叠队列</translation>
+    </message>
+    <message>
+        <source>Hold</source>
+        <translation>暂停</translation>
+    </message>
+    <message>
+        <source>Move</source>
+        <translation>移动</translation>
+    </message>
+    <message>
+        <source>Move down</source>
+        <translation>下移</translation>
+    </message>
+    <message>
+        <source>Move to bottom</source>
+        <translation>移到末尾</translation>
+    </message>
+    <message>
+        <source>Move to top</source>
+        <translation>移到最前</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>上移</translation>
+    </message>
+    <message>
+        <source>Nothing goes before the post being sent: use Post now.</source>
+        <translation>任何发布都不能排在正在发送的发布之前：请使用“立即发布”。</translation>
+    </message>
+    <message>
+        <source>Part of this post is already on Usenet: only Keep Archives can change.</source>
+        <translation>此发布的部分内容已在 Usenet 上：只能更改“保留压缩包”。</translation>
+    </message>
+    <message>
+        <source>Post next</source>
+        <translation>下一个发布</translation>
+    </message>
+    <message>
+        <source>Post now</source>
+        <translation>立即发布</translation>
+    </message>
+    <message>
+        <source>Post now?</source>
+        <translation>立即发布？</translation>
+    </message>
+    <message>
+        <source>Queue (%1)</source>
+        <translation>队列 (%1)</translation>
+    </message>
+    <message>
+        <source>Release</source>
+        <translation>恢复</translation>
+    </message>
+    <message>
+        <source>Remove the selected posts from the queue (%1)? Posts already started stay resumable from History › Resume; archives are kept or deleted according to Keep Archives.</source>
+        <translation>从队列中移除所选发布（%1）？已开始的发布仍可在“历史记录 › 续传”中继续；压缩包将根据“保留压缩包”保留或删除。</translation>
+    </message>
+    <message>
+        <source>Remove from queue</source>
+        <translation>从队列中移除</translation>
+    </message>
+    <message>
+        <source>Remove from the queue</source>
+        <translation>从队列中移除</translation>
+    </message>
+    <message>
+        <source>Resolve…</source>
+        <translation>解决…</translation>
+    </message>
+    <message>
+        <source>That place is kept for the post waiting to be posted now.</source>
+        <translation>该位置已为等待立即发布的发布保留。</translation>
+    </message>
+    <message>
+        <source>The change could not be saved; nothing was changed.</source>
+        <translation>无法保存更改；未做任何修改。</translation>
+    </message>
+    <message>
+        <source>The problem is still there.</source>
+        <translation>问题依然存在。</translation>
+    </message>
+    <message>
+        <source>The queue changed meanwhile: check the new order and try again.</source>
+        <translation>队列已在此期间发生变化：请检查新的顺序后重试。</translation>
+    </message>
+    <message>
+        <source>The switch to that post is in progress.</source>
+        <translation>正在切换到该发布。</translation>
+    </message>
+    <message>
+        <source>“%1” goes right after the post being sent%2. Then “%3” is set aside and comes back in 2nd place: it resumes later without sending its confirmed articles again.</source>
+        <translation>“%1”将排在正在发送的发布之后%2。随后“%3”会被暂时搁置并回到第 2 位：稍后继续，不会重新发送已确认的文章。</translation>
+    </message>
+    <message>
+        <source>Refused (%1).</source>
+        <translation>已拒绝（%1）。</translation>
+    </message>
+</context>
+<context>
+    <name>QueueTableModel</name>
+    <message>
+        <source>%1 % · %2/s</source>
+        <translation>%1 % · %2/s</translation>
+    </message>
+    <message>
+        <source>%1 %2 %</source>
+        <translation>%1 %2 %</translation>
+    </message>
+    <message>
+        <source>%1 · posts as soon as ready</source>
+        <translation>%1 · 准备好后立即发布</translation>
+    </message>
+    <message>
+        <source>A source file is missing or changed</source>
+        <translation>某个源文件缺失或已更改</translation>
+    </message>
+    <message>
+        <source>Added</source>
+        <translation>添加时间</translation>
+    </message>
+    <message>
+        <source>Archive or PAR2 creation failed</source>
+        <translation>压缩包或 PAR2 创建失败</translation>
+    </message>
+    <message>
+        <source>Archives ready · %1 in temp</source>
+        <translation>压缩包已就绪 · 临时占用 %1</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>自动</translation>
+    </message>
+    <message>
+        <source>Blocked</source>
+        <translation>已阻塞</translation>
+    </message>
+    <message>
+        <source>CLI</source>
+        <translation>命令行</translation>
+    </message>
+    <message>
+        <source>Checking</source>
+        <translation>检查</translation>
+    </message>
+    <message>
+        <source>Drop</source>
+        <translation>拖放</translation>
+    </message>
+    <message>
+        <source>Finalizing</source>
+        <translation>正在完成</translation>
+    </message>
+    <message>
+        <source>Held</source>
+        <translation>已暂停</translation>
+    </message>
+    <message>
+        <source>Held by you</source>
+        <translation>已由您暂停</translation>
+    </message>
+    <message>
+        <source>Held · ready</source>
+        <translation>已暂停 · 已就绪</translation>
+    </message>
+    <message>
+        <source>Not enough temporary space</source>
+        <translation>临时空间不足</translation>
+    </message>
+    <message>
+        <source>Origin</source>
+        <translation>来源</translation>
+    </message>
+    <message>
+        <source>Password to enter again</source>
+        <translation>需要重新输入密码</translation>
+    </message>
+    <message>
+        <source>Position %1: %2, %3, %4, %5</source>
+        <translation>位置 %1：%2，%3，%4，%5</translation>
+    </message>
+    <message>
+        <source>Post</source>
+        <translation>发布</translation>
+    </message>
+    <message>
+        <source>Post now: waiting for its preparation</source>
+        <translation>立即发布：等待其准备完成</translation>
+    </message>
+    <message>
+        <source>Posting</source>
+        <translation>正在发布</translation>
+    </message>
+    <message>
+        <source>Preparing</source>
+        <translation>正在准备</translation>
+    </message>
+    <message>
+        <source>Progress / details</source>
+        <translation>进度 / 详情</translation>
+    </message>
+    <message>
+        <source>Queued</source>
+        <translation>排队中</translation>
+    </message>
+    <message>
+        <source>Quick</source>
+        <translation>快速</translation>
+    </message>
+    <message>
+        <source>Ready</source>
+        <translation>已就绪</translation>
+    </message>
+    <message>
+        <source>Recovering</source>
+        <translation>正在恢复</translation>
+    </message>
+    <message>
+        <source>Recovering sources and archives…</source>
+        <translation>正在恢复源文件和压缩包…</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>续传</translation>
+    </message>
+    <message>
+        <source>Resume · held by you</source>
+        <translation>续传 · 已由您暂停</translation>
+    </message>
+    <message>
+        <source>Resume: confirmed articles are not posted again</source>
+        <translation>续传：已确认的文章不会重新发布</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>大小</translation>
+    </message>
+    <message>
+        <source>Starting…</source>
+        <translation>正在启动…</translation>
+    </message>
+    <message>
+        <source>State</source>
+        <translation>状态</translation>
+    </message>
+    <message>
+        <source>Stopping</source>
+        <translation>正在停止</translation>
+    </message>
+    <message>
+        <source>Stopping…</source>
+        <translation>正在停止…</translation>
+    </message>
+    <message>
+        <source>Tab #%1</source>
+        <translation>标签页 #%1</translation>
+    </message>
+    <message>
+        <source>The NZB could not be written</source>
+        <translation>无法写入 NZB</translation>
+    </message>
+    <message>
+        <source>The VPN is unavailable</source>
+        <translation>VPN 不可用</translation>
+    </message>
+    <message>
+        <source>The stop could not be confirmed</source>
+        <translation>无法确认已停止</translation>
+    </message>
+    <message>
+        <source>Waiting for its sources to be restored</source>
+        <translation>等待其源文件恢复</translation>
+    </message>
+    <message>
+        <source>Writing the NZB…</source>
+        <translation>正在写入 NZB…</translation>
     </message>
 </context>
 </TS>

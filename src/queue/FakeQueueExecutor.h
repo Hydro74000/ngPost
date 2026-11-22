@@ -12,7 +12,10 @@
 
 #include "queue/QueueExecutor.h"
 
+#include <QHash>
 #include <QList>
+
+class QTimer;
 
 namespace queue
 {
@@ -61,6 +64,10 @@ public:
     const Command *last(Command::Kind kind, qint64 postId) const;
     int count(Command::Kind kind, qint64 postId = 0) const;
 
+    //! Simulation for the J0 milestone: timers acknowledge every command and
+    //! report progress, still without any I/O. Off: tests acknowledge by hand.
+    void setSimulation(bool enabled, int stepMs = 1500, int transferMs = 12000);
+
     // Acknowledgements, built from the last matching command.
     bool ackStep(qint64 postId, bool ok = true, qint64 bytes = 0, const QString &error = {});
     bool ackTransferStarted(qint64 postId);
@@ -69,7 +76,25 @@ public:
     bool ackQuiesced(qint64 postId, bool ok = true, bool manifestEngaged = false);
 
 private:
+    struct Simulated
+    {
+        QTimer *timer = nullptr;
+        int percent = 0;
+        bool transfer = false;
+        bool paused = false;
+    };
+
+    void simulateStep(const Command &command);
+    void simulateTransfer(qint64 postId);
+    void simulateInterrupt(const Command &command);
+    void stopSimulation(qint64 postId);
+    QTimer *ticker(qint64 postId);
+
     QList<Command> _commands;
+    bool _simulate = false;
+    int _stepMs = 1500;
+    int _transferMs = 12000;
+    QHash<qint64, Simulated> _simulated;
 };
 
 } // namespace queue

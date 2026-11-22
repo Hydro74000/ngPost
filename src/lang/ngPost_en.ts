@@ -2235,6 +2235,26 @@ Write their NZB file to %2 instead of their current folder?</source>
         <translation>Tabs waiting to be posted: %1.
 Write their NZB file to %2 instead of their current folder?</translation>
     </message>
+    <message>
+        <source>Add files to the queue</source>
+        <translation>Add files to the queue</translation>
+    </message>
+    <message>
+        <source>Blocked posts: show the queue</source>
+        <translation>Blocked posts: show the queue</translation>
+    </message>
+    <message>
+        <source>Queue (%1)</source>
+        <translation>Queue (%1)</translation>
+    </message>
+    <message>
+        <source>Show or fold the queue (Ctrl+Shift+Q)</source>
+        <translation>Show or fold the queue (Ctrl+Shift+Q)</translation>
+    </message>
+    <message>
+        <source>ngPost queue</source>
+        <translation>ngPost queue</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -8433,6 +8453,324 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
         <location line="-17"/>
         <source>this profile carries a key ngPost has not reviewed</source>
         <translation>this profile carries a key ngPost has not reviewed</translation>
+    </message>
+</context>
+<context>
+    <name>QueuePanel</name>
+    <message>
+        <source>Posts: %1 (%2 held, %3 blocked) · %4 left · temporary files: %5</source>
+        <translation>Posts: %1 (%2 held, %3 blocked) · %4 left · temporary files: %5</translation>
+    </message>
+    <message>
+        <source>, which keeps sending while it is prepared</source>
+        <translation>, which keeps sending while it is prepared</translation>
+    </message>
+    <message>
+        <source>Add files…</source>
+        <translation>Add files…</translation>
+    </message>
+    <message>
+        <source>Another post is already waiting to be posted now.</source>
+        <translation>Another post is already waiting to be posted now.</translation>
+    </message>
+    <message>
+        <source>Detach into a window</source>
+        <translation>Detach into a window</translation>
+    </message>
+    <message>
+        <source>Don&apos;t ask again</source>
+        <translation>Don&apos;t ask again</translation>
+    </message>
+    <message>
+        <source>Duplicate</source>
+        <translation>Duplicate</translation>
+    </message>
+    <message>
+        <source>Edit…</source>
+        <translation>Edit…</translation>
+    </message>
+    <message>
+        <source>Enlarge or reduce the queue</source>
+        <translation>Enlarge or reduce the queue</translation>
+    </message>
+    <message>
+        <source>Fold the queue</source>
+        <translation>Fold the queue</translation>
+    </message>
+    <message>
+        <source>Hold</source>
+        <translation>Hold</translation>
+    </message>
+    <message>
+        <source>Move</source>
+        <translation>Move</translation>
+    </message>
+    <message>
+        <source>Move down</source>
+        <translation>Move down</translation>
+    </message>
+    <message>
+        <source>Move to bottom</source>
+        <translation>Move to bottom</translation>
+    </message>
+    <message>
+        <source>Move to top</source>
+        <translation>Move to top</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>Move up</translation>
+    </message>
+    <message>
+        <source>Nothing goes before the post being sent: use Post now.</source>
+        <translation>Nothing goes before the post being sent: use Post now.</translation>
+    </message>
+    <message>
+        <source>Part of this post is already on Usenet: only Keep Archives can change.</source>
+        <translation>Part of this post is already on Usenet: only Keep Archives can change.</translation>
+    </message>
+    <message>
+        <source>Post next</source>
+        <translation>Post next</translation>
+    </message>
+    <message>
+        <source>Post now</source>
+        <translation>Post now</translation>
+    </message>
+    <message>
+        <source>Post now?</source>
+        <translation>Post now?</translation>
+    </message>
+    <message>
+        <source>Queue (%1)</source>
+        <translation>Queue (%1)</translation>
+    </message>
+    <message>
+        <source>Release</source>
+        <translation>Release</translation>
+    </message>
+    <message>
+        <source>Remove the selected posts from the queue (%1)? Posts already started stay resumable from History › Resume; archives are kept or deleted according to Keep Archives.</source>
+        <translation>Remove the selected posts from the queue (%1)? Posts already started stay resumable from History › Resume; archives are kept or deleted according to Keep Archives.</translation>
+    </message>
+    <message>
+        <source>Remove from queue</source>
+        <translation>Remove from queue</translation>
+    </message>
+    <message>
+        <source>Remove from the queue</source>
+        <translation>Remove from the queue</translation>
+    </message>
+    <message>
+        <source>Resolve…</source>
+        <translation>Resolve…</translation>
+    </message>
+    <message>
+        <source>That place is kept for the post waiting to be posted now.</source>
+        <translation>That place is kept for the post waiting to be posted now.</translation>
+    </message>
+    <message>
+        <source>The change could not be saved; nothing was changed.</source>
+        <translation>The change could not be saved; nothing was changed.</translation>
+    </message>
+    <message>
+        <source>The problem is still there.</source>
+        <translation>The problem is still there.</translation>
+    </message>
+    <message>
+        <source>The queue changed meanwhile: check the new order and try again.</source>
+        <translation>The queue changed meanwhile: check the new order and try again.</translation>
+    </message>
+    <message>
+        <source>The switch to that post is in progress.</source>
+        <translation>The switch to that post is in progress.</translation>
+    </message>
+    <message>
+        <source>“%1” goes right after the post being sent%2. Then “%3” is set aside and comes back in 2nd place: it resumes later without sending its confirmed articles again.</source>
+        <translation>“%1” goes right after the post being sent%2. Then “%3” is set aside and comes back in 2nd place: it resumes later without sending its confirmed articles again.</translation>
+    </message>
+    <message>
+        <source>Refused (%1).</source>
+        <translation>Refused (%1).</translation>
+    </message>
+</context>
+<context>
+    <name>QueueTableModel</name>
+    <message>
+        <source>%1 % · %2/s</source>
+        <translation>%1 % · %2/s</translation>
+    </message>
+    <message>
+        <source>%1 %2 %</source>
+        <translation>%1 %2 %</translation>
+    </message>
+    <message>
+        <source>%1 · posts as soon as ready</source>
+        <translation>%1 · posts as soon as ready</translation>
+    </message>
+    <message>
+        <source>A source file is missing or changed</source>
+        <translation>A source file is missing or changed</translation>
+    </message>
+    <message>
+        <source>Added</source>
+        <translation>Added</translation>
+    </message>
+    <message>
+        <source>Archive or PAR2 creation failed</source>
+        <translation>Archive or PAR2 creation failed</translation>
+    </message>
+    <message>
+        <source>Archives ready · %1 in temp</source>
+        <translation>Archives ready · %1 in temp</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <source>Blocked</source>
+        <translation>Blocked</translation>
+    </message>
+    <message>
+        <source>CLI</source>
+        <translation>CLI</translation>
+    </message>
+    <message>
+        <source>Checking</source>
+        <translation>Checking</translation>
+    </message>
+    <message>
+        <source>Drop</source>
+        <translation>Drop</translation>
+    </message>
+    <message>
+        <source>Finalizing</source>
+        <translation>Finalizing</translation>
+    </message>
+    <message>
+        <source>Held</source>
+        <translation>Held</translation>
+    </message>
+    <message>
+        <source>Held by you</source>
+        <translation>Held by you</translation>
+    </message>
+    <message>
+        <source>Held · ready</source>
+        <translation>Held · ready</translation>
+    </message>
+    <message>
+        <source>Not enough temporary space</source>
+        <translation>Not enough temporary space</translation>
+    </message>
+    <message>
+        <source>Origin</source>
+        <translation>Origin</translation>
+    </message>
+    <message>
+        <source>Password to enter again</source>
+        <translation>Password to enter again</translation>
+    </message>
+    <message>
+        <source>Position %1: %2, %3, %4, %5</source>
+        <translation>Position %1: %2, %3, %4, %5</translation>
+    </message>
+    <message>
+        <source>Post</source>
+        <translation>Post</translation>
+    </message>
+    <message>
+        <source>Post now: waiting for its preparation</source>
+        <translation>Post now: waiting for its preparation</translation>
+    </message>
+    <message>
+        <source>Posting</source>
+        <translation>Posting</translation>
+    </message>
+    <message>
+        <source>Preparing</source>
+        <translation>Preparing</translation>
+    </message>
+    <message>
+        <source>Progress / details</source>
+        <translation>Progress / details</translation>
+    </message>
+    <message>
+        <source>Queued</source>
+        <translation>Queued</translation>
+    </message>
+    <message>
+        <source>Quick</source>
+        <translation>Quick</translation>
+    </message>
+    <message>
+        <source>Ready</source>
+        <translation>Ready</translation>
+    </message>
+    <message>
+        <source>Recovering</source>
+        <translation>Recovering</translation>
+    </message>
+    <message>
+        <source>Recovering sources and archives…</source>
+        <translation>Recovering sources and archives…</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>Resume</translation>
+    </message>
+    <message>
+        <source>Resume · held by you</source>
+        <translation>Resume · held by you</translation>
+    </message>
+    <message>
+        <source>Resume: confirmed articles are not posted again</source>
+        <translation>Resume: confirmed articles are not posted again</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Size</translation>
+    </message>
+    <message>
+        <source>Starting…</source>
+        <translation>Starting…</translation>
+    </message>
+    <message>
+        <source>State</source>
+        <translation>State</translation>
+    </message>
+    <message>
+        <source>Stopping</source>
+        <translation>Stopping</translation>
+    </message>
+    <message>
+        <source>Stopping…</source>
+        <translation>Stopping…</translation>
+    </message>
+    <message>
+        <source>Tab #%1</source>
+        <translation>Tab #%1</translation>
+    </message>
+    <message>
+        <source>The NZB could not be written</source>
+        <translation>The NZB could not be written</translation>
+    </message>
+    <message>
+        <source>The VPN is unavailable</source>
+        <translation>The VPN is unavailable</translation>
+    </message>
+    <message>
+        <source>The stop could not be confirmed</source>
+        <translation>The stop could not be confirmed</translation>
+    </message>
+    <message>
+        <source>Waiting for its sources to be restored</source>
+        <translation>Waiting for its sources to be restored</translation>
+    </message>
+    <message>
+        <source>Writing the NZB…</source>
+        <translation>Writing the NZB…</translation>
     </message>
 </context>
 </TS>

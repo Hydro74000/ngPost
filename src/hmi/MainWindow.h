@@ -51,6 +51,11 @@ class QMenu;
 class QPushButton;
 class QSlider;
 class QToolButton;
+class QueuePanel;
+namespace queue
+{
+class QueuePreview;
+}
 class QFrame;
 class QResizeEvent;
 class QShowEvent;
@@ -295,6 +300,8 @@ public:
     void closeTab(PostingWidget *postWidget);
 
     QToolButton *zoomButton() const { return _zoomBtn; }
+    //! Queue manager drawer; null until the queue manager is enabled.
+    QueuePanel *queuePanel() const { return _queuePanel; }
     QFrame *zoomPopup() const { return _zoomPopup; }
     QSlider *zoomSlider() const { return _zoomSlider; }
     void applyUiZoom(int percent, bool userInteractive = false);
@@ -494,6 +501,20 @@ private:
     int _lastLogBoxWidth = 250;
     bool _logBoxCollapsed = true;
     bool _logBoxStateRestored = false;
+
+    // Queue manager drawer (plan_queue.md §4), see MainWindowQueue.cpp.
+    void _initQueuePanel();
+    void _setQueuePanelShown(bool shown);
+    void _toggleQueueExpanded();
+    void _detachQueuePanel();
+    void _onQueueCounts(int total, int blocked);
+    void _redockQueuePanel();
+
+    QueuePanel *_queuePanel = nullptr;
+    queue::QueuePreview *_queuePreview = nullptr;
+    QToolButton *_queueToggle = nullptr;
+    QToolButton *_queueBlockedBadge = nullptr;
+    QList<int> _queueSizesBeforeExpand;
 
     QToolButton *_zoomBtn = nullptr;
     QFrame *_zoomPopup = nullptr;

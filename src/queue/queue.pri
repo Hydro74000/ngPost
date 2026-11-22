@@ -11,6 +11,7 @@ SOURCES += \
     $$PWD/InMemoryQueueStore.cpp \
     $$PWD/PostQueue.cpp \
     $$PWD/QueueCapabilities.cpp \
+    $$PWD/QueuePreview.cpp \
     $$PWD/QueueScheduler.cpp \
     $$PWD/QueueTypes.cpp
 
@@ -22,6 +23,7 @@ HEADERS += \
     $$PWD/QueueCapabilities.h \
     $$PWD/QueueEntry.h \
     $$PWD/QueueExecutor.h \
+    $$PWD/QueuePreview.h \
     $$PWD/QueueScheduler.h \
     $$PWD/QueueStore.h \
     $$PWD/QueueTypes.h

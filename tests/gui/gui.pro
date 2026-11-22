@@ -7,7 +7,8 @@
 TEMPLATE = subdirs
 
 SUBDIRS = \
-    tst_MainWindow
+    tst_MainWindow \
+    tst_QueuePanel
 
 # Phase 4.x — add when the VpnManager/Keychain test seam is in place:
 #   tst_VpnProfileEditDialog

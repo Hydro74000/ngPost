@@ -585,6 +585,34 @@
 4	src/PostingJob.h	PostingJob::widget() const
 6	src/PostingJobOptions.h	PostingJobOptions::describedPar2Pct() const
 5	src/PostingJobOptions.h	PostingJobResumeFileState::matches( QFileInfo const & file) const
+10	src/PostingJobOptionsCodec.cpp	fields()
+14	src/PostingJobOptionsCodec.cpp	freezeFamilies( PersistedQueueOptions & o)
+7	src/PostingJobOptionsCodec.cpp	integralIn( const QJsonValue & v , double min , double max)
+11	src/PostingJobOptionsCodec.cpp	jobBool( const char * name , FieldClass cls , bool PostingJobOptions :: * m , bool required = false)
+14	src/PostingJobOptionsCodec.cpp	jobString( const char * name , FieldClass cls , QString PostingJobOptions :: * m , bool required = false)
+11	src/PostingJobOptionsCodec.cpp	jobUInt( const char * name , FieldClass cls , uint PostingJobOptions :: * m , uint max)
+19	src/PostingJobOptionsCodec.cpp	metaFromJson( PersistedQueueOptions & o , const QJsonValue & v)
+9	src/PostingJobOptionsCodec.cpp	metaToJson( const PersistedQueueOptions & o)
+11	src/PostingJobOptionsCodec.cpp	optString( const char * name , FieldClass cls , QString PersistedQueueOptions :: * m)
+26	src/PostingJobOptionsCodec.cpp	optionscodec::archiverArgsArePersistable( const QString & family , const QString & args)
+13	src/PostingJobOptionsCodec.cpp	optionscodec::changedClasses( const PersistedQueueOptions & before , const PersistedQueueOptions & after)
+28	src/PostingJobOptionsCodec.cpp	optionscodec::decode( const QJsonObject & json)
+27	src/PostingJobOptionsCodec.cpp	optionscodec::encode( PersistedQueueOptions options)
+15	src/PostingJobOptionsCodec.cpp	optionscodec::fieldClass( const QString & field , bool * known)
+7	src/PostingJobOptionsCodec.cpp	optionscodec::persistedFields()
+18	src/PostingJobOptionsCodec.cpp	outputAndOperationFields()
+14	src/PostingJobOptionsCodec.cpp	parsePasswordOrigin( const QString & text , PasswordOrigin & origin)
+11	src/PostingJobOptionsCodec.cpp	passwordOriginName( PasswordOrigin origin)
+51	src/PostingJobOptionsCodec.cpp	recipeFields()
+10	src/PostingJobOptionsCodec.cpp	sourceOf( const QFileInfo & file)
+23	src/PostingJobOptionsCodec.cpp	sourcesFromJson( PersistedQueueOptions & o , const QJsonValue & v)
+10	src/PostingJobOptionsCodec.cpp	sourcesToJson( const PersistedQueueOptions & o)
+7	src/PostingJobOptionsCodec.cpp	toArray( const QStringList & list)
+12	src/PostingJobOptionsCodec.cpp	toStringList( const QJsonValue & v , QStringList & out)
+35	src/PostingJobOptionsCodec.cpp	transferFields()
+5	src/PostingJobOptionsCodec.h	PersistedSource::operator ==( const PersistedSource & other) const
+1	src/PostingJobOptionsCodec.h	optionscodec::DecodeResult::ok() const
+1	src/PostingJobOptionsCodec.h	optionscodec::EncodeResult::ok() const
 4	src/history/NzbHistoryRegenerator.cpp	NzbHistoryRegenerator::NzbHistoryRegenerator( PostHistoryStore * store)
 23	src/history/NzbHistoryRegenerator.cpp	NzbHistoryRegenerator::_checkFileHistory( const PostHistoryStore :: PostDetails & details , const PostHistoryStore :: FileSummary & file , const QList<PostHistoryStore::ArticleSummary> & articles , QStringList * warnings , QString * error)
 47	src/history/NzbHistoryRegenerator.cpp	NzbHistoryRegenerator::_writeFile( const PostHistoryStore :: PostDetails & details , const PostHistoryStore :: FileSummary & file , QTextStream & stream , int padding , qint64 postFullArticleBytesHint , bool hasExactArticleSize , bool useBodyBytes , int & repairedArticleBytes , QStringList * warnings , QString * error)
@@ -825,7 +853,7 @@
 9	src/hmi/ExternalToolPathWidget.cpp	ExternalToolPathWidget::selectTool( const QString & tool)
 5	src/hmi/ExternalToolPathWidget.cpp	ExternalToolPathWidget::setTool( const QString & tool)
 1	src/hmi/ExternalToolPathWidget.h	ExternalToolPathWidget::editor() const
-68	src/hmi/MainWindow.cpp	MainWindow::MainWindow( QWidget * parent)
+69	src/hmi/MainWindow.cpp	MainWindow::MainWindow( QWidget * parent)
 11	src/hmi/MainWindow.cpp	MainWindow::_addPostingControl( QHBoxLayout * layout , const char * name , const QIcon & icon)
 68	src/hmi/MainWindow.cpp	MainWindow::_addReleaseNotes( QDialog * dialog , const QString & notes)
 99	src/hmi/MainWindow.cpp	MainWindow::_addServer( NntpServerParams * serverParam)
@@ -1005,6 +1033,7 @@
 1	src/hmi/MainWindow.h	MainWindow::isLogBoxCollapsedForTest() const
 1	src/hmi/MainWindow.h	MainWindow::logBlockCapForTest() const
 1	src/hmi/MainWindow.h	MainWindow::logToggleBtnForTest() const
+1	src/hmi/MainWindow.h	MainWindow::queuePanel() const
 1	src/hmi/MainWindow.h	MainWindow::resumePostForTest( qint64 id)
 1	src/hmi/MainWindow.h	MainWindow::resumeTableForTest() const
 1	src/hmi/MainWindow.h	MainWindow::setLogBlockCapForTest( int blocks)
@@ -1377,6 +1406,152 @@
 33	src/postinfo/PostInfoTemplate.cpp	PostInfoTemplate::values( PostInfoData const & data , bool nativeSeparators)
 4	src/postinfo/PostInfoTemplate.h	PostInfoTemplate::SheetLine::text() const
 1	src/postinfo/PostInfoTemplate.h	PostInfoTemplate::Token::isMeta() const
+9	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::abandonPlanning( qint64 postId , const QString & runId)
+9	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::ackFinalized( qint64 postId , bool ok , const QString & error)
+9	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::ackQuiesced( qint64 postId , bool ok , bool manifestEngaged)
+9	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::ackStep( qint64 postId , bool ok , qint64 bytes , const QString & error)
+9	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::ackTransferFinished( qint64 postId , bool success)
+9	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::ackTransferStarted( qint64 postId)
+7	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::activate( qint64 postId , const QString & runId , const QString & setId)
+8	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::count( Command :: Kind kind , qint64 postId) const
+7	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::interrupt( qint64 postId , const QString & runId , Disposition disposition)
+7	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::last( Command :: Kind kind , qint64 postId) const
+7	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::pauseTransfer( qint64 postId)
+9	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::prepareStep( qint64 postId , const QString & runId , const QString & setId , PrepStep step)
+7	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::resumeTransfer( qint64 postId)
+13	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::retryFinalization( qint64 postId , const QString & runId)
+6	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::setSimulation( bool enabled , int stepMs , int transferMs)
+17	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::simulateInterrupt( const Command & command)
+23	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::simulateStep( const Command & command)
+26	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::simulateTransfer( qint64 postId)
+11	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::stopSimulation( qint64 postId)
+10	src/queue/FakeQueueExecutor.cpp	queue::FakeQueueExecutor::ticker( qint64 postId)
+1	src/queue/FakeQueueExecutor.h	queue::FakeQueueExecutor::clearCommands()
+1	src/queue/FakeQueueExecutor.h	queue::FakeQueueExecutor::commands() const
+49	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::commit( const QueueTransaction & transaction)
+5	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::failNextCommits( int count , const QString & error)
+8	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::loadEntries( const QString & queueId) const
+6	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::loadIntent( const QString & queueId) const
+4	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::loadOrder( const QString & queueId , Domain domain) const
+4	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::orderKey( const QString & queueId , Domain domain)
+21	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::validate( const QueueTransaction & transaction) const
+1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::commitCount() const
+1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::hasEntry( qint64 postId) const
+1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::interruptionsRecorded( const QString & runId) const
+6	src/queue/PostQueue.cpp	queue::PostQueue::PostQueue( QueueStore * store , const QString & sessionQueueId , QObject * parent)
+10	src/queue/PostQueue.cpp	queue::PostQueue::abandonPlanning( qint64 postId , const QueueView & seen)
+4	src/queue/PostQueue.cpp	queue::PostQueue::activeEntry() const
+14	src/queue/PostQueue.cpp	queue::PostQueue::admitEntry( QueueEntry entry)
+48	src/queue/PostQueue.cpp	queue::PostQueue::apply( const QueueTransaction & transaction , QueueCommit * result)
+15	src/queue/PostQueue.cpp	queue::PostQueue::cancelPostNow( const QString & intentId)
+7	src/queue/PostQueue.cpp	queue::PostQueue::capabilityOf( Action action , qint64 postId) const
+9	src/queue/PostQueue.cpp	queue::PostQueue::checkAction( Action action , const QList<qint64> & ids) const
+19	src/queue/PostQueue.cpp	queue::PostQueue::checkView( const QList<qint64> & ids , const QueueView & seen , bool checkOrder) const
+16	src/queue/PostQueue.cpp	queue::PostQueue::commitOrder( const OrderRef & ref , const QList<qint64> & ids , bool dropsIntent)
+17	src/queue/PostQueue.cpp	queue::PostQueue::duplicate( qint64 postId , const QueueView & seen)
+13	src/queue/PostQueue.cpp	queue::PostQueue::duplicateNzbPath( const QString & path) const
+42	src/queue/PostQueue.cpp	queue::PostQueue::edit( qint64 postId , const PersistedQueueOptions & options , const QueueView & seen)
+16	src/queue/PostQueue.cpp	queue::PostQueue::engineActivate( qint64 postId)
+13	src/queue/PostQueue.cpp	queue::PostQueue::engineBeginPreparation( qint64 postId , const ArtifactSetRef & set)
+22	src/queue/PostQueue.cpp	queue::PostQueue::engineBlock( qint64 postId , const BlockReason & reason , Lifecycle lifecycle)
+25	src/queue/PostQueue.cpp	queue::PostQueue::engineCommitSwitch( bool manifestEngaged)
+12	src/queue/PostQueue.cpp	queue::PostQueue::engineDropIntent( const QString & reason)
+26	src/queue/PostQueue.cpp	queue::PostQueue::engineInterrupt( qint64 postId , bool manifestEngaged , bool hold , bool keepArtifacts)
+12	src/queue/PostQueue.cpp	queue::PostQueue::engineRecordPrepared( qint64 postId , const ArtifactSetRef & set)
+6	src/queue/PostQueue.cpp	queue::PostQueue::engineRetire( qint64 postId)
+10	src/queue/PostQueue.cpp	queue::PostQueue::engineSetIntentSwitching()
+11	src/queue/PostQueue.cpp	queue::PostQueue::engineSetLifecycle( qint64 postId , Lifecycle lifecycle , Slot slot)
+10	src/queue/PostQueue.cpp	queue::PostQueue::engineSetSourceJournal( qint64 postId , bool unsettled)
+7	src/queue/PostQueue.cpp	queue::PostQueue::entryInSlot( Slot slot) const
+8	src/queue/PostQueue.cpp	queue::PostQueue::factsFor( const QueueEntry & entry) const
+5	src/queue/PostQueue.cpp	queue::PostQueue::find( qint64 postId) const
+13	src/queue/PostQueue.cpp	queue::PostQueue::firstFreeIndex( const QList<qint64> & rest , const QList<qint64> & moving) const
+14	src/queue/PostQueue.cpp	queue::PostQueue::headEntry() const
+27	src/queue/PostQueue.cpp	queue::PostQueue::holdOrRelease( const QList<qint64> & ids , bool held)
+11	src/queue/PostQueue.cpp	queue::PostQueue::intentTargetValid() const
+7	src/queue/PostQueue.cpp	queue::PostQueue::intentTouches( const QList<qint64> & ids) const
+26	src/queue/PostQueue.cpp	queue::PostQueue::move( const QList<qint64> & ids , int targetIndex , const QueueView & seen)
+12	src/queue/PostQueue.cpp	queue::PostQueue::moveToEdge( const QList<qint64> & ids , Edge edge , const QueueView & seen)
+16	src/queue/PostQueue.cpp	queue::PostQueue::newEntry( const PersistedQueueOptions & options , Origin origin , int tabNumber) const
+5	src/queue/PostQueue.cpp	queue::PostQueue::order( Domain domain , const QString & queueId) const
+4	src/queue/PostQueue.cpp	queue::PostQueue::orderKey( const QString & queueId , Domain domain)
+7	src/queue/PostQueue.cpp	queue::PostQueue::orderUpdate( const OrderRef & ref , const QList<qint64> & ids) const
+9	src/queue/PostQueue.cpp	queue::PostQueue::postNext( const QList<qint64> & ids , const QueueView & seen)
+42	src/queue/PostQueue.cpp	queue::PostQueue::postNow( qint64 postId , const QueueView & seen , bool replaceExisting)
+8	src/queue/PostQueue.cpp	queue::PostQueue::releaseArtifacts( QueueEntry & entry , bool keepCurrent) const
+30	src/queue/PostQueue.cpp	queue::PostQueue::remove( const QList<qint64> & ids , RemovePolicy policy , const QueueView & seen)
+27	src/queue/PostQueue.cpp	queue::PostQueue::removeData( const QList<qint64> & ids , RemovePolicy policy)
+4	src/queue/PostQueue.cpp	queue::PostQueue::resolve( Domain domain , const QString & queueId) const
+10	src/queue/PostQueue.cpp	queue::PostQueue::retryFinalization( qint64 postId , const QueueView & seen)
+19	src/queue/PostQueue.cpp	queue::PostQueue::revalidate( qint64 postId , const QueueView & seen)
+9	src/queue/PostQueue.cpp	queue::PostQueue::setHeld( const QList<qint64> & ids , bool held , const QueueView & seen)
+8	src/queue/PostQueue.cpp	queue::PostQueue::setPaused( bool paused)
+4	src/queue/PostQueue.cpp	queue::PostQueue::setRerollFunction( std :: function<void(PersistedQueueOptions&)> reroll)
+4	src/queue/PostQueue.cpp	queue::PostQueue::setRevalidateFunction( std :: function<BlockReason(const QueueEntry&)> revalidate)
+7	src/queue/PostQueue.cpp	queue::PostQueue::snapshot( Domain domain , const QString & queueId) const
+8	src/queue/PostQueue.cpp	queue::PostQueue::submit( const PersistedQueueOptions & options , Origin origin , int tabNumber)
+11	src/queue/PostQueue.cpp	queue::PostQueue::view( Domain domain , const QString & queueId) const
+4	src/queue/PostQueue.cpp	queue::codeStale()
+8	src/queue/PostQueue.cpp	queue::inOrder( const QList<qint64> & order , const QList<qint64> & ids)
+1	src/queue/PostQueue.h	queue::PostQueue::intent() const
+1	src/queue/PostQueue.h	queue::PostQueue::isPaused() const
+1	src/queue/PostQueue.h	queue::PostQueue::sessionQueueId() const
+31	src/queue/QueueCapabilities.cpp	queue::capability( Action action , const QueueEntry & entry , const QueueFacts & facts)
+8	src/queue/QueueCapabilities.cpp	queue::deferredCapability( Action action , const QueueEntry & entry)
+13	src/queue/QueueCapabilities.cpp	queue::finalizingCapability( Action action , const QueueEntry & entry)
+25	src/queue/QueueCapabilities.cpp	queue::flagRule( Action action , const QueueEntry & entry , Capability & out)
+9	src/queue/QueueCapabilities.cpp	queue::postingCapability( Action action)
+12	src/queue/QueueCapabilities.cpp	queue::preparingCapability( Action action)
+8	src/queue/QueueCapabilities.cpp	queue::removeCapability( const QueueEntry & entry)
+18	src/queue/QueueCapabilities.cpp	queue::waitingCapability( Action action , const QueueEntry & entry)
+1	src/queue/QueueCapabilities.h	queue::Capability::no( const QString & why)
+4	src/queue/QueueCapabilities.h	queue::Capability::yes( bool confirm = false , const QString & why = { })
+1	src/queue/QueueEntry.h	queue::QueueEntry::hasRuntime() const
+5	src/queue/QueueEntry.h	queue::QueueEntry::isEligible() const
+5	src/queue/QueueEntry.h	queue::QueueEntry::isReady() const
+4	src/queue/QueueEntry.h	queue::QueueEntry::needsPreparation() const
+7	src/queue/QueueEntry.h	queue::QueueEntry::retainedBytes() const
+20	src/queue/QueueScheduler.cpp	queue::QueueScheduler::QueueScheduler( PostQueue * queue , QueueExecutor * executor , Budget budget , QObject * parent)
+24	src/queue/QueueScheduler.cpp	queue::QueueScheduler::activateHead()
+10	src/queue/QueueScheduler.cpp	queue::QueueScheduler::continuePreparation( const QueueEntry & entry)
+10	src/queue/QueueScheduler.cpp	queue::QueueScheduler::estimatedPreparationBytes( const QueueEntry & entry)
+41	src/queue/QueueScheduler.cpp	queue::QueueScheduler::handleIntent()
+5	src/queue/QueueScheduler.cpp	queue::QueueScheduler::isCurrent( qint64 postId , const QString & runId) const
+9	src/queue/QueueScheduler.cpp	queue::QueueScheduler::newArtifactSet( const QueueEntry & entry) const
+13	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onFinalized( qint64 postId , const QString & runId , bool ok , const QString & error)
+13	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onPausedChanged( bool paused)
+36	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onQuiesced( qint64 postId , const QString & runId , bool ok , bool manifestEngaged)
+28	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onRuntimeActionRequested( qint64 postId , RuntimeRequest request)
+35	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onStepFinished( qint64 postId , const QString & runId , const QString & setId , PrepStep step , bool ok , const QString & error , qint64 bytes)
+7	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onTransferFinished( qint64 postId , const QString & runId , bool success)
+8	src/queue/QueueScheduler.cpp	queue::QueueScheduler::preparedCount() const
+12	src/queue/QueueScheduler.cpp	queue::QueueScheduler::reevaluate()
+9	src/queue/QueueScheduler.cpp	queue::QueueScheduler::requestStop( const QueueEntry & entry , PendingStop why , Disposition disposition)
+18	src/queue/QueueScheduler.cpp	queue::QueueScheduler::requiredPreparation() const
+7	src/queue/QueueScheduler.cpp	queue::QueueScheduler::scheduleReevaluate()
+4	src/queue/QueueScheduler.cpp	queue::QueueScheduler::setAdmission( std :: function<Admission(const QueueEntry&)> admission)
+5	src/queue/QueueScheduler.cpp	queue::QueueScheduler::setSwitchPreflight( std :: function<Admission(const QueueEntry&,const QueueEntry&)> preflight)
+7	src/queue/QueueScheduler.cpp	queue::QueueScheduler::spaceAllows( const QueueEntry & entry) const
+10	src/queue/QueueScheduler.cpp	queue::QueueScheduler::speculativePreparation() const
+29	src/queue/QueueScheduler.cpp	queue::QueueScheduler::startPreparation()
+10	src/queue/QueueScheduler.cpp	queue::QueueScheduler::stepsFor( const QueueEntry & entry) const
+1	src/queue/QueueStore.h	queue::QueueCommit::ok() const
+5	src/queue/QueueStore.h	queue::QueueTransaction::isEmpty() const
+4	src/queue/QueueTypes.cpp	queue::lifecycleName( Lifecycle lifecycle)
+7	src/queue/QueueTypes.cpp	queue::nameOf( const std :: array<std::pair<Enum,const char*>,N> & table , Enum value)
+4	src/queue/QueueTypes.cpp	queue::originName( Origin origin)
+4	src/queue/QueueTypes.cpp	queue::parseLifecycle( const QString & text , Lifecycle & lifecycle)
+4	src/queue/QueueTypes.cpp	queue::parseOrigin( const QString & text , Origin & origin)
+12	src/queue/QueueTypes.cpp	queue::valueOf( const std :: array<std::pair<Enum,const char*>,N> & table , const QString & text , Enum & out)
+1	src/queue/QueueTypes.h	queue::ArtifactSetRef::isNull() const
+1	src/queue/QueueTypes.h	queue::BlockReason::isBlocked() const
+4	src/queue/QueueTypes.h	queue::BlockReason::operator ==( const BlockReason & other) const
+1	src/queue/QueueTypes.h	queue::PostNowIntent::isNull() const
+4	src/queue/QueueTypes.h	queue::QueueCommandResult::done( QList<qint64> ids = { })
+4	src/queue/QueueTypes.h	queue::QueueCommandResult::inProgress( QList<qint64> ids)
+1	src/queue/QueueTypes.h	queue::QueueCommandResult::ok() const
+4	src/queue/QueueTypes.h	queue::QueueCommandResult::rejected( const QString & code , const QString & msg = { })
+4	src/queue/QueueTypes.h	queue::qHash( FieldClass value , size_t seed = 0)
 8	src/tools/ExternalToolResolver.cpp	externaltool::archiverForFile( const QString & path)
 25	src/tools/ExternalToolResolver.cpp	externaltool::bundledTool( const QString & path , const QString & appDir)
 4	src/tools/ExternalToolResolver.cpp	externaltool::bundledTool( const QString & path)

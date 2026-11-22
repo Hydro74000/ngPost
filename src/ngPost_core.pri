@@ -235,6 +235,11 @@ SOURCES += \
     $$PWD/hmi/SignedListWidget.cpp \
     $$PWD/hmi/StartupTabBar.cpp \
     $$PWD/hmi/MainWindow.cpp \
+    $$PWD/hmi/MainWindowQueue.cpp \
+    $$PWD/hmi/QueueIcons.cpp \
+    $$PWD/hmi/QueueItemDelegate.cpp \
+    $$PWD/hmi/QueuePanel.cpp \
+    $$PWD/hmi/QueueTableModel.cpp \
     $$PWD/hmi/VpnProfileEditDialog.cpp \
     $$PWD/hmi/VpnSettingsDialog.cpp
 
@@ -251,6 +256,10 @@ HEADERS += \
     $$PWD/hmi/SignedListWidget.h \
     $$PWD/hmi/StartupTabBar.h \
     $$PWD/hmi/MainWindow.h \
+    $$PWD/hmi/QueueIcons.h \
+    $$PWD/hmi/QueueItemDelegate.h \
+    $$PWD/hmi/QueuePanel.h \
+    $$PWD/hmi/QueueTableModel.h \
     $$PWD/hmi/VpnProfileEditDialog.h \
     $$PWD/hmi/VpnSettingsDialog.h \
     $$PWD/hmi/WrappedLabels.h

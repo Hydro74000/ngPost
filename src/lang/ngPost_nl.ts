@@ -2248,6 +2248,26 @@ Write their NZB file to %2 instead of their current folder?</source>
         <translation>Tabbladen die wachten om gepost te worden: %1.
 Hun NZB-bestand naar %2 schrijven in plaats van hun huidige map?</translation>
     </message>
+    <message>
+        <source>Add files to the queue</source>
+        <translation>Bestanden aan de wachtrij toevoegen</translation>
+    </message>
+    <message>
+        <source>Blocked posts: show the queue</source>
+        <translation>Geblokkeerde posts: wachtrij tonen</translation>
+    </message>
+    <message>
+        <source>Queue (%1)</source>
+        <translation>Wachtrij (%1)</translation>
+    </message>
+    <message>
+        <source>Show or fold the queue (Ctrl+Shift+Q)</source>
+        <translation>Wachtrij tonen of inklappen (Ctrl+Shift+Q)</translation>
+    </message>
+    <message>
+        <source>ngPost queue</source>
+        <translation>ngPost-wachtrij</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -8471,6 +8491,324 @@ Zijn configuratiebestand onder &lt;configDir&gt;/vpn/ en zijn inloggegevens in d
         <location line="-17"/>
         <source>this profile carries a key ngPost has not reviewed</source>
         <translation>dit profiel bevat een sleutel die ngPost niet heeft beoordeeld</translation>
+    </message>
+</context>
+<context>
+    <name>QueuePanel</name>
+    <message>
+        <source>Posts: %1 (%2 held, %3 blocked) · %4 left · temporary files: %5</source>
+        <translation>Posts: %1 (%2 gepauzeerd, %3 geblokkeerd) · %4 resterend · tijdelijke bestanden: %5</translation>
+    </message>
+    <message>
+        <source>, which keeps sending while it is prepared</source>
+        <translation>, die tijdens de voorbereiding blijft verzenden</translation>
+    </message>
+    <message>
+        <source>Add files…</source>
+        <translation>Bestanden toevoegen…</translation>
+    </message>
+    <message>
+        <source>Another post is already waiting to be posted now.</source>
+        <translation>Een andere post wacht al om nu geplaatst te worden.</translation>
+    </message>
+    <message>
+        <source>Detach into a window</source>
+        <translation>Losmaken in een venster</translation>
+    </message>
+    <message>
+        <source>Don&apos;t ask again</source>
+        <translation>Niet meer vragen</translation>
+    </message>
+    <message>
+        <source>Duplicate</source>
+        <translation>Dupliceren</translation>
+    </message>
+    <message>
+        <source>Edit…</source>
+        <translation>Bewerken…</translation>
+    </message>
+    <message>
+        <source>Enlarge or reduce the queue</source>
+        <translation>Wachtrij vergroten of verkleinen</translation>
+    </message>
+    <message>
+        <source>Fold the queue</source>
+        <translation>Wachtrij inklappen</translation>
+    </message>
+    <message>
+        <source>Hold</source>
+        <translation>Pauzeren</translation>
+    </message>
+    <message>
+        <source>Move</source>
+        <translation>Verplaatsen</translation>
+    </message>
+    <message>
+        <source>Move down</source>
+        <translation>Omlaag</translation>
+    </message>
+    <message>
+        <source>Move to bottom</source>
+        <translation>Naar onderen</translation>
+    </message>
+    <message>
+        <source>Move to top</source>
+        <translation>Naar boven</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>Omhoog</translation>
+    </message>
+    <message>
+        <source>Nothing goes before the post being sent: use Post now.</source>
+        <translation>Niets gaat vóór de post die wordt verzonden: gebruik Nu plaatsen.</translation>
+    </message>
+    <message>
+        <source>Part of this post is already on Usenet: only Keep Archives can change.</source>
+        <translation>Een deel van deze post staat al op Usenet: alleen Behoud archieven kan nog wijzigen.</translation>
+    </message>
+    <message>
+        <source>Post next</source>
+        <translation>Hierna plaatsen</translation>
+    </message>
+    <message>
+        <source>Post now</source>
+        <translation>Nu plaatsen</translation>
+    </message>
+    <message>
+        <source>Post now?</source>
+        <translation>Nu plaatsen?</translation>
+    </message>
+    <message>
+        <source>Queue (%1)</source>
+        <translation>Wachtrij (%1)</translation>
+    </message>
+    <message>
+        <source>Release</source>
+        <translation>Hervatten</translation>
+    </message>
+    <message>
+        <source>Remove the selected posts from the queue (%1)? Posts already started stay resumable from History › Resume; archives are kept or deleted according to Keep Archives.</source>
+        <translation>De geselecteerde posts uit de wachtrij verwijderen (%1)? Reeds begonnen posts blijven hervatbaar via Geschiedenis › Hervattingen; archieven worden bewaard of verwijderd volgens Behoud archieven.</translation>
+    </message>
+    <message>
+        <source>Remove from queue</source>
+        <translation>Uit de wachtrij verwijderen</translation>
+    </message>
+    <message>
+        <source>Remove from the queue</source>
+        <translation>Uit de wachtrij verwijderen</translation>
+    </message>
+    <message>
+        <source>Resolve…</source>
+        <translation>Oplossen…</translation>
+    </message>
+    <message>
+        <source>That place is kept for the post waiting to be posted now.</source>
+        <translation>Die plaats is gereserveerd voor de post die nu geplaatst moet worden.</translation>
+    </message>
+    <message>
+        <source>The change could not be saved; nothing was changed.</source>
+        <translation>De wijziging kon niet worden opgeslagen; er is niets gewijzigd.</translation>
+    </message>
+    <message>
+        <source>The problem is still there.</source>
+        <translation>Het probleem is er nog steeds.</translation>
+    </message>
+    <message>
+        <source>The queue changed meanwhile: check the new order and try again.</source>
+        <translation>De wachtrij is intussen gewijzigd: controleer de nieuwe volgorde en probeer het opnieuw.</translation>
+    </message>
+    <message>
+        <source>The switch to that post is in progress.</source>
+        <translation>De overstap naar die post is bezig.</translation>
+    </message>
+    <message>
+        <source>“%1” goes right after the post being sent%2. Then “%3” is set aside and comes back in 2nd place: it resumes later without sending its confirmed articles again.</source>
+        <translation>‘%1’ komt direct na de post die wordt verzonden%2. Daarna wordt ‘%3’ opzijgezet en komt op de 2e plaats: hij wordt later hervat zonder zijn bevestigde artikelen opnieuw te verzenden.</translation>
+    </message>
+    <message>
+        <source>Refused (%1).</source>
+        <translation>Geweigerd (%1).</translation>
+    </message>
+</context>
+<context>
+    <name>QueueTableModel</name>
+    <message>
+        <source>%1 % · %2/s</source>
+        <translation>%1 % · %2/s</translation>
+    </message>
+    <message>
+        <source>%1 %2 %</source>
+        <translation>%1 %2 %</translation>
+    </message>
+    <message>
+        <source>%1 · posts as soon as ready</source>
+        <translation>%1 · start zodra klaar</translation>
+    </message>
+    <message>
+        <source>A source file is missing or changed</source>
+        <translation>Een bronbestand ontbreekt of is gewijzigd</translation>
+    </message>
+    <message>
+        <source>Added</source>
+        <translation>Toegevoegd</translation>
+    </message>
+    <message>
+        <source>Archive or PAR2 creation failed</source>
+        <translation>Aanmaken van archieven of PAR2 mislukt</translation>
+    </message>
+    <message>
+        <source>Archives ready · %1 in temp</source>
+        <translation>Archieven klaar · %1 tijdelijk</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <source>Blocked</source>
+        <translation>Geblokkeerd</translation>
+    </message>
+    <message>
+        <source>CLI</source>
+        <translation>CLI</translation>
+    </message>
+    <message>
+        <source>Checking</source>
+        <translation>Controle</translation>
+    </message>
+    <message>
+        <source>Drop</source>
+        <translation>Neergezet</translation>
+    </message>
+    <message>
+        <source>Finalizing</source>
+        <translation>Afronden</translation>
+    </message>
+    <message>
+        <source>Held</source>
+        <translation>Gepauzeerd</translation>
+    </message>
+    <message>
+        <source>Held by you</source>
+        <translation>Door u gepauzeerd</translation>
+    </message>
+    <message>
+        <source>Held · ready</source>
+        <translation>Gepauzeerd · klaar</translation>
+    </message>
+    <message>
+        <source>Not enough temporary space</source>
+        <translation>Onvoldoende tijdelijke ruimte</translation>
+    </message>
+    <message>
+        <source>Origin</source>
+        <translation>Herkomst</translation>
+    </message>
+    <message>
+        <source>Password to enter again</source>
+        <translation>Wachtwoord opnieuw invoeren</translation>
+    </message>
+    <message>
+        <source>Position %1: %2, %3, %4, %5</source>
+        <translation>Positie %1: %2, %3, %4, %5</translation>
+    </message>
+    <message>
+        <source>Post</source>
+        <translation>Post</translation>
+    </message>
+    <message>
+        <source>Post now: waiting for its preparation</source>
+        <translation>Nu plaatsen: wacht op de voorbereiding</translation>
+    </message>
+    <message>
+        <source>Posting</source>
+        <translation>Plaatsen</translation>
+    </message>
+    <message>
+        <source>Preparing</source>
+        <translation>Voorbereiden</translation>
+    </message>
+    <message>
+        <source>Progress / details</source>
+        <translation>Voortgang / details</translation>
+    </message>
+    <message>
+        <source>Queued</source>
+        <translation>In wachtrij</translation>
+    </message>
+    <message>
+        <source>Quick</source>
+        <translation>Snel</translation>
+    </message>
+    <message>
+        <source>Ready</source>
+        <translation>Klaar</translation>
+    </message>
+    <message>
+        <source>Recovering</source>
+        <translation>Herstellen</translation>
+    </message>
+    <message>
+        <source>Recovering sources and archives…</source>
+        <translation>Bronnen en archieven herstellen…</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>Hervatting</translation>
+    </message>
+    <message>
+        <source>Resume · held by you</source>
+        <translation>Hervatting · door u gepauzeerd</translation>
+    </message>
+    <message>
+        <source>Resume: confirmed articles are not posted again</source>
+        <translation>Hervatting: bevestigde artikelen worden niet opnieuw geplaatst</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Grootte</translation>
+    </message>
+    <message>
+        <source>Starting…</source>
+        <translation>Starten…</translation>
+    </message>
+    <message>
+        <source>State</source>
+        <translation>Status</translation>
+    </message>
+    <message>
+        <source>Stopping</source>
+        <translation>Stoppen</translation>
+    </message>
+    <message>
+        <source>Stopping…</source>
+        <translation>Stoppen…</translation>
+    </message>
+    <message>
+        <source>Tab #%1</source>
+        <translation>Tabblad #%1</translation>
+    </message>
+    <message>
+        <source>The NZB could not be written</source>
+        <translation>Het NZB kon niet worden geschreven</translation>
+    </message>
+    <message>
+        <source>The VPN is unavailable</source>
+        <translation>De VPN is niet beschikbaar</translation>
+    </message>
+    <message>
+        <source>The stop could not be confirmed</source>
+        <translation>De stop kon niet worden bevestigd</translation>
+    </message>
+    <message>
+        <source>Waiting for its sources to be restored</source>
+        <translation>Wacht tot de bronnen zijn hersteld</translation>
+    </message>
+    <message>
+        <source>Writing the NZB…</source>
+        <translation>NZB schrijven…</translation>
     </message>
 </context>
 </TS>

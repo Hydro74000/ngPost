@@ -62,6 +62,7 @@ tst_PostHistory               48  Linux
 tst_PostInfoTemplate          36  Linux
 tst_PostQueue                 22  Linux
 tst_PostingJobOptionsCodec    27  Linux
+tst_QueuePanel                10  Linux
 tst_QueueScheduler            22  Linux
 tst_RandomToken                3  Linux
 tst_SecretMasker              22  Linux
@@ -97,6 +98,7 @@ tst_PostHistory               48  Darwin
 tst_PostInfoTemplate          36  Darwin
 tst_PostQueue                 22  Darwin
 tst_PostingJobOptionsCodec    27  Darwin
+tst_QueuePanel                10  Darwin
 tst_QueueScheduler            22  Darwin
 tst_RandomToken                3  Darwin
 tst_SecretMasker              22  Darwin
@@ -129,6 +131,7 @@ tst_PostHistory               48  Windows
 tst_PostInfoTemplate          34  Windows
 tst_PostQueue                 22  Windows
 tst_PostingJobOptionsCodec    27  Windows
+tst_QueuePanel                10  Windows
 tst_QueueScheduler            22  Windows
 tst_RandomToken                3  Windows
 tst_SecretMasker              22  Windows

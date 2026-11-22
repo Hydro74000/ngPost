@@ -61,6 +61,7 @@ signals:
     void quiesced(qint64 postId, const QString &runId, bool ok, bool manifestEngaged);
     //! Live progress, for views only; never used for a decision.
     void progress(qint64 postId, int percent, qint64 bytesPerSecond);
+    void stepProgress(qint64 postId, queue::PrepStep step, int percent);
 };
 
 } // namespace queue

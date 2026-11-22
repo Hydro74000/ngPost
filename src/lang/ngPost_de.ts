@@ -2247,6 +2247,26 @@ Write their NZB file to %2 instead of their current folder?</source>
         <translation>Tabs, die auf das Posten warten: %1.
 Ihre NZB-Datei in %2 statt im bisherigen Ordner speichern?</translation>
     </message>
+    <message>
+        <source>Add files to the queue</source>
+        <translation>Dateien zur Warteschlange hinzufügen</translation>
+    </message>
+    <message>
+        <source>Blocked posts: show the queue</source>
+        <translation>Blockierte Posts: Warteschlange anzeigen</translation>
+    </message>
+    <message>
+        <source>Queue (%1)</source>
+        <translation>Warteschlange (%1)</translation>
+    </message>
+    <message>
+        <source>Show or fold the queue (Ctrl+Shift+Q)</source>
+        <translation>Warteschlange ein- oder ausblenden (Strg+Umschalt+Q)</translation>
+    </message>
+    <message>
+        <source>ngPost queue</source>
+        <translation>ngPost-Warteschlange</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -8466,6 +8486,324 @@ Seine Konfigurationsdatei unter &lt;configDir&gt;/vpn/ und seine Zugangsdaten im
         <location line="-17"/>
         <source>this profile carries a key ngPost has not reviewed</source>
         <translation>dieses Profil enthält einen von ngPost nicht geprüften Schlüssel</translation>
+    </message>
+</context>
+<context>
+    <name>QueuePanel</name>
+    <message>
+        <source>Posts: %1 (%2 held, %3 blocked) · %4 left · temporary files: %5</source>
+        <translation>Posts: %1 (%2 angehalten, %3 blockiert) · %4 verbleibend · temporäre Dateien: %5</translation>
+    </message>
+    <message>
+        <source>, which keeps sending while it is prepared</source>
+        <translation>, der während der Vorbereitung weiter sendet</translation>
+    </message>
+    <message>
+        <source>Add files…</source>
+        <translation>Dateien hinzufügen…</translation>
+    </message>
+    <message>
+        <source>Another post is already waiting to be posted now.</source>
+        <translation>Ein anderer Post wartet bereits darauf, sofort gepostet zu werden.</translation>
+    </message>
+    <message>
+        <source>Detach into a window</source>
+        <translation>In ein eigenes Fenster lösen</translation>
+    </message>
+    <message>
+        <source>Don&apos;t ask again</source>
+        <translation>Nicht mehr fragen</translation>
+    </message>
+    <message>
+        <source>Duplicate</source>
+        <translation>Duplizieren</translation>
+    </message>
+    <message>
+        <source>Edit…</source>
+        <translation>Bearbeiten…</translation>
+    </message>
+    <message>
+        <source>Enlarge or reduce the queue</source>
+        <translation>Warteschlange vergrößern oder verkleinern</translation>
+    </message>
+    <message>
+        <source>Fold the queue</source>
+        <translation>Warteschlange einklappen</translation>
+    </message>
+    <message>
+        <source>Hold</source>
+        <translation>Anhalten</translation>
+    </message>
+    <message>
+        <source>Move</source>
+        <translation>Verschieben</translation>
+    </message>
+    <message>
+        <source>Move down</source>
+        <translation>Nach unten</translation>
+    </message>
+    <message>
+        <source>Move to bottom</source>
+        <translation>Ans Ende</translation>
+    </message>
+    <message>
+        <source>Move to top</source>
+        <translation>An den Anfang</translation>
+    </message>
+    <message>
+        <source>Move up</source>
+        <translation>Nach oben</translation>
+    </message>
+    <message>
+        <source>Nothing goes before the post being sent: use Post now.</source>
+        <translation>Nichts kommt vor den gerade gesendeten Post: verwenden Sie Jetzt posten.</translation>
+    </message>
+    <message>
+        <source>Part of this post is already on Usenet: only Keep Archives can change.</source>
+        <translation>Ein Teil dieses Posts ist bereits im Usenet: nur „Archive behalten“ kann sich noch ändern.</translation>
+    </message>
+    <message>
+        <source>Post next</source>
+        <translation>Als Nächstes posten</translation>
+    </message>
+    <message>
+        <source>Post now</source>
+        <translation>Jetzt posten</translation>
+    </message>
+    <message>
+        <source>Post now?</source>
+        <translation>Jetzt posten?</translation>
+    </message>
+    <message>
+        <source>Queue (%1)</source>
+        <translation>Warteschlange (%1)</translation>
+    </message>
+    <message>
+        <source>Release</source>
+        <translation>Fortsetzen</translation>
+    </message>
+    <message>
+        <source>Remove the selected posts from the queue (%1)? Posts already started stay resumable from History › Resume; archives are kept or deleted according to Keep Archives.</source>
+        <translation>Die ausgewählten Posts aus der Warteschlange entfernen (%1)? Bereits begonnene Posts bleiben unter Verlauf › Fortsetzungen fortsetzbar; Archive werden gemäß „Archive behalten“ behalten oder gelöscht.</translation>
+    </message>
+    <message>
+        <source>Remove from queue</source>
+        <translation>Aus der Warteschlange entfernen</translation>
+    </message>
+    <message>
+        <source>Remove from the queue</source>
+        <translation>Aus der Warteschlange entfernen</translation>
+    </message>
+    <message>
+        <source>Resolve…</source>
+        <translation>Beheben…</translation>
+    </message>
+    <message>
+        <source>That place is kept for the post waiting to be posted now.</source>
+        <translation>Dieser Platz ist für den Post reserviert, der sofort gepostet werden soll.</translation>
+    </message>
+    <message>
+        <source>The change could not be saved; nothing was changed.</source>
+        <translation>Die Änderung konnte nicht gespeichert werden; es wurde nichts geändert.</translation>
+    </message>
+    <message>
+        <source>The problem is still there.</source>
+        <translation>Das Problem besteht weiterhin.</translation>
+    </message>
+    <message>
+        <source>The queue changed meanwhile: check the new order and try again.</source>
+        <translation>Die Warteschlange hat sich inzwischen geändert: Prüfen Sie die neue Reihenfolge und versuchen Sie es erneut.</translation>
+    </message>
+    <message>
+        <source>The switch to that post is in progress.</source>
+        <translation>Der Wechsel zu diesem Post läuft.</translation>
+    </message>
+    <message>
+        <source>“%1” goes right after the post being sent%2. Then “%3” is set aside and comes back in 2nd place: it resumes later without sending its confirmed articles again.</source>
+        <translation>„%1“ kommt direkt nach dem gerade gesendeten Post%2. Danach wird „%3“ zurückgestellt und kommt auf Platz 2: Er wird später fortgesetzt, ohne seine bestätigten Artikel erneut zu senden.</translation>
+    </message>
+    <message>
+        <source>Refused (%1).</source>
+        <translation>Abgelehnt (%1).</translation>
+    </message>
+</context>
+<context>
+    <name>QueueTableModel</name>
+    <message>
+        <source>%1 % · %2/s</source>
+        <translation>%1 % · %2/s</translation>
+    </message>
+    <message>
+        <source>%1 %2 %</source>
+        <translation>%1 %2 %</translation>
+    </message>
+    <message>
+        <source>%1 · posts as soon as ready</source>
+        <translation>%1 · startet, sobald bereit</translation>
+    </message>
+    <message>
+        <source>A source file is missing or changed</source>
+        <translation>Eine Quelldatei fehlt oder wurde geändert</translation>
+    </message>
+    <message>
+        <source>Added</source>
+        <translation>Hinzugefügt</translation>
+    </message>
+    <message>
+        <source>Archive or PAR2 creation failed</source>
+        <translation>Erstellen der Archive oder PAR2 fehlgeschlagen</translation>
+    </message>
+    <message>
+        <source>Archives ready · %1 in temp</source>
+        <translation>Archive bereit · %1 temporär</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <source>Blocked</source>
+        <translation>Blockiert</translation>
+    </message>
+    <message>
+        <source>CLI</source>
+        <translation>CLI</translation>
+    </message>
+    <message>
+        <source>Checking</source>
+        <translation>Prüfung</translation>
+    </message>
+    <message>
+        <source>Drop</source>
+        <translation>Abgelegt</translation>
+    </message>
+    <message>
+        <source>Finalizing</source>
+        <translation>Abschluss</translation>
+    </message>
+    <message>
+        <source>Held</source>
+        <translation>Angehalten</translation>
+    </message>
+    <message>
+        <source>Held by you</source>
+        <translation>Von Ihnen angehalten</translation>
+    </message>
+    <message>
+        <source>Held · ready</source>
+        <translation>Angehalten · bereit</translation>
+    </message>
+    <message>
+        <source>Not enough temporary space</source>
+        <translation>Nicht genug temporärer Speicherplatz</translation>
+    </message>
+    <message>
+        <source>Origin</source>
+        <translation>Herkunft</translation>
+    </message>
+    <message>
+        <source>Password to enter again</source>
+        <translation>Passwort erneut eingeben</translation>
+    </message>
+    <message>
+        <source>Position %1: %2, %3, %4, %5</source>
+        <translation>Position %1: %2, %3, %4, %5</translation>
+    </message>
+    <message>
+        <source>Post</source>
+        <translation>Post</translation>
+    </message>
+    <message>
+        <source>Post now: waiting for its preparation</source>
+        <translation>Jetzt posten: wartet auf seine Vorbereitung</translation>
+    </message>
+    <message>
+        <source>Posting</source>
+        <translation>Wird gepostet</translation>
+    </message>
+    <message>
+        <source>Preparing</source>
+        <translation>Vorbereitung</translation>
+    </message>
+    <message>
+        <source>Progress / details</source>
+        <translation>Fortschritt / Details</translation>
+    </message>
+    <message>
+        <source>Queued</source>
+        <translation>Wartend</translation>
+    </message>
+    <message>
+        <source>Quick</source>
+        <translation>Schnell</translation>
+    </message>
+    <message>
+        <source>Ready</source>
+        <translation>Bereit</translation>
+    </message>
+    <message>
+        <source>Recovering</source>
+        <translation>Wiederherstellung</translation>
+    </message>
+    <message>
+        <source>Recovering sources and archives…</source>
+        <translation>Quellen und Archive werden wiederhergestellt…</translation>
+    </message>
+    <message>
+        <source>Resume</source>
+        <translation>Fortsetzung</translation>
+    </message>
+    <message>
+        <source>Resume · held by you</source>
+        <translation>Fortsetzung · von Ihnen angehalten</translation>
+    </message>
+    <message>
+        <source>Resume: confirmed articles are not posted again</source>
+        <translation>Fortsetzung: bestätigte Artikel werden nicht erneut gepostet</translation>
+    </message>
+    <message>
+        <source>Size</source>
+        <translation>Größe</translation>
+    </message>
+    <message>
+        <source>Starting…</source>
+        <translation>Startet…</translation>
+    </message>
+    <message>
+        <source>State</source>
+        <translation>Status</translation>
+    </message>
+    <message>
+        <source>Stopping</source>
+        <translation>Wird angehalten</translation>
+    </message>
+    <message>
+        <source>Stopping…</source>
+        <translation>Wird angehalten…</translation>
+    </message>
+    <message>
+        <source>Tab #%1</source>
+        <translation>Tab #%1</translation>
+    </message>
+    <message>
+        <source>The NZB could not be written</source>
+        <translation>Das NZB konnte nicht geschrieben werden</translation>
+    </message>
+    <message>
+        <source>The VPN is unavailable</source>
+        <translation>Das VPN ist nicht verfügbar</translation>
+    </message>
+    <message>
+        <source>The stop could not be confirmed</source>
+        <translation>Der Stopp konnte nicht bestätigt werden</translation>
+    </message>
+    <message>
+        <source>Waiting for its sources to be restored</source>
+        <translation>Wartet auf die Wiederherstellung seiner Quellen</translation>
+    </message>
+    <message>
+        <source>Writing the NZB…</source>
+        <translation>NZB wird geschrieben…</translation>
     </message>
 </context>
 </TS>

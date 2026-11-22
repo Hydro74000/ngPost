@@ -293,6 +293,7 @@ MainWindow::MainWindow(QWidget *parent) :
     _ui->postSplitter->setCollapsible(0, false);
     _initLogBoxToggle();
     _initZoomControl();
+    _initQueuePanel();
     _ui->progressBar->setRange(0, 100);
     updateProgressBar(0, 0, "");
 
