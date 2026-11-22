@@ -45,6 +45,9 @@ struct AttemptResult
     QString endCause; //!< normal, user_stop or technical
     QString avgSpeed;
     qint64 activeMs = 0; //!< transfer time of this attempt, added once
+    //! The attempt sent something. One that did not leaves the status of a
+    //! post already sent before (a resume) as it was.
+    bool transferred = true;
 };
 
 //! The end of a finalization: F3 once the NZB is published, or an explicit
@@ -165,5 +168,7 @@ public:
 };
 
 } // namespace queue
+
+Q_DECLARE_METATYPE(queue::AttemptResult)
 
 #endif // QUEUE_QUEUESTORE_H

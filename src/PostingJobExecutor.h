@@ -10,9 +10,10 @@
 // the (post, run, artifact set, phase, job instance) it was issued for, and a
 // run ends once even though PostingJob may say it twice.
 //
-// Lot C3 limits: keeping or abandoning a running TRANSFER is not supported
-// before C4 (quiesced(false)), nor are the two finalization commands; the
-// local end of a transfer is the historical _finishPosting().
+// The end of a run follows plan_queue.md §6.2: transferFinished() carries what
+// F1 records, finalize() publishes the NZB (F2), completeLocalWork() runs what
+// follows F3, then the runtime goes. Not yet supported (lot C4.6): keeping or
+// abandoning a running TRANSFER (quiesced(false)).
 //
 //========================================================================
 
@@ -58,6 +59,8 @@ public:
     void pauseTransfer(qint64 postId) override;
     void resumeTransfer(qint64 postId) override;
     void interrupt(qint64 postId, const QString &runId, queue::Disposition disposition) override;
+    void finalize(qint64 postId, const QString &runId) override;
+    void completeLocalWork(qint64 postId, const QString &runId) override;
     void retryFinalization(qint64 postId, const QString &runId) override;
     void abandonPlanning(qint64 postId, const QString &runId) override;
     //! A failed preparation keeps its runtime only while sources are renamed.
@@ -71,13 +74,21 @@ public:
 signals:
     //! A runtime is about to transfer, before its first byte: views connect here.
     void runtimeActivated(qint64 postId, PostingJob *job);
-    //! The transfer of @p job ended; it is still alive during this signal only.
+    //! The transfer of @p job is over (producers stopped); the job stays for
+    //! its finalization.
+    void transferEnded(qint64 postId, PostingJob *job);
+    //! @p job goes, after its local work or an abandon; alive during this
+    //! signal only.
     void runtimeEnded(qint64 postId, PostingJob *job);
+    //! What followed F3 was handed over: when @p postActionsQueued, the post
+    //! commands runner reports its end (PostCmdRunner::taskFinished).
+    void localWorkQueued(qint64 postId, const QString &runId, bool postActionsQueued);
 
 private:
     enum class Phase {
         Preparing,
         Transferring,
+        Finalizing, //!< transfer over: F2, then the work after F3
         Quiescing
     };
     struct Runtime
@@ -102,6 +113,7 @@ private:
                      const QString &error,
                      qint64 bytes);
     void onTransferEnded(qint64 postId, PostingJob *job, const QString &runId);
+    static queue::AttemptResult notSent(const QString &result);
     //! Acknowledgements leave on the event loop: never inside the command.
     void later(std::function<void()> emitter);
 

@@ -443,6 +443,63 @@ private slots:
         QCOMPARE(f.queue.find(a)->blocked.code, QStringLiteral("preparation_failed"));
     }
 
+    void finalizationFollowsF1ThenF3()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        settle();
+        const QString run = f.queue.find(a)->runId;
+        QVERIFY(f.executor.ackTransferFinished(a));
+        settle();
+        // F1 recorded with Finalizing, then only F2 is asked.
+        QCOMPARE(f.state(a), Lifecycle::Finalizing);
+        QVERIFY(f.store.resultOf(run));
+        QCOMPARE(f.store.resultOf(run)->result, QStringLiteral("success"));
+        QCOMPARE(f.executor.count(Kind::Finalize, a), 1);
+        QCOMPARE(f.executor.count(Kind::CompleteLocalWork, a), 0);
+        QVERIFY(f.executor.ackFinalized(a));
+        settle();
+        // F3, then the local work: never before the entry left durably.
+        QVERIFY(!f.queue.find(a));
+        QCOMPARE(f.store.finalizationOf(run), FinalizationStep::Kind::Complete);
+        QCOMPARE(f.executor.count(Kind::CompleteLocalWork, a), 1);
+    }
+
+    void aFailedF1AsksForNoF2()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        settle();
+        f.store.failNextCommits(1);
+        QVERIFY(f.executor.ackTransferFinished(a));
+        settle();
+        QCOMPARE(f.executor.count(Kind::Finalize, a), 0);
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        f.scheduler->retryAfterTechnicalPause();
+        settle();
+        QCOMPARE(f.executor.count(Kind::Finalize, a), 1); // asked once F1 holds
+    }
+
+    void aFailedF2BlocksThenRetryCompletes()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        settle();
+        QVERIFY(f.executor.ackTransferFinished(a));
+        settle();
+        QVERIFY(f.executor.ackFinalized(a, false, QStringLiteral("disk full")));
+        settle();
+        QCOMPARE(f.queue.find(a)->blocked.code, QStringLiteral("finalization_failed"));
+        QCOMPARE(f.executor.count(Kind::CompleteLocalWork, a), 0);
+        QVERIFY(f.queue.retryFinalization(a, f.queue.view()).ok());
+        settle();
+        QCOMPARE(f.executor.count(Kind::RetryFinalization, a), 1);
+        QVERIFY(f.executor.ackFinalized(a));
+        settle();
+        QVERIFY(!f.queue.find(a));
+        QCOMPARE(f.executor.count(Kind::CompleteLocalWork, a), 1);
+    }
+
     void failedWriteHoldsTheQueueUntilRetried()
     {
         Fixture f;
@@ -542,7 +599,9 @@ private slots:
         QVERIFY(f.executor.ackQuiesced(a, true, true));
         settle();
         QVERIFY(f.queue.find(a)->runId != oldRun);
-        emit f.executor.transferFinished(a, oldRun, true); // late, from the old run
+        AttemptResult late;
+        late.result = QStringLiteral("success");
+        emit f.executor.transferFinished(a, oldRun, late); // late, from the old run
         emit f.executor.finalized(a, oldRun, true, {});
         settle();
         QVERIFY(f.queue.find(a));

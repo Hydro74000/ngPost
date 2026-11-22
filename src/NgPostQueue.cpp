@@ -16,6 +16,7 @@
 
 #include "NgPost.h"
 
+#include "PostCmdRunner.h"
 #include "PostingJob.h"
 #include "PostingJobExecutor.h"
 #include "PostingJobOptionsCodec.h"
@@ -92,7 +93,31 @@ bool NgPost::_ensureQueueEngine()
             &PostingJobExecutor::runtimeActivated,
             this,
             &NgPost::_onQueueRuntimeActivated);
+    connect(_queueExecutor,
+            &PostingJobExecutor::transferEnded,
+            this,
+            &NgPost::_onQueueTransferEnded);
     connect(_queueExecutor, &PostingJobExecutor::runtimeEnded, this, &NgPost::_onQueueRuntimeEnded);
+    connect(_queueExecutor,
+            &PostingJobExecutor::localWorkQueued,
+            this,
+            [this](qint64 postId, const QString &, bool postActionsQueued) {
+        if (postActionsQueued)
+            _ownersAwaitingTasks.insert(postId);
+        else
+            _releaseQueuedPost(postId);
+    });
+    // Queued: a task may report its end while it is being handed over, before
+    // its post is known to wait for it.
+    if (_postCmdRunner)
+        connect(_postCmdRunner,
+                &PostCmdRunner::taskFinished,
+                this,
+                [this](qint64 postId, const QString &, quint64, bool) {
+            if (_ownersAwaitingTasks.remove(postId))
+                _releaseQueuedPost(postId);
+        },
+                Qt::QueuedConnection);
 
     QueueScheduler::Budget budget;
     budget.preparedMax = _preparePacking ? 1 : 0; // lot C3: PREPARE_PACKING only
@@ -340,8 +365,46 @@ void NgPost::_onQueueRuntimeActivated(qint64 postId, PostingJob *job)
     emit postingStateChanged();
 }
 
+void NgPost::_onQueueTransferEnded(qint64 postId, PostingJob *job)
+{
+    Q_UNUSED(postId)
+    // The transfer is over: the next post may become the active one while this
+    // one finishes its NZB and what follows.
+    if (_activeJob == job)
+        _activeJob = nullptr;
+    _releaseVpnForJob(job);
+    emit postingStateChanged();
+}
+
+void NgPost::_releaseQueuedPost(qint64 postId, int attempt)
+{
+    if (!_postQueue || _postQueue->engineReleaseOwnership(postId)) {
+        _pendingReleases.remove(postId);
+        QMetaObject::invokeMethod(this, &NgPost::maybeFinishApplication, Qt::QueuedConnection);
+        return;
+    }
+    // Not written: the post keeps its owner until it is, and the end waits.
+    _pendingReleases.insert(postId);
+    if (attempt >= kMaxReleaseAttempts) {
+        _pendingReleases.remove(postId); // the lock goes at exit: an orphan, recovered later
+        _error(tr("History database error: %1").arg(QStringLiteral("owner_release")),
+               ERROR_CODE::ERR_HISTORY);
+        QMetaObject::invokeMethod(this, &NgPost::maybeFinishApplication, Qt::QueuedConnection);
+        return;
+    }
+    QTimer::singleShot(500 << attempt, this, [this, postId, attempt] {
+        if (_pendingReleases.contains(postId))
+            _releaseQueuedPost(postId, attempt + 1);
+    });
+}
+
 void NgPost::_onQueueRuntimeEnded(qint64 postId, PostingJob *job)
 {
+#ifdef __USE_HMI__
+    // Its tab is over only now, and only if it still follows this post.
+    if (PostingWidget *view = job->widget(); view && view->followsRuntime(job))
+        view->onPostingJobDone();
+#endif
     _recordFinishedJob(job);
     if (_activeJob == job)
         _activeJob = nullptr;

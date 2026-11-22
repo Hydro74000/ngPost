@@ -35,7 +35,9 @@ public:
             Resume,
             Interrupt,
             RetryFinalization,
-            Abandon
+            Abandon,
+            Finalize,
+            CompleteLocalWork
         };
 
         Kind kind = Kind::Prepare;
@@ -56,6 +58,8 @@ public:
     void pauseTransfer(qint64 postId) override;
     void resumeTransfer(qint64 postId) override;
     void interrupt(qint64 postId, const QString &runId, Disposition disposition) override;
+    void finalize(qint64 postId, const QString &runId) override;
+    void completeLocalWork(qint64 postId, const QString &runId) override;
     void retryFinalization(qint64 postId, const QString &runId) override;
     void abandonPlanning(qint64 postId, const QString &runId) override;
 

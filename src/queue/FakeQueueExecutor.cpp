@@ -13,6 +13,17 @@ namespace
 {
 
 constexpr int kTickMs = 100;
+
+AttemptResult resultOf(qint64 postId, const QString &runId, const QString &result)
+{
+    AttemptResult attempt;
+    attempt.postId = postId;
+    attempt.runId = runId;
+    attempt.result = result;
+    attempt.endCause = result == QLatin1String("cancelled") ? QStringLiteral("user_stop")
+                                                            : QStringLiteral("normal");
+    return attempt;
+}
 constexpr qint64 kSimulatedRate = 68LL * 1024
     * 1024; //!< bytes per second shown by the J0 milestone
 
@@ -67,6 +78,26 @@ void FakeQueueExecutor::interrupt(qint64 postId, const QString &runId, Dispositi
         simulateInterrupt(_commands.constLast());
 }
 
+void FakeQueueExecutor::finalize(qint64 postId, const QString &runId)
+{
+    _commands.append(
+        { Command::Kind::Finalize, postId, runId, {}, PrepStep::Compress, Disposition::Keep });
+    if (_simulate)
+        QTimer::singleShot(400, this, [this, postId, runId] {
+            emit finalized(postId, runId, true, {});
+        });
+}
+
+void FakeQueueExecutor::completeLocalWork(qint64 postId, const QString &runId)
+{
+    _commands.append({ Command::Kind::CompleteLocalWork,
+                       postId,
+                       runId,
+                       {},
+                       PrepStep::Compress,
+                       Disposition::Keep });
+}
+
 void FakeQueueExecutor::retryFinalization(qint64 postId, const QString &runId)
 {
     _commands.append({ Command::Kind::RetryFinalization,
@@ -85,10 +116,6 @@ void FakeQueueExecutor::abandonPlanning(qint64 postId, const QString &runId)
 {
     _commands.append(
         { Command::Kind::Abandon, postId, runId, {}, PrepStep::Compress, Disposition::Abandon });
-    if (_simulate)
-        QTimer::singleShot(400, this, [this, postId, runId] {
-            emit finalized(postId, runId, true, {});
-        });
 }
 
 // --- simulation (J0) ---------------------------------------------------------------
@@ -158,10 +185,7 @@ void FakeQueueExecutor::simulateTransfer(qint64 postId)
         if (s.percent < 100)
             return;
         stopSimulation(postId);
-        emit transferFinished(postId, runId, true);
-        QTimer::singleShot(400, this, [this, postId, runId] {
-            emit finalized(postId, runId, true, {});
-        });
+        emit transferFinished(postId, runId, resultOf(postId, runId, QStringLiteral("success")));
     });
     QTimer::singleShot(0, this, [this, postId, runId] { emit transferStarted(postId, runId); });
     timer->start();
@@ -175,8 +199,9 @@ void FakeQueueExecutor::simulateInterrupt(const Command &command)
     const QString runId = command.runId;
     if (command.disposition == Disposition::Stop) {
         QTimer::singleShot(300, this, [this, postId, runId] {
-            emit transferFinished(postId, runId, false);
-            emit finalized(postId, runId, true, {});
+            emit transferFinished(postId,
+                                  runId,
+                                  resultOf(postId, runId, QStringLiteral("cancelled")));
         });
         return;
     }
@@ -230,7 +255,11 @@ bool FakeQueueExecutor::ackTransferFinished(qint64 postId, bool success)
     if (!c)
         return false;
     const QString runId = c->runId;
-    emit transferFinished(postId, runId, success);
+    emit transferFinished(postId,
+                          runId,
+                          resultOf(postId,
+                                   runId,
+                                   success ? QStringLiteral("success") : QStringLiteral("failed")));
     return true;
 }
 

@@ -746,6 +746,18 @@ bool PostHistoryService::markPostStarted(qint64 postId, QString *error)
     return ok;
 }
 
+bool PostHistoryService::setRunScratchNzb(const QString &runId, const QString &path, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->store().setRunScratchNzb(runId, path, &err);
+    });
+    if (error)
+        *error = err;
+    return ok;
+}
+
 bool PostHistoryService::updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error)
 {
     QString err;

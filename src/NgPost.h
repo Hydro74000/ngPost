@@ -511,7 +511,13 @@ private:
     PostingJob *_createQueueRuntime(const queue::QueueEntry &entry,
                                     const JobExecutionContext &context);
     void _onQueueRuntimeActivated(qint64 postId, PostingJob *job);
+    void _onQueueTransferEnded(qint64 postId, PostingJob *job);
     void _onQueueRuntimeEnded(qint64 postId, PostingJob *job);
+    //! The local work of a post out of the queue is over: it has no owner.
+    void _releaseQueuedPost(qint64 postId, int attempt = 0);
+    QSet<qint64> _ownersAwaitingTasks; //!< posts whose post commands still run
+    QSet<qint64> _pendingReleases;     //!< posts whose owner release is not written yet
+    static constexpr int kMaxReleaseAttempts = 4;
     //! Entries remain in the session queue, whatever their state.
     bool _queueHasWork() const;
     //! Removes, in one command, every entry (or every Auto one) that may be
@@ -745,6 +751,7 @@ public:
     void setAdmissionRetryBaseMsForTest(int ms) { _admissionRetryBaseMs = ms; }
     int pendingAdmissionRetriesForTest() const { return int(_admissionRetries.size()); }
     bool cancelingAllForTest() const { return _cancelingAll; }
+    bool hasPendingReleasesForTest() const { return !_pendingReleases.isEmpty(); }
     //! The queue engine cannot be built, as with an unusable database.
     void setQueueEngineUnavailableForTest(bool unavailable)
     {
@@ -841,7 +848,8 @@ public:
 
     void changeLanguage(const QString &lang);
 
-    void doNzbPostCMD(PostingJob *job);
+    //! Hands the post's commands and upload to the runner; true if it took them.
+    bool doNzbPostCMD(PostingJob *job);
 
     //! The only place allowed to quit or to power the machine off. Waits for
     //! the posts, the post commands and the nzb uploads.

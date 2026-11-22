@@ -438,6 +438,26 @@ bool PostHistoryStore::_checkPreconditions(QSqlDatabase &db,
     return true;
 }
 
+bool PostHistoryStore::setRunScratchNzb(const QString &runId, const QString &path, QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = _database(error);
+    int rows = 0;
+    if (!run(db,
+             QStringLiteral("UPDATE post_runs SET scratch_nzb_path=? WHERE run_id=?"),
+             { path, runId },
+             error,
+             &rows))
+        return false;
+    if (rows != 1) {
+        if (error)
+            *error = QStringLiteral("unknown run %1").arg(runId);
+        return false;
+    }
+    return true;
+}
+
 //! A command issued for (post, run) applies only while that run is still the
 //! one of the entry, and the post still this session's.
 bool PostHistoryStore::_checkQueuedRun(QSqlDatabase &db,
@@ -492,7 +512,26 @@ bool PostHistoryStore::_recordAttemptResult(QSqlDatabase &db,
         return false;
     }
     q.finish();
-    return updatePostStatus(attempt.postId, attempt.result, 0, 0, 0, 0, attempt.avgSpeed, error)
+    QSqlQuery status(db);
+    status.prepare(QStringLiteral("SELECT status FROM posts WHERE id=?"));
+    status.addBindValue(attempt.postId);
+    if (!status.exec() || !status.next()) {
+        if (error)
+            *error = QStringLiteral("unknown post %1").arg(attempt.postId);
+        return false;
+    }
+    const bool rewritesStatus = attempt.transferred
+        || status.value(0).toString() == QLatin1String("queued");
+    status.finish();
+    return (!rewritesStatus
+            || updatePostStatus(attempt.postId,
+                                attempt.result,
+                                0,
+                                0,
+                                0,
+                                0,
+                                attempt.avgSpeed,
+                                error))
         && addActiveSeconds(attempt.postId, attempt.activeMs / 1000, error)
         && run(db,
                QStringLiteral("UPDATE post_runs SET result=?, result_recorded=1, end_cause=?, "

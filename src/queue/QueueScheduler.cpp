@@ -360,14 +360,23 @@ void QueueScheduler::activateHead()
     _executor->activate(postId, _queue->find(postId)->runId, setId);
 }
 
-void QueueScheduler::onTransferFinished(qint64 postId, const QString &runId, bool success)
+void QueueScheduler::onTransferFinished(qint64 postId,
+                                        const QString &runId,
+                                        const AttemptResult &result)
 {
-    Q_UNUSED(success) // the result itself is recorded by F1, in the history
     if (!isCurrent(postId, runId))
         return;
-    applyInOrder([this, postId, runId] {
-        return !isCurrent(postId, runId)
-            || _queue->engineSetLifecycle(postId, Lifecycle::Finalizing, Slot::Transfer);
+    // F1 and the move to Finalizing together; F2 is asked only once F1 holds.
+    applyInOrder([this, postId, runId, result] {
+        if (!isCurrent(postId, runId))
+            return true;
+        AttemptResult attempt = result;
+        attempt.postId = postId;
+        attempt.runId = runId;
+        if (!_queue->engineRecordResult(attempt))
+            return false;
+        _executor->finalize(postId, runId);
+        return true;
     });
 }
 
@@ -378,8 +387,13 @@ void QueueScheduler::onFinalized(qint64 postId, const QString &runId, bool ok, c
     applyInOrder([this, postId, runId, ok, error] {
         if (!isCurrent(postId, runId))
             return true;
-        if (ok)
-            return _queue->engineRetire(postId);
+        if (ok) {
+            // F3: only now may its post commands, upload and cleanup run.
+            if (!_queue->engineFinishFinalization(postId, runId, FinalizationStep::Kind::Complete))
+                return false;
+            _executor->completeLocalWork(postId, runId);
+            return true;
+        }
         return _queue->engineBlock(postId,
                                    { QStringLiteral("finalization_failed"),
                                      { { QStringLiteral("error"), error } } },
@@ -522,7 +536,16 @@ void QueueScheduler::onRuntimeActionRequested(qint64 postId, RuntimeRequest requ
         }
         _executor->retryFinalization(postId, copy.runId);
         break;
-    case RuntimeRequest::AbandonPlanning: _executor->abandonPlanning(postId, copy.runId); break;
+    case RuntimeRequest::AbandonPlanning:
+        // Facts kept, no deliverable, nothing after: the runtime just goes.
+        if (!_queue->engineFinishFinalization(postId,
+                                              copy.runId,
+                                              FinalizationStep::Kind::Abandon)) {
+            enterTechnicalPause(QStringLiteral("store_failed"));
+            break;
+        }
+        _executor->abandonPlanning(postId, copy.runId);
+        break;
     }
 }
 

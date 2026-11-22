@@ -6918,6 +6918,10 @@ Setzen Sie PAR2_SOURCE = custom und korrigieren Sie PAR2_PATH in der Konfigurati
         <source>The prepared files of %1 are missing: nothing is posted.</source>
         <translation>Die vorbereiteten Dateien von %1 fehlen: Es wird nichts gepostet.</translation>
     </message>
+    <message>
+        <source>History database error: %1</source>
+        <translation>Fehler der Verlaufsdatenbank: %1</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>

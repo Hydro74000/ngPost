@@ -178,8 +178,7 @@ void PostingJobExecutor::activate(qint64 postId, const QString &runId, const QSt
     if (it != _runtimes.cend()) {
         if (it->runId != runId || it->setId != setId || it->phase != Phase::Preparing) {
             later([this, postId, runId] {
-                emit transferFinished(postId, runId, false);
-                emit finalized(postId, runId, false, QStringLiteral("busy"));
+                emit transferFinished(postId, runId, notSent(QStringLiteral("failed")));
             });
             return;
         }
@@ -188,8 +187,7 @@ void PostingJobExecutor::activate(qint64 postId, const QString &runId, const QSt
         job = createJob(postId, runId, setId);
         if (!job) {
             later([this, postId, runId] {
-                emit transferFinished(postId, runId, false);
-                emit finalized(postId, runId, false, QStringLiteral("no_runtime"));
+                emit transferFinished(postId, runId, notSent(QStringLiteral("failed")));
             });
             return;
         }
@@ -217,6 +215,16 @@ void PostingJobExecutor::activate(qint64 postId, const QString &runId, const QSt
     }, Qt::QueuedConnection);
 }
 
+AttemptResult PostingJobExecutor::notSent(const QString &result)
+{
+    AttemptResult attempt;
+    attempt.result = result;
+    attempt.endCause = result == QLatin1String("cancelled") ? QStringLiteral("user_stop")
+                                                            : QStringLiteral("technical");
+    attempt.transferred = false;
+    return attempt;
+}
+
 void PostingJobExecutor::onTransferEnded(qint64 postId, PostingJob *job, const QString &runId)
 {
     if (!isCurrent(postId, job, runId, Phase::Transferring))
@@ -225,16 +233,51 @@ void PostingJobExecutor::onTransferEnded(qint64 postId, PostingJob *job, const Q
     if (runtime.ended)
         return;
     runtime.ended = true;
-    const bool success = job->hasPostFinishedSuccessfully();
-    const bool localEndOk = !job->historyDataUnreliable();
-    job->allowArtifactCleanup(success); // C3: as the historical job decided it
+    // The runtime stays for F2 and for what follows F3: only the transfer ends.
+    runtime.phase = Phase::Finalizing;
+    const PostingJob::TransferOutcome outcome = job->finishTransfer();
+    AttemptResult attempt;
+    attempt.result = outcome.result;
+    attempt.endCause = outcome.endCause;
+    attempt.avgSpeed = outcome.avgSpeed;
+    attempt.activeMs = outcome.activeMs;
+    attempt.transferred = outcome.transferred;
+    emit transferEnded(postId, job);
+    emit transferFinished(postId, runId, attempt);
+}
+
+void PostingJobExecutor::finalize(qint64 postId, const QString &runId)
+{
+    const auto it = _runtimes.constFind(postId);
+    if (it == _runtimes.cend() || it->runId != runId || it->phase != Phase::Finalizing
+        || !it->job) {
+        // No runtime ever transferred for this run: nothing to publish.
+        later([this, postId, runId] { emit finalized(postId, runId, true, {}); });
+        return;
+    }
+    QString error;
+    const bool published = it->job->publishDeliverable(&error);
+    later([this, postId, runId, published, error] {
+        emit finalized(postId, runId, published, error);
+    });
+}
+
+void PostingJobExecutor::completeLocalWork(qint64 postId, const QString &runId)
+{
+    const auto it = _runtimes.constFind(postId);
+    if (it == _runtimes.cend() || it->runId != runId || !it->job) {
+        emit localWorkQueued(postId, runId, false);
+        return;
+    }
+    PostingJob *job = it->job;
+    job->allowArtifactCleanup(job->hasPostFinishedSuccessfully());
+    // F2 published something only if articles were sent: no sheet, script or
+    // upload for a post that produced no NZB.
+    job->runPostFinalizationWork(job->hasTransferStarted());
+    const bool queued = job->postActionsQueued();
     emit runtimeEnded(postId, job);
     releaseRuntime(postId);
-    emit transferFinished(postId, runId, success);
-    emit finalized(postId,
-                   runId,
-                   localEndOk,
-                   localEndOk ? QString() : QStringLiteral("history_unreliable"));
+    emit localWorkQueued(postId, runId, queued);
 }
 
 void PostingJobExecutor::pauseTransfer(qint64 postId)
@@ -260,8 +303,7 @@ void PostingJobExecutor::interrupt(qint64 postId, const QString &runId, Disposit
         // Nothing runs for this run: the stop holds at once.
         if (disposition == Disposition::Stop)
             later([this, postId, runId] {
-                emit transferFinished(postId, runId, false);
-                emit finalized(postId, runId, true, {});
+                emit transferFinished(postId, runId, notSent(QStringLiteral("cancelled")));
             });
         else
             later([this, postId, runId] { emit quiesced(postId, runId, true, false); });
@@ -288,14 +330,24 @@ void PostingJobExecutor::interrupt(qint64 postId, const QString &runId, Disposit
 
 void PostingJobExecutor::retryFinalization(qint64 postId, const QString &runId)
 {
-    later([this, postId, runId] {
-        emit finalized(postId, runId, false, QStringLiteral("unsupported"));
-    });
+    const auto it = _runtimes.constFind(postId);
+    if (it == _runtimes.cend() || it->runId != runId || it->phase != Phase::Finalizing) {
+        // Repairing it without its runtime is the restoration's (lot C6).
+        later([this, postId, runId] {
+            emit finalized(postId, runId, false, QStringLiteral("no_runtime"));
+        });
+        return;
+    }
+    finalize(postId, runId);
 }
 
 void PostingJobExecutor::abandonPlanning(qint64 postId, const QString &runId)
 {
-    later([this, postId, runId] {
-        emit finalized(postId, runId, false, QStringLiteral("unsupported"));
-    });
+    const auto it = _runtimes.constFind(postId);
+    if (it != _runtimes.cend() && it->runId == runId && it->job) {
+        // No deliverable, no post action, archives kept for a resume.
+        emit runtimeEnded(postId, it->job);
+        releaseRuntime(postId);
+    }
+    emit localWorkQueued(postId, runId, false);
 }

@@ -41,6 +41,7 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QTemporaryFile>
+#include <QUuid>
 #include <QThread>
 #include <algorithm>
 #include <cmath>
@@ -482,6 +483,10 @@ void PostingJob::_connectWidgetSignals()
                 _postWidget,
                 &PostingWidget::onArticlesNumber,
                 Qt::QueuedConnection);
+        // A queue runtime outlives its transfer (NZB, then what follows): its
+        // tab is told by NgPost when the runtime goes.
+        if (_queueRuntime)
+            return;
         connect(this,
                 &PostingJob::postingFinished,
                 _postWidget,
@@ -1098,6 +1103,15 @@ void PostingJob::_postFiles()
         return;
     } else {
         _writeNzbHeader();
+    }
+    if (_queueRuntime && !_scratchNzbPath.isEmpty() && _ngPost->historyService()) {
+        QString err;
+        if (!_ngPost->historyService()->setRunScratchNzb(_context.runId, _scratchNzbPath, &err)) {
+            // Unrecorded, a recovery could not find it: nothing is sent.
+            _error(tr("History database error: %1").arg(err));
+            _abortBeforeTransfer(_resumeFromHistory);
+            return;
+        }
     }
 
     // The transfer really starts here, which can be long after the job was
@@ -1832,7 +1846,23 @@ bool PostingJob::_initPosting()
             _nzbFilePath = fi.absoluteFilePath();
         }
     }
-    if (_resumeFromHistory) {
+    if (_queueRuntime) {
+        // Never the destination: the deliverable is published from the history
+        // once the result is durable. The stream goes to a private scratch file,
+        // kept for a recovery, named without any secret.
+        // Inside the destination folder only: a folder that does not exist is
+        // not created, and opening fails as it always did.
+        const QDir destination = QFileInfo(_nzbFilePath).absoluteDir();
+        const QDir work(destination.filePath(QStringLiteral(".ngpost-work")));
+        if (destination.exists())
+            destination.mkdir(QStringLiteral(".ngpost-work"));
+        _scratchNzbPath = work.filePath(
+            QStringLiteral("%1-%2-%3.nzb")
+                .arg(_context.postId)
+                .arg(_context.runId.left(8))
+                .arg(QUuid::createUuid().toString(QUuid::Id128).left(8)));
+        _nzb = new QFile(_scratchNzbPath);
+    } else if (_resumeFromHistory) {
         // Never truncate the last usable NZB before the consolidated history
         // rewrite has succeeded. The streamed retry contains only the missing
         // files, so it is diagnostic scratch data, not a deliverable NZB.
@@ -1990,6 +2020,13 @@ void PostingJob::_finishPosting()
     // on the last file, connection lost, user stop).
     if (_finishedAtWall.isValid())
         return;
+    if (_queueRuntime) {
+        // Its controller records the result, publishes the NZB and runs what
+        // follows, each step once it is durable (plan_queue.md §6.2).
+        _stopProducers();
+        _closeNzbStream();
+        return;
+    }
     _stopProducers();
     _recordHistoricalResult();
 
@@ -2064,11 +2101,15 @@ PostingJob::TransferOutcome PostingJob::transferOutcome() const
         outcome.result = hasPostFinishedSuccessfully() ? QStringLiteral("success")
                                                        : QStringLiteral("partial");
     else
-        outcome.result = _cancelRequested ? QStringLiteral("cancelled") : QStringLiteral("failed");
+        // As the historical job: stopped once it sent something, a post failed
+        // (and stays resumable); stopped before, it was cancelled.
+        outcome.result = _cancelRequested && !_timeStart.isValid() ? QStringLiteral("cancelled")
+                                                                   : QStringLiteral("failed");
     outcome.endCause = _cancelRequested && !_postFinished ? QStringLiteral("user_stop")
                                                           : QStringLiteral("normal");
     outcome.avgSpeed = avgSpeed();
     outcome.activeMs = _activeMsAtEnd >= 0 ? _activeMsAtEnd : _activeMs();
+    outcome.transferred = _timeStart.isValid();
     return outcome;
 }
 
@@ -2242,7 +2283,7 @@ void PostingJob::_runPostActions(bool nzbReady)
     // without its nzb would describe nothing.
     if (postInfoReady) {
         _writePostInfoFile();
-        _ngPost->doNzbPostCMD(this);
+        _postActionsQueued = _ngPost->doNzbPostCMD(this);
     }
 }
 
@@ -2260,7 +2301,35 @@ PostingJob::TransferOutcome PostingJob::finishTransfer()
 
 bool PostingJob::publishDeliverable(QString *error)
 {
-    return _publishNzb(error);
+    if (!_queueRuntime)
+        return _publishNzb(error);
+    if (!_timeStart.isValid())
+        return true; // nothing was sent: there is nothing to publish
+    if (_historyDataUnreliable || !_historyPostId || !_ngPost->historyService()) {
+        if (error)
+            *error = tr("Could not consolidate the resumed NZB because its history is incomplete; "
+                        "the previous NZB was left untouched.");
+        return false;
+    }
+    QStringList warnings;
+    QString err;
+    const QString livePassword = _rarPass.isEmpty() ? _options.declaredPassword : _rarPass;
+    if (!_ngPost->historyService()->regenerateNzbToFile(_historyPostId,
+                                                        _nzbFilePath,
+                                                        true,
+                                                        &warnings,
+                                                        &err,
+                                                        livePassword)) {
+        if (error)
+            *error = tr("Could not regenerate final NZB from history: %1").arg(err);
+        return false;
+    }
+    for (const QString &warning : warnings)
+        _error(tr("NZB history warning: %1").arg(warning));
+    // Published: the streamed copy served its purpose.
+    if (!_scratchNzbPath.isEmpty() && QFile::remove(_scratchNzbPath))
+        QDir().rmdir(QFileInfo(_scratchNzbPath).absolutePath()); // only if now empty
+    return true;
 }
 
 void PostingJob::runPostFinalizationWork(bool nzbReady)

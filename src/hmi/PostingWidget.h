@@ -120,6 +120,7 @@ public:
     //! Queue engine: this tab's post left the queue without transferring.
     void onQueuedPostRemoved();
     qint64 queuedPostId() const { return _queuedPostId; }
+    bool followsRuntime(const PostingJob *job) const { return job && _postingJob == job; }
 
     void init();
     //! Takes the packing of the Auto Posting tab (its AUTO_* settings) in place

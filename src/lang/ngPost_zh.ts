@@ -6918,6 +6918,10 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
         <source>The prepared files of %1 are missing: nothing is posted.</source>
         <translation>%1 的预处理文件缺失：不会发布任何内容。</translation>
     </message>
+    <message>
+        <source>History database error: %1</source>
+        <translation>历史数据库错误：%1</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>

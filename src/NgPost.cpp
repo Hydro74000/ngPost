@@ -1727,10 +1727,10 @@ void NgPost::reportNzbCheckSslUnavailable()
         _nzbCheck->reportUnusable(tr("SSL support is unavailable"));
 }
 
-void NgPost::doNzbPostCMD(PostingJob *job)
+bool NgPost::doNzbPostCMD(PostingJob *job)
 {
     if (!_postCmdRunner)
-        return;
+        return false;
 
     PostCmdRunner::Settings settings;
     settings.cmdTimeoutSec    = _postCmdTimeoutSec;
@@ -1745,6 +1745,7 @@ void NgPost::doNzbPostCMD(PostingJob *job)
                             _nzbPostCmd,
                             _urlNzbUpload ? *_urlNzbUpload : QUrl(),
                             job->isQueueRuntime() ? job->executionContext().runId : QString());
+    return true; // reported by PostCmdRunner::taskFinished, even when empty
 }
 
 //! The only place allowed to end the run. It waits for the posts, for the
@@ -1831,7 +1832,8 @@ void NgPost::maybeFinishApplication()
     }
 
     if (_shutdownHolds || _activeJob || !_pendingJobs.isEmpty() || _queueCanProgress()
-        || !_admissionRetries.isEmpty())
+        || !_admissionRetries.isEmpty() || !_ownersAwaitingTasks.isEmpty()
+        || !_pendingReleases.isEmpty())
         return;
     if (_queueHasWork()) {
         // Only blocked or held posts are left: the GUI keeps them for the user;

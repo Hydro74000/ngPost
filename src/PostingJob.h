@@ -173,6 +173,8 @@ private:
     bool _preparationStopped = false; //!< quiescePreparation() ran: no tool end counts
     bool _artifactCleanupAllowed = false; //!< see allowArtifactCleanup()
     qint64 _activeMsAtEnd = -1;           //!< transfer time frozen by _stopProducers()
+    bool _postActionsQueued = false;
+    QString _scratchNzbPath;         //!< queue runtime: where the NZB streams before F2
     bool _stepDriven = false;        //!< see setStepDriven()
     bool _compressedThisRun = false; //!< compression ended well: PAR2 covers the archive
     bool _collected = false;         //!< files to publish already collected
@@ -399,6 +401,7 @@ public:
         QString endCause; //!< normal or user_stop
         QString avgSpeed;
         qint64 activeMs = 0;
+        bool transferred = false; //!< the transfer started
     };
     TransferOutcome transferOutcome() const;
     //! Queue runtime: stops the transfer (producers stopped and joined, history
@@ -409,6 +412,11 @@ public:
     bool publishDeliverable(QString *error);
     //! After F3: post info file, post commands, .nfo copy and source deletion.
     void runPostFinalizationWork(bool nzbReady);
+    //! Its post commands or upload were handed to the runner, which will say
+    //! when they are over (PostCmdRunner::taskFinished).
+    bool postActionsQueued() const { return _postActionsQueued; }
+    //! The transfer started: articles may have been sent.
+    bool hasTransferStarted() const { return _timeStart.isValid(); }
     //! Queue runtime: whether its temporary archives may go with it (keepRar
     //! still applies). Never decided by the runtime alone.
     void allowArtifactCleanup(bool allowed) { _artifactCleanupAllowed = allowed; }

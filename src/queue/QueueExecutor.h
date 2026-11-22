@@ -13,6 +13,7 @@
 #ifndef QUEUE_QUEUEEXECUTOR_H
 #define QUEUE_QUEUEEXECUTOR_H
 
+#include "queue/QueueStore.h"
 #include "queue/QueueTypes.h"
 
 #include <QObject>
@@ -41,8 +42,14 @@ public:
     //! Asks the runtime of @p postId to stop. Keep and Abandon end with
     //! quiesced(); Stop goes through transferFinished() and finalized().
     virtual void interrupt(qint64 postId, const QString &runId, Disposition disposition) = 0;
-    //! A blocked finalization: try F2/F3 again, or abandon the planning (facts
-    //! kept, no deliverable). Both end with finalized().
+    //! F2, once the result of the run is durable (F1): publishes its NZB, ends
+    //! with finalized(ok).
+    virtual void finalize(qint64 postId, const QString &runId) = 0;
+    //! After F3: the local work of the post (post info file, commands, upload,
+    //! cleanup), then the runtime goes.
+    virtual void completeLocalWork(qint64 postId, const QString &runId) = 0;
+    //! A blocked finalization: F2 tried again, ending with finalized(), or the
+    //! planning abandoned (recorded by the scheduler; the runtime just goes).
     virtual void retryFinalization(qint64 postId, const QString &runId) = 0;
     virtual void abandonPlanning(qint64 postId, const QString &runId) = 0;
     //! The runtime of @p postId still holds something only it can settle
@@ -62,7 +69,9 @@ signals:
                       const QString &error,
                       qint64 bytes);
     void transferStarted(qint64 postId, const QString &runId);
-    void transferFinished(qint64 postId, const QString &runId, bool success);
+    //! The transfer is over, producers stopped and joined, history flushed:
+    //! what F1 records.
+    void transferFinished(qint64 postId, const QString &runId, const queue::AttemptResult &result);
     void finalized(qint64 postId, const QString &runId, bool ok, const QString &error);
     //! Barriers passed: tools stopped, connections closed, article events flushed.
     void quiesced(qint64 postId, const QString &runId, bool ok, bool manifestEngaged);

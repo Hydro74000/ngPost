@@ -6908,6 +6908,10 @@ Définissez PAR2_SOURCE = custom et corrigez PAR2_PATH dans la configuration (Pa
         <source>The prepared files of %1 are missing: nothing is posted.</source>
         <translation>Les fichiers préparés de %1 sont introuvables : rien n’est posté.</translation>
     </message>
+    <message>
+        <source>History database error: %1</source>
+        <translation>Erreur de base d&apos;historique : %1</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>

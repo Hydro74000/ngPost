@@ -1332,6 +1332,7 @@ void TestPostFlow::queue_engine_posts_a_packed_post_through_the_queue()
         s << "nzbPath = " << nzbDir << "\n"
           << "TMP_DIR = " << root << "\n"
           << "POST_DB = " << dbPath << "\n"
+          << "NZB_POST_CMD = /bin/true\n" // the owner goes once it reported its end
           << "RAR_PATH = " << root << "/fakerar\n"
           << "PAR2_PATH = " << root << "/fakepar2\n"
           << "PAR2_PCT = 8\n"

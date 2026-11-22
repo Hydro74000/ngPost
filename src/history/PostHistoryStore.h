@@ -375,6 +375,9 @@ public:
     bool markPostCrashedArticlesUnknown(QString *error = nullptr);
     bool cleanupInvalidResumePosts(QString *error = nullptr);
     QStringList liveOwners() const;
+    //! Where the run streams its NZB before the deliverable is published:
+    //! recorded before its first article, so a recovery finds it.
+    bool setRunScratchNzb(const QString &runId, const QString &path, QString *error = nullptr);
 
     // Primary query with full filter support.
     QList<PostSummary> listPosts(const ListFilter &filter, QString *error = nullptr);

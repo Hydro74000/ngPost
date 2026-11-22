@@ -99,7 +99,9 @@ private slots:
                         bool ok,
                         const QString &error,
                         qint64 bytes);
-    void onTransferFinished(qint64 postId, const QString &runId, bool success);
+    void onTransferFinished(qint64 postId,
+                            const QString &runId,
+                            const queue::AttemptResult &result);
     void onFinalized(qint64 postId, const QString &runId, bool ok, const QString &error);
     void onQuiesced(qint64 postId, const QString &runId, bool ok, bool manifestEngaged);
     void onRuntimeActionRequested(qint64 postId, queue::RuntimeRequest request);

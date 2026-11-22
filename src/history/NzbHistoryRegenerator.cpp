@@ -314,6 +314,17 @@ bool NzbHistoryRegenerator::_writeFiles(const PostHistoryStore::PostDetails &det
 }
 
 
+namespace
+{
+//! The date of the post, not of the rebuild: publishing the same NZB again
+//! (a finalization repaired after a crash) gives the same bytes.
+qint64 postDate(const PostHistoryStore::PostDetails &details)
+{
+    const QDateTime created = QDateTime::fromString(details.post.createdAt, Qt::ISODate);
+    return created.isValid() ? created.toSecsSinceEpoch() : QDateTime::currentSecsSinceEpoch();
+}
+} // namespace
+
 bool NzbHistoryRegenerator::_writeFile(const PostHistoryStore::PostDetails &details,
                                        const PostHistoryStore::FileSummary &file,
                                        QTextStream &stream,
@@ -346,7 +357,7 @@ bool NzbHistoryRegenerator::_writeFile(const PostHistoryStore::PostDetails &deta
     }
 
     stream << tab << "<file poster=\"" << escapeXml(details.from) << "\""
-           << " date=\"" << QDateTime::currentSecsSinceEpoch() << "\""
+           << " date=\"" << postDate(details) << "\""
            << QString(" subject=\"[%1/%2] - &quot;")
                   .arg(file.ordinal, padding, 10, QChar('0'))
                   .arg(details.files.size())

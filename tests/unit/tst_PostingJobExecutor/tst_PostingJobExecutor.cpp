@@ -240,20 +240,23 @@ private slots:
         QSignalSpy finished(env.executor.get(), &QueueExecutor::transferFinished);
         QSignalSpy finalized(env.executor.get(), &QueueExecutor::finalized);
         env.executor->activate(id, run, QStringLiteral("set-1"));
-        QTRY_COMPARE_WITH_TIMEOUT(finalized.size(), 1, 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 20000);
         QCOMPARE(started.size(), 1);
-        QCOMPARE(finished.size(), 1);
-        QVERIFY(finished.first().at(2).toBool());
-        QVERIFY(finalized.first().at(2).toBool());
+        QCOMPARE(finished.first().at(2).value<AttemptResult>().result, QStringLiteral("success"));
         QCOMPARE(finished.first().at(1).toString(), run);
+        QVERIFY(!QFileInfo::exists(env.root + QStringLiteral("/activated.nzb"))); // not before F2
+        env.executor->finalize(id, run);
+        QTRY_COMPARE_WITH_TIMEOUT(finalized.size(), 1, 10000);
+        QVERIFY(finalized.first().at(2).toBool());
 
         QFile nzb(env.root + QStringLiteral("/activated.nzb"));
         QVERIFY(nzb.open(QIODevice::ReadOnly));
         const QByteArray content = nzb.readAll();
         QVERIFY(content.contains("activated-arch.rar"));
         QVERIFY(content.contains("activated-arch.par2"));
-        QVERIFY(!content.contains("activated.bin"));                // never the original
-        QCOMPARE(env.historyStatus(id), QStringLiteral("success")); // the admitted row
+        QVERIFY(!content.contains("activated.bin")); // never the original
+        // The streamed copy is gone once the deliverable exists.
+        QVERIFY(!QDir(env.root + QStringLiteral("/.ngpost-work")).exists());
 #endif
     }
 
@@ -264,14 +267,17 @@ private slots:
         QVERIFY2(env.start(&error), qPrintable(error));
         const qint64 id = env.submit(env.post(QStringLiteral("plain")));
         const QString run = env.queue->find(id)->runId;
-        QSignalSpy finalized(env.executor.get(), &QueueExecutor::finalized);
         QSignalSpy finished(env.executor.get(), &QueueExecutor::transferFinished);
         env.executor->activate(id, run, {});
-        QTRY_COMPARE_WITH_TIMEOUT(finalized.size(), 1, 20000);
-        QVERIFY(finished.first().at(2).toBool());
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 20000);
+        QCOMPARE(finished.first().at(2).value<AttemptResult>().result, QStringLiteral("success"));
         QVERIFY(env.mock.receivedArticles().size() > 0);
-        QCOMPARE(env.historyStatus(id), QStringLiteral("success"));
-        QVERIFY(!env.executor->runtime(id));
+        // The runtime waits for its finalization, then goes with its local work.
+        QVERIFY(env.executor->runtime(id));
+        QSignalSpy local(env.executor.get(), &PostingJobExecutor::localWorkQueued);
+        env.executor->completeLocalWork(id, run);
+        QCOMPARE(local.size(), 1);
+        QTRY_VERIFY(!env.executor->runtime(id));
     }
 
     void missingManifestPublishesNothing()
@@ -284,9 +290,18 @@ private slots:
         QSignalSpy finished(env.executor.get(), &QueueExecutor::transferFinished);
         env.executor->activate(id, run, QStringLiteral("never-prepared"));
         QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 10000);
-        QVERIFY(!finished.first().at(2).toBool());
+        QCOMPARE(finished.first().at(2).value<AttemptResult>().result, QStringLiteral("failed"));
         QTest::qWait(200);
         QCOMPARE(env.mock.receivedArticles().size(), 0); // the original is not posted
+        // No NZB was produced: no post action follows.
+        QSignalSpy finalized(env.executor.get(), &QueueExecutor::finalized);
+        env.executor->finalize(id, run);
+        QTRY_COMPARE(finalized.size(), 1);
+        QVERIFY(finalized.first().at(2).toBool()); // nothing to publish is not a failure
+        QSignalSpy local(env.executor.get(), &PostingJobExecutor::localWorkQueued);
+        env.executor->completeLocalWork(id, run);
+        QCOMPARE(local.size(), 1);
+        QVERIFY(!local.first().at(2).toBool());
     }
 
     void aRunEndsOnceAndStaleCallsAreRefused()
@@ -297,7 +312,6 @@ private slots:
         const qint64 id = env.submit(env.post(QStringLiteral("once")));
         const QString run = env.queue->find(id)->runId;
         QSignalSpy finished(env.executor.get(), &QueueExecutor::transferFinished);
-        QSignalSpy finalized(env.executor.get(), &QueueExecutor::finalized);
         env.executor->activate(id, run, {});
         PostingJob *job = env.executor->runtime(id);
         QVERIFY(job);
@@ -307,7 +321,7 @@ private slots:
         }, Qt::DirectConnection);
         // A second activation of the same post, under another run, is refused.
         env.executor->activate(id, QStringLiteral("another-run"), {});
-        QTRY_VERIFY_WITH_TIMEOUT(finalized.size() >= 2, 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(finished.size() >= 2, 20000);
         QTest::qWait(200);
         int ofRun = 0;
         for (const QList<QVariant> &end : finished)
@@ -384,8 +398,10 @@ private slots:
                  qPrintable(QStringLiteral("%1 confirmed by the server, %2 recorded")
                                 .arg(received)
                                 .arg(recorded)));
+        QSignalSpy finished(env.executor.get(), &QueueExecutor::transferFinished);
         env.executor->interrupt(id, run, Disposition::Stop);
-        QTRY_VERIFY_WITH_TIMEOUT(!env.executor->runtime(id), 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 20000);
+        QCOMPARE(finished.first().at(2).value<AttemptResult>().result, QStringLiteral("failed"));
     }
 
     void finishingATransferRecordsNoResult()

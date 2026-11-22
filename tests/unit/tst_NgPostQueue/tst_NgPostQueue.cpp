@@ -315,6 +315,28 @@ private slots:
         QCOMPARE(env.mock.receivedArticles().size(), 0);
     }
 
+    void anOwnerReleaseIsRetriedUntilWritten()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        QVERIFY(env.sql(QStringLiteral(
+            "CREATE TRIGGER refuse_release BEFORE UPDATE OF owner_id ON posts WHEN NEW.owner_id "
+            "IS NULL BEGIN SELECT RAISE(ABORT, 'injected'); END")));
+        const NgPost::QueueAdmission admission = env.ngPost->admitPost(env.post(
+                                                                           QStringLiteral("owned")),
+                                                                       Origin::Cli);
+        QVERIFY(admission.accepted);
+        QTRY_VERIFY_WITH_TIMEOUT(!env.ngPost->postQueue()->find(admission.postId), 20000);
+        QTest::qWait(300);
+        QVERIFY(!env.scalar(QStringLiteral("SELECT owner_id FROM posts")).isNull());
+        QVERIFY(env.ngPost->hasPendingReleasesForTest()); // the end waits for it
+        QVERIFY(env.sql(QStringLiteral("DROP TRIGGER refuse_release")));
+        QTRY_VERIFY_WITH_TIMEOUT(env.scalar(QStringLiteral("SELECT owner_id FROM posts")).isNull(),
+                                 10000);
+        QVERIFY(!env.ngPost->hasPendingReleasesForTest());
+    }
+
     void resumeEndsATechnicalPause()
     {
         Env env;
