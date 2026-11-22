@@ -417,7 +417,11 @@ bool QueueScheduler::requestStop(const QueueEntry &entry, PendingStop why, Dispo
     return true;
 }
 
-void QueueScheduler::onQuiesced(qint64 postId, const QString &runId, bool ok, bool manifestEngaged)
+void QueueScheduler::onQuiesced(qint64 postId,
+                                const QString &runId,
+                                bool ok,
+                                bool manifestEngaged,
+                                qint64 activeMs)
 {
     const QueueEntry *entry = _queue->find(postId);
     if (!entry || entry->runId != runId)
@@ -439,28 +443,37 @@ void QueueScheduler::onQuiesced(qint64 postId, const QString &runId, bool ok, bo
         enterTechnicalPause(QStringLiteral("quiesce_failed"));
         return;
     }
-    applyInOrder([this, postId, runId, why, manifestEngaged, wasTransfer] {
+    applyInOrder([this, postId, runId, why, manifestEngaged, wasTransfer, activeMs] {
         return !isCurrent(postId, runId)
-            || recordQuiesced(postId, why, manifestEngaged, wasTransfer);
+            || recordQuiesced(postId, runId, why, manifestEngaged, wasTransfer, activeMs);
     });
     if (_stuck.remove(postId) && _stuck.isEmpty())
         retryAfterTechnicalPause(); // the stop is proven after all
     scheduleReevaluate();
 }
 
-bool QueueScheduler::recordQuiesced(qint64 postId, PendingStop why, bool manifest, bool wasTransfer)
+bool QueueScheduler::recordQuiesced(qint64 postId,
+                                    const QString &runId,
+                                    PendingStop why,
+                                    bool manifest,
+                                    bool wasTransfer,
+                                    qint64 activeMs)
 {
     bool written = false;
+    // A kept run ends interrupted with its transfer time; its successor resumes
+    // the transfer manifest when one was engaged (plan_queue.md §6.2).
     switch (why) {
     case PendingStop::SwitchActive: written = _queue->engineCommitSwitch(manifest); break;
     case PendingStop::Hold:
-        written = _queue->engineInterrupt(postId, manifest, true, wasTransfer);
+        written = _queue
+                      ->engineKeepForRestart(postId, runId, activeMs, manifest, true, wasTransfer);
         break;
     case PendingStop::Preempt:
-        written = _queue->engineInterrupt(postId, manifest, false, false);
+        written = _queue->engineKeepForRestart(postId, runId, activeMs, manifest, false, false);
         break;
     case PendingStop::Technical:
-        written = _queue->engineInterrupt(postId, manifest, false, wasTransfer);
+        written = _queue
+                      ->engineKeepForRestart(postId, runId, activeMs, manifest, false, wasTransfer);
         break;
     case PendingStop::CancelPreparation: written = _queue->engineRetire(postId); break;
     }

@@ -458,6 +458,21 @@ bool PostHistoryStore::setRunScratchNzb(const QString &runId, const QString &pat
     return true;
 }
 
+bool PostHistoryStore::markTransferManifestComplete(qint64 postId, QString *error)
+{
+    if (!initialize(error))
+        return false;
+    QSqlDatabase db = _database(error);
+    return run(db,
+               QStringLiteral("INSERT OR IGNORE INTO post_info(post_id) VALUES(?)"),
+               { postId },
+               error)
+        && run(db,
+               QStringLiteral("UPDATE post_info SET transfer_manifest_complete=1 WHERE post_id=?"),
+               { postId },
+               error);
+}
+
 //! A command issued for (post, run) applies only while that run is still the
 //! one of the entry, and the post still this session's.
 bool PostHistoryStore::_checkQueuedRun(QSqlDatabase &db,

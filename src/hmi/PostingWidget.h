@@ -119,6 +119,8 @@ public:
     void bindQueueRuntime(PostingJob *job);
     //! Queue engine: this tab's post left the queue without transferring.
     void onQueuedPostRemoved();
+    //! Queue engine: the transfer was kept for later; the post waits again.
+    void onQueueRuntimeKept();
     qint64 queuedPostId() const { return _queuedPostId; }
     bool followsRuntime(const PostingJob *job) const { return job && _postingJob == job; }
 

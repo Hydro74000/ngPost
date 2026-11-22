@@ -174,6 +174,7 @@ private:
     bool _artifactCleanupAllowed = false; //!< see allowArtifactCleanup()
     qint64 _activeMsAtEnd = -1;           //!< transfer time frozen by _stopProducers()
     bool _postActionsQueued = false;
+    bool _manifestEngaged = false;   //!< see transferManifestEngaged()
     QString _scratchNzbPath;         //!< queue runtime: where the NZB streams before F2
     bool _stepDriven = false;        //!< see setStepDriven()
     bool _compressedThisRun = false; //!< compression ended well: PAR2 covers the archive
@@ -417,6 +418,8 @@ public:
     bool postActionsQueued() const { return _postActionsQueued; }
     //! The transfer started: articles may have been sent.
     bool hasTransferStarted() const { return _timeStart.isValid(); }
+    //! Queue runtime: its complete transfer manifest is recorded.
+    bool transferManifestEngaged() const { return _manifestEngaged; }
     //! Queue runtime: whether its temporary archives may go with it (keepRar
     //! still applies). Never decided by the runtime alone.
     void allowArtifactCleanup(bool allowed) { _artifactCleanupAllowed = allowed; }

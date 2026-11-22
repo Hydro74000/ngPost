@@ -512,6 +512,12 @@ private:
                                     const JobExecutionContext &context);
     void _onQueueRuntimeActivated(qint64 postId, PostingJob *job);
     void _onQueueTransferEnded(qint64 postId, PostingJob *job);
+    void _onQueueRuntimeKept(qint64 postId, PostingJob *job);
+    //! The options resuming what is left of a queued post's transfer manifest.
+    bool _queuedResumeOptions(qint64 postId,
+                              const PostingJobOptions &original,
+                              PostingJobOptions *options,
+                              QString *error);
     void _onQueueRuntimeEnded(qint64 postId, PostingJob *job);
     //! The local work of a post out of the queue is over: it has no owner.
     void _releaseQueuedPost(qint64 postId, int attempt = 0);

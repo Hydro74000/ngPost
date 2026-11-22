@@ -1219,6 +1219,15 @@ void PostingWidget::bindQueueRuntime(PostingJob *job)
     _activatePosting();
 }
 
+void PostingWidget::onQueueRuntimeKept()
+{
+    _postingJob = nullptr; // gone with its run; the post stays this tab's
+    _state = STATE::POSTING;
+    _ui->postButton->setText(tr("Cancel Posting"));
+    _hmi->updateJobTab(this, _hmi->pendingColor(), _hmi->pendingIcon());
+    emit submissionEligibilityChanged();
+}
+
 void PostingWidget::onQueuedPostRemoved()
 {
     if (!_queuedPostId || _postingJob)

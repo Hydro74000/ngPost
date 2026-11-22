@@ -103,7 +103,11 @@ private slots:
                             const QString &runId,
                             const queue::AttemptResult &result);
     void onFinalized(qint64 postId, const QString &runId, bool ok, const QString &error);
-    void onQuiesced(qint64 postId, const QString &runId, bool ok, bool manifestEngaged);
+    void onQuiesced(qint64 postId,
+                    const QString &runId,
+                    bool ok,
+                    bool manifestEngaged,
+                    qint64 activeMs);
     void onRuntimeActionRequested(qint64 postId, queue::RuntimeRequest request);
     void onPausedChanged(bool paused);
 
@@ -130,7 +134,12 @@ private:
     bool requestStop(const QueueEntry &entry, PendingStop why, Disposition disposition);
     bool isCurrent(qint64 postId, const QString &runId) const;
     bool recordStep(qint64 postId, PrepStep step, bool ok, const QString &error, qint64 bytes);
-    bool recordQuiesced(qint64 postId, PendingStop why, bool manifest, bool wasTransfer);
+    bool recordQuiesced(qint64 postId,
+                        const QString &runId,
+                        PendingStop why,
+                        bool manifest,
+                        bool wasTransfer,
+                        qint64 activeMs);
     void enterTechnicalPause(const QString &reason);
     //! Applies @p write now, or after the acknowledgements already waiting;
     //! a failure keeps it waiting and pauses the queue technically.

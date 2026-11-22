@@ -81,6 +81,7 @@ public:
                       QString *error = nullptr);
     bool markPostStarted(qint64 postId, QString *error = nullptr);
     bool setRunScratchNzb(const QString &runId, const QString &path, QString *error = nullptr);
+    bool markTransferManifestComplete(qint64 postId, QString *error = nullptr);
     bool updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error = nullptr);
     bool setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error = nullptr);
     bool addActiveSeconds(qint64 postId, qint64 seconds, QString *error = nullptr);

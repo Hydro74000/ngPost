@@ -12,8 +12,8 @@
 //
 // The end of a run follows plan_queue.md §6.2: transferFinished() carries what
 // F1 records, finalize() publishes the NZB (F2), completeLocalWork() runs what
-// follows F3, then the runtime goes. Not yet supported (lot C4.6): keeping or
-// abandoning a running TRANSFER (quiesced(false)).
+// follows F3, then the runtime goes. Keeping a running transfer stops it
+// without a result: its post stays queued, resumed by the next runtime.
 //
 //========================================================================
 
@@ -80,6 +80,9 @@ signals:
     //! @p job goes, after its local work or an abandon; alive during this
     //! signal only.
     void runtimeEnded(qint64 postId, PostingJob *job);
+    //! The transfer of @p job was kept for a restart: its post stays queued
+    //! under a new run. Alive during this signal only.
+    void runtimeKept(qint64 postId, PostingJob *job);
     //! What followed F3 was handed over: when @p postActionsQueued, the post
     //! commands runner reports its end (PostCmdRunner::taskFinished).
     void localWorkQueued(qint64 postId, const QString &runId, bool postActionsQueued);
@@ -113,6 +116,7 @@ private:
                      const QString &error,
                      qint64 bytes);
     void onTransferEnded(qint64 postId, PostingJob *job, const QString &runId);
+    void keepTransfer(qint64 postId, const QString &runId);
     static queue::AttemptResult notSent(const QString &result);
     //! Acknowledgements leave on the event loop: never inside the command.
     void later(std::function<void()> emitter);

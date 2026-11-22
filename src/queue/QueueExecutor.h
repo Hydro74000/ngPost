@@ -74,7 +74,12 @@ signals:
     void transferFinished(qint64 postId, const QString &runId, const queue::AttemptResult &result);
     void finalized(qint64 postId, const QString &runId, bool ok, const QString &error);
     //! Barriers passed: tools stopped, connections closed, article events flushed.
-    void quiesced(qint64 postId, const QString &runId, bool ok, bool manifestEngaged);
+    //! @p activeMs: transfer time of the run kept, recorded with its interruption.
+    void quiesced(qint64 postId,
+                  const QString &runId,
+                  bool ok,
+                  bool manifestEngaged,
+                  qint64 activeMs = 0);
     //! Live progress, for views only; never used for a decision.
     void progress(qint64 postId, int percent, qint64 bytesPerSecond);
     void stepProgress(qint64 postId, queue::PrepStep step, int percent);

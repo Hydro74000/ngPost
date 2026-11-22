@@ -314,8 +314,7 @@ void PostingJobExecutor::interrupt(qint64 postId, const QString &runId, Disposit
             emit it->job->stopPosting(); // terminal: ends through onTransferEnded()
             return;
         }
-        // Keeping or abandoning a transfer needs the barriers of lot C4.
-        later([this, postId, runId] { emit quiesced(postId, runId, false, false); });
+        keepTransfer(postId, runId);
         return;
     }
     it->phase = Phase::Quiescing;
@@ -326,6 +325,28 @@ void PostingJobExecutor::interrupt(qint64 postId, const QString &runId, Disposit
         releaseRuntime(postId);
     } // otherwise the runtime and its slot stay: the stop is not proven
     later([this, postId, runId, stopped] { emit quiesced(postId, runId, stopped, false); });
+}
+
+//! An interruption kept (Hold, "post now", close and keep): producers stopped
+//! and joined, the history flushed, no result recorded. Its successor resumes
+//! the transfer manifest; in-flight articles were classified by their closing.
+void PostingJobExecutor::keepTransfer(qint64 postId, const QString &runId)
+{
+    Runtime &runtime = _runtimes[postId];
+    PostingJob *job = runtime.job;
+    if (!job) {
+        later([this, postId, runId] { emit quiesced(postId, runId, false, false); });
+        return;
+    }
+    runtime.phase = Phase::Quiescing;
+    const PostingJob::TransferOutcome outcome = job->finishTransfer();
+    const bool manifest = job->transferManifestEngaged();
+    emit runtimeKept(postId, job);
+    releaseRuntime(postId); // its archives stay: no cleanup was allowed
+    const qint64 activeMs = outcome.activeMs;
+    later([this, postId, runId, manifest, activeMs] {
+        emit quiesced(postId, runId, true, manifest, activeMs);
+    });
 }
 
 void PostingJobExecutor::retryFinalization(qint64 postId, const QString &runId)

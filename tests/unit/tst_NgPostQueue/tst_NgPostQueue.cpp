@@ -53,7 +53,7 @@ struct Env
             qputenv("NGPOST_QUEUE_ENGINE", previousSwitch);
     }
 
-    bool start(QString *error, const QStringList &mockArgs = {})
+    bool start(QString *error, const QStringList &mockArgs = {}, const QString &extraConfig = {})
     {
         if (!mock.start(mockArgs)) {
             *error = QStringLiteral("the mock NNTP server did not start");
@@ -70,6 +70,23 @@ struct Env
         QTextStream(&conf) << "GROUPS = alt.binaries.test\nthread = 1\nnzbPath = " << root
                            << "\nPOST_DB = " << dbPath() << "\n[server]\nhost = 127.0.0.1\n"
                            << "port = " << mock.port() << "\nssl = false\nconnection = 1\n";
+        if (!extraConfig.isEmpty()) {
+            // Global keys must precede the [server] section: written again, first.
+            conf.close();
+            QFile again(PathHelper::configFilePath());
+            if (!again.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                *error = QStringLiteral("could not read the test configuration back");
+                return false;
+            }
+            const QByteArray body = again.readAll();
+            again.close();
+            if (!again.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                *error = QStringLiteral("could not rewrite the test configuration");
+                return false;
+            }
+            again.write(extraConfig.toUtf8() + body);
+            again.close();
+        }
         conf.close();
         *error = ngPost->parseDefaultConfig();
         if (!error->isEmpty())
@@ -335,6 +352,72 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(env.scalar(QStringLiteral("SELECT owner_id FROM posts")).isNull(),
                                  10000);
         QVERIFY(!env.ngPost->hasPendingReleasesForTest());
+    }
+
+    void aHeldTransferResumesWithoutResending()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, { QStringLiteral("--slow-mode-ms"), QStringLiteral("20") }),
+                 qPrintable(error));
+        const NgPost::QueueAdmission admission = env.ngPost->admitPost(
+            env.post(QStringLiteral("held"), 2 * 1024 * 1024),
+            Origin::Cli);
+        QVERIFY(admission.accepted);
+        const qint64 id = admission.postId;
+        QTRY_VERIFY_WITH_TIMEOUT(env.mock.receivedArticles().size() > 20, 20000);
+        queue::PostQueue *queue = env.ngPost->postQueue();
+        QVERIFY(queue->setHeld({ id }, true, queue->view()).ok());
+        QTRY_VERIFY_WITH_TIMEOUT(queue->find(id) && queue->find(id)->lifecycle == Lifecycle::Queued,
+                                 10000);
+        QVERIFY(queue->find(id)->held);
+        QVERIFY(queue->find(id)->transferManifestEngaged);
+        const int beforeResume = env.mock.receivedArticles().size();
+        QTest::qWait(300);
+        QCOMPARE(env.mock.receivedArticles().size(), beforeResume); // held: nothing goes
+        QCOMPARE(
+            env.scalar(QStringLiteral("SELECT state FROM post_runs WHERE run_no=1")).toString(),
+            QStringLiteral("interrupted"));
+
+        QVERIFY(queue->setHeld({ id }, false, queue->view()).ok());
+        QTRY_VERIFY_WITH_TIMEOUT(!queue->find(id), 30000);
+        QCOMPARE(env.scalar(QStringLiteral("SELECT status FROM posts")).toString(),
+                 QStringLiteral("success"));
+        const int total = env.scalar(QStringLiteral("SELECT SUM(total_articles) FROM post_files"))
+                              .toInt();
+        QVERIFY(total > 20);
+        // What was confirmed before the hold is not sent again: at most the
+        // article in flight at that moment is.
+        QVERIFY2(env.mock.receivedArticles().size() <= total + 1,
+                 qPrintable(QStringLiteral("%1 received for %2 articles")
+                                .arg(env.mock.receivedArticles().size())
+                                .arg(total)));
+        QCOMPARE(env.scalar(QStringLiteral("SELECT COUNT(*) FROM post_runs")).toInt(), 2);
+    }
+
+    void aHeldPostResumesWithAPasswordTheHistoryDoesNotKeep()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error,
+                           { QStringLiteral("--slow-mode-ms"), QStringLiteral("20") },
+                           QStringLiteral("HISTORY_STORE_PASSWORDS = false\n")),
+                 qPrintable(error));
+        PostingJobOptions options = env.post(QStringLiteral("secret"), 1024 * 1024);
+        options.declaredPassword = QStringLiteral("only-in-memory-77");
+        const NgPost::QueueAdmission admission = env.ngPost->admitPost(options, Origin::Cli);
+        QVERIFY(admission.accepted);
+        const qint64 id = admission.postId;
+        QVERIFY(env.scalar(QStringLiteral("SELECT rar_pass FROM posts")).toString().isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(env.mock.receivedArticles().size() > 5, 20000);
+        queue::PostQueue *queue = env.ngPost->postQueue();
+        QVERIFY(queue->setHeld({ id }, true, queue->view()).ok());
+        QTRY_VERIFY_WITH_TIMEOUT(queue->find(id) && queue->find(id)->lifecycle == Lifecycle::Queued,
+                                 10000);
+        QVERIFY(queue->setHeld({ id }, false, queue->view()).ok());
+        QTRY_VERIFY_WITH_TIMEOUT(!queue->find(id), 30000);
+        QCOMPARE(env.scalar(QStringLiteral("SELECT status FROM posts")).toString(),
+                 QStringLiteral("success"));
     }
 
     void resumeEndsATechnicalPause()

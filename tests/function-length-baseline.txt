@@ -304,16 +304,18 @@
 4	src/NgPost.h	NgPost::useTmpRam() const
 1	src/NgPost.h	NgPost::vpnManager() const
 4	src/NgPost.h	NgPost::waitDurationBeforeAutoResume() const
-10	src/NgPostQueue.cpp	NgPost::_createQueueRuntime( const QueueEntry & entry , const JobExecutionContext & context)
-125	src/NgPostQueue.cpp	NgPost::_ensureQueueEngine()
+21	src/NgPostQueue.cpp	NgPost::_createQueueRuntime( const QueueEntry & entry , const JobExecutionContext & context)
+126	src/NgPostQueue.cpp	NgPost::_ensureQueueEngine()
 33	src/NgPostQueue.cpp	NgPost::_onQueueRuntimeActivated( qint64 postId , PostingJob * job)
 19	src/NgPostQueue.cpp	NgPost::_onQueueRuntimeEnded( qint64 postId , PostingJob * job)
+13	src/NgPostQueue.cpp	NgPost::_onQueueRuntimeKept( qint64 postId , PostingJob * job)
 10	src/NgPostQueue.cpp	NgPost::_onQueueTransferEnded( qint64 postId , PostingJob * job)
 15	src/NgPostQueue.cpp	NgPost::_queueAdmissionConfirmed( QueueAdmission * admission)
 19	src/NgPostQueue.cpp	NgPost::_queueAdmitted( const QueueCommandResult & result , PostingWidget * view)
 9	src/NgPostQueue.cpp	NgPost::_queueCanProgress() const
 4	src/NgPostQueue.cpp	NgPost::_queueHasWork() const
 31	src/NgPostQueue.cpp	NgPost::_queueRecipe( const PostingJobOptions & options) const
+41	src/NgPostQueue.cpp	NgPost::_queuedResumeOptions( qint64 postId , const PostingJobOptions & original , PostingJobOptions * options , QString * error)
 7	src/NgPostQueue.cpp	NgPost::_releaseQueueOwner()
 21	src/NgPostQueue.cpp	NgPost::_releaseQueuedPost( qint64 postId , int attempt)
 23	src/NgPostQueue.cpp	NgPost::_removeQueuedPosts( bool monitoredOnly)
@@ -518,7 +520,7 @@
 17	src/PostingJob.cpp	PostingJob::_logStart()
 11	src/PostingJob.cpp	PostingJob::_mergedPauseReason( PauseReason current , PauseReason incoming)
 56	src/PostingJob.cpp	PostingJob::_obfuscateInputFileNames( QString const & tmpFolder , QString const & archiveName)
-92	src/PostingJob.cpp	PostingJob::_postFiles()
+103	src/PostingJob.cpp	PostingJob::_postFiles()
 8	src/PostingJob.cpp	PostingJob::_preparePostersArticles()
 57	src/PostingJob.cpp	PostingJob::_printStats() const
 19	src/PostingJob.cpp	PostingJob::_protectedPaths() const
@@ -643,6 +645,7 @@
 4	src/PostingJob.h	PostingJob::sourcePath() const
 4	src/PostingJob.h	PostingJob::startedAtWall() const
 4	src/PostingJob.h	PostingJob::timestamp() const
+1	src/PostingJob.h	PostingJob::transferManifestEngaged() const
 2	src/PostingJob.h	PostingJob::unrestoredOriginalsForTest( QMap<QString,QString> const & stillObfuscated)
 4	src/PostingJob.h	PostingJob::widget() const
 17	src/PostingJobExecution.h	PreparedManifest::isValid() const
@@ -652,8 +655,9 @@
 17	src/PostingJobExecutor.cpp	PostingJobExecutor::completeLocalWork( qint64 postId , const QString & runId)
 17	src/PostingJobExecutor.cpp	PostingJobExecutor::createJob( qint64 postId , const QString & runId , const QString & setId)
 15	src/PostingJobExecutor.cpp	PostingJobExecutor::finalize( qint64 postId , const QString & runId)
-31	src/PostingJobExecutor.cpp	PostingJobExecutor::interrupt( qint64 postId , const QString & runId , Disposition disposition)
+30	src/PostingJobExecutor.cpp	PostingJobExecutor::interrupt( qint64 postId , const QString & runId , Disposition disposition)
 8	src/PostingJobExecutor.cpp	PostingJobExecutor::isCurrent( qint64 postId , const PostingJob * job , const QString & runId , Phase phase) const
+18	src/PostingJobExecutor.cpp	PostingJobExecutor::keepTransfer( qint64 postId , const QString & runId)
 4	src/PostingJobExecutor.cpp	PostingJobExecutor::key( qint64 postId , const QString & runId , const QString & setId)
 4	src/PostingJobExecutor.cpp	PostingJobExecutor::later( std :: function<void()> emitter)
 6	src/PostingJobExecutor.cpp	PostingJobExecutor::manifest( qint64 postId , const QString & runId , const QString & setId) const
@@ -752,6 +756,7 @@
 11	src/history/PostHistoryService.cpp	PostHistoryService::markPostCrashedArticlesUnknown( QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::markPostResuming( qint64 postId , QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::markPostStarted( qint64 postId , QString * error)
+12	src/history/PostHistoryService.cpp	PostHistoryService::markTransferManifestComplete( qint64 postId , QString * error)
 4	src/history/PostHistoryService.cpp	PostHistoryService::prepareForUse()
 9	src/history/PostHistoryService.cpp	PostHistoryService::purgePassword( qint64 postId , QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::purgeResumeData( qint64 postId , QString * error)
@@ -920,6 +925,7 @@
 30	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::loadQueueEntries( const QString & queueId , QString * error)
 27	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::loadQueueIntent( const QString & queueId , QString * error)
 19	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::loadQueueOrder( const QString & queueId , Domain domain , QString * error)
+14	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::markTransferManifestComplete( qint64 postId , QString * error)
 46	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::normalizeInterruptedPosts( const QStringList & liveOwners , QString * error)
 15	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::queueIds( QString * error)
 19	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::setRunScratchNzb( const QString & runId , const QString & path , QString * error)
@@ -1328,6 +1334,7 @@
 4	src/hmi/PostingWidget.cpp	PostingWidget::onPostFiles()
 4	src/hmi/PostingWidget.cpp	PostingWidget::onPostInfoToggled( bool checked)
 4	src/hmi/PostingWidget.cpp	PostingWidget::onPostingJobDone()
+8	src/hmi/PostingWidget.cpp	PostingWidget::onQueueRuntimeKept()
 21	src/hmi/PostingWidget.cpp	PostingWidget::onQueuedPostRemoved()
 15	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFilesClicked()
 12	src/hmi/PostingWidget.cpp	PostingWidget::onSelectFolderClicked()
@@ -1805,12 +1812,12 @@
 9	src/queue/QueueScheduler.cpp	queue::QueueScheduler::newArtifactSet( const QueueEntry & entry) const
 21	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onFinalized( qint64 postId , const QString & runId , bool ok , const QString & error)
 13	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onPausedChanged( bool paused)
-30	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onQuiesced( qint64 postId , const QString & runId , bool ok , bool manifestEngaged)
+34	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onQuiesced( qint64 postId , const QString & runId , bool ok , bool manifestEngaged , qint64 activeMs)
 44	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onRuntimeActionRequested( qint64 postId , RuntimeRequest request)
 23	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onStepFinished( qint64 postId , const QString & runId , const QString & setId , PrepStep step , bool ok , const QString & error , qint64 bytes)
 19	src/queue/QueueScheduler.cpp	queue::QueueScheduler::onTransferFinished( qint64 postId , const QString & runId , const AttemptResult & result)
 8	src/queue/QueueScheduler.cpp	queue::QueueScheduler::preparedCount() const
-23	src/queue/QueueScheduler.cpp	queue::QueueScheduler::recordQuiesced( qint64 postId , PendingStop why , bool manifest , bool wasTransfer)
+32	src/queue/QueueScheduler.cpp	queue::QueueScheduler::recordQuiesced( qint64 postId , const QString & runId , PendingStop why , bool manifest , bool wasTransfer , qint64 activeMs)
 36	src/queue/QueueScheduler.cpp	queue::QueueScheduler::recordStep( qint64 postId , PrepStep step , bool ok , const QString & error , qint64 bytes)
 19	src/queue/QueueScheduler.cpp	queue::QueueScheduler::reevaluate()
 12	src/queue/QueueScheduler.cpp	queue::QueueScheduler::requestStop( const QueueEntry & entry , PendingStop why , Disposition disposition)

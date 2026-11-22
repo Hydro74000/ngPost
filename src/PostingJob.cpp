@@ -1104,14 +1104,25 @@ void PostingJob::_postFiles()
     } else {
         _writeNzbHeader();
     }
-    if (_queueRuntime && !_scratchNzbPath.isEmpty() && _ngPost->historyService()) {
+    if (_queueRuntime && _ngPost->historyService()) {
+        // Before the first article: where the NZB streams, and the transfer
+        // manifest (every file and article of the post) as complete. From then
+        // on an interrupted post is resumed, never prepared again. A manifest
+        // missing a file would resume, and publish, without it: nothing is sent.
         QString err;
-        if (!_ngPost->historyService()->setRunScratchNzb(_context.runId, _scratchNzbPath, &err)) {
-            // Unrecorded, a recovery could not find it: nothing is sent.
+        if (_historyDataUnreliable) {
+            _error(tr("History database error: %1").arg(QStringLiteral("file records")));
+            _abortBeforeTransfer(_resumeFromHistory);
+            return;
+        }
+        if ((!_scratchNzbPath.isEmpty()
+             && !_ngPost->historyService()->setRunScratchNzb(_context.runId, _scratchNzbPath, &err))
+            || !_ngPost->historyService()->markTransferManifestComplete(_historyPostId, &err)) {
             _error(tr("History database error: %1").arg(err));
             _abortBeforeTransfer(_resumeFromHistory);
             return;
         }
+        _manifestEngaged = true;
     }
 
     // The transfer really starts here, which can be long after the job was

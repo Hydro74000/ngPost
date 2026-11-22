@@ -430,6 +430,71 @@ private slots:
         QCOMPARE(env.historyStatus(id), QStringLiteral("posting"));
     }
 
+    void keepingATransferStopsItWithoutAResult()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, {}, { QStringLiteral("--slow-mode-ms"), QStringLiteral("20") }),
+                 qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("kept"), false, false, 2000000));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy started(env.executor.get(), &QueueExecutor::transferStarted);
+        QSignalSpy quiesced(env.executor.get(), &QueueExecutor::quiesced);
+        QSignalSpy finished(env.executor.get(), &QueueExecutor::transferFinished);
+        env.executor->activate(id, run, {});
+        QTRY_COMPARE_WITH_TIMEOUT(started.size(), 1, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(env.mock.receivedArticles().size() > 2, 10000);
+        env.executor->interrupt(id, run, Disposition::Keep);
+        QTRY_COMPARE_WITH_TIMEOUT(quiesced.size(), 1, 10000);
+        QVERIFY(quiesced.first().at(2).toBool()); // stop proven
+        QVERIFY(quiesced.first().at(3).toBool()); // its transfer manifest is engaged
+        QVERIFY(quiesced.first().at(4).toLongLong() > 0);
+        QVERIFY(!env.executor->runtime(id));
+        const int received = env.mock.receivedArticles().size();
+        QTest::qWait(300);
+        QCOMPARE(env.mock.receivedArticles().size(), received);
+        QCOMPARE(finished.size(), 0);                               // no result...
+        QCOMPARE(env.historyStatus(id), QStringLiteral("posting")); // ...recorded
+        const QString name = QUuid::createUuid().toString();
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+            db.setDatabaseName(env.dbPath());
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            q.prepare(
+                QStringLiteral("SELECT transfer_manifest_complete FROM post_info WHERE post_id=?"));
+            q.addBindValue(id);
+            QVERIFY(q.exec() && q.next());
+            QCOMPARE(q.value(0).toInt(), 1);
+        }
+        QSqlDatabase::removeDatabase(name);
+    }
+
+    void anUnrecordedFileSendsNothing()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("unrecorded")));
+        const QString run = env.queue->find(id)->runId;
+        const QString name = QUuid::createUuid().toString();
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+            db.setDatabaseName(env.dbPath());
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("CREATE TRIGGER refuse_files BEFORE INSERT ON post_files "
+                                          "BEGIN SELECT RAISE(ABORT, 'injected'); END")));
+        }
+        QSqlDatabase::removeDatabase(name);
+        QSignalSpy finished(env.executor.get(), &QueueExecutor::transferFinished);
+        env.executor->activate(id, run, {});
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 10000);
+        QVERIFY(!finished.first().at(2).value<AttemptResult>().transferred);
+        QTest::qWait(300);
+        QCOMPARE(env.mock.receivedArticles().size(), 0); // a manifest missing a file: nothing goes
+    }
+
     void failedQueueWriteStartsNoTransfer()
     {
         Env env;

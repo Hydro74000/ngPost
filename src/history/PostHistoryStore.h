@@ -378,6 +378,9 @@ public:
     //! Where the run streams its NZB before the deliverable is published:
     //! recorded before its first article, so a recovery finds it.
     bool setRunScratchNzb(const QString &runId, const QString &path, QString *error = nullptr);
+    //! Every file and article of the transfer is recorded: from now on the post
+    //! is resumed from this manifest, never prepared again.
+    bool markTransferManifestComplete(qint64 postId, QString *error = nullptr);
 
     // Primary query with full filter support.
     QList<PostSummary> listPosts(const ListFilter &filter, QString *error = nullptr);

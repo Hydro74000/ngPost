@@ -22,6 +22,7 @@
 #include "PostingJobOptionsCodec.h"
 #include "history/HistoryQueueStore.h"
 #include "history/PostHistoryService.h"
+#include "history/ResumePlanner.h"
 #include "queue/OwnerLock.h"
 #include "queue/PostQueue.h"
 #include "queue/QueueScheduler.h"
@@ -98,6 +99,7 @@ bool NgPost::_ensureQueueEngine()
             this,
             &NgPost::_onQueueTransferEnded);
     connect(_queueExecutor, &PostingJobExecutor::runtimeEnded, this, &NgPost::_onQueueRuntimeEnded);
+    connect(_queueExecutor, &PostingJobExecutor::runtimeKept, this, &NgPost::_onQueueRuntimeKept);
     connect(_queueExecutor,
             &PostingJobExecutor::localWorkQueued,
             this,
@@ -328,7 +330,60 @@ PostingJob *NgPost::_createQueueRuntime(const QueueEntry &entry, const JobExecut
     PostingWidget *view = nullptr;
 #endif
     // The frozen options of the admission: no new name, password or poster.
-    return new PostingJob(this, entry.options.job, context, view);
+    PostingJobOptions options = entry.options.job;
+    if (entry.transferManifestEngaged) {
+        // Its transfer manifest is engaged: what is left of it is resumed from
+        // the history, never prepared nor sent again.
+        QString error;
+        if (!_queuedResumeOptions(entry.postId, entry.options.job, &options, &error)) {
+            _error(tr("Post %1 cannot be resumed: %2").arg(entry.postId).arg(error),
+                   ERROR_CODE::ERR_HISTORY);
+            return nullptr;
+        }
+    }
+    return new PostingJob(this, options, context, view);
+}
+
+bool NgPost::_queuedResumeOptions(qint64 postId,
+                                  const PostingJobOptions &original,
+                                  PostingJobOptions *options,
+                                  QString *error)
+{
+    PostHistoryStore::PostDetails details;
+    QString err;
+    if (!_historyService || !_historyService->loadPostDetails(postId, &details, &err)) {
+        *error = err.isEmpty() ? tr("history store is not available") : err;
+        return false;
+    }
+    const ResumePlanner::JobPlan plan = ResumePlanner::buildJobPlan(details);
+    if (!plan.unavailableSources.isEmpty()) {
+        *error = tr("source files are missing or changed");
+        return false;
+    }
+    if (plan.files.isEmpty()) {
+        *error = tr("no source file remains available to resume");
+        return false;
+    }
+    QString nzbPath = details.nzbPath;
+    if (nzbPath.isEmpty()) {
+        nzbPath = _nzbPath + QDir::separator() + details.post.nzbName;
+        if (!nzbPath.endsWith(QStringLiteral(".nzb")))
+            nzbPath += QStringLiteral(".nzb");
+    }
+    QList<QString> groups = details.post.groups.split(',', Qt::SkipEmptyParts);
+    if (groups.isEmpty())
+        groups = getPostingGroups();
+    *options = ResumePlanner::jobOptions(_baseJobOptions(), details, nzbPath, groups, plan, from());
+    // A password the history does not keep is still known to this session.
+    if (options->rarPass.isEmpty()) {
+        const QString known = original.rarPass.isEmpty() ? original.declaredPassword
+                                                         : original.rarPass;
+        if (!known.isEmpty()) {
+            options->rarPass = known;
+            options->resumePasswordUnavailable = false;
+        }
+    }
+    return true;
 }
 
 void NgPost::_onQueueRuntimeActivated(qint64 postId, PostingJob *job)
@@ -373,6 +428,20 @@ void NgPost::_onQueueTransferEnded(qint64 postId, PostingJob *job)
     if (_activeJob == job)
         _activeJob = nullptr;
     _releaseVpnForJob(job);
+    emit postingStateChanged();
+}
+
+void NgPost::_onQueueRuntimeKept(qint64 postId, PostingJob *job)
+{
+    Q_UNUSED(postId)
+    if (_activeJob == job)
+        _activeJob = nullptr;
+    _releaseVpnForJob(job);
+#ifdef __USE_HMI__
+    // Its post is waiting again: its tab says so, and still follows it.
+    if (PostingWidget *view = job->widget(); view && view->followsRuntime(job))
+        view->onQueueRuntimeKept();
+#endif
     emit postingStateChanged();
 }
 

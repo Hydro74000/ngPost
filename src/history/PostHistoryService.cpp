@@ -758,6 +758,19 @@ bool PostHistoryService::setRunScratchNzb(const QString &runId, const QString &p
     return ok;
 }
 
+bool PostHistoryService::markTransferManifestComplete(qint64 postId, QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->flushArticleEventsBlocking(&err)
+            && worker->store().markTransferManifestComplete(postId, &err);
+    });
+    if (error)
+        *error = err;
+    return ok;
+}
+
 bool PostHistoryService::updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error)
 {
     QString err;
