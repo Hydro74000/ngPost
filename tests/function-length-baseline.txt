@@ -454,10 +454,12 @@
 17	src/PostingJob.cpp	PostingJob::_canCompress( bool checkTemporaryPath) const
 30	src/PostingJob.cpp	PostingJob::_canGenPar2( bool checkTemporaryPath) const
 15	src/PostingJob.cpp	PostingJob::_checkTmpFolder() const
+31	src/PostingJob.cpp	PostingJob::_chooseTmpPath( bool par2Only)
 9	src/PostingJob.cpp	PostingJob::_cleanCompressDir()
 8	src/PostingJob.cpp	PostingJob::_cleanExtProc()
 52	src/PostingJob.cpp	PostingJob::_closeNzb()
 45	src/PostingJob.cpp	PostingJob::_collectPackedFiles()
+8	src/PostingJob.cpp	PostingJob::_compressDirBytes() const
 33	src/PostingJob.cpp	PostingJob::_connectJobSignals()
 30	src/PostingJob.cpp	PostingJob::_connectWidgetSignals()
 21	src/PostingJob.cpp	PostingJob::_copyNfoNextToNzb()
@@ -472,13 +474,14 @@
 4	src/PostingJob.cpp	PostingJob::_error( const QString & error) const
 19	src/PostingJob.cpp	PostingJob::_finishIfCanceled()
 130	src/PostingJob.cpp	PostingJob::_finishPosting()
+12	src/PostingJob.cpp	PostingJob::_finishStep( queue :: PrepStep step , bool ok , const QString & error)
 10	src/PostingJob.cpp	PostingJob::_flushHistoryService()
 175	src/PostingJob.cpp	PostingJob::_initPosting()
 48	src/PostingJob.cpp	PostingJob::_livePostInfoData() const
 4	src/PostingJob.cpp	PostingJob::_log( const QString & aMsg , bool newline) const
 11	src/PostingJob.cpp	PostingJob::_mergedPauseReason( PauseReason current , PauseReason incoming)
 56	src/PostingJob.cpp	PostingJob::_obfuscateInputFileNames( QString const & tmpFolder , QString const & archiveName)
-81	src/PostingJob.cpp	PostingJob::_postFiles()
+83	src/PostingJob.cpp	PostingJob::_postFiles()
 8	src/PostingJob.cpp	PostingJob::_preparePostersArticles()
 57	src/PostingJob.cpp	PostingJob::_printStats() const
 19	src/PostingJob.cpp	PostingJob::_protectedPaths() const
@@ -494,18 +497,18 @@
 51	src/PostingJob.cpp	PostingJob::_writePostInfoFile()
 7	src/PostingJob.cpp	PostingJob::buildPar2ArgsForTest( const QString & configuredArgs , bool useParPar , bool useMultiPar , uint redundancy)
 14	src/PostingJob.cpp	PostingJob::nbArticlesUnknown() const
-49	src/PostingJob.cpp	PostingJob::onCompressionFinished( int exitCode)
+64	src/PostingJob.cpp	PostingJob::onCompressionFinished( int exitCode , QProcess :: ExitStatus exitStatus)
 56	src/PostingJob.cpp	PostingJob::onDisconnectedConnection( NntpConnection * con)
-16	src/PostingJob.cpp	PostingJob::onExtProcError( QProcess :: ProcessError error)
+22	src/PostingJob.cpp	PostingJob::onExtProcError( QProcess :: ProcessError error)
 16	src/PostingJob.cpp	PostingJob::onExtProcReadyReadStandardError()
 9	src/PostingJob.cpp	PostingJob::onExtProcReadyReadStandardOutput()
-32	src/PostingJob.cpp	PostingJob::onGenPar2Finished( int exitCode)
+41	src/PostingJob.cpp	PostingJob::onGenPar2Finished( int exitCode , QProcess :: ExitStatus exitStatus)
 18	src/PostingJob.cpp	PostingJob::onImmediateSpeedComputation()
 29	src/PostingJob.cpp	PostingJob::onNntpErrorReading()
 41	src/PostingJob.cpp	PostingJob::onNntpFilePosted()
 10	src/PostingJob.cpp	PostingJob::onNntpFileStartPosting()
 12	src/PostingJob.cpp	PostingJob::onResumeTriggered()
-90	src/PostingJob.cpp	PostingJob::onStartPosting( bool isActiveJob)
+51	src/PostingJob.cpp	PostingJob::onStartPosting( bool isActiveJob)
 10	src/PostingJob.cpp	PostingJob::onStopPosting()
 21	src/PostingJob.cpp	PostingJob::pause( PauseReason reason)
 11	src/PostingJob.cpp	PostingJob::postInfoData() const
@@ -517,9 +520,10 @@
 5	src/PostingJob.cpp	PostingJob::restoreObfuscatedPathsForTest( QMap<QString,QString> & paths , QString & stagingPath)
 19	src/PostingJob.cpp	PostingJob::resume()
 7	src/PostingJob.cpp	PostingJob::resumeIfPausedFor( PauseReason reason)
+37	src/PostingJob.cpp	PostingJob::runPreparationStep( queue :: PrepStep step)
 4	src/PostingJob.cpp	PostingJob::sslSupportInfo()
 145	src/PostingJob.cpp	PostingJob::startCompressFiles( const QString & cmdRar , const QString & tmpFolder , const QString & archiveName , const QString & pass , uint volSize)
-104	src/PostingJob.cpp	PostingJob::startGenPar2( const QString & tmpFolder , const QString & archiveName , uint redundancy)
+106	src/PostingJob.cpp	PostingJob::startGenPar2( const QString & tmpFolder , const QString & archiveName , uint redundancy)
 4	src/PostingJob.cpp	PostingJob::supportsSsl()
 7	src/PostingJob.cpp	PostingJob::waitForVpnAfterUserResume()
 57	src/PostingJob.cpp	PostingJob::~PostingJob()
@@ -560,6 +564,7 @@
 4	src/PostingJob.h	PostingJob::isPaused() const
 4	src/PostingJob.h	PostingJob::isPosting() const
 4	src/PostingJob.h	PostingJob::isResumeFromHistory() const
+1	src/PostingJob.h	PostingJob::isStepDriven() const
 2	src/PostingJob.h	PostingJob::mergePauseReasonForTest( PauseReason current , PauseReason incoming)
 4	src/PostingJob.h	PostingJob::nbArticlesFailed() const
 4	src/PostingJob.h	PostingJob::nbArticlesTotal() const
@@ -577,6 +582,7 @@
 4	src/PostingJob.h	PostingJob::rarName() const
 4	src/PostingJob.h	PostingJob::rarPass() const
 4	src/PostingJob.h	PostingJob::setDelFilesAfterPosted( bool delFiles)
+1	src/PostingJob.h	PostingJob::setStepDriven( bool driven)
 5	src/PostingJob.h	PostingJob::sourceName() const
 4	src/PostingJob.h	PostingJob::sourcePath() const
 4	src/PostingJob.h	PostingJob::startedAtWall() const
@@ -613,6 +619,12 @@
 5	src/PostingJobOptionsCodec.h	PersistedSource::operator ==( const PersistedSource & other) const
 1	src/PostingJobOptionsCodec.h	optionscodec::DecodeResult::ok() const
 1	src/PostingJobOptionsCodec.h	optionscodec::EncodeResult::ok() const
+4	src/history/HistoryQueueStore.cpp	HistoryQueueStore::commit( const QueueTransaction & transaction)
+4	src/history/HistoryQueueStore.cpp	HistoryQueueStore::loadEntries( const QString & queueId) const
+4	src/history/HistoryQueueStore.cpp	HistoryQueueStore::loadIntent( const QString & queueId) const
+4	src/history/HistoryQueueStore.cpp	HistoryQueueStore::loadOrder( const QString & queueId , Domain domain) const
+4	src/history/HistoryQueueStore.h	HistoryQueueStore::HistoryQueueStore( PostHistoryStore * store)
+4	src/history/HistoryQueueStore.h	ServiceQueueStore::ServiceQueueStore( PostHistoryService * service)
 4	src/history/NzbHistoryRegenerator.cpp	NzbHistoryRegenerator::NzbHistoryRegenerator( PostHistoryStore * store)
 23	src/history/NzbHistoryRegenerator.cpp	NzbHistoryRegenerator::_checkFileHistory( const PostHistoryStore :: PostDetails & details , const PostHistoryStore :: FileSummary & file , const QList<PostHistoryStore::ArticleSummary> & articles , QStringList * warnings , QString * error)
 47	src/history/NzbHistoryRegenerator.cpp	NzbHistoryRegenerator::_writeFile( const PostHistoryStore :: PostDetails & details , const PostHistoryStore :: FileSummary & file , QTextStream & stream , int padding , qint64 postFullArticleBytesHint , bool hasExactArticleSize , bool useBodyBytes , int & repairedArticleBytes , QStringList * warnings , QString * error)
@@ -636,7 +648,7 @@
 10	src/history/PostHistoryService.cpp	PostHistoryService::addActiveSeconds( qint64 postId , qint64 seconds , QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::checkResume( qint64 postId , ResumeRow * row , QString * error)
 11	src/history/PostHistoryService.cpp	PostHistoryService::cleanupInvalidResumePosts( QString * error)
-9	src/history/PostHistoryService.cpp	PostHistoryService::commitQueueTransaction( const queue :: QueueTransaction & transaction)
+10	src/history/PostHistoryService.cpp	PostHistoryService::commitQueueTransaction( const queue :: QueueTransaction & transaction)
 4	src/history/PostHistoryService.cpp	PostHistoryService::configure( const QString & dbPath , bool storePasswords)
 9	src/history/PostHistoryService.cpp	PostHistoryService::createPost( const PostHistoryStore :: PostRecord & record , QString * error)
 13	src/history/PostHistoryService.cpp	PostHistoryService::createPost( const PostHistoryStore :: PostRecord & record , const PostHistoryStore :: PostInfo & info , const QMap<QString,MetaValue> & meta , QString * error)
@@ -654,9 +666,9 @@
 10	src/history/PostHistoryService.cpp	PostHistoryService::listPosts( const PostHistoryStore :: ListFilter & filter , QString * error)
 13	src/history/PostHistoryService.cpp	PostHistoryService::loadPostDetails( qint64 postId , PostHistoryStore :: PostDetails * details , QString * error)
 12	src/history/PostHistoryService.cpp	PostHistoryService::loadPostInfoRecord( qint64 postId , PostHistoryStore :: PostInfoRecord * record , QString * error)
-6	src/history/PostHistoryService.cpp	PostHistoryService::loadQueueEntries( const QString & queueId , QString * error)
-6	src/history/PostHistoryService.cpp	PostHistoryService::loadQueueIntent( const QString & queueId , QString * error)
-6	src/history/PostHistoryService.cpp	PostHistoryService::loadQueueOrder( const QString & queueId , queue :: Domain domain , QString * error)
+9	src/history/PostHistoryService.cpp	PostHistoryService::loadQueueEntries( const QString & queueId , QString * error)
+9	src/history/PostHistoryService.cpp	PostHistoryService::loadQueueIntent( const QString & queueId , QString * error)
+10	src/history/PostHistoryService.cpp	PostHistoryService::loadQueueOrder( const QString & queueId , queue :: Domain domain , QString * error)
 11	src/history/PostHistoryService.cpp	PostHistoryService::markPostCrashedArticlesUnknown( QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::markPostResuming( qint64 postId , QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::markPostStarted( qint64 postId , QString * error)
@@ -802,12 +814,49 @@
 4	src/history/PostHistoryStore.cpp	valueString( const QSqlQuery & q , const char * name)
 1	src/history/PostHistoryStore.h	PostHistoryStore::ownerId() const
 1	src/history/PostHistoryStore.h	PostHistoryStore::setOwnerId( const QString & ownerId)
+63	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_admitQueueEntry( QSqlDatabase & db , QueueEntry & entry , QString * error)
+33	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_applyQueueTransaction( QSqlDatabase & db , const QueueTransaction & transaction , QueueCommit & result)
+38	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_migrateToV6( QSqlDatabase & db , QString * error)
+36	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_mirrorQueuedPost( QSqlDatabase & db , const QueueEntry & entry , QString * error)
+15	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_refuseFutureSchema( QSqlDatabase & db , QString * error)
+42	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_renewQueueRun( QSqlDatabase & db , qint64 postId , QString * runId , int * runNo , QString * error)
+20	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_retireQueueEntry( QSqlDatabase & db , qint64 postId , QString * error)
+49	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_writeArtifactSets( QSqlDatabase & db , const QueueEntry & entry , QString * error)
+73	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_writeQueueEntry( QSqlDatabase & db , const QueueEntry & entry , bool insert , QString * error)
+28	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_writeQueueIntent( QSqlDatabase & db , const QueueTransaction & transaction , QString * error)
+23	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_writeQueueOrder( QSqlDatabase & db , const QString & queueId , Domain domain , const QList<qint64> & ids , quint64 revision , QString * error)
+59	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::claimQueue( const QString & fromQueueId , const QString & fromOwnerId , const QString & toQueueId , const QString & toOwnerId , Domain domain , QString * error)
+18	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::cleanupInvalidResumePosts( const QStringList & liveOwners , QString * error)
+21	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::commitQueueTransaction( const QueueTransaction & transaction)
+30	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::loadQueueEntries( const QString & queueId , QString * error)
+27	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::loadQueueIntent( const QString & queueId , QString * error)
+19	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::loadQueueOrder( const QString & queueId , Domain domain , QString * error)
+46	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::normalizeInterruptedPosts( const QStringList & liveOwners , QString * error)
+15	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::queueIds( QString * error)
+5	src/history/PostHistoryStoreQueue.cpp	artifactState( const QueueEntry & entry)
+7	src/history/PostHistoryStoreQueue.cpp	asValues( const QStringList & list)
+7	src/history/PostHistoryStoreQueue.cpp	blockedParams( const BlockReason & reason)
+8	src/history/PostHistoryStoreQueue.cpp	ensureOrderRow( QSqlDatabase & db , const QString & queueId , Domain domain , QString * error)
+34	src/history/PostHistoryStoreQueue.cpp	entryFromRow( const QSqlQuery & q , const QString & queueId)
+13	src/history/PostHistoryStoreQueue.cpp	hasColumn( QSqlDatabase & db , const QString & table , const QString & column , QString * error)
+4	src/history/PostHistoryStoreQueue.cpp	nullString()
+10	src/history/PostHistoryStoreQueue.cpp	orphanFilter( const QStringList & liveOwners , const QString & column)
+22	src/history/PostHistoryStoreQueue.cpp	readArtifacts( QSqlDatabase & db , QueueEntry & e , const QString & currentId)
+4	src/history/PostHistoryStoreQueue.cpp	restoreState( Domain domain)
+19	src/history/PostHistoryStoreQueue.cpp	run( QSqlDatabase & db , const QString & sql , const QVariantList & values , QString * error , int * rows = nullptr)
+46	src/history/PostHistoryStoreQueue.cpp	v6ArtifactStatements()
+83	src/history/PostHistoryStoreQueue.cpp	v6QueueStatements()
+6	src/history/PostHistoryStoreQueue.cpp	v6Statements()
 4	src/history/ResumePlanner.cpp	ResumePlanner::ResumePlanner( PostHistoryStore * store)
 49	src/history/ResumePlanner.cpp	ResumePlanner::buildJobPlan( const PostHistoryStore :: PostDetails & details)
 69	src/history/ResumePlanner.cpp	ResumePlanner::check( qint64 postId , QString * error)
 57	src/history/ResumePlanner.cpp	ResumePlanner::jobOptions( PostingJobOptions base , const PostHistoryStore :: PostDetails & details , const QString & nzbPath , const QList<QString> & groups , const JobPlan & plan , const std :: string & fallbackFrom)
 19	src/history/ResumePlanner.cpp	passwordDeclaredInNzb( const QString & path)
 4	src/history/ResumePlanner.cpp	splitStoredGroups( const QString & groups)
+4	src/history/ServiceQueueStore.cpp	ServiceQueueStore::commit( const QueueTransaction & transaction)
+4	src/history/ServiceQueueStore.cpp	ServiceQueueStore::loadEntries( const QString & queueId) const
+4	src/history/ServiceQueueStore.cpp	ServiceQueueStore::loadIntent( const QString & queueId) const
+4	src/history/ServiceQueueStore.cpp	ServiceQueueStore::loadOrder( const QString & queueId , Domain domain) const
 13	src/hmi/AutoPostWidget.cpp	AutoPostWidget::AutoPostWidget( NgPost * ngPost , MainWindow * hmi)
 25	src/hmi/AutoPostWidget.cpp	AutoPostWidget::_buildPostInfoRow()
 29	src/hmi/AutoPostWidget.cpp	AutoPostWidget::_handleFinishedJob( const QString & path , uint nbArticles , uint nbUploaded , uint nbFailed)
@@ -1534,6 +1583,15 @@
 1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::commitCount() const
 1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::hasEntry( qint64 postId) const
 1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::interruptionsRecorded( const QString & runId) const
+4	src/queue/OwnerLock.cpp	queue::OwnerLock::OwnerLock( const QString & dbPath)
+14	src/queue/OwnerLock.cpp	queue::OwnerLock::acquire( QString * error)
+4	src/queue/OwnerLock.cpp	queue::OwnerLock::isHeld() const
+6	src/queue/OwnerLock.cpp	queue::OwnerLock::isValidOwnerId( const QString & ownerId)
+4	src/queue/OwnerLock.cpp	queue::OwnerLock::lockPath( const QString & dbPath , const QString & ownerId)
+15	src/queue/OwnerLock.cpp	queue::OwnerLock::ownersOnDisk( const QString & dbPath)
+15	src/queue/OwnerLock.cpp	queue::OwnerLock::probe( const QString & dbPath , const QString & ownerId , std :: unique_ptr<QLockFile> * guard)
+9	src/queue/OwnerLock.cpp	queue::canonicalBase( const QString & dbPath)
+1	src/queue/OwnerLock.h	queue::OwnerLock::ownerId() const
 6	src/queue/PostQueue.cpp	queue::PostQueue::PostQueue( QueueStore * store , const QString & sessionQueueId , QObject * parent)
 10	src/queue/PostQueue.cpp	queue::PostQueue::abandonPlanning( qint64 postId , const QueueView & seen)
 4	src/queue/PostQueue.cpp	queue::PostQueue::activeEntry() const

@@ -31,10 +31,10 @@ using namespace queue;
 namespace
 {
 
-const QStringList &v6Statements()
+//! Runs, queue orders, artifact sets, queue entries and the "post now" intent.
+QStringList v6QueueStatements()
 {
-    // Schema retained with Codex (revue_queue/echanges/06_codex_arbitrage_c2c3.md).
-    static const QStringList statements = {
+    return {
         QStringLiteral(
             "CREATE TABLE IF NOT EXISTS post_runs ("
             "run_id TEXT PRIMARY KEY NOT NULL,"
@@ -113,6 +113,13 @@ const QStringList &v6Statements()
             "active_run_id TEXT NOT NULL REFERENCES post_runs(run_id),"
             "state TEXT NOT NULL CHECK(state IN ('pending','switching')),"
             "created_at TEXT NOT NULL)"),
+    };
+}
+
+//! Artifact contents, staged source moves and path references.
+QStringList v6ArtifactStatements()
+{
+    return {
         QStringLiteral(
             "CREATE TABLE IF NOT EXISTS post_run_artifacts ("
             "artifact_set_id TEXT NOT NULL REFERENCES post_artifact_sets(artifact_set_id) "
@@ -155,6 +162,12 @@ const QStringList &v6Statements()
         QStringLiteral("CREATE INDEX IF NOT EXISTS post_path_refs_source ON post_path_refs(role, "
                        "path_key, released_at)"),
     };
+}
+
+const QStringList &v6Statements()
+{
+    // Schema retained with Codex (revue_queue/echanges/06_codex_arbitrage_c2c3.md).
+    static const QStringList statements = v6QueueStatements() + v6ArtifactStatements();
     return statements;
 }
 

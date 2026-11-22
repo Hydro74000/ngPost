@@ -1559,7 +1559,7 @@ void TestPostHistory::connection_retries_pragmas_after_initial_open_failure()
                  .toString().toLower(),
              QStringLiteral("wal"));
     QCOMPARE(connectionPragma(added.first(), QStringLiteral("PRAGMA synchronous")).toInt(),
-             1); // SQLITE_SYNC_NORMAL
+             2); // SQLITE_SYNC_FULL
 }
 
 void TestPostHistory::started_at_is_set_by_the_transfer_and_never_rewritten()
