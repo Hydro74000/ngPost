@@ -2267,6 +2267,20 @@ Ihre NZB-Datei in %2 statt im bisherigen Ordner speichern?</translation>
         <source>ngPost queue</source>
         <translation>ngPost-Warteschlange</translation>
     </message>
+    <message>
+        <source>Saving the queue before closing...</source>
+        <translation>Warteschlange wird vor dem Schließen gespeichert...</translation>
+    </message>
+    <message>
+        <source>Queue not saved</source>
+        <translation>Warteschlange nicht gespeichert</translation>
+    </message>
+    <message>
+        <source>The queue could not be saved, so ngPost stays open.
+The log tells why; resuming the posts tries again.</source>
+        <translation>Die Warteschlange konnte nicht gespeichert werden, ngPost bleibt geöffnet.
+Das Protokoll nennt den Grund; das Fortsetzen der Posts versucht es erneut.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -4696,6 +4710,14 @@ Ihre aktive Konfigurationsdatei ist:
     <message>
         <source>Some posts could not be sent and remain in the queue.</source>
         <translation>Einige Posts konnten nicht gesendet werden und bleiben in der Warteschlange.</translation>
+    </message>
+    <message>
+        <source>ngPost is closing: nothing new is posted.</source>
+        <translation>ngPost wird beendet: Es wird nichts Neues gepostet.</translation>
+    </message>
+    <message>
+        <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
+        <translation>Beenden ohne gespeicherte Warteschlange: Die unterbrochenen Posts können aus dem Verlauf fortgesetzt werden.</translation>
     </message>
 </context>
 <context>

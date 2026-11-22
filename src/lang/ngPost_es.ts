@@ -2266,6 +2266,20 @@ Write their NZB file to %2 instead of their current folder?</source>
         <source>ngPost queue</source>
         <translation>Cola de ngPost</translation>
     </message>
+    <message>
+        <source>Saving the queue before closing...</source>
+        <translation>Guardando la cola antes de cerrar...</translation>
+    </message>
+    <message>
+        <source>Queue not saved</source>
+        <translation>Cola no guardada</translation>
+    </message>
+    <message>
+        <source>The queue could not be saved, so ngPost stays open.
+The log tells why; resuming the posts tries again.</source>
+        <translation>No se pudo guardar la cola, así que ngPost sigue abierto.
+El registro indica el motivo; reanudar los envíos lo vuelve a intentar.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -4696,6 +4710,14 @@ Su archivo de configuración activo es:
     <message>
         <source>Some posts could not be sent and remain in the queue.</source>
         <translation>Algunas publicaciones no se pudieron enviar y permanecen en la cola.</translation>
+    </message>
+    <message>
+        <source>ngPost is closing: nothing new is posted.</source>
+        <translation>ngPost se está cerrando: no se publica nada nuevo.</translation>
+    </message>
+    <message>
+        <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
+        <translation>Saliendo sin guardar la cola: los envíos interrumpidos se pueden reanudar desde el historial.</translation>
     </message>
 </context>
 <context>

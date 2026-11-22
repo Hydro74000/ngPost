@@ -1,5 +1,6 @@
 #include "Par2SettingsDialog.h"
 #include <QPointer>
+#include <memory>
 #include <QScopedValueRollback>
 //========================================================================
 //
@@ -795,13 +796,22 @@ void MainWindow::closeEvent(QCloseEvent *event)
         _saveHistoryColumns();
     }
 
-    if (_ngPost->hasPostingJobs())
-    {
+    if (_keepingQueueForClose) {
+        event->ignore(); // the queue is being saved: the window closes after
+        return;
+    }
+    if (!_closeApproved && _ngPost->hasPostingJobs()) {
         int res = QMessageBox::question(this,
                                         tr("close while still posting?"),
                                         tr("ngPost is currently posting.\nAre you sure you want to quit?"),
                                         QMessageBox::Yes,
                                         QMessageBox::No);
+        if (res == QMessageBox::Yes && _ngPost->queueHasEntries()) {
+            // Nothing is lost: the window waits until the queue is kept.
+            event->ignore();
+            _keepQueueThenClose();
+            return;
+        }
         if (res == QMessageBox::Yes)
         {
             _ngPost->closeAllPostingJobs();
@@ -812,8 +822,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
             event->ignore();
             return;
         }
-    }
-    else
+    } else
         event->accept();
 
     // Flush any server field still mid-edit (focus still in a QLineEdit
@@ -841,6 +850,29 @@ void MainWindow::closeEvent(QCloseEvent *event)
             }
         }
     }
+}
+
+void MainWindow::_keepQueueThenClose()
+{
+    _keepingQueueForClose = true;
+    centralWidget()->setEnabled(false);
+    statusBar()->showMessage(tr("Saving the queue before closing..."));
+    auto hold = std::make_shared<decltype(_ngPost->holdShutdown())>(_ngPost->holdShutdown());
+    connect(_ngPost, &NgPost::queueClosed, this, [this, hold](bool ok) {
+        _keepingQueueForClose = false;
+        centralWidget()->setEnabled(true);
+        statusBar()->clearMessage();
+        if (ok) {
+            _closeApproved = true;
+            close();
+            return;
+        }
+        QMessageBox::warning(this,
+                             tr("Queue not saved"),
+                             tr("The queue could not be saved, so ngPost stays open.\n"
+                                "The log tells why; resuming the posts tries again."));
+    }, Qt::SingleShotConnection);
+    _ngPost->closeQueueKeeping();
 }
 
 void MainWindow::changeEvent(QEvent *event)

@@ -443,6 +443,14 @@ private:
     bool _queuePaused = false;
     const bool _queueEngine = qEnvironmentVariable("NGPOST_QUEUE_ENGINE") == QLatin1String("1");
     bool _queueLeftBlocked = false; //!< the command line run said it once
+    bool _queueClosing = false;     //!< closeQueueKeeping() under way
+    bool _queueClosed = false;      //!< kept by a close: nothing new until the end
+    bool _queueExitRequested = false; //!< a fatal exit already closed the queue
+    void _checkQueueClosed();
+    void _connectQueueExecutor(); //!< runtimes and post actions, for _ensureQueueEngine()
+    void _connectQueueEvents();   //!< scheduler and queue, for _ensureQueueEngine()
+    //! Some queue entry still has a runtime (transfer, preparation, finalization).
+    bool _queueHasRuntimes() const;
     bool _startingFromView = false; //!< within startQueuedWork()
     // The queue engine (NgPostQueue.cpp), built by _ensureQueueEngine().
     queue::OwnerLock *_ownerLock = nullptr;
@@ -541,6 +549,7 @@ private:
 #ifdef NGPOST_TESTING
     bool _queueEngineUnavailableForTest = false;
     int _shutdownStartCount = 0;
+    int _exitRequestCount = 0; //!< QCoreApplication::exit() asked by a fatal error
     int _shutdownRecheckCount = 0;
     QString _allowedShutdownCmdForTest;
 #endif
@@ -758,6 +767,13 @@ public:
     int pendingAdmissionRetriesForTest() const { return int(_admissionRetries.size()); }
     bool cancelingAllForTest() const { return _cancelingAll; }
     bool hasPendingReleasesForTest() const { return !_pendingReleases.isEmpty(); }
+    //! What a fatal error does: a VPN that cannot come up, for instance.
+    void requestExitForTest(bool waitForActiveJob)
+    {
+        _requestExit(ERROR_CODE::ERR_VPN, waitForActiveJob);
+    }
+    bool exitPendingForTest() const { return _pendingExitCode >= 0; }
+    int exitRequestCountForTest() const { return _exitRequestCount; }
     //! The queue engine cannot be built, as with an unusable database.
     void setQueueEngineUnavailableForTest(bool unavailable)
     {
@@ -1001,6 +1017,14 @@ public:
                                queue::Origin origin,
                                PostingWidget *view = nullptr);
     queue::PostQueue *postQueue() const { return _postQueue; }
+    //! Queue engine: closes the session keeping its queue (plan_queue.md §6.2):
+    //! no admission, no new start, running transfers and preparations kept for
+    //! a restart, engaged finalizations finished. queueClosed() tells the end.
+    //! With @p letTransferFinish the transfer under way ends on its own.
+    void closeQueueKeeping(bool letTransferFinish = false);
+    bool isClosingQueue() const { return _queueClosing; }
+    //! The session queue holds some entry: a close has something to keep.
+    bool queueHasEntries() const;
     //! Lets the scheduler start at once what may start, once the view that
     //! submitted a post has taken its state (a tab's click reads as before).
     void startQueuedWork();
@@ -1011,6 +1035,8 @@ private:
 
 
 signals:
+    //! closeQueueKeeping() is over: @p ok when everything was kept durably.
+    void queueClosed(bool ok);
     void postingStateChanged();
     void par2DefaultsChanged();
     void log(QString msg, bool newline); //!< in case we signal from another thread

@@ -2255,6 +2255,20 @@ Write their NZB file to %2 instead of their current folder?</translation>
         <source>ngPost queue</source>
         <translation>ngPost queue</translation>
     </message>
+    <message>
+        <source>Saving the queue before closing...</source>
+        <translation>Saving the queue before closing...</translation>
+    </message>
+    <message>
+        <source>Queue not saved</source>
+        <translation>Queue not saved</translation>
+    </message>
+    <message>
+        <source>The queue could not be saved, so ngPost stays open.
+The log tells why; resuming the posts tries again.</source>
+        <translation>The queue could not be saved, so ngPost stays open.
+The log tells why; resuming the posts tries again.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -4674,6 +4688,14 @@ One thing does change for such a script: the old configuration file has no POST_
     <message>
         <source>Some posts could not be sent and remain in the queue.</source>
         <translation>Some posts could not be sent and remain in the queue.</translation>
+    </message>
+    <message>
+        <source>ngPost is closing: nothing new is posted.</source>
+        <translation>ngPost is closing: nothing new is posted.</translation>
+    </message>
+    <message>
+        <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
+        <translation>Exiting without the queue saved: the interrupted posts can be resumed from the history.</translation>
     </message>
 </context>
 <context>

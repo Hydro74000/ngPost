@@ -99,6 +99,10 @@ QueueCommit InMemoryQueueStore::commit(const QueueTransaction &transaction)
         result.error = _failureError;
         return result;
     }
+    if (_refuse && _refuse(transaction)) {
+        result.error = QStringLiteral("injected_failure");
+        return result;
+    }
     result.error = validate(transaction);
     if (result.ok())
         result.error = validateRuns(transaction);

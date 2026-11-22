@@ -15,6 +15,8 @@
 #include <QHash>
 #include <QSet>
 
+#include <functional>
+
 namespace queue
 {
 
@@ -29,6 +31,12 @@ public:
 
     //! The next @p count commits fail with @p error and change nothing.
     void failNextCommits(int count, const QString &error = QStringLiteral("injected_failure"));
+    //! Every commit @p refuse returns true for fails and changes nothing,
+    //! until the rule is replaced (an empty function lifts it).
+    void failCommitsWhere(std::function<bool(const QueueTransaction &)> refuse)
+    {
+        _refuse = std::move(refuse);
+    }
 
     int commitCount() const { return _commits; }
     //! Results ever recorded for a run: an interrupted run must appear once.
@@ -70,6 +78,7 @@ private:
     QHash<qint64, int> _runNumbers; //!< post id -> last run number
     qint64 _nextPostId = 1;
     int _failures = 0;
+    std::function<bool(const QueueTransaction &)> _refuse;
     QString _failureError;
     int _commits = 0;
 };

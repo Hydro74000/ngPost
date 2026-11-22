@@ -2266,6 +2266,20 @@ Gravar o arquivo NZB delas em %2 em vez da pasta atual?</translation>
         <source>ngPost queue</source>
         <translation>Fila do ngPost</translation>
     </message>
+    <message>
+        <source>Saving the queue before closing...</source>
+        <translation>A guardar a fila antes de fechar...</translation>
+    </message>
+    <message>
+        <source>Queue not saved</source>
+        <translation>Fila não guardada</translation>
+    </message>
+    <message>
+        <source>The queue could not be saved, so ngPost stays open.
+The log tells why; resuming the posts tries again.</source>
+        <translation>Não foi possível guardar a fila, por isso o ngPost permanece aberto.
+O registo indica o motivo; retomar os envios tenta de novo.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -4695,6 +4709,14 @@ O seu ficheiro de configuração activo é:
     <message>
         <source>Some posts could not be sent and remain in the queue.</source>
         <translation>Algumas postagens não puderam ser enviadas e permanecem na fila.</translation>
+    </message>
+    <message>
+        <source>ngPost is closing: nothing new is posted.</source>
+        <translation>O ngPost está a fechar: nada de novo é publicado.</translation>
+    </message>
+    <message>
+        <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
+        <translation>A sair sem a fila guardada: os envios interrompidos podem ser retomados a partir do histórico.</translation>
     </message>
 </context>
 <context>

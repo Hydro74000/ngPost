@@ -2257,6 +2257,20 @@ Write their NZB file to %2 instead of their current folder?</source>
         <source>ngPost queue</source>
         <translation>File ngPost</translation>
     </message>
+    <message>
+        <source>Saving the queue before closing...</source>
+        <translation>Enregistrement de la file avant fermeture...</translation>
+    </message>
+    <message>
+        <source>Queue not saved</source>
+        <translation>File non enregistrée</translation>
+    </message>
+    <message>
+        <source>The queue could not be saved, so ngPost stays open.
+The log tells why; resuming the posts tries again.</source>
+        <translation>La file n&apos;a pas pu être enregistrée : ngPost reste ouvert.
+Le journal en donne la raison ; reprendre les envois réessaie.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -4686,6 +4700,14 @@ Votre fichier de configuration actif est :
     <message>
         <source>Some posts could not be sent and remain in the queue.</source>
         <translation>Certains posts n’ont pas pu être envoyés et restent dans la file.</translation>
+    </message>
+    <message>
+        <source>ngPost is closing: nothing new is posted.</source>
+        <translation>ngPost se ferme : aucun nouvel envoi n&apos;est accepté.</translation>
+    </message>
+    <message>
+        <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
+        <translation>Sortie sans que la file soit enregistrée : les envois interrompus peuvent être repris depuis l&apos;historique.</translation>
     </message>
 </context>
 <context>

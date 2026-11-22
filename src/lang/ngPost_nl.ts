@@ -2268,6 +2268,20 @@ Hun NZB-bestand naar %2 schrijven in plaats van hun huidige map?</translation>
         <source>ngPost queue</source>
         <translation>ngPost-wachtrij</translation>
     </message>
+    <message>
+        <source>Saving the queue before closing...</source>
+        <translation>Wachtrij wordt opgeslagen voor het afsluiten...</translation>
+    </message>
+    <message>
+        <source>Queue not saved</source>
+        <translation>Wachtrij niet opgeslagen</translation>
+    </message>
+    <message>
+        <source>The queue could not be saved, so ngPost stays open.
+The log tells why; resuming the posts tries again.</source>
+        <translation>De wachtrij kon niet worden opgeslagen, dus ngPost blijft open.
+Het logboek vermeldt de reden; de posts hervatten probeert het opnieuw.</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -4700,6 +4714,14 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
     <message>
         <source>Some posts could not be sent and remain in the queue.</source>
         <translation>Sommige posts konden niet worden verzonden en blijven in de wachtrij.</translation>
+    </message>
+    <message>
+        <source>ngPost is closing: nothing new is posted.</source>
+        <translation>ngPost wordt afgesloten: er wordt niets nieuws gepost.</translation>
+    </message>
+    <message>
+        <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
+        <translation>Afsluiten zonder opgeslagen wachtrij: de onderbroken posts kunnen vanuit de geschiedenis worden hervat.</translation>
     </message>
 </context>
 <context>

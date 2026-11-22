@@ -31,9 +31,20 @@ PostingJobExecutor::PostingJobExecutor(const PostQueue *queue,
 
 PostingJobExecutor::~PostingJobExecutor()
 {
-    // The job's own destructor stops a tool that still runs.
-    for (const Runtime &runtime : std::as_const(_runtimes))
-        delete runtime.job.data();
+    // Torn down with work still running (an exit whose close could not be
+    // written): a transfer stops the way a Keep does, producers joined and
+    // confirmed articles flushed, before its job is deleted. No result is
+    // recorded: the run is found unfinished at the next start. The job's own
+    // destructor stops a tool that still runs.
+    for (const Runtime &runtime : std::as_const(_runtimes)) {
+        PostingJob *job = runtime.job;
+        if (!job)
+            continue;
+        disconnect(job, nullptr, this, nullptr);
+        if (runtime.phase != Phase::Preparing)
+            job->finishTransfer();
+        delete job;
+    }
 }
 
 QString PostingJobExecutor::key(qint64 postId, const QString &runId, const QString &setId)
@@ -209,10 +220,18 @@ void PostingJobExecutor::activate(qint64 postId, const QString &runId, const QSt
         }, Qt::QueuedConnection);
     emit runtimeActivated(postId, job);
     // Bound now, started on the next turn of the event loop, as the historical
-    // queue did: a stop asked in between ends it before any byte is sent.
-    QMetaObject::invokeMethod(job, [job, manifest = _manifests.take(key(postId, runId, setId))] {
-        job->activateTransfer(manifest);
-    }, Qt::QueuedConnection);
+    // queue did: a stop asked in between ends it before any byte is sent. A
+    // Keep in between took the runtime away: then it never starts at all.
+    QMetaObject::invokeMethod(this,
+                              [this,
+                               postId,
+                               runId,
+                               job = QPointer<PostingJob>(job),
+                               manifest = _manifests.take(key(postId, runId, setId))] {
+        if (job && isCurrent(postId, job, runId, Phase::Transferring))
+            job->activateTransfer(manifest);
+    },
+                              Qt::QueuedConnection);
 }
 
 AttemptResult PostingJobExecutor::notSent(const QString &result)

@@ -76,12 +76,14 @@ void QueueScheduler::reevaluate()
     if (_technicalPause)
         return; // only the last durable state is known: nothing starts
     handleIntent();
-    if (_queue->isPaused())
+    if (_queue->isPaused() || _closing)
         return; // a running step finishes; nothing new starts, not even a preparation
     // The head first: anticipation never delays a transfer that can start.
     activateHead();
-    if (_technicalPause)
-        return; // a write just failed: not one more decision
+    // A write just failed, or the admission's handlers closed or paused the
+    // queue: not one more decision.
+    if (_technicalPause || _closing || _queue->isPaused())
+        return;
     if (const QueueEntry *prep = _queue->entryInSlot(Slot::Preparation))
         continuePreparation(*prep);
     else
@@ -132,9 +134,10 @@ bool QueueScheduler::handleIntent()
             requestStop(*prep, PendingStop::Preempt, Disposition::Keep);
         return false;
     }
-    if (_queue->isPaused())
+    if (_queue->isPaused() || _closing)
         return false;
     if (_preflight) {
+        const qint64 activeId = active->postId;
         const Admission admission = _preflight(*target, *active);
         if (admission == Admission::Wait)
             return false;
@@ -143,6 +146,11 @@ bool QueueScheduler::handleIntent()
                 enterTechnicalPause(QStringLiteral("store_failed"));
             return false;
         }
+        // Its handlers may change the queue: everything is checked again.
+        active = _queue->activeEntry();
+        if (_closing || _technicalPause || !active || active->postId != activeId
+            || active->lifecycle != Lifecycle::Posting || _queue->intent().isNull())
+            return false;
     }
     const QueueEntry activeCopy = *active;
     if (!_queue->engineSetIntentSwitching()) {
@@ -339,19 +347,24 @@ void QueueScheduler::activateHead()
     const QueueEntry *head = _queue->headEntry();
     if (!head || !head->isReady())
         return; // strict order: never start a ready entry behind a head still preparing
+    const qint64 postId = head->postId;
     if (_admission) {
         const Admission admission = _admission(*head);
-        if (admission == Admission::Wait)
+        // Its handlers may change the queue (a refused VPN closes it): look again.
+        head = _queue->find(postId);
+        if (!head || admission == Admission::Wait)
             return;
         if (admission == Admission::Blocked) {
-            if (!_queue->engineBlock(head->postId,
+            if (!_queue->engineBlock(postId,
                                      { QStringLiteral("vpn_unavailable"), {} },
                                      head->lifecycle))
                 enterTechnicalPause(QStringLiteral("store_failed"));
             return;
         }
+        if (_closing || _technicalPause || _queue->isPaused() || _queue->activeEntry()
+            || !head->isReady())
+            return;
     }
-    const qint64 postId = head->postId;
     const QString setId = head->artifacts.id;
     if (!_queue->engineActivate(postId)) {
         enterTechnicalPause(QStringLiteral("store_failed"));
@@ -483,6 +496,45 @@ bool QueueScheduler::recordQuiesced(qint64 postId,
     _remainingSteps.remove(postId);
     _preparedBytes.remove(postId);
     return true;
+}
+
+void QueueScheduler::keepRunningForClose(bool letTransferFinish)
+{
+    _closing = true;
+    // Writes still wait (an F1, maybe): an entry may look Posting while its
+    // runtime already finalizes. No stop is asked on a state not known.
+    if (_technicalPause)
+        return;
+    // A "post now" not yet switching is dropped; a switch under way ends as a
+    // switch, and nothing starts after it while closing.
+    const PostNowIntent intent = _queue->intent();
+    if (!intent.isNull() && intent.state == PostNowIntent::State::Pending
+        && !_queue->engineDropIntent(QStringLiteral("closing"))) {
+        enterTechnicalPause(QStringLiteral("store_failed"));
+        return;
+    }
+    for (const QueueEntry &entry : _queue->snapshot(Domain::Session)) {
+        if (_pendingStops.contains(entry.postId))
+            continue;
+        // A switch whose stop could not be written is asked again as a switch.
+        if (entry.lifecycle == Lifecycle::Posting && intent.state == PostNowIntent::State::Switching
+            && entry.runId == intent.activeRunId) {
+            if (!requestStop(entry, PendingStop::SwitchActive, Disposition::Keep))
+                return;
+            continue;
+        }
+        // Kept as after a technical stop: not held, a transfer keeps its archives.
+        const bool stops = entry.lifecycle == Lifecycle::Preparing
+            || (entry.lifecycle == Lifecycle::Posting && !letTransferFinish);
+        if (stops && !requestStop(entry, PendingStop::Technical, Disposition::Keep))
+            return; // the technical pause tells the close it failed
+    }
+}
+
+void QueueScheduler::cancelClose()
+{
+    _closing = false;
+    scheduleReevaluate();
 }
 
 void QueueScheduler::enterTechnicalPause(const QString &reason)

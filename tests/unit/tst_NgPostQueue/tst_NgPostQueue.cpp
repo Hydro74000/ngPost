@@ -17,6 +17,7 @@
 #include "queue/QueueScheduler.h"
 #include "utils/PathHelper.h"
 
+#include <QSignalSpy>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -418,6 +419,218 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!queue->find(id), 30000);
         QCOMPARE(env.scalar(QStringLiteral("SELECT status FROM posts")).toString(),
                  QStringLiteral("success"));
+    }
+
+    void aCloseKeepsTheQueueForARestart()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, { QStringLiteral("--slow-mode-ms"), QStringLiteral("20") }),
+                 qPrintable(error));
+        const NgPost::QueueAdmission first = env.ngPost->admitPost(env.post(QStringLiteral("first"),
+                                                                            2 * 1024 * 1024),
+                                                                   Origin::Cli);
+        QVERIFY(first.accepted);
+        const NgPost::QueueAdmission second = env.ngPost->admitPost(env.post(
+                                                                        QStringLiteral("second")),
+                                                                    Origin::Cli);
+        QVERIFY(second.accepted);
+        QTRY_VERIFY_WITH_TIMEOUT(env.mock.receivedArticles().size() > 5, 20000);
+        QSignalSpy closed(env.ngPost.get(), &NgPost::queueClosed);
+        env.ngPost->closeQueueKeeping();
+        // Nothing is admitted from now on, not even before the close is over.
+        QVERIFY(!env.ngPost->admitPost(env.post(QStringLiteral("late")), Origin::Cli).accepted);
+        env.ngPost->resume(); // nor started again
+        QTRY_COMPARE_WITH_TIMEOUT(closed.count(), 1, 20000);
+        QVERIFY(closed.at(0).at(0).toBool());
+
+        PostQueue *queue = env.ngPost->postQueue();
+        QCOMPARE(queue->order(), (QList<qint64>{ first.postId, second.postId }));
+        QCOMPARE(queue->find(first.postId)->lifecycle, Lifecycle::Queued);
+        QVERIFY(queue->find(first.postId)->transferManifestEngaged);
+        QVERIFY(!queue->find(first.postId)->held);
+        QCOMPARE(env.scalar(QStringLiteral("SELECT state FROM post_runs WHERE post_id=%1 AND "
+                                           "run_no=1")
+                                .arg(first.postId))
+                     .toString(),
+                 QStringLiteral("interrupted"));
+        QCOMPARE(queue->find(second.postId)->lifecycle, Lifecycle::Queued);
+        const int received = env.mock.receivedArticles().size();
+        QTest::qWait(500);
+        QCOMPARE(env.mock.receivedArticles().size(), received); // nothing goes on or starts
+        QCOMPARE(env.scalar(QStringLiteral("SELECT COUNT(*) FROM posts")).toInt(), 2);
+    }
+
+    void aCloseBeforeTheTransferStartsSendsNothing()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        const NgPost::QueueAdmission admission = env.ngPost->admitPost(env.post(QStringLiteral(
+                                                                           "unsent")),
+                                                                       Origin::Cli);
+        QVERIFY(admission.accepted);
+        env.ngPost->startQueuedWork(); // activated; its start waits for the event loop
+        QCOMPARE(env.ngPost->postQueue()->find(admission.postId)->lifecycle, Lifecycle::Posting);
+        QSignalSpy closed(env.ngPost.get(), &NgPost::queueClosed);
+        env.ngPost->closeQueueKeeping(); // before that turn
+        QTRY_COMPARE_WITH_TIMEOUT(closed.count(), 1, 10000);
+        QVERIFY(closed.at(0).at(0).toBool());
+        QTest::qWait(500);
+        QCOMPARE(env.mock.receivedArticles().size(), 0);
+        const QueueEntry *entry = env.ngPost->postQueue()->find(admission.postId);
+        QVERIFY(entry);
+        QCOMPARE(entry->lifecycle, Lifecycle::Queued);
+        QVERIFY(!entry->transferManifestEngaged);
+        // The kept runtime never started: no file was registered for a transfer.
+        QCOMPARE(env.scalar(QStringLiteral("SELECT COUNT(*) FROM post_files")).toInt(), 0);
+        QCOMPARE(
+            env.scalar(QStringLiteral("SELECT transfer_manifest_complete FROM post_info")).toInt(),
+            0);
+    }
+
+    void aCloseThatCannotBeWrittenSaysSo()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, { QStringLiteral("--slow-mode-ms"), QStringLiteral("30") }),
+                 qPrintable(error));
+        const NgPost::QueueAdmission admission = env.ngPost->admitPost(
+            env.post(QStringLiteral("kept"), 2 * 1024 * 1024),
+            Origin::Cli);
+        QVERIFY(admission.accepted);
+        QTRY_VERIFY_WITH_TIMEOUT(env.mock.receivedArticles().size() > 0, 15000);
+        QVERIFY(env.sql(
+            QStringLiteral("CREATE TRIGGER refuse_stop BEFORE UPDATE OF stage ON post_queue WHEN "
+                           "NEW.stage='quiescing' BEGIN SELECT RAISE(ABORT, 'injected'); END")));
+        QSignalSpy closed(env.ngPost.get(), &NgPost::queueClosed);
+        env.ngPost->closeQueueKeeping();
+        QTRY_COMPARE_WITH_TIMEOUT(closed.count(), 1, 5000);
+        QVERIFY(!closed.at(0).at(0).toBool()); // never announced as saved
+        QVERIFY(env.ngPost->postQueue()->find(admission.postId));
+        QVERIFY(env.ngPost->isPaused()); // held; Resume is the way out
+        QVERIFY(!env.ngPost->isClosingQueue());
+
+        QVERIFY(env.sql(QStringLiteral("DROP TRIGGER refuse_stop")));
+        env.ngPost->closeQueueKeeping(); // asked again: written this time
+        QTRY_COMPARE_WITH_TIMEOUT(closed.count(), 2, 20000);
+        QVERIFY(closed.at(1).at(0).toBool());
+        QCOMPARE(env.ngPost->postQueue()->find(admission.postId)->lifecycle, Lifecycle::Queued);
+    }
+
+    void aCloseNeverStopsAPostWhoseResultWaits()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        QVERIFY(env.sql(QStringLiteral(
+            "CREATE TRIGGER refuse_f1 BEFORE UPDATE OF finalization_state ON post_runs WHEN "
+            "NEW.finalization_state='nzb_pending' BEGIN SELECT RAISE(ABORT, 'injected'); END")));
+        const NgPost::QueueAdmission admission = env.ngPost->admitPost(env.post(
+                                                                           QStringLiteral("ended")),
+                                                                       Origin::Cli);
+        QVERIFY(admission.accepted);
+        QTRY_VERIFY_WITH_TIMEOUT(env.ngPost->queueSchedulerForTest()->isTechnicallyPaused(), 15000);
+        QSignalSpy closed(env.ngPost.get(), &NgPost::queueClosed);
+        env.ngPost->closeQueueKeeping(); // the retry of F1 fails again
+        QTRY_COMPARE_WITH_TIMEOUT(closed.count(), 1, 5000);
+        QVERIFY(!closed.at(0).at(0).toBool());
+        QVERIFY(env.ngPost->postQueue()->find(admission.postId));
+        QCOMPARE(env.scalar(QStringLiteral("SELECT COUNT(*) FROM post_runs")).toInt(), 1);
+
+        QVERIFY(env.sql(QStringLiteral("DROP TRIGGER refuse_f1")));
+        env.ngPost->closeQueueKeeping(); // F1 written: the post ends, it is not kept
+        QTRY_COMPARE_WITH_TIMEOUT(closed.count(), 2, 20000);
+        QVERIFY(closed.at(1).at(0).toBool());
+        QVERIFY(!env.ngPost->postQueue()->find(admission.postId));
+        QCOMPARE(env.scalar(QStringLiteral("SELECT status FROM posts")).toString(),
+                 QStringLiteral("success"));
+        QCOMPARE(env.scalar(QStringLiteral("SELECT COUNT(*) FROM post_runs")).toInt(), 1);
+    }
+
+    void aFatalExitKeepsTheTransferForARestart()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, { QStringLiteral("--slow-mode-ms"), QStringLiteral("20") }),
+                 qPrintable(error));
+        const NgPost::QueueAdmission admission = env.ngPost->admitPost(
+            env.post(QStringLiteral("cut"), 2 * 1024 * 1024),
+            Origin::Cli);
+        QVERIFY(admission.accepted);
+        QTRY_VERIFY_WITH_TIMEOUT(env.mock.receivedArticles().size() > 5, 20000);
+        QSignalSpy closed(env.ngPost.get(), &NgPost::queueClosed);
+        env.ngPost->requestExitForTest(false);
+        QVERIFY(env.ngPost->exitPendingForTest());
+        QTRY_COMPARE_WITH_TIMEOUT(closed.count(), 1, 20000);
+        QVERIFY(closed.at(0).at(0).toBool());
+        const QueueEntry *entry = env.ngPost->postQueue()->find(admission.postId);
+        QVERIFY(entry);
+        QCOMPARE(entry->lifecycle, Lifecycle::Queued);
+        QVERIFY(entry->transferManifestEngaged);
+        QVERIFY(env.scalar(QStringLiteral("SELECT status FROM posts")).toString()
+                != QLatin1String("success"));
+    }
+
+    void aFatalExitWhoseCloseFailsStillStopsTheTransfer()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, { QStringLiteral("--slow-mode-ms"), QStringLiteral("20") }),
+                 qPrintable(error));
+        const NgPost::QueueAdmission admission = env.ngPost->admitPost(
+            env.post(QStringLiteral("cut"), 2 * 1024 * 1024),
+            Origin::Cli);
+        QVERIFY(admission.accepted);
+        QTRY_VERIFY_WITH_TIMEOUT(env.mock.receivedArticles().size() > 5, 20000);
+        QVERIFY(env.sql(
+            QStringLiteral("CREATE TRIGGER refuse_stop BEFORE UPDATE OF stage ON post_queue WHEN "
+                           "NEW.stage='quiescing' BEGIN SELECT RAISE(ABORT, 'injected'); END")));
+        QSignalSpy closed(env.ngPost.get(), &NgPost::queueClosed);
+        env.ngPost->requestExitForTest(false);
+        QTRY_COMPARE_WITH_TIMEOUT(closed.count(), 1, 5000);
+        QVERIFY(!closed.at(0).at(0).toBool());
+        QTRY_COMPARE_WITH_TIMEOUT(env.ngPost->exitRequestCountForTest(), 1, 5000);
+        // What the exit tears down: the transfer stops first, its confirmed
+        // articles recorded, and nothing is sent after.
+        env.ngPost.reset();
+        const int received = env.mock.receivedArticles().size();
+        QTest::qWait(500);
+        QCOMPARE(env.mock.receivedArticles().size(), received);
+        const int posted = env
+                               .scalar(QStringLiteral(
+                                   "SELECT COUNT(*) FROM post_articles WHERE status='posted'"))
+                               .toInt();
+        QVERIFY2(posted >= received - 1 && posted <= received,
+                 qPrintable(
+                     QStringLiteral("%1 recorded for %2 received").arg(posted).arg(received)));
+    }
+
+    void aFatalExitLetsTheTransferItWaitsForEnd()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, { QStringLiteral("--slow-mode-ms"), QStringLiteral("20") }),
+                 qPrintable(error));
+        const NgPost::QueueAdmission first = env.ngPost->admitPost(
+            env.post(QStringLiteral("direct"), 512 * 1024),
+            Origin::Cli);
+        QVERIFY(first.accepted);
+        const NgPost::QueueAdmission second = env.ngPost->admitPost(env.post(
+                                                                        QStringLiteral("next")),
+                                                                    Origin::Cli);
+        QVERIFY(second.accepted);
+        QTRY_VERIFY_WITH_TIMEOUT(env.mock.receivedArticles().size() > 0, 20000);
+        QSignalSpy closed(env.ngPost.get(), &NgPost::queueClosed);
+        env.ngPost->requestExitForTest(true);
+        QTRY_COMPARE_WITH_TIMEOUT(closed.count(), 1, 20000);
+        QVERIFY(closed.at(0).at(0).toBool());
+        QVERIFY(!env.ngPost->postQueue()->find(first.postId)); // ended on its own
+        QCOMPARE(env.scalar(
+                        QStringLiteral("SELECT status FROM posts WHERE id=%1").arg(first.postId))
+                     .toString(),
+                 QStringLiteral("success"));
+        QCOMPARE(env.ngPost->postQueue()->find(second.postId)->lifecycle, Lifecycle::Queued);
     }
 
     void resumeEndsATechnicalPause()

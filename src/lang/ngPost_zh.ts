@@ -2267,6 +2267,20 @@ Write their NZB file to %2 instead of their current folder?</source>
         <source>ngPost queue</source>
         <translation>ngPost 队列</translation>
     </message>
+    <message>
+        <source>Saving the queue before closing...</source>
+        <translation>关闭前正在保存队列...</translation>
+    </message>
+    <message>
+        <source>Queue not saved</source>
+        <translation>队列未保存</translation>
+    </message>
+    <message>
+        <source>The queue could not be saved, so ngPost stays open.
+The log tells why; resuming the posts tries again.</source>
+        <translation>无法保存队列，因此 ngPost 保持打开。
+日志中说明了原因；恢复发布会重试。</translation>
+    </message>
 </context>
 <context>
     <name>NgPost</name>
@@ -4696,6 +4710,14 @@ Your active configuration file is:
     <message>
         <source>Some posts could not be sent and remain in the queue.</source>
         <translation>部分帖子未能发送，仍保留在队列中。</translation>
+    </message>
+    <message>
+        <source>ngPost is closing: nothing new is posted.</source>
+        <translation>ngPost 正在关闭：不会发布新的内容。</translation>
+    </message>
+    <message>
+        <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
+        <translation>退出时未保存队列：中断的发布可以从历史记录中恢复。</translation>
     </message>
 </context>
 <context>

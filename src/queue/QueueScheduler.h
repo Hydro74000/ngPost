@@ -78,6 +78,14 @@ public:
     //! has applied every acknowledgement left waiting. Distinct from the user's
     //! pause, which the queue itself records.
     bool isTechnicallyPaused() const { return _technicalPause; }
+    //! A close that keeps the queue: nothing new starts, every running
+    //! preparation, and the transfer unless @p letTransferFinish, is stopped
+    //! and kept for a restart; engaged finalizations go on. Unlike a pause, a
+    //! transfer left to finish is not held.
+    void keepRunningForClose(bool letTransferFinish = false);
+    //! The close failed: the queue may start things again (once resumed).
+    void cancelClose();
+    bool isClosing() const { return _closing; }
     QString technicalPauseReason() const { return _technicalReason; }
 
 signals:
@@ -156,6 +164,7 @@ private:
     qint64 _stepRunning = 0;                        //!< post id whose step is running
     QHash<qint64, PendingStop> _pendingStops;
     qint64 _pausedTransfer = 0;
+    bool _closing = false; //!< keepRunningForClose(): nothing new starts
     bool _scheduled = false;
     PreparationFailure _preparationFailure = PreparationFailure::Block;
     bool _technicalPause = false;

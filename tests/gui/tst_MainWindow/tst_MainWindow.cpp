@@ -87,6 +87,7 @@
 #include <QPointer>
 #include "utils/PathHelper.h"
 #include "NgPost.h"
+#include "queue/PostQueue.h"
 #include "PostingJob.h"
 #include "PostingJobOptions.h"
 #include "history/PostHistoryService.h"
@@ -259,6 +260,8 @@ private slots:
     void auto_post_failing_before_transfer_closes_its_line();
     void global_post_controls_pause_resume_and_cancel_data();
     void global_post_controls_pause_resume_and_cancel();
+    //! Queue engine: closing keeps the queue; the window goes only once it is kept.
+    void closing_keeps_the_queue_before_the_window_goes();
     void shutdown_waits_for_every_post_data();
     void shutdown_waits_for_every_post();
     void shutdown_requires_new_completed_post_data();
@@ -5472,6 +5475,74 @@ void TestMainWindow::shutdown_waits_for_every_post_data()
         QTest::newRow("close unstarted posts" + suffix)
             << false << autoClose << true << QString("close");
     }
+}
+
+void TestMainWindow::closing_keeps_the_queue_before_the_window_goes()
+{
+    if (qEnvironmentVariable("NGPOST_QUEUE_ENGINE") != QLatin1String("1"))
+        QSKIP("only the queue engine keeps posts when the window closes");
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    // ARTICLE_SIZE stays the default: it is process-wide and would leak into
+    // the next tests. Slow replies keep a 20 MB post going long enough.
+    QVERIFY(mock.start({ "--slow-mode-ms", "150" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              QString("GROUPS = alt.binaries.test\nthread = 1\nnzbPath = %1\n"
+                                      "[server]\nhost = 127.0.0.1\nport = %2\nssl = false\n"
+                                      "connection = 1\n")
+                                  .arg(root)
+                                  .arg(mock.port()),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    window->show();
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    QList<QPointer<PostingWidget>> posts{ qobject_cast<PostingWidget *>(tabs->widget(2)),
+                                          window->addNewQuickTab() };
+    for (int i = 0; i < posts.size(); ++i) {
+        QFile file(root + QString("/kept-%1.bin").arg(i));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(QByteArray(i == 0 ? 20 * 1024 * 1024 : 64000, char('a' + i)));
+        file.close();
+        posts[i]->addPath(file.fileName(), 0);
+        posts[i]->postFiles(true);
+    }
+    QTRY_VERIFY_WITH_TIMEOUT(mock.receivedArticles().size() > 1, 20000);
+    QVERIFY(ngPost.postQueue());
+    const QList<qint64> order = ngPost.postQueue()->order();
+    QCOMPARE(order.size(), 2);
+
+    bool confirmed = false;
+    QTimer confirm;
+    connect(&confirm, &QTimer::timeout, window, [&] {
+        for (auto *widget : QApplication::topLevelWidgets()) {
+            auto *box = qobject_cast<QMessageBox *>(widget);
+            if (box && box->text().startsWith("ngPost is currently posting.")) {
+                confirmed = true;
+                box->done(QMessageBox::Yes);
+            }
+        }
+    });
+    confirm.start(5);
+    QVERIFY(!window->close()); // not yet: the queue is being kept
+    confirm.stop();
+    QVERIFY(confirmed);
+    QVERIFY(window->isVisible());
+    QVERIFY(!window->close()); // asked again meanwhile: no second question
+    QTRY_VERIFY_WITH_TIMEOUT(!window->isVisible(), 20000);
+
+    QCOMPARE(ngPost.postQueue()->order(), order);
+    const queue::QueueEntry *first = ngPost.postQueue()->find(order.first());
+    QCOMPARE(first->lifecycle, queue::Lifecycle::Queued);
+    QVERIFY(first->transferManifestEngaged);
+    const int received = mock.receivedArticles().size();
+    QTest::qWait(300);
+    QCOMPARE(mock.receivedArticles().size(), received);
 }
 
 void TestMainWindow::shutdown_waits_for_every_post()

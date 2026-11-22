@@ -602,6 +602,11 @@ void NgPost::_connectVpnRecoverySignals()
             bool const stopForPreservation = _activeJob->_vpnRequired;
             if (stopForPreservation)
                 _activeJob->pause(PostingJob::PauseReason::VpnRecovery);
+            if (_activeJob->isQueueRuntime()) {
+                // The queue keeps a stopped transfer for a restart.
+                _requestExit(ERROR_CODE::ERR_VPN, !stopForPreservation);
+                return;
+            }
             _requestExit(ERROR_CODE::ERR_VPN, true);
             if (stopForPreservation)
                 emit _activeJob->stopPosting();
@@ -628,7 +633,9 @@ void NgPost::_connectVpnRecoverySignals()
         }
         if (_activeJob) {
             _activeJob->pause(PostingJob::PauseReason::VpnRecovery);
-            if (!useHMI()) {
+            if (!useHMI() && _activeJob->isQueueRuntime()) {
+                _requestExit(ERROR_CODE::ERR_VPN); // kept for a restart by the queue
+            } else if (!useHMI()) {
                 // Let PostingJob close every connection and flush the unknown
                 // article states before the normal no-jobs barrier exits with
                 // ERR_VPN. Exiting immediately here would recreate the crash
@@ -1758,6 +1765,12 @@ void NgPost::_requestExit(ERROR_CODE code, bool waitForActiveJob)
 {
     _pendingExitCode = static_cast<int>(code);
     _pendingExitWaitsForActiveJob = _pendingExitWaitsForActiveJob || waitForActiveJob;
+    // Queue engine: what runs is kept for a restart, not cut by the exit; a
+    // transfer the caller waits for ends on its own.
+    if (_postQueue && !_queueExitRequested) {
+        _queueExitRequested = true;
+        closeQueueKeeping(waitForActiveJob);
+    }
     // A VPN admission failure can be emitted synchronously while CLI parsing
     // is still running, before exec(). Qt ignores exit() in that window.
     QTimer::singleShot(0, this, [this]() { maybeFinishApplication(); });
@@ -1818,7 +1831,10 @@ void NgPost::maybeFinishApplication()
         _waitingForUnsubmittedPosts = false;
 #endif
     if (_pendingExitCode >= 0) {
-        if (_pendingExitWaitsForActiveJob && _activeJob)
+        if (_pendingExitWaitsForActiveJob && _activeJob && !_activeJob->isQueueRuntime())
+            return;
+        // Queue engine: the stops and finalizations, then what follows a post.
+        if (_queueClosing || !_ownersAwaitingTasks.isEmpty() || !_pendingReleases.isEmpty())
             return;
         if (_postCmdRunner && !_postCmdRunner->isIdle()) {
             if (!_waitingForPostCmds) {
@@ -1827,6 +1843,9 @@ void NgPost::maybeFinishApplication()
             }
             return;
         }
+#ifdef NGPOST_TESTING
+        ++_exitRequestCount;
+#endif
         QCoreApplication::exit(_pendingExitCode);
         return;
     }
@@ -1920,8 +1939,8 @@ void NgPost::pause()
 
 void NgPost::resume()
 {
-    if (_cancelingAll)
-        return;
+    if (_cancelingAll || _queueClosing || _queueClosed)
+        return; // a close keeping the queue holds it
     const auto notify = qScopeGuard([this] { emit postingStateChanged(); });
     if (_queueScheduler && _queueScheduler->isTechnicallyPaused())
         _queueScheduler->retryAfterTechnicalPause();

@@ -90,6 +90,37 @@ bool NgPost::_ensureQueueEngine()
     },
                                             lock->ownerId(),
                                             this);
+    _connectQueueExecutor();
+
+    QueueScheduler::Budget budget;
+    budget.preparedMax = _preparePacking ? 1 : 0; // lot C3: PREPARE_PACKING only
+    // Where a preparation writes. The free space budget itself is lot C6: until
+    // then a post that does not fit fails as it always did.
+    budget.rootFor = [](const QueueEntry &entry) {
+        const QString tmp = entry.options.job.tmpPath;
+        return QDir(tmp.isEmpty() ? QDir::tempPath() : tmp).absolutePath();
+    };
+    _queueScheduler = new QueueScheduler(_postQueue, _queueExecutor, budget, this);
+    // Until the queue view can show a blocked entry (C7a), a failed preparation
+    // ends its post as failed, as it always did.
+    _queueScheduler->setPreparationFailurePolicy(QueueScheduler::PreparationFailure::Retire);
+    _queueScheduler->setAdmission([this](const QueueEntry &) {
+        if (!_vpnManager)
+            return QueueScheduler::Admission::Proceed;
+        switch (_vpnManager->admitJob(_nntpServers, _vpnManager->jobNeedsVpn(_nntpServers))) {
+        case VpnManager::Admission::Proceed: return QueueScheduler::Admission::Proceed;
+        case VpnManager::Admission::Wait: return QueueScheduler::Admission::Wait;
+        case VpnManager::Admission::Blocked: break;
+        }
+        return QueueScheduler::Admission::Blocked;
+    });
+    _connectQueueEvents();
+    _ownerLock = lock.release();
+    return true;
+}
+
+void NgPost::_connectQueueExecutor()
+{
     connect(_queueExecutor,
             &PostingJobExecutor::runtimeActivated,
             this,
@@ -120,29 +151,10 @@ bool NgPost::_ensureQueueEngine()
                 _releaseQueuedPost(postId);
         },
                 Qt::QueuedConnection);
+}
 
-    QueueScheduler::Budget budget;
-    budget.preparedMax = _preparePacking ? 1 : 0; // lot C3: PREPARE_PACKING only
-    // Where a preparation writes. The free space budget itself is lot C6: until
-    // then a post that does not fit fails as it always did.
-    budget.rootFor = [](const QueueEntry &entry) {
-        const QString tmp = entry.options.job.tmpPath;
-        return QDir(tmp.isEmpty() ? QDir::tempPath() : tmp).absolutePath();
-    };
-    _queueScheduler = new QueueScheduler(_postQueue, _queueExecutor, budget, this);
-    // Until the queue view can show a blocked entry (C7a), a failed preparation
-    // ends its post as failed, as it always did.
-    _queueScheduler->setPreparationFailurePolicy(QueueScheduler::PreparationFailure::Retire);
-    _queueScheduler->setAdmission([this](const QueueEntry &) {
-        if (!_vpnManager)
-            return QueueScheduler::Admission::Proceed;
-        switch (_vpnManager->admitJob(_nntpServers, _vpnManager->jobNeedsVpn(_nntpServers))) {
-        case VpnManager::Admission::Proceed: return QueueScheduler::Admission::Proceed;
-        case VpnManager::Admission::Wait: return QueueScheduler::Admission::Wait;
-        case VpnManager::Admission::Blocked: break;
-        }
-        return QueueScheduler::Admission::Blocked;
-    });
+void NgPost::_connectQueueEvents()
+{
     connect(_queueScheduler,
             &QueueScheduler::technicalPauseChanged,
             this,
@@ -152,6 +164,8 @@ bool NgPost::_ensureQueueEngine()
             // A stop that could not be written: Cancel and Resume must stay
             // available to ask again.
             _cancelingAll = false;
+            if (_queueClosing)
+                QMetaObject::invokeMethod(this, &NgPost::_checkQueueClosed, Qt::QueuedConnection);
         }
         emit postingStateChanged();
         maybeFinishApplication();
@@ -169,7 +183,7 @@ bool NgPost::_ensureQueueEngine()
 #else
         Q_UNUSED(postId)
 #endif
-        if (!hasPostingJobs()) {
+        if (!hasPostingJobs() && !_queueClosing) {
             _queuePaused = false;
             _cancelingAll = false;
             if (_postQueue->isPaused())
@@ -178,13 +192,15 @@ bool NgPost::_ensureQueueEngine()
         emit postingStateChanged();
         QMetaObject::invokeMethod(this, &NgPost::maybeFinishApplication, Qt::QueuedConnection);
     });
+    connect(_postQueue, &PostQueue::changed, this, [this] {
+        if (_queueClosing)
+            QMetaObject::invokeMethod(this, &NgPost::_checkQueueClosed, Qt::QueuedConnection);
+    });
     connect(_postQueue, &PostQueue::entryChanged, this, [this](qint64 postId) {
         const QueueEntry *entry = _postQueue->find(postId);
         if (entry && entry->blocked.isBlocked())
             QMetaObject::invokeMethod(this, &NgPost::maybeFinishApplication, Qt::QueuedConnection);
     });
-    _ownerLock = lock.release();
-    return true;
 }
 
 void NgPost::_stopQueueRuntimes()
@@ -289,6 +305,10 @@ void NgPost::startQueuedWork()
 bool NgPost::_queueAdmissionConfirmed(QueueAdmission *admission)
 {
     _lastPostingStartCanceled = false;
+    if (_queueClosing || _queueClosed) {
+        admission->error = tr("ngPost is closing: nothing new is posted.");
+        return false;
+    }
     if (!_ensureQueueEngine()) {
         admission->error = tr("history store is not available");
         return false;
@@ -531,6 +551,72 @@ bool NgPost::_removeQueuedPosts(bool monitoredOnly)
     // A running entry is only asked to stop once its Quiescing is written:
     // a technical pause here means that request did not leave.
     return removed.ok() && !(_queueScheduler && _queueScheduler->isTechnicallyPaused());
+}
+
+void NgPost::closeQueueKeeping(bool letTransferFinish)
+{
+    if (!_postQueue) {
+        QMetaObject::invokeMethod(this, [this] { emit queueClosed(true); }, Qt::QueuedConnection);
+        return;
+    }
+    // Nothing is admitted any more. The folder monitor goes on: what it finds
+    // is refused and tried again later, so a close that fails loses no file.
+    _queueClosing = true;
+    // A close asked again after a failed one first writes what was left; if
+    // that still fails, nothing is stopped on a state not known.
+    if (_queueScheduler->isTechnicallyPaused())
+        _queueScheduler->retryAfterTechnicalPause();
+    _queueScheduler->keepRunningForClose(letTransferFinish);
+    // Jobs of the historical coordinator stop as they always did.
+    _resetShutdownCompletion();
+    qDeleteAll(_pendingJobs);
+    _pendingJobs.clear();
+    if (_activeJob && !_activeJob->isQueueRuntime())
+        _activeJob->onStopPosting();
+    QMetaObject::invokeMethod(this, &NgPost::_checkQueueClosed, Qt::QueuedConnection);
+}
+
+void NgPost::_checkQueueClosed()
+{
+    if (!_queueClosing)
+        return;
+    const bool failed = _queueScheduler && _queueScheduler->isTechnicallyPaused();
+    if (!failed && _queueHasRuntimes())
+        return; // a stop or a finalization still runs
+    _queueClosing = false;
+    _queueClosed = !failed;
+    if (failed) {
+        // Nothing starts again on its own, the transfer is held: Resume
+        // retries the writes.
+        _queueScheduler->cancelClose();
+        _queuePaused = true;
+        _postQueue->setPaused(true);
+        emit postingStateChanged();
+    }
+    emit queueClosed(!failed);
+    if (_pendingExitCode >= 0) {
+        // The exit goes on: what still runs is stopped, producers joined and
+        // confirmed articles flushed, when the runtimes are torn down.
+        if (failed)
+            _error(tr("Exiting without the queue saved: the interrupted posts can be resumed "
+                      "from the history."));
+        QMetaObject::invokeMethod(this, &NgPost::maybeFinishApplication, Qt::QueuedConnection);
+    }
+}
+
+bool NgPost::queueHasEntries() const
+{
+    return _postQueue && !_postQueue->snapshot(Domain::Session).isEmpty();
+}
+
+bool NgPost::_queueHasRuntimes() const
+{
+    if (!_postQueue)
+        return false;
+    for (const QueueEntry &entry : _postQueue->snapshot(Domain::Session))
+        if (entry.hasRuntime())
+            return true;
+    return false;
 }
 
 bool NgPost::_queueHasWork() const

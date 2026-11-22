@@ -120,6 +120,10 @@ private:
     int _progressJobNumber = 1;
     QPushButton *_par2SettingsButton = nullptr;
     bool _submittingAll = false;
+    //! Queue engine: the queue is being kept before the window closes.
+    bool _keepingQueueForClose = false;
+    bool _closeApproved = false; //!< the queue was kept: the next close goes through
+    void _keepQueueThenClose();
     //! NZB destination path the prepared tabs were last offered to follow.
     QString _offeredNzbPath;
     void _offerNzbPathToTabs();

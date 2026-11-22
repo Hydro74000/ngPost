@@ -324,6 +324,149 @@ private slots:
         QCOMPARE(f.state(b), Lifecycle::Posting);
     }
 
+    void aCloseKeepsTheTransferAndThePreparation()
+    {
+        Fixture f(0);
+        const qint64 a = f.add(QStringLiteral("a"));
+        const qint64 b = f.add(QStringLiteral("b"), true);
+        const qint64 c = f.add(QStringLiteral("c"));
+        settle();
+        QVERIFY(f.executor.ackTransferStarted(a));
+        QVERIFY(f.queue.postNow(b, f.queue.view()).ok()); // b must be prepared first
+        settle();
+        QCOMPARE(f.state(b), Lifecycle::Preparing);
+        QSignalSpy dropped(&f.queue, &PostQueue::intentDropped);
+        f.scheduler->keepRunningForClose();
+        QCOMPARE(dropped.count(), 1);
+        QCOMPARE(dropped.at(0).at(1).toString(), QStringLiteral("closing"));
+        QCOMPARE(f.executor.last(Kind::Interrupt, a)->disposition, Disposition::Keep);
+        QCOMPARE(f.executor.last(Kind::Interrupt, b)->disposition, Disposition::Keep);
+        QVERIFY(f.executor.ackQuiesced(a, true, true));
+        QVERIFY(f.executor.ackQuiesced(b));
+        settle();
+        QCOMPARE(f.state(a), Lifecycle::Queued);
+        QVERIFY(f.queue.find(a)->transferManifestEngaged);
+        QVERIFY(!f.queue.find(a)->held); // kept, not suspended
+        QCOMPARE(f.queue.find(a)->runNo, 2);
+        QCOMPARE(f.state(b), Lifecycle::Queued);
+        QCOMPARE(f.state(c), Lifecycle::Queued);
+        QCOMPARE(f.queue.order(), (QList<qint64>{ a, b, c }));
+        QCOMPARE(f.executor.count(Kind::Activate, a), 1); // nothing started again
+        QCOMPARE(f.executor.count(Kind::Activate, c), 0);
+    }
+
+    void aCloseCanLetTheTransferEnd()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        const qint64 b = f.add(QStringLiteral("b"), true);
+        settle();
+        QVERIFY(f.executor.ackTransferStarted(a));
+        settle();
+        QCOMPARE(f.state(b), Lifecycle::Preparing); // speculative
+        f.scheduler->keepRunningForClose(true);
+        QCOMPARE(f.executor.count(Kind::Interrupt, a), 0);
+        QCOMPARE(f.executor.count(Kind::Pause, a), 0); // not held either
+        QVERIFY(f.executor.ackQuiesced(b));
+        settle();
+        f.finishTransfer(a);
+        QVERIFY(!f.queue.find(a));
+        QCOMPARE(f.state(b), Lifecycle::Queued); // nothing starts after it
+    }
+
+    void aCloseLetsASwitchUnderWayEnd()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        const qint64 b = f.add(QStringLiteral("b"));
+        settle();
+        QVERIFY(f.queue.postNow(b, f.queue.view()).ok());
+        settle();
+        QCOMPARE(f.queue.intent().state, PostNowIntent::State::Switching);
+        f.scheduler->keepRunningForClose();
+        QCOMPARE(f.executor.count(Kind::Interrupt, a), 1); // asked once, by the switch
+        QVERIFY(f.executor.ackQuiesced(a, true, true));
+        settle();
+        QVERIFY(f.queue.intent().isNull());
+        QVERIFY(!f.scheduler->isTechnicallyPaused());
+        QCOMPARE(f.queue.order(), (QList<qint64>{ b, a }));
+        QCOMPARE(f.state(b), Lifecycle::Queued); // nothing starts while closing
+        f.scheduler->cancelClose();              // the close failed elsewhere
+        settle();
+        QCOMPARE(f.state(b), Lifecycle::Posting);
+    }
+
+    void aCloseStopsNothingWhileAWriteWaits()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        settle();
+        QVERIFY(f.executor.ackTransferStarted(a));
+        f.store.failNextCommits(2); // F1, then its retry
+        QVERIFY(f.executor.ackTransferFinished(a));
+        settle();
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        f.scheduler->retryAfterTechnicalPause();
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        QCOMPARE(f.state(a), Lifecycle::Posting); // F1 not written yet
+        f.scheduler->keepRunningForClose();
+        QCOMPARE(f.executor.count(Kind::Interrupt, a), 0); // its runtime already finalizes
+        f.scheduler->retryAfterTechnicalPause();
+        settle();
+        QCOMPARE(f.state(a), Lifecycle::Finalizing);
+        QVERIFY(f.executor.ackFinalized(a));
+        settle();
+        QVERIFY(!f.queue.find(a));
+    }
+
+    void aCloseAsksAStalledSwitchAgainAsASwitch()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        const qint64 b = f.add(QStringLiteral("b"));
+        settle();
+        // The switch is written, its stop is not.
+        f.store.failCommitsWhere([a](const QueueTransaction &tx) {
+            for (const QueueEntry &entry : tx.upserts)
+                if (entry.postId == a && entry.lifecycle == Lifecycle::Quiescing)
+                    return true;
+            return false;
+        });
+        QVERIFY(f.queue.postNow(b, f.queue.view()).ok());
+        settle();
+        QCOMPARE(f.queue.intent().state, PostNowIntent::State::Switching);
+        QCOMPARE(f.state(a), Lifecycle::Posting);
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        f.store.failCommitsWhere({});
+        f.scheduler->retryAfterTechnicalPause();
+        f.scheduler->keepRunningForClose();
+        QCOMPARE(f.executor.count(Kind::Interrupt, a), 1);
+        QVERIFY(f.executor.ackQuiesced(a, true, true));
+        settle();
+        QVERIFY(f.queue.intent().isNull()); // committed as a switch
+        QCOMPARE(f.queue.order(), (QList<qint64>{ b, a }));
+        QCOMPARE(f.state(b), Lifecycle::Queued);
+    }
+
+    void aCloseFromTheAdmissionStartsNoPreparation()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        const qint64 b = f.add(QStringLiteral("b"), true);
+        // A VPN refused while the head is admitted: its handler closes the queue.
+        f.scheduler->setAdmission([&f, a](const QueueEntry &entry) {
+            if (entry.postId != a)
+                return QueueScheduler::Admission::Proceed;
+            f.scheduler->keepRunningForClose();
+            return QueueScheduler::Admission::Blocked;
+        });
+        settle();
+        QVERIFY(f.queue.find(a)->blocked.isBlocked());
+        QCOMPARE(f.state(b), Lifecycle::Queued);
+        QCOMPARE(f.executor.count(Kind::Prepare, b), 0);
+        QCOMPARE(f.executor.count(Kind::Activate, a), 0);
+    }
+
     void removingTheActiveIsATerminalStop()
     {
         Fixture f;
