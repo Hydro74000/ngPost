@@ -22,4 +22,7 @@ SUBDIRS = \
     tst_UpdateChecker \
     tst_WireGuardBackend \
     tst_WindowsBindHelper \
-    tst_WindowsSecurity
+    tst_WindowsSecurity \
+    tst_PostingJobOptionsCodec \
+    tst_PostQueue \
+    tst_QueueScheduler

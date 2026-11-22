@@ -52,6 +52,10 @@ struct PostingJobResumeFileState
     }
 };
 
+//! Adding a field? Give it a policy in PostingJobOptionsCodec (persisted with
+//! its edit class, secret, recomputed by ResumePlanner, or resolved again at
+//! restoration) and cover it in tst_PostingJobOptionsCodec. A field without a
+//! policy silently vanishes when a queued post is restored.
 struct PostingJobOptions
 {
     // what to post, and where the nzb goes

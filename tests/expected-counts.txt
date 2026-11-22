@@ -60,6 +60,9 @@ tst_PathHelper                45  Linux
 tst_PostFlow                  28  Linux
 tst_PostHistory               48  Linux
 tst_PostInfoTemplate          36  Linux
+tst_PostQueue                 22  Linux
+tst_PostingJobOptionsCodec    27  Linux
+tst_QueueScheduler            22  Linux
 tst_RandomToken                3  Linux
 tst_SecretMasker              22  Linux
 tst_UpdateChecker             46  Linux
@@ -92,6 +95,9 @@ tst_PathHelper                45  Darwin
 tst_PostFlow                  24  Darwin
 tst_PostHistory               48  Darwin
 tst_PostInfoTemplate          36  Darwin
+tst_PostQueue                 22  Darwin
+tst_PostingJobOptionsCodec    27  Darwin
+tst_QueueScheduler            22  Darwin
 tst_RandomToken                3  Darwin
 tst_SecretMasker              22  Darwin
 tst_UpdateChecker             46  Darwin
@@ -121,6 +127,9 @@ tst_PathHelper                38  Windows
 tst_PostFlow                  18  Windows
 tst_PostHistory               48  Windows
 tst_PostInfoTemplate          34  Windows
+tst_PostQueue                 22  Windows
+tst_PostingJobOptionsCodec    27  Windows
+tst_QueueScheduler            22  Windows
 tst_RandomToken                3  Windows
 tst_SecretMasker              22  Windows
 tst_UpdateChecker             46  Windows

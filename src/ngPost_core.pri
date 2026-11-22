@@ -162,6 +162,8 @@ SOURCES += \
         $$PWD/vpn/WireGuardConfigPolicy.cpp \
         $$PWD/vpn/WireGuardBackend.cpp
 
+include($$PWD/queue/queue.pri)
+
 HEADERS += \
     $$PWD/ArticleBuilder.h \
     $$PWD/FileUploader.h \
