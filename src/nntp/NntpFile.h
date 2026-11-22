@@ -79,6 +79,12 @@ public:
     uint nbUnknownArticles() const;
     void onArticlePostingStarted(NntpArticle *article, int attemptNo);
     void markArticleUnknown(NntpArticle *article, const QString &reason);
+    //! Queue runtimes (plan_queue.md, C4.2): the definitive answer of the server
+    //! is recorded by the connection that got it, before any notification, so a
+    //! stop can never lose a confirmed article waiting in the UI thread's queue.
+    bool capturesAtProducer() const { return _capturesAtProducer; }
+    //! Called by the connection thread, on a definitive reply.
+    void captureArticleOutcome(NntpArticle *article, bool posted);
 
 signals:
     void allArticlesArePosted();
@@ -93,6 +99,7 @@ public slots:
 
 private:
     PostingJob       *const _postingJob;
+    const bool _capturesAtProducer;
 
     //! Everything this class needs from the QFileInfo it was handed, resolved
     //! once at construction.

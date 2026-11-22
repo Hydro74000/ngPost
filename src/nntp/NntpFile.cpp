@@ -33,22 +33,32 @@ uint NntpFile::articleCount(qint64 fileSize, qint64 articleSize)
     return static_cast<uint>(fileSize / articleSize + (fileSize % articleSize ? 1 : 0));
 }
 
-NntpFile::NntpFile(PostingJob *postingJob, const QFileInfo &file,
-                   uint num, uint nbFiles, int padding,
-                   const QList<QString> &grpList):
-    QObject(),
-    _postingJob(postingJob),
-    _absoluteFilePath(file.absoluteFilePath()),
-    _absoluteDirPath(file.absolutePath()),
-    _displayName(file.fileName()),
-    _fileNameUtf8(file.fileName().toStdString()),
-    _fileSizeBytes(file.size()),
-    _num(num), _nbFiles(nbFiles), _padding(padding),
-    _grpList(grpList), _groups(grpList.join(",").toStdString()),
-    _nbAticles(articleCount(_fileSizeBytes, postingJob->articleSizeBytes())),
-    _articles(),
-    _historyFileId(0),
-    _posted(), _failed(), _unknown(), _unknownMutex()
+NntpFile::NntpFile(PostingJob *postingJob,
+                   const QFileInfo &file,
+                   uint num,
+                   uint nbFiles,
+                   int padding,
+                   const QList<QString> &grpList)
+    : QObject()
+    , _postingJob(postingJob)
+    , _capturesAtProducer(postingJob->isQueueRuntime())
+    , _absoluteFilePath(file.absoluteFilePath())
+    , _absoluteDirPath(file.absolutePath())
+    , _displayName(file.fileName())
+    , _fileNameUtf8(file.fileName().toStdString())
+    , _fileSizeBytes(file.size())
+    , _num(num)
+    , _nbFiles(nbFiles)
+    , _padding(padding)
+    , _grpList(grpList)
+    , _groups(grpList.join(",").toStdString())
+    , _nbAticles(articleCount(_fileSizeBytes, postingJob->articleSizeBytes()))
+    , _articles()
+    , _historyFileId(0)
+    , _posted()
+    , _failed()
+    , _unknown()
+    , _unknownMutex()
 {
 #if defined(__DEBUG__) && defined(LOG_CONSTRUCTORS)
     qDebug() << "Creation NntpFile: " << file.absoluteFilePath()
@@ -89,7 +99,8 @@ void NntpFile::onArticlePosted(quint64 size)
         QMutexLocker lock(&_unknownMutex);
         _unknown.remove(part);
     }
-    _postingJob->recordHistoryArticlePosted(article);
+    if (!_capturesAtProducer)
+        _postingJob->recordHistoryArticlePosted(article);
     article->freeMemory(); // free resources
 
     if (_posted.size() + _failed.size() == static_cast<int>(_nbAticles))
@@ -117,7 +128,9 @@ void NntpFile::onArticleFailed(quint64 size)
         QMutexLocker lock(&_unknownMutex);
         _unknown.remove(part);
     }
-    _postingJob->recordHistoryArticleFailed(article, QStringLiteral("article failed after retry"));
+    if (!_capturesAtProducer)
+        _postingJob->recordHistoryArticleFailed(article,
+                                                QStringLiteral("article failed after retry"));
     article->freeMemory(); // free resources
 
     if (_posted.size() + _failed.size() == static_cast<int>(_nbAticles))
@@ -186,6 +199,15 @@ void NntpFile::writeToNZB(QTextStream &stream, const QString &from)
 void NntpFile::onArticlePostingStarted(NntpArticle *article, int attemptNo)
 {
     _postingJob->recordHistoryArticlePosting(article, attemptNo);
+}
+
+void NntpFile::captureArticleOutcome(NntpArticle *article, bool posted)
+{
+    if (posted)
+        _postingJob->recordHistoryArticlePosted(article);
+    else
+        _postingJob->recordHistoryArticleFailed(article,
+                                                QStringLiteral("article failed after retry"));
 }
 
 void NntpFile::markArticleUnknown(NntpArticle *article, const QString &reason)

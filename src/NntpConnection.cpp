@@ -514,6 +514,10 @@ void NntpConnection::_handleArticleResponse(QByteArray &line)
                      .arg(_srvParams.host)
                      .arg(line.constData()));
 #endif
+        // Recorded here, with the Message-ID the server kept, before anyone
+        // is told: the confirmation outlives a stop that drops notifications.
+        if (NntpFile *file = _currentArticle->nntpFile(); file && file->capturesAtProducer())
+            file->captureArticleOutcome(_currentArticle, true);
         emit _currentArticle->posted(_currentArticle->size());
     } else {
 #if defined(__DEBUG__) && defined(LOG_POSTING_STEPS)
@@ -543,6 +547,8 @@ void NntpConnection::_handleArticleResponse(QByteArray &line)
             // article's retry budget is exhausted it is failed; only
             // transport loss without a final reply is classified as
             // unknown.
+            if (NntpFile *file = _currentArticle->nntpFile(); file && file->capturesAtProducer())
+                file->captureArticleOutcome(_currentArticle, false);
             emit _currentArticle->failed(_currentArticle->size());
         }
     }

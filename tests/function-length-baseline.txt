@@ -338,7 +338,7 @@
 34	src/NntpConnection.cpp	NntpConnection::NntpConnection( NgPost * ngPost , int id , const NntpServerParams & srvParams)
 38	src/NntpConnection.cpp	NntpConnection::_closeConnection( bool dropTransport)
 13	src/NntpConnection.cpp	NntpConnection::_detachSocketSignals()
-68	src/NntpConnection.cpp	NntpConnection::_handleArticleResponse( QByteArray & line)
+74	src/NntpConnection.cpp	NntpConnection::_handleArticleResponse( QByteArray & line)
 29	src/NntpConnection.cpp	NntpConnection::_handleAuthPass( QByteArray & line)
 43	src/NntpConnection.cpp	NntpConnection::_handleAuthUser( QByteArray & line)
 33	src/NntpConnection.cpp	NntpConnection::_handlePostResponse( QByteArray & line)
@@ -830,7 +830,7 @@
 8	src/history/PostHistoryStore.cpp	PostHistoryStore::markArticlePosting( qint64 fileId , int part , const QString & msgId , int attemptNo , QString * error)
 55	src/history/PostHistoryStore.cpp	PostHistoryStore::markArticlePosting( qint64 fileId , int part , const QString & msgId , int attemptNo , qint64 pos , qint64 bytes , QString * error)
 8	src/history/PostHistoryStore.cpp	PostHistoryStore::markArticleUnknown( qint64 fileId , int part , const QString & msgId , const QString & err , QString * error)
-46	src/history/PostHistoryStore.cpp	PostHistoryStore::markArticleUnknown( qint64 fileId , int part , const QString & msgId , const QString & err , qint64 pos , qint64 bytes , QString * error)
+48	src/history/PostHistoryStore.cpp	PostHistoryStore::markArticleUnknown( qint64 fileId , int part , const QString & msgId , const QString & err , qint64 pos , qint64 bytes , QString * error)
 4	src/history/PostHistoryStore.cpp	PostHistoryStore::markPostCrashedArticlesUnknown( QString * error)
 19	src/history/PostHistoryStore.cpp	PostHistoryStore::markPostResuming( qint64 postId , QString * error)
 20	src/history/PostHistoryStore.cpp	PostHistoryStore::markPostStarted( qint64 postId , QString * error)
@@ -1515,17 +1515,19 @@
 1	src/nntp/NntpArticle.h	NntpArticle::part() const
 1	src/nntp/NntpArticle.h	NntpArticle::setNbMaxRetry( ushort nbMax)
 1	src/nntp/NntpArticle.h	NntpArticle::size() const
-26	src/nntp/NntpFile.cpp	NntpFile::NntpFile( PostingJob * postingJob , const QFileInfo & file , uint num , uint nbFiles , int padding , const QList<QString> & grpList)
+36	src/nntp/NntpFile.cpp	NntpFile::NntpFile( PostingJob * postingJob , const QFileInfo & file , uint num , uint nbFiles , int padding , const QList<QString> & grpList)
 6	src/nntp/NntpFile.cpp	NntpFile::articleCount( qint64 fileSize , qint64 articleSize)
+8	src/nntp/NntpFile.cpp	NntpFile::captureArticleOutcome( NntpArticle * article , bool posted)
 8	src/nntp/NntpFile.cpp	NntpFile::markArticleUnknown( NntpArticle * article , const QString & reason)
 20	src/nntp/NntpFile.cpp	NntpFile::missingArticles() const
 5	src/nntp/NntpFile.cpp	NntpFile::nbUnknownArticles() const
-27	src/nntp/NntpFile.cpp	NntpFile::onArticleFailed( quint64 size)
-27	src/nntp/NntpFile.cpp	NntpFile::onArticlePosted( quint64 size)
+29	src/nntp/NntpFile.cpp	NntpFile::onArticleFailed( quint64 size)
+28	src/nntp/NntpFile.cpp	NntpFile::onArticlePosted( quint64 size)
 4	src/nntp/NntpFile.cpp	NntpFile::onArticlePostingStarted( NntpArticle * article , int attemptNo)
 56	src/nntp/NntpFile.cpp	NntpFile::writeToNZB( QTextStream & stream , const QString & from)
 7	src/nntp/NntpFile.cpp	NntpFile::~NntpFile()
 1	src/nntp/NntpFile.h	NntpFile::addArticle( NntpArticle * article)
+1	src/nntp/NntpFile.h	NntpFile::capturesAtProducer() const
 4	src/nntp/NntpFile.h	NntpFile::directoryPath() const
 1	src/nntp/NntpFile.h	NntpFile::fileName() const
 1	src/nntp/NntpFile.h	NntpFile::fileSize() const

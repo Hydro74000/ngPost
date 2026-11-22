@@ -25,6 +25,8 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QUuid>
+#include <QThread>
+#include <QElapsedTimer>
 #include <QtTest>
 
 #include <memory>
@@ -63,9 +65,9 @@ struct Env
     std::unique_ptr<PostQueue> queue;
     std::unique_ptr<PostingJobExecutor> executor;
 
-    bool start(QString *error, const QString &rarScript = {})
+    bool start(QString *error, const QString &rarScript = {}, const QStringList &mockArgs = {})
     {
-        if (!mock.start()) {
+        if (!mock.start(mockArgs)) {
             *error = QStringLiteral("the mock NNTP server did not start");
             return false;
         }
@@ -117,12 +119,15 @@ struct Env
 
     QString dbPath() const { return root + QStringLiteral("/history.sqlite"); }
 
-    PersistedQueueOptions post(const QString &name, bool compress = false, bool par2 = false)
+    PersistedQueueOptions post(const QString &name,
+                               bool compress = false,
+                               bool par2 = false,
+                               int bytes = 64000)
     {
         const QString source = root + QStringLiteral("/%1.bin").arg(name);
         QFile file(source);
         if (file.open(QIODevice::WriteOnly))
-            file.write(QByteArray(64000, 'a'));
+            file.write(QByteArray(bytes, 'a'));
         file.close();
         QDir().mkpath(root + QStringLiteral("/tmp"));
         PersistedQueueOptions o;
@@ -146,7 +151,7 @@ struct Env
         o.par2Family = par2 ? par2::toolName(par2::Tool::Par2cmdline) : QString();
         PersistedSource persisted;
         persisted.path = source;
-        persisted.sizeBytes = 64000;
+        persisted.sizeBytes = bytes;
         o.sources << persisted;
         return o;
     }
@@ -338,6 +343,49 @@ private slots:
         QVERIFY(QFileInfo::exists(env.root + QStringLiteral("/stopped.bin")));
         QCOMPARE(env.historyStatus(id), QStringLiteral("queued")); // nothing was finalized
 #endif
+    }
+
+    void aConfirmedArticleIsRecordedBeforeTheUiHearsOfIt()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, {}, { QStringLiteral("--slow-mode-ms"), QStringLiteral("20") }),
+                 qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("captured"), false, false, 3000000));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy started(env.executor.get(), &QueueExecutor::transferStarted);
+        env.executor->activate(id, run, {});
+        QTRY_COMPARE_WITH_TIMEOUT(started.size(), 1, 10000);
+        const int before = env.mock.receivedArticles().size();
+        // From here on the UI thread runs no event: only the connections work.
+        QElapsedTimer wait;
+        wait.start();
+        while (wait.elapsed() < 2000)
+            QThread::msleep(20);
+        const int received = env.mock.receivedArticles().size();
+        QVERIFY2(received > before + 5, "the connections did not post on their own");
+        QVERIFY2(env.ngPost->historyService()->flush(&error), qPrintable(error));
+        const QString name = QUuid::createUuid().toString();
+        int recorded = 0;
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+            db.setDatabaseName(env.dbPath());
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            q.prepare(QStringLiteral("SELECT COUNT(*) FROM post_articles a JOIN post_files f ON "
+                                     "f.id = a.file_id WHERE f.post_id=? AND a.status='posted'"));
+            q.addBindValue(id);
+            QVERIFY(q.exec() && q.next());
+            recorded = q.value(0).toInt();
+        }
+        QSqlDatabase::removeDatabase(name);
+        // At most the article whose reply was in flight when the count was taken.
+        QVERIFY2(recorded >= received - 1,
+                 qPrintable(QStringLiteral("%1 confirmed by the server, %2 recorded")
+                                .arg(received)
+                                .arg(recorded)));
+        env.executor->interrupt(id, run, Disposition::Stop);
+        QTRY_VERIFY_WITH_TIMEOUT(!env.executor->runtime(id), 20000);
     }
 
     void failedQueueWriteStartsNoTransfer()

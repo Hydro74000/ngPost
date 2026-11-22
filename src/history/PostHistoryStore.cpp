@@ -1492,14 +1492,16 @@ bool PostHistoryStore::markArticleUnknown(qint64 fileId,
         return false;
     QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
     QSqlQuery a(db);
-    a.prepare(QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
-                             "status, msg_id, error, updated_at)"
-                             "VALUES(?, ?, ?, ?, 'unknown', ?, ?, ?)"
-                             "ON CONFLICT(file_id, part) DO UPDATE SET "
-                             "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
-                             "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
-                             "status='unknown', msg_id=excluded.msg_id, error=excluded.error,"
-                             "updated_at=excluded.updated_at"));
+    a.prepare(
+        QStringLiteral("INSERT INTO post_articles(file_id, part, pos, bytes,"
+                       "status, msg_id, error, updated_at)"
+                       "VALUES(?, ?, ?, ?, 'unknown', ?, ?, ?)"
+                       "ON CONFLICT(file_id, part) DO UPDATE SET "
+                       "pos=CASE WHEN excluded.bytes > 0 THEN excluded.pos ELSE pos END,"
+                       "bytes=CASE WHEN excluded.bytes > 0 THEN excluded.bytes ELSE bytes END,"
+                       "status='unknown', msg_id=excluded.msg_id, error=excluded.error,"
+                       "updated_at=excluded.updated_at "
+                       "WHERE post_articles.status!='posted'"));
     a.addBindValue(fileId);
     a.addBindValue(part);
     a.addBindValue(storedPayloadPos(pos, bytes));
