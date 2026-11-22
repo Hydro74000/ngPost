@@ -479,6 +479,8 @@
 7	src/PostingJob.cpp	PostingJob::PostingJob( NgPost * ngPost , const PostingJobOptions & options , PostingWidget * postWidget , QObject * parent)
 8	src/PostingJob.cpp	PostingJob::PostingJob( NgPost * ngPost , const PostingJobOptions & options , const JobExecutionContext & context , PostingWidget * postWidget , QObject * parent)
 10	src/PostingJob.cpp	PostingJob::_abortBeforeTransfer( bool keepResumeResumable)
+7	src/PostingJob.cpp	PostingJob::_activeMs() const
+9	src/PostingJob.cpp	PostingJob::_afterCompletePost()
 63	src/PostingJob.cpp	PostingJob::_buildFinalPostInfoData()
 17	src/PostingJob.cpp	PostingJob::_canCompress( bool checkTemporaryPath) const
 30	src/PostingJob.cpp	PostingJob::_canGenPar2( bool checkTemporaryPath) const
@@ -486,7 +488,8 @@
 31	src/PostingJob.cpp	PostingJob::_chooseTmpPath( bool par2Only)
 9	src/PostingJob.cpp	PostingJob::_cleanCompressDir()
 8	src/PostingJob.cpp	PostingJob::_cleanExtProc()
-52	src/PostingJob.cpp	PostingJob::_closeNzb()
+12	src/PostingJob.cpp	PostingJob::_closeNzb()
+7	src/PostingJob.cpp	PostingJob::_closeNzbStream()
 45	src/PostingJob.cpp	PostingJob::_collectPackedFiles()
 8	src/PostingJob.cpp	PostingJob::_compressDirBytes() const
 33	src/PostingJob.cpp	PostingJob::_connectJobSignals()
@@ -503,7 +506,7 @@
 13	src/PostingJob.cpp	PostingJob::_dirSize( const QString & path)
 4	src/PostingJob.cpp	PostingJob::_error( const QString & error) const
 19	src/PostingJob.cpp	PostingJob::_finishIfCanceled()
-130	src/PostingJob.cpp	PostingJob::_finishPosting()
+27	src/PostingJob.cpp	PostingJob::_finishPosting()
 12	src/PostingJob.cpp	PostingJob::_finishStep( queue :: PrepStep step , bool ok , const QString & error)
 10	src/PostingJob.cpp	PostingJob::_flushHistoryService()
 175	src/PostingJob.cpp	PostingJob::_initPosting()
@@ -516,11 +519,16 @@
 8	src/PostingJob.cpp	PostingJob::_preparePostersArticles()
 57	src/PostingJob.cpp	PostingJob::_printStats() const
 19	src/PostingJob.cpp	PostingJob::_protectedPaths() const
+36	src/PostingJob.cpp	PostingJob::_publishNzb( QString * error)
 78	src/PostingJob.cpp	PostingJob::_readNextArticleIntoBufferPtr( const QString & threadName , char ** bufferPtr)
+25	src/PostingJob.cpp	PostingJob::_recordHistoricalResult()
 18	src/PostingJob.cpp	PostingJob::_recordHistoryArticleEnd( NntpArticle * article , const QString & reason , bool unknown)
+29	src/PostingJob.cpp	PostingJob::_reportUnpostedFiles()
 20	src/PostingJob.cpp	PostingJob::_resolveNfoSource()
 18	src/PostingJob.cpp	PostingJob::_restoreObfuscatedFileNames()
+16	src/PostingJob.cpp	PostingJob::_runPostActions( bool nzbReady)
 31	src/PostingJob.cpp	PostingJob::_startPosterThreads( int nbPosters , int nbCon)
+46	src/PostingJob.cpp	PostingJob::_stopProducers()
 11	src/PostingJob.cpp	PostingJob::_terminateExternalProcess()
 7	src/PostingJob.cpp	PostingJob::_unrestoredOriginals( QMap<QString,QString> const & stillObfuscated)
 4	src/PostingJob.cpp	PostingJob::_warn( const QString & warning) const
@@ -528,6 +536,7 @@
 51	src/PostingJob.cpp	PostingJob::_writePostInfoFile()
 29	src/PostingJob.cpp	PostingJob::activateTransfer( const PreparedManifest & manifest)
 7	src/PostingJob.cpp	PostingJob::buildPar2ArgsForTest( const QString & configuredArgs , bool useParPar , bool useMultiPar , uint redundancy)
+9	src/PostingJob.cpp	PostingJob::finishTransfer()
 14	src/PostingJob.cpp	PostingJob::nbArticlesUnknown() const
 64	src/PostingJob.cpp	PostingJob::onCompressionFinished( int exitCode , QProcess :: ExitStatus exitStatus)
 56	src/PostingJob.cpp	PostingJob::onDisconnectedConnection( NntpConnection * con)
@@ -545,6 +554,7 @@
 21	src/PostingJob.cpp	PostingJob::pause( PauseReason reason)
 11	src/PostingJob.cpp	PostingJob::postInfoData() const
 14	src/PostingJob.cpp	PostingJob::preparedManifest() const
+4	src/PostingJob.cpp	PostingJob::publishDeliverable( QString * error)
 18	src/PostingJob.cpp	PostingJob::quiescePreparation()
 4	src/PostingJob.cpp	PostingJob::recordHistoryArticleFailed( NntpArticle * article , const QString & reason)
 12	src/PostingJob.cpp	PostingJob::recordHistoryArticlePosted( NntpArticle * article)
@@ -554,13 +564,15 @@
 5	src/PostingJob.cpp	PostingJob::restoreObfuscatedPathsForTest( QMap<QString,QString> & paths , QString & stagingPath)
 19	src/PostingJob.cpp	PostingJob::resume()
 7	src/PostingJob.cpp	PostingJob::resumeIfPausedFor( PauseReason reason)
+8	src/PostingJob.cpp	PostingJob::runPostFinalizationWork( bool nzbReady)
 43	src/PostingJob.cpp	PostingJob::runPreparationStep( queue :: PrepStep step)
 4	src/PostingJob.cpp	PostingJob::sslSupportInfo()
 145	src/PostingJob.cpp	PostingJob::startCompressFiles( const QString & cmdRar , const QString & tmpFolder , const QString & archiveName , const QString & pass , uint volSize)
 106	src/PostingJob.cpp	PostingJob::startGenPar2( const QString & tmpFolder , const QString & archiveName , uint redundancy)
 4	src/PostingJob.cpp	PostingJob::supportsSsl()
+14	src/PostingJob.cpp	PostingJob::transferOutcome() const
 7	src/PostingJob.cpp	PostingJob::waitForVpnAfterUserResume()
-57	src/PostingJob.cpp	PostingJob::~PostingJob()
+59	src/PostingJob.cpp	PostingJob::~PostingJob()
 49	src/PostingJob.cpp	buildPar2Args( const QString & configuredArgs , bool useParPar , bool useMultiPar , uint redundancy)
 9	src/PostingJob.cpp	decimalPadding( uint count)
 8	src/PostingJob.cpp	isInlineRedundancyArg( const QString & arg , bool useMultiPar , bool useParPar)
@@ -573,6 +585,7 @@
 39	src/PostingJob.cpp	restoreObfuscatedPaths( QMap<QString,QString> & paths , QString & stagingPath , NgPost * ngPost , QList<QPair<QString,QString>> * failedRestores = nullptr)
 8	src/PostingJob.cpp	toStdPath( QString const & path)
 9	src/PostingJob.h	PostingJob::_getNextFile()
+1	src/PostingJob.h	PostingJob::allowArtifactCleanup( bool allowed)
 4	src/PostingJob.h	PostingJob::archiveFolder() const
 10	src/PostingJob.h	PostingJob::articleFailed( quint64 size)
 9	src/PostingJob.h	PostingJob::articlePosted( quint64 size)
@@ -638,7 +651,7 @@
 4	src/PostingJobExecutor.cpp	PostingJobExecutor::later( std :: function<void()> emitter)
 6	src/PostingJobExecutor.cpp	PostingJobExecutor::manifest( qint64 postId , const QString & runId , const QString & setId) const
 20	src/PostingJobExecutor.cpp	PostingJobExecutor::onStepEnded( qint64 postId , PostingJob * job , const QString & runId , const QString & setId , PrepStep step , bool ok , const QString & error , qint64 bytes)
-18	src/PostingJobExecutor.cpp	PostingJobExecutor::onTransferEnded( qint64 postId , PostingJob * job , const QString & runId)
+19	src/PostingJobExecutor.cpp	PostingJobExecutor::onTransferEnded( qint64 postId , PostingJob * job , const QString & runId)
 6	src/PostingJobExecutor.cpp	PostingJobExecutor::pauseTransfer( qint64 postId)
 48	src/PostingJobExecutor.cpp	PostingJobExecutor::prepareStep( qint64 postId , const QString & runId , const QString & setId , PrepStep step)
 11	src/PostingJobExecutor.cpp	PostingJobExecutor::releaseRuntime( qint64 postId)

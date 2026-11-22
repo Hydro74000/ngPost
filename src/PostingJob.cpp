@@ -587,7 +587,9 @@ PostingJob::~PostingJob()
         _restoreObfuscatedFileNames();
 
     if (_compressDir) {
-        if (hasPostFinishedSuccessfully())
+        // A queue runtime is told by its controller; the historical job decides
+        // from its own transfer.
+        if (_queueRuntime ? _artifactCleanupAllowed : hasPostFinishedSuccessfully())
             _cleanCompressDir();
         delete _compressDir;
         _compressDir = nullptr;
@@ -1988,6 +1990,28 @@ void PostingJob::_finishPosting()
     // on the last file, connection lost, user stop).
     if (_finishedAtWall.isValid())
         return;
+    _stopProducers();
+    _recordHistoricalResult();
+
+    // 2.: close nzb file
+    _closeNzb();
+
+    if (_ngPost->debugMode())
+        _log("All posters stopped...");
+
+#ifdef __DEBUG__
+    _log("All connections are closed...");
+#endif
+    _reportUnpostedFiles();
+    if (_filesToUpload.isEmpty() && _filesInProgress.isEmpty() && _filesFailed.isEmpty())
+        _afterCompletePost();
+}
+
+//! The end of the transfer itself: the duration frozen, every producer stopped
+//! and joined, the history flushed. Each in-flight article is classified by the
+//! closing of its transport. No result is recorded and nothing is published.
+void PostingJob::_stopProducers()
+{
     _finishedAtWall = QDateTime::currentDateTime();
 
     // A job may be stopped while still paused. resume() normally accounts for
@@ -2002,6 +2026,7 @@ void PostingJob::_finishPosting()
     }
 
     _stopPosting = 0x1;
+    _activeMsAtEnd = _activeMs(); // the transfer time, frozen once
 
     if (_timeStart.isValid() && _postFinished && _filesFailed.isEmpty()) {
         _nbArticlesUploaded = _nbArticlesTotal; // we might not have processed the last onArticlePosted
@@ -2030,82 +2055,100 @@ void PostingJob::_finishPosting()
     // the final CLI counters are produced.
     if (_timeStart.isValid())
         _printStats();
+}
 
-    if (_historyPostId && _ngPost->historyService()) {
-        QString status;
-        if (_postFinished)
-            status = hasPostFinishedSuccessfully() ? QStringLiteral("success")
-                                                   : QStringLiteral("partial");
-        else
-            status = QStringLiteral("failed");
-        // Added, not set: a resumed post transfers in several sittings.
-        qint64 activeSeconds = 0;
-        if (_timeStart.isValid()) {
-            const qint64 activeMs = _timeStart.elapsed() - _pauseDuration;
-            if (activeMs > 0)
-                activeSeconds = activeMs / 1000;
-        }
-        // One transaction: a crash in between must not leave a finished post
-        // whose duration was never recorded.
-        QString err;
-        if (!_ngPost->historyService()->finalizePost(_historyPostId,
-                                                     status,
-                                                     avgSpeed(),
-                                                     activeSeconds,
-                                                     &err)) {
-            _historyDataUnreliable = true;
-            // The post itself went out; say so rather than fail the run, but
-            // say it: the history is what resume and the record sheets read.
-            _warn(tr("History: could not record the outcome of post %1: %2")
-                      .arg(_historyPostId)
-                      .arg(err));
-        }
+PostingJob::TransferOutcome PostingJob::transferOutcome() const
+{
+    TransferOutcome outcome;
+    if (_postFinished)
+        outcome.result = hasPostFinishedSuccessfully() ? QStringLiteral("success")
+                                                       : QStringLiteral("partial");
+    else
+        outcome.result = _cancelRequested ? QStringLiteral("cancelled") : QStringLiteral("failed");
+    outcome.endCause = _cancelRequested && !_postFinished ? QStringLiteral("user_stop")
+                                                          : QStringLiteral("normal");
+    outcome.avgSpeed = avgSpeed();
+    outcome.activeMs = _activeMsAtEnd >= 0 ? _activeMsAtEnd : _activeMs();
+    return outcome;
+}
+
+qint64 PostingJob::_activeMs() const
+{
+    if (!_timeStart.isValid())
+        return 0;
+    const qint64 activeMs = _timeStart.elapsed() - _pauseDuration;
+    return activeMs > 0 ? activeMs : 0;
+}
+
+//! The historical job queue: the result of the post, recorded by the job.
+void PostingJob::_recordHistoricalResult()
+{
+    if (!_historyPostId || !_ngPost->historyService())
+        return;
+    QString status;
+    if (_postFinished)
+        status = hasPostFinishedSuccessfully() ? QStringLiteral("success")
+                                               : QStringLiteral("partial");
+    else
+        status = QStringLiteral("failed");
+    // Added, not set: a resumed post transfers in several sittings.
+    const qint64 activeSeconds = (_activeMsAtEnd >= 0 ? _activeMsAtEnd : _activeMs()) / 1000;
+    // One transaction: a crash in between must not leave a finished post
+    // whose duration was never recorded.
+    QString err;
+    if (!_ngPost->historyService()
+             ->finalizePost(_historyPostId, status, avgSpeed(), activeSeconds, &err)) {
+        _historyDataUnreliable = true;
+        // The post itself went out; say so rather than fail the run, but
+        // say it: the history is what resume and the record sheets read.
+        _warn(tr("History: could not record the outcome of post %1: %2")
+                  .arg(_historyPostId)
+                  .arg(err));
     }
+}
 
-    // 2.: close nzb file
-    _closeNzb();
-
-    if (_ngPost->debugMode())
-        _log("All posters stopped...");
-
-#ifdef __DEBUG__
-    _log("All connections are closed...");
-#endif
-
-    // 5.: print out the list of files that havn't been posted
-    // (in case of disconnection)
+//! 5.: print out the list of files that havn't been posted (in case of
+//! disconnection).
+void PostingJob::_reportUnpostedFiles()
+{
     int nbPendingFiles = _filesToUpload.size() + _filesInProgress.size() + _filesFailed.size();
-    if (nbPendingFiles) {
-        _error(tr("ERROR: there were %1 on %2 that havn't been posted:")
-                   .arg(nbPendingFiles)
-                   .arg(_nbFiles));
-        bool isDebugMode = _ngPost->debugMode();
-        for (NntpFile *file : _filesInProgress) {
-            QString msg = QString("  - %1").arg(file->stats());
-            if (isDebugMode)
-                msg += QString(" (fInProgress%1)").arg(file->missingArticles());
-            _error(msg);
-        }
-        for (NntpFile *file : _filesToUpload) {
-            QString msg = QString("  - %1").arg(file->stats());
-            if (isDebugMode)
-                msg += QString(" (fToUpload%1)").arg(file->missingArticles());
-            _error(msg);
-        }
-        for (NntpFile *file : _filesFailed) {
-            QString msg = QString("  - %1").arg(file->stats());
-            if (isDebugMode)
-                msg += QString(" (fFailed%1)").arg(file->missingArticles());
-            _error(msg);
-        }
-        _error(
-            tr("you can try to repost only those and concatenate the nzb with the current one ;)"));
-    } else if (_postFinished) {
-        if (!_nfoSrcToCopy.isEmpty())
-            _copyNfoNextToNzb();
-        if (MB_LoadAtomic(_delFilesAfterPost))
-            _delOriginalFilesOfCompletePost();
+    if (!nbPendingFiles)
+        return;
+    _error(tr("ERROR: there were %1 on %2 that havn't been posted:")
+               .arg(nbPendingFiles)
+               .arg(_nbFiles));
+    bool isDebugMode = _ngPost->debugMode();
+    for (NntpFile *file : _filesInProgress) {
+        QString msg = QString("  - %1").arg(file->stats());
+        if (isDebugMode)
+            msg += QString(" (fInProgress%1)").arg(file->missingArticles());
+        _error(msg);
     }
+    for (NntpFile *file : _filesToUpload) {
+        QString msg = QString("  - %1").arg(file->stats());
+        if (isDebugMode)
+            msg += QString(" (fToUpload%1)").arg(file->missingArticles());
+        _error(msg);
+    }
+    for (NntpFile *file : _filesFailed) {
+        QString msg = QString("  - %1").arg(file->stats());
+        if (isDebugMode)
+            msg += QString(" (fFailed%1)").arg(file->missingArticles());
+        _error(msg);
+    }
+    _error(tr("you can try to repost only those and concatenate the nzb with the current one ;)"));
+}
+
+//! What a complete post allows once its NZB exists: the .nfo next to it, and
+//! the deletion of its sources when asked.
+void PostingJob::_afterCompletePost()
+{
+    if (!_postFinished)
+        return;
+    if (!_nfoSrcToCopy.isEmpty())
+        _copyNfoNextToNzb();
+    if (MB_LoadAtomic(_delFilesAfterPost))
+        _delOriginalFilesOfCompletePost();
 }
 
 void PostingJob::_delOriginalFilesOfCompletePost()
@@ -2126,55 +2169,107 @@ void PostingJob::_delOriginalFilesOfCompletePost()
 
 void PostingJob::_closeNzb()
 {
-    if (_nzb) {
-        if (_nzb->isOpen()) {
-            _nzbStream << "</nzb>\n";
-            _nzb->close();
-            bool nzbReady = !(_resumeFromHistory && _historyDataUnreliable);
-            if (!nzbReady)
-                _error(tr("Could not consolidate the resumed NZB because its history is incomplete; "
-                          "the previous NZB was left untouched."));
-            if (_historyPostId && _ngPost->historyService()
-                && !_historyDataUnreliable) {
-                QStringList warnings;
-                QString err;
-                const QString livePassword =
-                    _rarPass.isEmpty() ? _options.declaredPassword : _rarPass;
-                if (!_ngPost->historyService()->regenerateNzbToFile(
-                        _historyPostId,
-                        _nzbFilePath,
-                        true,
-                        &warnings,
-                        &err,
-                        livePassword)) {
-                    _error(tr("Could not regenerate final NZB from history: %1").arg(err));
-                    // A fresh post still has its complete streamed NZB. A
-                    // resume deliberately streamed only to a scratch file and
-                    // therefore has no new deliverable until consolidation
-                    // succeeds.
-                    if (_resumeFromHistory)
-                        nzbReady = false;
-                }
-                for (const QString &warning : warnings)
-                    _error(tr("NZB history warning: %1").arg(warning));
-            }
-            // Consolidated once, then used by both the post info file and the
-            // post commands: they must describe the same post, and for a
-            // resume that means the whole post, not the leftovers.
-            bool postInfoReady = nzbReady;
-            if (_ngPost->needsPostInfoData(_options))
-                postInfoReady = postInfoReady && _buildFinalPostInfoData();
-            // Written before the post commands so a script can pick it up with
-            // __postInfoPath__, and only when an nzb exists: a post info file
-            // without its nzb would describe nothing.
-            if (postInfoReady) {
-                _writePostInfoFile();
-                _ngPost->doNzbPostCMD(this);
-            }
-        }
-        delete _nzb;
-        _nzb = nullptr;
+    if (!_nzb)
+        return;
+    if (_nzb->isOpen()) {
+        _closeNzbStream();
+        const bool nzbReady = _publishNzb(nullptr);
+        _runPostActions(nzbReady);
     }
+    delete _nzb;
+    _nzb = nullptr;
+}
+
+//! The streamed NZB is complete: for a resume it is only scratch data.
+void PostingJob::_closeNzbStream()
+{
+    if (!_nzb || !_nzb->isOpen())
+        return;
+    _nzbStream << "</nzb>\n";
+    _nzb->close();
+}
+
+//! The deliverable, rebuilt from the history: what a resume or a crash can
+//! rely on. False when no reliable NZB exists, with @p error saying why.
+bool PostingJob::_publishNzb(QString *error)
+{
+    bool nzbReady = !(_resumeFromHistory && _historyDataUnreliable);
+    if (!nzbReady) {
+        const QString message = tr("Could not consolidate the resumed NZB because its history is "
+                                   "incomplete; the previous NZB was left untouched.");
+        _error(message);
+        if (error)
+            *error = message;
+    }
+    if (_historyPostId && _ngPost->historyService() && !_historyDataUnreliable) {
+        QStringList warnings;
+        QString err;
+        const QString livePassword = _rarPass.isEmpty() ? _options.declaredPassword : _rarPass;
+        if (!_ngPost->historyService()->regenerateNzbToFile(_historyPostId,
+                                                            _nzbFilePath,
+                                                            true,
+                                                            &warnings,
+                                                            &err,
+                                                            livePassword)) {
+            const QString message = tr("Could not regenerate final NZB from history: %1").arg(err);
+            _error(message);
+            if (error)
+                *error = message;
+            // A fresh post still has its complete streamed NZB. A
+            // resume deliberately streamed only to a scratch file and
+            // therefore has no new deliverable until consolidation
+            // succeeds.
+            if (_resumeFromHistory)
+                nzbReady = false;
+        }
+        for (const QString &warning : warnings)
+            _error(tr("NZB history warning: %1").arg(warning));
+    }
+    return nzbReady;
+}
+
+//! The post info file and the post commands, once the NZB they describe exists.
+void PostingJob::_runPostActions(bool nzbReady)
+{
+    // Consolidated once, then used by both the post info file and the
+    // post commands: they must describe the same post, and for a
+    // resume that means the whole post, not the leftovers.
+    bool postInfoReady = nzbReady;
+    if (_ngPost->needsPostInfoData(_options))
+        postInfoReady = postInfoReady && _buildFinalPostInfoData();
+    // Written before the post commands so a script can pick it up with
+    // __postInfoPath__, and only when an nzb exists: a post info file
+    // without its nzb would describe nothing.
+    if (postInfoReady) {
+        _writePostInfoFile();
+        _ngPost->doNzbPostCMD(this);
+    }
+}
+
+// --- queue runtime (plan_queue.md §6.2: F1, F2, then the work after F3) -------------
+
+PostingJob::TransferOutcome PostingJob::finishTransfer()
+{
+    if (!_finishedAtWall.isValid()) {
+        _ngPost->flushConnectionRetries();
+        _stopProducers();
+        _closeNzbStream();
+    }
+    return transferOutcome();
+}
+
+bool PostingJob::publishDeliverable(QString *error)
+{
+    return _publishNzb(error);
+}
+
+void PostingJob::runPostFinalizationWork(bool nzbReady)
+{
+    _runPostActions(nzbReady);
+    _reportUnpostedFiles();
+    if (nzbReady && _filesToUpload.isEmpty() && _filesInProgress.isEmpty()
+        && _filesFailed.isEmpty())
+        _afterCompletePost();
 }
 
 PostInfoData PostingJob::postInfoData() const

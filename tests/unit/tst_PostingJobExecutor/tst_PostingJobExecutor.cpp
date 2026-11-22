@@ -388,6 +388,32 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!env.executor->runtime(id), 20000);
     }
 
+    void finishingATransferRecordsNoResult()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, {}, { QStringLiteral("--slow-mode-ms"), QStringLiteral("20") }),
+                 qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("finished"), false, false, 2000000));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy started(env.executor.get(), &QueueExecutor::transferStarted);
+        env.executor->activate(id, run, {});
+        QTRY_COMPARE_WITH_TIMEOUT(started.size(), 1, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(env.mock.receivedArticles().size() > 2, 10000);
+        PostingJob *job = env.executor->runtime(id);
+        QVERIFY(job);
+        const PostingJob::TransferOutcome first = job->finishTransfer();
+        QCOMPARE(first.result, QStringLiteral("failed")); // stopped before its end
+        QVERIFY(first.activeMs > 0);
+        const int received = env.mock.receivedArticles().size();
+        QTest::qWait(300);
+        QCOMPARE(env.mock.receivedArticles().size(), received); // nothing produces any more
+        const PostingJob::TransferOutcome again = job->finishTransfer();
+        QCOMPARE(again.activeMs, first.activeMs); // frozen, once
+        // The result belongs to the controller (F1): nothing was recorded.
+        QCOMPARE(env.historyStatus(id), QStringLiteral("posting"));
+    }
+
     void failedQueueWriteStartsNoTransfer()
     {
         Env env;

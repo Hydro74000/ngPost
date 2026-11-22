@@ -227,6 +227,7 @@ void PostingJobExecutor::onTransferEnded(qint64 postId, PostingJob *job, const Q
     runtime.ended = true;
     const bool success = job->hasPostFinishedSuccessfully();
     const bool localEndOk = !job->historyDataUnreliable();
+    job->allowArtifactCleanup(success); // C3: as the historical job decided it
     emit runtimeEnded(postId, job);
     releaseRuntime(postId);
     emit transferFinished(postId, runId, success);

@@ -171,6 +171,8 @@ private:
     const bool _queueRuntime; //!< built for an executor: see JobExecutionContext
     JobExecutionContext _context;
     bool _preparationStopped = false; //!< quiescePreparation() ran: no tool end counts
+    bool _artifactCleanupAllowed = false; //!< see allowArtifactCleanup()
+    qint64 _activeMsAtEnd = -1;           //!< transfer time frozen by _stopProducers()
     bool _stepDriven = false;        //!< see setStepDriven()
     bool _compressedThisRun = false; //!< compression ended well: PAR2 covers the archive
     bool _collected = false;         //!< files to publish already collected
@@ -390,6 +392,27 @@ public:
     //! Built for the queue's executor, not for the historical job queue.
     bool isQueueRuntime() const { return _queueRuntime; }
 
+    //! What one attempt did, for F1 (plan_queue.md §6.2).
+    struct TransferOutcome
+    {
+        QString result;   //!< success, partial, failed or cancelled
+        QString endCause; //!< normal or user_stop
+        QString avgSpeed;
+        qint64 activeMs = 0;
+    };
+    TransferOutcome transferOutcome() const;
+    //! Queue runtime: stops the transfer (producers stopped and joined, history
+    //! flushed, streamed NZB closed) and describes it. Records no result,
+    //! publishes nothing, runs no post action. Idempotent.
+    TransferOutcome finishTransfer();
+    //! F2: the NZB rebuilt from the history at its destination.
+    bool publishDeliverable(QString *error);
+    //! After F3: post info file, post commands, .nfo copy and source deletion.
+    void runPostFinalizationWork(bool nzbReady);
+    //! Queue runtime: whether its temporary archives may go with it (keepRar
+    //! still applies). Never decided by the runtime alone.
+    void allowArtifactCleanup(bool allowed) { _artifactCleanupAllowed = allowed; }
+
 signals:
     void pauseChanged();
     void startPosting(
@@ -511,6 +534,14 @@ private:
     void _flushHistoryService();
 
     void _closeNzb();
+    void _stopProducers();
+    qint64 _activeMs() const;
+    void _recordHistoricalResult();
+    void _reportUnpostedFiles();
+    void _afterCompletePost();
+    void _closeNzbStream();
+    bool _publishNzb(QString *error);
+    void _runPostActions(bool nzbReady);
     void _printStats() const;
 
     bool startCompressFiles(const QString &cmdRar,
