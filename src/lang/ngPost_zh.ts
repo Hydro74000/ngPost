@@ -6910,6 +6910,10 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
         <source>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</source>
         <translation>未删除已发布的文件：%1 篇文章失败或未确认。问题解决后请从历史记录中续传该贴。</translation>
     </message>
+    <message>
+        <source>The prepared files of %1 are missing: nothing is posted.</source>
+        <translation>%1 的预处理文件缺失：不会发布任何内容。</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>

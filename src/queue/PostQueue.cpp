@@ -773,11 +773,34 @@ bool PostQueue::engineBlock(qint64 postId, const BlockReason &reason, Lifecycle 
     return true;
 }
 
+bool PostQueue::engineMarkStuck(qint64 postId, const BlockReason &reason)
+{
+    if (!_entries.contains(postId))
+        return false;
+    QueueEntry entry = _entries.value(postId);
+    entry.blocked = reason; // lifecycle and slot stay: the runtime still holds them
+    ++entry.recipeRevision;
+    QueueTransaction tx;
+    tx.upserts << entry;
+    return apply(tx);
+}
+
+namespace
+{
+//! An interruption acknowledged at last proves the stop that was not.
+void clearUnprovenStop(QueueEntry &entry)
+{
+    if (entry.blocked.code == QLatin1String("quiesce_failed"))
+        entry.blocked = {};
+}
+} // namespace
+
 bool PostQueue::engineInterrupt(qint64 postId, bool manifestEngaged, bool hold, bool keepArtifacts)
 {
     if (!_entries.contains(postId))
         return false;
     QueueEntry entry = _entries.value(postId);
+    clearUnprovenStop(entry);
     entry.lifecycle = Lifecycle::Queued;
     entry.slot = Slot::None;
     entry.transferManifestEngaged = entry.transferManifestEngaged || manifestEngaged;
@@ -817,6 +840,7 @@ bool PostQueue::engineCommitSwitch(bool manifestEngaged)
     if (_intent.isNull() || !active)
         return false;
     QueueEntry old = *active;
+    clearUnprovenStop(old);
     old.lifecycle = Lifecycle::Queued;
     old.slot = Slot::None;
     old.transferManifestEngaged = old.transferManifestEngaged || manifestEngaged;

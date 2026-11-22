@@ -20,6 +20,7 @@
 
 #ifndef POSTINGJOB_H
 #define POSTINGJOB_H
+#include "PostingJobExecution.h"
 #include "PostingJobOptions.h"
 #include "queue/QueueTypes.h"
 #include "utils/Macros.h"
@@ -167,6 +168,9 @@ private:
     AtomicBool _noMoreFiles;
 
     bool _postStarted;
+    const bool _queueRuntime; //!< built for an executor: see JobExecutionContext
+    JobExecutionContext _context;
+    bool _preparationStopped = false; //!< quiescePreparation() ran: no tool end counts
     bool _stepDriven = false;        //!< see setStepDriven()
     bool _compressedThisRun = false; //!< compression ended well: PAR2 covers the archive
     bool _collected = false;         //!< files to publish already collected
@@ -238,6 +242,12 @@ public:
     PostingJob(NgPost *ngPost,
                const PostingJobOptions &options,
                PostingWidget *postWidget = nullptr,
+               QObject *parent = nullptr);
+    //! A runtime of the queue (lot C3): it writes no history row of its own and
+    //! reports only to its executor, never to NgPost's job coordinator.
+    PostingJob(NgPost *ngPost,
+               const PostingJobOptions &options,
+               const JobExecutionContext &context,
                QObject *parent = nullptr);
     ~PostingJob() override;
 
@@ -362,6 +372,20 @@ public:
     bool isStepDriven() const { return _stepDriven; }
     //! Starts @p step; its end is reported by preparationStepFinished().
     bool runPreparationStep(queue::PrepStep step);
+    //! What the preparation left for the transfer, once Collect has run.
+    PreparedManifest preparedManifest() const;
+    //! Stops a running preparation tool and puts renamed sources back, with
+    //! no history write and no post action. False when either is not proven.
+    bool quiescePreparation();
+    //! Source files are still under an obfuscated name: the runtime holds the
+    //! only map back and must stay alive.
+    bool hasUnrestoredSources() const { return !_obfuscatedFileNames.isEmpty(); }
+    //! Starts the transfer of a queued post. A post that packs must give a
+    //! valid @p manifest: its original files are never published instead.
+    bool activateTransfer(const PreparedManifest &manifest);
+    //! A history write of this run failed: its local end is not reliable.
+    bool historyDataUnreliable() const { return _historyDataUnreliable; }
+    const JobExecutionContext &executionContext() const { return _context; }
 
 signals:
     void pauseChanged();
@@ -462,7 +486,14 @@ private:
     //! jobs are finalized as failed in history; a refused resume keeps the
     //! original post resumable.
     void _abortBeforeTransfer(bool keepResumeResumable = false);
+    PostingJob(NgPost *ngPost,
+               const PostingJobOptions &options,
+               PostingWidget *postWidget,
+               QObject *parent,
+               const JobExecutionContext *context);
     void _connectJobSignals();
+    void _connectRuntimeSignals();
+    void _logStart();
 #ifdef __USE_HMI__
     void _connectWidgetSignals();
 #endif

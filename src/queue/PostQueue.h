@@ -95,6 +95,8 @@ public:
     bool engineSetLifecycle(qint64 postId, Lifecycle lifecycle, Slot slot);
     //! Blocks an entry and frees its slot; its artifacts follow keepRar.
     bool engineBlock(qint64 postId, const BlockReason &reason, Lifecycle lifecycle);
+    //! A stop the runtime could not prove: blocked, but lifecycle and slot stay.
+    bool engineMarkStuck(qint64 postId, const BlockReason &reason);
     //! Interruption kept: interrupted run recorded, successor run attached.
     bool engineInterrupt(qint64 postId, bool manifestEngaged, bool hold, bool keepArtifacts);
     bool engineSetIntentSwitching();

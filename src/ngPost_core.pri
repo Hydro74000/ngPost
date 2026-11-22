@@ -141,6 +141,7 @@ SOURCES += \
         $$PWD/PostCmdRunner.cpp \
         $$PWD/Poster.cpp \
         $$PWD/PostingJob.cpp \
+        $$PWD/PostingJobExecutor.cpp \
         $$PWD/par2/Par2Settings.cpp \
         $$PWD/tools/ExternalToolResolver.cpp \
         $$PWD/nntp/Nntp.cpp \
@@ -184,6 +185,8 @@ HEADERS += \
     $$PWD/PostCmdRunner.h \
     $$PWD/Poster.h \
     $$PWD/PostingJob.h \
+    $$PWD/PostingJobExecution.h \
+    $$PWD/PostingJobExecutor.h \
     $$PWD/nntp/Nntp.h \
     $$PWD/nntp/NntpArticle.h \
     $$PWD/nntp/NntpFile.h \

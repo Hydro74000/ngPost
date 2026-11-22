@@ -63,8 +63,9 @@ tst_PostInfoTemplate          36  Linux
 tst_PostQueue                 22  Linux
 tst_PostingJobOptionsCodec    27  Linux
 tst_QueuePanel                10  Linux
-tst_QueueScheduler            22  Linux
+tst_QueueScheduler            26  Linux
 tst_QueueStoreSqlite          16  Linux
+tst_PostingJobExecutor         9  Linux
 tst_RandomToken                3  Linux
 tst_SecretMasker              22  Linux
 tst_UpdateChecker             46  Linux
@@ -100,8 +101,9 @@ tst_PostInfoTemplate          36  Darwin
 tst_PostQueue                 22  Darwin
 tst_PostingJobOptionsCodec    27  Darwin
 tst_QueuePanel                10  Darwin
-tst_QueueScheduler            22  Darwin
+tst_QueueScheduler            26  Darwin
 tst_QueueStoreSqlite          16  Darwin
+tst_PostingJobExecutor         9  Darwin
 tst_RandomToken                3  Darwin
 tst_SecretMasker              22  Darwin
 tst_UpdateChecker             46  Darwin
@@ -119,6 +121,7 @@ tst_Yenc                      30  Darwin
 # The Windows-only suites run here and only here; tst_PathHelper and
 # tst_PostInfoTemplate skip the cases that need a symlink privilege, and
 # tst_MainWindow skips the tool-path cases that need a POSIX file mode.
+# tst_PostingJobExecutor skips the three cases whose fake rar/par2 are shell scripts.
 tst_CliParser                 65  Windows
 tst_FoldersMonitor            10  Windows
 tst_GoldenNzb                  4  Windows
@@ -134,8 +137,9 @@ tst_PostInfoTemplate          34  Windows
 tst_PostQueue                 22  Windows
 tst_PostingJobOptionsCodec    27  Windows
 tst_QueuePanel                10  Windows
-tst_QueueScheduler            22  Windows
+tst_QueueScheduler            26  Windows
 tst_QueueStoreSqlite          16  Windows
+tst_PostingJobExecutor         6  Windows
 tst_RandomToken                3  Windows
 tst_SecretMasker              22  Windows
 tst_UpdateChecker             46  Windows

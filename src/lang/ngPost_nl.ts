@@ -6914,6 +6914,10 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
         <source>Not deleting the posted files: %1 article(s) failed or are unconfirmed. Resume the post from the history once the problem is solved.</source>
         <translation>De geposte bestanden worden niet verwijderd: %1 artikel(en) mislukt of onbevestigd. Hervat de post vanuit de geschiedenis zodra het probleem is opgelost.</translation>
     </message>
+    <message>
+        <source>The prepared files of %1 are missing: nothing is posted.</source>
+        <translation>De voorbereide bestanden van %1 ontbreken: er wordt niets gepost.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>

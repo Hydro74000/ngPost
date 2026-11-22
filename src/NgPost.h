@@ -427,6 +427,7 @@ private:
     QQueue<PostingJob *> _pendingJobs;
     PostingJob *_packingJob;
     bool _queuePaused = false;
+    const bool _queueEngine = qEnvironmentVariable("NGPOST_QUEUE_ENGINE") == QLatin1String("1");
     bool _cancelingAll = false;
     quint64 _postingCancelGeneration = 0;
     bool _resumeActiveJob();
@@ -686,6 +687,7 @@ public:
         return true;
     }
     int shutdownStartCountForTest() const { return _shutdownStartCount; }
+    bool ensureHistoryStoreForTest() { return _ensureHistoryStore(); }
     //! What a monitored \a file would be posted with, without posting it.
     PostingJobOptions monitoredPostOptionsForTest(const QFileInfo &file);
     int shutdownRecheckCountForTest() const { return _shutdownRecheckCount; }
@@ -900,6 +902,9 @@ public:
 
     VpnManager *vpnManager() const { return _vpnManager; }
     PostHistoryService *historyService() const { return _historyService; }
+    //! Internal switch of the queue engine (lot C3), read once per instance from
+    //! NGPOST_QUEUE_ENGINE=1. Off, posts follow the historical job queue.
+    bool queueEngineEnabled() const { return _queueEngine; }
 
 signals:
     void postingStateChanged();

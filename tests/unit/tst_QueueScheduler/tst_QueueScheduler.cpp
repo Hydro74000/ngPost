@@ -366,6 +366,7 @@ private slots:
     {
         Fixture f;
         const qint64 a = f.add(QStringLiteral("a"), true);
+        const qint64 b = f.add(QStringLiteral("b"), true); // needs the slot a holds
         settle();
         QVERIFY(f.queue.setHeld({ a }, true, f.queue.view()).ok());
         settle();
@@ -373,7 +374,95 @@ private slots:
         settle();
         QCOMPARE(f.queue.find(a)->blocked.code, QStringLiteral("quiesce_failed"));
         QCOMPARE(f.state(a), Lifecycle::Quiescing);
-        QVERIFY(!f.queue.find(a)->artifacts.isNull()); // nothing released
+        QCOMPARE(f.queue.find(a)->slot, Slot::Preparation); // the runtime keeps it
+        QVERIFY(!f.queue.find(a)->artifacts.isNull());      // nothing released
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        f.scheduler->retryAfterTechnicalPause();
+        settle();
+        QVERIFY(f.scheduler->isTechnicallyPaused()); // the stop is still not proven
+        QCOMPARE(f.executor.count(Kind::Prepare, b), 0);
+
+        QVERIFY(f.executor.ackQuiesced(a, true)); // proven at last
+        settle();
+        QVERIFY(!f.scheduler->isTechnicallyPaused());
+        QVERIFY(!f.queue.find(a)->blocked.isBlocked());
+        QVERIFY(f.queue.find(a)->held);
+        QCOMPARE(f.state(b), Lifecycle::Preparing);
+    }
+
+    void failedWriteHoldsTheQueueUntilRetried()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        QSignalSpy pauses(f.scheduler.get(), &QueueScheduler::technicalPauseChanged);
+        settle();
+        QVERIFY(f.executor.ackStep(a, true, 300)); // compression
+        settle();
+        f.store.failNextCommits(1);
+        QVERIFY(f.executor.ackStep(a, true, 10)); // collection: "prepared" is not written
+        settle();
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        QCOMPARE(pauses.size(), 1);
+        QCOMPARE(f.state(a), Lifecycle::Preparing);
+        QCOMPARE(f.executor.count(Kind::Activate), 0);
+        f.scheduler->reevaluate();
+        QCOMPARE(f.executor.count(Kind::Activate), 0); // nothing starts meanwhile
+
+        f.scheduler->retryAfterTechnicalPause();
+        settle();
+        QVERIFY(!f.scheduler->isTechnicallyPaused());
+        QCOMPARE(pauses.size(), 2);
+        QCOMPARE(f.state(a), Lifecycle::Posting);
+        QCOMPARE(f.queue.find(a)->artifacts.bytes, qint64(310)); // recorded once
+    }
+
+    void acknowledgementsWaitBehindAFailedOne()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        settle();
+        f.store.failNextCommits(1);
+        QVERIFY(f.executor.ackTransferFinished(a)); // "finalizing" is not written
+        settle();
+        QVERIFY(f.executor.ackFinalized(a)); // must not retire before it
+        settle();
+        QVERIFY(f.queue.find(a));
+        QCOMPARE(f.state(a), Lifecycle::Posting);
+        f.scheduler->retryAfterTechnicalPause();
+        settle();
+        QVERIFY(!f.queue.find(a)); // both applied, in order
+        QVERIFY(!f.scheduler->isTechnicallyPaused());
+    }
+
+    void stopIsAskedOnlyOnceQuiescingIsWritten()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        settle();
+        QCOMPARE(f.state(a), Lifecycle::Posting);
+        f.store.failNextCommits(1);
+        QVERIFY(f.queue.remove({ a }, RemovePolicy::Default, f.queue.view()).ok());
+        settle();
+        QCOMPARE(f.executor.count(Kind::Interrupt, a), 0);
+        QCOMPARE(f.state(a), Lifecycle::Posting);
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+    }
+
+    void failedActivationStartsNoTransfer()
+    {
+        Fixture f;
+        f.store.failNextCommits(1);
+        const qint64 a = f.add(QStringLiteral("a")); // admission itself fails
+        QCOMPARE(a, qint64(0));
+        const qint64 b = f.add(QStringLiteral("b"));
+        f.store.failNextCommits(1); // the activation of b
+        settle();
+        QCOMPARE(f.executor.count(Kind::Activate), 0);
+        QCOMPARE(f.state(b), Lifecycle::Queued);
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        f.scheduler->retryAfterTechnicalPause();
+        settle();
+        QCOMPARE(f.state(b), Lifecycle::Posting);
     }
 
     void vpnAdmissionWaitsOrBlocks()

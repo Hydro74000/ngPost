@@ -26,4 +26,5 @@ SUBDIRS = \
     tst_PostingJobOptionsCodec \
     tst_PostQueue \
     tst_QueueScheduler \
-    tst_QueueStoreSqlite
+    tst_QueueStoreSqlite \
+    tst_PostingJobExecutor

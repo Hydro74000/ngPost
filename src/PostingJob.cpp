@@ -261,6 +261,23 @@ PostingJob::PostingJob(NgPost *ngPost,
                        const PostingJobOptions &options,
                        PostingWidget *postWidget,
                        QObject *parent)
+    : PostingJob(ngPost, options, postWidget, parent, nullptr)
+{
+}
+
+PostingJob::PostingJob(NgPost *ngPost,
+                       const PostingJobOptions &options,
+                       const JobExecutionContext &context,
+                       QObject *parent)
+    : PostingJob(ngPost, options, nullptr, parent, &context)
+{
+}
+
+PostingJob::PostingJob(NgPost *ngPost,
+                       const PostingJobOptions &options,
+                       PostingWidget *postWidget,
+                       QObject *parent,
+                       const JobExecutionContext *context)
     : QObject(parent)
     , _ngPost(ngPost)
     , _options(options)
@@ -337,6 +354,8 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _stopPosting(0x0)
     , _noMoreFiles(0x0)
     , _postStarted(false)
+    , _queueRuntime(context != nullptr)
+    , _context(context ? *context : JobExecutionContext())
     , _packed(false)
     , _postFinished(false)
     , _obfuscateArticles(options.obfuscateArticles)
@@ -358,7 +377,7 @@ PostingJob::PostingJob(NgPost *ngPost,
     , _resumeTimer()
     , _authRejectedCycles(0)
     , _isActiveJob(false)
-    , _historyPostId(options.resumeHistoryPostId)
+    , _historyPostId(context ? context->postId : options.resumeHistoryPostId)
     , _resumeFromHistory(options.resumeHistoryPostId != 0)
     , _resumeFileStatesByPath(options.resumeFileStatesByPath)
 #ifdef __COMPUTE_IMMEDIATE_SPEED__
@@ -371,7 +390,10 @@ PostingJob::PostingJob(NgPost *ngPost,
 #ifdef __DEBUG__
     qDebug() << "[PostingJob] >>>> Construct " << this;
 #endif
-    _connectJobSignals();
+    if (_queueRuntime)
+        _connectRuntimeSignals();
+    else
+        _connectJobSignals();
 
 #ifdef __USE_HMI__
     _connectWidgetSignals();
@@ -390,7 +412,20 @@ PostingJob::PostingJob(NgPost *ngPost,
     if (ngPost->debugMode())
         _log(NntpConnection::sslSupportInfo());
 
-    _createHistoryRecord();
+    // A queued post was admitted, and its history row written, before any
+    // runtime existed.
+    if (!_queueRuntime)
+        _createHistoryRecord();
+}
+
+//! Only what a runtime needs for itself: its executor listens to the rest.
+void PostingJob::_connectRuntimeSignals()
+{
+    connect(this, &PostingJob::pauseChanged, _ngPost, &NgPost::postingStateChanged);
+    connect(this, &PostingJob::stopPosting, this, [this] {
+        _cancelRequested = true;
+    }, Qt::DirectConnection);
+    connect(this, &PostingJob::stopPosting, this, &PostingJob::onStopPosting, Qt::QueuedConnection);
 }
 
 void PostingJob::_connectJobSignals()
@@ -805,20 +840,7 @@ void PostingJob::onStartPosting(bool isActiveJob)
     qDebug() << "[MB_TRACE][Issue#82][PostingJob::onStartPosting] job: " << this
              << ", file: " << nzbName() << " (isActive: " << isActiveJob << ")";
 #endif
-#ifdef __USE_HMI__
-    if (_postWidget)
-        // Plain text, not an HTML fragment. The log pane builds its content
-        // with a bounded QTextCursor rather than QTextEdit::append(), so markup
-        // reaches the user as literal "<h3>...</h3>"; the very same string is
-        // also written verbatim to the log file, where a tag never belonged
-        // either. Emphasis, where the pane wants it, is a QTextCharFormat --
-        // see MainWindow::logError(). The blank line is layout, so it stays out
-        // of the translated sentence.
-        _log(QStringLiteral("\n")
-             + tr("Start Post #%1: %2").arg(_postWidget->jobNumber()).arg(_nzbName));
-    else
-#endif
-        _log(QString("\n\n[%1] %2: %3").arg(timestamp()).arg(tr("Start posting")).arg(_nzbName));
+    _logStart();
 
     // Resolve the .nfo before packing changes _files; copy it only after success.
     if (_ngPost->_copyNfoWithNzb && !_nzbFilePath.isEmpty())
@@ -846,6 +868,24 @@ void PostingJob::onStartPosting(bool isActiveJob)
         _packed = true;
         _postFiles();
     }
+}
+
+void PostingJob::_logStart()
+{
+#ifdef __USE_HMI__
+    if (_postWidget)
+        // Plain text, not an HTML fragment. The log pane builds its content
+        // with a bounded QTextCursor rather than QTextEdit::append(), so markup
+        // reaches the user as literal "<h3>...</h3>"; the very same string is
+        // also written verbatim to the log file, where a tag never belonged
+        // either. Emphasis, where the pane wants it, is a QTextCharFormat --
+        // see MainWindow::logError(). The blank line is layout, so it stays out
+        // of the translated sentence.
+        _log(QStringLiteral("\n")
+             + tr("Start Post #%1: %2").arg(_postWidget->jobNumber()).arg(_nzbName));
+    else
+#endif
+        _log(QString("\n\n[%1] %2: %3").arg(timestamp()).arg(tr("Start posting")).arg(_nzbName));
 }
 
 void PostingJob::_chooseTmpPath(bool par2Only)
@@ -884,6 +924,7 @@ bool PostingJob::runPreparationStep(queue::PrepStep step)
 {
     if (!_stepDriven) {
         _stepDriven = true;
+        _logStart();
         // As onStartPosting(): the .nfo is found before packing changes _files.
         if (_ngPost->_copyNfoWithNzb && !_nzbFilePath.isEmpty())
             _resolveNfoSource();
@@ -929,6 +970,68 @@ void PostingJob::_finishStep(queue::PrepStep step, bool ok, const QString &error
     QMetaObject::invokeMethod(this, [this, step, ok, error, bytes] {
         emit preparationStepFinished(step, ok, error, bytes);
     }, Qt::QueuedConnection);
+}
+
+PreparedManifest PostingJob::preparedManifest() const
+{
+    PreparedManifest manifest;
+    if (!_collected || !_compressDir)
+        return manifest;
+    manifest.dir = _compressDir->absolutePath();
+    for (const QFileInfo &file : _files)
+        manifest.files << file.absoluteFilePath();
+    manifest.copiedNfos = QStringList(_copiedNfoPaths.cbegin(), _copiedNfoPaths.cend());
+    manifest.bytes = _compressDirBytes();
+    manifest.compressed = _compressedThisRun;
+    manifest.par2 = _doPar2;
+    return manifest;
+}
+
+bool PostingJob::quiescePreparation()
+{
+    _preparationStopped = true;
+    if (_extProc) {
+        disconnect(_extProc, nullptr, this, nullptr);
+        if (_extProc->state() != QProcess::NotRunning) {
+            _extProc->terminate();
+            if (!_extProc->waitForFinished(1500)) {
+                _extProc->kill();
+                _extProc->waitForFinished(500);
+            }
+        }
+        if (_extProc->state() != QProcess::NotRunning)
+            return false; // still running: nothing is proven
+        _cleanExtProc();
+    }
+    return _restoreObfuscatedFileNames();
+}
+
+bool PostingJob::activateTransfer(const PreparedManifest &manifest)
+{
+    _isActiveJob = true;
+    _logStart();
+    // Like onStartPosting(): the .nfo is looked for among the original sources.
+    if (_ngPost->_copyNfoWithNzb && !_nzbFilePath.isEmpty())
+        _resolveNfoSource();
+    if (_doCompress || _doPar2) {
+        if (!manifest.isValid()) {
+            _error(tr("The prepared files of %1 are missing: nothing is posted.").arg(_nzbName));
+            _abortBeforeTransfer();
+            return false;
+        }
+        delete _compressDir;
+        _compressDir = new QDir(manifest.dir);
+        _files.clear();
+        for (const QString &path : manifest.files)
+            _files << QFileInfo(path);
+        _copiedNfoPaths = QSet<QString>(manifest.copiedNfos.cbegin(), manifest.copiedNfos.cend());
+        _compressedThisRun = manifest.compressed;
+        _collected = true; // exactly the prepared list, in its order
+        emit archiveFileNames(manifest.files);
+    }
+    _packed = true;
+    _postFiles();
+    return true;
 }
 
 qint64 PostingJob::_compressDirBytes() const
@@ -2490,7 +2593,7 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
 
 void PostingJob::onCompressionFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    if (_finishIfCanceled())
+    if (_preparationStopped || _finishIfCanceled())
         return;
     if (_ngPost->debugMode())
         _log(tr("=> rar exit code: %1\n").arg(exitCode));
@@ -2662,7 +2765,7 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
 
 void PostingJob::onGenPar2Finished(int exitCode, QProcess::ExitStatus exitStatus)
 {
-    if (_finishIfCanceled())
+    if (_preparationStopped || _finishIfCanceled())
         return;
     if (_ngPost->debugMode())
         _log(tr("=> par2 exit code: %1\n").arg(exitCode));
@@ -2769,7 +2872,7 @@ void PostingJob::onExtProcError(QProcess::ProcessError error)
 {
     // FailedToStart does not emit finished(): a missing interpreter or shared
     // library must terminate this job, rather than leaving it packing forever.
-    if (error != QProcess::FailedToStart || !_extProc)
+    if (error != QProcess::FailedToStart || !_extProc || _preparationStopped)
         return;
     const QString message = tr("Could not start external tool %1: %2")
                                 .arg(_extProc->program(), _extProc->errorString());

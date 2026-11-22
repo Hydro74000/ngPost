@@ -23,6 +23,7 @@
 #include <QHash>
 #include <QList>
 #include <QObject>
+#include <QSet>
 
 #include <functional>
 
@@ -64,9 +65,21 @@ public:
     //! Estimated temporary bytes a preparation of @p entry needs, margin excluded.
     static qint64 estimatedPreparationBytes(const QueueEntry &entry);
 
+    //! A queue write failed: nothing new starts until retryAfterTechnicalPause()
+    //! has applied every acknowledgement left waiting. Distinct from the user's
+    //! pause, which the queue itself records.
+    bool isTechnicallyPaused() const { return _technicalPause; }
+    QString technicalPauseReason() const { return _technicalReason; }
+
+signals:
+    void technicalPauseChanged(bool paused, const QString &reason);
+
 public slots:
     //! Looks at the queue and starts what may start. Idempotent.
     void reevaluate();
+    //! Applies, in order, the acknowledgements a failed write left waiting; the
+    //! technical pause ends once they all went through.
+    void retryAfterTechnicalPause();
 
 private slots:
     void scheduleReevaluate();
@@ -103,8 +116,14 @@ private:
     int preparedCount() const;
     QList<PrepStep> stepsFor(const QueueEntry &entry) const;
     ArtifactSetRef newArtifactSet(const QueueEntry &entry) const;
-    void requestStop(const QueueEntry &entry, PendingStop why, Disposition disposition);
+    bool requestStop(const QueueEntry &entry, PendingStop why, Disposition disposition);
     bool isCurrent(qint64 postId, const QString &runId) const;
+    bool recordStep(qint64 postId, PrepStep step, bool ok, const QString &error, qint64 bytes);
+    bool recordQuiesced(qint64 postId, PendingStop why, bool manifest, bool wasTransfer);
+    void enterTechnicalPause(const QString &reason);
+    //! Applies @p write now, or after the acknowledgements already waiting;
+    //! a failure keeps it waiting and pauses the queue technically.
+    void applyInOrder(std::function<bool()> write);
 
     PostQueue *_queue;
     QueueExecutor *_executor;
@@ -118,6 +137,10 @@ private:
     QHash<qint64, PendingStop> _pendingStops;
     qint64 _pausedTransfer = 0;
     bool _scheduled = false;
+    bool _technicalPause = false;
+    QString _technicalReason;
+    QList<std::function<bool()>> _waitingWrites; //!< acknowledgements not yet durable
+    QSet<qint64> _stuck; //!< runtimes whose stop is not proven: they keep their slot
 };
 
 } // namespace queue
