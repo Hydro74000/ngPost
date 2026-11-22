@@ -45,6 +45,13 @@ public:
     //! kept, no deliverable). Both end with finalized().
     virtual void retryFinalization(qint64 postId, const QString &runId) = 0;
     virtual void abandonPlanning(qint64 postId, const QString &runId) = 0;
+    //! The runtime of @p postId still holds something only it can settle
+    //! (renamed sources): its entry must stay, even after a failure.
+    virtual bool holdsUnsettledWork(qint64 postId) const
+    {
+        Q_UNUSED(postId)
+        return false;
+    }
 
 signals:
     void stepFinished(qint64 postId,

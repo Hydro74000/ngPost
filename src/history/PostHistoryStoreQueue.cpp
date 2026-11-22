@@ -367,9 +367,14 @@ bool PostHistoryStore::_applyQueueTransaction(QSqlDatabase &db,
             return false;
         result.runs.insert(postId, renewed);
     }
-    for (qint64 postId : transaction.removals)
+    for (qint64 postId : transaction.removals) {
+        const auto outcome = transaction.outcomes.constFind(postId);
+        if (outcome != transaction.outcomes.cend()
+            && !_recordRunOutcome(db, postId, *outcome, &result.error))
+            return false;
         if (!_retireQueueEntry(db, postId, &result.error))
             return false;
+    }
     for (const QueueTransaction::Order &order : transaction.orders) {
         QList<qint64> ids;
         for (qint64 id : order.ids)
@@ -697,6 +702,33 @@ bool PostHistoryStore::_renewQueueRun(QSqlDatabase &db,
         && run(db,
                QStringLiteral("UPDATE post_info SET current_run_id=? WHERE post_id=?"),
                { *runId, postId },
+               error);
+}
+
+//! Ends the current run of @p postId with a known outcome, before its retirement.
+//! A post that never transferred takes the outcome as its status; a resume keeps
+//! its own, and with it what it can still resume.
+bool PostHistoryStore::_recordRunOutcome(QSqlDatabase &db,
+                                         qint64 postId,
+                                         const RunOutcome &outcome,
+                                         QString *error)
+{
+    return run(db,
+               QStringLiteral(
+                   "UPDATE post_runs SET state='terminal', result=?, result_recorded=1, "
+                   "end_cause=?, finished_at=?, supervision_json=COALESCE(?, supervision_json) "
+                   "WHERE run_id=(SELECT run_id FROM post_queue WHERE post_id=?) AND "
+                   "result_recorded=0"),
+               { outcome.result,
+                 outcome.endCause,
+                 _now(),
+                 outcome.diagnosticJson.isEmpty() ? nullString() : QVariant(outcome.diagnosticJson),
+                 postId },
+               error)
+        && run(db,
+               QStringLiteral("UPDATE posts SET status=?, finished_at=? WHERE id=? AND "
+                              "status='queued'"),
+               { outcome.result, _now(), postId },
                error);
 }
 

@@ -42,6 +42,14 @@ public:
         Blocked
     };
 
+    //! What a failed preparation step does to its entry. Block keeps it,
+    //! durably, for a retry from the queue view; Retire ends it as failed, as
+    //! long as no view can show a blocked entry (plan_queue.md, until C7a).
+    enum class PreparationFailure {
+        Block,
+        Retire
+    };
+
     struct Budget
     {
         int preparedMax = 2;                       //!< QUEUE_PREPARED_MAX
@@ -58,6 +66,7 @@ public:
                    QObject *parent = nullptr);
 
     void setAdmission(std::function<Admission(const QueueEntry &)> admission);
+    void setPreparationFailurePolicy(PreparationFailure policy) { _preparationFailure = policy; }
     //! Side-effect free VPN check of a "post now" switch; Blocked drops the intent.
     void setSwitchPreflight(
         std::function<Admission(const QueueEntry &target, const QueueEntry &active)> preflight);
@@ -137,6 +146,7 @@ private:
     QHash<qint64, PendingStop> _pendingStops;
     qint64 _pausedTransfer = 0;
     bool _scheduled = false;
+    PreparationFailure _preparationFailure = PreparationFailure::Block;
     bool _technicalPause = false;
     QString _technicalReason;
     QList<std::function<bool()>> _waitingWrites; //!< acknowledgements not yet durable

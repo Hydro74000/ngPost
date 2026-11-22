@@ -27,6 +27,7 @@ namespace queue
 {
 struct QueueEntry;
 struct QueueTransaction;
+struct RunOutcome;
 struct QueueCommit;
 struct PostNowIntent;
 enum class Domain;
@@ -469,6 +470,10 @@ private:
                                 queue::QueueCommit &result);
     bool _admitQueueEntry(QSqlDatabase &db, queue::QueueEntry &entry, QString *error);
     bool _admitExistingQueueEntry(QSqlDatabase &db, queue::QueueEntry &entry, QString *error);
+    bool _recordRunOutcome(QSqlDatabase &db,
+                           qint64 postId,
+                           const queue::RunOutcome &outcome,
+                           QString *error);
     bool _writeQueueEntry(QSqlDatabase &db,
                           const queue::QueueEntry &entry,
                           bool insert,

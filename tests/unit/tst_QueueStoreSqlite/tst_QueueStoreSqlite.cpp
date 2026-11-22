@@ -461,6 +461,38 @@ private slots:
                  QStringLiteral("normal"));
     }
 
+    void aFailedPreparationEndsFailedButAResumeKeepsItsStatus()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        QVERIFY(f.queue->engineBeginPreparation(
+            a,
+            { QStringLiteral("g1"), 1, 0, 0, QStringLiteral("/tmp") }));
+        QVERIFY(f.queue->engineFailPreparation(a, PrepStep::Compress, QStringLiteral("exit 2")));
+        QVERIFY(!f.queue->find(a));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT result FROM post_runs WHERE post_id=?"), { a })
+                     .toString(),
+                 QStringLiteral("failed"));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT end_cause FROM post_runs WHERE post_id=?"), { a })
+                     .toString(),
+                 QStringLiteral("technical"));
+        QVERIFY(f.scalar(QStringLiteral("SELECT supervision_json FROM post_runs WHERE post_id=?"),
+                         { a })
+                    .toString()
+                    .contains(QStringLiteral("exit 2")));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { a }).toString(),
+                 QStringLiteral("failed"));
+
+        // A resume that fails before transferring keeps what it can resume.
+        f.scalar(QStringLiteral("UPDATE posts SET status='partial' WHERE id=?"), { a });
+        PersistedQueueOptions o = makeOptions(QStringLiteral("a"));
+        o.job.resumeHistoryPostId = a;
+        QVERIFY(f.queue->enqueueExisting(a, o, Origin::Resume).ok());
+        QVERIFY(f.queue->engineFailPreparation(a, PrepStep::Collect, QStringLiteral("gone")));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { a }).toString(),
+                 QStringLiteral("partial"));
+    }
+
     void aStoppedPreparationIsCancelled()
     {
         Fixture f;

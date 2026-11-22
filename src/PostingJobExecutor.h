@@ -60,6 +60,8 @@ public:
     void interrupt(qint64 postId, const QString &runId, queue::Disposition disposition) override;
     void retryFinalization(qint64 postId, const QString &runId) override;
     void abandonPlanning(qint64 postId, const QString &runId) override;
+    //! A failed preparation keeps its runtime only while sources are renamed.
+    bool holdsUnsettledWork(qint64 postId) const override { return _runtimes.contains(postId); }
 
     //! The live job of @p postId, or null.
     PostingJob *runtime(qint64 postId) const;

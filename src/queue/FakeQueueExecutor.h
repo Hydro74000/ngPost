@@ -14,6 +14,7 @@
 
 #include <QHash>
 #include <QList>
+#include <QSet>
 
 class QTimer;
 
@@ -60,6 +61,15 @@ public:
 
     const QList<Command> &commands() const { return _commands; }
     void clearCommands() { _commands.clear(); }
+    //! Makes holdsUnsettledWork() answer yes for @p postId.
+    void setUnsettled(qint64 postId, bool unsettled = true)
+    {
+        if (unsettled)
+            _unsettled.insert(postId);
+        else
+            _unsettled.remove(postId);
+    }
+    bool holdsUnsettledWork(qint64 postId) const override { return _unsettled.contains(postId); }
     //! Last command of @p kind for @p postId, or nullptr.
     const Command *last(Command::Kind kind, qint64 postId) const;
     int count(Command::Kind kind, qint64 postId = 0) const;
@@ -91,6 +101,7 @@ private:
     QTimer *ticker(qint64 postId);
 
     QList<Command> _commands;
+    QSet<qint64> _unsettled;
     bool _simulate = false;
     int _stepMs = 1500;
     int _transferMs = 12000;

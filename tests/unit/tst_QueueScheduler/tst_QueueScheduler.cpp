@@ -397,6 +397,52 @@ private slots:
         QCOMPARE(f.state(b), Lifecycle::Preparing);
     }
 
+    void retirePolicyEndsAFailedPreparation()
+    {
+        Fixture f;
+        f.scheduler->setPreparationFailurePolicy(QueueScheduler::PreparationFailure::Retire);
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        const qint64 b = f.add(QStringLiteral("b"));
+        settle();
+        QVERIFY(f.executor.ackStep(a, false, 0, QStringLiteral("rar exit 2")));
+        settle();
+        QVERIFY(!f.queue.find(a));
+        QCOMPARE(f.store.outcomeOf(a).result, QStringLiteral("failed"));
+        QCOMPARE(f.store.outcomeOf(a).endCause, QStringLiteral("technical"));
+        QVERIFY(f.store.outcomeOf(a).diagnosticJson.contains(QStringLiteral("rar exit 2")));
+        QCOMPARE(f.state(b), Lifecycle::Posting); // the next one goes on
+    }
+
+    void retireThatCannotBeWrittenPauses()
+    {
+        Fixture f;
+        f.scheduler->setPreparationFailurePolicy(QueueScheduler::PreparationFailure::Retire);
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        settle();
+        f.store.failNextCommits(1);
+        QVERIFY(f.executor.ackStep(a, false));
+        settle();
+        QVERIFY(f.queue.find(a)); // nothing half done
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        f.scheduler->retryAfterTechnicalPause();
+        settle();
+        QVERIFY(!f.queue.find(a));
+        QCOMPARE(f.store.outcomeOf(a).result, QStringLiteral("failed"));
+    }
+
+    void retirePolicyKeepsWhatOnlyItsRuntimeCanSettle()
+    {
+        Fixture f;
+        f.scheduler->setPreparationFailurePolicy(QueueScheduler::PreparationFailure::Retire);
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        settle();
+        f.executor.setUnsettled(a); // sources still renamed
+        QVERIFY(f.executor.ackStep(a, false));
+        settle();
+        QVERIFY(f.queue.find(a));
+        QCOMPARE(f.queue.find(a)->blocked.code, QStringLiteral("preparation_failed"));
+    }
+
     void failedWriteHoldsTheQueueUntilRetried()
     {
         Fixture f;

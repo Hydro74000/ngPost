@@ -1014,6 +1014,8 @@ bool PostingJob::quiescePreparation()
 
 bool PostingJob::activateTransfer(const PreparedManifest &manifest)
 {
+    if (_finishIfCanceled())
+        return false; // stopped before its start: nothing is sent
     _isActiveJob = true;
     _logStart();
     // Like onStartPosting(): the .nfo is looked for among the original sources.

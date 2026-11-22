@@ -34,6 +34,7 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QScopedValueRollback>
 #include <QUuid>
 
 using namespace queue;
@@ -102,6 +103,9 @@ bool NgPost::_ensureQueueEngine()
         return QDir(tmp.isEmpty() ? QDir::tempPath() : tmp).absolutePath();
     };
     _queueScheduler = new QueueScheduler(_postQueue, _queueExecutor, budget, this);
+    // Until the queue view can show a blocked entry (C7a), a failed preparation
+    // ends its post as failed, as it always did.
+    _queueScheduler->setPreparationFailurePolicy(QueueScheduler::PreparationFailure::Retire);
     _queueScheduler->setAdmission([this](const QueueEntry &) {
         if (!_vpnManager)
             return QueueScheduler::Admission::Proceed;
@@ -131,6 +135,10 @@ bool NgPost::_ensureQueueEngine()
         // Still followed by a tab: it left the queue without transferring.
         if (PostingWidget *view = _queueViews.take(postId))
             view->onQueuedPostRemoved();
+        // An Auto post that ended before any transfer closes its line too.
+        const QString autoRow = _autoRows.take(postId);
+        if (!autoRow.isEmpty() && _hmi)
+            _hmi->autoWidget()->updateFinishedJob(autoRow, 0, 0, 0);
 #else
         Q_UNUSED(postId)
 #endif
@@ -217,7 +225,14 @@ NgPost::QueueAdmission NgPost::admitPost(const PostingJobOptions &options,
     if (!_queueAdmissionConfirmed(&admission))
         return admission;
     const QueueCommandResult result = _postQueue->submit(_queueRecipe(options), origin, tabNumber);
-    return _queueAdmitted(result, view);
+    admission = _queueAdmitted(result, view);
+#ifdef __USE_HMI__
+    // The Auto Posting tab lists a monitored file by its path: the line to
+    // close if the post leaves without a transfer.
+    if (admission.accepted && origin == Origin::Auto && !options.files.isEmpty())
+        _autoRows.insert(admission.postId, options.files.first().absoluteFilePath());
+#endif
+    return admission;
 }
 
 NgPost::QueueAdmission NgPost::admitResume(qint64 postId,
@@ -233,6 +248,15 @@ NgPost::QueueAdmission NgPost::admitResume(qint64 postId,
                                                                   _queueRecipe(options),
                                                                   origin);
     return _queueAdmitted(result, view);
+}
+
+void NgPost::startQueuedWork()
+{
+    if (!_queueScheduler)
+        return;
+    // The user is on the tab that just started: no tab switch, as before.
+    const QScopedValueRollback<bool> clicked(_startingFromView, true);
+    _queueScheduler->reevaluate();
 }
 
 bool NgPost::_queueAdmissionConfirmed(QueueAdmission *admission)
@@ -302,7 +326,8 @@ void NgPost::_onQueueRuntimeActivated(qint64 postId, PostingJob *job)
                     &AutoPostWidget::onMonitorJobStart);
         else
             job->widget()->bindQueueRuntime(job);
-        _hmi->setTab(job->widget());
+        if (!_startingFromView)
+            _hmi->setTab(job->widget()); // the queue moved on to this post
     }
 #endif
     connect(job,
@@ -323,6 +348,7 @@ void NgPost::_onQueueRuntimeEnded(qint64 postId, PostingJob *job)
     _releaseVpnForJob(job);
 #ifdef __USE_HMI__
     _queueViews.remove(postId);
+    _autoRows.remove(postId); // _recordFinishedJob() closed its line
 #else
     Q_UNUSED(postId)
 #endif

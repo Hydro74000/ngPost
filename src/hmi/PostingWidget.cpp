@@ -1188,6 +1188,8 @@ void PostingWidget::_submitToQueue(const PostingJobOptions &options,
                        _hmi->pendingIcon(),
                        QFileInfo(filled.nzbFilePath).fileName());
     emit submissionEligibilityChanged();
+    // The head starts now, as a click always did; the rest waits its turn.
+    _ngPost->startQueuedWork();
 }
 
 void PostingWidget::attachQueuedResume(qint64 postId,
@@ -1208,6 +1210,7 @@ void PostingWidget::attachQueuedResume(qint64 postId,
                        _hmi->pendingIcon(),
                        QFileInfo(nzbPath).fileName());
     emit submissionEligibilityChanged();
+    _ngPost->startQueuedWork();
 }
 
 void PostingWidget::bindQueueRuntime(PostingJob *job)
@@ -1221,7 +1224,12 @@ void PostingWidget::onQueuedPostRemoved()
     if (!_queuedPostId || _postingJob)
         return; // a transfer ends through onPostingJobDone()
     _queuedPostId = 0;
-    _postingFinished = false;
+    // As a pending job that is cancelled: finished, and ready to be posted
+    // again from scratch. The queue already closed its history row, so
+    // nothing of it is left to supersede.
+    _postingFinished = true;
+    _resubmittable = true;
+    _stoppedAttempt = {};
     // A preparation may have shown its archives: the sources come back.
     if (!_queuedInputPaths.isEmpty()) {
         _ui->filesList->clear2();
@@ -1229,6 +1237,7 @@ void PostingWidget::onQueuedPostRemoved()
             _ui->filesList->addPath(path, QFileInfo(path).isDir());
     }
     _hmi->clearJobTab(this);
+    _clearActivePostingHighlights();
     setIDLE();
 }
 

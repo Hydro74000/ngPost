@@ -254,6 +254,9 @@ private slots:
     void global_cancel_external_tool_data();
     void global_cancel_external_tool();
     void canceled_job_never_starts();
+    //! A monitored file whose post fails before any transfer (no compressor)
+    //! closes its line in the Auto Posting tab, in both posting engines.
+    void auto_post_failing_before_transfer_closes_its_line();
     void global_post_controls_pause_resume_and_cancel_data();
     void global_post_controls_pause_resume_and_cancel();
     void shutdown_waits_for_every_post_data();
@@ -6819,6 +6822,51 @@ void TestMainWindow::canceled_job_never_starts()
     QCOMPARE(started.count(), 0);
     QVERIFY(!QFile::exists(options.nzbFilePath));
     QCOMPARE(mock.receivedArticles().size(), 0);
+}
+
+void TestMainWindow::auto_post_failing_before_transfer_closes_its_line()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start());
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const QString root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(
+        ngPost,
+        QString(
+            "TMP_DIR = %1\nRAR_SOURCE = custom\nRAR_PATH = %1/missing-rar\nAUTO_PACK = COMPRESS\n")
+                .arg(root)
+            + shutdownTestConfig(root, mock.port()),
+        &error);
+    QVERIFY2(window, qPrintable(error));
+    QFile incoming(root + "/watched.bin");
+    QVERIFY(incoming.open(QIODevice::WriteOnly));
+    incoming.write(QByteArray(20000, 'w'));
+    incoming.close();
+    const QFileInfo file(incoming.fileName());
+    auto *list = window->autoWidget()->findChild<QListWidget *>("filesList");
+    QVERIFY(list);
+    // What the tab shows while it monitors: its folder first, then the files.
+    list->addItem(QString("Monitoring %1").arg(root));
+    QVERIFY(QMetaObject::invokeMethod(&ngPost,
+                                      "onNewFileToProcess",
+                                      Qt::DirectConnection,
+                                      Q_ARG(QFileInfo, file)));
+    QTRY_VERIFY_WITH_TIMEOUT(!ngPost.hasPostingJobs(), 15000);
+    QListWidgetItem *line = nullptr;
+    for (int i = 0; i < list->count(); ++i)
+        if (list->item(i)->text().startsWith("- " + file.absoluteFilePath()))
+            line = list->item(i);
+    QVERIFY(line);
+    QTRY_VERIFY2(!line->data(Qt::UserRole).toBool(), // no longer shown as waiting
+                 qPrintable(line->text()));
+    QVERIFY2(line->text().endsWith("[0 err / 0]"), qPrintable(line->text()));
+    QCOMPARE(mock.receivedArticles().size(), 0);
+    QVERIFY(file.exists()); // the source is left as it was
 }
 
 void TestMainWindow::global_pause_holds_pending_and_new_posts_data()

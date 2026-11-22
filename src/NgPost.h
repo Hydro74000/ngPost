@@ -443,6 +443,7 @@ private:
     bool _queuePaused = false;
     const bool _queueEngine = qEnvironmentVariable("NGPOST_QUEUE_ENGINE") == QLatin1String("1");
     bool _queueLeftBlocked = false; //!< the command line run said it once
+    bool _startingFromView = false; //!< within startQueuedWork()
     // The queue engine (NgPostQueue.cpp), built by _ensureQueueEngine().
     queue::OwnerLock *_ownerLock = nullptr;
     ServiceQueueStore *_queueStore = nullptr;
@@ -451,6 +452,7 @@ private:
     queue::QueueScheduler *_queueScheduler = nullptr;
 #ifdef __USE_HMI__
     QHash<qint64, QPointer<PostingWidget>> _queueViews; //!< post id -> its tab
+    QHash<qint64, QString> _autoRows; //!< Auto post id -> its line in the Auto Posting tab
 #endif
     bool _cancelingAll = false;
     quint64 _postingCancelGeneration = 0;
@@ -985,6 +987,9 @@ public:
                                queue::Origin origin,
                                PostingWidget *view = nullptr);
     queue::PostQueue *postQueue() const { return _postQueue; }
+    //! Lets the scheduler start at once what may start, once the view that
+    //! submitted a post has taken its state (a tab's click reads as before).
+    void startQueuedWork();
 
 private:
     QueueAdmission _queueAdmitted(const queue::QueueCommandResult &result, PostingWidget *view);

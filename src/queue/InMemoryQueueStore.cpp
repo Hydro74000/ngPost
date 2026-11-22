@@ -84,8 +84,11 @@ QueueCommit InMemoryQueueStore::commit(const QueueTransaction &transaction)
         entry.runId = QUuid::createUuid().toString(QUuid::WithoutBraces);
         result.runs.insert(id, { entry.runId, entry.runNo });
     }
-    for (qint64 id : transaction.removals)
+    for (qint64 id : transaction.removals) {
         _entries.remove(id);
+        if (transaction.outcomes.contains(id))
+            _outcomes.insert(id, transaction.outcomes.value(id));
+    }
     for (const QueueTransaction::Order &order : transaction.orders) {
         QList<qint64> ids;
         for (qint64 id : order.ids)

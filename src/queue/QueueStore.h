@@ -26,6 +26,14 @@
 namespace queue
 {
 
+//! How the current run of an entry ends when it leaves with a known outcome.
+struct RunOutcome
+{
+    QString result;   //!< post_runs.result: "failed", ...
+    QString endCause; //!< post_runs.end_cause: "technical", ...
+    QString diagnosticJson;
+};
+
 struct QueueTransaction
 {
     struct Order
@@ -45,6 +53,9 @@ struct QueueTransaction
     QList<QueueEntry> existingAdmissions;
     //! Entries leaving the queue (the post itself stays in the history).
     QList<qint64> removals;
+    //! For some of the removals: the outcome their current run ends with. A
+    //! post that never transferred takes it as its status (a resume keeps its own).
+    QHash<qint64, RunOutcome> outcomes;
     //! Post ids whose current run ends as interrupted and gets a successor run.
     QList<qint64> renewRuns;
     QList<Order> orders;

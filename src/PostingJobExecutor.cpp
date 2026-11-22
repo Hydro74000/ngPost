@@ -210,7 +210,11 @@ void PostingJobExecutor::activate(qint64 postId, const QString &runId, const QSt
             onTransferEnded(postId, job, runId);
         }, Qt::QueuedConnection);
     emit runtimeActivated(postId, job);
-    job->activateTransfer(_manifests.take(key(postId, runId, setId)));
+    // Bound now, started on the next turn of the event loop, as the historical
+    // queue did: a stop asked in between ends it before any byte is sent.
+    QMetaObject::invokeMethod(job, [job, manifest = _manifests.take(key(postId, runId, setId))] {
+        job->activateTransfer(manifest);
+    }, Qt::QueuedConnection);
 }
 
 void PostingJobExecutor::onTransferEnded(qint64 postId, PostingJob *job, const QString &runId)

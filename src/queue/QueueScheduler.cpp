@@ -309,7 +309,10 @@ bool QueueScheduler::recordStep(qint64 postId,
         return true;
     }
     bool written = false;
-    if (!ok) {
+    if (!ok && _preparationFailure == PreparationFailure::Retire
+        && !_executor->holdsUnsettledWork(postId)) {
+        written = _queue->engineFailPreparation(postId, step, error);
+    } else if (!ok) {
         written = _queue->engineBlock(postId,
                                       { QStringLiteral("preparation_failed"),
                                         { { QStringLiteral("step"), static_cast<int>(step) },

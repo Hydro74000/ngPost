@@ -9,6 +9,9 @@
 
 #include "PostQueue.h"
 
+#include <QJsonDocument>
+#include <QJsonObject>
+
 #include <QDir>
 #include <QFileInfo>
 #include <QSet>
@@ -610,11 +613,14 @@ QueueCommandResult PostQueue::edit(qint64 postId,
     return QueueCommandResult::done({ postId });
 }
 
-QueueCommandResult PostQueue::removeData(const QList<qint64> &ids, RemovePolicy policy)
+QueueCommandResult PostQueue::removeData(const QList<qint64> &ids,
+                                         RemovePolicy policy,
+                                         const QHash<qint64, RunOutcome> &outcomes)
 {
     Q_UNUSED(policy) // physical archive cleanup belongs to the recovery lot (C5)
     QueueTransaction tx;
     tx.removals = ids;
+    tx.outcomes = outcomes;
     QHash<QString, OrderRef> touched;
     for (qint64 id : ids) {
         const QueueEntry &entry = _entries[id];
@@ -918,6 +924,22 @@ bool PostQueue::engineRetire(qint64 postId)
     if (!_entries.contains(postId))
         return false;
     return removeData({ postId }, RemovePolicy::Default).ok();
+}
+
+bool PostQueue::engineFailPreparation(qint64 postId, PrepStep step, const QString &error)
+{
+    if (!_entries.contains(postId))
+        return false;
+    RunOutcome outcome;
+    outcome.result = QStringLiteral("failed");
+    outcome.endCause = QStringLiteral("technical");
+    outcome.diagnosticJson = QString::fromUtf8(
+        QJsonDocument(
+            QJsonObject{ { QStringLiteral("preparation_failed"),
+                           QJsonObject{ { QStringLiteral("step"), static_cast<int>(step) },
+                                        { QStringLiteral("error"), error } } } })
+            .toJson(QJsonDocument::Compact));
+    return removeData({ postId }, RemovePolicy::Default, { { postId, outcome } }).ok();
 }
 
 } // namespace queue

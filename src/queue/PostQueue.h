@@ -113,6 +113,9 @@ public:
     bool engineSetSourceJournal(qint64 postId, bool unsettled);
     //! The entry leaves the queue (F3 done, or a removal completed).
     bool engineRetire(qint64 postId);
+    //! A preparation failed: the entry leaves, its run ends failed (technical),
+    //! in one transaction.
+    bool engineFailPreparation(qint64 postId, PrepStep step, const QString &error);
     //! Whether the intent target can still be switched to.
     bool intentTargetValid() const;
 
@@ -147,7 +150,9 @@ private:
     QueueCommandResult commitOrder(const OrderRef &ref, const QList<qint64> &ids, bool dropsIntent);
     void releaseArtifacts(QueueEntry &entry, bool keepCurrent) const;
     QueueCommandResult holdOrRelease(const QList<qint64> &ids, bool held);
-    QueueCommandResult removeData(const QList<qint64> &ids, RemovePolicy policy);
+    QueueCommandResult removeData(const QList<qint64> &ids,
+                                  RemovePolicy policy,
+                                  const QHash<qint64, RunOutcome> &outcomes = {});
     QString duplicateNzbPath(const QString &path) const;
     QueueCommandResult admitEntry(QueueEntry entry);
     QueueEntry newEntry(const PersistedQueueOptions &options, Origin origin, int tabNumber) const;

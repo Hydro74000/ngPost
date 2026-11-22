@@ -32,6 +32,8 @@ public:
     int commitCount() const { return _commits; }
     //! Results ever recorded for a run: an interrupted run must appear once.
     int interruptionsRecorded(const QString &runId) const { return _interruptions.value(runId); }
+    //! The outcome a removal recorded for @p postId, if any.
+    RunOutcome outcomeOf(qint64 postId) const { return _outcomes.value(postId); }
     bool hasEntry(qint64 postId) const { return _entries.contains(postId); }
 
 private:
@@ -41,6 +43,7 @@ private:
     QHash<qint64, QueueEntry> _entries;
     QHash<QString, QList<qint64>> _orders;
     QHash<QString, PostNowIntent> _intents; //!< queue id -> intent
+    QHash<qint64, RunOutcome> _outcomes;
     QHash<QString, int> _interruptions;
     QHash<qint64, int> _runNumbers; //!< post id -> last run number
     qint64 _nextPostId = 1;

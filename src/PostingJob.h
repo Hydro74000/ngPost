@@ -387,6 +387,8 @@ public:
     //! A history write of this run failed: its local end is not reliable.
     bool historyDataUnreliable() const { return _historyDataUnreliable; }
     const JobExecutionContext &executionContext() const { return _context; }
+    //! Built for the queue's executor, not for the historical job queue.
+    bool isQueueRuntime() const { return _queueRuntime; }
 
 signals:
     void pauseChanged();

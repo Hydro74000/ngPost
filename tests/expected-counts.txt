@@ -51,7 +51,7 @@
 tst_CliParser                 68  Linux
 tst_FoldersMonitor            10  Linux
 tst_GoldenNzb                  4  Linux
-tst_MainWindow               250  Linux
+tst_MainWindow               251  Linux
 tst_MockNntp                   8  Linux
 tst_NntpFile                  29  Linux
 tst_OpenVpnConfigPolicy       74  Linux
@@ -63,8 +63,8 @@ tst_PostInfoTemplate          36  Linux
 tst_PostQueue                 23  Linux
 tst_PostingJobOptionsCodec    27  Linux
 tst_QueuePanel                10  Linux
-tst_QueueScheduler            26  Linux
-tst_QueueStoreSqlite          20  Linux
+tst_QueueScheduler            29  Linux
+tst_QueueStoreSqlite          21  Linux
 tst_PostingJobExecutor         9  Linux
 tst_NgPostQueue               10  Linux
 tst_RandomToken                3  Linux
@@ -90,7 +90,7 @@ tst_Yenc                      30  Linux
 tst_CliParser                 63  Darwin
 tst_FoldersMonitor            10  Darwin
 tst_GoldenNzb                  4  Darwin
-tst_MainWindow               203  Darwin
+tst_MainWindow               204  Darwin
 tst_MockNntp                   8  Darwin
 tst_NntpFile                  29  Darwin
 tst_OpenVpnConfigPolicy       74  Darwin
@@ -102,8 +102,8 @@ tst_PostInfoTemplate          36  Darwin
 tst_PostQueue                 23  Darwin
 tst_PostingJobOptionsCodec    27  Darwin
 tst_QueuePanel                10  Darwin
-tst_QueueScheduler            26  Darwin
-tst_QueueStoreSqlite          20  Darwin
+tst_QueueScheduler            29  Darwin
+tst_QueueStoreSqlite          21  Darwin
 tst_PostingJobExecutor         9  Darwin
 tst_NgPostQueue               10  Darwin
 tst_RandomToken                3  Darwin
@@ -127,7 +127,7 @@ tst_Yenc                      30  Darwin
 tst_CliParser                 65  Windows
 tst_FoldersMonitor            10  Windows
 tst_GoldenNzb                  4  Windows
-tst_MainWindow               227  Windows
+tst_MainWindow               228  Windows
 tst_MockNntp                   8  Windows
 tst_NntpFile                  29  Windows
 tst_OpenVpnConfigPolicy       74  Windows
@@ -139,8 +139,8 @@ tst_PostInfoTemplate          34  Windows
 tst_PostQueue                 23  Windows
 tst_PostingJobOptionsCodec    27  Windows
 tst_QueuePanel                10  Windows
-tst_QueueScheduler            26  Windows
-tst_QueueStoreSqlite          20  Windows
+tst_QueueScheduler            29  Windows
+tst_QueueStoreSqlite          21  Windows
 tst_PostingJobExecutor         6  Windows
 tst_NgPostQueue               10  Windows
 tst_RandomToken                3  Windows

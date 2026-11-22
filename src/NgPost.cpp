@@ -1927,6 +1927,8 @@ void NgPost::resume()
     _queuePaused = false;
     if (_postQueue)
         _postQueue->setPaused(false);
+    if (_queueScheduler)
+        _queueScheduler->reevaluate(); // the next post starts now, as it always did
     _startNextPostingJob();
     if (_preparePacking && !_packingJob && _activeJob && _activeJob->isPacked())
         _prepareNextPacking();
@@ -2745,13 +2747,17 @@ void NgPost::cancelAllPostingJobs()
     for (PostingJob *job : _pendingJobs)
         if (!job->cancelRequested())
             emit job->stopPosting();
+    // A job of the historical coordinator stops directly; a queue runtime
+    // stops through its queue below.
+    if (_activeJob && !_activeJob->isQueueRuntime() && !_activeJob->cancelRequested())
+        emit _activeJob->stopPosting();
     if (_queueEngine) {
         // Refused admissions waiting for a retry are cancelled too, even
         // when the queue itself could not be built.
         _admissionRetries.clear();
         ++_monitorGeneration;
     }
-    if (_queueEngine && !_postQueue) {
+    if (_queueEngine && !_postQueue && !hasPostingJobs()) {
         _cancelingAll = false; // nothing was admitted: nothing else to stop
         emit postingStateChanged();
         return;
@@ -2787,17 +2793,17 @@ void NgPost::stopActivePostingForResume()
 
 void NgPost::closeAllMonitoringJobs()
 {
-    if (_postQueue) {
+    if (_queueEngine) {
         ++_monitorGeneration; // admissions still waiting to be retried are dropped
         _admissionRetries.clear();
-        if (!_removeQueuedPosts(true)) {
-            // Not all written: no Auto post may run, or go on transferring,
-            // once monitoring is stopped. The pause holds the active one too.
-            _postQueue->setPaused(true);
-            _queuePaused = true;
-        }
-        return;
     }
+    if (_postQueue && !_removeQueuedPosts(true)) {
+        // Not all written: no Auto post may run, or go on transferring, once
+        // monitoring is stopped. The pause holds the active one too.
+        _postQueue->setPaused(true);
+        _queuePaused = true;
+    }
+    // Jobs of the historical coordinator; a queue runtime stops through its queue.
     auto it = _pendingJobs.begin();
     while (it != _pendingJobs.end())
     {
@@ -2813,23 +2819,19 @@ void NgPost::closeAllMonitoringJobs()
         else
             ++it;
     }
-    if (_activeJob && !_activeJob->widget())
-    {
+    if (_activeJob && !_activeJob->isQueueRuntime() && !_activeJob->widget()) {
         emit _activeJob->stopPosting();
         if (_debug)
             _error(tr("Stopping monitoring job: %1").arg(_activeJob->getFirstOriginalFile()));
-
     }
 }
 
 bool NgPost::hasMonitoringPostingJobs() const
 {
-    if (_postQueue) {
+    if (_postQueue)
         for (const queue::QueueEntry &entry : _postQueue->snapshot(queue::Domain::Session))
             if (entry.origin == queue::Origin::Auto)
                 return true;
-        return false;
-    }
     if (_activeJob)
     {
         if (!_activeJob->widget())
