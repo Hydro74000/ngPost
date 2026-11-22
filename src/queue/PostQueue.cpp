@@ -56,6 +56,23 @@ void PostQueue::setRevalidateFunction(std::function<BlockReason(const QueueEntry
     _revalidate = std::move(revalidate);
 }
 
+bool PostQueue::load()
+{
+    _entries.clear();
+    _orders.clear();
+    _orderRevisions.clear();
+    for (const QueueEntry &entry : _store->loadEntries(_sessionQueueId))
+        _entries.insert(entry.postId, entry);
+    for (Domain domain : { Domain::Session, Domain::Deferred }) {
+        const QList<qint64> ids = _store->loadOrder(_sessionQueueId, domain);
+        if (!ids.isEmpty())
+            _orders.insert(orderKey(_sessionQueueId, domain), ids);
+    }
+    _intent = _store->loadIntent(_sessionQueueId).value_or(PostNowIntent{});
+    emit changed();
+    return true;
+}
+
 // --- reading ------------------------------------------------------------------------
 
 QString PostQueue::orderKey(const QString &queueId, Domain domain)

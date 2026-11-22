@@ -142,6 +142,17 @@ public:
                                qint64 bodyBytes = 0);
     bool flush(QString *error = nullptr);
 
+    // Queue manager (plan_queue.md §5.5): run on the worker, waited for.
+    void setOwnerId(const QString &ownerId);
+    queue::QueueCommit commitQueueTransaction(const queue::QueueTransaction &transaction);
+    QList<queue::QueueEntry> loadQueueEntries(const QString &queueId, QString *error = nullptr);
+    QList<qint64> loadQueueOrder(const QString &queueId,
+                                 queue::Domain domain,
+                                 QString *error = nullptr);
+    std::optional<queue::PostNowIntent> loadQueueIntent(const QString &queueId,
+                                                        QString *error = nullptr);
+    QHash<QString, int> queueIds(QString *error = nullptr);
+
     bool loadPostDetails(qint64 postId,
                          PostHistoryStore::PostDetails *details,
                          QString *error = nullptr);

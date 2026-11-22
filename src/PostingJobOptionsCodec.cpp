@@ -388,9 +388,10 @@ EncodeResult encode(PersistedQueueOptions options)
     result.error = freezeFamilies(options);
     if (!result.ok())
         return result;
-    options.sources.clear();
-    for (const QFileInfo &file : options.job.files)
-        options.sources << sourceOf(file);
+    // Sources are captured once, at admission; later encodings keep them.
+    if (options.sources.isEmpty())
+        for (const QFileInfo &file : options.job.files)
+            options.sources << sourceOf(file);
     if (options.sources.isEmpty()) {
         result.error = QStringLiteral("no_source");
         return result;

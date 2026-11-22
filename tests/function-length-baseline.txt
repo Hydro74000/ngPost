@@ -597,7 +597,7 @@
 26	src/PostingJobOptionsCodec.cpp	optionscodec::archiverArgsArePersistable( const QString & family , const QString & args)
 13	src/PostingJobOptionsCodec.cpp	optionscodec::changedClasses( const PersistedQueueOptions & before , const PersistedQueueOptions & after)
 28	src/PostingJobOptionsCodec.cpp	optionscodec::decode( const QJsonObject & json)
-27	src/PostingJobOptionsCodec.cpp	optionscodec::encode( PersistedQueueOptions options)
+28	src/PostingJobOptionsCodec.cpp	optionscodec::encode( PersistedQueueOptions options)
 15	src/PostingJobOptionsCodec.cpp	optionscodec::fieldClass( const QString & field , bool * known)
 7	src/PostingJobOptionsCodec.cpp	optionscodec::persistedFields()
 18	src/PostingJobOptionsCodec.cpp	outputAndOperationFields()
@@ -636,6 +636,7 @@
 10	src/history/PostHistoryService.cpp	PostHistoryService::addActiveSeconds( qint64 postId , qint64 seconds , QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::checkResume( qint64 postId , ResumeRow * row , QString * error)
 11	src/history/PostHistoryService.cpp	PostHistoryService::cleanupInvalidResumePosts( QString * error)
+9	src/history/PostHistoryService.cpp	PostHistoryService::commitQueueTransaction( const queue :: QueueTransaction & transaction)
 4	src/history/PostHistoryService.cpp	PostHistoryService::configure( const QString & dbPath , bool storePasswords)
 9	src/history/PostHistoryService.cpp	PostHistoryService::createPost( const PostHistoryStore :: PostRecord & record , QString * error)
 13	src/history/PostHistoryService.cpp	PostHistoryService::createPost( const PostHistoryStore :: PostRecord & record , const PostHistoryStore :: PostInfo & info , const QMap<QString,MetaValue> & meta , QString * error)
@@ -653,18 +654,23 @@
 10	src/history/PostHistoryService.cpp	PostHistoryService::listPosts( const PostHistoryStore :: ListFilter & filter , QString * error)
 13	src/history/PostHistoryService.cpp	PostHistoryService::loadPostDetails( qint64 postId , PostHistoryStore :: PostDetails * details , QString * error)
 12	src/history/PostHistoryService.cpp	PostHistoryService::loadPostInfoRecord( qint64 postId , PostHistoryStore :: PostInfoRecord * record , QString * error)
+6	src/history/PostHistoryService.cpp	PostHistoryService::loadQueueEntries( const QString & queueId , QString * error)
+6	src/history/PostHistoryService.cpp	PostHistoryService::loadQueueIntent( const QString & queueId , QString * error)
+6	src/history/PostHistoryService.cpp	PostHistoryService::loadQueueOrder( const QString & queueId , queue :: Domain domain , QString * error)
 11	src/history/PostHistoryService.cpp	PostHistoryService::markPostCrashedArticlesUnknown( QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::markPostResuming( qint64 postId , QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::markPostStarted( qint64 postId , QString * error)
 4	src/history/PostHistoryService.cpp	PostHistoryService::prepareForUse()
 9	src/history/PostHistoryService.cpp	PostHistoryService::purgePassword( qint64 postId , QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::purgeResumeData( qint64 postId , QString * error)
+6	src/history/PostHistoryService.cpp	PostHistoryService::queueIds( QString * error)
 15	src/history/PostHistoryService.cpp	PostHistoryService::regenerateNzb( qint64 postId , QTextStream & stream , bool includePassword , QStringList * warnings , QString * error)
 21	src/history/PostHistoryService.cpp	PostHistoryService::regenerateNzbToFile( qint64 postId , const QString & outPath , bool includePassword , QStringList * warnings , QString * error , const QString & passwordOverride)
 18	src/history/PostHistoryService.cpp	PostHistoryService::requestHistorySnapshot( const PostHistoryStore :: ListFilter & filter , const QSet<qint64> & ignoredResumeIds , QObject * receiver , const HistorySnapshotCallback & callback)
 19	src/history/PostHistoryService.cpp	PostHistoryService::requestPostDetails( qint64 postId , QObject * receiver , const DetailsCallback & callback)
 19	src/history/PostHistoryService.cpp	PostHistoryService::requestStatsSnapshot( const QString & dateFrom , const QString & dateTo , const QString & groupFilter , QObject * receiver , const StatsSnapshotCallback & callback)
 9	src/history/PostHistoryService.cpp	PostHistoryService::resumeCandidates( QString * error)
+4	src/history/PostHistoryService.cpp	PostHistoryService::setOwnerId( const QString & ownerId)
 9	src/history/PostHistoryService.cpp	PostHistoryService::setPostAbandoned( qint64 postId , QString * error)
 11	src/history/PostHistoryService.cpp	PostHistoryService::setPostMeta( qint64 postId , const QMap<QString,MetaValue> & meta , QString * error)
 10	src/history/PostHistoryService.cpp	PostHistoryService::setPostSizeIfUnset( qint64 postId , qint64 sizeBytes , QString * error)
@@ -710,6 +716,7 @@
 6	src/history/PostHistoryService.cpp	PostHistoryWorker::start()
 33	src/history/PostHistoryService.cpp	PostHistoryWorker::statsSnapshot( const QString & dateFrom , const QString & dateTo , const QString & groupFilter)
 9	src/history/PostHistoryService.cpp	PostHistoryWorker::stop()
+1	src/history/PostHistoryService.cpp	PostHistoryWorker::store()
 4	src/history/PostHistoryService.cpp	PostHistoryWorker::updatePostNzbPath( qint64 postId , const QString & nzbPath , QString * error)
 20	src/history/PostHistoryService.cpp	PostHistoryWorker::updatePostStatus( qint64 postId , const QString & status , int nbFiles , int nbArticles , int nbFailedArticles , qint64 sizeBytes , const QString & avgSpeed , QString * error)
 6	src/history/PostHistoryService.cpp	PostHistoryWorker::upsertFile( const PostHistoryStore :: FileRecord & record , QString * error)
@@ -718,15 +725,18 @@
 58	src/history/PostHistoryStore.cpp	PostHistoryStore::PostInfoRecord::toPostInfoData() const
 6	src/history/PostHistoryStore.cpp	PostHistoryStore::_connectionName() const
 69	src/history/PostHistoryStore.cpp	PostHistoryStore::_createPost( const PostRecord & record , const PostInfo * info , const QMap<QString,MetaValue> & meta , QString * error)
+4	src/history/PostHistoryStore.cpp	PostHistoryStore::_database( QString * error)
 12	src/history/PostHistoryStore.cpp	PostHistoryStore::_exec( const QString & sql , QString * error)
-141	src/history/PostHistoryStore.cpp	PostHistoryStore::_execSchema( QString * error)
-170	src/history/PostHistoryStore.cpp	PostHistoryStore::_migrateSchema( QSqlDatabase & db , QString * error)
+146	src/history/PostHistoryStore.cpp	PostHistoryStore::_execSchema( QString * error)
+173	src/history/PostHistoryStore.cpp	PostHistoryStore::_migrateSchema( QSqlDatabase & db , QString * error)
+4	src/history/PostHistoryStore.cpp	PostHistoryStore::_now()
+4	src/history/PostHistoryStore.cpp	PostHistoryStore::_setQueryError( QString * error , const QSqlQuery & q)
 30	src/history/PostHistoryStore.cpp	PostHistoryStore::_writePostInfo( QSqlDatabase & db , qint64 postId , const PostInfo & info , QString * error)
 32	src/history/PostHistoryStore.cpp	PostHistoryStore::_writePostMeta( QSqlDatabase & db , qint64 postId , const QMap<QString,MetaValue> & meta , QString * error)
 18	src/history/PostHistoryStore.cpp	PostHistoryStore::addActiveSeconds( qint64 postId , qint64 seconds , QString * error)
 20	src/history/PostHistoryStore.cpp	PostHistoryStore::allGroups( QString * error)
 199	src/history/PostHistoryStore.cpp	PostHistoryStore::applyArticleEvents( const QList<ArticleEvent> & events , QString * error)
-17	src/history/PostHistoryStore.cpp	PostHistoryStore::cleanupInvalidResumePosts( QString * error)
+4	src/history/PostHistoryStore.cpp	PostHistoryStore::cleanupInvalidResumePosts( QString * error)
 16	src/history/PostHistoryStore.cpp	PostHistoryStore::closeConnection()
 10	src/history/PostHistoryStore.cpp	PostHistoryStore::configure( const QString & dbPath , bool storePasswords)
 6	src/history/PostHistoryStore.cpp	PostHistoryStore::createPost( const PostRecord & record , QString * error)
@@ -750,9 +760,9 @@
 55	src/history/PostHistoryStore.cpp	PostHistoryStore::markArticlePosting( qint64 fileId , int part , const QString & msgId , int attemptNo , qint64 pos , qint64 bytes , QString * error)
 8	src/history/PostHistoryStore.cpp	PostHistoryStore::markArticleUnknown( qint64 fileId , int part , const QString & msgId , const QString & err , QString * error)
 46	src/history/PostHistoryStore.cpp	PostHistoryStore::markArticleUnknown( qint64 fileId , int part , const QString & msgId , const QString & err , qint64 pos , qint64 bytes , QString * error)
-43	src/history/PostHistoryStore.cpp	PostHistoryStore::markPostCrashedArticlesUnknown( QString * error)
+5	src/history/PostHistoryStore.cpp	PostHistoryStore::markPostCrashedArticlesUnknown( QString * error)
 19	src/history/PostHistoryStore.cpp	PostHistoryStore::markPostResuming( qint64 postId , QString * error)
-17	src/history/PostHistoryStore.cpp	PostHistoryStore::markPostStarted( qint64 postId , QString * error)
+20	src/history/PostHistoryStore.cpp	PostHistoryStore::markPostStarted( qint64 postId , QString * error)
 14	src/history/PostHistoryStore.cpp	PostHistoryStore::purgePassword( qint64 postId , QString * error)
 33	src/history/PostHistoryStore.cpp	PostHistoryStore::purgeResumeData( qint64 postId , QString * error)
 4	src/history/PostHistoryStore.cpp	PostHistoryStore::resetBusyTimeoutForTest()
@@ -775,7 +785,7 @@
 21	src/history/PostHistoryStore.cpp	appendListFilterSql( QString * sql , const PostHistoryStore :: ListFilter & f)
 13	src/history/PostHistoryStore.cpp	bindListFilterValues( QSqlQuery * q , const PostHistoryStore :: ListFilter & f)
 6	src/history/PostHistoryStore.cpp	ceilDividePositive( qint64 numerator , qint64 denominator)
-105	src/history/PostHistoryStore.cpp	dbFor( const QString & connectionName , const QString & dbPath , QString * error)
+103	src/history/PostHistoryStore.cpp	dbFor( const QString & connectionName , const QString & dbPath , QString * error)
 4	src/history/PostHistoryStore.cpp	joinGroups( const QStringList & groups)
 4	src/history/PostHistoryStore.cpp	nowIso()
 74	src/history/PostHistoryStore.cpp	resolveArticleSizeBytes( const PostHistoryStore :: PostDetails & details , qint64 storedArticleSize)
@@ -790,6 +800,8 @@
 4	src/history/PostHistoryStore.cpp	valueI64( const QSqlQuery & q , const char * name)
 4	src/history/PostHistoryStore.cpp	valueInt( const QSqlQuery & q , const char * name)
 4	src/history/PostHistoryStore.cpp	valueString( const QSqlQuery & q , const char * name)
+1	src/history/PostHistoryStore.h	PostHistoryStore::ownerId() const
+1	src/history/PostHistoryStore.h	PostHistoryStore::setOwnerId( const QString & ownerId)
 4	src/history/ResumePlanner.cpp	ResumePlanner::ResumePlanner( PostHistoryStore * store)
 49	src/history/ResumePlanner.cpp	ResumePlanner::buildJobPlan( const PostHistoryStore :: PostDetails & details)
 69	src/history/ResumePlanner.cpp	ResumePlanner::check( qint64 postId , QString * error)
@@ -1043,6 +1055,14 @@
 1	src/hmi/MainWindow.h	MainWindow::zoomButton() const
 1	src/hmi/MainWindow.h	MainWindow::zoomPopup() const
 1	src/hmi/MainWindow.h	MainWindow::zoomSlider() const
+12	src/hmi/MainWindowQueue.cpp	MainWindow::_detachQueuePanel()
+57	src/hmi/MainWindowQueue.cpp	MainWindow::_initQueuePanel()
+8	src/hmi/MainWindowQueue.cpp	MainWindow::_onQueueCounts( int total , int blocked)
+12	src/hmi/MainWindowQueue.cpp	MainWindow::_redockQueuePanel()
+13	src/hmi/MainWindowQueue.cpp	MainWindow::_setQueuePanelShown( bool shown)
+15	src/hmi/MainWindowQueue.cpp	MainWindow::_toggleQueueExpanded()
+5	src/hmi/MainWindowQueue.cpp	RedockOnClose::RedockOnClose( QObject * parent , std :: function<void()> redock)
+9	src/hmi/MainWindowQueue.cpp	RedockOnClose::eventFilter( QObject * watched , QEvent * event)
 77	src/hmi/Par2SettingsDialog.cpp	Par2SettingsDialog::Par2SettingsDialog( NgPost * ngPost , const QFileInfoList & files , bool beforeCompression , bool percentageOverride , QWidget * parent)
 9	src/hmi/Par2SettingsDialog.cpp	Par2SettingsDialog::_allowToolChoices( par2 :: Tool tool , par2 :: Volumes volumes)
 46	src/hmi/Par2SettingsDialog.cpp	Par2SettingsDialog::_buildAdvancedControls( QFormLayout * details)
@@ -1195,6 +1215,82 @@
 1	src/hmi/PostingWidget.h	PostingWidget::jobNumber() const
 1	src/hmi/PostingWidget.h	PostingWidget::postInfoMeta() const
 1	src/hmi/PostingWidget.h	PostingWidget::postInfoTemplateOverride() const
+8	src/hmi/QueueIcons.cpp	queueicons::Pen::fill( std :: initializer_list<QPointF> points) const
+1	src/hmi/QueueIcons.cpp	queueicons::Pen::line( std :: initializer_list<QPointF> points) const
+1	src/hmi/QueueIcons.cpp	queueicons::Pen::rect( const QRectF & r) const
+16	src/hmi/QueueIcons.cpp	queueicons::drawGear( const Pen & d)
+26	src/hmi/QueueIcons.cpp	queueicons::drawMedia( Glyph glyph , const Pen & d)
+26	src/hmi/QueueIcons.cpp	queueicons::drawStates( Glyph glyph , const Pen & d)
+47	src/hmi/QueueIcons.cpp	queueicons::drawTools( Glyph glyph , const Pen & d)
+10	src/hmi/QueueIcons.cpp	queueicons::drawWarn( const Pen & d)
+16	src/hmi/QueueIcons.cpp	queueicons::icon( Glyph glyph , const QColor & color , int size)
+5	src/hmi/QueueItemDelegate.cpp	QueueItemDelegate::QueueItemDelegate( QueueTableModel * model , QObject * parent)
+59	src/hmi/QueueItemDelegate.cpp	QueueItemDelegate::paint( QPainter * p , const QStyleOptionViewItem & opt , const QModelIndex & index) const
+7	src/hmi/QueueItemDelegate.cpp	QueueItemDelegate::sizeHint( const QStyleOptionViewItem & option , const QModelIndex & index) const
+12	src/hmi/QueueItemDelegate.cpp	glyphOf( const QueueEntry & e)
+15	src/hmi/QueueItemDelegate.cpp	hueOf( const QueueEntry & e)
+5	src/hmi/QueueItemDelegate.cpp	isBusy( const QueueEntry & e)
+6	src/hmi/QueueItemDelegate.cpp	mix( const QColor & a , const QColor & b , double t)
+25	src/hmi/QueueItemDelegate.cpp	paintBar( QPainter * p , const QRect & cell , int percent , const QColor & color , const QString & text , const QColor & fg)
+21	src/hmi/QueueItemDelegate.cpp	paintChip( QPainter * p , const QRect & cell , const QueueEntry & e , const QStyleOptionViewItem & opt)
+28	src/hmi/QueueItemDelegate.cpp	paintRank( QPainter * p , const QRect & cell , const QueueEntry & e , int rank , const QColor & fg , bool selected)
+8	src/hmi/QueueItemDelegate.cpp	toneOf( const QueueEntry & e , const QPalette & palette)
+31	src/hmi/QueuePanel.cpp	QueuePanel::QueuePanel( PostQueue * queue , QueueExecutor * executor , QWidget * parent)
+31	src/hmi/QueuePanel.cpp	QueuePanel::buildHeader()
+41	src/hmi/QueuePanel.cpp	QueuePanel::buildTable()
+14	src/hmi/QueuePanel.cpp	QueuePanel::buildToolbar()
+10	src/hmi/QueuePanel.cpp	QueuePanel::confirm( const QString & title , const QString & text) const
+52	src/hmi/QueuePanel.cpp	QueuePanel::createActions()
+4	src/hmi/QueuePanel.cpp	QueuePanel::holdShutdown() const
+4	src/hmi/QueuePanel.cpp	QueuePanel::lastMessage() const
+13	src/hmi/QueuePanel.cpp	QueuePanel::moveBy( int delta)
+11	src/hmi/QueuePanel.cpp	QueuePanel::moveTo( const QList<qint64> & ids , int targetRow)
+34	src/hmi/QueuePanel.cpp	QueuePanel::postNow()
+17	src/hmi/QueuePanel.cpp	QueuePanel::removeSelected()
+4	src/hmi/QueuePanel.cpp	QueuePanel::report( const QueueCommandResult & result)
+11	src/hmi/QueuePanel.cpp	QueuePanel::selectPosts( const QList<qint64> & postIds)
+12	src/hmi/QueuePanel.cpp	QueuePanel::selectedPostIds() const
+22	src/hmi/QueuePanel.cpp	QueuePanel::showContextMenu( const QPoint & pos)
+8	src/hmi/QueuePanel.cpp	QueuePanel::toggleHold()
+28	src/hmi/QueuePanel.cpp	QueuePanel::trigger( Command command)
+24	src/hmi/QueuePanel.cpp	QueuePanel::updateActions()
+20	src/hmi/QueuePanel.cpp	QueuePanel::updateFooter()
+29	src/hmi/QueuePanel.cpp	commandError( const QueueCommandResult & result)
+8	src/hmi/QueuePanel.cpp	toolButton( QAction * action , bool withText)
+1	src/hmi/QueuePanel.h	QueuePanel::action( Command command) const
+1	src/hmi/QueuePanel.h	QueuePanel::model() const
+1	src/hmi/QueuePanel.h	QueuePanel::setDialogGuard( std :: function<std::shared_ptr<void>()> guard)
+1	src/hmi/QueuePanel.h	QueuePanel::table() const
+4	src/hmi/QueuePanel.h	qHash( QueuePanel :: Command command , size_t seed = 0)
+13	src/hmi/QueueTableModel.cpp	QueueTableModel::QueueTableModel( PostQueue * queue , QueueExecutor * executor , QObject * parent)
+16	src/hmi/QueueTableModel.cpp	QueueTableModel::blockText( const BlockReason & reason)
+13	src/hmi/QueueTableModel.cpp	QueueTableModel::canDropMimeData( const QMimeData * data , Qt :: DropAction action , int row , int column , const QModelIndex & parent) const
+4	src/hmi/QueueTableModel.cpp	QueueTableModel::columnCount( const QModelIndex & parent) const
+35	src/hmi/QueueTableModel.cpp	QueueTableModel::data( const QModelIndex & index , int role) const
+29	src/hmi/QueueTableModel.cpp	QueueTableModel::detailText( const QueueEntry & entry) const
+24	src/hmi/QueueTableModel.cpp	QueueTableModel::dropMimeData( const QMimeData * data , Qt :: DropAction action , int row , int column , const QModelIndex & parent)
+4	src/hmi/QueueTableModel.cpp	QueueTableModel::entryAt( int row) const
+10	src/hmi/QueueTableModel.cpp	QueueTableModel::flags( const QModelIndex & index) const
+15	src/hmi/QueueTableModel.cpp	QueueTableModel::headerData( int section , Qt :: Orientation orientation , int role) const
+14	src/hmi/QueueTableModel.cpp	QueueTableModel::mimeData( const QModelIndexList & indexes) const
+4	src/hmi/QueueTableModel.cpp	QueueTableModel::mimeTypes() const
+7	src/hmi/QueueTableModel.cpp	QueueTableModel::onProgress( qint64 postId , int percent , qint64 bytesPerSecond)
+7	src/hmi/QueueTableModel.cpp	QueueTableModel::onStepProgress( qint64 postId , PrepStep step , int percent)
+12	src/hmi/QueueTableModel.cpp	QueueTableModel::originText( const QueueEntry & entry)
+5	src/hmi/QueueTableModel.cpp	QueueTableModel::postIdAt( int row) const
+39	src/hmi/QueueTableModel.cpp	QueueTableModel::refresh()
+4	src/hmi/QueueTableModel.cpp	QueueTableModel::rowCount( const QModelIndex & parent) const
+7	src/hmi/QueueTableModel.cpp	QueueTableModel::rowOf( qint64 postId) const
+7	src/hmi/QueueTableModel.cpp	QueueTableModel::scheduleRefresh()
+4	src/hmi/QueueTableModel.cpp	QueueTableModel::sizeText( qint64 bytes)
+15	src/hmi/QueueTableModel.cpp	QueueTableModel::stateText( const QueueEntry & entry)
+4	src/hmi/QueueTableModel.cpp	QueueTableModel::supportedDropActions() const
+6	src/hmi/QueueTableModel.cpp	QueueTableModel::updateRow( qint64 postId)
+9	src/hmi/QueueTableModel.cpp	stepName( PrepStep step)
+1	src/hmi/QueueTableModel.h	QueueTableModel::live( qint64 postId) const
+1	src/hmi/QueueTableModel.h	QueueTableModel::queue() const
+1	src/hmi/QueueTableModel.h	QueueTableModel::setReorderEnabled( bool enabled)
+1	src/hmi/QueueTableModel.h	QueueTableModel::shownView() const
 13	src/hmi/SignedListWidget.cpp	SignedListWidget::SignedListWidget( QWidget * parent)
 4	src/hmi/SignedListWidget.cpp	SignedListWidget::_isShown( const QModelIndex & index) const
 7	src/hmi/SignedListWidget.cpp	SignedListWidget::addPath( const QString & path , bool isDir)
@@ -1470,6 +1566,7 @@
 27	src/queue/PostQueue.cpp	queue::PostQueue::holdOrRelease( const QList<qint64> & ids , bool held)
 11	src/queue/PostQueue.cpp	queue::PostQueue::intentTargetValid() const
 7	src/queue/PostQueue.cpp	queue::PostQueue::intentTouches( const QList<qint64> & ids) const
+16	src/queue/PostQueue.cpp	queue::PostQueue::load()
 26	src/queue/PostQueue.cpp	queue::PostQueue::move( const QList<qint64> & ids , int targetIndex , const QueueView & seen)
 12	src/queue/PostQueue.cpp	queue::PostQueue::moveToEdge( const QList<qint64> & ids , Edge edge , const QueueView & seen)
 16	src/queue/PostQueue.cpp	queue::PostQueue::newEntry( const PersistedQueueOptions & options , Origin origin , int tabNumber) const
@@ -1511,6 +1608,14 @@
 5	src/queue/QueueEntry.h	queue::QueueEntry::isReady() const
 4	src/queue/QueueEntry.h	queue::QueueEntry::needsPreparation() const
 7	src/queue/QueueEntry.h	queue::QueueEntry::retainedBytes() const
+8	src/queue/QueuePreview.cpp	queue::QueuePreview::QueuePreview( QObject * parent)
+23	src/queue/QueuePreview.cpp	queue::QueuePreview::add( const QString & name , bool compress , bool par2 , qint64 bytes , Origin origin , int tab)
+11	src/queue/QueuePreview.cpp	queue::QueuePreview::addDemoPosts()
+7	src/queue/QueuePreview.cpp	queue::QueuePreview::addPaths( const QStringList & paths)
+4	src/queue/QueuePreview.cpp	queue::QueuePreview::requested()
+6	src/queue/QueuePreview.cpp	queue::previewBudget()
+1	src/queue/QueuePreview.h	queue::QueuePreview::executor()
+1	src/queue/QueuePreview.h	queue::QueuePreview::queue()
 20	src/queue/QueueScheduler.cpp	queue::QueueScheduler::QueueScheduler( PostQueue * queue , QueueExecutor * executor , Budget budget , QObject * parent)
 24	src/queue/QueueScheduler.cpp	queue::QueueScheduler::activateHead()
 10	src/queue/QueueScheduler.cpp	queue::QueueScheduler::continuePreparation( const QueueEntry & entry)

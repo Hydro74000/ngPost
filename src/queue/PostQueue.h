@@ -44,6 +44,10 @@ class PostQueue : public QObject
 public:
     PostQueue(QueueStore *store, const QString &sessionQueueId, QObject *parent = nullptr);
 
+    //! Reads what the store holds for this session queue (and its deferred lot)
+    //! into memory. Used once, at start, before any command.
+    bool load();
+
     // --- reading ---------------------------------------------------------------
     QString sessionQueueId() const { return _sessionQueueId; }
     QList<qint64> order(Domain domain = Domain::Session, const QString &queueId = {}) const;

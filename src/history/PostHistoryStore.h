@@ -17,12 +17,26 @@
 #include <QStringList>
 
 class QSqlDatabase;
+class QSqlQuery;
 class QTextStream;
+
+#include <QHash>
+#include <optional>
+
+namespace queue
+{
+struct QueueEntry;
+struct QueueTransaction;
+struct QueueCommit;
+struct PostNowIntent;
+enum class Domain;
+}
 
 class PostHistoryStore
 {
 public:
-    struct PostRecord {
+    struct PostRecord
+    {
         QString nzbName;
         QString nzbPath;
         QString rarName;
@@ -37,7 +51,8 @@ public:
         bool obfuscateFileName = false;
     };
 
-    struct FileRecord {
+    struct FileRecord
+    {
         qint64 postId = 0;
         int ordinal = 0;
         QString originalPath;
@@ -49,18 +64,20 @@ public:
         QString status = QStringLiteral("pending");
     };
 
-    struct ArticleRecord {
+    struct ArticleRecord
+    {
         qint64 fileId = 0;
         int part = 0;
         qint64 pos = 0;
-        qint64 bytes = 0;      //!< slice of the SOURCE file this article carries
-        qint64 bodyBytes = 0;  //!< size of the posted article once yEnc encoded
+        qint64 bytes = 0;     //!< slice of the SOURCE file this article carries
+        qint64 bodyBytes = 0; //!< size of the posted article once yEnc encoded
         QString status = QStringLiteral("pending");
         QString msgId;
         QString error;
     };
 
-    struct ArticleEvent {
+    struct ArticleEvent
+    {
         enum class Kind {
             Posting,
             Posted,
@@ -79,7 +96,8 @@ public:
         QString error;
     };
 
-    struct PostSummary {
+    struct PostSummary
+    {
         qint64 id = 0;
         QString nzbName;
         QString nzbPath;
@@ -98,7 +116,8 @@ public:
         QString resumeReason;
     };
 
-    struct FileSummary {
+    struct FileSummary
+    {
         qint64 id = 0;
         int ordinal = 0;
         QString originalPath;
@@ -110,7 +129,8 @@ public:
         QString status;
     };
 
-    struct ArticleSummary {
+    struct ArticleSummary
+    {
         qint64 fileId = 0;
         int part = 0;
         //! pos/bytes describe the slice of the SOURCE file. They are what
@@ -126,7 +146,8 @@ public:
         QString status;
     };
 
-    struct PostDetails {
+    struct PostDetails
+    {
         PostSummary post;
         QString nzbPath;
         QString rarName;
@@ -157,12 +178,13 @@ public:
     //! Facts about a post that the aggregates of `posts` cannot express.
     //! Negative or empty means "not recorded", which is how posts made before
     //! this table existed come back.
-    struct PostInfo {
-        int par2Pct = -1;          //!< < 0: no par2 at all
-        qint64 postSizeBytes = -1; //!< archive + parity, copied .nfo excluded
-        qint64 activeSeconds = -1; //!< transfer time, cumulated over resumes
+    struct PostInfo
+    {
+        int par2Pct = -1;             //!< < 0: no par2 at all
+        qint64 postSizeBytes = -1;    //!< archive + parity, copied .nfo excluded
+        qint64 activeSeconds = -1;    //!< transfer time, cumulated over resumes
         qint64 articleSizeBytes = -1; //!< payload bytes per Usenet article
-        QString sourcePath;        //!< raw input path, before folder expansion
+        QString sourcePath;           //!< raw input path, before folder expansion
         QString originalName;
         QString appVersion;
     };
@@ -170,14 +192,15 @@ public:
     //! Everything needed to describe a post, without loading its files and
     //! articles: a post info file needs none of those, and a large post has
     //! hundreds of thousands of article rows.
-    struct PostInfoRecord {
+    struct PostInfoRecord
+    {
         PostSummary post;
         PostInfo info;
         QString nzbPath;
         QString rarName;
         QString rarPass;
         QString from;
-        QString startedAt; //!< ISO 8601 UTC, empty while the transfer has not begun
+        QString startedAt;        //!< ISO 8601 UTC, empty while the transfer has not begun
         int nbArticlesPosted = 0; //!< rows whose persisted status is exactly "posted"
         QMap<QString, MetaValue> meta;
         //! Posted artifacts, loaded without their article rows. They are used
@@ -193,12 +216,13 @@ public:
     };
 
     //! Filter struct for listPosts(). All fields are optional (empty = no filter).
-    struct ListFilter {
+    struct ListFilter
+    {
         QString status;
         QString search;
         QString group;
         bool onlyWithPassword = false;
-        bool onlyWithErrors   = false;
+        bool onlyWithErrors = false;
         QString dateFrom; //!< ISO date "YYYY-MM-DD"
         QString dateTo;   //!< ISO date "YYYY-MM-DD"
         int limit = 0;    //!< <= 0 means unlimited
@@ -206,18 +230,20 @@ public:
     };
 
     //! Aggregated stats for one calendar day.
-    struct DayStats {
-        QString date;          //!< "YYYY-MM-DD"
-        int     nbPosts  = 0;
-        int     nbFailed = 0;
-        qint64  totalBytes = 0;
-        double  avgSpeedBps = 0.0;
+    struct DayStats
+    {
+        QString date; //!< "YYYY-MM-DD"
+        int nbPosts = 0;
+        int nbFailed = 0;
+        qint64 totalBytes = 0;
+        double avgSpeedBps = 0.0;
     };
 
     //! Aggregated stats per newsgroup.
-    struct GroupStats {
+    struct GroupStats
+    {
         QString group;
-        int    nbPosts    = 0;
+        int nbPosts = 0;
         qint64 totalBytes = 0;
     };
 
@@ -358,12 +384,12 @@ public:
     bool loadPostDetails(qint64 postId, PostDetails *details, QString *error = nullptr);
 
     // Stats queries.
-    QList<DayStats>   statsByDay(const QString &dateFrom = QString(),
-                                 const QString &dateTo   = QString(),
-                                 const QString &group    = QString(),
-                                 QString *error = nullptr);
+    QList<DayStats> statsByDay(const QString &dateFrom = QString(),
+                               const QString &dateTo = QString(),
+                               const QString &group = QString(),
+                               QString *error = nullptr);
     QList<GroupStats> statsByGroup(const QString &dateFrom = QString(),
-                                   const QString &dateTo   = QString(),
+                                   const QString &dateTo = QString(),
                                    QString *error = nullptr);
     QList<PostSummary> topPostsBySize(int n = 20, QString *error = nullptr);
     QStringList allGroups(QString *error = nullptr);
@@ -374,7 +400,37 @@ public:
     //! Bump when the schema changes, and add the matching step in
     //! _migrateSchema(). v1: initial. v2: post_info/post_meta. v3: the frozen
     //! article-size boundary required for a byte-identical resume.
-    static constexpr int kSchemaVersion = 5;
+    static constexpr int kSchemaVersion = 6;
+
+    // --- queue manager (plan_queue.md §5), implemented in PostHistoryStoreQueue.cpp ---
+    //! Identity of the process that owns what it admits (posts.owner_id).
+    void setOwnerId(const QString &ownerId) { _ownerId = ownerId; }
+    QString ownerId() const { return _ownerId; }
+    //! Applies a whole queue transaction in one SQL transaction, or nothing.
+    queue::QueueCommit commitQueueTransaction(const queue::QueueTransaction &transaction);
+    QList<queue::QueueEntry> loadQueueEntries(const QString &queueId, QString *error = nullptr);
+    QList<qint64> loadQueueOrder(const QString &queueId,
+                                 queue::Domain domain,
+                                 QString *error = nullptr);
+    std::optional<queue::PostNowIntent> loadQueueIntent(const QString &queueId,
+                                                        QString *error = nullptr);
+    //! Start-up normalization of interrupted posts, limited to posts no live
+    //! owner holds (legacy rows have none). A post still in a queue is never
+    //! declared cancelled: its recovery decides from the facts.
+    bool normalizeInterruptedPosts(const QStringList &liveOwners, QString *error = nullptr);
+    //! The resume clean-up of start-up, with the same ownership limits.
+    bool cleanupInvalidResumePosts(const QStringList &liveOwners, QString *error);
+    //! Moves the entries of a dead owner's queue to @p toQueueId, after its
+    //! entries of the same domain and in their own order, and hands their posts
+    //! to @p toOwnerId. Its "post now" intent is abandoned. Returns the count.
+    int claimQueue(const QString &fromQueueId,
+                   const QString &fromOwnerId,
+                   const QString &toQueueId,
+                   const QString &toOwnerId,
+                   queue::Domain domain,
+                   QString *error = nullptr);
+    //! Queue ids present in the database, with their entry count.
+    QHash<QString, int> queueIds(QString *error = nullptr);
 
 private:
     QString _dbPath;
@@ -396,6 +452,40 @@ private:
                         QString *error);
     bool _exec(const QString &sql, QString *error);
     QString _connectionName() const;
+
+    // Queue manager (PostHistoryStoreQueue.cpp).
+    QString _ownerId;
+    QSqlDatabase _database(QString *error);
+    static QString _now();
+    static void _setQueryError(QString *error, const QSqlQuery &q);
+    bool _migrateToV6(QSqlDatabase &db, QString *error);
+    bool _refuseFutureSchema(QSqlDatabase &db, QString *error);
+
+    bool _applyQueueTransaction(QSqlDatabase &db,
+                                const queue::QueueTransaction &transaction,
+                                queue::QueueCommit &result);
+    bool _admitQueueEntry(QSqlDatabase &db, queue::QueueEntry &entry, QString *error);
+    bool _writeQueueEntry(QSqlDatabase &db,
+                          const queue::QueueEntry &entry,
+                          bool insert,
+                          QString *error);
+    bool _writeArtifactSets(QSqlDatabase &db, const queue::QueueEntry &entry, QString *error);
+    bool _mirrorQueuedPost(QSqlDatabase &db, const queue::QueueEntry &entry, QString *error);
+    bool _renewQueueRun(QSqlDatabase &db,
+                        qint64 postId,
+                        QString *runId,
+                        int *runNo,
+                        QString *error);
+    bool _retireQueueEntry(QSqlDatabase &db, qint64 postId, QString *error);
+    bool _writeQueueOrder(QSqlDatabase &db,
+                          const QString &queueId,
+                          queue::Domain domain,
+                          const QList<qint64> &ids,
+                          quint64 revision,
+                          QString *error);
+    bool _writeQueueIntent(QSqlDatabase &db,
+                           const queue::QueueTransaction &transaction,
+                           QString *error);
 };
 
 #endif // POSTHISTORYSTORE_H

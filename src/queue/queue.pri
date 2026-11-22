@@ -9,6 +9,7 @@ SOURCES += \
     $$PWD/../PostingJobOptionsCodec.cpp \
     $$PWD/FakeQueueExecutor.cpp \
     $$PWD/InMemoryQueueStore.cpp \
+    $$PWD/OwnerLock.cpp \
     $$PWD/PostQueue.cpp \
     $$PWD/QueueCapabilities.cpp \
     $$PWD/QueuePreview.cpp \
@@ -19,6 +20,7 @@ HEADERS += \
     $$PWD/../PostingJobOptionsCodec.h \
     $$PWD/FakeQueueExecutor.h \
     $$PWD/InMemoryQueueStore.h \
+    $$PWD/OwnerLock.h \
     $$PWD/PostQueue.h \
     $$PWD/QueueCapabilities.h \
     $$PWD/QueueEntry.h \

@@ -87,13 +87,13 @@ private slots:
     void schema_refuses_an_invalid_version();
 
     //! journal_mode pragmas can execute successfully but return a mode other
-    //! than WAL. NORMAL must only be selected from the returned value; an
-    //! in-memory SQLite connection deterministically returns "memory".
+    //! than WAL; an in-memory SQLite connection deterministically returns
+    //! "memory". Durability stays FULL whatever the journal mode.
     void non_wal_connection_keeps_full_synchronous();
 
-    //! A normal file connection must exercise the other side of the policy:
-    //! WAL is both selected and paired with NORMAL, on creation and reopen.
-    void file_connection_uses_wal_and_normal_synchronous();
+    //! A normal file connection selects WAL, and keeps synchronous=FULL on
+    //! creation and reopen (plan_queue.md §5.1).
+    void file_connection_uses_wal_and_full_synchronous();
 
     //! A reader can make the WAL switch fail. That real error path must stay
     //! in rollback-journal + FULL and emit one release-visible warning.
@@ -1449,7 +1449,7 @@ void TestPostHistory::non_wal_connection_keeps_full_synchronous()
              2); // SQLITE_SYNC_FULL
 }
 
-void TestPostHistory::file_connection_uses_wal_and_normal_synchronous()
+void TestPostHistory::file_connection_uses_wal_and_full_synchronous()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
@@ -1469,7 +1469,7 @@ void TestPostHistory::file_connection_uses_wal_and_normal_synchronous()
                          .toString().toLower(),
                      QStringLiteral("wal"));
             QCOMPARE(connectionPragma(added.first(), QStringLiteral("PRAGMA synchronous")).toInt(),
-                     1); // SQLITE_SYNC_NORMAL
+                     2); // SQLITE_SYNC_FULL: queue control writes must survive a power cut
         }
     }
 }

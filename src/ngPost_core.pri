@@ -129,7 +129,10 @@ SOURCES += \
         $$PWD/FoldersMonitorForNewFiles.cpp \
         $$PWD/history/NzbHistoryRegenerator.cpp \
         $$PWD/history/PostHistoryService.cpp \
+        $$PWD/history/HistoryQueueStore.cpp \
         $$PWD/history/PostHistoryStore.cpp \
+        $$PWD/history/PostHistoryStoreQueue.cpp \
+        $$PWD/history/ServiceQueueStore.cpp \
         $$PWD/history/ResumePlanner.cpp \
         $$PWD/NgPost.cpp \
         $$PWD/NntpCheckCon.cpp \
@@ -170,6 +173,7 @@ HEADERS += \
     $$PWD/FoldersMonitorForNewFiles.h \
     $$PWD/history/NzbHistoryRegenerator.h \
     $$PWD/history/PostHistoryService.h \
+    $$PWD/history/HistoryQueueStore.h \
     $$PWD/history/PostHistoryStore.h \
     $$PWD/history/ResumePlanner.h \
     $$PWD/NgPost.h \

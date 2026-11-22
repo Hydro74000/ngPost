@@ -129,19 +129,17 @@ QSqlDatabase dbFor(const QString &connectionName, const QString &dbPath, QString
         }
         pragma.finish();
 
-        // Under WAL, NORMAL is the durability the mode is designed around: a
-        // crash or a kill still cannot corrupt the database, only the very
-        // last transactions can be lost on a power cut. The default FULL
-        // fsyncs on every commit, and the article flush commits in batches
-        // while a post runs -- with callers of upsertFile(), deletePost() and
-        // purgePassword() blocking behind that flush. PRAGMA journal_mode may
-        // execute successfully while returning another mode (or fail under a
-        // long-lived reader), so NORMAL is safe only after checking its row.
+        // FULL in every journal mode. The queue manager commits its control
+        // transactions (admissions, order, runs) and, before renaming a
+        // source, the journal that lets it put the file back: under WAL with
+        // NORMAL, a power cut may lose the last of them, and with them the
+        // only record of where a user's file went (plan_queue.md §5.1). The
+        // article flush already commits in batches, so the extra fsync is
+        // paid per batch, not per article.
         const bool walEnabled =
             journalMode.compare(QStringLiteral("wal"), Qt::CaseInsensitive) == 0;
-        const QString synchronousMode = walEnabled ? QStringLiteral("NORMAL")
-                                                   : QStringLiteral("FULL");
-        const int expectedSynchronous = walEnabled ? 1 : 2;
+        const QString synchronousMode = QStringLiteral("FULL");
+        const int expectedSynchronous = 2;
         if (!pragma.exec(QStringLiteral("PRAGMA synchronous=%1").arg(synchronousMode))) {
             setError(error, pragma);
             db.close();
@@ -432,6 +430,11 @@ bool PostHistoryStore::_execSchema(QString *error)
 
     if (!db.transaction()) {
         setError(error, db);
+        return false;
+    }
+    // A database written by a newer ngPost is refused before any DDL touches it.
+    if (!_refuseFutureSchema(db, error)) {
+        db.rollback();
         return false;
     }
 
@@ -730,6 +733,9 @@ bool PostHistoryStore::_migrateSchema(QSqlDatabase &db, QString *error)
         }
     }
 
+    if (!_migrateToV6(db, error))
+        return false;
+
     if (storedVersion != kSchemaVersion) {
         QSqlQuery q(db);
         q.prepare(QStringLiteral("INSERT OR REPLACE INTO schema_meta(key, value) "
@@ -921,8 +927,11 @@ bool PostHistoryStore::markPostStarted(qint64 postId, QString *error)
     QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
 
     QSqlQuery q(db);
-    // "AND started_at IS NULL": a resume keeps the date of the first attempt.
-    q.prepare(QStringLiteral("UPDATE posts SET started_at=? WHERE id=? AND started_at IS NULL"));
+    // "COALESCE": a resume keeps the date of the first attempt. A post admitted
+    // by the queue manager leaves 'queued' only now, when it really starts.
+    q.prepare(QStringLiteral("UPDATE posts SET started_at=COALESCE(started_at, ?),"
+                             "status=CASE WHEN status='queued' THEN 'posting' ELSE status END "
+                             "WHERE id=?"));
     q.addBindValue(nowIso());
     q.addBindValue(postId);
     if (!q.exec()) {
@@ -1719,64 +1728,13 @@ bool PostHistoryStore::applyArticleEvents(const QList<ArticleEvent> &events, QSt
 
 bool PostHistoryStore::markPostCrashedArticlesUnknown(QString *error)
 {
-    if (!initialize(error))
-        return false;
-    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
-    QSqlQuery q(db);
-    if (!q.exec(QStringLiteral("UPDATE post_articles SET status='unknown',"
-                               "error='application stopped before confirmation',"
-                               "updated_at=datetime('now') WHERE status='posting'"))) {
-        setError(error, q);
-        return false;
-    }
-    QSqlQuery a(db);
-    if (!a.exec(QStringLiteral("UPDATE post_article_attempts SET status='unknown',"
-                               "error='application stopped before confirmation',"
-                               "finished_at=datetime('now') WHERE status='posting'"))) {
-        setError(error, a);
-        return false;
-    }
-    QSqlQuery empty(db);
-    if (!empty.exec(QStringLiteral(
-            "UPDATE posts SET status='cancelled', resume_state=NULL,"
-            " resume_reason='posting never started; nothing to resume',"
-            " finished_at=COALESCE(finished_at, datetime('now'))"
-            " WHERE status='posting'"
-            " AND NOT EXISTS (SELECT 1 FROM post_files WHERE post_id=posts.id)"))) {
-        setError(error, empty);
-        return false;
-    }
-
-    // Posts still in 'posting' status survived a crash. They are resumable only
-    // once at least one file row exists; zero-file posts never reached upload.
-    QSqlQuery p(db);
-    if (!p.exec(QStringLiteral(
-            "UPDATE posts SET status='resumable', resume_state='resumable',"
-            " resume_reason='application stopped while posting'"
-            " WHERE status='posting'"
-            " AND EXISTS (SELECT 1 FROM post_files WHERE post_id=posts.id)"))) {
-        setError(error, p);
-        return false;
-    }
-    return true;
+    // Kept for the legacy paths: no owner is known to be alive.
+    return normalizeInterruptedPosts({}, error);
 }
 
 bool PostHistoryStore::cleanupInvalidResumePosts(QString *error)
 {
-    if (!initialize(error))
-        return false;
-    QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
-    QSqlQuery q(db);
-    if (!q.exec(QStringLiteral(
-            "UPDATE posts SET status='cancelled', resume_state=NULL,"
-            " resume_reason='posting never started; nothing to resume',"
-            " finished_at=COALESCE(finished_at, datetime('now'))"
-            " WHERE (status IN ('posting','resumable') OR resume_state='resumable')"
-            " AND NOT EXISTS (SELECT 1 FROM post_files WHERE post_id=posts.id)"))) {
-        setError(error, q);
-        return false;
-    }
-    return true;
+    return cleanupInvalidResumePosts({}, error);
 }
 
 namespace {
@@ -2480,4 +2438,21 @@ bool PostHistoryStore::importLegacyCsv(const QString &path, QString *error)
         updatePostStatus(postId, QStringLiteral("success"), 0, 0, 0, 0, cols.value(3), error);
     }
     return true;
+}
+
+// --- access for PostHistoryStoreQueue.cpp ---------------------------------------------
+
+QSqlDatabase PostHistoryStore::_database(QString *error)
+{
+    return dbFor(_connectionName(), _dbPath, error);
+}
+
+QString PostHistoryStore::_now()
+{
+    return nowIso();
+}
+
+void PostHistoryStore::_setQueryError(QString *error, const QSqlQuery &q)
+{
+    setError(error, q);
 }

@@ -7,6 +7,8 @@
 
 #include "history/PostHistoryService.h"
 
+#include "queue/QueueStore.h"
+
 #include "history/NzbHistoryRegenerator.h"
 #include "history/ResumePlanner.h"
 
@@ -106,6 +108,8 @@ public:
         }
         _store.configure(dbPath, storePasswords);
     }
+
+    PostHistoryStore &store() { return _store; }
 
     void prepareForUse()
     {
@@ -1128,4 +1132,60 @@ void PostHistoryService::requestPostDetails(qint64 postId,
                 callback(ok, details, err);
         }, Qt::QueuedConnection);
     });
+}
+
+// --- queue manager -------------------------------------------------------------------------
+
+void PostHistoryService::setOwnerId(const QString &ownerId)
+{
+    _invokeBlocking([ownerId](PostHistoryWorker *worker) { worker->store().setOwnerId(ownerId); });
+}
+
+queue::QueueCommit PostHistoryService::commitQueueTransaction(
+    const queue::QueueTransaction &transaction)
+{
+    queue::QueueCommit result;
+    if (!_invokeBlocking([&](PostHistoryWorker *worker) {
+        result = worker->store().commitQueueTransaction(transaction);
+    }))
+        result.error = QStringLiteral("history service unavailable");
+    return result;
+}
+
+QList<queue::QueueEntry> PostHistoryService::loadQueueEntries(const QString &queueId,
+                                                              QString *error)
+{
+    QList<queue::QueueEntry> entries;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        entries = worker->store().loadQueueEntries(queueId, error);
+    });
+    return entries;
+}
+
+QList<qint64> PostHistoryService::loadQueueOrder(const QString &queueId,
+                                                 queue::Domain domain,
+                                                 QString *error)
+{
+    QList<qint64> ids;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ids = worker->store().loadQueueOrder(queueId, domain, error);
+    });
+    return ids;
+}
+
+std::optional<queue::PostNowIntent> PostHistoryService::loadQueueIntent(const QString &queueId,
+                                                                        QString *error)
+{
+    std::optional<queue::PostNowIntent> intent;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        intent = worker->store().loadQueueIntent(queueId, error);
+    });
+    return intent;
+}
+
+QHash<QString, int> PostHistoryService::queueIds(QString *error)
+{
+    QHash<QString, int> ids;
+    _invokeBlocking([&](PostHistoryWorker *worker) { ids = worker->store().queueIds(error); });
+    return ids;
 }

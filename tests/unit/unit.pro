@@ -25,4 +25,5 @@ SUBDIRS = \
     tst_WindowsSecurity \
     tst_PostingJobOptionsCodec \
     tst_PostQueue \
-    tst_QueueScheduler
+    tst_QueueScheduler \
+    tst_QueueStoreSqlite
