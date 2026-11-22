@@ -380,6 +380,100 @@ private slots:
                  QStringLiteral("already_queued"));
     }
 
+    void finalizationFollowsItsRun()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue.engineActivate(a));
+        const QString run = f.queue.find(a)->runId;
+        AttemptResult result;
+        result.postId = a;
+        result.runId = QStringLiteral("not-this-one");
+        result.result = QStringLiteral("success");
+        QVERIFY(!f.queue.engineRecordResult(result)); // a replaced run
+        QVERIFY(!f.queue.engineFinishFinalization(a, run, FinalizationStep::Kind::Complete));
+        result.runId = run;
+        result.activeMs = 1200;
+        QVERIFY(f.queue.engineRecordResult(result));
+        QCOMPARE(f.queue.find(a)->lifecycle, Lifecycle::Finalizing);
+        QVERIFY(f.store.resultOf(run));
+        result.result = QStringLiteral("failed");
+        QVERIFY(!f.queue.engineRecordResult(result)); // contradicts F1
+        QSignalSpy removed(&f.queue, &PostQueue::entryRemoved);
+        QVERIFY(f.queue.engineFinishFinalization(a, run, FinalizationStep::Kind::Complete));
+        QCOMPARE(removed.size(), 1);
+        QVERIFY(!f.queue.find(a));
+        QVERIFY(f.queue.order().isEmpty());
+        QCOMPARE(f.store.finalizationOf(run), FinalizationStep::Kind::Complete);
+        QVERIFY(!f.store.isReleased(a));
+        QVERIFY(f.queue.engineReleaseOwnership(a));
+        QVERIFY(f.store.isReleased(a));
+    }
+
+    void abandonNeedsNoResult()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue.engineActivate(a));
+        const QString run = f.queue.find(a)->runId;
+        QVERIFY(f.queue.engineFinishFinalization(a, run, FinalizationStep::Kind::Abandon));
+        QVERIFY(!f.queue.find(a));
+        QCOMPARE(f.store.finalizationOf(run), FinalizationStep::Kind::Abandon);
+    }
+
+    void keepForRestartRecordsTheTimeOfItsRun()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue.engineActivate(a));
+        const QString run = f.queue.find(a)->runId;
+        QVERIFY(f.queue.engineKeepForRestart(a, run, 2500, false, false, false));
+        QCOMPARE(f.store.keptActiveMs(run), qint64(2500));
+        QVERIFY(f.queue.find(a)->runId != run);
+        QVERIFY(!f.queue.engineKeepForRestart(a, run, 2500, false, false, false));
+        QCOMPARE(f.store.keptActiveMs(run), qint64(2500));
+    }
+
+    void aResultIsKeptAsFirstRecorded()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue.engineActivate(a));
+        const QString run = f.queue.find(a)->runId;
+        AttemptResult first;
+        first.postId = a;
+        first.runId = run;
+        first.result = QStringLiteral("success");
+        first.activeMs = 1000;
+        QVERIFY(f.queue.engineRecordResult(first));
+        AttemptResult again = first;
+        again.activeMs = 9000; // a repeat after a lost answer
+        QVERIFY(f.queue.engineRecordResult(again));
+        QCOMPARE(f.store.resultOf(run)->activeMs, qint64(1000));
+        QVERIFY(!f.queue.engineKeepForRestart(a, run, 0, false, false, true)); // F1 engaged
+        // Two contradicting results in one transaction are refused.
+        const qint64 b = f.add(QStringLiteral("b"));
+        QueueTransaction tx;
+        AttemptResult ok;
+        ok.postId = b;
+        ok.runId = f.queue.find(b)->runId;
+        ok.result = QStringLiteral("success");
+        AttemptResult ko = ok;
+        ko.result = QStringLiteral("failed");
+        tx.results << ok << ko;
+        tx.expectedRevisions.insert(b, f.queue.find(b)->recipeRevision);
+        QCOMPARE(f.store.commit(tx).error, QStringLiteral("contradictory_result"));
+        QVERIFY(!f.store.resultOf(ok.runId));
+        // Nor a result and a restart of the same run.
+        QueueTransaction restart;
+        restart.results << ok;
+        restart.renewRuns << b;
+        restart.expectedRuns.insert(b, ok.runId);
+        restart.expectedRevisions.insert(b, f.queue.find(b)->recipeRevision);
+        QCOMPARE(f.store.commit(restart).error, QStringLiteral("conflicting_operations"));
+        QVERIFY(!f.store.resultOf(ok.runId));
+    }
+
     void interruptionRenewsTheRunOnce()
     {
         Fixture f;

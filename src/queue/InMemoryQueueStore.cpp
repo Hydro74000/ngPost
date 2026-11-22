@@ -47,6 +47,50 @@ QString InMemoryQueueStore::validate(const QueueTransaction &transaction) const
     return {};
 }
 
+//! The rules the history database enforces on runs: a command for a replaced
+//! run fails, F1 is recorded once, F3 needs F1.
+QString InMemoryQueueStore::validateRuns(const QueueTransaction &transaction) const
+{
+    const auto current = [this](qint64 postId, const QString &runId) {
+        return _entries.contains(postId) && _entries.value(postId).runId == runId;
+    };
+    QString shape = transaction.shapeError();
+    if (!shape.isEmpty())
+        return shape;
+    for (qint64 id : transaction.renewRuns)
+        if (_results.contains(_entries.value(id).runId))
+            return QStringLiteral("finalization_engaged");
+    for (auto it = transaction.expectedRuns.cbegin(); it != transaction.expectedRuns.cend(); ++it)
+        if (!current(it.key(), it.value()))
+            return QStringLiteral("stale_run");
+    for (auto it = transaction.expectedRevisions.cbegin();
+         it != transaction.expectedRevisions.cend();
+         ++it)
+        if (_entries.value(it.key()).recipeRevision != it.value())
+            return QStringLiteral("stale_revision");
+    QHash<QString, QString> batch; // run id -> result within this transaction
+    for (const AttemptResult &attempt : transaction.results) {
+        if (!current(attempt.postId, attempt.runId))
+            return QStringLiteral("stale_run");
+        const auto recorded = _results.constFind(attempt.runId);
+        if ((recorded != _results.cend() && recorded->result != attempt.result)
+            || batch.value(attempt.runId, attempt.result) != attempt.result)
+            return QStringLiteral("contradictory_result");
+        batch.insert(attempt.runId, attempt.result);
+    }
+    for (const FinalizationStep &step : transaction.finalizations)
+        if (!current(step.postId, step.runId))
+            return QStringLiteral("stale_run");
+    for (const FinalizationStep &step : transaction.finalizations) {
+        bool hasResult = _results.contains(step.runId);
+        for (const AttemptResult &attempt : transaction.results)
+            hasResult = hasResult || attempt.runId == step.runId;
+        if (step.kind == FinalizationStep::Kind::Complete && !hasResult)
+            return QStringLiteral("finalization_without_result");
+    }
+    return {};
+}
+
 QueueCommit InMemoryQueueStore::commit(const QueueTransaction &transaction)
 {
     QueueCommit result;
@@ -56,6 +100,8 @@ QueueCommit InMemoryQueueStore::commit(const QueueTransaction &transaction)
         return result;
     }
     result.error = validate(transaction);
+    if (result.ok())
+        result.error = validateRuns(transaction);
     if (!result.ok())
         return result;
 
@@ -77,9 +123,13 @@ QueueCommit InMemoryQueueStore::commit(const QueueTransaction &transaction)
         result.runs.insert(entry.postId, { entry.runId, entry.runNo });
         _entries.insert(entry.postId, entry);
     }
+    for (const AttemptResult &attempt : transaction.results)
+        if (!_results.contains(attempt.runId)) // the first one stays: a repeat changes nothing
+            _results.insert(attempt.runId, attempt);
     for (qint64 id : transaction.renewRuns) {
         QueueEntry &entry = _entries[id];
         ++_interruptions[entry.runId];
+        _keptActiveMs[entry.runId] += transaction.interruptedActiveMs.value(id);
         entry.runNo = ++_runNumbers[id];
         entry.runId = QUuid::createUuid().toString(QUuid::WithoutBraces);
         result.runs.insert(id, { entry.runId, entry.runNo });
@@ -89,6 +139,12 @@ QueueCommit InMemoryQueueStore::commit(const QueueTransaction &transaction)
         if (transaction.outcomes.contains(id))
             _outcomes.insert(id, transaction.outcomes.value(id));
     }
+    for (const FinalizationStep &step : transaction.finalizations) {
+        _entries.remove(step.postId);
+        _finalizations.insert(step.runId, step.kind);
+    }
+    for (qint64 id : transaction.releases)
+        _released.insert(id);
     for (const QueueTransaction::Order &order : transaction.orders) {
         QList<qint64> ids;
         for (qint64 id : order.ids)

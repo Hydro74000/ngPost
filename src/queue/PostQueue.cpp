@@ -267,7 +267,10 @@ bool PostQueue::apply(const QueueTransaction &transaction, QueueCommit *result)
         if (!changedIds.contains(it.key()))
             changedIds << it.key();
     }
-    for (qint64 id : transaction.removals)
+    QList<qint64> removedIds = transaction.removals;
+    for (const FinalizationStep &step : transaction.finalizations)
+        removedIds << step.postId;
+    for (qint64 id : removedIds)
         _entries.remove(id);
     for (const QueueTransaction::Order &o : transaction.orders) {
         QList<qint64> ids;
@@ -284,7 +287,7 @@ bool PostQueue::apply(const QueueTransaction &transaction, QueueCommit *result)
 
     for (qint64 id : changedIds)
         emit entryChanged(id);
-    for (qint64 id : transaction.removals)
+    for (qint64 id : removedIds)
         emit entryRemoved(id);
     for (const QueueTransaction::Order &o : transaction.orders)
         emit orderChanged(o.queueId, o.domain);
@@ -621,6 +624,18 @@ QueueCommandResult PostQueue::removeData(const QList<qint64> &ids,
     QueueTransaction tx;
     tx.removals = ids;
     tx.outcomes = outcomes;
+    const bool dropsIntent = addLeaving(tx, ids);
+    const qint64 target = _intent.targetPostId;
+    QueueCommit commit;
+    if (!apply(tx, &commit))
+        return QueueCommandResult::rejected(QStringLiteral("store_failed"), commit.error);
+    if (dropsIntent)
+        emit intentDropped(target, QStringLiteral("target_removed"));
+    return QueueCommandResult::done(ids);
+}
+
+bool PostQueue::addLeaving(QueueTransaction &tx, const QList<qint64> &ids) const
+{
     QHash<QString, OrderRef> touched;
     for (qint64 id : ids) {
         const QueueEntry &entry = _entries[id];
@@ -633,15 +648,9 @@ QueueCommandResult PostQueue::removeData(const QList<qint64> &ids,
         tx.orders << orderUpdate(ref, rest);
     }
     const bool dropsIntent = intentTouches(ids);
-    const qint64 target = _intent.targetPostId;
     if (dropsIntent)
         tx.dropIntentId = _intent.intentId;
-    QueueCommit commit;
-    if (!apply(tx, &commit))
-        return QueueCommandResult::rejected(QStringLiteral("store_failed"), commit.error);
-    if (dropsIntent)
-        emit intentDropped(target, QStringLiteral("target_removed"));
-    return QueueCommandResult::done(ids);
+    return dropsIntent;
 }
 
 QueueCommandResult PostQueue::remove(const QList<qint64> &ids,
@@ -845,6 +854,8 @@ bool PostQueue::engineInterrupt(qint64 postId, bool manifestEngaged, bool hold, 
     if (!keepArtifacts)
         releaseArtifacts(entry, entry.options.job.keepRar);
     QueueTransaction tx;
+    tx.expectedRuns.insert(postId, entry.runId);
+    tx.expectedRevisions.insert(postId, _entries.value(postId).recipeRevision);
     tx.upserts << entry;
     tx.renewRuns << postId;
     const bool dropsIntent = hold && intentTouches({ postId });
@@ -880,6 +891,8 @@ bool PostQueue::engineCommitSwitch(bool manifestEngaged)
     old.transferManifestEngaged = old.transferManifestEngaged || manifestEngaged;
 
     QueueTransaction tx;
+    tx.expectedRuns.insert(old.postId, old.runId);
+    tx.expectedRevisions.insert(old.postId, old.recipeRevision);
     tx.upserts << old;
     tx.renewRuns << old.postId;
     tx.dropIntentId = _intent.intentId;
@@ -924,6 +937,84 @@ bool PostQueue::engineRetire(qint64 postId)
     if (!_entries.contains(postId))
         return false;
     return removeData({ postId }, RemovePolicy::Default).ok();
+}
+
+bool PostQueue::engineRecordResult(const AttemptResult &attempt)
+{
+    if (!_entries.contains(attempt.postId))
+        return false;
+    QueueEntry entry = _entries.value(attempt.postId);
+    entry.lifecycle = Lifecycle::Finalizing; // F1 and the move to finalization together
+    entry.slot = Slot::Transfer;
+    QueueTransaction tx;
+    tx.expectedRuns.insert(attempt.postId, attempt.runId);
+    tx.expectedRevisions.insert(attempt.postId, entry.recipeRevision);
+    tx.upserts << entry;
+    tx.results << attempt;
+    return apply(tx);
+}
+
+bool PostQueue::engineFinishFinalization(qint64 postId,
+                                         const QString &runId,
+                                         FinalizationStep::Kind kind)
+{
+    if (!_entries.contains(postId))
+        return false;
+    QueueTransaction tx;
+    tx.expectedRuns.insert(postId, runId);
+    tx.expectedRevisions.insert(postId, _entries.value(postId).recipeRevision);
+    tx.finalizations << FinalizationStep{ postId, runId, kind };
+    const bool dropsIntent = addLeaving(tx, { postId });
+    if (!apply(tx))
+        return false;
+    if (dropsIntent)
+        emit intentDropped(postId, QStringLiteral("target_removed"));
+    return true;
+}
+
+bool PostQueue::engineKeepForRestart(qint64 postId,
+                                     const QString &runId,
+                                     qint64 activeMs,
+                                     bool manifestEngaged,
+                                     bool hold,
+                                     bool keepArtifacts)
+{
+    if (!_entries.contains(postId))
+        return false;
+    QueueEntry entry = _entries.value(postId);
+    QueueTransaction tx;
+    tx.expectedRuns.insert(postId, runId);
+    tx.expectedRevisions.insert(postId, entry.recipeRevision);
+    clearUnprovenStop(entry);
+    entry.lifecycle = Lifecycle::Queued;
+    entry.slot = Slot::None;
+    entry.transferManifestEngaged = entry.transferManifestEngaged || manifestEngaged;
+    if (hold && !entry.held) {
+        entry.held = true;
+        ++entry.recipeRevision;
+    }
+    if (!keepArtifacts)
+        releaseArtifacts(entry, entry.options.job.keepRar);
+    tx.upserts << entry;
+    tx.renewRuns << postId;
+    tx.interruptedActiveMs.insert(postId, activeMs);
+    const bool dropsIntent = hold && intentTouches({ postId });
+    if (dropsIntent)
+        tx.dropIntentId = _intent.intentId;
+    if (!apply(tx))
+        return false;
+    if (dropsIntent)
+        emit intentDropped(postId, QStringLiteral("target_held"));
+    return true;
+}
+
+bool PostQueue::engineReleaseOwnership(qint64 postId)
+{
+    if (_entries.contains(postId))
+        return false; // still queued: its owner is still needed
+    QueueTransaction tx;
+    tx.releases << postId;
+    return apply(tx);
 }
 
 bool PostQueue::engineFailPreparation(qint64 postId, PrepStep step, const QString &error)

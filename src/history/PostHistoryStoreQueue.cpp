@@ -345,6 +345,8 @@ bool PostHistoryStore::_applyQueueTransaction(QSqlDatabase &db,
                                               const QueueTransaction &transaction,
                                               QueueCommit &result)
 {
+    if (!_checkPreconditions(db, transaction, &result.error))
+        return false;
     for (QueueEntry entry : transaction.upserts) {
         if (entry.postId <= 0) {
             const qint64 placeholder = entry.postId;
@@ -361,9 +363,17 @@ bool PostHistoryStore::_applyQueueTransaction(QSqlDatabase &db,
             return false;
         result.runs.insert(entry.postId, { entry.runId, entry.runNo });
     }
+    for (const AttemptResult &attempt : transaction.results)
+        if (!_recordAttemptResult(db, attempt, &result.error))
+            return false;
     for (qint64 postId : transaction.renewRuns) {
         QueueCommit::Run renewed;
-        if (!_renewQueueRun(db, postId, &renewed.runId, &renewed.runNo, &result.error))
+        if (!_renewQueueRun(db,
+                            postId,
+                            transaction.interruptedActiveMs.value(postId),
+                            &renewed.runId,
+                            &renewed.runNo,
+                            &result.error))
             return false;
         result.runs.insert(postId, renewed);
     }
@@ -375,6 +385,9 @@ bool PostHistoryStore::_applyQueueTransaction(QSqlDatabase &db,
         if (!_retireQueueEntry(db, postId, &result.error))
             return false;
     }
+    for (const FinalizationStep &step : transaction.finalizations)
+        if (!_finishQueuedRun(db, step, &result.error))
+            return false;
     for (const QueueTransaction::Order &order : transaction.orders) {
         QList<qint64> ids;
         for (qint64 id : order.ids)
@@ -382,7 +395,168 @@ bool PostHistoryStore::_applyQueueTransaction(QSqlDatabase &db,
         if (!_writeQueueOrder(db, order.queueId, order.domain, ids, order.revision, &result.error))
             return false;
     }
+    for (qint64 postId : transaction.releases)
+        if (!_releaseQueuedPost(db, postId, &result.error))
+            return false;
     return _writeQueueIntent(db, transaction, &result.error);
+}
+
+//! Every operation on a run states the run it was issued for: F1, F3 and
+//! abandon by their own (post, run), a renewal through expectedRuns. A recipe
+//! revision, when given, must still be the stored one.
+bool PostHistoryStore::_checkPreconditions(QSqlDatabase &db,
+                                           const QueueTransaction &transaction,
+                                           QString *error)
+{
+    const QString shape = transaction.shapeError();
+    if (!shape.isEmpty()) {
+        if (error)
+            *error = shape;
+        return false;
+    }
+    for (auto it = transaction.expectedRuns.cbegin(); it != transaction.expectedRuns.cend(); ++it)
+        if (!_checkQueuedRun(db, it.key(), it.value(), error))
+            return false;
+    for (const AttemptResult &attempt : transaction.results)
+        if (!_checkQueuedRun(db, attempt.postId, attempt.runId, error))
+            return false;
+    for (const FinalizationStep &step : transaction.finalizations)
+        if (!_checkQueuedRun(db, step.postId, step.runId, error))
+            return false;
+    for (auto it = transaction.expectedRevisions.cbegin();
+         it != transaction.expectedRevisions.cend();
+         ++it) {
+        QSqlQuery q(db);
+        q.prepare(QStringLiteral("SELECT recipe_revision FROM post_queue WHERE post_id=?"));
+        q.addBindValue(it.key());
+        if (!q.exec() || !q.next() || q.value(0).toULongLong() != it.value()) {
+            if (error)
+                *error = QStringLiteral("stale_revision: post %1").arg(it.key());
+            return false;
+        }
+    }
+    return true;
+}
+
+//! A command issued for (post, run) applies only while that run is still the
+//! one of the entry, and the post still this session's.
+bool PostHistoryStore::_checkQueuedRun(QSqlDatabase &db,
+                                       qint64 postId,
+                                       const QString &runId,
+                                       QString *error)
+{
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT q.run_id, p.owner_id FROM post_queue q JOIN posts p ON "
+                             "p.id = q.post_id WHERE q.post_id=?"));
+    q.addBindValue(postId);
+    if (!q.exec() || !q.next()) {
+        if (error)
+            *error = QStringLiteral("stale_run: post %1 is not queued").arg(postId);
+        return false;
+    }
+    if (q.value(0).toString() != runId) {
+        if (error)
+            *error = QStringLiteral("stale_run: post %1 moved on to another run").arg(postId);
+        return false;
+    }
+    if (!_ownerId.isEmpty() && q.value(1).toString() != _ownerId) {
+        if (error)
+            *error = QStringLiteral("not_owner: post %1 belongs to another session").arg(postId);
+        return false;
+    }
+    return true;
+}
+
+//! F1. Recorded once: the same result again changes nothing (an acknowledgement
+//! repeated after a lost answer), a different one is refused.
+bool PostHistoryStore::_recordAttemptResult(QSqlDatabase &db,
+                                            const AttemptResult &attempt,
+                                            QString *error)
+{
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT result, result_recorded FROM post_runs WHERE run_id=? AND "
+                             "post_id=?"));
+    q.addBindValue(attempt.runId);
+    q.addBindValue(attempt.postId);
+    if (!q.exec() || !q.next()) {
+        if (error)
+            *error = QStringLiteral("unknown run %1").arg(attempt.runId);
+        return false;
+    }
+    if (q.value(1).toInt() == 1) {
+        if (q.value(0).toString() == attempt.result)
+            return true;
+        if (error)
+            *error = QStringLiteral("contradictory_result: run %1 already ended %2")
+                         .arg(attempt.runId, q.value(0).toString());
+        return false;
+    }
+    q.finish();
+    return updatePostStatus(attempt.postId, attempt.result, 0, 0, 0, 0, attempt.avgSpeed, error)
+        && addActiveSeconds(attempt.postId, attempt.activeMs / 1000, error)
+        && run(db,
+               QStringLiteral("UPDATE post_runs SET result=?, result_recorded=1, end_cause=?, "
+                              "state='settling', finalization_state='nzb_pending', "
+                              "active_ms=active_ms+?, finished_at=? WHERE run_id=?"),
+               { attempt.result,
+                 attempt.endCause.isEmpty() ? QStringLiteral("normal") : attempt.endCause,
+                 attempt.activeMs,
+                 _now(),
+                 attempt.runId },
+               error);
+}
+
+//! F3 (complete) or abandon: the run ends, the entry leaves the queue. The post
+//! keeps its owner: its local work (post actions, cleanup) is not over yet.
+bool PostHistoryStore::_finishQueuedRun(QSqlDatabase &db,
+                                        const FinalizationStep &step,
+                                        QString *error)
+{
+    int rows = 0;
+    const bool written = step.kind == FinalizationStep::Kind::Complete
+        ? run(db,
+              QStringLiteral(
+                  "UPDATE post_runs SET state='terminal', finalization_state='complete', "
+                  "finished_at=COALESCE(finished_at, ?) WHERE run_id=? AND post_id=? AND "
+                  "result_recorded=1 AND finalization_state IN ('nzb_pending','complete')"),
+              { _now(), step.runId, step.postId },
+              error,
+              &rows)
+        : run(db,
+              QStringLiteral(
+                  "UPDATE post_runs SET state='terminal', finalization_state='abandoned', "
+                  "result=COALESCE(result, 'interrupted'), result_recorded=1, "
+                  "end_cause=COALESCE(end_cause, 'abandon'), "
+                  "finished_at=COALESCE(finished_at, ?) WHERE run_id=? AND post_id=?"),
+              { _now(), step.runId, step.postId },
+              error,
+              &rows);
+    if (!written)
+        return false;
+    if (rows != 1) {
+        if (error)
+            *error = QStringLiteral("finalization_without_result: run %1").arg(step.runId);
+        return false;
+    }
+    return run(db,
+               QStringLiteral("DELETE FROM post_queue_intents WHERE target_post_id=?"),
+               { step.postId },
+               error)
+        && run(db,
+               QStringLiteral("DELETE FROM post_queue WHERE post_id=?"),
+               { step.postId },
+               error);
+}
+
+//! The local work of a post out of the queue is over: no session owns it any more.
+bool PostHistoryStore::_releaseQueuedPost(QSqlDatabase &db, qint64 postId, QString *error)
+{
+    return run(db,
+               QStringLiteral("UPDATE posts SET owner_id=NULL WHERE id=? AND (owner_id IS NULL OR "
+                              "owner_id=?) AND NOT EXISTS (SELECT 1 FROM post_queue WHERE "
+                              "post_id=posts.id)"),
+               { postId, _ownerId.isEmpty() ? nullString() : QVariant(_ownerId) },
+               error);
 }
 
 bool PostHistoryStore::_admitQueueEntry(QSqlDatabase &db, QueueEntry &entry, QString *error)
@@ -664,6 +838,7 @@ bool PostHistoryStore::_mirrorQueuedPost(QSqlDatabase &db, const QueueEntry &ent
 
 bool PostHistoryStore::_renewQueueRun(QSqlDatabase &db,
                                       qint64 postId,
+                                      qint64 activeMs,
                                       QString *runId,
                                       int *runNo,
                                       QString *error)
@@ -671,7 +846,8 @@ bool PostHistoryStore::_renewQueueRun(QSqlDatabase &db,
     QSqlQuery q(db);
     q.prepare(
         QStringLiteral("SELECT q.run_id, (SELECT COALESCE(MAX(run_no), 0) + 1 FROM post_runs r "
-                       "WHERE r.post_id = q.post_id) FROM post_queue q WHERE q.post_id=?"));
+                       "WHERE r.post_id = q.post_id), (SELECT result_recorded FROM post_runs c "
+                       "WHERE c.run_id = q.run_id) FROM post_queue q WHERE q.post_id=?"));
     q.addBindValue(postId);
     if (!q.exec() || !q.next()) {
         if (error)
@@ -680,16 +856,23 @@ bool PostHistoryStore::_renewQueueRun(QSqlDatabase &db,
                 : q.lastError().text();
         return false;
     }
+    if (q.value(2).toInt() == 1) {
+        // F1 engaged its finalization: a restart would lose it.
+        if (error)
+            *error = QStringLiteral("finalization_engaged: post %1").arg(postId);
+        return false;
+    }
     const QString previous = q.value(0).toString();
     *runNo = q.value(1).toInt();
     *runId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    // The interruption is recorded once: a run that already has a result keeps it.
+    q.finish();
     return run(db,
                QStringLiteral("UPDATE post_runs SET state='interrupted', result='interrupted', "
-                              "result_recorded=1, end_cause='keep', finished_at=? "
-                              "WHERE run_id=? AND result_recorded=0"),
-               { _now(), previous },
+                              "result_recorded=1, end_cause='keep', finished_at=?, "
+                              "active_ms=active_ms+? WHERE run_id=? AND result_recorded=0"),
+               { _now(), activeMs, previous },
                error)
+        && addActiveSeconds(postId, activeMs / 1000, error)
         && run(db,
                QStringLiteral("INSERT INTO post_runs(run_id, post_id, run_no, created_at, state) "
                               "VALUES(?, ?, ?, ?, 'queued')"),

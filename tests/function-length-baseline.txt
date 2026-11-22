@@ -875,12 +875,17 @@
 1	src/history/PostHistoryStore.h	PostHistoryStore::setOwnerId( const QString & ownerId)
 36	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_admitExistingQueueEntry( QSqlDatabase & db , QueueEntry & entry , QString * error)
 63	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_admitQueueEntry( QSqlDatabase & db , QueueEntry & entry , QString * error)
-43	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_applyQueueTransaction( QSqlDatabase & db , const QueueTransaction & transaction , QueueCommit & result)
+59	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_applyQueueTransaction( QSqlDatabase & db , const QueueTransaction & transaction , QueueCommit & result)
+33	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_checkPreconditions( QSqlDatabase & db , const QueueTransaction & transaction , QString * error)
+26	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_checkQueuedRun( QSqlDatabase & db , qint64 postId , const QString & runId , QString * error)
+39	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_finishQueuedRun( QSqlDatabase & db , const FinalizationStep & step , QString * error)
 38	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_migrateToV6( QSqlDatabase & db , QString * error)
 36	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_mirrorQueuedPost( QSqlDatabase & db , const QueueEntry & entry , QString * error)
+36	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_recordAttemptResult( QSqlDatabase & db , const AttemptResult & attempt , QString * error)
 23	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_recordRunOutcome( QSqlDatabase & db , qint64 postId , const RunOutcome & outcome , QString * error)
 15	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_refuseFutureSchema( QSqlDatabase & db , QString * error)
-42	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_renewQueueRun( QSqlDatabase & db , qint64 postId , QString * runId , int * runNo , QString * error)
+9	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_releaseQueuedPost( QSqlDatabase & db , qint64 postId , QString * error)
+51	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_renewQueueRun( QSqlDatabase & db , qint64 postId , qint64 activeMs , QString * runId , int * runNo , QString * error)
 34	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_retireQueueEntry( QSqlDatabase & db , qint64 postId , QString * error)
 49	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_writeArtifactSets( QSqlDatabase & db , const QueueEntry & entry , QString * error)
 83	src/history/PostHistoryStoreQueue.cpp	PostHistoryStore::_writeQueueEntry( QSqlDatabase & db , const QueueEntry & entry , bool insert , QString * error)
@@ -1642,17 +1647,22 @@
 1	src/queue/FakeQueueExecutor.h	queue::FakeQueueExecutor::commands() const
 1	src/queue/FakeQueueExecutor.h	queue::FakeQueueExecutor::holdsUnsettledWork( qint64 postId) const
 7	src/queue/FakeQueueExecutor.h	queue::FakeQueueExecutor::setUnsettled( qint64 postId , bool unsettled = true)
-58	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::commit( const QueueTransaction & transaction)
+70	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::commit( const QueueTransaction & transaction)
 5	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::failNextCommits( int count , const QString & error)
 8	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::loadEntries( const QString & queueId) const
 6	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::loadIntent( const QString & queueId) const
 4	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::loadOrder( const QString & queueId , Domain domain) const
 4	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::orderKey( const QString & queueId , Domain domain)
 26	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::validate( const QueueTransaction & transaction) const
+41	src/queue/InMemoryQueueStore.cpp	queue::InMemoryQueueStore::validateRuns( const QueueTransaction & transaction) const
 1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::commitCount() const
+6	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::finalizationOf( const QString & runId) const
 1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::hasEntry( qint64 postId) const
 1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::interruptionsRecorded( const QString & runId) const
+1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::isReleased( qint64 postId) const
+1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::keptActiveMs( const QString & runId) const
 1	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::outcomeOf( qint64 postId) const
+5	src/queue/InMemoryQueueStore.h	queue::InMemoryQueueStore::resultOf( const QString & runId) const
 4	src/queue/OwnerLock.cpp	queue::OwnerLock::OwnerLock( const QString & dbPath)
 14	src/queue/OwnerLock.cpp	queue::OwnerLock::acquire( QString * error)
 4	src/queue/OwnerLock.cpp	queue::OwnerLock::isHeld() const
@@ -1665,8 +1675,9 @@
 6	src/queue/PostQueue.cpp	queue::PostQueue::PostQueue( QueueStore * store , const QString & sessionQueueId , QObject * parent)
 10	src/queue/PostQueue.cpp	queue::PostQueue::abandonPlanning( qint64 postId , const QueueView & seen)
 4	src/queue/PostQueue.cpp	queue::PostQueue::activeEntry() const
+18	src/queue/PostQueue.cpp	queue::PostQueue::addLeaving( QueueTransaction & tx , const QList<qint64> & ids) const
 14	src/queue/PostQueue.cpp	queue::PostQueue::admitEntry( QueueEntry entry)
-52	src/queue/PostQueue.cpp	queue::PostQueue::apply( const QueueTransaction & transaction , QueueCommit * result)
+55	src/queue/PostQueue.cpp	queue::PostQueue::apply( const QueueTransaction & transaction , QueueCommit * result)
 15	src/queue/PostQueue.cpp	queue::PostQueue::cancelPostNow( const QString & intentId)
 7	src/queue/PostQueue.cpp	queue::PostQueue::capabilityOf( Action action , qint64 postId) const
 9	src/queue/PostQueue.cpp	queue::PostQueue::checkAction( Action action , const QList<qint64> & ids) const
@@ -1678,12 +1689,16 @@
 16	src/queue/PostQueue.cpp	queue::PostQueue::engineActivate( qint64 postId)
 13	src/queue/PostQueue.cpp	queue::PostQueue::engineBeginPreparation( qint64 postId , const ArtifactSetRef & set)
 22	src/queue/PostQueue.cpp	queue::PostQueue::engineBlock( qint64 postId , const BlockReason & reason , Lifecycle lifecycle)
-26	src/queue/PostQueue.cpp	queue::PostQueue::engineCommitSwitch( bool manifestEngaged)
+28	src/queue/PostQueue.cpp	queue::PostQueue::engineCommitSwitch( bool manifestEngaged)
 12	src/queue/PostQueue.cpp	queue::PostQueue::engineDropIntent( const QString & reason)
 15	src/queue/PostQueue.cpp	queue::PostQueue::engineFailPreparation( qint64 postId , PrepStep step , const QString & error)
-27	src/queue/PostQueue.cpp	queue::PostQueue::engineInterrupt( qint64 postId , bool manifestEngaged , bool hold , bool keepArtifacts)
+17	src/queue/PostQueue.cpp	queue::PostQueue::engineFinishFinalization( qint64 postId , const QString & runId , FinalizationStep :: Kind kind)
+29	src/queue/PostQueue.cpp	queue::PostQueue::engineInterrupt( qint64 postId , bool manifestEngaged , bool hold , bool keepArtifacts)
+35	src/queue/PostQueue.cpp	queue::PostQueue::engineKeepForRestart( qint64 postId , const QString & runId , qint64 activeMs , bool manifestEngaged , bool hold , bool keepArtifacts)
 11	src/queue/PostQueue.cpp	queue::PostQueue::engineMarkStuck( qint64 postId , const BlockReason & reason)
 12	src/queue/PostQueue.cpp	queue::PostQueue::engineRecordPrepared( qint64 postId , const ArtifactSetRef & set)
+14	src/queue/PostQueue.cpp	queue::PostQueue::engineRecordResult( const AttemptResult & attempt)
+8	src/queue/PostQueue.cpp	queue::PostQueue::engineReleaseOwnership( qint64 postId)
 6	src/queue/PostQueue.cpp	queue::PostQueue::engineRetire( qint64 postId)
 10	src/queue/PostQueue.cpp	queue::PostQueue::engineSetIntentSwitching()
 11	src/queue/PostQueue.cpp	queue::PostQueue::engineSetLifecycle( qint64 postId , Lifecycle lifecycle , Slot slot)
@@ -1708,7 +1723,7 @@
 42	src/queue/PostQueue.cpp	queue::PostQueue::postNow( qint64 postId , const QueueView & seen , bool replaceExisting)
 8	src/queue/PostQueue.cpp	queue::PostQueue::releaseArtifacts( QueueEntry & entry , bool keepCurrent) const
 30	src/queue/PostQueue.cpp	queue::PostQueue::remove( const QList<qint64> & ids , RemovePolicy policy , const QueueView & seen)
-30	src/queue/PostQueue.cpp	queue::PostQueue::removeData( const QList<qint64> & ids , RemovePolicy policy , const QHash<qint64,RunOutcome> & outcomes)
+17	src/queue/PostQueue.cpp	queue::PostQueue::removeData( const QList<qint64> & ids , RemovePolicy policy , const QHash<qint64,RunOutcome> & outcomes)
 4	src/queue/PostQueue.cpp	queue::PostQueue::resolve( Domain domain , const QString & queueId) const
 10	src/queue/PostQueue.cpp	queue::PostQueue::retryFinalization( qint64 postId , const QueueView & seen)
 19	src/queue/PostQueue.cpp	queue::PostQueue::revalidate( qint64 postId , const QueueView & seen)
@@ -1782,7 +1797,8 @@
 1	src/queue/QueueScheduler.h	queue::QueueScheduler::setPreparationFailurePolicy( PreparationFailure policy)
 1	src/queue/QueueScheduler.h	queue::QueueScheduler::technicalPauseReason() const
 1	src/queue/QueueStore.h	queue::QueueCommit::ok() const
-5	src/queue/QueueStore.h	queue::QueueTransaction::isEmpty() const
+6	src/queue/QueueStore.h	queue::QueueTransaction::isEmpty() const
+23	src/queue/QueueStore.h	queue::QueueTransaction::shapeError() const
 4	src/queue/QueueTypes.cpp	queue::lifecycleName( Lifecycle lifecycle)
 7	src/queue/QueueTypes.cpp	queue::nameOf( const std :: array<std::pair<Enum,const char*>,N> & table , Enum value)
 4	src/queue/QueueTypes.cpp	queue::originName( Origin origin)

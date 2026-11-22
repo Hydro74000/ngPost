@@ -13,6 +13,7 @@
 #include "queue/QueueStore.h"
 
 #include <QHash>
+#include <QSet>
 
 namespace queue
 {
@@ -35,8 +36,25 @@ public:
     //! The outcome a removal recorded for @p postId, if any.
     RunOutcome outcomeOf(qint64 postId) const { return _outcomes.value(postId); }
     bool hasEntry(qint64 postId) const { return _entries.contains(postId); }
+    //! F1 recorded for a run, if any.
+    std::optional<AttemptResult> resultOf(const QString &runId) const
+    {
+        const auto it = _results.constFind(runId);
+        return it == _results.cend() ? std::nullopt : std::optional<AttemptResult>(*it);
+    }
+    //! How the finalization of a run ended, if it did.
+    std::optional<FinalizationStep::Kind> finalizationOf(const QString &runId) const
+    {
+        const auto it = _finalizations.constFind(runId);
+        return it == _finalizations.cend() ? std::nullopt
+                                           : std::optional<FinalizationStep::Kind>(*it);
+    }
+    qint64 keptActiveMs(const QString &runId) const { return _keptActiveMs.value(runId); }
+    bool isReleased(qint64 postId) const { return _released.contains(postId); }
 
 private:
+    QString validateRuns(const QueueTransaction &transaction) const;
+
     static QString orderKey(const QString &queueId, Domain domain);
     QString validate(const QueueTransaction &transaction) const;
 
@@ -44,6 +62,10 @@ private:
     QHash<QString, QList<qint64>> _orders;
     QHash<QString, PostNowIntent> _intents; //!< queue id -> intent
     QHash<qint64, RunOutcome> _outcomes;
+    QHash<QString, AttemptResult> _results;                //!< run id -> F1
+    QHash<QString, FinalizationStep::Kind> _finalizations; //!< run id -> F3 or abandon
+    QHash<QString, qint64> _keptActiveMs;                  //!< run id -> time of a kept run
+    QSet<qint64> _released;
     QHash<QString, int> _interruptions;
     QHash<qint64, int> _runNumbers; //!< post id -> last run number
     qint64 _nextPostId = 1;

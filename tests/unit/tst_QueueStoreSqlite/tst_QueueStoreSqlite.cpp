@@ -24,6 +24,24 @@
 using namespace queue;
 using queuetest::makeOptions;
 
+namespace
+{
+//! F1 of a transferred post: (result, run, duration) are what the store holds.
+AttemptResult attempt(qint64 postId,
+                      const QString &runId,
+                      const QString &result = QStringLiteral("success"),
+                      qint64 activeMs = 5000)
+{
+    AttemptResult a;
+    a.postId = postId;
+    a.runId = runId;
+    a.result = result;
+    a.avgSpeed = QStringLiteral("1 MB/s");
+    a.activeMs = activeMs;
+    return a;
+}
+} // namespace
+
 class tst_QueueStoreSqlite : public QObject
 {
     Q_OBJECT
@@ -510,6 +528,206 @@ private slots:
                  QStringLiteral("cancelled"));
         QCOMPARE(f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { a }).toString(),
                  QStringLiteral("cancelled"));
+    }
+
+    void f1IsRecordedOnceAndKeepsTheEntry()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue->engineActivate(a));
+        const QString run = f.queue->find(a)->runId;
+        QVERIFY(f.queue->engineRecordResult(attempt(a, run)));
+        QCOMPARE(f.queue->find(a)->lifecycle, Lifecycle::Finalizing);
+        const auto runValue = [&f, &run](const char *column) {
+            return f.scalar(QStringLiteral("SELECT %1 FROM post_runs WHERE run_id=?")
+                                .arg(QLatin1String(column)),
+                            { run });
+        };
+        QCOMPARE(runValue("result").toString(), QStringLiteral("success"));
+        QCOMPARE(runValue("finalization_state").toString(), QStringLiteral("nzb_pending"));
+        QCOMPARE(runValue("state").toString(), QStringLiteral("settling"));
+        QCOMPARE(runValue("active_ms").toLongLong(), qint64(5000));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { a }).toString(),
+                 QStringLiteral("success"));
+        const auto seconds = [&f, a] {
+            return f
+                .scalar(QStringLiteral("SELECT active_seconds FROM post_info WHERE post_id=?"),
+                        { a })
+                .toLongLong();
+        };
+        QCOMPARE(seconds(), qint64(5));
+        // The same acknowledgement again (its answer was lost): nothing doubles.
+        QVERIFY(f.queue->engineRecordResult(attempt(a, run)));
+        QCOMPARE(seconds(), qint64(5));
+        QCOMPARE(runValue("active_ms").toLongLong(), qint64(5000));
+        // A contradicting one is refused.
+        QVERIFY(!f.queue->engineRecordResult(attempt(a, run, QStringLiteral("failed"))));
+        QCOMPARE(runValue("result").toString(), QStringLiteral("success"));
+    }
+
+    void f3RetiresButKeepsTheOwnerUntilReleased()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue->engineActivate(a));
+        const QString run = f.queue->find(a)->runId;
+        QVERIFY(!f.queue->engineFinishFinalization(a, run, FinalizationStep::Kind::Complete));
+        QVERIFY(f.queue->find(a)); // no F3 without F1
+        QVERIFY(f.queue->engineRecordResult(attempt(a, run)));
+        QVERIFY(!f.queue->engineReleaseOwnership(a)); // still queued
+        QVERIFY(f.queue->engineFinishFinalization(a, run, FinalizationStep::Kind::Complete));
+        QVERIFY(!f.queue->find(a));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM post_queue")).toInt(), 0);
+        QCOMPARE(f.scalar(QStringLiteral("SELECT finalization_state FROM post_runs WHERE run_id=?"),
+                          { run })
+                     .toString(),
+                 QStringLiteral("complete"));
+        QCOMPARE(
+            f.scalar(QStringLiteral("SELECT owner_id FROM posts WHERE id=?"), { a }).toString(),
+            QStringLiteral("owner-A")); // its post actions are not over
+        QVERIFY(f.queue->engineReleaseOwnership(a));
+        QVERIFY(f.scalar(QStringLiteral("SELECT owner_id FROM posts WHERE id=?"), { a }).isNull());
+    }
+
+    void aReplacedRunOrAForeignOwnerIsRefused()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue->engineActivate(a));
+        const QString run = f.queue->find(a)->runId;
+        QVERIFY(!f.queue->engineRecordResult(attempt(a, QStringLiteral("an-older-run"))));
+        f.scalar(QStringLiteral("UPDATE posts SET owner_id='owner-B' WHERE id=?"), { a });
+        QVERIFY(!f.queue->engineRecordResult(attempt(a, run)));
+        QVERIFY(f.scalar(QStringLiteral("SELECT result FROM post_runs WHERE run_id=?"), { run })
+                    .isNull());
+    }
+
+    void anAbandonKeepsTheFactsAndLeaves()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue->engineActivate(a));
+        const QString run = f.queue->find(a)->runId;
+        f.scalar(QStringLiteral("UPDATE posts SET status='partial' WHERE id=?"), { a });
+        QVERIFY(f.queue->engineFinishFinalization(a, run, FinalizationStep::Kind::Abandon));
+        QVERIFY(!f.queue->find(a));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT finalization_state FROM post_runs WHERE run_id=?"),
+                          { run })
+                     .toString(),
+                 QStringLiteral("abandoned"));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { a }).toString(),
+                 QStringLiteral("partial")); // facts kept, still resumable
+    }
+
+    void aKeptRunAddsItsTimeOnce()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue->engineActivate(a));
+        const QString run = f.queue->find(a)->runId;
+        QVERIFY(f.queue->engineKeepForRestart(a, run, 3000, true, false, true));
+        const QueueEntry *entry = f.queue->find(a);
+        QCOMPARE(entry->lifecycle, Lifecycle::Queued);
+        QVERIFY(entry->transferManifestEngaged);
+        QVERIFY(entry->runId != run);
+        QCOMPARE(f.scalar(QStringLiteral("SELECT active_ms FROM post_runs WHERE run_id=?"), { run })
+                     .toLongLong(),
+                 qint64(3000));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT state FROM post_runs WHERE run_id=?"), { run })
+                     .toString(),
+                 QStringLiteral("interrupted"));
+        // The history total counts it, then the next attempt on top.
+        const auto seconds = [&f, a] {
+            return f
+                .scalar(QStringLiteral("SELECT active_seconds FROM post_info WHERE post_id=?"),
+                        { a })
+                .toLongLong();
+        };
+        QCOMPARE(seconds(), qint64(3));
+        QVERIFY(f.queue->engineActivate(a));
+        QVERIFY(f.queue->engineRecordResult(attempt(a, f.queue->find(a)->runId)));
+        QCOMPARE(seconds(), qint64(8));
+        // The same keep, for the run that is gone: refused, nothing added.
+        QVERIFY(!f.queue->engineKeepForRestart(a, run, 3000, true, false, true));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT active_ms FROM post_runs WHERE run_id=?"), { run })
+                     .toLongLong(),
+                 qint64(3000));
+    }
+
+    void aKeepAfterF1IsRefused()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue->engineActivate(a));
+        const QString run = f.queue->find(a)->runId;
+        QVERIFY(f.queue->engineRecordResult(attempt(a, run)));
+        QVERIFY(!f.queue->engineKeepForRestart(a, run, 1000, true, false, true));
+        QCOMPARE(f.queue->find(a)->runId, run); // still finalizing that run
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM post_runs WHERE post_id=?"), { a })
+                     .toInt(),
+                 1);
+    }
+
+    void eachOperationChecksItsOwnRun()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue->engineActivate(a));
+        const QString first = f.queue->find(a)->runId;
+        QVERIFY(f.queue->engineKeepForRestart(a, first, 0, false, false, true));
+        const QString second = f.queue->find(a)->runId;
+        const quint64 revision = f.queue->find(a)->recipeRevision;
+        // Declaring the current run while finalizing the old one fails.
+        QueueTransaction tx;
+        tx.expectedRuns.insert(a, second);
+        tx.expectedRevisions.insert(a, revision);
+        tx.finalizations << FinalizationStep{ a, first, FinalizationStep::Kind::Abandon };
+        QCOMPARE(f.adapter->commit(tx).error.left(9), QStringLiteral("stale_run"));
+        QVERIFY(f.queue->find(a));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM post_queue")).toInt(), 1);
+        // A renewal without the run it was issued for fails too...
+        QueueTransaction renewal;
+        renewal.renewRuns << a;
+        renewal.expectedRevisions.insert(a, revision);
+        QCOMPARE(f.adapter->commit(renewal).error, QStringLiteral("missing_precondition"));
+        // ...and so does an operation that does not say which revision it saw.
+        QueueTransaction unrevised;
+        unrevised.finalizations << FinalizationStep{ a, second, FinalizationStep::Kind::Abandon };
+        QCOMPARE(f.adapter->commit(unrevised).error, QStringLiteral("missing_precondition"));
+        // A renewal and the finalization of the same post never go together.
+        QueueTransaction both;
+        both.expectedRuns.insert(a, second);
+        both.expectedRevisions.insert(a, revision);
+        both.renewRuns << a;
+        both.finalizations << FinalizationStep{ a, second, FinalizationStep::Kind::Abandon };
+        QCOMPARE(f.adapter->commit(both).error, QStringLiteral("conflicting_operations"));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM post_runs WHERE post_id=?"), { a })
+                     .toInt(),
+                 2);
+        // So does a command that saw another recipe revision.
+        QueueTransaction revised;
+        revised.expectedRevisions.insert(a, f.queue->find(a)->recipeRevision + 1);
+        revised.finalizations << FinalizationStep{ a, second, FinalizationStep::Kind::Abandon };
+        QVERIFY(!f.adapter->commit(revised).ok());
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM post_queue")).toInt(), 1);
+    }
+
+    void aFailingFinalizationLeavesNoResult()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        QVERIFY(f.queue->engineActivate(a));
+        const QString run = f.queue->find(a)->runId;
+        QueueTransaction tx;
+        tx.results << attempt(a, run);
+        tx.finalizations << FinalizationStep{ 4242,
+                                              QStringLiteral("nowhere"),
+                                              FinalizationStep::Kind::Complete };
+        QVERIFY(!f.adapter->commit(tx).ok());
+        QVERIFY(f.scalar(QStringLiteral("SELECT result FROM post_runs WHERE run_id=?"), { run })
+                    .isNull());
+        QCOMPARE(f.scalar(QStringLiteral("SELECT status FROM posts WHERE id=?"), { a }).toString(),
+                 QStringLiteral("queued"));
     }
 
     void aDeadOwnersQueueIsClaimedInOrder()

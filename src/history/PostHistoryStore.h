@@ -28,6 +28,8 @@ namespace queue
 struct QueueEntry;
 struct QueueTransaction;
 struct RunOutcome;
+struct AttemptResult;
+struct FinalizationStep;
 struct QueueCommit;
 struct PostNowIntent;
 enum class Domain;
@@ -470,6 +472,15 @@ private:
                                 queue::QueueCommit &result);
     bool _admitQueueEntry(QSqlDatabase &db, queue::QueueEntry &entry, QString *error);
     bool _admitExistingQueueEntry(QSqlDatabase &db, queue::QueueEntry &entry, QString *error);
+    bool _checkPreconditions(QSqlDatabase &db,
+                             const queue::QueueTransaction &transaction,
+                             QString *error);
+    bool _checkQueuedRun(QSqlDatabase &db, qint64 postId, const QString &runId, QString *error);
+    bool _recordAttemptResult(QSqlDatabase &db,
+                              const queue::AttemptResult &attempt,
+                              QString *error);
+    bool _finishQueuedRun(QSqlDatabase &db, const queue::FinalizationStep &step, QString *error);
+    bool _releaseQueuedPost(QSqlDatabase &db, qint64 postId, QString *error);
     bool _recordRunOutcome(QSqlDatabase &db,
                            qint64 postId,
                            const queue::RunOutcome &outcome,
@@ -482,6 +493,7 @@ private:
     bool _mirrorQueuedPost(QSqlDatabase &db, const queue::QueueEntry &entry, QString *error);
     bool _renewQueueRun(QSqlDatabase &db,
                         qint64 postId,
+                        qint64 activeMs,
                         QString *runId,
                         int *runNo,
                         QString *error);

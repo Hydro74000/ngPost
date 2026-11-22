@@ -113,6 +113,22 @@ public:
     bool engineSetSourceJournal(qint64 postId, bool unsettled);
     //! The entry leaves the queue (F3 done, or a removal completed).
     bool engineRetire(qint64 postId);
+    //! F1: the result of the current run, recorded once, and the entry moved to
+    //! Finalizing in the same transaction (plan_queue.md §6.2).
+    bool engineRecordResult(const AttemptResult &attempt);
+    //! F3 (Complete, after the NZB is published) or Abandon: the run ends, the
+    //! entry leaves, its post keeps its owner until engineReleaseOwnership().
+    bool engineFinishFinalization(qint64 postId, const QString &runId, FinalizationStep::Kind kind);
+    //! An interruption kept for a restart: the run of @p runId ends interrupted
+    //! with its transfer time, a successor run is attached.
+    bool engineKeepForRestart(qint64 postId,
+                              const QString &runId,
+                              qint64 activeMs,
+                              bool manifestEngaged,
+                              bool hold,
+                              bool keepArtifacts);
+    //! The local work of a post out of the queue is over.
+    bool engineReleaseOwnership(qint64 postId);
     //! A preparation failed: the entry leaves, its run ends failed (technical),
     //! in one transaction.
     bool engineFailPreparation(qint64 postId, PrepStep step, const QString &error);
@@ -150,6 +166,8 @@ private:
     QueueCommandResult commitOrder(const OrderRef &ref, const QList<qint64> &ids, bool dropsIntent);
     void releaseArtifacts(QueueEntry &entry, bool keepCurrent) const;
     QueueCommandResult holdOrRelease(const QList<qint64> &ids, bool held);
+    //! Order updates and intent drop of entries leaving; true if the intent goes.
+    bool addLeaving(QueueTransaction &tx, const QList<qint64> &ids) const;
     QueueCommandResult removeData(const QList<qint64> &ids,
                                   RemovePolicy policy,
                                   const QHash<qint64, RunOutcome> &outcomes = {});
