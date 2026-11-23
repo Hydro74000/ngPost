@@ -31,7 +31,10 @@
 #if defined(Q_OS_UNIX)
 #  include <QSocketDescriptor>
 #  include <QSocketNotifier>
+#include <cerrno>
+#include <cstring>
 #  include <fcntl.h>
+#include <poll.h>
 #  include <pthread.h>
 #  include <unistd.h>
 #endif
@@ -70,20 +73,77 @@ namespace
 
 int sSigPipe[2] = {-1, -1};
 
+// Stopping on SIGINT / SIGTERM (plan_queue.md, lot C4.8). The first signal
+// starts the graceful exit on the event loop and arms a native watchdog; the
+// second, or the watchdog, ends the process at once with _exit(): no
+// destructor, no Qt, no SQLite -- a blocked main thread cannot delay it.
+volatile sig_atomic_t sStopSignals = 0;
+volatile sig_atomic_t sForcing = 0; //!< a forced exit is under way
+unsigned sExitWatchdogSeconds = 30; //!< NGPOST_EXIT_WATCHDOG_SECONDS
+
+//! Best effort, never blocking: a full or stalled stderr (a pipe nobody reads)
+//! loses the message, never the exit. poll(), strlen() and write() are
+//! async-signal-safe, and the message is shorter than PIPE_BUF, so a pipe with
+//! room takes it whole.
+void writeDiagnostic(const char *message)
+{
+    pollfd err = {};
+    err.fd = STDERR_FILENO;
+    err.events = POLLOUT;
+    if (::poll(&err, 1, 0) == 1 && (err.revents & POLLOUT)) {
+        ssize_t r = ::write(STDERR_FILENO, message, std::strlen(message));
+        (void)r;
+    }
+}
+
+//! Ends the process now. A write that blocks anyway (a stalled file system)
+//! is cut by one more alarm, whose handler sees sForcing and exits at once.
+[[noreturn]] void forceExit(const char *message, int code)
+{
+    sForcing = 1;
+    ::alarm(1);
+    writeDiagnostic(message);
+    ::_exit(code);
+}
+
+extern "C" void exitWatchdogHandler(int)
+{
+    if (sForcing != 0)
+        ::_exit(128 + SIGALRM);
+    forceExit("ngPost: not stopped in time after the stop signal: forced exit\n", 128 + SIGALRM);
+}
+
+void readExitWatchdog()
+{
+    // How long the graceful exit may take after the first stop signal.
+    bool set = false;
+    const int seconds = qEnvironmentVariableIntValue("NGPOST_EXIT_WATCHDOG_SECONDS", &set);
+    if (set && seconds > 0 && seconds <= 3600)
+        sExitWatchdogSeconds = static_cast<unsigned>(seconds);
+}
+
 extern "C" void posixSignalHandler(int sig)
 {
-    // The only thing we are allowed to do from signal context. write() is on
-    // the POSIX signal-safety list; the pipe is O_NONBLOCK so a wedged reader
-    // can never make us block. We ignore the return value: if the pipe is
-    // full because a previous signal hasn't been drained yet, dropping a
-    // duplicate Ctrl-C is harmless (same intent as the first one).
+    const int savedErrno = errno;
+    if (sig == SIGINT || sig == SIGTERM) {
+        if (sStopSignals != 0)
+            forceExit("ngPost: second stop signal: forced exit\n", 128 + sig);
+        sStopSignals = 1;
+        ::alarm(sExitWatchdogSeconds); // independent of the event loop
+    }
+    // The only other thing we are allowed to do from signal context. write()
+    // is on the POSIX signal-safety list; the pipe is O_NONBLOCK so a wedged
+    // reader can never make us block. We ignore the return value: if the pipe
+    // is full, dropping a duplicate signal is harmless (same intent).
     unsigned char s = static_cast<unsigned char>(sig);
     ssize_t r = ::write(sSigPipe[1], &s, 1);
     (void)r;
+    errno = savedErrno;
 }
 
 bool installPosixSignalRouter()
 {
+    readExitWatchdog();
     // Atomic creation with O_CLOEXEC so QProcess children we spawn (rar, par2,
     // openvpn helper) don't inherit these fds, and O_NONBLOCK so the signal
     // handler's write() can never block.
@@ -122,6 +182,10 @@ bool installPosixSignalRouter()
     struct sigaction sa{};
     sa.sa_handler = &posixSignalHandler;
     sigemptyset(&sa.sa_mask);
+    // A SIGTERM landing in the middle of the SIGINT handler (or the reverse)
+    // waits for it: the "first signal" test cannot be interleaved.
+    sigaddset(&sa.sa_mask, SIGINT);
+    sigaddset(&sa.sa_mask, SIGTERM);
     // SA_RESTART so a signal arriving during a worker thread's blocking
     // syscall (NNTP socket read/write, SQLite I/O, file read in
     // ArticleBuilder) doesn't surface EINTR all over the codebase. The
@@ -133,6 +197,14 @@ bool installPosixSignalRouter()
 #ifdef __linux__
     ::sigaction(SIGUSR1, &sa, nullptr);
 #endif
+    // The watchdog stays installed until the very end, destructors included.
+    // Re-entrant: the alarm armed by forceExit() must reach a handler that is
+    // itself stuck in write().
+    struct sigaction watchdog = {};
+    watchdog.sa_handler = &exitWatchdogHandler;
+    sigemptyset(&watchdog.sa_mask);
+    watchdog.sa_flags = SA_NODEFER;
+    ::sigaction(SIGALRM, &watchdog, nullptr);
     return true;
 }
 
@@ -169,7 +241,10 @@ void dispatchSignal(int sig)
     case SIGTERM:
         std::cout << "Closing the application...\n";
         std::cout.flush();
-        QCoreApplication::quit();
+        if (app)
+            app->requestGracefulExit();
+        else
+            QCoreApplication::quit();
         break;
 #ifdef __linux__
     case SIGUSR1:

@@ -18,7 +18,9 @@
 //========================================================================
 
 #include <QtTest>
+#include <csignal>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -260,6 +262,22 @@ private slots:
     //! through the queue: prepared, transferred, retired, and its history row
     //! is the one the admission wrote.
     void queue_engine_posts_a_packed_post_through_the_queue();
+
+    //! SIGINT / SIGTERM (lot C4.8), each in its own process. The first signal
+    //! keeps the queue and waits for the post commands; the second, or the
+    //! exit watchdog, ends the process at once; the historical engine still
+    //! quits at once; a GUI run closes without a dialog.
+    void queue_engine_stop_signal_keeps_the_post();
+    void queue_engine_stop_signal_waits_for_post_commands();
+    void queue_engine_second_stop_signal_forces_the_exit();
+    void queue_engine_exit_watchdog_ends_a_stuck_exit();
+    void stop_signal_at_start_exits_cleanly();
+    void historical_engine_stop_signal_quits_at_once();
+    void gui_stop_signal_closes_without_a_dialog();
+    //! The same escalation when the output is a full pipe nobody reads: the
+    //! main thread is stuck writing, the diagnostic must not stick too.
+    void exit_watchdog_ends_a_run_stuck_on_its_output();
+    void second_stop_signal_ends_a_run_stuck_on_its_output();
 };
 
 void TestPostFlow::initTestCase()
@@ -1400,6 +1418,394 @@ void TestPostFlow::queue_engine_posts_a_packed_post_through_the_queue()
 }
 
 QTEST_MAIN(TestPostFlow)
+#ifdef Q_OS_UNIX
+namespace
+{
+
+//! Writes the configuration of a signal test: history and NZB in @p root.
+bool writeSignalConfig(const QString &root, quint16 port, const QString &extra)
+{
+    QFile conf(root + QStringLiteral("/ngPost.conf"));
+    if (!conf.open(QIODevice::WriteOnly | QIODevice::Text) || !QDir().mkpath(root + "/nzb"))
+        return false;
+    QTextStream s(&conf);
+    s << "nzbPath = " << root << "/nzb\n"
+      << "TMP_DIR = " << root << "\n"
+      << "POST_DB = " << root << "/history.sqlite\n"
+      << extra << "[server]\nhost = 127.0.0.1\nport = " << port
+      << "\nssl = false\nconnection = 1\nenabled = true\nnzbcheck = false\n";
+    return true;
+}
+
+//! Starts ngPost and leaves it running, to be stopped by a signal.
+bool startForSignal(QProcess &p,
+                    const QString &bin,
+                    const QString &root,
+                    const QStringList &args,
+                    bool queueEngine,
+                    const QString &watchdogSeconds = {})
+{
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("HOME", root);
+    env.insert("XDG_CONFIG_HOME", root + QStringLiteral("/.config"));
+    env.insert("NGPOST_QUEUE_ENGINE", queueEngine ? "1" : "0");
+    env.insert("QT_QPA_PLATFORM", "offscreen");
+    if (!watchdogSeconds.isEmpty())
+        env.insert("NGPOST_EXIT_WATCHDOG_SECONDS", watchdogSeconds);
+    p.setProcessEnvironment(env);
+    p.setProcessChannelMode(QProcess::MergedChannels);
+    p.start(bin, args);
+    return p.waitForStarted(5000);
+}
+
+QStringList postArgs(const QString &root, const QString &input)
+{
+    return { "-c",
+             root + QStringLiteral("/ngPost.conf"),
+             "-i",
+             input,
+             "-g",
+             "alt.binaries.test",
+             "--disp_progress",
+             "none" };
+}
+
+QString writeInput(const QString &root, const QString &name, int bytes)
+{
+    const QString path = root + QLatin1Char('/') + name;
+    QFile in(path);
+    if (in.open(QIODevice::WriteOnly))
+        in.write(QByteArray(bytes, 's'));
+    return path;
+}
+
+QVariant dbScalar(const QString &dbPath, const QString &sql)
+{
+    const QString name = QStringLiteral("signal-probe");
+    QVariant value;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+        db.setDatabaseName(dbPath);
+        QSqlQuery q(db);
+        if (db.open() && q.exec(sql) && q.next())
+            value = q.value(0);
+    }
+    QSqlDatabase::removeDatabase(name);
+    return value;
+}
+
+bool nzbPublished(const QString &root)
+{
+    return !QDir(root + "/nzb").entryList({ QStringLiteral("*.nzb") }, QDir::Files).isEmpty();
+}
+
+QString finishedOutput(QProcess &p)
+{
+    return QStringLiteral("exit status %1, code %2, output:\n%3")
+        .arg(int(p.exitStatus()))
+        .arg(p.exitCode())
+        .arg(QString::fromLocal8Bit(p.readAll()));
+}
+
+//! ngPost writing into a pipe that nobody reads and that is filled first: its
+//! first output blocks the main thread for good, so only the native
+//! escalation (second signal, watchdog) can end it.
+class StuckOutputRun
+{
+public:
+    explicit StuckOutputRun(const QString &root)
+        : _pid(root + "/ngpost.pid")
+        , _code(root + "/ngpost.code")
+        , _reader(root + "/reader.pid")
+    {
+    }
+    ~StuckOutputRun()
+    {
+        // The reader gone, every writer gets EPIPE and the shell ends.
+        if (const qint64 reader = readNumber(_reader); reader > 0)
+            ::kill(pid_t(reader), SIGKILL);
+        if (!_shell.waitForFinished(5000))
+            _shell.kill();
+    }
+    bool start(const QString &bin, const QString &root, const QStringList &args)
+    {
+        const QString script = QStringLiteral(
+                                   "{ head -c 1048576 /dev/zero & \"$0\" \"$@\" & echo $! > '%1'; "
+                                   "wait $!; echo $? > '%2'; } 2>&1 "
+                                   "| sh -c 'echo $$ > \"$0\"; exec sleep 60' '%3'")
+                                   .arg(_pid, _code, _reader);
+        return startForSignal(_shell,
+                              QStringLiteral("/bin/sh"),
+                              root,
+                              QStringList{ "-c", script, bin } + args,
+                              true,
+                              QStringLiteral("2"));
+    }
+    qint64 pid() const { return readNumber(_pid); }
+    //! ngPost's exit code once it ended, -1 before.
+    qint64 exitCode() const { return QFile::exists(_code) ? readNumber(_code) : -1; }
+
+private:
+    static qint64 readNumber(const QString &path)
+    {
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly))
+            return -1;
+        bool ok = false;
+        const qint64 value = f.readAll().trimmed().toLongLong(&ok);
+        return ok ? value : -1;
+    }
+    QProcess _shell;
+    QString _pid, _code, _reader;
+};
+
+} // namespace
+#endif
+
+void TestPostFlow::queue_engine_stop_signal_keeps_the_post()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX signals");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "20" }));
+    const QString root = sandbox.rootPath();
+    // ARTICLE_SIZE is the process's own here: many small articles, a long post.
+    QVERIFY(writeSignalConfig(root, mock.port(), "ARTICLE_SIZE = 16384\n"));
+    QProcess p;
+    QVERIFY(startForSignal(p,
+                           _bin,
+                           root,
+                           postArgs(root, writeInput(root, "long.bin", 2 * 1024 * 1024)),
+                           true));
+    QTRY_VERIFY_WITH_TIMEOUT(mock.receivedArticles().size() > 5, 20000);
+    ::kill(p.processId(), SIGTERM);
+    QVERIFY2(p.waitForFinished(15000), "the stop signal did not end the run");
+    // Not completed: the run says so, and what it leaves behind.
+    const QString out = finishedOutput(p);
+    QVERIFY2(p.exitStatus() == QProcess::NormalExit && p.exitCode() == 1, qPrintable(out));
+    QVERIFY2(out.contains("remain in the queue"), qPrintable(out));
+    const int received = mock.receivedArticles().size();
+    QTest::qWait(300);
+    QCOMPARE(mock.receivedArticles().size(), received);
+
+    const QString db = root + QStringLiteral("/history.sqlite");
+    // Kept for a restart: still queued, its attempt ended interrupted, a new
+    // one waiting, every confirmed article recorded, no NZB published.
+    QCOMPARE(dbScalar(db, "SELECT COUNT(*) FROM post_queue").toInt(), 1);
+    QCOMPARE(dbScalar(db, "SELECT state FROM post_runs WHERE run_no=1").toString(),
+             QStringLiteral("interrupted"));
+    QCOMPARE(dbScalar(db, "SELECT COUNT(*) FROM post_runs").toInt(), 2);
+    const int posted = dbScalar(db, "SELECT COUNT(*) FROM post_articles WHERE status='posted'")
+                           .toInt();
+    QVERIFY2(posted >= received - 1 && posted <= received,
+             qPrintable(QStringLiteral("%1 recorded for %2 received").arg(posted).arg(received)));
+    QVERIFY(!nzbPublished(root));
+#endif
+}
+
+void TestPostFlow::queue_engine_stop_signal_waits_for_post_commands()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX signals");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString root = sandbox.rootPath();
+    const QString marker = root + QStringLiteral("/post-command-done");
+    QVERIFY(writeFakeTool(root + "/postcmd.sh",
+                          QStringLiteral("#!/bin/sh\nsleep 1\ntouch '%1'\n").arg(marker)));
+    QVERIFY(writeSignalConfig(root, mock.port(), "NZB_POST_CMD = " + root + "/postcmd.sh\n"));
+    QProcess p;
+    QVERIFY(
+        startForSignal(p, _bin, root, postArgs(root, writeInput(root, "small.bin", 5000)), true));
+    QTRY_VERIFY_WITH_TIMEOUT(nzbPublished(root), 20000);
+    ::kill(p.processId(), SIGTERM);
+    QVERIFY2(p.waitForFinished(15000), "the stop signal did not end the run");
+    QVERIFY2(p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0,
+             qPrintable(finishedOutput(p)));
+    QVERIFY2(QFile::exists(marker), "the exit cut the post command short");
+    QCOMPARE(dbScalar(root + "/history.sqlite", "SELECT COUNT(*) FROM post_queue").toInt(), 0);
+#endif
+}
+
+void TestPostFlow::queue_engine_second_stop_signal_forces_the_exit()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX signals");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString root = sandbox.rootPath();
+    QVERIFY(writeFakeTool(root + "/postcmd.sh", QStringLiteral("#!/bin/sh\nsleep 5\n")));
+    QVERIFY(writeSignalConfig(root, mock.port(), "NZB_POST_CMD = " + root + "/postcmd.sh\n"));
+    QProcess p;
+    QVERIFY(
+        startForSignal(p, _bin, root, postArgs(root, writeInput(root, "small.bin", 5000)), true));
+    QTRY_VERIFY_WITH_TIMEOUT(nzbPublished(root), 20000);
+    ::kill(p.processId(), SIGTERM);
+    QVERIFY2(!p.waitForFinished(800), "the exit did not wait for the post command");
+    QElapsedTimer forced;
+    forced.start();
+    ::kill(p.processId(), SIGTERM);
+    QVERIFY2(p.waitForFinished(3000), "the second signal did not end the run");
+    QVERIFY(forced.elapsed() < 2500);
+    const QString out = finishedOutput(p);
+    QVERIFY2(p.exitStatus() == QProcess::NormalExit && p.exitCode() == 128 + SIGTERM,
+             qPrintable(out));
+    QVERIFY2(out.contains("second stop signal"), qPrintable(out));
+#endif
+}
+
+void TestPostFlow::queue_engine_exit_watchdog_ends_a_stuck_exit()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX signals");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString root = sandbox.rootPath();
+    QVERIFY(writeFakeTool(root + "/postcmd.sh", QStringLiteral("#!/bin/sh\nsleep 8\n")));
+    QVERIFY(writeSignalConfig(root, mock.port(), "NZB_POST_CMD = " + root + "/postcmd.sh\n"));
+    QProcess p;
+    QVERIFY(startForSignal(p,
+                           _bin,
+                           root,
+                           postArgs(root, writeInput(root, "small.bin", 5000)),
+                           true,
+                           QStringLiteral("2")));
+    QTRY_VERIFY_WITH_TIMEOUT(nzbPublished(root), 20000);
+    QElapsedTimer budget;
+    budget.start();
+    ::kill(p.processId(), SIGTERM);
+    QVERIFY2(p.waitForFinished(6000), "the watchdog did not end the run");
+    QVERIFY(budget.elapsed() >= 1500);
+    const QString out = finishedOutput(p);
+    QVERIFY2(p.exitStatus() == QProcess::NormalExit && p.exitCode() == 128 + SIGALRM,
+             qPrintable(out));
+    QVERIFY2(out.contains("not stopped in time"), qPrintable(out));
+#endif
+}
+
+void TestPostFlow::stop_signal_at_start_exits_cleanly()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX signals");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "200" }));
+    const QString root = sandbox.rootPath();
+    QVERIFY(writeSignalConfig(root, mock.port(), QString()));
+    QProcess p;
+    QVERIFY(
+        startForSignal(p, _bin, root, postArgs(root, writeInput(root, "early.bin", 5000)), true));
+    QTest::qWait(150); // before the slow server even greets
+    ::kill(p.processId(), SIGTERM);
+    QVERIFY2(p.waitForFinished(15000), "the stop signal did not end the run");
+    const QString out = finishedOutput(p);
+    QVERIFY2(p.exitStatus() == QProcess::NormalExit && p.exitCode() == 1, qPrintable(out));
+    QVERIFY(!nzbPublished(root));
+    QCOMPARE(mock.receivedArticles().size(), 0);
+    // Admitted before the signal: kept for the next start, nothing sent.
+    QCOMPARE(dbScalar(root + "/history.sqlite", "SELECT COUNT(*) FROM post_queue").toInt(), 1);
+#endif
+}
+
+void TestPostFlow::historical_engine_stop_signal_quits_at_once()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX signals");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "20" }));
+    const QString root = sandbox.rootPath();
+    QVERIFY(writeSignalConfig(root, mock.port(), "ARTICLE_SIZE = 16384\n"));
+    QProcess p;
+    QVERIFY(startForSignal(p,
+                           _bin,
+                           root,
+                           postArgs(root, writeInput(root, "long.bin", 2 * 1024 * 1024)),
+                           false));
+    QTRY_VERIFY_WITH_TIMEOUT(mock.receivedArticles().size() > 5, 20000);
+    QElapsedTimer stop;
+    stop.start();
+    ::kill(p.processId(), SIGTERM);
+    QVERIFY2(p.waitForFinished(10000), "the stop signal did not end the run");
+    QVERIFY(stop.elapsed() < 5000);
+    QVERIFY2(p.exitStatus() == QProcess::NormalExit, qPrintable(finishedOutput(p)));
+#endif
+}
+
+void TestPostFlow::gui_stop_signal_closes_without_a_dialog()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX signals");
+#else
+    HomeSandbox sandbox;
+    const QString root = sandbox.rootPath();
+    QProcess p;
+    QVERIFY(startForSignal(p, _bin, root, {}, true));
+    if (p.waitForFinished(2000))
+        QSKIP("this build has no GUI: without arguments it only prints its help");
+    ::kill(p.processId(), SIGTERM);
+    QVERIFY2(p.waitForFinished(15000), "the GUI did not close on the stop signal");
+    QVERIFY2(p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0,
+             qPrintable(finishedOutput(p)));
+#endif
+}
+
+void TestPostFlow::exit_watchdog_ends_a_run_stuck_on_its_output()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX signals");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString root = sandbox.rootPath();
+    QVERIFY(writeSignalConfig(root, mock.port(), QString()));
+    StuckOutputRun run(root);
+    QVERIFY(run.start(_bin, root, postArgs(root, writeInput(root, "stuck.bin", 5000))));
+    QTRY_VERIFY_WITH_TIMEOUT(run.pid() > 0, 5000);
+    QTest::qWait(500); // its output is blocked by now
+    QElapsedTimer budget;
+    budget.start();
+    ::kill(pid_t(run.pid()), SIGTERM);
+    QTRY_VERIFY_WITH_TIMEOUT(run.exitCode() >= 0, 6000);
+    QVERIFY(budget.elapsed() >= 1500);
+    QCOMPARE(run.exitCode(), qint64(128 + SIGALRM));
+#endif
+}
+
+void TestPostFlow::second_stop_signal_ends_a_run_stuck_on_its_output()
+{
+#ifndef Q_OS_UNIX
+    QSKIP("POSIX signals");
+#else
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString root = sandbox.rootPath();
+    QVERIFY(writeSignalConfig(root, mock.port(), QString()));
+    StuckOutputRun run(root);
+    QVERIFY(run.start(_bin, root, postArgs(root, writeInput(root, "stuck.bin", 5000))));
+    QTRY_VERIFY_WITH_TIMEOUT(run.pid() > 0, 5000);
+    QTest::qWait(500);
+    ::kill(pid_t(run.pid()), SIGTERM);
+    QTest::qWait(200);
+    QCOMPARE(run.exitCode(), qint64(-1)); // the first signal cannot run: stuck
+    ::kill(pid_t(run.pid()), SIGTERM);
+    QTRY_VERIFY_WITH_TIMEOUT(run.exitCode() >= 0, 1500);
+    QCOMPARE(run.exitCode(), qint64(128 + SIGTERM));
+#endif
+}
+
 #include "tst_PostFlow.moc"
 
 void TestPostFlow::recovered_connection_is_successful_and_timestamped()

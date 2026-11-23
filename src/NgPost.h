@@ -1022,6 +1022,10 @@ public:
     //! a restart, engaged finalizations finished. queueClosed() tells the end.
     //! With @p letTransferFinish the transfer under way ends on its own.
     void closeQueueKeeping(bool letTransferFinish = false);
+    //! The first SIGINT / SIGTERM (main.cpp), never a dialog: the historical
+    //! engine quits at once as it always did; with a queue, it is kept first
+    //! (closeQueueKeeping()), then the post actions end, as for a fatal exit.
+    void requestGracefulExit();
     bool isClosingQueue() const { return _queueClosing; }
     //! The session queue holds some entry: a close has something to keep.
     bool queueHasEntries() const;

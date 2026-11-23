@@ -576,6 +576,17 @@ void NgPost::closeQueueKeeping(bool letTransferFinish)
     QMetaObject::invokeMethod(this, &NgPost::_checkQueueClosed, Qt::QueuedConnection);
 }
 
+void NgPost::requestGracefulExit()
+{
+    if (_pendingExitCode >= 0)
+        return; // already leaving: only a second signal forces it, natively
+    if (!_postQueue) {
+        QCoreApplication::quit();
+        return;
+    }
+    _requestExit(ERROR_CODE::NONE, false);
+}
+
 void NgPost::_checkQueueClosed()
 {
     if (!_queueClosing)
@@ -600,6 +611,13 @@ void NgPost::_checkQueueClosed()
         if (failed)
             _error(tr("Exiting without the queue saved: the interrupted posts can be resumed "
                       "from the history."));
+        else if (!useHMI() && queueHasEntries() && !_queueLeftBlocked) {
+            // A command line run that leaves posts behind did not complete.
+            _queueLeftBlocked = true;
+            if (_err == ERROR_CODE::NONE)
+                _err = ERROR_CODE::COMPLETED_WITH_ERRORS;
+            _error(tr("Some posts could not be sent and remain in the queue."));
+        }
         QMetaObject::invokeMethod(this, &NgPost::maybeFinishApplication, Qt::QueuedConnection);
     }
 }

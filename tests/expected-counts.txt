@@ -57,7 +57,7 @@ tst_NntpFile                  29  Linux
 tst_OpenVpnConfigPolicy       74  Linux
 tst_Par2Settings              17  Linux
 tst_PathHelper                45  Linux
-tst_PostFlow                  29  Linux
+tst_PostFlow                  38  Linux
 tst_PostHistory               48  Linux
 tst_PostInfoTemplate          37  Linux
 tst_PostQueue                 27  Linux
@@ -96,7 +96,7 @@ tst_NntpFile                  29  Darwin
 tst_OpenVpnConfigPolicy       74  Darwin
 tst_Par2Settings              17  Darwin
 tst_PathHelper                45  Darwin
-tst_PostFlow                  25  Darwin
+tst_PostFlow                  33  Darwin
 tst_PostHistory               48  Darwin
 tst_PostInfoTemplate          37  Darwin
 tst_PostQueue                 27  Darwin
