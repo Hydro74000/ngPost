@@ -142,6 +142,10 @@ private:
     bool requestStop(const QueueEntry &entry, PendingStop why, Disposition disposition);
     bool isCurrent(qint64 postId, const QString &runId) const;
     bool recordStep(qint64 postId, PrepStep step, bool ok, const QString &error, qint64 bytes);
+    void holdUnprovenStop(qint64 postId,
+                          const QString &runId,
+                          PendingStop why,
+                          const QString &reason);
     bool recordQuiesced(qint64 postId,
                         const QString &runId,
                         PendingStop why,

@@ -34,9 +34,10 @@ public:
         Quiescing,       //!< asked to stop
         StoppedVerified, //!< nothing it started can write any more
         Unproven,        //!< ended without proof: its files are left alone
-        //! Capability "unavailable" (macOS): the tool ended on its own, with
-        //! status 0, no stop asked. Its outputs may be used; nothing proves its
-        //! descendants gone, so nothing is renamed back or deleted on that basis.
+        //! Capability "unavailable" (macOS): the tool ran and ended on its own,
+        //! no stop asked, its supervisor ending as planned. With status 0 its outputs may
+        //! be used; nothing proves its descendants gone, so nothing is renamed
+        //! back or deleted on that basis, whatever the status.
         Exited
     };
     Q_ENUM(State)
@@ -121,6 +122,7 @@ private:
     bool _readyReceived = false;
     bool _stopAsked = false;
     bool _toolExitedSeen = false;
+    bool _execFailedSeen = false;
 };
 
 #endif // TOOLS_EXTERNALTOOLPROCESS_H

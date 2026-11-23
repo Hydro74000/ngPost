@@ -656,16 +656,60 @@ private slots:
         QCOMPARE(r.stopped.size(), 1);
     }
 
-    void macFailedToolIsUnproven()
+    void macFailedToolHasExitedWithItsStatus()
     {
+        // Ended on its own: no more running, whatever its status (lot C5.6).
+        // Its status, not its state, says its outputs are not to be used.
         Run r;
         QVERIFY(r.script(QStringLiteral("fail.py"), "import sys\nsys.exit(3)\n"));
         QVERIFY(r.start({ r.path(QStringLiteral("fail.py")) }));
         QTRY_COMPARE_WITH_TIMEOUT(r.ready.size(), 1, 5000);
         r.tool.allowExecution();
         QTRY_COMPARE_WITH_TIMEOUT(r.stopped.size(), 1, 10000);
-        QCOMPARE(r.tool.state(), ExternalToolProcess::State::Unproven);
+        QVERIFY(!r.verified());
+        QCOMPARE(r.tool.state(), ExternalToolProcess::State::Exited);
         QCOMPARE(r.tool.toolStatus(), 3);
+    }
+
+    void macUnexecutableToolIsNeverExited()
+    {
+        // Its exec failed: it never ran, so it never "ended on its own".
+        QTemporaryDir dir;
+        ExternalToolProcess tool;
+        QSignalSpy ready(&tool, &ExternalToolProcess::ready);
+        QSignalSpy failed(&tool, &ExternalToolProcess::execFailed);
+        QSignalSpy stopped(&tool, &ExternalToolProcess::stopped);
+        QVERIFY(tool.start(dir.filePath(QStringLiteral("no-such-tool")),
+                           {},
+                           dir.path(),
+                           dir.filePath(QStringLiteral("proof"))));
+        QTRY_COMPARE_WITH_TIMEOUT(ready.size(), 1, 5000);
+        tool.allowExecution();
+        QTRY_COMPARE_WITH_TIMEOUT(stopped.size(), 1, 5000);
+        QCOMPARE(failed.size(), 1);
+        QVERIFY(!stopped.at(0).at(0).toBool());
+        QCOMPARE(tool.state(), ExternalToolProcess::State::Unproven);
+        QCOMPARE(tool.toolStatus(), 127);
+    }
+
+    void macLostSupervisorIsUnprovenEvenAfterTheToolEnded()
+    {
+        // The tool ended, then its supervisor was killed: not as planned.
+        Run r;
+        QVERIFY(r.script(QStringLiteral("fail.py"), "import sys\nsys.exit(3)\n"));
+        qputenv("NGPOST_TEST_STALL_AFTER_TOOL_EXIT", "1");
+        const bool started = r.start({ r.path(QStringLiteral("fail.py")) });
+        qunsetenv("NGPOST_TEST_STALL_AFTER_TOOL_EXIT");
+        QVERIFY(started);
+        QTRY_COMPARE_WITH_TIMEOUT(r.ready.size(), 1, 5000);
+        QSignalSpy exited(&r.tool, &ExternalToolProcess::toolExited);
+        r.tool.allowExecution();
+        QTRY_COMPARE_WITH_TIMEOUT(exited.size(), 1, 10000);
+        const QJsonObject identity = QJsonDocument::fromJson(r.tool.identityJson().toUtf8())
+                                         .object();
+        ::kill(pid_t(identity.value(QStringLiteral("pid")).toString().toLongLong()), SIGKILL);
+        QTRY_COMPARE_WITH_TIMEOUT(r.stopped.size(), 1, 10000);
+        QCOMPARE(r.tool.state(), ExternalToolProcess::State::Unproven);
     }
 
     void macStoppedToolIsUnprovenAndItsGroupKilled()

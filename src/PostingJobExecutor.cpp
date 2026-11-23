@@ -173,9 +173,10 @@ void PostingJobExecutor::onStepEnded(qint64 postId,
     if (ok && step == PrepStep::Collect)
         _manifests.insert(key(postId, runId, setId), job->preparedManifest());
     // Nothing else runs now. A job still holding renamed sources keeps the
-    // only map back to their names: it stays until they are restored.
+    // only map back to their names: it stays until they are restored. One
+    // whose tool ended unproven stays with its slot: the tool may still write.
     const bool over = !ok || step == PrepStep::Collect;
-    if (over && !job->hasUnrestoredSources())
+    if (over && !job->hasUnrestoredSources() && !job->holdsUnprovenTool())
         releaseRuntime(postId);
     emit stepFinished(postId, runId, setId, step, ok, error, bytes);
 }
@@ -289,7 +290,8 @@ void PostingJobExecutor::completeLocalWork(qint64 postId, const QString &runId)
         return;
     }
     PostingJob *job = it->job;
-    job->allowArtifactCleanup(job->hasPostFinishedSuccessfully());
+    // Only archives whose tool is proven stopped may go (an "exited" one is not).
+    job->allowArtifactCleanup(job->hasPostFinishedSuccessfully() && job->preparedSetStopProven());
     // F2 published something only if articles were sent: no sheet, script or
     // upload for a post that produced no NZB.
     job->runPostFinalizationWork(job->hasTransferStarted());
@@ -336,14 +338,40 @@ void PostingJobExecutor::interrupt(qint64 postId, const QString &runId, Disposit
         keepTransfer(postId, runId);
         return;
     }
-    it->phase = Phase::Quiescing;
-    const QString setId = it->setId;
-    const bool stopped = it->job && it->job->quiescePreparation();
-    if (stopped) {
-        _manifests.remove(key(postId, runId, setId));
-        releaseRuntime(postId);
-    } // otherwise the runtime and its slot stay: the stop is not proven
-    later([this, postId, runId, stopped] { emit quiesced(postId, runId, stopped, false); });
+    quiescePreparation(postId, runId);
+}
+
+//! A preparation stops asynchronously: its tool's supervisor answers. Asked
+//! again while it stops, the same answer comes; a later ask is answered again.
+void PostingJobExecutor::quiescePreparation(qint64 postId, const QString &runId)
+{
+    Runtime &runtime = _runtimes[postId];
+    PostingJob *job = runtime.job;
+    if (!job) {
+        later([this, postId, runId] { emit quiesced(postId, runId, false, false); });
+        return;
+    }
+    if (runtime.phase == Phase::Quiescing && runtime.quiesceAsked)
+        return; // under way: its answer covers this ask too
+    runtime.phase = Phase::Quiescing;
+    runtime.quiesceAsked = true;
+    const QString setId = runtime.setId;
+    // Connected before the ask: the answer may come at once.
+    connect(job,
+            &PostingJob::preparationQuiesced,
+            this,
+            [this, postId, job, runId, setId](bool proven) {
+        if (!isCurrent(postId, job, runId, Phase::Quiescing))
+            return; // a replaced runtime
+        _runtimes[postId].quiesceAsked = false;
+        if (proven) {
+            _manifests.remove(key(postId, runId, setId));
+            releaseRuntime(postId);
+        } // otherwise the runtime and its slot stay: the stop is not proven
+        emit quiesced(postId, runId, proven, false);
+    },
+            Qt::SingleShotConnection);
+    job->quiescePreparation();
 }
 
 //! An interruption kept (Hold, "post now", close and keep): producers stopped

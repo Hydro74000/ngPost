@@ -80,4 +80,15 @@ bool parseLifecycle(const QString &text, Lifecycle &lifecycle)
     return valueOf(kLifecycles, text, lifecycle);
 }
 
+QString stepError(const char *code, const QString &text)
+{
+    return QStringLiteral("%1: %2").arg(QLatin1String(code), text);
+}
+
+bool stepErrorIs(const QString &error, const char *code)
+{
+    const QLatin1String prefix(code);
+    return error.startsWith(prefix) && error.mid(prefix.size(), 1) == QLatin1String(":");
+}
+
 } // namespace queue

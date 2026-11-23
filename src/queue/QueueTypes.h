@@ -67,6 +67,14 @@ enum class PrepStep {
     Collect
 };
 
+//! Codes a failed step's error may start with (lot C5.6), as "<code>: <text>".
+//! The tool may still write: its runtime, files and slot stay, the queue waits.
+constexpr const char *kStepToolUnproven = "tool_unproven";
+//! Its supervision could not be recorded: no tool runs without it.
+constexpr const char *kStepStoreFailed = "store_failed";
+QString stepError(const char *code, const QString &text);
+bool stepErrorIs(const QString &error, const char *code);
+
 //! What an interruption means for the entry being stopped.
 enum class Disposition {
     Keep,   //!< interruption kept: back to Queued, a new run follows

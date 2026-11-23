@@ -771,6 +771,43 @@ bool PostHistoryService::markTransferManifestComplete(qint64 postId, QString *er
     return ok;
 }
 
+bool PostHistoryService::recordToolSupervision(qint64 postId,
+                                               const QString &runId,
+                                               const QString &setId,
+                                               const QString &capability,
+                                               const QString &toolState,
+                                               const QString &toolIdentityJson,
+                                               QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->store().recordToolSupervision(postId,
+                                                   runId,
+                                                   setId,
+                                                   capability,
+                                                   toolState,
+                                                   toolIdentityJson,
+                                                   &err);
+    });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+std::optional<PostHistoryStore::ArtifactSetRecord> PostHistoryService::artifactSet(
+    const QString &setId,
+    QString *error)
+{
+    QString err;
+    std::optional<PostHistoryStore::ArtifactSetRecord> set;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { set = worker->store().artifactSet(setId, &err); });
+    if (error)
+        *error = err;
+    return set;
+}
+
 bool PostHistoryService::updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error)
 {
     QString err;

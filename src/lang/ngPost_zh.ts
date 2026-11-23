@@ -4719,6 +4719,10 @@ Your active configuration file is:
         <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
         <translation>退出时未保存队列：中断的发布可以从历史记录中恢复。</translation>
     </message>
+    <message>
+        <source>The queue waits: ngPost could not make sure that a post stopped (%1). Its files are left as they are until ngPost restarts.</source>
+        <translation>队列正在等待：ngPost 无法确认某个发布已停止（%1）。在 ngPost 重新启动之前，其文件保持原样。</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -6944,6 +6948,34 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
         <source>History database error: %1</source>
         <translation>历史数据库错误：%1</translation>
     </message>
+    <message>
+        <source>The temporary files of %1 are kept: their tool may still write in them.</source>
+        <translation>%1 的临时文件被保留：其工具可能仍在写入。</translation>
+    </message>
+    <message>
+        <source>its supervision cannot be recorded in the history</source>
+        <translation>无法在历史记录中记录其监管</translation>
+    </message>
+    <message>
+        <source>the folder %1 cannot be created</source>
+        <translation>无法创建文件夹 %1</translation>
+    </message>
+    <message>
+        <source>its supervisor did not start</source>
+        <translation>其监管进程未能启动</translation>
+    </message>
+    <message>
+        <source>ngPost could not make sure that %1 and everything it started stopped: its files and the source names are left as they are.</source>
+        <translation>ngPost 无法确认 %1 及其启动的所有进程均已停止：其文件和源文件名保持原样。</translation>
+    </message>
+    <message>
+        <source>the supervision of %1 could not be recorded</source>
+        <translation>无法记录对 %1 的监管</translation>
+    </message>
+    <message>
+        <source>Not deleting the posted files: nothing proves that their archive or PAR2 tool, and everything it started, stopped using them.</source>
+        <translation>不删除已发布的文件：无法证明其归档或 PAR2 工具及其启动的所有进程已停止使用它们。</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -8839,6 +8871,10 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
     <message>
         <source>Writing the NZB…</source>
         <translation>正在写入 NZB…</translation>
+    </message>
+    <message>
+        <source>Its archive or PAR2 tool could not be confirmed stopped</source>
+        <translation>无法确认其归档或 PAR2 工具已停止</translation>
     </message>
 </context>
 </TS>

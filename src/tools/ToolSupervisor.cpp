@@ -216,6 +216,11 @@ bool leaderEnded(Tool &tool)
     if (tool.status < 0) {
         tool.status = info.si_code == CLD_EXITED ? info.si_status : 128 + info.si_status;
         say("tool_exited " + std::to_string(tool.status));
+#ifdef NGPOST_TESTING
+        // Stands for a supervisor lost right after its tool ended (lot C5.6).
+        if (::getenv("NGPOST_TEST_STALL_AFTER_TOOL_EXIT"))
+            ::pause();
+#endif
     }
     return true;
 }

@@ -4719,6 +4719,10 @@ Su archivo de configuración activo es:
         <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
         <translation>Saliendo sin guardar la cola: los envíos interrumpidos se pueden reanudar desde el historial.</translation>
     </message>
+    <message>
+        <source>The queue waits: ngPost could not make sure that a post stopped (%1). Its files are left as they are until ngPost restarts.</source>
+        <translation>La cola espera: ngPost no pudo asegurarse de que una publicación se detuviera (%1). Sus archivos se dejan tal cual hasta que ngPost se reinicie.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -6944,6 +6948,34 @@ Establezca PAR2_SOURCE = custom y corrija PAR2_PATH en la configuración (Ajuste
         <source>History database error: %1</source>
         <translation>Error de la base de datos del historial: %1</translation>
     </message>
+    <message>
+        <source>The temporary files of %1 are kept: their tool may still write in them.</source>
+        <translation>Se conservan los archivos temporales de %1: su herramienta aún puede escribir en ellos.</translation>
+    </message>
+    <message>
+        <source>its supervision cannot be recorded in the history</source>
+        <translation>su supervisión no puede registrarse en el historial</translation>
+    </message>
+    <message>
+        <source>the folder %1 cannot be created</source>
+        <translation>no se puede crear la carpeta %1</translation>
+    </message>
+    <message>
+        <source>its supervisor did not start</source>
+        <translation>su supervisor no se inició</translation>
+    </message>
+    <message>
+        <source>ngPost could not make sure that %1 and everything it started stopped: its files and the source names are left as they are.</source>
+        <translation>ngPost no pudo asegurarse de que %1 y todo lo que inició se detuvieran: sus archivos y los nombres de las fuentes se dejan tal cual.</translation>
+    </message>
+    <message>
+        <source>the supervision of %1 could not be recorded</source>
+        <translation>no se pudo registrar la supervisión de %1</translation>
+    </message>
+    <message>
+        <source>Not deleting the posted files: nothing proves that their archive or PAR2 tool, and everything it started, stopped using them.</source>
+        <translation>No se eliminan los archivos publicados: nada demuestra que su herramienta de archivo o PAR2, y todo lo que inició, haya dejado de usarlos.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -8839,6 +8871,10 @@ Se eliminarán su archivo de configuración bajo &lt;configDir&gt;/vpn/ y sus cr
     <message>
         <source>Writing the NZB…</source>
         <translation>Escribiendo el NZB…</translation>
+    </message>
+    <message>
+        <source>Its archive or PAR2 tool could not be confirmed stopped</source>
+        <translation>No se pudo confirmar que su herramienta de archivo o PAR2 se detuviera</translation>
     </message>
 </context>
 </TS>

@@ -160,7 +160,15 @@ void NgPost::_connectQueueEvents()
             this,
             [this](bool paused, const QString &reason) {
         if (paused) {
-            _error(tr("History database error: %1").arg(reason), ERROR_CODE::ERR_HISTORY);
+            // An unproven stop is no database error: the queue waits for a restart.
+            if (reason == QLatin1String("quiesce_failed")
+                || reason == QLatin1String(queue::kStepToolUnproven))
+                _error(tr("The queue waits: ngPost could not make sure that a post stopped "
+                          "(%1). Its files are left as they are until ngPost restarts.")
+                           .arg(reason),
+                       ERROR_CODE::ERR_HISTORY); // the exit code it always had
+            else
+                _error(tr("History database error: %1").arg(reason), ERROR_CODE::ERR_HISTORY);
             // A stop that could not be written: Cancel and Resume must stay
             // available to ask again.
             _cancelingAll = false;

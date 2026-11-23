@@ -586,6 +586,77 @@ private slots:
         QCOMPARE(f.queue.find(a)->blocked.code, QStringLiteral("preparation_failed"));
     }
 
+    void aToolEndedUnprovenKeepsItsSlotAndPausesTheQueue()
+    {
+        Fixture f;
+        f.scheduler->setPreparationFailurePolicy(QueueScheduler::PreparationFailure::Retire);
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        const qint64 b = f.add(QStringLiteral("b"), true); // needs the slot a holds
+        settle();
+        const QString run = f.queue.find(a)->runId;
+        QVERIFY(
+            f.executor.ackStep(a, false, 0, stepError(kStepToolUnproven, QStringLiteral("rar"))));
+        settle();
+        // Not retired, not blocked as a failure: the tool may still write.
+        QVERIFY(f.queue.find(a));
+        QCOMPARE(f.queue.find(a)->blocked.code, QLatin1String(kStepToolUnproven));
+        QCOMPARE(f.state(a), Lifecycle::Preparing);
+        QCOMPARE(f.queue.find(a)->slot, Slot::Preparation);
+        QCOMPARE(f.queue.find(a)->runId, run);
+        QVERIFY(!f.queue.find(a)->artifacts.isNull());
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        QCOMPARE(f.scheduler->technicalPauseReason(), QLatin1String(kStepToolUnproven));
+        f.scheduler->retryAfterTechnicalPause();
+        settle();
+        QVERIFY(f.scheduler->isTechnicallyPaused()); // nothing proves it stopped since
+        QCOMPARE(f.executor.count(Kind::Prepare, b), 0);
+        QCOMPARE(f.executor.count(Kind::Prepare, a), 1); // no next step either
+    }
+
+    void aRefusedSupervisionKeepsThePostForANewAttempt()
+    {
+        Fixture f;
+        f.scheduler->setPreparationFailurePolicy(QueueScheduler::PreparationFailure::Retire);
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        settle();
+        const QString run = f.queue.find(a)->runId;
+        QVERIFY(f.executor.ackStep(a, false, 0, stepError(kStepStoreFailed, QStringLiteral("db"))));
+        settle();
+        // The history refused, not the post: kept, unblocked, under a new run.
+        QVERIFY(f.queue.find(a));
+        QVERIFY(!f.queue.find(a)->blocked.isBlocked());
+        QCOMPARE(f.state(a), Lifecycle::Queued);
+        QVERIFY(f.queue.find(a)->runId != run);
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        QCOMPARE(f.scheduler->technicalPauseReason(), QLatin1String(kStepStoreFailed));
+        f.scheduler->retryAfterTechnicalPause();
+        settle();
+        QVERIFY(!f.scheduler->isTechnicallyPaused());
+        QCOMPARE(f.state(a), Lifecycle::Preparing); // prepared again
+        QCOMPARE(f.executor.count(Kind::Prepare, a), 2);
+    }
+
+    void aRefusedSupervisionWithWorkStillHeldRenewsNothing()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        settle();
+        const QString run = f.queue.find(a)->runId;
+        f.executor.setUnsettled(a); // sources its runtime could not rename back
+        QVERIFY(f.executor.ackStep(a, false, 0, stepError(kStepStoreFailed, QStringLiteral("db"))));
+        settle();
+        // A new run would be refused by the runtime still there: none starts.
+        QCOMPARE(f.queue.find(a)->runId, run);
+        QCOMPARE(f.state(a), Lifecycle::Preparing);
+        QCOMPARE(f.queue.find(a)->slot, Slot::Preparation);
+        QCOMPARE(f.queue.find(a)->blocked.code, QLatin1String(kStepStoreFailed));
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        f.scheduler->retryAfterTechnicalPause();
+        settle();
+        QVERIFY(f.scheduler->isTechnicallyPaused());
+        QCOMPARE(f.executor.count(Kind::Prepare, a), 1);
+    }
+
     void finalizationFollowsF1ThenF3()
     {
         Fixture f;

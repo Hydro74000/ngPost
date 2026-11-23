@@ -833,7 +833,8 @@ namespace
 //! An interruption acknowledged at last proves the stop that was not.
 void clearUnprovenStop(QueueEntry &entry)
 {
-    if (entry.blocked.code == QLatin1String("quiesce_failed"))
+    if (entry.blocked.code == QLatin1String("quiesce_failed")
+        || entry.blocked.code == QLatin1String(kStepToolUnproven))
         entry.blocked = {};
 }
 } // namespace

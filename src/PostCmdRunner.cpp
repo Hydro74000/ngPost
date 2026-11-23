@@ -16,6 +16,15 @@
 
 #include <limits>
 
+#if defined(Q_OS_WIN)
+#ifndef NOMINMAX
+#define NOMINMAX // std::numeric_limits<>::max() below
+#endif
+#include <windows.h>
+#elif defined(Q_OS_UNIX)
+#include <unistd.h>
+#endif
+
 namespace
 {
 //! Head and tail of a chatty command, so a script looping on stderr cannot
@@ -259,6 +268,16 @@ void PostCmdRunner::_runNextCommand()
     PostInfoTemplate::applyEnvironment(env, _current.data, _current.settings.exposeSecrets);
     _process->setProcessEnvironment(env);
     _process->setProcessChannelMode(QProcess::SeparateChannels);
+    // Out of reach of what stops ngPost (plan_queue.md lot C5.6): Ctrl+C in a
+    // terminal, a signal to the process group, Ctrl+Break on its console. A
+    // graceful exit waits for the command; only cancelAll() ends it early.
+#if defined(Q_OS_WIN)
+    _process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
+        args->flags |= CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW;
+    });
+#elif defined(Q_OS_UNIX)
+    _process->setChildProcessModifier([] { ::setsid(); });
+#endif
 
     _stdout.clear();
     _stderr.clear();

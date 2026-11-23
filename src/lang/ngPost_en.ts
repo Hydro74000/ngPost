@@ -4697,6 +4697,10 @@ One thing does change for such a script: the old configuration file has no POST_
         <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
         <translation>Exiting without the queue saved: the interrupted posts can be resumed from the history.</translation>
     </message>
+    <message>
+        <source>The queue waits: ngPost could not make sure that a post stopped (%1). Its files are left as they are until ngPost restarts.</source>
+        <translation>The queue waits: ngPost could not make sure that a post stopped (%1). Its files are left as they are until ngPost restarts.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -6911,6 +6915,34 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
         <source>History database error: %1</source>
         <translation>History database error: %1</translation>
     </message>
+    <message>
+        <source>The temporary files of %1 are kept: their tool may still write in them.</source>
+        <translation>The temporary files of %1 are kept: their tool may still write in them.</translation>
+    </message>
+    <message>
+        <source>its supervision cannot be recorded in the history</source>
+        <translation>its supervision cannot be recorded in the history</translation>
+    </message>
+    <message>
+        <source>the folder %1 cannot be created</source>
+        <translation>the folder %1 cannot be created</translation>
+    </message>
+    <message>
+        <source>its supervisor did not start</source>
+        <translation>its supervisor did not start</translation>
+    </message>
+    <message>
+        <source>ngPost could not make sure that %1 and everything it started stopped: its files and the source names are left as they are.</source>
+        <translation>ngPost could not make sure that %1 and everything it started stopped: its files and the source names are left as they are.</translation>
+    </message>
+    <message>
+        <source>the supervision of %1 could not be recorded</source>
+        <translation>the supervision of %1 could not be recorded</translation>
+    </message>
+    <message>
+        <source>Not deleting the posted files: nothing proves that their archive or PAR2 tool, and everything it started, stopped using them.</source>
+        <translation>Not deleting the posted files: nothing proves that their archive or PAR2 tool, and everything it started, stopped using them.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -8805,6 +8837,10 @@ Its config file under &lt;configDir&gt;/vpn/ and its credentials in the keychain
     <message>
         <source>Writing the NZB…</source>
         <translation>Writing the NZB…</translation>
+    </message>
+    <message>
+        <source>Its archive or PAR2 tool could not be confirmed stopped</source>
+        <translation>Its archive or PAR2 tool could not be confirmed stopped</translation>
     </message>
 </context>
 </TS>

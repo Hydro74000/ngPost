@@ -14,10 +14,12 @@
 #include "PostingJob.h"
 #include "PostingJobExecutor.h"
 #include "TestEnv.h"
+#include "TestMain.h"
 #include "history/HistoryQueueStore.h"
 #include "history/PostHistoryService.h"
 #include "queue/PostQueue.h"
 #include "queue/QueueScheduler.h"
+#include "tools/ExternalToolProcess.h"
 #include "utils/PathHelper.h"
 
 #include <QSignalSpy>
@@ -27,9 +29,31 @@
 #include <QUuid>
 #include <QThread>
 #include <QElapsedTimer>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QtTest>
 
+#include <chrono>
+#include <cstring>
 #include <memory>
+#include <thread>
+
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <signal.h>
+#include <unistd.h>
+#endif
+
+// Where a supervisor proves the stop of a tool and all its descendants (lot
+// C5.6); macOS runs tools without ever proving anything.
+#if defined(Q_OS_LINUX) || defined(Q_OS_WIN)
+#define PROVEN_SUPERVISION 1
+#endif
 
 using namespace queue;
 using ngpost::tests::HomeSandbox;
@@ -37,6 +61,140 @@ using ngpost::tests::MockNntpServer;
 
 namespace
 {
+
+// --- the fake tools ---------------------------------------------------------------------
+//
+// The test binary stands for rar and par2 (lot C5.6), on every platform: run
+// with NGPOST_FAKE_TOOLS set, it does what NGPOST_FAKE_RAR (or NGPOST_FAKE_PAR2,
+// when given a .par2 file) says, as ';'-separated actions run in order:
+//   touch=<path>   pid=<path>   late=<path> (a descendant creates it 1 s later)
+//   ignoreterm (POSIX)   sleep=<ms>   write=<bytes> (into its archive or .par2)
+//   exit=<code>
+
+constexpr const char *kLateSwitch = "--fake-late";
+
+void createFile(const QString &path)
+{
+    QFile f(path);
+    if (f.open(QIODevice::WriteOnly))
+        f.close();
+}
+
+//! A descendant of the fake tool, outliving it unless its tree is stopped.
+void spawnLateWriter(const QString &path)
+{
+#ifdef Q_OS_WIN
+    wchar_t self[MAX_PATH] = {};
+    ::GetModuleFileNameW(nullptr, self, MAX_PATH);
+    std::wstring command = L"\"" + std::wstring(self) + L"\" "
+        + QString::fromLatin1(kLateSwitch).toStdWString() + L" \"" + path.toStdWString() + L"\"";
+    STARTUPINFOW startup = {};
+    startup.cb = sizeof startup;
+    PROCESS_INFORMATION info = {};
+    if (::CreateProcessW(nullptr,
+                         command.data(),
+                         nullptr,
+                         nullptr,
+                         FALSE,
+                         CREATE_NO_WINDOW,
+                         nullptr,
+                         nullptr,
+                         &startup,
+                         &info)) {
+        ::CloseHandle(info.hThread);
+        ::CloseHandle(info.hProcess);
+    }
+#else
+    const QByteArray target = QFile::encodeName(path);
+    if (::fork() == 0) {
+        ::sleep(1);
+        const int fd = ::open(target.constData(), O_CREAT | O_WRONLY, 0644);
+        if (fd >= 0)
+            ::close(fd);
+        ::_exit(0);
+    }
+#endif
+}
+
+int fakeTool(int argc, char *argv[])
+{
+    QString rarTarget;
+    QString par2Target;
+    for (int i = 1; i < argc; ++i) {
+        const QString arg = QString::fromLocal8Bit(argv[i]);
+        if (par2Target.isEmpty() && arg.endsWith(QLatin1String(".par2")))
+            par2Target = arg;
+        else if (rarTarget.isEmpty()
+                 && (arg.endsWith(QLatin1String(".rar")) || arg.endsWith(QLatin1String(".7z"))))
+            rarTarget = arg;
+    }
+    const bool par2 = !par2Target.isEmpty();
+    const QString script = par2
+        ? qEnvironmentVariable("NGPOST_FAKE_PAR2", QStringLiteral("write=4000"))
+        : qEnvironmentVariable("NGPOST_FAKE_RAR", QStringLiteral("write=40000"));
+    for (const QString &action : script.split(QLatin1Char(';'), Qt::SkipEmptyParts)) {
+        const QString name = action.section(QLatin1Char('='), 0, 0);
+        const QString value = action.section(QLatin1Char('='), 1);
+        if (name == QLatin1String("touch")) {
+            createFile(value);
+        } else if (name == QLatin1String("pid")) {
+            QFile f(value);
+            if (f.open(QIODevice::WriteOnly))
+                f.write(QByteArray::number(QCoreApplication::applicationPid()));
+        } else if (name == QLatin1String("late")) {
+            spawnLateWriter(value);
+        } else if (name == QLatin1String("ignoreterm")) {
+#ifndef Q_OS_WIN
+            ::signal(SIGTERM, SIG_IGN);
+#endif
+        } else if (name == QLatin1String("sleep")) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(value.toInt()));
+        } else if (name == QLatin1String("write")) {
+            QFile f(par2 ? par2Target : rarTarget);
+            if (!f.open(QIODevice::WriteOnly))
+                return 2;
+            f.write(QByteArray(value.toInt(), '\0'));
+        } else if (name == QLatin1String("exit")) {
+            return value.toInt();
+        }
+    }
+    return 0;
+}
+
+//! Before the test application: the fake tools and their descendants.
+int fakeToolsMain(int argc, char *argv[])
+{
+    if (argc == 3 && std::strcmp(argv[1], kLateSwitch) == 0) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        createFile(QString::fromLocal8Bit(argv[2]));
+        return 0;
+    }
+    if (qEnvironmentVariableIsSet("NGPOST_FAKE_TOOLS"))
+        return fakeTool(argc, argv);
+    return -1;
+}
+
+void killPid(qint64 pid)
+{
+    if (pid <= 0)
+        return;
+#ifdef Q_OS_WIN
+    if (HANDLE process = ::OpenProcess(PROCESS_TERMINATE, FALSE, static_cast<DWORD>(pid))) {
+        ::TerminateProcess(process, 1);
+        ::CloseHandle(process);
+    }
+#else
+    ::kill(pid_t(pid), SIGKILL);
+#endif
+}
+
+//! Ends the process whose pid a fake tool wrote in @p pidFile.
+void killWrittenPid(const QString &pidFile)
+{
+    QFile f(pidFile);
+    if (f.open(QIODevice::ReadOnly))
+        killPid(f.readAll().trimmed().toLongLong());
+}
 
 bool writeFakeTool(const QString &path, const QString &script)
 {
@@ -47,6 +205,29 @@ bool writeFakeTool(const QString &path, const QString &script)
     f.close();
     return f.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
                             | QFileDevice::ExeOwner);
+}
+
+//! A real SQLite refusal of the tool supervision steps: every one, or only
+//! those recording @p state.
+bool refuseToolStates(const QString &dbPath, const QString &state = {})
+{
+    const QString connection = QUuid::createUuid().toString();
+    bool ok = false;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        db.setDatabaseName(dbPath);
+        QSqlQuery q(db);
+        const QString when = state.isEmpty()
+            ? QString()
+            : QStringLiteral(" WHEN NEW.tool_state='%1'").arg(state);
+        ok = db.open()
+            && q.exec(QStringLiteral("CREATE TRIGGER refuse_tool_states BEFORE UPDATE OF "
+                                     "tool_state ON post_artifact_sets%1 BEGIN SELECT "
+                                     "RAISE(ABORT, 'injected'); END")
+                          .arg(when));
+    }
+    QSqlDatabase::removeDatabase(connection);
+    return ok;
 }
 
 //! One NgPost with a server on the mock, its history, a queue on that history
@@ -64,8 +245,23 @@ struct Env
     std::unique_ptr<ServiceQueueStore> store;
     std::unique_ptr<PostQueue> queue;
     std::unique_ptr<PostingJobExecutor> executor;
+    //! The tool posts run as rar and par2: this binary, as fake tools.
+    QString rarProgram = QCoreApplication::applicationFilePath();
+    QString par2Program = QCoreApplication::applicationFilePath();
 
-    bool start(QString *error, const QString &rarScript = {}, const QStringList &mockArgs = {})
+    ~Env()
+    {
+        executor.reset(); // before the fake tools' settings go
+        qunsetenv("NGPOST_FAKE_TOOLS");
+        qunsetenv("NGPOST_FAKE_RAR");
+        qunsetenv("NGPOST_FAKE_PAR2");
+    }
+
+    //! @p rarScript and @p par2Script: what the fake tools do, see fakeTool().
+    bool start(QString *error,
+               const QString &rarScript = {},
+               const QStringList &mockArgs = {},
+               const QString &par2Script = {})
     {
         if (!mock.start(mockArgs)) {
             *error = QStringLiteral("the mock NNTP server did not start");
@@ -89,23 +285,15 @@ struct Env
             *error = QStringLiteral("the history database did not open");
             return false;
         }
-#ifdef Q_OS_UNIX
-        // Stand-ins for rar and par2, as tst_PostFlow: CI has neither.
-        const QString rar = rarScript.isEmpty()
-            ? QStringLiteral("#!/bin/sh\nfor a in \"$@\"; do case \"$a\" in *.rar) t=\"$a\";; "
-                             "esac; done\nhead -c 40000 /dev/zero > \"$t\"\nexit 0\n")
-            : rarScript;
-        if (!writeFakeTool(root + QStringLiteral("/fakerar"), rar)
-            || !writeFakeTool(root + QStringLiteral("/fakepar2"),
-                              QStringLiteral("#!/bin/sh\nfor a in \"$@\"; do case \"$a\" in "
-                                             "*.par2) t=\"$a\";; esac; done\n"
-                                             "head -c 4000 /dev/zero > \"$t\"\nexit 0\n"))) {
-            *error = QStringLiteral("could not write the fake tools");
-            return false;
-        }
-#else
-        Q_UNUSED(rarScript)
-#endif
+        // Preparation facts are written for a session only, as in the queue.
+        ngPost->historyService()->setOwnerId(QStringLiteral("owner-test"));
+        // Stand-ins for rar and par2: CI has neither. Read by the tools at
+        // their start, inherited through their supervisor.
+        qputenv("NGPOST_FAKE_TOOLS", "1");
+        qputenv("NGPOST_FAKE_RAR",
+                rarScript.isEmpty() ? QByteArray("write=40000") : rarScript.toLocal8Bit());
+        qputenv("NGPOST_FAKE_PAR2",
+                par2Script.isEmpty() ? QByteArray("write=4000") : par2Script.toLocal8Bit());
         store = std::make_unique<ServiceQueueStore>(ngPost->historyService());
         queue = std::make_unique<PostQueue>(store.get(), QStringLiteral("session-test"));
         executor = std::make_unique<PostingJobExecutor>(queue.get(),
@@ -122,7 +310,8 @@ struct Env
     PersistedQueueOptions post(const QString &name,
                                bool compress = false,
                                bool par2 = false,
-                               int bytes = 64000)
+                               int bytes = 64000,
+                               bool obfuscate = false)
     {
         const QString source = root + QStringLiteral("/%1.bin").arg(name);
         QFile file(source);
@@ -141,12 +330,13 @@ struct Env
         o.job.doPar2 = par2;
         o.job.par2Pct = 10;
         o.job.keepRar = false;
+        o.job.obfuscateFileName = obfuscate;
         o.job.tmpPath = root + QStringLiteral("/tmp");
         o.job.rarName = name + QStringLiteral("-arch");
         o.job.rarTool = QStringLiteral("rar");
-        o.job.rarPath = root + QStringLiteral("/fakerar");
+        o.job.rarPath = rarProgram;
         o.job.par2Tool = par2::Tool::Par2cmdline;
-        o.job.par2Path = root + QStringLiteral("/fakepar2");
+        o.job.par2Path = par2Program;
         o.archiverFamily = compress ? QStringLiteral("rar") : QString();
         o.par2Family = par2 ? par2::toolName(par2::Tool::Par2cmdline) : QString();
         PersistedSource persisted;
@@ -159,6 +349,45 @@ struct Env
     qint64 submit(const PersistedQueueOptions &options)
     {
         return queue->submit(options, Origin::Cli).postIds.value(0);
+    }
+
+    //! The artifact set the scheduler opens when a preparation begins.
+    QString beginSet(qint64 postId)
+    {
+        const QueueEntry *entry = queue->find(postId);
+        ArtifactSetRef set;
+        set.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        set.generation = entry->lastGeneration + 1;
+        set.recipeRevision = entry->recipeRevision;
+        set.root = root + QStringLiteral("/tmp");
+        return queue->engineBeginPreparation(postId, set) ? set.id : QString();
+    }
+
+    //! What the history holds of @p setId's tools.
+    PostHistoryStore::ArtifactSetRecord set(const QString &setId) const
+    {
+        return ngPost->historyService()->artifactSet(setId).value_or(
+            PostHistoryStore::ArtifactSetRecord());
+    }
+
+    //! Waits for @p setId's tool to be recorded as @p state.
+    bool waitToolState(const QString &setId, const QString &state, int ms = 15000) const
+    {
+        return QTest::qWaitFor([&] { return set(setId).toolState == state; }, ms);
+    }
+
+    //! The pid of the supervisor recorded for @p setId.
+    qint64 supervisorPid(const QString &setId) const
+    {
+        const QJsonObject identity = QJsonDocument::fromJson(set(setId).toolIdentityJson.toUtf8())
+                                         .object();
+        return identity.value(QStringLiteral("pid")).toString().toLongLong();
+    }
+
+    QString source(const QString &name) const { return root + QStringLiteral("/%1.bin").arg(name); }
+    QString archiveDir(const QString &name) const
+    {
+        return root + QStringLiteral("/tmp/%1-arch").arg(name);
     }
 
     //! Runs every step of a preparation through the executor alone.
@@ -199,47 +428,46 @@ class tst_PostingJobExecutor : public QObject
 private slots:
     void preparationEndsWithoutAnyTransfer()
     {
-#ifndef Q_OS_UNIX
-        QSKIP("the fake rar/par2 tools are shell scripts");
-#else
         Env env;
         QString error;
         QVERIFY2(env.start(&error), qPrintable(error));
         const qint64 id = env.submit(env.post(QStringLiteral("prepared"), true, true));
         QVERIFY(id > 0);
         const QString run = env.queue->find(id)->runId;
-        QVERIFY2(env.prepare(id, run, QStringLiteral("set-1"), &error), qPrintable(error));
+        const QString set = env.beginSet(id);
+        QVERIFY2(env.prepare(id, run, set, &error), qPrintable(error));
 
-        const PreparedManifest manifest = env.executor->manifest(id, run, QStringLiteral("set-1"));
+        const PreparedManifest manifest = env.executor->manifest(id, run, set);
         QVERIFY(manifest.isValid());
         QVERIFY(manifest.compressed);
         QCOMPARE(manifest.files.size(), 2); // the archive and its parity, in order
         QVERIFY(manifest.files.first().endsWith(QStringLiteral(".par2")));
         QVERIFY(manifest.files.last().endsWith(QStringLiteral(".rar")));
         QCOMPARE(manifest.bytes, qint64(44000));
-        QVERIFY(!env.executor->runtime(id));  // no job while the entry waits
-        QTest::qWait(50);                     // the released job is gone...
+#ifdef PROVEN_SUPERVISION
+        QVERIFY(!env.executor->runtime(id)); // no job while the entry waits
+#else
+        QVERIFY(env.executor->runtime(id)); // only "exited": it keeps its guard
+#endif
+        QTest::qWait(50);                     // a released job is gone...
         QVERIFY(QDir(manifest.dir).exists()); // ...and its files stay
         QCOMPARE(env.mock.receivedArticles().size(), 0);
-#endif
     }
 
     void activationPostsExactlyThePreparedFiles()
     {
-#ifndef Q_OS_UNIX
-        QSKIP("the fake rar/par2 tools are shell scripts");
-#else
         Env env;
         QString error;
         QVERIFY2(env.start(&error), qPrintable(error));
         const qint64 id = env.submit(env.post(QStringLiteral("activated"), true, true));
         const QString run = env.queue->find(id)->runId;
-        QVERIFY2(env.prepare(id, run, QStringLiteral("set-1"), &error), qPrintable(error));
+        const QString set = env.beginSet(id);
+        QVERIFY2(env.prepare(id, run, set, &error), qPrintable(error));
 
         QSignalSpy started(env.executor.get(), &QueueExecutor::transferStarted);
         QSignalSpy finished(env.executor.get(), &QueueExecutor::transferFinished);
         QSignalSpy finalized(env.executor.get(), &QueueExecutor::finalized);
-        env.executor->activate(id, run, QStringLiteral("set-1"));
+        env.executor->activate(id, run, set);
         QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 20000);
         QCOMPARE(started.size(), 1);
         QCOMPARE(finished.first().at(2).value<AttemptResult>().result, QStringLiteral("success"));
@@ -257,7 +485,6 @@ private slots:
         QVERIFY(!content.contains("activated.bin")); // never the original
         // The streamed copy is gone once the deliverable exists.
         QVERIFY(!QDir(env.root + QStringLiteral("/.ngpost-work")).exists());
-#endif
     }
 
     void postWithoutPackingIsActivatedDirectly()
@@ -331,31 +558,399 @@ private slots:
         QCOMPARE(finished.size(), 2); // the refused one says so, under its own run
     }
 
-    void stoppingAPreparationProvesTheToolStopped()
+    // --- supervised tools (lot C5.6) ----------------------------------------------------
+
+    void aRefusedSupervisionRunsNoTool()
     {
-#ifndef Q_OS_UNIX
-        QSKIP("the fake rar tool is a shell script");
+        Env env;
+        QString error;
+        const QString ran = env.sandbox.rootPath() + QStringLiteral("/rar-ran");
+        QVERIFY2(env.start(&error, QStringLiteral("touch=%1;write=40000").arg(ran)),
+                 qPrintable(error));
+        QVERIFY(refuseToolStates(env.dbPath()));
+        const qint64 id = env.submit(env.post(QStringLiteral("refused"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, set, PrepStep::Compress);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(!steps.first().at(4).toBool());
+        const QString stepErr = steps.first().at(5).toString();
+        QVERIFY2(stepErrorIs(stepErr, kStepStoreFailed), qPrintable(stepErr));
+        QTest::qWait(300);
+        QVERIFY(!QFileInfo::exists(ran));                                  // never told to run
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("refused")))); // its name is back
+        QVERIFY(!env.executor->runtime(id));
+        QCOMPARE(env.set(set).toolState, QStringLiteral("idle"));
+    }
+
+    void toolStatesAreRecordedAndTheirProofsStayOutOfThePost()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("recorded"), true, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QVERIFY2(env.prepare(id, run, set, &error), qPrintable(error));
+        const PostHistoryStore::ArtifactSetRecord record = env.set(set);
+        QCOMPARE(record.supervision, ExternalToolProcess::capability());
+        QVERIFY(!record.toolIdentityJson.isEmpty());
+#ifdef PROVEN_SUPERVISION
+        QCOMPARE(record.toolState, QStringLiteral("stopped_verified"));
+        // Once the history holds a proven stop, its proof file is not kept.
+        QVERIFY(QDir(PathHelper::configDir() + QStringLiteral("/tool-proofs"))
+                    .entryList(QDir::Files)
+                    .isEmpty());
+#else
+        QCOMPARE(record.toolState, QStringLiteral("exited")); // nothing proven, never
+#endif
+        const PreparedManifest manifest = env.executor->manifest(id, run, set);
+        QCOMPARE(manifest.files.size(), 2);
+        for (const QString &file : manifest.files)
+            QVERIFY2(!file.endsWith(QStringLiteral(".proof")), qPrintable(file));
+    }
+
+    void aToolThatCannotStartFailsItsStep()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+#ifdef Q_OS_WIN
+        env.rarProgram = env.root + QStringLiteral("/notanexe.exe");
+        QVERIFY(writeFakeTool(env.rarProgram, QStringLiteral("not an executable\n")));
+#else
+        env.rarProgram = env.root + QStringLiteral("/badinterpreter");
+        QVERIFY(writeFakeTool(env.rarProgram, QStringLiteral("#!/nonexistent/interpreter\n")));
+#endif
+        const qint64 id = env.submit(
+            env.post(QStringLiteral("unstarted"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, env.beginSet(id), PrepStep::Compress);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(!steps.first().at(4).toBool());
+        const QString stepErr = steps.first().at(5).toString();
+        QVERIFY2(stepErr.contains(QStringLiteral("Could not start external tool")),
+                 qPrintable(stepErr));
+        // An exec that failed proves that nothing ran, wherever nothing else can.
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("unstarted"))));
+        QVERIFY(!QDir(env.archiveDir(QStringLiteral("unstarted"))).exists());
+        QTRY_VERIFY(!env.executor->runtime(id));
+    }
+
+    void aFailingToolFailsItsStep()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, QStringLiteral("exit=3")), qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("failing"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, env.beginSet(id), PrepStep::Compress);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(!steps.first().at(4).toBool());
+        const QString stepErr = steps.first().at(5).toString();
+        QVERIFY2(stepErr.contains(QStringLiteral("compression: 3")), qPrintable(stepErr));
+        QVERIFY(!stepErrorIs(stepErr, kStepToolUnproven)); // a failure, not a stuck tool
+#ifdef PROVEN_SUPERVISION
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("failing")))); // name back
+        QVERIFY(!QDir(env.archiveDir(QStringLiteral("failing"))).exists());
+        QTRY_VERIFY(!env.executor->runtime(id));
+#else
+        // Ended on its own (Exited), but nothing proves its descendants gone:
+        // nothing renamed back or deleted, and the runtime keeps the map back.
+        QVERIFY(!QFileInfo::exists(env.source(QStringLiteral("failing"))));
+        QVERIFY(QDir(env.archiveDir(QStringLiteral("failing"))).exists());
+        QVERIFY(env.executor->runtime(id));
+#endif
+    }
+
+    void anEmptyPar2FailsItsStep()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, {}, {}, QStringLiteral("exit=0")), qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("noparity"), false, true));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, env.beginSet(id), PrepStep::Par2);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(!steps.first().at(4).toBool());
+        const QString stepErr = steps.first().at(5).toString();
+        QVERIFY2(stepErr.contains(QStringLiteral("wrote no par2 file")), qPrintable(stepErr));
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("noparity"))));
+#ifdef PROVEN_SUPERVISION
+        QVERIFY(!QDir(env.archiveDir(QStringLiteral("noparity"))).exists());
+#else
+        QVERIFY(QDir(env.archiveDir(QStringLiteral("noparity"))).exists());
+#endif
+    }
+
+    void stoppingBeforeTheToolRunsProvesItNeverRan()
+    {
+        Env env;
+        QString error;
+        const QString ran = env.sandbox.rootPath() + QStringLiteral("/rar-ran");
+        QVERIFY2(env.start(&error, QStringLiteral("touch=%1;write=40000").arg(ran)),
+                 qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("early"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        QSignalSpy quiesced(env.executor.get(), &QueueExecutor::quiesced);
+        env.executor->prepareStep(id, run, set, PrepStep::Compress);
+        // Before its supervisor could even say it is ready: never told to run.
+        env.executor->interrupt(id, run, Disposition::Keep);
+        QTRY_COMPARE_WITH_TIMEOUT(quiesced.size(), 1, 10000);
+        QVERIFY(quiesced.first().at(2).toBool()); // proven everywhere: nothing ran
+        QVERIFY(!env.executor->runtime(id));
+        QTest::qWait(300);
+        QCOMPARE(steps.size(), 0);
+        QVERIFY(!QFileInfo::exists(ran));
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("early"))));
+        QCOMPARE(env.set(set).toolState, QStringLiteral("idle"));
+    }
+
+    void stoppingARunningToolStopsItsDescendants()
+    {
+        Env env;
+        QString error;
+        const QString late = env.sandbox.rootPath() + QStringLiteral("/late-write");
+        QVERIFY2(env.start(&error, QStringLiteral("late=%1;sleep=30000").arg(late)),
+                 qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("stopped"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        QSignalSpy quiesced(env.executor.get(), &QueueExecutor::quiesced);
+        env.executor->prepareStep(id, run, set, PrepStep::Compress);
+        QVERIFY(env.waitToolState(set, QStringLiteral("running")));
+        env.executor->interrupt(id, run, Disposition::Keep);
+        env.executor->interrupt(id, run, Disposition::Keep); // the same stop, under way
+        QTRY_COMPARE_WITH_TIMEOUT(quiesced.size(), 1, 10000);
+#ifdef PROVEN_SUPERVISION
+        QVERIFY(quiesced.first().at(2).toBool());
+        QVERIFY(!env.executor->runtime(id));
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("stopped")))); // name back
+        QCOMPARE(env.set(set).toolState, QStringLiteral("stopped_verified"));
+#else
+        // Stopped, but never proven: everything stays where it is.
+        QVERIFY(!quiesced.first().at(2).toBool());
+        QVERIFY(env.executor->runtime(id));
+        QVERIFY(!QFileInfo::exists(env.source(QStringLiteral("stopped"))));
+        QCOMPARE(env.set(set).toolState, QStringLiteral("unproven"));
+#endif
+        QTest::qWait(1500);
+        QCOMPARE(quiesced.size(), 1);      // one answer for the stop asked twice
+        QCOMPARE(steps.size(), 0);         // the killed tool's end is not a step end
+        QVERIFY(!QFileInfo::exists(late)); // its descendant went with it
+        QCOMPARE(env.historyStatus(id), QStringLiteral("queued")); // nothing was finalized
+    }
+
+    void aStopTheHistoryCannotHoldKeepsEverything()
+    {
+#ifndef PROVEN_SUPERVISION
+        QSKIP("nothing is ever proven here: there is no proven stop to record");
 #else
         Env env;
         QString error;
-        QVERIFY2(env.start(&error, QStringLiteral("#!/bin/sh\nexec sleep 30\n")),
-                 qPrintable(error));
-        const qint64 id = env.submit(env.post(QStringLiteral("stopped"), true));
+        QVERIFY2(env.start(&error, QStringLiteral("sleep=30000")), qPrintable(error));
+        QVERIFY(refuseToolStates(env.dbPath(), QStringLiteral("stopped_verified")));
+        const qint64 id = env.submit(env.post(QStringLiteral("unheld"), true, false, 64000, true));
         const QString run = env.queue->find(id)->runId;
-        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        const QString set = env.beginSet(id);
         QSignalSpy quiesced(env.executor.get(), &QueueExecutor::quiesced);
-        env.executor->prepareStep(id, run, QStringLiteral("set-1"), PrepStep::Compress);
-        PostingJob *job = env.executor->runtime(id);
-        QVERIFY(job);
-        QTest::qWait(200); // the tool is running
+        env.executor->prepareStep(id, run, set, PrepStep::Compress);
+        QVERIFY(env.waitToolState(set, QStringLiteral("running")));
         env.executor->interrupt(id, run, Disposition::Keep);
         QTRY_COMPARE_WITH_TIMEOUT(quiesced.size(), 1, 10000);
+        // Proven, but not recorded: nothing goes on from a proof only in memory.
+        QVERIFY(!quiesced.first().at(2).toBool());
+        QVERIFY(env.executor->runtime(id));
+        QVERIFY(!QFileInfo::exists(env.source(QStringLiteral("unheld"))));
+        QCOMPARE(env.set(set).toolState, QStringLiteral("quiescing"));
+        // Its proof stays for the recovery.
+        QVERIFY(!QDir(PathHelper::configDir() + QStringLiteral("/tool-proofs"))
+                     .entryList(QDir::Files)
+                     .isEmpty());
+#endif
+    }
+
+    void anEndTheHistoryCannotHoldRenewsNothing()
+    {
+#ifndef PROVEN_SUPERVISION
+        QSKIP("nothing is ever proven here: there is no proven stop to record");
+#else
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        QVERIFY(refuseToolStates(env.dbPath(), QStringLiteral("stopped_verified")));
+        QueueScheduler::Budget budget;
+        budget.rootFor = [&env](const QueueEntry &) { return env.root + QStringLiteral("/tmp"); };
+        QueueScheduler scheduler(env.queue.get(), env.executor.get(), budget);
+        const qint64 id = env.submit(env.post(QStringLiteral("unended"), true, false, 64000, true));
+        QTRY_VERIFY_WITH_TIMEOUT(scheduler.isTechnicallyPaused(), 15000);
+        QCOMPARE(scheduler.technicalPauseReason(), QLatin1String(kStepStoreFailed));
+        // Its sources are still renamed: the runtime keeps them, under its run.
+        const QueueEntry *entry = env.queue->find(id);
+        QVERIFY(entry);
+        QCOMPARE(entry->lifecycle, Lifecycle::Preparing);
+        QCOMPARE(entry->blocked.code, QLatin1String(kStepStoreFailed));
+        QVERIFY(env.executor->runtime(id));
+        QCOMPARE(env.executor->runtime(id)->executionContext().runId, entry->runId);
+        QVERIFY(!QFileInfo::exists(env.source(QStringLiteral("unended"))));
+#endif
+    }
+
+    void aPreparedPostIsReleasedOnlyOnceItsToolsAreProven()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("held"), true, true, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QVERIFY2(env.prepare(id, run, set, &error), qPrintable(error));
+        QSignalSpy quiesced(env.executor.get(), &QueueExecutor::quiesced);
+#ifdef PROVEN_SUPERVISION
+        QTRY_VERIFY(!env.executor->runtime(id));
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("held")))); // name back
+        env.executor->interrupt(id, run, Disposition::Keep);
+        QTRY_COMPARE(quiesced.size(), 1);
         QVERIFY(quiesced.first().at(2).toBool());
-        QVERIFY(!env.executor->runtime(id));
+#else
+        // Only "exited": its sources keep their names, the runtime its guard,
+        // and a stop of the prepared post is never taken as proven.
         QTest::qWait(200);
-        QCOMPARE(steps.size(), 0); // the killed tool's end is not a step end
-        QVERIFY(QFileInfo::exists(env.root + QStringLiteral("/stopped.bin")));
-        QCOMPARE(env.historyStatus(id), QStringLiteral("queued")); // nothing was finalized
+        QVERIFY(env.executor->runtime(id));
+        QVERIFY(!QFileInfo::exists(env.source(QStringLiteral("held"))));
+        env.executor->interrupt(id, run, Disposition::Keep);
+        QTRY_COMPARE(quiesced.size(), 1);
+        QVERIFY(!quiesced.first().at(2).toBool());
+        QVERIFY(env.executor->runtime(id));
+#endif
+    }
+
+    void aLostSupervisorLeavesEverythingInPlace()
+    {
+        Env env;
+        QString error;
+        const QString pidFile = env.sandbox.rootPath() + QStringLiteral("/rar-pid");
+        QVERIFY2(env.start(&error, QStringLiteral("pid=%1;sleep=30000").arg(pidFile)),
+                 qPrintable(error));
+        QueueScheduler::Budget budget;
+        budget.rootFor = [&env](const QueueEntry &) { return env.root + QStringLiteral("/tmp"); };
+        QueueScheduler scheduler(env.queue.get(), env.executor.get(), budget);
+        const qint64 id = env.submit(env.post(QStringLiteral("lost"), true, false, 64000, true));
+        QTRY_VERIFY_WITH_TIMEOUT(!env.queue->find(id)->artifacts.isNull(), 10000);
+        const QString set = env.queue->find(id)->artifacts.id;
+        QVERIFY(env.waitToolState(set, QStringLiteral("running")));
+        const qint64 supervisor = env.supervisorPid(set);
+        QVERIFY(supervisor > 0);
+        killPid(supervisor); // its proof can never come now
+        QTRY_VERIFY_WITH_TIMEOUT(scheduler.isTechnicallyPaused(), 10000);
+        QCOMPARE(scheduler.technicalPauseReason(), QLatin1String(kStepToolUnproven));
+        const QueueEntry *entry = env.queue->find(id);
+        QVERIFY(entry);
+        QCOMPARE(entry->blocked.code, QLatin1String(kStepToolUnproven));
+        QCOMPARE(entry->lifecycle, Lifecycle::Preparing);
+        QCOMPARE(entry->slot, Slot::Preparation);
+        QVERIFY(env.executor->runtime(id));                              // and its owner with it
+        QVERIFY(!QFileInfo::exists(env.source(QStringLiteral("lost")))); // still renamed
+        QVERIFY(QDir(env.archiveDir(QStringLiteral("lost"))).exists());
+        QCOMPARE(env.set(set).toolState, QStringLiteral("unproven"));
+        killWrittenPid(pidFile);
+    }
+
+    void aStopThatCannotBeProvenKeepsEverything()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("a job object ends its tree at once: no stop can be lost on its way");
+#else
+        Env env;
+        QString error;
+        const QString pidFile = env.sandbox.rootPath() + QStringLiteral("/rar-pid");
+        // TERM ignored: its supervisor waits before KILL, and is lost meanwhile.
+        QVERIFY2(env.start(&error, QStringLiteral("ignoreterm;pid=%1;sleep=30000").arg(pidFile)),
+                 qPrintable(error));
+        const qint64 id = env.submit(
+            env.post(QStringLiteral("unproven"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QSignalSpy quiesced(env.executor.get(), &QueueExecutor::quiesced);
+        env.executor->prepareStep(id, run, set, PrepStep::Compress);
+        QVERIFY(env.waitToolState(set, QStringLiteral("running")));
+        const qint64 supervisor = env.supervisorPid(set);
+        QVERIFY(supervisor > 0);
+        env.executor->interrupt(id, run, Disposition::Keep);
+        killPid(supervisor);
+        QTRY_COMPARE_WITH_TIMEOUT(quiesced.size(), 1, 10000);
+        QVERIFY(!quiesced.first().at(2).toBool());
+        QVERIFY(env.executor->runtime(id));
+        QVERIFY(!QFileInfo::exists(env.source(QStringLiteral("unproven"))));
+        QVERIFY(QDir(env.archiveDir(QStringLiteral("unproven"))).exists());
+        QCOMPARE(env.set(set).toolState, QStringLiteral("unproven"));
+        // Asked again, it answers again: still not proven.
+        env.executor->interrupt(id, run, Disposition::Keep);
+        QTRY_COMPARE_WITH_TIMEOUT(quiesced.size(), 2, 5000);
+        QVERIFY(!quiesced.at(1).at(2).toBool());
+        killWrittenPid(pidFile);
+#endif
+    }
+
+    void destroyingAPreparingRuntimeKeepsItsFiles()
+    {
+        Env env;
+        QString error;
+        const QString late = env.sandbox.rootPath() + QStringLiteral("/late-write");
+        QVERIFY2(env.start(&error, QStringLiteral("late=%1;sleep=30000").arg(late)),
+                 qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("dropped"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        env.executor->prepareStep(id, run, set, PrepStep::Compress);
+        QVERIFY(env.waitToolState(set, QStringLiteral("running")));
+        env.executor.reset(); // its job goes while the tool runs
+        // Nothing proves it stopped yet: names and files stay.
+        QVERIFY(!QFileInfo::exists(env.source(QStringLiteral("dropped"))));
+        QVERIFY(QDir(env.archiveDir(QStringLiteral("dropped"))).exists());
+#ifdef PROVEN_SUPERVISION
+        // The end of its lifeline: the supervisor stops the tree, then proves it.
+        const QDir proofs(PathHelper::configDir() + QStringLiteral("/tool-proofs"));
+        QTRY_VERIFY_WITH_TIMEOUT(!proofs.entryList(QDir::Files).isEmpty(), 10000);
+#endif
+        QTest::qWait(1500);
+        QVERIFY(!QFileInfo::exists(late));
+    }
+
+    void archivesAndSourcesGoOnlyOnceTheirToolIsProvenStopped()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        PersistedQueueOptions options = env.post(QStringLiteral("cleaned"), true, true);
+        options.job.delFilesAfterPost = true; // --rm_posted
+        const qint64 id = env.submit(options);
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QVERIFY2(env.prepare(id, run, set, &error), qPrintable(error));
+        QSignalSpy finished(env.executor.get(), &QueueExecutor::transferFinished);
+        QSignalSpy finalized(env.executor.get(), &QueueExecutor::finalized);
+        env.executor->activate(id, run, set);
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 20000);
+        env.executor->finalize(id, run);
+        QTRY_COMPARE_WITH_TIMEOUT(finalized.size(), 1, 10000);
+        env.executor->completeLocalWork(id, run);
+        QTRY_VERIFY(!env.executor->runtime(id));
+#ifdef PROVEN_SUPERVISION
+        QTRY_VERIFY(!QDir(env.archiveDir(QStringLiteral("cleaned"))).exists());
+        QVERIFY(!QFileInfo::exists(env.source(QStringLiteral("cleaned")))); // posted, then gone
+#else
+        // Only "exited": nothing proves no descendant still uses them.
+        QTest::qWait(500);
+        QVERIFY(QDir(env.archiveDir(QStringLiteral("cleaned"))).exists());
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("cleaned"))));
 #endif
     }
 
@@ -536,5 +1131,5 @@ private slots:
     }
 };
 
-QTEST_MAIN(tst_PostingJobExecutor)
+NGPOST_TEST_MAIN_WITH(tst_PostingJobExecutor, fakeToolsMain)
 #include "tst_PostingJobExecutor.moc"

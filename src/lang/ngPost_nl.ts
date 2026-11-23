@@ -4723,6 +4723,10 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <source>Exiting without the queue saved: the interrupted posts can be resumed from the history.</source>
         <translation>Afsluiten zonder opgeslagen wachtrij: de onderbroken posts kunnen vanuit de geschiedenis worden hervat.</translation>
     </message>
+    <message>
+        <source>The queue waits: ngPost could not make sure that a post stopped (%1). Its files are left as they are until ngPost restarts.</source>
+        <translation>De wachtrij wacht: ngPost kon niet nagaan of een post gestopt is (%1). De bestanden blijven zoals ze zijn tot ngPost opnieuw start.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -6948,6 +6952,34 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
         <source>History database error: %1</source>
         <translation>Fout van de geschiedenisdatabase: %1</translation>
     </message>
+    <message>
+        <source>The temporary files of %1 are kept: their tool may still write in them.</source>
+        <translation>De tijdelijke bestanden van %1 blijven bewaard: hun hulpprogramma kan er nog in schrijven.</translation>
+    </message>
+    <message>
+        <source>its supervision cannot be recorded in the history</source>
+        <translation>het toezicht erop kan niet in de geschiedenis worden vastgelegd</translation>
+    </message>
+    <message>
+        <source>the folder %1 cannot be created</source>
+        <translation>de map %1 kan niet worden aangemaakt</translation>
+    </message>
+    <message>
+        <source>its supervisor did not start</source>
+        <translation>het toezichtproces is niet gestart</translation>
+    </message>
+    <message>
+        <source>ngPost could not make sure that %1 and everything it started stopped: its files and the source names are left as they are.</source>
+        <translation>ngPost kon niet nagaan of %1 en alles wat het startte gestopt is: de bestanden en de namen van de bronnen blijven zoals ze zijn.</translation>
+    </message>
+    <message>
+        <source>the supervision of %1 could not be recorded</source>
+        <translation>het toezicht op %1 kon niet worden vastgelegd</translation>
+    </message>
+    <message>
+        <source>Not deleting the posted files: nothing proves that their archive or PAR2 tool, and everything it started, stopped using them.</source>
+        <translation>De geposte bestanden worden niet verwijderd: niets bewijst dat hun archief- of PAR2-hulpprogramma, en alles wat het startte, ze niet meer gebruikt.</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>
@@ -8843,6 +8875,10 @@ Zijn configuratiebestand onder &lt;configDir&gt;/vpn/ en zijn inloggegevens in d
     <message>
         <source>Writing the NZB…</source>
         <translation>NZB schrijven…</translation>
+    </message>
+    <message>
+        <source>Its archive or PAR2 tool could not be confirmed stopped</source>
+        <translation>Het stoppen van het archief- of PAR2-hulpprogramma kon niet worden bevestigd</translation>
     </message>
 </context>
 </TS>

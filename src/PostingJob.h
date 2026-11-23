@@ -41,6 +41,7 @@
 #include <QTime>
 #include <QTimer>
 #include <QVector>
+class ExternalToolProcess;
 class NgPost;
 class NntpConnection;
 class NntpFile;
@@ -94,6 +95,19 @@ private:
     PostingWidget *const _postWidget;
 
     QProcess *_extProc;
+    //! Queue runtime (lot C5.6): its tool runs under a supervisor that proves
+    //! its stop. Kept after its end, until the next tool: what it proved
+    //! decides what may be renamed back or deleted.
+    ExternalToolProcess *_tool = nullptr;
+    QString _toolProgram;
+    QString _toolDurable;            //!< tool state the history holds for this launch, "" none
+    QString _toolFailure;            //!< why its tool could not run (exec), shown as the step error
+    QString _toolProof;              //!< its proof file, removed once the history holds the stop
+    bool _toolStoreFailed = false;   //!< a supervision step could not be recorded
+    bool _toolAllowed = false;       //!< told to run: without it, the tool never existed
+    bool _toolEndRecorded = false;   //!< its end is held by the history
+    bool _toolEndedUnproven = false; //!< a tool ended without proof: nothing is touched
+    bool _toolEndedExited = false;   //!< a tool only "exited" (macOS): nothing is deleted
     QDir *_compressDir;
     bool _limitProcDisplay;
     bool _extProcIsPar2;
@@ -381,11 +395,16 @@ public:
     //! What the preparation left for the transfer, once Collect has run.
     PreparedManifest preparedManifest() const;
     //! Stops a running preparation tool and puts renamed sources back, with
-    //! no history write and no post action. False when either is not proven.
-    bool quiescePreparation();
+    //! no post action. preparationQuiesced() answers, once per call: false
+    //! when the tool's stop or the names are not proven back.
+    void quiescePreparation();
     //! Source files are still under an obfuscated name: the runtime holds the
     //! only map back and must stay alive.
     bool hasUnrestoredSources() const { return !_obfuscatedFileNames.isEmpty(); }
+    //! What its tool started may still write (running, ended without proof,
+    //! only "exited", or a proof the history does not hold yet): the runtime
+    //! keeps its files, names and slot, after its preparation too.
+    bool holdsUnprovenTool() const;
     //! Starts the transfer of a queued post. A post that packs must give a
     //! valid @p manifest: its original files are never published instead.
     bool activateTransfer(const PreparedManifest &manifest);
@@ -423,6 +442,9 @@ public:
     //! Queue runtime: whether its temporary archives may go with it (keepRar
     //! still applies). Never decided by the runtime alone.
     void allowArtifactCleanup(bool allowed) { _artifactCleanupAllowed = allowed; }
+    //! Queue runtime: the history says the tools of its artifact set are proven
+    //! stopped (or none ran). Unreadable, or only "exited", it is not.
+    bool preparedSetStopProven() const;
 
 signals:
     void pauseChanged();
@@ -443,6 +465,9 @@ signals:
     //! Queue-driven mode: one preparation step ended. @p bytes is what this
     //! step added to the temporary folder, not the folder's total.
     void preparationStepFinished(queue::PrepStep step, bool ok, const QString &error, qint64 bytes);
+    //! Answer to quiescePreparation(): @p proven when nothing it started can
+    //! still write and its sources have their names back.
+    void preparationQuiesced(bool proven);
 
 public slots:
     void onStopPosting(); //!< for HMI
@@ -566,9 +591,23 @@ private:
     bool _canGenPar2(bool checkTemporaryPath = true) const;
 
     bool _finishIfCanceled();
+    //! Supervised tools (queue runtime, lot C5.6): see ExternalToolProcess.
+    bool _startSupervisedTool(const QString &program, const QStringList &args);
+    bool _recordToolState(const QString &state, const QString &capability = {});
+    void _onToolReady(const QString &capability, const QString &identityJson);
+    void _onToolStarted();
+    void _onToolStopped();
+    void _stopSupervisedTool();
+    void _answerQuiesce();
+    //! Nothing this job started can still write: no tool, or its stop proven.
+    bool _toolStopProven() const;
+    void _failToolStep(queue::PrepStep step, const QString &error);
+    void _onToolOutput(const QByteArray &output);
+    void _onToolErrorOutput(const QByteArray &output);
     void _terminateExternalProcess();
     void _cleanExtProc();
     void _createExtProc();
+    void _prepareLegacyProcess(void (PostingJob::*onEnd)(int, QProcess::ExitStatus));
     PostHistoryService *_recordHistoryArticleEnd(NntpArticle *article,
                                                  const QString &reason,
                                                  bool unknown);

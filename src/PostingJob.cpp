@@ -27,7 +27,9 @@
 #include "nntp/NntpFile.h"
 #include "nntp/NntpServerParams.h"
 #include "postinfo/PostInfoTemplate.h"
+#include "tools/ExternalToolProcess.h"
 #include "tools/ExternalToolResolver.h"
+#include "utils/PathHelper.h"
 #include "utils/SecretMasker.h"
 #ifdef __USE_HMI__
 #include "hmi/PostingWidget.h"
@@ -47,6 +49,17 @@
 #include <cmath>
 #include <filesystem>
 #include <system_error>
+
+namespace
+{
+using ToolState = ExternalToolProcess::State;
+
+bool toolOver(ToolState state)
+{
+    return state == ToolState::Idle || state == ToolState::StoppedVerified
+        || state == ToolState::Exited || state == ToolState::Unproven;
+}
+} // namespace
 
 namespace
 {
@@ -563,6 +576,12 @@ PostingJob::~PostingJob()
     if (_ngPost->debugMode())
         _log("Deleting PostingJob");
 
+    // A supervised tool still running goes with the end of its lifeline: its
+    // supervisor stops the whole tree. Until that is proven, its files and the
+    // renamed sources stay as they are (the guards below see it running).
+    if (_tool)
+        disconnect(_tool, nullptr, this, nullptr);
+
     // A queued pre-packing job can be destroyed while its compressor is still
     // running. Release every process handle before trying to move the user's
     // source files back, particularly for Windows file-locking semantics.
@@ -611,6 +630,7 @@ PostingJob::~PostingJob()
         delete _nzb;
     if (_file)
         delete _file;
+    delete _tool; // closes its lifeline
 }
 
 PostingJob::PauseReason PostingJob::_mergedPauseReason(PauseReason current,
@@ -1000,23 +1020,25 @@ PreparedManifest PostingJob::preparedManifest() const
     return manifest;
 }
 
-bool PostingJob::quiescePreparation()
+void PostingJob::quiescePreparation()
 {
     _preparationStopped = true;
-    if (_extProc) {
-        disconnect(_extProc, nullptr, this, nullptr);
-        if (_extProc->state() != QProcess::NotRunning) {
-            _extProc->terminate();
-            if (!_extProc->waitForFinished(1500)) {
-                _extProc->kill();
-                _extProc->waitForFinished(500);
-            }
-        }
-        if (_extProc->state() != QProcess::NotRunning)
-            return false; // still running: nothing is proven
-        _cleanExtProc();
+    // A tool under way answers once its supervisor proved (or not) its stop.
+    if (_tool && !toolOver(_tool->state())) {
+        _stopSupervisedTool();
+        return;
     }
-    return _restoreObfuscatedFileNames();
+    _answerQuiesce();
+}
+
+void PostingJob::_answerQuiesce()
+{
+    // Proven only when nothing it started can still write and the names are
+    // back: a tool that only exited, or ended unproven, keeps everything.
+    const bool proven = _toolStopProven() && _restoreObfuscatedFileNames();
+    QMetaObject::invokeMethod(this, [this, proven] {
+        emit preparationQuiesced(proven);
+    }, Qt::QueuedConnection);
 }
 
 bool PostingJob::activateTransfer(const PreparedManifest &manifest)
@@ -1312,6 +1334,8 @@ void PostingJob::onStopPosting()
         return;
     if (_extProc && _extProc->state() != QProcess::NotRunning)
         _terminateExternalProcess();
+    else if (_tool && !toolOver(_tool->state()))
+        _stopSupervisedTool(); // its end finishes the cancel
     else
         _finishIfCanceled();
 }
@@ -1677,6 +1701,10 @@ void PostingJob::_obfuscateInputFileNames(QString const &tmpFolder, QString cons
 //! released its handles.
 bool PostingJob::_restoreObfuscatedFileNames()
 {
+    // Only once nothing it started can still use them, and that is recorded:
+    // otherwise the journal of lot C5.7 brings them back.
+    if (!_toolStopProven())
+        return _obfuscatedFileNames.isEmpty() && _obfuscationStagingPath.isEmpty();
     QList<QPair<QString, QString>> failedRestores;
     const bool restored = restoreObfuscatedPaths(_obfuscatedFileNames,
                                                   _obfuscationStagingPath,
@@ -2216,6 +2244,13 @@ void PostingJob::_delOriginalFilesOfCompletePost()
                    .arg(_nbArticlesFailed + nbArticlesUnknown()));
         return;
     }
+    // Queue runtime (lot C5.6): sources a tool read go only once that tool and
+    // everything it started are proven stopped, and the history holds it.
+    if (_queueRuntime && (!_toolStopProven() || !preparedSetStopProven())) {
+        _error(tr("Not deleting the posted files: nothing proves that their archive or PAR2 "
+                  "tool, and everything it started, stopped using them."));
+        return;
+    }
     _delOriginalFiles();
 }
 
@@ -2642,12 +2677,7 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
     if (archiveTmpFolder.isEmpty())
         return false;
 
-    _createExtProc();
-    connect(_extProc,
-            static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
-            this,
-            &PostingJob::onCompressionFinished,
-            Qt::QueuedConnection);
+    _prepareLegacyProcess(&PostingJob::onCompressionFinished);
 
     _use7z = false;
     if (_options.rarTool == QLatin1String("7zip")
@@ -2765,6 +2795,8 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
         _log(QString("%1...\n").arg(tr("Compressing files")));
     _limitProcDisplay = false;
     _extProcIsPar2 = false;
+    if (_queueRuntime)
+        return _startSupervisedTool(cmdRar, args);
     _extProc->start(cmdRar, args);
 
 #ifdef __DEBUG__
@@ -2855,8 +2887,6 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
 
     // we've already compressed => we gen par2 for the files in the archive folder
     if (_compressedThisRun) {
-        if (!_extProc)
-            _createExtProc();
         if (useParPar && (args.isEmpty() || args.last().trimmed() != "-o"))
             args << "-o";
         args << QString("%1/%2.par2").arg(archiveTmpFolder, archiveName);
@@ -2920,15 +2950,9 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
         QString const createdFolder = _createArchiveFolder(tmpFolder, archiveName);
         if (createdFolder.isEmpty())
             return false;
-
-        _createExtProc();
     }
 
-    connect(_extProc,
-            static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
-            this,
-            &PostingJob::onGenPar2Finished,
-            Qt::QueuedConnection);
+    _prepareLegacyProcess(&PostingJob::onGenPar2Finished);
 
     if (_ngPost->debugMode() || !_postWidget)
         _log(QString("[%1] %2: %3 %4")
@@ -2941,6 +2965,8 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
     _limitProcDisplay = true;
     _extProcIsPar2 = true;
     _nbProcDisp = 0;
+    if (_queueRuntime)
+        return _startSupervisedTool(_par2Path, args);
     _extProc->start(_par2Path, args);
 
     return true;
@@ -3010,6 +3036,22 @@ void PostingJob::_createExtProc()
             Qt::DirectConnection);
 }
 
+//! Historical jobs: their QProcess (created once, kept from rar to par2), its
+//! end handled by @p onEnd. A queue runtime has none: its tool runs
+//! supervised (_startSupervisedTool).
+void PostingJob::_prepareLegacyProcess(void (PostingJob::*onEnd)(int, QProcess::ExitStatus))
+{
+    if (_queueRuntime)
+        return;
+    if (!_extProc)
+        _createExtProc();
+    connect(_extProc,
+            static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
+            this,
+            onEnd,
+            Qt::QueuedConnection);
+}
+
 void PostingJob::_cleanExtProc()
 {
     delete _extProc;
@@ -3019,10 +3061,211 @@ void PostingJob::_cleanExtProc()
         _log(tr("External process deleted."));
 }
 
+// --- supervised tools (queue runtime, plan_queue.md lot C5.6) -------------------------
+
+bool PostingJob::holdsUnprovenTool() const
+{
+    return !_toolStopProven();
+}
+
+bool PostingJob::_toolStopProven() const
+{
+    // Exited (macOS) says nothing of descendants; Unproven, nothing at all.
+    if (_toolEndedUnproven || _toolEndedExited)
+        return false;
+    if (!_tool || _tool->state() == ToolState::Idle)
+        return true;
+    // Never told to run, or its exec failed: nothing ran, whatever its
+    // supervisor could prove, once that supervisor is over.
+    if (!_toolAllowed || !_toolFailure.isEmpty())
+        return toolOver(_tool->state());
+    // It ran: proven by its supervisor, and that proof held by the history
+    // before anything depends on it.
+    return _tool->state() == ToolState::StoppedVerified && _toolEndRecorded;
+}
+
+bool PostingJob::preparedSetStopProven() const
+{
+    if (_context.setId.isEmpty())
+        return true; // nothing was prepared
+    PostHistoryService *history = _ngPost->historyService();
+    const auto set = history ? history->artifactSet(_context.setId)
+                             : std::optional<PostHistoryStore::ArtifactSetRecord>();
+    return set && PostHistoryStore::toolStopProven(*set);
+}
+
+bool PostingJob::_startSupervisedTool(const QString &program, const QStringList &args)
+{
+    // A tool runs only once how it is stopped is recorded with its set; its
+    // proof lives outside every archive folder, one file per launch.
+    PostHistoryService *history = _ngPost->historyService();
+    const QString proofDir = PathHelper::configDir() + QStringLiteral("/tool-proofs");
+    QString failure;
+    if (!history || _context.setId.isEmpty())
+        failure = tr("its supervision cannot be recorded in the history");
+    else if (!QDir().mkpath(proofDir))
+        failure = tr("the folder %1 cannot be created").arg(proofDir);
+    if (failure.isEmpty()) {
+        if (_tool)
+            _tool->deleteLater(); // over: the flags keep what it proved
+        _tool = new ExternalToolProcess(this);
+        _toolProgram = program;
+        _toolProof = QStringLiteral("%1/%2-%3.proof")
+                         .arg(proofDir,
+                              _context.setId,
+                              QUuid::createUuid().toString(QUuid::WithoutBraces));
+        _toolDurable.clear();
+        _toolFailure.clear();
+        _toolStoreFailed = false;
+        _toolAllowed = false;
+        _toolEndRecorded = false;
+        connect(_tool, &ExternalToolProcess::ready, this, &PostingJob::_onToolReady);
+        connect(_tool, &ExternalToolProcess::started, this, &PostingJob::_onToolStarted);
+        connect(_tool, &ExternalToolProcess::execFailed, this, [this](int error) {
+            _toolFailure = tr("Could not start external tool %1: %2")
+                               .arg(_toolProgram, qt_error_string(error));
+        });
+        connect(_tool, &ExternalToolProcess::standardOutput, this, &PostingJob::_onToolOutput);
+        connect(_tool, &ExternalToolProcess::standardError, this, &PostingJob::_onToolErrorOutput);
+        connect(_tool, &ExternalToolProcess::stopped, this, &PostingJob::_onToolStopped);
+        if (_tool->start(program, args, QString(), _toolProof))
+            return true;
+        failure = tr("its supervisor did not start");
+    }
+    _error(tr("Could not start external tool %1: %2").arg(program, failure));
+    // Nothing ran: the names go back and the folder goes, as after any failed start.
+    if (!_restoreObfuscatedFileNames())
+        _error(tr("Some source files are still under their obfuscated name; ngPost will try "
+                  "again when the job ends."));
+    _cleanCompressDir();
+    return false;
+}
+
+bool PostingJob::_recordToolState(const QString &state, const QString &capability)
+{
+    PostHistoryService *history = _ngPost->historyService();
+    QString err = QStringLiteral("no history");
+    if (history
+        && history->recordToolSupervision(_context.postId,
+                                          _context.runId,
+                                          _context.setId,
+                                          capability,
+                                          state,
+                                          _tool->identityJson(),
+                                          &err)) {
+        _toolDurable = state;
+        return true;
+    }
+    _toolStoreFailed = true;
+    _error(tr("History database error: %1").arg(err));
+    return false;
+}
+
+void PostingJob::_onToolReady(const QString &capability, const QString & /*identityJson*/)
+{
+    if (_preparationStopped || _cancelRequested)
+        return; // its stop is asked already: it never runs
+    // Durable first: a tool whose supervision is not recorded never runs.
+    if (!_recordToolState(QStringLiteral("starting"), capability)) {
+        _tool->stop();
+        return;
+    }
+    _toolAllowed = true;
+    _tool->allowExecution();
+}
+
+void PostingJob::_onToolStarted()
+{
+    if (_toolDurable == QLatin1String("starting") && !_recordToolState(QStringLiteral("running")))
+        _stopSupervisedTool();
+}
+
+void PostingJob::_stopSupervisedTool()
+{
+    if (!_tool || toolOver(_tool->state()) || _tool->state() == ToolState::Quiescing)
+        return; // over, or its stop under way: the same answer will come
+    // "quiescing" is only recorded once "running" is; its failure is no
+    // reason to keep the tool running.
+    if (_toolDurable == QLatin1String("running"))
+        _recordToolState(QStringLiteral("quiescing"));
+    _tool->stop();
+}
+
+void PostingJob::_onToolStopped()
+{
+    const ToolState state = _tool->state();
+    const bool ranNothing = !_toolAllowed || !_toolFailure.isEmpty();
+    const bool unproven = state == ToolState::Unproven && !ranNothing;
+    const bool exited = state == ToolState::Exited && !ranNothing;
+    // Sticky: the guards of an earlier tool of this job stay.
+    _toolEndedUnproven = _toolEndedUnproven || unproven;
+    _toolEndedExited = _toolEndedExited || exited;
+    // Its end is durable before anything depends on it (_toolStopProven()).
+    // The proof goes once the history holds the stop; otherwise it stays for
+    // the recovery.
+    if (!_toolDurable.isEmpty()) {
+        const QString end = state == ToolState::StoppedVerified ? QStringLiteral("stopped_verified")
+            : exited                                            ? QStringLiteral("exited")
+                                                                : QStringLiteral("unproven");
+        _toolEndRecorded = _recordToolState(end);
+        if (_toolEndRecorded && state == ToolState::StoppedVerified)
+            QFile::remove(_toolProof);
+    }
+    if (_preparationStopped) {
+        _answerQuiesce();
+        return;
+    }
+    if (_finishIfCanceled())
+        return;
+    const queue::PrepStep step = _extProcIsPar2 ? queue::PrepStep::Par2 : queue::PrepStep::Compress;
+    if (unproven) {
+        const QString error = tr("ngPost could not make sure that %1 and everything it started "
+                                 "stopped: its files and the source names are left as they are.")
+                                  .arg(_toolProgram);
+        _error(error);
+        _failToolStep(step, queue::stepError(queue::kStepToolUnproven, error));
+        return;
+    }
+    QString failure = _toolFailure;
+    if (_toolStoreFailed)
+        failure = queue::stepError(
+            queue::kStepStoreFailed,
+            tr("the supervision of %1 could not be recorded").arg(_toolProgram));
+    if (!failure.isEmpty()) {
+        if (!_toolStoreFailed)
+            _error(failure);
+        if (!_restoreObfuscatedFileNames())
+            _error(tr("Some source files are still under their obfuscated name; ngPost will try "
+                      "again when the job ends."));
+        _cleanCompressDir();
+        _failToolStep(step, failure);
+        return;
+    }
+    // The business criteria of the historical end; what they would delete or
+    // rename back goes through the guards of an unproven or exited tool.
+    if (step == queue::PrepStep::Par2)
+        onGenPar2Finished(_tool->toolStatus(), QProcess::NormalExit);
+    else
+        onCompressionFinished(_tool->toolStatus(), QProcess::NormalExit);
+}
+
+void PostingJob::_failToolStep(queue::PrepStep step, const QString &error)
+{
+    if (_stepDriven)
+        _finishStep(step, false, error);
+    else
+        _abortBeforeTransfer();
+}
+
 void PostingJob::_cleanCompressDir()
 {
     if (!_compressDir)
         return;
+    if (!_toolStopProven()) {
+        _log(tr("The temporary files of %1 are kept: their tool may still write in them.")
+                 .arg(_nzbName));
+        return;
+    }
     if (!_keepRar)
         _compressDir->removeRecursively();
     if (_ngPost->debugMode())
@@ -3076,8 +3319,13 @@ void PostingJob::onExtProcError(QProcess::ProcessError error)
 
 void PostingJob::onExtProcReadyReadStandardOutput()
 {
+    _onToolOutput(_ngPost->debugMode() ? _extProc->readAllStandardOutput() : QByteArray());
+}
+
+void PostingJob::_onToolOutput(const QByteArray &output)
+{
     if (_ngPost->debugMode())
-        _log(_extProc->readAllStandardOutput(), false);
+        _log(output, false);
     else if (_isActiveJob) {
         if (!_limitProcDisplay || ++_nbProcDisp % 42 == 0)
             _log("*", false);
@@ -3086,8 +3334,11 @@ void PostingJob::onExtProcReadyReadStandardOutput()
 
 void PostingJob::onExtProcReadyReadStandardError()
 {
-    const QByteArray output = _extProc->readAllStandardError();
+    _onToolErrorOutput(_extProc->readAllStandardError());
+}
 
+void PostingJob::_onToolErrorOutput(const QByteArray &output)
+{
     if (_extProcIsPar2 && (_par2Tool == par2::Tool::ParPar)) {
         if (_ngPost->debugMode())
             _log(QString::fromLocal8Bit(output), false);

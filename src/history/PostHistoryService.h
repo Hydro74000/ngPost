@@ -16,6 +16,7 @@
 #include <QStringList>
 #include <QThread>
 #include <functional>
+#include <optional>
 
 class QTextStream;
 
@@ -82,6 +83,18 @@ public:
     bool markPostStarted(qint64 postId, QString *error = nullptr);
     bool setRunScratchNzb(const QString &runId, const QString &path, QString *error = nullptr);
     bool markTransferManifestComplete(qint64 postId, QString *error = nullptr);
+    //! The supervision of a preparation tool (lot C5.6): written before the tool
+    //! may run, then each step of its stop (PostHistoryStore::recordToolSupervision).
+    bool recordToolSupervision(qint64 postId,
+                               const QString &runId,
+                               const QString &setId,
+                               const QString &capability,
+                               const QString &toolState,
+                               const QString &toolIdentityJson,
+                               QString *error = nullptr);
+    //! What the history holds of an artifact set (PostHistoryStore::artifactSet).
+    std::optional<PostHistoryStore::ArtifactSetRecord> artifactSet(const QString &setId,
+                                                                   QString *error = nullptr);
     bool updatePostNzbPath(qint64 postId, const QString &nzbPath, QString *error = nullptr);
     bool setPostSizeIfUnset(qint64 postId, qint64 sizeBytes, QString *error = nullptr);
     bool addActiveSeconds(qint64 postId, qint64 seconds, QString *error = nullptr);

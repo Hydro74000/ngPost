@@ -100,13 +100,15 @@ private:
         QString runId;
         QString setId;
         Phase phase = Phase::Preparing;
-        bool ended = false; //!< the transfer end was already reported
+        bool ended = false;        //!< the transfer end was already reported
+        bool quiesceAsked = false; //!< its preparation's stop awaits its answer
     };
 
     static QString key(qint64 postId, const QString &runId, const QString &setId);
     PostingJob *createJob(qint64 postId, const QString &runId, const QString &setId);
     bool isCurrent(qint64 postId, const PostingJob *job, const QString &runId, Phase phase) const;
     void releaseRuntime(qint64 postId);
+    void quiescePreparation(qint64 postId, const QString &runId);
     void onStepEnded(qint64 postId,
                      PostingJob *job,
                      const QString &runId,

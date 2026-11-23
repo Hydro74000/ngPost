@@ -57,15 +57,15 @@ tst_NntpFile                  29  Linux
 tst_OpenVpnConfigPolicy       74  Linux
 tst_Par2Settings              17  Linux
 tst_PathHelper                45  Linux
-tst_PostFlow                  38  Linux
+tst_PostFlow                  39  Linux
 tst_PostHistory               48  Linux
 tst_PostInfoTemplate          37  Linux
 tst_PostQueue                 27  Linux
 tst_PostingJobOptionsCodec    27  Linux
 tst_QueuePanel                10  Linux
-tst_QueueScheduler            38  Linux
+tst_QueueScheduler            41  Linux
 tst_QueueStoreSqlite          41  Linux
-tst_PostingJobExecutor        13  Linux
+tst_PostingJobExecutor        26  Linux
 tst_PreparationWorkspace      12  Linux
 tst_ExternalToolProcess       18  Linux
 tst_NgPostQueue               20  Linux
@@ -98,17 +98,17 @@ tst_NntpFile                  29  Darwin
 tst_OpenVpnConfigPolicy       74  Darwin
 tst_Par2Settings              17  Darwin
 tst_PathHelper                45  Darwin
-tst_PostFlow                  33  Darwin
+tst_PostFlow                  34  Darwin
 tst_PostHistory               48  Darwin
 tst_PostInfoTemplate          37  Darwin
 tst_PostQueue                 27  Darwin
 tst_PostingJobOptionsCodec    27  Darwin
 tst_QueuePanel                10  Darwin
-tst_QueueScheduler            38  Darwin
+tst_QueueScheduler            41  Darwin
 tst_QueueStoreSqlite          41  Darwin
-tst_PostingJobExecutor        13  Darwin
+tst_PostingJobExecutor        24  Darwin
 tst_PreparationWorkspace      12  Darwin
-tst_ExternalToolProcess        8  Darwin
+tst_ExternalToolProcess       10  Darwin
 tst_NgPostQueue               20  Darwin
 tst_RandomToken                3  Darwin
 tst_SecretMasker              22  Darwin
@@ -127,7 +127,7 @@ tst_Yenc                      30  Darwin
 # The Windows-only suites run here and only here; tst_PathHelper and
 # tst_PostInfoTemplate skip the cases that need a symlink privilege, and
 # tst_MainWindow skips the tool-path cases that need a POSIX file mode.
-# tst_PostingJobExecutor skips the three cases whose fake rar/par2 are shell scripts.
+# tst_PostingJobExecutor skips the case that needs a stop a job object cannot lose.
 tst_CliParser                 65  Windows
 tst_FoldersMonitor            10  Windows
 tst_GoldenNzb                  4  Windows
@@ -137,15 +137,15 @@ tst_NntpFile                  29  Windows
 tst_OpenVpnConfigPolicy       74  Windows
 tst_Par2Settings              18  Windows
 tst_PathHelper                38  Windows
-tst_PostFlow                  29  Windows
+tst_PostFlow                  30  Windows
 tst_PostHistory               48  Windows
 tst_PostInfoTemplate          35  Windows
 tst_PostQueue                 27  Windows
 tst_PostingJobOptionsCodec    27  Windows
 tst_QueuePanel                10  Windows
-tst_QueueScheduler            38  Windows
+tst_QueueScheduler            41  Windows
 tst_QueueStoreSqlite          41  Windows
-tst_PostingJobExecutor        10  Windows
+tst_PostingJobExecutor        25  Windows
 tst_PreparationWorkspace      12  Windows
 tst_ExternalToolProcess       17  Windows
 tst_NgPostQueue               20  Windows

@@ -38,6 +38,9 @@
 
 #include "hmi/CheckBoxCenterWidget.h"
 #include "hmi/PostInfoDialog.h"
+#include "tools/ToolSupervisor.h"
+
+#include <cstring>
 
 #include <QComboBox>
 #include <QFile>
@@ -3217,6 +3220,9 @@ void TestMainWindow::no_log_call_passes_html_markup()
 
 int main(int argc, char **argv)
 {
+    // Queue runtimes run their tools under this binary, as under ngPost (lot C5.6).
+    if (argc > 1 && std::strcmp(argv[1], toolsupervisor::kSwitch) == 0)
+        return toolsupervisor::run(argc, argv);
     QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     QApplication app(argc, argv);
     if (app.arguments().size() == 3 && app.arguments().at(1) == "--ngpost-test-shutdown") {

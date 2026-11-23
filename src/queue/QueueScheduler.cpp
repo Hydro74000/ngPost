@@ -291,6 +291,30 @@ void QueueScheduler::onStepFinished(qint64 postId,
         _stepRunning = 0;
     if (_pendingStops.contains(postId))
         return; // its quiescence decides
+    if (!ok && stepErrorIs(error, kStepToolUnproven)) {
+        holdUnprovenStop(postId, runId, PendingStop::Technical, QLatin1String(kStepToolUnproven));
+        return;
+    }
+    if (!ok && stepErrorIs(error, kStepStoreFailed)) {
+        // Its runtime still holds what only it can settle (renamed sources, a
+        // stop the history does not hold): no new run, the queue waits.
+        if (_executor->holdsUnsettledWork(postId)) {
+            holdUnprovenStop(postId,
+                             runId,
+                             PendingStop::Technical,
+                             QLatin1String(kStepStoreFailed));
+            return;
+        }
+        // Refused by the history, not by the post: it is kept for a new
+        // attempt, and the queue waits for the history.
+        applyInOrder([this, postId, runId] {
+            return !isCurrent(postId, runId)
+                || recordQuiesced(postId, runId, PendingStop::Technical, false, false, 0);
+        });
+        enterTechnicalPause(QLatin1String(kStepStoreFailed));
+        scheduleReevaluate();
+        return;
+    }
     applyInOrder([this, postId, runId, setId, step, ok, error, bytes] {
         const QueueEntry *current = _queue->find(postId);
         if (!current || current->runId != runId || current->artifacts.id != setId)
@@ -445,15 +469,7 @@ void QueueScheduler::onQuiesced(qint64 postId,
     if (_stepRunning == postId)
         _stepRunning = 0;
     if (!ok) {
-        // Stop not proven: the runtime may still write. It keeps its slot,
-        // nothing is cleaned up, and the whole queue waits.
-        _pendingStops.insert(postId, why);
-        _stuck.insert(postId);
-        applyInOrder([this, postId, runId] {
-            return !isCurrent(postId, runId)
-                || _queue->engineMarkStuck(postId, { QStringLiteral("quiesce_failed"), {} });
-        });
-        enterTechnicalPause(QStringLiteral("quiesce_failed"));
+        holdUnprovenStop(postId, runId, why, QStringLiteral("quiesce_failed"));
         return;
     }
     applyInOrder([this, postId, runId, why, manifestEngaged, wasTransfer, activeMs] {
@@ -463,6 +479,21 @@ void QueueScheduler::onQuiesced(qint64 postId,
     if (_stuck.remove(postId) && _stuck.isEmpty())
         retryAfterTechnicalPause(); // the stop is proven after all
     scheduleReevaluate();
+}
+
+//! Stop not proven: the runtime may still write. It keeps its slot, nothing
+//! is cleaned up, and the whole queue waits.
+void QueueScheduler::holdUnprovenStop(qint64 postId,
+                                      const QString &runId,
+                                      PendingStop why,
+                                      const QString &reason)
+{
+    _pendingStops.insert(postId, why);
+    _stuck.insert(postId);
+    applyInOrder([this, postId, runId, reason] {
+        return !isCurrent(postId, runId) || _queue->engineMarkStuck(postId, { reason, {} });
+    });
+    enterTechnicalPause(reason);
 }
 
 bool QueueScheduler::recordQuiesced(qint64 postId,

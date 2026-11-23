@@ -392,6 +392,7 @@ void ExternalToolProcess::handleLine(const QByteArray &line)
             _state = State::Running;
         emit started(words.at(1).toLongLong());
     } else if (verb == "exec_failed" && words.size() >= 2) {
+        _execFailedSeen = true;
         emit execFailed(words.at(1).toInt());
     } else if ((verb == "tool_exited" || verb == "finished") && words.size() >= 2) {
         _toolStatus = words.at(1).toInt();
@@ -411,10 +412,12 @@ void ExternalToolProcess::onSupervisorFinished()
         // It ended before being able to run anything: the tool never existed.
         verified = true;
     } else if (capability() == QStringLiteral("unavailable")) {
-        // No proof here (macOS, lot C5.5). A tool that ended on its own and
-        // successfully, untouched by any stop, may hand over its outputs;
-        // nothing about its descendants is ever concluded.
-        const bool exited = !_stopAsked && _toolExitedSeen && _toolStatus == 0
+        // No proof here (macOS, lots C5.5, C5.6). A tool that ran and ended on
+        // its own, untouched by any stop, its supervisor ending as planned,
+        // runs no more: its status says whether its outputs may be used.
+        // Nothing about its descendants is ever concluded. One whose exec
+        // failed never ran: it is no Exited tool (its controller knows why).
+        const bool exited = !_stopAsked && _toolExitedSeen && !_execFailedSeen
             && _supervisor->exitStatus() == QProcess::NormalExit
             && _supervisor->exitCode() == toolsupervisor::kUnproven;
         _state = exited ? State::Exited : State::Unproven;

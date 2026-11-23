@@ -41,6 +41,8 @@
 #endif
 #include <windows.h>
 #include <cwchar>
+#else
+#include <unistd.h> // setpgid
 #endif
 
 #include "Fixtures.h"
@@ -277,6 +279,9 @@ private slots:
     //! quits at once; a GUI run closes without a dialog.
     void queue_engine_stop_signal_keeps_the_post();
     void queue_engine_stop_signal_waits_for_post_commands();
+    //! A stop to ngPost's whole process group, as Ctrl+C in a terminal (lot
+    //! C5.6): its post commands are out of reach and end their work.
+    void stop_to_the_whole_group_spares_the_post_commands();
     void queue_engine_second_stop_signal_forces_the_exit();
     void queue_engine_exit_watchdog_ends_a_stuck_exit();
     void stop_signal_at_start_exits_cleanly();
@@ -1485,6 +1490,10 @@ bool startForSignal(QProcess &p,
         a->flags |= CREATE_NEW_PROCESS_GROUP;
         a->flags &= ~DWORD(CREATE_NO_WINDOW);
     });
+#else
+    // Its own process group, as a terminal's foreground job: a stop to the
+    // whole group does not reach this test.
+    p.setChildProcessModifier([] { ::setpgid(0, 0); });
 #endif
     p.start(program, args);
     return p.waitForStarted(5000);
@@ -1497,6 +1506,17 @@ bool stopProcess(qint64 pid)
     return ::GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, static_cast<DWORD>(pid)) != 0;
 #else
     return ::kill(pid_t(pid), SIGTERM) == 0;
+#endif
+}
+
+//! Ctrl+C in a terminal: SIGINT to the whole process group of @p pid (its
+//! leader). Windows: Ctrl+Break to its process group, the same as stopProcess().
+bool stopProcessGroup(qint64 pid)
+{
+#ifdef Q_OS_WIN
+    return ::GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, static_cast<DWORD>(pid)) != 0;
+#else
+    return ::kill(-pid_t(pid), SIGINT) == 0;
 #endif
 }
 
@@ -1524,17 +1544,16 @@ qint64 forcedExitCode()
 
 constexpr qint64 kWatchdogExitCode = 142; // 128 + SIGALRM; the same on Windows
 
-//! Created by the post command of sleepingPostCommand() once it runs, and
-//! ignores Ctrl+Break: only then may a test interrupt ngPost.
+//! Created by the post command of sleepingPostCommand() once it runs: only
+//! then may a test interrupt ngPost.
 QString postCommandStarted(const QString &root)
 {
     return root + QStringLiteral("/postcmd-started");
 }
 
 //! The NZB_POST_CMD of a command that sleeps @p seconds, then creates
-//! @p marker if one is given. On Windows, Ctrl+Break reaches the whole process
-//! group, the post commands of ngPost included, as Ctrl+C does in a terminal:
-//! this one ignores it, so that what is tested is ngPost waiting for it.
+//! @p marker if one is given. It does not protect itself: Ctrl+C or
+//! Ctrl+Break would end it, were ngPost's post commands not out of their reach.
 QString sleepingPostCommand(const QString &root, int seconds, const QString &marker = {})
 {
     const QString script = root + QStringLiteral("/postcmd.py");
@@ -1542,8 +1561,7 @@ QString sleepingPostCommand(const QString &root, int seconds, const QString &mar
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
         return QString();
     QTextStream s(&f);
-    s << "import pathlib, signal, time\n"
-      << "if hasattr(signal, 'SIGBREAK'):\n    signal.signal(signal.SIGBREAK, signal.SIG_IGN)\n"
+    s << "import pathlib, time\n"
       << "pathlib.Path(r'" << postCommandStarted(root) << "').touch()\n"
       << "time.sleep(" << seconds << ")\n";
     if (!marker.isEmpty())
@@ -1762,6 +1780,27 @@ void TestPostFlow::queue_engine_stop_signal_waits_for_post_commands()
              qPrintable(finishedOutput(p)));
     QVERIFY2(QFile::exists(marker), "the exit cut the post command short");
     QCOMPARE(dbScalar(root + "/history.sqlite", "SELECT COUNT(*) FROM post_queue").toInt(), 0);
+}
+
+void TestPostFlow::stop_to_the_whole_group_spares_the_post_commands()
+{
+    HomeSandbox sandbox;
+    MockNntpServer mock;
+    QVERIFY(mock.start());
+    const QString root = sandbox.rootPath();
+    const QString marker = root + QStringLiteral("/post-command-done");
+    QVERIFY(writeSignalConfig(root,
+                              mock.port(),
+                              "NZB_POST_CMD = " + sleepingPostCommand(root, 1, marker) + "\n"));
+    QProcess p;
+    QVERIFY(
+        startForSignal(p, _bin, root, postArgs(root, writeInput(root, "small.bin", 5000)), true));
+    QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(postCommandStarted(root)), 20000);
+    QVERIFY(stopProcessGroup(p.processId()));
+    QVERIFY2(p.waitForFinished(15000), "the stop request did not end the run");
+    QVERIFY2(p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0,
+             qPrintable(finishedOutput(p)));
+    QVERIFY2(QFile::exists(marker), "the stop reached the post command");
 }
 
 void TestPostFlow::queue_engine_second_stop_signal_forces_the_exit()

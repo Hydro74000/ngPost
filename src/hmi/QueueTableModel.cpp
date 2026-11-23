@@ -188,6 +188,8 @@ QString QueueTableModel::blockText(const BlockReason &reason)
         { QStringLiteral("vpn_unavailable"), QT_TR_NOOP("The VPN is unavailable") },
         { QStringLiteral("finalization_failed"), QT_TR_NOOP("The NZB could not be written") },
         { QStringLiteral("quiesce_failed"), QT_TR_NOOP("The stop could not be confirmed") },
+        { QStringLiteral("tool_unproven"),
+          QT_TR_NOOP("Its archive or PAR2 tool could not be confirmed stopped") },
         { QStringLiteral("password_required"), QT_TR_NOOP("Password to enter again") },
         { QStringLiteral("sources_pending_recovery"),
           QT_TR_NOOP("Waiting for its sources to be restored") },
