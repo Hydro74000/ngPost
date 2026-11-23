@@ -132,6 +132,7 @@ SOURCES += \
         $$PWD/history/HistoryQueueStore.cpp \
         $$PWD/history/PostHistoryStore.cpp \
         $$PWD/history/PostHistoryStoreQueue.cpp \
+        $$PWD/history/PostHistoryStorePreparation.cpp \
         $$PWD/history/ServiceQueueStore.cpp \
         $$PWD/history/ResumePlanner.cpp \
         $$PWD/NgPost.cpp \
@@ -177,6 +178,7 @@ HEADERS += \
     $$PWD/history/PostHistoryService.h \
     $$PWD/history/HistoryQueueStore.h \
     $$PWD/history/PostHistoryStore.h \
+    $$PWD/history/PostHistorySql.h \
     $$PWD/history/ResumePlanner.h \
     $$PWD/NgPost.h \
     $$PWD/tools/ExternalToolResolver.h \

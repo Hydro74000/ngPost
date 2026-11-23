@@ -414,6 +414,444 @@ private slots:
         QCOMPARE(e->lastGeneration, 1);
     }
 
+    // --- recoverable preparation (lot C5.1) -------------------------------------------
+
+    void artifactSetsAreRecordedBeforeTheDisk()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        const QString run = f.queue->find(a)->runId;
+        PostHistoryStore::ArtifactSetPlan plan{ QStringLiteral("set-1"),
+                                                a,
+                                                run,
+                                                1,
+                                                0,
+                                                QStringLiteral("/tmp/root"),
+                                                QStringLiteral("/tmp/root/a-1/archives"),
+                                                QStringLiteral("/tmp/root/a-1/staging") };
+        QString error;
+        QVERIFY2(f.store->createArtifactSet(plan, &error), qPrintable(error));
+        QVERIFY2(f.store->createArtifactSet(plan, &error), qPrintable(error)); // repeated
+        const auto set = f.store->artifactSet(QStringLiteral("set-1"));
+        QVERIFY(set);
+        QCOMPARE(set->state, QStringLiteral("preparing"));
+        QCOMPARE(set->toolState, QStringLiteral("idle"));
+        QCOMPARE(set->plan.archiveDir, plan.archiveDir);
+        QCOMPARE(set->plan.stagingDir, plan.stagingDir);
+
+        PostHistoryStore::ArtifactSetPlan moved = plan;
+        moved.archiveDir = QStringLiteral("/elsewhere");
+        QVERIFY(!f.store->createArtifactSet(moved, &error)); // its places never change
+        QVERIFY(error.startsWith(QStringLiteral("artifact_set_mismatch")));
+        PostHistoryStore::ArtifactSetPlan again = plan;
+        again.setId = QStringLiteral("set-again");
+        QVERIFY(!f.store->createArtifactSet(again, &error)); // generation 1 is taken
+        QVERIFY(error.startsWith(QStringLiteral("artifact_set_generation")));
+        PostHistoryStore::ArtifactSetPlan stale = plan;
+        stale.setId = QStringLiteral("set-stale");
+        stale.generation = 2;
+        stale.runId = QStringLiteral("not-the-run");
+        QVERIFY(!f.store->createArtifactSet(stale, &error));
+        QVERIFY(error.startsWith(QStringLiteral("stale_run")));
+        f.store->setOwnerId(QStringLiteral("owner-B"));
+        PostHistoryStore::ArtifactSetPlan foreign = plan;
+        foreign.setId = QStringLiteral("set-foreign");
+        foreign.generation = 2;
+        QVERIFY(!f.store->createArtifactSet(foreign, &error));
+        QVERIFY(error.startsWith(QStringLiteral("not_owner")));
+    }
+
+    void aSetIsVerifiedOnlyWithItsCompleteList()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        const QString run = f.queue->find(a)->runId;
+        const ArtifactSetRef ref{ QStringLiteral("set-1"), 1, 0, 0, QStringLiteral("/tmp/root") };
+        QVERIFY(f.queue->engineBeginPreparation(a, ref));
+        QString error;
+        QVERIFY2(f.store->createArtifactSet(
+                     { ref.id, a, run, 1, 0, ref.root, QStringLiteral("/tmp/root/archives"), {} },
+                     &error),
+                 qPrintable(error));
+        // The model saying "prepared" is not a proof.
+        QVERIFY(f.queue->engineRecordPrepared(a, ref));
+        QCOMPARE(f.store->artifactSet(ref.id)->state, QStringLiteral("preparing"));
+
+        auto file = [](int sequence, const QString &name, const QString &role, bool publish) {
+            return PostHistoryStore::ArtifactRecord{
+                sequence,
+                QStringLiteral("/tmp/root/archives/") + name,
+                1000 + sequence,
+                QStringLiteral("2026-11-23T10:00:00Z"),
+                QStringLiteral("{\"dev\":1,\"ino\":%1}").arg(sequence + 10),
+                role,
+                publish,
+                QStringLiteral("alt.binaries.test")
+            };
+        };
+        const QList<PostHistoryStore::ArtifactRecord> manifest{
+            file(0, QStringLiteral("a.part1.rar"), QStringLiteral("archive"), true),
+            file(1, QStringLiteral("a.part2.rar"), QStringLiteral("archive"), true),
+            file(2, QStringLiteral("a.par2"), QStringLiteral("par2"), true)
+        };
+        QVERIFY(!f.store->recordPreparedArtifacts(a, run, ref.id, {}, &error));
+        QCOMPARE(error, QStringLiteral("manifest_empty"));
+        QVERIFY(!f.store->recordPreparedArtifacts(a,
+                                                  run,
+                                                  ref.id,
+                                                  { manifest[0], manifest[2] },
+                                                  &error));
+        QCOMPARE(error, QStringLiteral("manifest_sequence")); // a hole: partial
+        QVERIFY(!f.store->recordPreparedArtifacts(
+            a,
+            run,
+            ref.id,
+            { file(0, QStringLiteral("x"), QStringLiteral("nfo"), false) },
+            &error));
+        QCOMPARE(error, QStringLiteral("manifest_publishes_nothing"));
+        QVERIFY(f.store->recordToolSupervision(a,
+                                               run,
+                                               ref.id,
+                                               QStringLiteral("linux_test"),
+                                               QStringLiteral("starting"),
+                                               {},
+                                               &error));
+        QVERIFY(!f.store->recordPreparedArtifacts(a, run, ref.id, manifest, &error));
+        QVERIFY(error.startsWith(QStringLiteral("tool_not_stopped"))); // a tool may still write
+        QVERIFY(f.store->recordToolSupervision(a,
+                                               run,
+                                               ref.id,
+                                               {},
+                                               QStringLiteral("stopped_verified"),
+                                               {},
+                                               &error));
+
+        QVERIFY2(f.store->recordPreparedArtifacts(a, run, ref.id, manifest, &error),
+                 qPrintable(error));
+        const auto set = f.store->artifactSet(ref.id);
+        QCOMPARE(set->state, QStringLiteral("verified"));
+        QCOMPARE(set->bytes, qint64(1000 + 1001 + 1002));
+        QCOMPARE(set->artifacts, manifest);
+        QCOMPARE(f.scalar(QStringLiteral("SELECT current_artifact_set_id FROM post_queue WHERE "
+                                         "post_id=?"),
+                          { a })
+                     .toString(),
+                 ref.id);
+        QVERIFY2(f.store->recordPreparedArtifacts(a, run, ref.id, manifest, &error),
+                 qPrintable(error)); // repeated after a lost acknowledgement
+        QVERIFY(!f.store->recordPreparedArtifacts(a, run, ref.id, { manifest[0] }, &error));
+        QVERIFY(error.startsWith(QStringLiteral("artifact_set_verified")));
+        // A later write of the entry neither verifies nor unverifies it.
+        QVERIFY(f.queue->setHeld({ a }, true, f.queue->view()).ok());
+        QCOMPARE(f.store->artifactSet(ref.id)->state, QStringLiteral("verified"));
+        QCOMPARE(f.store->artifactSet(ref.id)->bytes, qint64(3003));
+    }
+
+    void sourceMovesAreJournaledAndOutliveTheEntry()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        const QString run = f.queue->find(a)->runId;
+        const QList<PostHistoryStore::SourceMove> moves{ { 0,
+                                                           QStringLiteral("/in/a.mkv"),
+                                                           QStringLiteral("/stage/x1"),
+                                                           QStringLiteral("{\"ino\":1}"),
+                                                           {},
+                                                           {},
+                                                           {} },
+                                                         { 1,
+                                                           QStringLiteral("/in/a.nfo"),
+                                                           QStringLiteral("/stage/x2"),
+                                                           QStringLiteral("{\"ino\":2}"),
+                                                           {},
+                                                           {},
+                                                           {} } };
+        QString error;
+        QVERIFY2(f.store->planSourceMoves(a, run, {}, moves, &error), qPrintable(error));
+        QVERIFY2(f.store->planSourceMoves(a, run, {}, moves, &error), qPrintable(error));
+        auto conflicting = moves;
+        conflicting[1].stagedPath = QStringLiteral("/stage/other");
+        QVERIFY(!f.store->planSourceMoves(a, run, {}, conflicting, &error));
+        QVERIFY(error.startsWith(QStringLiteral("source_move_conflict")));
+        QVERIFY(!f.store->planSourceMoves(a, run, QStringLiteral("no-such-set"), moves, &error));
+        QCOMPARE(f.store->unsettledSourceMoves(a).size(), 2);
+
+        QVERIFY(f.store->resolveSourceMoves(a, run, { 0, 1 }, QStringLiteral("moved"), &error));
+        QVERIFY(f.store->resolveSourceMoves(a, run, { 1 }, QStringLiteral("restored"), &error));
+        QVERIFY(!f.store->resolveSourceMoves(a, run, { 1 }, QStringLiteral("moved"), &error));
+        QVERIFY(error.startsWith(QStringLiteral("source_move_state"))); // restored is settled
+
+        // Reopened, as after a crash: the journal is the same.
+        PostHistoryStore reopened(f.dir.filePath(QStringLiteral("history.sqlite")), true);
+        reopened.setOwnerId(QStringLiteral("owner-A"));
+        const auto unsettled = reopened.unsettledSourceMoves(a);
+        QCOMPARE(unsettled.size(), 1);
+        QCOMPARE(unsettled.first().sequence, 0);
+        QCOMPARE(unsettled.first().state, QStringLiteral("moved"));
+        QCOMPARE(unsettled.first().stagedPath, QStringLiteral("/stage/x1"));
+
+        // The entry leaves; its post keeps its owner while a source is away.
+        QVERIFY(f.queue->remove({ a }, RemovePolicy::Default, f.queue->view()).ok());
+        QCOMPARE(
+            f.scalar(QStringLiteral("SELECT owner_id FROM posts WHERE id=?"), { a }).toString(),
+            QStringLiteral("owner-A"));
+        QVERIFY2(f.store->resolveSourceMoves(a, run, { 0 }, QStringLiteral("restored"), &error),
+                 qPrintable(error));
+        QVERIFY(f.store->unsettledSourceMoves(a).isEmpty());
+    }
+
+    void toolSupervisionFollowsItsSteps()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        const QString run = f.queue->find(a)->runId;
+        QString error;
+        QVERIFY(f.store->createArtifactSet({ QStringLiteral("set-1"),
+                                             a,
+                                             run,
+                                             1,
+                                             0,
+                                             QStringLiteral("/r"),
+                                             QStringLiteral("/r/a"),
+                                             {} },
+                                           &error));
+        auto step = [&](const QString &capability, const QString &state) {
+            return f.store->recordToolSupervision(a,
+                                                  run,
+                                                  QStringLiteral("set-1"),
+                                                  capability,
+                                                  state,
+                                                  QStringLiteral("{\"pid\":42}"),
+                                                  &error);
+        };
+        QVERIFY(!step({}, QStringLiteral("starting"))); // how it stops comes first
+        QCOMPARE(error, QStringLiteral("supervision_missing"));
+        QVERIFY(step(QStringLiteral("linux_test"), QStringLiteral("starting")));
+        QVERIFY(step({}, QStringLiteral("running")));
+        QVERIFY(!step({}, QStringLiteral("idle")));
+        QVERIFY(step({}, QStringLiteral("quiescing")));
+        QVERIFY(step({}, QStringLiteral("unproven")));
+        QVERIFY(!step({}, QStringLiteral("starting"))); // nothing new on an unproven stop
+        QVERIFY(step({}, QStringLiteral("stopped_verified")));
+        QVERIFY(step({}, QStringLiteral("starting")));
+        PostHistoryStore reopened(f.dir.filePath(QStringLiteral("history.sqlite")), true);
+        const auto set = reopened.artifactSet(QStringLiteral("set-1"));
+        QCOMPARE(set->supervision, QStringLiteral("linux_test"));
+        QCOMPARE(set->toolState, QStringLiteral("starting"));
+        QCOMPARE(set->toolIdentityJson, QStringLiteral("{\"pid\":42}"));
+    }
+
+    void anUnsettledJournalKeepsItsPostFromDeletion()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        const QString run = f.queue->find(a)->runId;
+        QString error;
+        QVERIFY(f.store->createArtifactSet({ QStringLiteral("set-1"),
+                                             a,
+                                             run,
+                                             1,
+                                             0,
+                                             QStringLiteral("/r"),
+                                             QStringLiteral("/r/a"),
+                                             {} },
+                                           &error));
+        QVERIFY(f.store->planSourceMoves(a,
+                                         run,
+                                         QStringLiteral("set-1"),
+                                         { { 0,
+                                             QStringLiteral("/in/a"),
+                                             QStringLiteral("/stage/a"),
+                                             QStringLiteral("{\"ino\":1}"),
+                                             {},
+                                             {},
+                                             {} } },
+                                         &error));
+        QVERIFY(f.queue->remove({ a }, RemovePolicy::Default, f.queue->view()).ok());
+        QVERIFY(!f.store->deletePost(a, &error));
+        QVERIFY(error.startsWith(QStringLiteral("source_journal_unsettled")));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM posts WHERE id=?"), { a }).toInt(),
+                 1);
+        QVERIFY(f.store->resolveSourceMoves(a, run, { 0 }, QStringLiteral("restored"), &error));
+        QVERIFY2(f.store->deletePost(a, &error), qPrintable(error));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM posts WHERE id=?"), { a }).toInt(),
+                 0);
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM post_artifact_sets")).toInt(), 0);
+        QCOMPARE(f.scalar(QStringLiteral("SELECT COUNT(*) FROM post_source_moves")).toInt(), 0);
+    }
+
+    void preparationFactsNeedTheirSession()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"));
+        const QString run = f.queue->find(a)->runId;
+        QString error;
+        QVERIFY(f.store->planSourceMoves(a,
+                                         run,
+                                         {},
+                                         { { 0,
+                                             QStringLiteral("/in/a"),
+                                             QStringLiteral("/stage/a"),
+                                             QStringLiteral("{\"ino\":1}"),
+                                             {},
+                                             {},
+                                             {} } },
+                                         &error));
+        f.store->setOwnerId(QString()); // speaks for no session
+        QVERIFY(!f.store->resolveSourceMoves(a, run, { 0 }, QStringLiteral("restored"), &error));
+        QVERIFY(error.startsWith(QStringLiteral("not_owner")));
+        f.store->setOwnerId(QStringLiteral("owner-B")); // another one
+        QVERIFY(!f.store->resolveSourceMoves(a, run, { 0 }, QStringLiteral("restored"), &error));
+        QVERIFY(error.startsWith(QStringLiteral("not_owner")));
+        QCOMPARE(f.scalar(QStringLiteral("SELECT state FROM post_source_moves")).toString(),
+                 QStringLiteral("planned"));
+    }
+
+    void aVerifiedSizeOutlivesItsInvalidation()
+    {
+        Fixture f;
+        PersistedQueueOptions o = makeOptions(QStringLiteral("k"), true);
+        o.job.keepRar = true;
+        const qint64 a = f.queue->submit(o, Origin::Auto).postIds.value(0);
+        const QString run = f.queue->find(a)->runId;
+        const ArtifactSetRef ref{ QStringLiteral("set-1"), 1, 0, 0, QStringLiteral("/tmp/root") };
+        QVERIFY(f.queue->engineBeginPreparation(a, ref));
+        QString error;
+        QVERIFY(f.store->createArtifactSet(
+            { ref.id, a, run, 1, 0, ref.root, QStringLiteral("/tmp/root/archives"), {} },
+            &error));
+        QVERIFY2(f.store->recordPreparedArtifacts(a,
+                                                  run,
+                                                  ref.id,
+                                                  { { 0,
+                                                      QStringLiteral("/tmp/root/archives/k.rar"),
+                                                      3003,
+                                                      QStringLiteral("2026-11-23T10:00:00Z"),
+                                                      QStringLiteral("{\"ino\":7}"),
+                                                      QStringLiteral("archive"),
+                                                      true,
+                                                      {} } },
+                                                  &error),
+                 qPrintable(error));
+        QVERIFY(f.queue->engineRecordPrepared(a, ref)); // the model knows no size
+        o.job.rarName = QStringLiteral("again");        // invalidated, kept by keepRar
+        QVERIFY(f.queue->edit(a, o, f.queue->view()).ok());
+        QCOMPARE(f.store->artifactSet(ref.id)->state, QStringLiteral("invalidated"));
+        QCOMPARE(f.store->artifactSet(ref.id)->bytes, qint64(3003));
+        QVERIFY(f.queue->setHeld({ a }, true, f.queue->view()).ok()); // written again
+        QCOMPARE(f.store->artifactSet(ref.id)->bytes, qint64(3003));
+    }
+
+    void aStaleRecipeIsNeitherPreparedNorVerified()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        const QString run = f.queue->find(a)->runId;
+        const ArtifactSetRef ref{ QStringLiteral("set-1"), 1, 0, 0, QStringLiteral("/r") };
+        QVERIFY(f.queue->engineBeginPreparation(a, ref));
+        QString error;
+        QVERIFY(!f.store->createArtifactSet(
+            { ref.id, a, run, 1, 5, ref.root, QStringLiteral("/r/a"), {} },
+            &error));
+        QVERIFY(error.startsWith(QStringLiteral("recipe_revision")));
+        QVERIFY2(f.store->createArtifactSet(
+                     { ref.id, a, run, 1, 0, ref.root, QStringLiteral("/r/a"), {} },
+                     &error),
+                 qPrintable(error));
+        // The recipe changes while the set is prepared.
+        f.scalar(QStringLiteral("UPDATE post_queue SET recipe_revision=recipe_revision+1"));
+        QVERIFY(!f.store->recordPreparedArtifacts(a,
+                                                  run,
+                                                  ref.id,
+                                                  { { 0,
+                                                      QStringLiteral("/r/a/a.rar"),
+                                                      10,
+                                                      QStringLiteral("2026-11-23T10:00:00Z"),
+                                                      QStringLiteral("{\"ino\":7}"),
+                                                      QStringLiteral("archive"),
+                                                      true,
+                                                      {} } },
+                                                  &error));
+        QVERIFY(error.startsWith(QStringLiteral("recipe_revision")));
+        QCOMPARE(f.store->artifactSet(ref.id)->state, QStringLiteral("preparing"));
+    }
+
+    void aReplayedMoveKeepsItsSet()
+    {
+        Fixture f;
+        const qint64 a = f.add(QStringLiteral("a"), true);
+        const QString run = f.queue->find(a)->runId;
+        QString error;
+        for (int generation : { 1, 2 })
+            QVERIFY(f.store->createArtifactSet({ QStringLiteral("set-%1").arg(generation),
+                                                 a,
+                                                 run,
+                                                 generation,
+                                                 0,
+                                                 QStringLiteral("/r"),
+                                                 QStringLiteral("/r/%1").arg(generation),
+                                                 {} },
+                                               &error));
+        const QList<PostHistoryStore::SourceMove> move{ { 0,
+                                                          QStringLiteral("/in/a"),
+                                                          QStringLiteral("/stage/a"),
+                                                          QStringLiteral("{\"ino\":1}"),
+                                                          {},
+                                                          {},
+                                                          {} } };
+        QVERIFY(f.store->planSourceMoves(a, run, QStringLiteral("set-1"), move, &error));
+        QVERIFY(f.store->planSourceMoves(a, run, QStringLiteral("set-1"), move, &error));
+        QVERIFY(!f.store->planSourceMoves(a, run, QStringLiteral("set-2"), move, &error));
+        QVERIFY(error.startsWith(QStringLiteral("source_move_conflict")));
+        QVERIFY(!f.store->planSourceMoves(a, run, {}, move, &error));
+        QVERIFY(error.startsWith(QStringLiteral("source_move_conflict")));
+    }
+
+    void anEarlierV6DatabaseGainsTheSupervisionColumns()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("history.sqlite"));
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                                        QStringLiteral("early-v6"));
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("CREATE TABLE schema_meta(key TEXT PRIMARY KEY, value "
+                                          "TEXT)")));
+            QVERIFY(q.exec(QStringLiteral("INSERT INTO schema_meta VALUES('version', '6')")));
+            QVERIFY(q.exec(QStringLiteral(
+                "CREATE TABLE post_artifact_sets (artifact_set_id TEXT PRIMARY KEY NOT NULL, "
+                "post_id INTEGER NOT NULL, created_by_run TEXT NOT NULL, generation INTEGER NOT "
+                "NULL, recipe_revision INTEGER NOT NULL, state TEXT NOT NULL, retained INTEGER NOT "
+                "NULL DEFAULT 0, root TEXT NOT NULL, archive_dir TEXT, staging_dir TEXT, "
+                "marker_identity_json TEXT, bytes INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT "
+                "NULL, UNIQUE(post_id, generation), UNIQUE(post_id, artifact_set_id))")));
+            q.finish();
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("early-v6"));
+        PostHistoryStore store(path, true);
+        QString error;
+        QVERIFY2(store.initialize(&error), qPrintable(error));
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                                    QStringLiteral("early-v6-check"));
+        db.setDatabaseName(path);
+        QVERIFY(db.open());
+        QStringList columns;
+        {
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("PRAGMA table_info(post_artifact_sets)")));
+            while (q.next())
+                columns << q.value(1).toString();
+        }
+        db.close();
+        db = QSqlDatabase();
+        QSqlDatabase::removeDatabase(QStringLiteral("early-v6-check"));
+        for (const char *column : { "supervision", "tool_state", "tool_identity_json" })
+            QVERIFY2(columns.contains(QLatin1String(column)), column);
+    }
+
     void normalizationSparesLiveOwners()
     {
         Fixture f;

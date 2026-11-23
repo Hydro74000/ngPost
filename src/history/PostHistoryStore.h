@@ -21,6 +21,7 @@ class QSqlQuery;
 class QTextStream;
 
 #include <QHash>
+#include <functional>
 #include <optional>
 
 namespace queue
@@ -444,6 +445,102 @@ public:
     //! Queue ids present in the database, with their entry count.
     QHash<QString, int> queueIds(QString *error = nullptr);
 
+    // --- recoverable preparation (plan_queue.md §5.5, lot C5), PostHistoryStorePreparation.cpp ---
+    //! Where a set of archives is prepared: recorded before anything is created
+    //! on disk, so that a recovery knows what may be ours.
+    struct ArtifactSetPlan
+    {
+        QString setId;
+        qint64 postId = 0;
+        QString runId;
+        int generation = 0;
+        quint64 recipeRevision = 0;
+        QString root;       //!< effective TMP_DIR or TMP_RAM
+        QString archiveDir; //!< archives of this generation only
+        QString stagingDir; //!< sources moved aside, never mixed with the archives
+    };
+    //! One file of a verified set (post_run_artifacts).
+    struct ArtifactRecord
+    {
+        int sequence = 0;
+        QString path;
+        qint64 size = 0;
+        QString mtime;
+        QString identityJson; //!< native identity: (device, inode) or (volume, file index)
+        QString role;         //!< archive, par2, nfo, staged_source
+        bool publish = false; //!< part of the explicit list of files to post
+        QString groups;
+        bool operator==(const ArtifactRecord &o) const
+        {
+            return sequence == o.sequence && path == o.path && size == o.size && mtime == o.mtime
+                && identityJson == o.identityJson && role == o.role && publish == o.publish
+                && groups == o.groups;
+        }
+    };
+    struct ArtifactSetRecord
+    {
+        ArtifactSetPlan plan;
+        QString state;
+        bool retained = false;
+        QString markerIdentityJson;
+        QString supervision; //!< how the tools of the set are proven stopped
+        QString toolState;   //!< idle, starting, running, quiescing, stopped_verified, unproven
+        QString toolIdentityJson;
+        qint64 bytes = 0;
+        QList<ArtifactRecord> artifacts;
+    };
+    //! A source moved aside by an obfuscation, journaled before the rename.
+    struct SourceMove
+    {
+        int sequence = 0;
+        QString sourcePath;
+        QString stagedPath;
+        QString identityJson;
+        QString state; //!< planned, moved, restored, blocked
+        QString runId;
+        QString setId;
+    };
+    //! The places of a new set (or of the one the queue just opened for the run).
+    bool createArtifactSet(const ArtifactSetPlan &plan, QString *error = nullptr);
+    //! The marker that proves a folder is the set's, once created.
+    bool recordArtifactMarker(qint64 postId,
+                              const QString &runId,
+                              const QString &setId,
+                              const QString &markerIdentityJson,
+                              QString *error = nullptr);
+    //! The tool of a set and its supervision: a tool starts only once how it is
+    //! stopped is recorded, and its files are touched only once it is proven stopped.
+    bool recordToolSupervision(qint64 postId,
+                               const QString &runId,
+                               const QString &setId,
+                               const QString &capability,
+                               const QString &toolState,
+                               const QString &toolIdentityJson,
+                               QString *error = nullptr);
+    //! Intents to move sources: written before any rename, all or none.
+    bool planSourceMoves(qint64 postId,
+                         const QString &runId,
+                         const QString &setId,
+                         const QList<SourceMove> &moves,
+                         QString *error = nullptr);
+    //! What became of planned moves: moved, restored or blocked. Allowed after
+    //! the post left the queue: the journal outlives the entry.
+    bool resolveSourceMoves(qint64 postId,
+                            const QString &runId,
+                            const QList<int> &sequences,
+                            const QString &state,
+                            QString *error = nullptr);
+    //! Moves not settled yet (planned, moved or blocked), oldest first.
+    QList<SourceMove> unsettledSourceMoves(qint64 postId, QString *error = nullptr);
+    //! The complete list of what a set prepared: the set becomes verified and
+    //! the entry's current one. A partial list is refused.
+    bool recordPreparedArtifacts(qint64 postId,
+                                 const QString &runId,
+                                 const QString &setId,
+                                 const QList<ArtifactRecord> &artifacts,
+                                 QString *error = nullptr);
+    std::optional<ArtifactSetRecord> artifactSet(const QString &setId, QString *error = nullptr);
+
 private:
     QString _dbPath;
     bool _storePasswords;
@@ -467,6 +564,18 @@ private:
 
     // Queue manager (PostHistoryStoreQueue.cpp).
     QString _ownerId;
+    // Recoverable preparation (PostHistoryStorePreparation.cpp).
+    //! Runs @p work in one SQL transaction, or changes nothing.
+    bool _preparationWrite(const std::function<bool(QSqlDatabase &, QString *)> &work,
+                           QString *error);
+    //! The set is the post's, opened by @p runId; its states are returned.
+    bool _checkOwnSet(QSqlDatabase &db,
+                      qint64 postId,
+                      const QString &runId,
+                      const QString &setId,
+                      QString *state,
+                      QString *toolState,
+                      QString *error);
     QSqlDatabase _database(QString *error);
     static QString _now();
     static void _setQueryError(QString *error, const QSqlQuery &q);

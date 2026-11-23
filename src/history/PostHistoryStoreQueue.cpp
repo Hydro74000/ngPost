@@ -15,6 +15,7 @@
 #include "history/PostHistoryStore.h"
 
 #include "PostingJobOptionsCodec.h"
+#include "history/PostHistorySql.h"
 #include "queue/QueueStore.h"
 
 #include <QFileInfo>
@@ -27,6 +28,8 @@
 #include <QVariant>
 
 using namespace queue;
+using historysql::nullString;
+using historysql::run;
 
 namespace
 {
@@ -71,6 +74,9 @@ QStringList v6QueueStatements()
             "('preparing','verified','invalidated','discarded')),"
             "retained INTEGER NOT NULL DEFAULT 0 CHECK(retained IN (0,1)),"
             "root TEXT NOT NULL, archive_dir TEXT, staging_dir TEXT, marker_identity_json TEXT,"
+            "supervision TEXT, tool_state TEXT NOT NULL DEFAULT 'idle' CHECK(tool_state IN "
+            "('idle','starting','running','quiescing','stopped_verified','unproven')),"
+            "tool_identity_json TEXT,"
             "bytes INTEGER NOT NULL DEFAULT 0 CHECK(bytes >= 0),"
             "created_at TEXT NOT NULL,"
             "UNIQUE(post_id, generation), UNIQUE(post_id, artifact_set_id),"
@@ -208,38 +214,12 @@ QString runState(const QueueEntry &entry)
     return QStringLiteral("queued");
 }
 
-QVariant nullString()
-{
-    return QVariant(QMetaType::fromType<QString>());
-}
-
 QString blockedParams(const BlockReason &reason)
 {
     if (!reason.isBlocked() || reason.params.isEmpty())
         return {};
     return QString::fromUtf8(
         QJsonDocument(QJsonObject::fromVariantMap(reason.params)).toJson(QJsonDocument::Compact));
-}
-
-//! Runs one statement with positional values; false sets @p error.
-bool run(QSqlDatabase &db,
-         const QString &sql,
-         const QVariantList &values,
-         QString *error,
-         int *rows = nullptr)
-{
-    QSqlQuery q(db);
-    q.prepare(sql);
-    for (const QVariant &value : values)
-        q.addBindValue(value);
-    if (!q.exec()) {
-        if (error)
-            *error = q.lastError().text();
-        return false;
-    }
-    if (rows)
-        *rows = q.numRowsAffected();
-    return true;
 }
 
 //! The parent row an entry's (queue, domain) refers to.
@@ -250,12 +230,6 @@ bool ensureOrderRow(QSqlDatabase &db, const QString &queueId, Domain domain, QSt
                               "order_revision) VALUES(?, ?, 0)"),
                { queueId, restoreState(domain) },
                error);
-}
-
-QString artifactState(const QueueEntry &entry)
-{
-    return entry.lifecycle == Lifecycle::Preparing ? QStringLiteral("preparing")
-                                                   : QStringLiteral("verified");
 }
 
 } // namespace
@@ -280,6 +254,18 @@ bool PostHistoryStore::_migrateToV6(QSqlDatabase &db, QString *error)
           "transfer_manifest_complete",
           "ALTER TABLE post_info ADD COLUMN transfer_manifest_complete INTEGER NOT NULL DEFAULT 0 "
           "CHECK(transfer_manifest_complete IN (0, 1))" },
+        // Lot C5: how the tools of a set are supervised (databases of earlier builds).
+        { "post_artifact_sets",
+          "supervision",
+          "ALTER TABLE post_artifact_sets ADD COLUMN supervision TEXT" },
+        { "post_artifact_sets",
+          "tool_state",
+          "ALTER TABLE post_artifact_sets ADD COLUMN tool_state TEXT NOT NULL DEFAULT 'idle' "
+          "CHECK(tool_state IN ('idle','starting','running','quiescing','stopped_verified',"
+          "'unproven'))" },
+        { "post_artifact_sets",
+          "tool_identity_json",
+          "ALTER TABLE post_artifact_sets ADD COLUMN tool_identity_json TEXT" },
     };
     for (const Column &c : columns) {
         QString columnError;
@@ -605,10 +591,12 @@ bool PostHistoryStore::_finishQueuedRun(QSqlDatabase &db,
 //! The local work of a post out of the queue is over: no session owns it any more.
 bool PostHistoryStore::_releaseQueuedPost(QSqlDatabase &db, qint64 postId, QString *error)
 {
+    // Sources not back in place keep their owner: only it may settle them.
     return run(db,
                QStringLiteral("UPDATE posts SET owner_id=NULL WHERE id=? AND (owner_id IS NULL OR "
                               "owner_id=?) AND NOT EXISTS (SELECT 1 FROM post_queue WHERE "
-                              "post_id=posts.id)"),
+                              "post_id=posts.id) AND NOT EXISTS (SELECT 1 FROM post_source_moves "
+                              "WHERE post_id=posts.id AND state IN ('planned','moved','blocked'))"),
                { postId, _ownerId.isEmpty() ? nullString() : QVariant(_ownerId) },
                error);
 }
@@ -717,12 +705,14 @@ bool PostHistoryStore::_admitExistingQueueEntry(QSqlDatabase &db, QueueEntry &en
 }
 
 //! Current and retained sets are recorded; a set the entry let go of is
-//! invalidated (its files are cleaned up by the recovery lot, never here).
+//! invalidated (its files are cleaned up by the recovery lot, never here). A
+//! set is verified only by recordPreparedArtifacts(), with its complete list,
+//! never because the model says the entry is prepared.
 bool PostHistoryStore::_writeArtifactSets(QSqlDatabase &db, const QueueEntry &entry, QString *error)
 {
     QList<std::pair<ArtifactSetRef, QString>> sets;
     if (!entry.artifacts.isNull())
-        sets.append({ entry.artifacts, artifactState(entry) });
+        sets.append({ entry.artifacts, QStringLiteral("preparing") });
     for (const ArtifactSetRef &kept : entry.retainedSets)
         sets.append({ kept, QStringLiteral("invalidated") });
     QStringList keep;
@@ -735,8 +725,11 @@ bool PostHistoryStore::_writeArtifactSets(QSqlDatabase &db, const QueueEntry &en
                      "generation,"
                      "recipe_revision, state, retained, root, bytes, created_at) "
                      "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(artifact_set_id) DO UPDATE "
-                     "SET "
-                     "state=excluded.state, retained=excluded.retained, bytes=excluded.bytes"),
+                     "SET state=CASE WHEN excluded.state='invalidated' THEN 'invalidated' ELSE "
+                     "post_artifact_sets.state END, retained=excluded.retained, bytes=CASE WHEN "
+                     "EXISTS (SELECT 1 FROM post_run_artifacts a WHERE a.artifact_set_id="
+                     "post_artifact_sets.artifact_set_id) THEN post_artifact_sets.bytes ELSE "
+                     "excluded.bytes END"),
                  { set.id,
                    entry.postId,
                    entry.runId,
@@ -993,12 +986,20 @@ bool PostHistoryStore::_retireQueueEntry(QSqlDatabase &db, qint64 postId, QStrin
                { _now(), postId },
                error)
         && run(db,
-               QStringLiteral("UPDATE posts SET status='cancelled', finished_at=?, owner_id=NULL "
-                              "WHERE id=? AND status='queued'"),
+               QStringLiteral("UPDATE posts SET status='cancelled', finished_at=?, owner_id=CASE "
+                              "WHEN EXISTS (SELECT 1 FROM post_source_moves WHERE "
+                              "post_id=posts.id AND state IN ('planned','moved','blocked')) "
+                              "THEN owner_id ELSE NULL END WHERE id=? AND status='queued'"),
                { _now(), postId },
                error)
-        // Out of the queue, a post belongs to no session any more.
-        && run(db, QStringLiteral("UPDATE posts SET owner_id=NULL WHERE id=?"), { postId }, error)
+        // Out of the queue, a post belongs to no session any more, unless its
+        // sources are not back in place yet.
+        && run(db,
+               QStringLiteral("UPDATE posts SET owner_id=NULL WHERE id=? AND NOT EXISTS (SELECT 1 "
+                              "FROM post_source_moves WHERE post_id=posts.id AND state IN "
+                              "('planned','moved','blocked'))"),
+               { postId },
+               error)
         && run(db,
                QStringLiteral("DELETE FROM post_queue_intents WHERE target_post_id=?"),
                { postId },

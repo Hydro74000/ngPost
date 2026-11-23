@@ -7,6 +7,7 @@ DEFINES += APP_VERSION=\\\"queue-test\\\"
 SOURCES += tst_QueueStoreSqlite.cpp \
            ../../../src/history/PostHistoryStore.cpp \
            ../../../src/history/PostHistoryStoreQueue.cpp \
+           ../../../src/history/PostHistoryStorePreparation.cpp \
            ../../../src/history/HistoryQueueStore.cpp
 HEADERS += ../../../src/history/PostHistoryStore.h \
            ../../../src/history/HistoryQueueStore.h

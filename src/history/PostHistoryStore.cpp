@@ -2104,11 +2104,38 @@ bool PostHistoryStore::deletePost(qint64 postId, QString *error)
     if (!initialize(error))
         return false;
     QSqlDatabase db = dbFor(_connectionName(), _dbPath, error);
-    QSqlQuery q(db);
-    q.prepare(QStringLiteral("DELETE FROM posts WHERE id=?"));
-    q.addBindValue(postId);
-    if (!q.exec()) {
-        setError(error, q);
+    if (!db.transaction()) {
+        if (error)
+            *error = db.lastError().text();
+        return false;
+    }
+    // A post whose sources are not back in place is not forgotten. Settled
+    // journals and prepared sets go first: their rows keep their parents
+    // (ON DELETE RESTRICT). Rows only: no user file is touched.
+    const QStringList steps{
+        QStringLiteral("SELECT 1 FROM post_source_moves WHERE post_id=? AND state IN "
+                       "('planned','moved','blocked')"),
+        QStringLiteral("DELETE FROM post_source_moves WHERE post_id=?"),
+        QStringLiteral("DELETE FROM post_artifact_sets WHERE post_id=?"),
+        QStringLiteral("DELETE FROM posts WHERE id=?"),
+    };
+    for (int i = 0; i < steps.size(); ++i) {
+        QSqlQuery q(db);
+        q.prepare(steps.at(i));
+        q.addBindValue(postId);
+        const bool ok = q.exec();
+        if (!ok || (i == 0 && q.next())) {
+            if (error)
+                *error = ok ? QStringLiteral("source_journal_unsettled: post %1").arg(postId)
+                            : q.lastError().text();
+            db.rollback();
+            return false;
+        }
+    }
+    if (!db.commit()) {
+        if (error)
+            *error = db.lastError().text();
+        db.rollback();
         return false;
     }
     return true;
