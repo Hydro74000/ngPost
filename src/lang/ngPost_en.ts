@@ -6955,6 +6955,18 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
         <source>Some source files are still under their obfuscated name: nothing is posted before they are back.</source>
         <translation>Some source files are still under their obfuscated name: nothing is posted before they are back.</translation>
     </message>
+    <message>
+        <source>No temporary folder can be used for %1: %2</source>
+        <translation>No temporary folder can be used for %1: %2</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t create the temporary folder &apos;%1&apos;: %2</source>
+        <translation>Couldn&apos;t create the temporary folder &apos;%1&apos;: %2</translation>
+    </message>
+    <message>
+        <source>The temporary files of %1 are kept: %2</source>
+        <translation>The temporary files of %1 are kept: %2</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>

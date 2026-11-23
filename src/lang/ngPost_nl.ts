@@ -6992,6 +6992,18 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
         <source>Some source files are still under their obfuscated name: nothing is posted before they are back.</source>
         <translation>Sommige bronbestanden dragen nog hun versluierde naam: er wordt niets gepost voordat ze terug zijn.</translation>
     </message>
+    <message>
+        <source>No temporary folder can be used for %1: %2</source>
+        <translation>Er kan geen tijdelijke map worden gebruikt voor %1: %2</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t create the temporary folder &apos;%1&apos;: %2</source>
+        <translation>De tijdelijke map &apos;%1&apos; kon niet worden aangemaakt: %2</translation>
+    </message>
+    <message>
+        <source>The temporary files of %1 are kept: %2</source>
+        <translation>De tijdelijke bestanden van %1 blijven bewaard: %2</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>

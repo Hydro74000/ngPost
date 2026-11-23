@@ -25,6 +25,11 @@ struct JobExecutionContext
     queue::Origin origin = queue::Origin::Quick;
     int tabNumber = 0;
     QString setId; //!< artifact set being prepared or posted, if any
+    //! Lot C5.8: where that set is prepared, as the queue recorded it (its
+    //! root is the effective TMP_DIR or TMP_RAM, chosen before the set exists).
+    QString setRoot;
+    int setGeneration = 0;
+    quint64 setRecipeRevision = 0;
 };
 
 //! The files a preparation produced, as the transfer will publish them. Kept

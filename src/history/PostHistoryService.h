@@ -84,6 +84,13 @@ public:
     bool markPostStarted(qint64 postId, QString *error = nullptr);
     bool setRunScratchNzb(const QString &runId, const QString &path, QString *error = nullptr);
     bool markTransferManifestComplete(qint64 postId, QString *error = nullptr);
+    //! The places of an artifact set, then its marker (lot C5.8, see PostHistoryStore).
+    bool createArtifactSet(const PostHistoryStore::ArtifactSetPlan &plan, QString *error = nullptr);
+    bool recordArtifactMarker(qint64 postId,
+                              const QString &runId,
+                              const QString &setId,
+                              const QString &markerIdentityJson,
+                              QString *error = nullptr);
     //! The supervision of a preparation tool (lot C5.6): written before the tool
     //! may run, then each step of its stop (PostHistoryStore::recordToolSupervision).
     bool recordToolSupervision(qint64 postId,

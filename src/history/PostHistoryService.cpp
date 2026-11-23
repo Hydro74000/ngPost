@@ -771,6 +771,34 @@ bool PostHistoryService::markTransferManifestComplete(qint64 postId, QString *er
     return ok;
 }
 
+bool PostHistoryService::createArtifactSet(const PostHistoryStore::ArtifactSetPlan &plan,
+                                           QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking(
+        [&](PostHistoryWorker *worker) { ok = worker->store().createArtifactSet(plan, &err); });
+    if (error)
+        *error = err;
+    return ok;
+}
+
+bool PostHistoryService::recordArtifactMarker(qint64 postId,
+                                              const QString &runId,
+                                              const QString &setId,
+                                              const QString &markerIdentityJson,
+                                              QString *error)
+{
+    QString err;
+    bool ok = false;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        ok = worker->store().recordArtifactMarker(postId, runId, setId, markerIdentityJson, &err);
+    });
+    if (error)
+        *error = err;
+    return ok;
+}
+
 bool PostHistoryService::recordToolSupervision(qint64 postId,
                                                const QString &runId,
                                                const QString &setId,

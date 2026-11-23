@@ -11,12 +11,15 @@
 
 #include "MockNntpServer.h"
 #include "NgPost.h"
+#include "PostingJobOptionsCodec.h"
+#include "queue/QueueEntry.h"
 #include "TestEnv.h"
 #include "history/PostHistoryService.h"
 #include "queue/PostQueue.h"
 #include "queue/QueueScheduler.h"
 #include "utils/PathHelper.h"
 
+#include <QDir>
 #include <QSignalSpy>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -631,6 +634,32 @@ private slots:
                      .toString(),
                  QStringLiteral("success"));
         QCOMPARE(env.ngPost->postQueue()->find(second.postId)->lifecycle, Lifecycle::Queued);
+    }
+
+    void aPreparationRootIsChosenBeforeItsSet()
+    {
+        Env env;
+        QString error;
+        const QString ram = env.sandbox.rootPath() + QStringLiteral("/ram");
+        const QString disk = env.sandbox.rootPath() + QStringLiteral("/disk");
+        QVERIFY(QDir().mkpath(ram) && QDir().mkpath(disk));
+        QVERIFY2(env.start(&error,
+                           {},
+                           QStringLiteral("TMP_RAM = %1\nTMP_RAM_RATIO = 1.1\n").arg(ram)),
+                 qPrintable(error));
+        QueueEntry entry;
+        entry.options.job = env.post(QStringLiteral("rooted"));
+        entry.options.job.tmpPath = disk;
+        entry.options.job.doCompress = true;
+        // It fits in TMP_RAM: there, canonical, before any set records it (lot C5.8).
+        QCOMPARE(env.ngPost->preparationRoot(entry), QFileInfo(ram).canonicalFilePath());
+        PersistedSource huge;
+        huge.sizeBytes = Q_INT64_C(1) << 60;
+        entry.options.sources = { huge };
+        QCOMPARE(env.ngPost->preparationRoot(entry), QFileInfo(disk).canonicalFilePath());
+        entry.options.sources.clear();
+        entry.options.job.doCompress = false; // nothing prepared: TMP_DIR as before
+        QCOMPARE(env.ngPost->preparationRoot(entry), QFileInfo(disk).canonicalFilePath());
     }
 
     void resumeEndsATechnicalPause()

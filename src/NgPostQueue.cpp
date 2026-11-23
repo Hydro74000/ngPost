@@ -94,12 +94,10 @@ bool NgPost::_ensureQueueEngine()
 
     QueueScheduler::Budget budget;
     budget.preparedMax = _preparePacking ? 1 : 0; // lot C3: PREPARE_PACKING only
-    // Where a preparation writes. The free space budget itself is lot C6: until
-    // then a post that does not fit fails as it always did.
-    budget.rootFor = [](const QueueEntry &entry) {
-        const QString tmp = entry.options.job.tmpPath;
-        return QDir(tmp.isEmpty() ? QDir::tempPath() : tmp).absolutePath();
-    };
+    // Where a preparation writes, chosen before its set records it (lot C5.8).
+    // The free space budget itself is lot C6: until then a post that does not
+    // fit fails as it always did.
+    budget.rootFor = [this](const QueueEntry &entry) { return preparationRoot(entry); };
     _queueScheduler = new QueueScheduler(_postQueue, _queueExecutor, budget, this);
     // Until the queue view can show a blocked entry (C7a), a failed preparation
     // ends its post as failed, as it always did.
@@ -639,6 +637,30 @@ void NgPost::_checkQueueClosed()
 bool NgPost::queueHasEntries() const
 {
     return _postQueue && !_postQueue->snapshot(Domain::Session).isEmpty();
+}
+
+QString NgPost::preparationRoot(const QueueEntry &entry) const
+{
+    const PostingJobOptions &job = entry.options.job;
+    QString root = job.tmpPath.isEmpty() ? QDir::tempPath() : job.tmpPath;
+#ifdef __USE_TMP_RAM__
+    // As PostingJob::_chooseTmpPath() did: TMP_RAM when the post fits in it.
+    if (useTmpRam() && (job.doCompress || job.doPar2)) {
+        qint64 size = 0;
+        for (const PersistedSource &source : entry.options.sources)
+            size += source.sizeBytes;
+        if (size <= 0)
+            for (const QFileInfo &file : job.files)
+                size += recursiveSize(file);
+        const bool par2Only = !job.doCompress;
+        const double ratio = par2Only ? ramRatio() - 1 : ramRatio();
+        if (ratio * static_cast<double>(size) < static_cast<double>(ramAvailable()))
+            root = _ramPath;
+    }
+#endif
+    // The set records it once: canonical, so that it never names two places.
+    const QString canonical = QFileInfo(root).canonicalFilePath();
+    return canonical.isEmpty() ? QDir(root).absolutePath() : canonical;
 }
 
 bool NgPost::_queueHasRuntimes() const

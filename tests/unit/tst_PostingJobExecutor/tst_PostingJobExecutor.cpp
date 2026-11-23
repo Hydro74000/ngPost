@@ -68,6 +68,7 @@ namespace
 // with NGPOST_FAKE_TOOLS set, it does what NGPOST_FAKE_RAR (or NGPOST_FAKE_PAR2,
 // when given a .par2 file) says, as ';'-separated actions run in order:
 //   touch=<path>   pid=<path>   late=<path> (a descendant creates it 1 s later)
+//   args=<path> (its arguments, one per line)
 //   ignoreterm (POSIX)   sleep=<ms>   write=<bytes> (into its archive or .par2)
 //   exit=<code>
 
@@ -141,6 +142,11 @@ int fakeTool(int argc, char *argv[])
             QFile f(value);
             if (f.open(QIODevice::WriteOnly))
                 f.write(QByteArray::number(QCoreApplication::applicationPid()));
+        } else if (name == QLatin1String("args")) {
+            QFile f(value);
+            if (f.open(QIODevice::WriteOnly | QIODevice::Text))
+                for (int i = 1; i < argc; ++i)
+                    f.write(QByteArray(argv[i]) + '\n');
         } else if (name == QLatin1String("late")) {
             spawnLateWriter(value);
         } else if (name == QLatin1String("ignoreterm")) {
@@ -348,8 +354,11 @@ struct Env
 
     qint64 submit(const PersistedQueueOptions &options)
     {
-        return queue->submit(options, Origin::Cli).postIds.value(0);
+        const qint64 id = queue->submit(options, Origin::Cli).postIds.value(0);
+        ids.insert(QFileInfo(options.job.nzbFilePath).completeBaseName(), id);
+        return id;
     }
+    QHash<QString, qint64> ids; //!< post of each name submitted
 
     //! The artifact set the scheduler opens when a preparation begins.
     QString beginSet(qint64 postId)
@@ -359,7 +368,7 @@ struct Env
         set.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
         set.generation = entry->lastGeneration + 1;
         set.recipeRevision = entry->recipeRevision;
-        set.root = root + QStringLiteral("/tmp");
+        set.root = tmpRoot();
         return queue->engineBeginPreparation(postId, set) ? set.id : QString();
     }
 
@@ -428,9 +437,16 @@ struct Env
     }
 
     QString source(const QString &name) const { return root + QStringLiteral("/%1.bin").arg(name); }
-    QString archiveDir(const QString &name) const
+    //! The canonical temporary root, as NgPost::preparationRoot() gives it.
+    QString tmpRoot() const { return QFileInfo(root + QStringLiteral("/tmp")).canonicalFilePath(); }
+    //! The folder of generation @p generation of @p name's sets (lot C5.8).
+    QString setDir(const QString &name, int generation = 1) const
     {
-        return root + QStringLiteral("/tmp/%1-arch").arg(name);
+        return tmpRoot() + QStringLiteral("/ngpost-%1-g%2").arg(ids.value(name)).arg(generation);
+    }
+    QString archiveDir(const QString &name, int generation = 1) const
+    {
+        return setDir(name, generation) + QStringLiteral("/archives");
     }
 
     //! Runs every step of a preparation through the executor alone.
@@ -830,7 +846,7 @@ private slots:
         QVERIFY2(env.start(&error), qPrintable(error));
         QVERIFY(refuseToolStates(env.dbPath(), QStringLiteral("stopped_verified")));
         QueueScheduler::Budget budget;
-        budget.rootFor = [&env](const QueueEntry &) { return env.root + QStringLiteral("/tmp"); };
+        budget.rootFor = [&env](const QueueEntry &) { return env.tmpRoot(); };
         QueueScheduler scheduler(env.queue.get(), env.executor.get(), budget);
         const qint64 id = env.submit(env.post(QStringLiteral("unended"), true, false, 64000, true));
         QTRY_VERIFY_WITH_TIMEOUT(scheduler.isTechnicallyPaused(), 15000);
@@ -889,7 +905,7 @@ private slots:
         QVERIFY2(env.start(&error, QStringLiteral("pid=%1;sleep=30000").arg(pidFile)),
                  qPrintable(error));
         QueueScheduler::Budget budget;
-        budget.rootFor = [&env](const QueueEntry &) { return env.root + QStringLiteral("/tmp"); };
+        budget.rootFor = [&env](const QueueEntry &) { return env.tmpRoot(); };
         QueueScheduler scheduler(env.queue.get(), env.executor.get(), budget);
         const qint64 id = env.submit(env.post(QStringLiteral("lost"), true, false, 64000, true));
         QTRY_VERIFY_WITH_TIMEOUT(!env.queue->find(id)->artifacts.isNull(), 10000);
@@ -1084,7 +1100,8 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(quiesced.size(), 1, 10000);
         QVERIFY(quiesced.first().at(2).toBool());
         QCOMPARE(env.moveStates(id), QStringList{ QStringLiteral("restored") });
-        QVERIFY(!QFileInfo::exists(env.root + QStringLiteral("/tmp/.ngPost_src_unheld-arch")));
+        QVERIFY(
+            !QFileInfo::exists(env.setDir(QStringLiteral("unheld")) + QStringLiteral("/staging")));
 #endif
     }
 
@@ -1239,7 +1256,7 @@ private slots:
         QString error;
         QVERIFY2(env.start(&error, rar), qPrintable(error));
         QueueScheduler::Budget budget;
-        budget.rootFor = [&env](const QueueEntry &) { return env.root + QStringLiteral("/tmp"); };
+        budget.rootFor = [&env](const QueueEntry &) { return env.tmpRoot(); };
         QueueScheduler scheduler(env.queue.get(), env.executor.get(), budget);
         // Even where a failed preparation retires its post (the command line).
         scheduler.setPreparationFailurePolicy(QueueScheduler::PreparationFailure::Retire);
@@ -1288,6 +1305,147 @@ private slots:
         QCOMPARE(owner, QStringLiteral("owner-test"));
         QVERIFY(env.refuseReturns(false));
 #endif
+    }
+
+    // --- one folder per set (lot C5.8) -----------------------------------------------------
+
+    void twoGenerationsLiveSideBySide()
+    {
+#ifndef PROVEN_SUPERVISION
+        QSKIP("only \"exited\" here: the first runtime keeps its guard");
+#else
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        PersistedQueueOptions options = env.post(QStringLiteral("kept"), true, true);
+        options.job.keepRar = true;
+        const qint64 id = env.submit(options);
+        const QString run = env.queue->find(id)->runId;
+        QVERIFY2(env.prepare(id, run, env.beginSet(id), &error), qPrintable(error));
+        QTRY_VERIFY(!env.executor->runtime(id));
+        // The next generation of the same post: its own folder, the first kept.
+        QVERIFY2(env.prepare(id, run, env.beginSet(id), &error), qPrintable(error));
+        QTRY_VERIFY(!env.executor->runtime(id));
+        for (const int generation : { 1, 2 }) {
+            QVERIFY(QFileInfo::exists(env.archiveDir(QStringLiteral("kept"), generation)
+                                      + QStringLiteral("/kept-arch.rar")));
+            QVERIFY(QFileInfo::exists(env.setDir(QStringLiteral("kept"), generation)
+                                      + QStringLiteral("/.ngpost-set")));
+        }
+#endif
+    }
+
+    void aReplacedMarkerKeepsTheSetFolder()
+    {
+#ifndef PROVEN_SUPERVISION
+        QSKIP("nothing is ever proven here: nothing is deleted anyway");
+#else
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("foreign"), true, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QVERIFY2(env.prepare(id, run, set, &error), qPrintable(error));
+        QSignalSpy finished(env.executor.get(), &QueueExecutor::transferFinished);
+        QSignalSpy finalized(env.executor.get(), &QueueExecutor::finalized);
+        env.executor->activate(id, run, set);
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 20000);
+        env.executor->finalize(id, run);
+        QTRY_COMPARE_WITH_TIMEOUT(finalized.size(), 1, 10000);
+        // Its marker replaced: the folder is no longer provably the set's.
+        const QString marker = env.setDir(QStringLiteral("foreign"))
+            + QStringLiteral("/.ngpost-set");
+        QVERIFY(QFile::remove(marker));
+        QFile again(marker);
+        QVERIFY(again.open(QIODevice::WriteOnly));
+        again.close();
+        env.executor->completeLocalWork(id, run);
+        QTRY_VERIFY(!env.executor->runtime(id));
+        QTest::qWait(300);
+        QVERIFY(QFileInfo::exists(env.archiveDir(QStringLiteral("foreign"))
+                                  + QStringLiteral("/foreign-arch.rar")));
+#endif
+    }
+
+    void markersAndStagingAreNeverPosted()
+    {
+        Env env;
+        QString error;
+        const QString par2Args = env.sandbox.rootPath() + QStringLiteral("/par2-args");
+        QVERIFY2(env.start(&error, {}, {}, QStringLiteral("args=%1;write=4000").arg(par2Args)),
+                 qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("inside"), true, true, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        for (const PrepStep step : { PrepStep::Compress, PrepStep::Par2, PrepStep::Collect }) {
+            const qsizetype before = steps.size();
+            env.executor->prepareStep(id, run, set, step);
+            QTRY_VERIFY_WITH_TIMEOUT(steps.size() > before, 15000);
+        }
+        QFile args(par2Args);
+        QVERIFY(args.open(QIODevice::ReadOnly));
+        const QByteArray given = args.readAll();
+        QVERIFY2(!given.contains(".ngpost-set") && !given.contains("/staging"), given.constData());
+#ifdef PROVEN_SUPERVISION
+        const PreparedManifest manifest = env.executor->manifest(id, run, set);
+        QVERIFY(manifest.isValid());
+        for (const QString &file : manifest.files) {
+            QVERIFY2(file.startsWith(env.archiveDir(QStringLiteral("inside")) + QLatin1Char('/')),
+                     qPrintable(file));
+            QVERIFY(!file.endsWith(QStringLiteral(".ngpost-set")));
+        }
+#endif
+    }
+
+    void aSetFolderAlreadyThereIsNeverTouched()
+    {
+        Env env;
+        QString error;
+        const QString ran = env.sandbox.rootPath() + QStringLiteral("/rar-ran");
+        QVERIFY2(env.start(&error, QStringLiteral("touch=%1;write=40000").arg(ran)),
+                 qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("taken"), true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        // Someone else's folder under the name the set would take.
+        QVERIFY(QDir().mkpath(env.setDir(QStringLiteral("taken"))));
+        QFile theirs(env.setDir(QStringLiteral("taken")) + QStringLiteral("/theirs.txt"));
+        QVERIFY(theirs.open(QIODevice::WriteOnly));
+        theirs.write("theirs");
+        theirs.close();
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, set, PrepStep::Compress);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(!steps.first().at(4).toBool());
+        QVERIFY2(steps.first().at(5).toString().contains(QStringLiteral("temporary folder")),
+                 qPrintable(steps.first().at(5).toString()));
+        QVERIFY(QFileInfo::exists(theirs.fileName()));
+        QVERIFY(!QFileInfo::exists(ran)); // no tool started
+        QTRY_VERIFY(!env.executor->runtime(id));
+    }
+
+    void aRefusedMarkerRecordStartsNoTool()
+    {
+        Env env;
+        QString error;
+        const QString ran = env.sandbox.rootPath() + QStringLiteral("/rar-ran");
+        QVERIFY2(env.start(&error, QStringLiteral("touch=%1;write=40000").arg(ran)),
+                 qPrintable(error));
+        QVERIFY(env.exec(QStringLiteral("CREATE TRIGGER refuse_markers BEFORE UPDATE OF "
+                                        "marker_identity_json ON post_artifact_sets BEGIN SELECT "
+                                        "RAISE(ABORT, 'injected'); END")));
+        const qint64 id = env.submit(env.post(QStringLiteral("unmarked"), true));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, env.beginSet(id), PrepStep::Compress);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(!steps.first().at(4).toBool());
+        const QString stepErr = steps.first().at(5).toString();
+        QVERIFY2(stepErrorIs(stepErr, kStepStoreFailed), qPrintable(stepErr));
+        QVERIFY(QFileInfo::exists(env.setDir(QStringLiteral("unmarked")))); // kept, not deleted
+        QVERIFY(!QFileInfo::exists(ran));
     }
 
     void archivesAndSourcesGoOnlyOnceTheirToolIsProvenStopped()

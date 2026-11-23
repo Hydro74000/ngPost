@@ -961,6 +961,9 @@ public:
 
 #ifdef __USE_TMP_RAM__
     inline bool useTmpRam() const;
+    //! Queue engine (lot C5.8): where a preparation of @p entry writes, TMP_RAM
+    //! when it fits, TMP_DIR otherwise; canonical. Its set records it.
+    QString preparationRoot(const queue::QueueEntry &entry) const;
     inline double ramRatio() const;
     qint64 ramAvailable() const;
     static qint64 recursiveSize(const QFileInfo &fi);

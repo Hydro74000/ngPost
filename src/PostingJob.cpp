@@ -29,6 +29,7 @@
 #include "postinfo/PostInfoTemplate.h"
 #include "tools/ExternalToolProcess.h"
 #include "tools/ExternalToolResolver.h"
+#include "utils/NativeFileIdentity.h"
 #include "utils/NoReplaceRename.h"
 #include "utils/PathHelper.h"
 #include "utils/SecretMasker.h"
@@ -957,15 +958,22 @@ bool PostingJob::runPreparationStep(queue::PrepStep step)
     }
     switch (step) {
     case queue::PrepStep::Compress:
-        _chooseTmpPath(false);
+        // A queue runtime prepares in the folder of its set: its root was
+        // chosen (TMP_RAM or TMP_DIR) before the set was recorded.
+        if (!_openWorkspace()) {
+            _finishStep(step, false, std::exchange(_stepFailure, QString()));
+            return false;
+        }
         if (_canCompress(false)
             && startCompressFiles(_rarPath, _tmpPath, _rarName, _rarPass, _rarSize))
             return true;
         _finishStep(step, false, std::exchange(_stepFailure, QString())); // also in the log
         return false;
     case queue::PrepStep::Par2:
-        if (!_compressedThisRun)
-            _chooseTmpPath(true);
+        if (!_openWorkspace()) {
+            _finishStep(step, false, std::exchange(_stepFailure, QString()));
+            return false;
+        }
         if (_canGenPar2(false) && startGenPar2(_tmpPath, _rarName, _par2Pct))
             return true;
         _finishStep(step, false, {}); // the reason is already in the log
@@ -1069,6 +1077,7 @@ bool PostingJob::activateTransfer(const PreparedManifest &manifest)
         }
         delete _compressDir;
         _compressDir = new QDir(manifest.dir);
+        _loadWorkspace(); // its cleanup stays the set's own (lot C5.8)
         _files.clear();
         for (const QString &path : manifest.files)
             _files << QFileInfo(path);
@@ -1652,7 +1661,9 @@ void PostingJob::_copyNfoNextToNzb()
 //! error and the user's own files must never live inside something we delete.
 QString PostingJob::_obfuscateInputFileNames(QString const &tmpFolder, QString const &archiveName)
 {
-    QString const stagingPath = QString("%1/.ngPost_src_%2").arg(tmpFolder, archiveName);
+    QString const stagingPath = _workspace
+        ? _workspace->stagingDir
+        : QString("%1/.ngPost_src_%2").arg(tmpFolder, archiveName);
     QDir          staging(stagingPath);
     bool const    hasStaging = staging.exists() || staging.mkpath(QStringLiteral("."));
     if (!hasStaging)
@@ -3046,7 +3057,7 @@ bool PostingJob::startGenPar2(const QString &tmpFolder, const QString &archiveNa
                                      (_par2Tool == par2::Tool::MultiPar),
                                      redundancy);
 
-    QString archiveTmpFolder = QString("%1/%2").arg(tmpFolder, archiveName);
+    QString archiveTmpFolder = _archiveFolder(tmpFolder, archiveName);
 
     // we've already compressed => we gen par2 for the files in the archive folder
     if (_compressedThisRun) {
@@ -3433,6 +3444,17 @@ void PostingJob::_cleanCompressDir()
     // comes first (lot C5.7).
     if (!_compressDir || _moveRecordFailed)
         return;
+    // A queue runtime deletes only its own set, proven by its marker (lot
+    // C5.8); keepRar retains it. Without its workspace, nothing at all.
+    if (_queueRuntime) {
+        if (!_toolStopProven())
+            return;
+        QString err;
+        if (_workspace && !_workspace->removeArchives(_context.setId, _markerJson, _keepRar, &err)
+            && !_keepRar)
+            _log(tr("The temporary files of %1 are kept: %2").arg(_nzbName, err));
+        return;
+    }
     if (!_toolStopProven()) {
         _log(tr("The temporary files of %1 are kept: their tool may still write in them.")
                  .arg(_nzbName));
@@ -3444,8 +3466,91 @@ void PostingJob::_cleanCompressDir()
         _log(tr("Compressed files deleted."));
 }
 
+QString PostingJob::_archiveFolder(const QString &tmpFolder, const QString &archiveName) const
+{
+    return _workspace ? _workspace->archiveDir : QString("%1/%2").arg(tmpFolder, archiveName);
+}
+
+//! Queue runtime (lot C5.8): the folder of its set, in that order: its places
+//! recorded, the folders created, the identity of its marker recorded. Any
+//! failure stops there; what was created is kept (nothing proves it ours).
+bool PostingJob::_openWorkspace()
+{
+    if (!_queueRuntime || _workspace)
+        return true;
+    PostHistoryService *history = _ngPost->historyService();
+    QString err;
+    const auto plan = PreparationWorkspace::plan(_context.setRoot,
+                                                 _context.postId,
+                                                 _context.setGeneration,
+                                                 &err);
+    if (!plan || !history || _context.setId.isEmpty()) {
+        _stepFailure = tr("No temporary folder can be used for %1: %2")
+                           .arg(_nzbName, err.isEmpty() ? QStringLiteral("no set") : err);
+        _error(_stepFailure);
+        return false;
+    }
+    const PostHistoryStore::ArtifactSetPlan places{ _context.setId,
+                                                    _context.postId,
+                                                    _context.runId,
+                                                    _context.setGeneration,
+                                                    _context.setRecipeRevision,
+                                                    plan->root,
+                                                    plan->archiveDir,
+                                                    plan->stagingDir };
+    if (!history->createArtifactSet(places, &err)) {
+        _error(tr("History database error: %1").arg(err));
+        _stepFailure = queue::stepError(queue::kStepStoreFailed, err);
+        return false;
+    }
+    NativeFileIdentity marker;
+    if (!plan->create(_context.setId, &marker, &err)) {
+        _stepFailure = tr("Couldn't create the temporary folder '%1': %2").arg(plan->setDir, err);
+        _error(_stepFailure);
+        return false;
+    }
+    if (!history->recordArtifactMarker(_context.postId,
+                                       _context.runId,
+                                       _context.setId,
+                                       marker.toJson(),
+                                       &err)) {
+        _error(tr("History database error: %1").arg(err));
+        _stepFailure = queue::stepError(queue::kStepStoreFailed, err);
+        return false;
+    }
+    _workspace = *plan;
+    _markerJson = marker.toJson();
+    _tmpPath = plan->root;
+    return true;
+}
+
+//! Queue runtime activated on a prepared set (lot C5.8): its folder and marker
+//! as the history holds them, so that its cleanup stays the set's own.
+bool PostingJob::_loadWorkspace()
+{
+    if (!_queueRuntime || _workspace || _context.setId.isEmpty())
+        return _workspace.has_value();
+    PostHistoryService *history = _ngPost->historyService();
+    const auto set = history ? history->artifactSet(_context.setId)
+                             : std::optional<PostHistoryStore::ArtifactSetRecord>();
+    const auto plan = set
+        ? PreparationWorkspace::plan(set->plan.root, _context.postId, set->plan.generation)
+        : std::nullopt;
+    if (!plan || set->markerIdentityJson.isEmpty() || plan->archiveDir != set->plan.archiveDir)
+        return false;
+    _workspace = *plan;
+    _markerJson = set->markerIdentityJson;
+    return true;
+}
+
 QString PostingJob::_createArchiveFolder(const QString &tmpFolder, const QString &archiveName)
 {
+    if (_workspace) {
+        // Created with its set: the tools write there and nowhere else.
+        delete _compressDir;
+        _compressDir = new QDir(_workspace->archiveDir);
+        return _workspace->archiveDir;
+    }
     QString archiveTmpFolder = QString("%1/%2").arg(tmpFolder).arg(archiveName);
     _compressDir = new QDir(archiveTmpFolder);
     if (_compressDir->exists()) {

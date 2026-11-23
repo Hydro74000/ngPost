@@ -7702,8 +7702,13 @@ void TestMainWindow::stop_then_post_all_restarts_stopped_tabs()
     }
     QVERIFY(ngPost.historyService()->flush(&error));
     QCOMPARE(ngPost.historyService()->listPosts({}, &error).size(), 2);
-    if (compressed) // kept for a resume until the tab posts again
-        QVERIFY(QFileInfo::exists(root + "/restart-1"));
+    if (compressed) { // kept for a resume until the tab posts again
+        // The queue engine prepares in one folder per set (lot C5.8).
+        if (qEnvironmentVariable("NGPOST_QUEUE_ENGINE") == QLatin1String("1"))
+            QVERIFY(!QDir(root).entryList({ QStringLiteral("ngpost-*-g*") }, QDir::Dirs).isEmpty());
+        else
+            QVERIFY(QFileInfo::exists(root + "/restart-1"));
+    }
     QVERIFY(QFileInfo::exists(posts.first()->findChild<QLineEdit *>("nzbFileEdit")->text()));
 
     // The NZB the stop left is the tab's own: posting again asks nothing.

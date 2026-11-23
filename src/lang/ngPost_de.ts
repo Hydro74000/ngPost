@@ -6988,6 +6988,18 @@ Setzen Sie PAR2_SOURCE = custom und korrigieren Sie PAR2_PATH in der Konfigurati
         <source>Some source files are still under their obfuscated name: nothing is posted before they are back.</source>
         <translation>Einige Quelldateien tragen noch ihren verschleierten Namen: Nichts wird gepostet, bevor sie zurück sind.</translation>
     </message>
+    <message>
+        <source>No temporary folder can be used for %1: %2</source>
+        <translation>Für %1 kann kein temporärer Ordner verwendet werden: %2</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t create the temporary folder &apos;%1&apos;: %2</source>
+        <translation>Der temporäre Ordner „%1“ konnte nicht erstellt werden: %2</translation>
+    </message>
+    <message>
+        <source>The temporary files of %1 are kept: %2</source>
+        <translation>Die temporären Dateien von %1 bleiben erhalten: %2</translation>
+    </message>
 </context>
 <context>
     <name>PostingWidget</name>

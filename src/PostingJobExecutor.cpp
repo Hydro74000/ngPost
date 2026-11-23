@@ -81,6 +81,11 @@ PostingJob *PostingJobExecutor::createJob(qint64 postId, const QString &runId, c
     context.origin = entry->origin;
     context.tabNumber = entry->tabNumber;
     context.setId = setId;
+    if (!setId.isEmpty() && entry->artifacts.id == setId) {
+        context.setRoot = entry->artifacts.root;
+        context.setGeneration = entry->artifacts.generation;
+        context.setRecipeRevision = entry->artifacts.recipeRevision;
+    }
     PostingJob *job = _factory(*entry, context);
     if (job && !job->parent())
         job->setParent(this);

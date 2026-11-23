@@ -23,6 +23,7 @@
 #include "PostingJobExecution.h"
 #include "PostingJobOptions.h"
 #include "queue/QueueTypes.h"
+#include "tools/PreparationWorkspace.h"
 #include "utils/Macros.h"
 
 #include <QDateTime>
@@ -227,6 +228,10 @@ private:
     bool _moveRecordFailed = false; //!< the history refused an outcome: the step fails
     int _nextMoveSequence = 0;
     QString _stepFailure; //!< why the step being started could not start
+    //! Queue runtime (lot C5.8): the folder of its artifact set, and the
+    //! identity of its marker; nothing else is ever deleted for it.
+    std::optional<PreparationWorkspace> _workspace;
+    QString _markerJson;
 
     const QList<QString>
         _grpList; //!< Newsgroup where we're posting in a list format to write in the nzb file
@@ -551,6 +556,9 @@ private:
     QString _obfuscateInputFileNames(QString const &tmpFolder, QString const &archiveName);
     QString _obfuscateQueuedSource(const QFileInfo &fileInfo, const QString &randomBase);
     bool _obfuscateBeforeCompression(QString const &tmpFolder, QString const &archiveName);
+    bool _openWorkspace();
+    bool _loadWorkspace();
+    QString _archiveFolder(const QString &tmpFolder, const QString &archiveName) const;
     bool _restoreQueuedSources();
     bool _restoreObfuscatedFileNames();
 

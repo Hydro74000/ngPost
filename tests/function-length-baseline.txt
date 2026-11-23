@@ -313,7 +313,7 @@
 61	src/NgPostQueue.cpp	NgPost::_connectQueueEvents()
 33	src/NgPostQueue.cpp	NgPost::_connectQueueExecutor()
 21	src/NgPostQueue.cpp	NgPost::_createQueueRuntime( const QueueEntry & entry , const JobExecutionContext & context)
-58	src/NgPostQueue.cpp	NgPost::_ensureQueueEngine()
+56	src/NgPostQueue.cpp	NgPost::_ensureQueueEngine()
 33	src/NgPostQueue.cpp	NgPost::_onQueueRuntimeActivated( qint64 postId , PostingJob * job)
 19	src/NgPostQueue.cpp	NgPost::_onQueueRuntimeEnded( qint64 postId , PostingJob * job)
 13	src/NgPostQueue.cpp	NgPost::_onQueueRuntimeKept( qint64 postId , PostingJob * job)
@@ -333,6 +333,7 @@
 20	src/NgPostQueue.cpp	NgPost::admitPost( const PostingJobOptions & options , Origin origin , int tabNumber , PostingWidget * view)
 14	src/NgPostQueue.cpp	NgPost::admitResume( qint64 postId , const PostingJobOptions & options , Origin origin , PostingWidget * view)
 22	src/NgPostQueue.cpp	NgPost::closeQueueKeeping( bool letTransferFinish)
+23	src/NgPostQueue.cpp	NgPost::preparationRoot( const QueueEntry & entry) const
 4	src/NgPostQueue.cpp	NgPost::queueHasEntries() const
 12	src/NgPostQueue.cpp	NgPost::requestGracefulExit()
 8	src/NgPostQueue.cpp	NgPost::startQueuedWork()
@@ -499,12 +500,13 @@
 7	src/PostingJob.cpp	PostingJob::_activeMs() const
 9	src/PostingJob.cpp	PostingJob::_afterCompletePost()
 9	src/PostingJob.cpp	PostingJob::_answerQuiesce()
+4	src/PostingJob.cpp	PostingJob::_archiveFolder( const QString & tmpFolder , const QString & archiveName) const
 63	src/PostingJob.cpp	PostingJob::_buildFinalPostInfoData()
 17	src/PostingJob.cpp	PostingJob::_canCompress( bool checkTemporaryPath) const
 30	src/PostingJob.cpp	PostingJob::_canGenPar2( bool checkTemporaryPath) const
 15	src/PostingJob.cpp	PostingJob::_checkTmpFolder() const
 31	src/PostingJob.cpp	PostingJob::_chooseTmpPath( bool par2Only)
-16	src/PostingJob.cpp	PostingJob::_cleanCompressDir()
+27	src/PostingJob.cpp	PostingJob::_cleanCompressDir()
 8	src/PostingJob.cpp	PostingJob::_cleanExtProc()
 12	src/PostingJob.cpp	PostingJob::_closeNzb()
 7	src/PostingJob.cpp	PostingJob::_closeNzbStream()
@@ -515,7 +517,7 @@
 34	src/PostingJob.cpp	PostingJob::_connectWidgetSignals()
 21	src/PostingJob.cpp	PostingJob::_copyNfoNextToNzb()
 32	src/PostingJob.cpp	PostingJob::_copyNfoToArchive()
-21	src/PostingJob.cpp	PostingJob::_createArchiveFolder( const QString & tmpFolder , const QString & archiveName)
+27	src/PostingJob.cpp	PostingJob::_createArchiveFolder( const QString & tmpFolder , const QString & archiveName)
 19	src/PostingJob.cpp	PostingJob::_createExtProc()
 50	src/PostingJob.cpp	PostingJob::_createHistoryRecord()
 50	src/PostingJob.cpp	PostingJob::_createNntpConnections()
@@ -530,17 +532,19 @@
 10	src/PostingJob.cpp	PostingJob::_flushHistoryService()
 191	src/PostingJob.cpp	PostingJob::_initPosting()
 48	src/PostingJob.cpp	PostingJob::_livePostInfoData() const
+16	src/PostingJob.cpp	PostingJob::_loadWorkspace()
 4	src/PostingJob.cpp	PostingJob::_log( const QString & aMsg , bool newline) const
 17	src/PostingJob.cpp	PostingJob::_logStart()
 11	src/PostingJob.cpp	PostingJob::_mergedPauseReason( PauseReason current , PauseReason incoming)
 12	src/PostingJob.cpp	PostingJob::_obfuscateBeforeCompression( QString const & tmpFolder , QString const & archiveName)
-68	src/PostingJob.cpp	PostingJob::_obfuscateInputFileNames( QString const & tmpFolder , QString const & archiveName)
+70	src/PostingJob.cpp	PostingJob::_obfuscateInputFileNames( QString const & tmpFolder , QString const & archiveName)
 49	src/PostingJob.cpp	PostingJob::_obfuscateQueuedSource( const QFileInfo & fileInfo , const QString & randomBase)
 14	src/PostingJob.cpp	PostingJob::_onToolErrorOutput( const QByteArray & output)
 9	src/PostingJob.cpp	PostingJob::_onToolOutput( const QByteArray & output)
 12	src/PostingJob.cpp	PostingJob::_onToolReady( const QString & capability , const QString &)
 5	src/PostingJob.cpp	PostingJob::_onToolStarted()
 57	src/PostingJob.cpp	PostingJob::_onToolStopped()
+49	src/PostingJob.cpp	PostingJob::_openWorkspace()
 103	src/PostingJob.cpp	PostingJob::_postFiles()
 12	src/PostingJob.cpp	PostingJob::_prepareLegacyProcess((PostingJob::*onEnd)(int,QProcess::ExitStatus))
 8	src/PostingJob.cpp	PostingJob::_preparePostersArticles()
@@ -566,7 +570,7 @@
 4	src/PostingJob.cpp	PostingJob::_warn( const QString & warning) const
 30	src/PostingJob.cpp	PostingJob::_writeNzbHeader()
 51	src/PostingJob.cpp	PostingJob::_writePostInfoFile()
-29	src/PostingJob.cpp	PostingJob::activateTransfer( const PreparedManifest & manifest)
+30	src/PostingJob.cpp	PostingJob::activateTransfer( const PreparedManifest & manifest)
 7	src/PostingJob.cpp	PostingJob::buildPar2ArgsForTest( const QString & configuredArgs , bool useParPar , bool useMultiPar , uint redundancy)
 9	src/PostingJob.cpp	PostingJob::finishTransfer()
 4	src/PostingJob.cpp	PostingJob::holdsUnprovenTool() const
@@ -599,7 +603,7 @@
 19	src/PostingJob.cpp	PostingJob::resume()
 7	src/PostingJob.cpp	PostingJob::resumeIfPausedFor( PauseReason reason)
 8	src/PostingJob.cpp	PostingJob::runPostFinalizationWork( bool nzbReady)
-53	src/PostingJob.cpp	PostingJob::runPreparationStep( queue :: PrepStep step)
+60	src/PostingJob.cpp	PostingJob::runPreparationStep( queue :: PrepStep step)
 6	src/PostingJob.cpp	PostingJob::settleSources()
 4	src/PostingJob.cpp	PostingJob::sslSupportInfo()
 142	src/PostingJob.cpp	PostingJob::startCompressFiles( const QString & cmdRar , const QString & tmpFolder , const QString & archiveName , const QString & pass , uint volSize)
@@ -683,7 +687,7 @@
 12	src/PostingJobExecutor.cpp	PostingJobExecutor::abandonPlanning( qint64 postId , const QString & runId)
 51	src/PostingJobExecutor.cpp	PostingJobExecutor::activate( qint64 postId , const QString & runId , const QString & setId)
 21	src/PostingJobExecutor.cpp	PostingJobExecutor::completeLocalWork( qint64 postId , const QString & runId)
-17	src/PostingJobExecutor.cpp	PostingJobExecutor::createJob( qint64 postId , const QString & runId , const QString & setId)
+22	src/PostingJobExecutor.cpp	PostingJobExecutor::createJob( qint64 postId , const QString & runId , const QString & setId)
 15	src/PostingJobExecutor.cpp	PostingJobExecutor::finalize( qint64 postId , const QString & runId)
 23	src/PostingJobExecutor.cpp	PostingJobExecutor::interrupt( qint64 postId , const QString & runId , Disposition disposition)
 8	src/PostingJobExecutor.cpp	PostingJobExecutor::isCurrent( qint64 postId , const PostingJob * job , const QString & runId , Phase phase) const
@@ -766,6 +770,7 @@
 11	src/history/PostHistoryService.cpp	PostHistoryService::cleanupInvalidResumePosts( QString * error)
 10	src/history/PostHistoryService.cpp	PostHistoryService::commitQueueTransaction( const queue :: QueueTransaction & transaction)
 4	src/history/PostHistoryService.cpp	PostHistoryService::configure( const QString & dbPath , bool storePasswords)
+11	src/history/PostHistoryService.cpp	PostHistoryService::createArtifactSet( const PostHistoryStore :: ArtifactSetPlan & plan , QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::createPost( const PostHistoryStore :: PostRecord & record , QString * error)
 13	src/history/PostHistoryService.cpp	PostHistoryService::createPost( const PostHistoryStore :: PostRecord & record , const PostHistoryStore :: PostInfo & info , const QMap<QString,MetaValue> & meta , QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::deletePost( qint64 postId , QString * error)
@@ -795,6 +800,7 @@
 9	src/history/PostHistoryService.cpp	PostHistoryService::purgePassword( qint64 postId , QString * error)
 9	src/history/PostHistoryService.cpp	PostHistoryService::purgeResumeData( qint64 postId , QString * error)
 6	src/history/PostHistoryService.cpp	PostHistoryService::queueIds( QString * error)
+15	src/history/PostHistoryService.cpp	PostHistoryService::recordArtifactMarker( qint64 postId , const QString & runId , const QString & setId , const QString & markerIdentityJson , QString * error)
 23	src/history/PostHistoryService.cpp	PostHistoryService::recordToolSupervision( qint64 postId , const QString & runId , const QString & setId , const QString & capability , const QString & toolState , const QString & toolIdentityJson , QString * error)
 15	src/history/PostHistoryService.cpp	PostHistoryService::regenerateNzb( qint64 postId , QTextStream & stream , bool includePassword , QStringList * warnings , QString * error)
 21	src/history/PostHistoryService.cpp	PostHistoryService::regenerateNzbToFile( qint64 postId , const QString & outPath , bool includePassword , QStringList * warnings , QString * error , const QString & passwordOverride)
