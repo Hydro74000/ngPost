@@ -21,7 +21,9 @@
 #include <QCoreApplication>
 #include <QLoggingCategory>
 #include "NgPost.h"
+#include "tools/ToolSupervisor.h"
 #include <csignal>
+#include <cstring>
 #include <iostream>
 
 #if defined(Q_OS_WIN)
@@ -481,6 +483,32 @@ void attachWindowsStopRouter(NgPost *ngPost)
 
 #endif // Q_OS_UNIX vs Q_OS_WIN
 
+//! Before NgPost's constructor runs. On POSIX, NgPost wires up VpnManager,
+//! UpdateChecker, PostHistoryService and the network access manager, any of
+//! which can spawn Qt internal threads: installing first ensures every later
+//! thread inherits the blocked signal mask, so the kernel always delivers our
+//! signals to the main thread.
+void installStopRouter()
+{
+#if defined(Q_OS_UNIX)
+    if (!installPosixSignalRouter())
+        std::cerr << "warning: failed to install POSIX signal router\n";
+#else
+    if (!installWindowsStopRouter())
+        std::cerr << "warning: failed to install the Windows stop handler\n";
+#endif
+}
+
+//! Once NgPost exists: stop requests reach it on its thread.
+void attachStopRouter(NgPost *ngPost)
+{
+#if defined(Q_OS_UNIX)
+    attachPosixSignalRouter(ngPost);
+#else
+    attachWindowsStopRouter(ngPost);
+#endif
+}
+
 } // anonymous namespace
 
 #if defined(__USE_TMP_RAM__) && defined(__DEBUG__)
@@ -495,30 +523,18 @@ void dispFolderSize(const QFileInfo &folderPath)
 
 int main(int argc, char* argv[])
 {
+    // A preparation tool's supervisor (lot C5.3): ngPost itself, before any
+    // Qt object, signal router or configuration.
+    if (argc > 1 && std::strcmp(argv[1], toolsupervisor::kSwitch) == 0)
+        return toolsupervisor::run(argc, argv);
+
     // disable SSL warnings
     QLoggingCategory::setFilterRules("qt.network.ssl.warning=false");
 
-#if defined(Q_OS_UNIX)
-    // Install the signal router *before* NgPost's constructor runs — NgPost
-    // wires up VpnManager, UpdateChecker, PostHistoryService and the network
-    // access manager, any of which can spawn Qt internal threads. Doing this
-    // first ensures every later thread inherits the blocked signal mask, so
-    // the kernel always delivers our signals to the main thread.
-    if (!installPosixSignalRouter())
-        std::cerr << "warning: failed to install POSIX signal router\n";
-#else
-    if (!installWindowsStopRouter())
-        std::cerr << "warning: failed to install the Windows stop handler\n";
-#endif
-
+    installStopRouter();
     //    qDebug() << "argc: " << argc;
     app = new NgPost(argc, argv);
-
-#if defined(Q_OS_UNIX)
-    attachPosixSignalRouter(app);
-#else
-    attachWindowsStopRouter(app);
-#endif
+    attachStopRouter(app);
 
     int exitCode = 0;
 #ifdef __USE_HMI__
