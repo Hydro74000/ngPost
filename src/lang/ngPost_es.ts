@@ -4723,6 +4723,10 @@ Su archivo de configuración activo es:
         <source>The queue waits: ngPost could not make sure that a post stopped (%1). Its files are left as they are until ngPost restarts.</source>
         <translation>La cola espera: ngPost no pudo asegurarse de que una publicación se detuviera (%1). Sus archivos se dejan tal cual hasta que ngPost se reinicie.</translation>
     </message>
+    <message>
+        <source>The queue waits: some source files are still under their obfuscated name. They are left as they are until ngPost restarts.</source>
+        <translation>La cola espera: algunos archivos de origen siguen con su nombre ofuscado. Se dejan tal cual hasta que ngPost se reinicie.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -6975,6 +6979,14 @@ Establezca PAR2_SOURCE = custom y corrija PAR2_PATH en la configuración (Ajuste
     <message>
         <source>Not deleting the posted files: nothing proves that their archive or PAR2 tool, and everything it started, stopped using them.</source>
         <translation>No se eliminan los archivos publicados: nada demuestra que su herramienta de archivo o PAR2, y todo lo que inició, haya dejado de usarlos.</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t rename %1 without copying it or replacing another file: nothing is posted, so that it never goes out under its real name.</source>
+        <translation>No se puede renombrar %1 sin copiarlo ni reemplazar otro archivo: no se publica nada, para que nunca salga con su nombre real.</translation>
+    </message>
+    <message>
+        <source>Some source files are still under their obfuscated name: nothing is posted before they are back.</source>
+        <translation>Algunos archivos de origen siguen con su nombre ofuscado: no se publica nada hasta que vuelvan.</translation>
     </message>
 </context>
 <context>

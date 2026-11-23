@@ -4701,6 +4701,10 @@ One thing does change for such a script: the old configuration file has no POST_
         <source>The queue waits: ngPost could not make sure that a post stopped (%1). Its files are left as they are until ngPost restarts.</source>
         <translation>The queue waits: ngPost could not make sure that a post stopped (%1). Its files are left as they are until ngPost restarts.</translation>
     </message>
+    <message>
+        <source>The queue waits: some source files are still under their obfuscated name. They are left as they are until ngPost restarts.</source>
+        <translation>The queue waits: some source files are still under their obfuscated name. They are left as they are until ngPost restarts.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -6942,6 +6946,14 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
     <message>
         <source>Not deleting the posted files: nothing proves that their archive or PAR2 tool, and everything it started, stopped using them.</source>
         <translation>Not deleting the posted files: nothing proves that their archive or PAR2 tool, and everything it started, stopped using them.</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t rename %1 without copying it or replacing another file: nothing is posted, so that it never goes out under its real name.</source>
+        <translation>Couldn&apos;t rename %1 without copying it or replacing another file: nothing is posted, so that it never goes out under its real name.</translation>
+    </message>
+    <message>
+        <source>Some source files are still under their obfuscated name: nothing is posted before they are back.</source>
+        <translation>Some source files are still under their obfuscated name: nothing is posted before they are back.</translation>
     </message>
 </context>
 <context>

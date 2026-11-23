@@ -9,6 +9,7 @@
 #define POSTHISTORYSERVICE_H
 
 #include "history/PostHistoryStore.h"
+#include "tools/SourceMoves.h"
 
 #include <QList>
 #include <QObject>
@@ -92,6 +93,13 @@ public:
                                const QString &toolState,
                                const QString &toolIdentityJson,
                                QString *error = nullptr);
+    //! The journaled moves of an obfuscation (lot C5.7, tools/SourceMoves),
+    //! run on the history worker: the journal before and after each rename.
+    sourcemoves::Result moveSourceOut(const sourcemoves::Run &run,
+                                      int sequence,
+                                      const QString &source,
+                                      const QString &target);
+    sourcemoves::Result moveSourceBack(qint64 postId, const QString &runId, int sequence);
     //! What the history holds of an artifact set (PostHistoryStore::artifactSet).
     std::optional<PostHistoryStore::ArtifactSetRecord> artifactSet(const QString &setId,
                                                                    QString *error = nullptr);

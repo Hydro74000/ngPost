@@ -29,6 +29,7 @@
 #include "postinfo/PostInfoTemplate.h"
 #include "tools/ExternalToolProcess.h"
 #include "tools/ExternalToolResolver.h"
+#include "utils/NoReplaceRename.h"
 #include "utils/PathHelper.h"
 #include "utils/SecretMasker.h"
 #ifdef __USE_HMI__
@@ -49,6 +50,7 @@
 #include <cmath>
 #include <filesystem>
 #include <system_error>
+#include <utility>
 
 namespace
 {
@@ -74,28 +76,18 @@ int decimalPadding(uint count)
     return padding;
 }
 
-std::filesystem::path toStdPath(QString const &path)
-{
-#if defined(Q_OS_WIN)
-    return std::filesystem::path(reinterpret_cast<wchar_t const *>(path.utf16()));
-#else
-    return std::filesystem::path(QFile::encodeName(path).toStdString());
-#endif
-}
-
-//! Move a path, or fail -- never copy.
+//! Move a path, or fail -- never copy, never replace (lot C5.7).
 //!
 //! QFile::rename() silently falls back to copying the whole file when the
-//! kernel answers EXDEV, which on a 50 GB post is not a rename at all. No
-//! pre-check predicts EXDEV reliably either: two btrfs subvolumes report the
-//! same QStorageInfo::device() and still refuse rename(2). So ask the kernel
-//! and let it answer. std::filesystem::rename maps to rename(2) on POSIX and
-//! to MoveFileExW without MOVEFILE_COPY_ALLOWED on Windows, so neither copies.
-bool moveWithoutCopying(QString const &from, QString const &to)
+//! kernel answers EXDEV, which on a 50 GB post is not a rename at all, and
+//! rename(2) replaces whatever sits at the target. No pre-check predicts EXDEV
+//! reliably either: two btrfs subvolumes report the same QStorageInfo::device()
+//! and still refuse rename(2). So ask the kernel, atomically: see
+//! utils/NoReplaceRename. Where it has no such call (NFS, some FUSE mounts),
+//! nothing moves.
+bool renameNoReplace(QString const &from, QString const &to)
 {
-    std::error_code ec;
-    std::filesystem::rename(toStdPath(from), toStdPath(to), ec);
-    return !ec;
+    return noreplace::rename(from, to) == noreplace::Result::Renamed;
 }
 
 //! Restore obfuscated inputs without throwing away failed mappings. The
@@ -115,7 +107,7 @@ bool restoreObfuscatedPaths(QMap<QString, QString> &paths,
         if (ngPost)
             ngPost->ignoreMonitorPath(originalPath);
 
-        if (QFile::rename(stagedPath, originalPath)) {
+        if (renameNoReplace(stagedPath, originalPath)) {
             if (ngPost)
                 ngPost->stopIgnoringMonitorPath(stagedPath);
             it = paths.erase(it);
@@ -607,7 +599,8 @@ PostingJob::~PostingJob()
     // Last resort: a job torn down before onCompressionFinished() ran would
     // otherwise leave the user's files in the staging folder under a random
     // name.
-    if (!_obfuscatedFileNames.isEmpty() || !_obfuscationStagingPath.isEmpty())
+    if (!_obfuscatedFileNames.isEmpty() || !_obfuscationStagingPath.isEmpty()
+        || !_unsettledMoves.isEmpty())
         _restoreObfuscatedFileNames();
 
     if (_compressDir) {
@@ -968,7 +961,7 @@ bool PostingJob::runPreparationStep(queue::PrepStep step)
         if (_canCompress(false)
             && startCompressFiles(_rarPath, _tmpPath, _rarName, _rarPass, _rarSize))
             return true;
-        _finishStep(step, false, {}); // the reason is already in the log
+        _finishStep(step, false, std::exchange(_stepFailure, QString())); // also in the log
         return false;
     case queue::PrepStep::Par2:
         if (!_compressedThisRun)
@@ -978,6 +971,16 @@ bool PostingJob::runPreparationStep(queue::PrepStep step)
         _finishStep(step, false, {}); // the reason is already in the log
         return false;
     case queue::PrepStep::Collect:
+        // Nothing goes on while a source is aside (lot C5.7): no transfer,
+        // finalization or Keep ever has an unsettled move to carry.
+        if (!settleSources()) {
+            _finishStep(step,
+                        false,
+                        queue::stepError(queue::kStepSourcesPending,
+                                         tr("Some source files are still under their obfuscated "
+                                            "name: nothing is posted before they are back.")));
+            return false;
+        }
         // NFO copies and the explicit list of files to publish, once: a later
         // activation posts exactly this list.
         if (!_collected) {
@@ -992,8 +995,16 @@ bool PostingJob::runPreparationStep(queue::PrepStep step)
     return false;
 }
 
-void PostingJob::_finishStep(queue::PrepStep step, bool ok, const QString &error)
+void PostingJob::_finishStep(queue::PrepStep step, bool ok, const QString &reported)
 {
+    // A source move the history refused to record comes before any other
+    // outcome (lot C5.7): the queue must treat it as a storage failure.
+    QString error = reported;
+    if (_moveRecordFailed && !queue::stepErrorIs(error, queue::kStepStoreFailed)) {
+        ok = false;
+        error = queue::stepError(queue::kStepStoreFailed,
+                                 QStringLiteral("source move not recorded"));
+    }
     qint64 bytes = 0;
     if (ok) {
         const qint64 total = _compressDirBytes();
@@ -1639,7 +1650,7 @@ void PostingJob::_copyNfoNextToNzb()
 //! folder sits NEXT TO the archive folder rather than inside it, because
 //! _cleanCompressDir() wipes the archive folder recursively on any compression
 //! error and the user's own files must never live inside something we delete.
-void PostingJob::_obfuscateInputFileNames(QString const &tmpFolder, QString const &archiveName)
+QString PostingJob::_obfuscateInputFileNames(QString const &tmpFolder, QString const &archiveName)
 {
     QString const stagingPath = QString("%1/.ngPost_src_%2").arg(tmpFolder, archiveName);
     QDir          staging(stagingPath);
@@ -1657,6 +1668,12 @@ void PostingJob::_obfuscateInputFileNames(QString const &tmpFolder, QString cons
         if (_ngPost->_keepNfoExtension
             && fileInfo.suffix().compare("nfo", Qt::CaseInsensitive) == 0)
             randomBase += ".nfo";
+        if (_queueRuntime) {
+            const QString failure = _obfuscateQueuedSource(fileInfo, randomBase);
+            if (!failure.isEmpty())
+                return failure;
+            continue;
+        }
 
         QString const fileName = fileInfo.absoluteFilePath();
         QString       obfuscatedName;
@@ -1668,7 +1685,7 @@ void PostingJob::_obfuscateInputFileNames(QString const &tmpFolder, QString cons
             // Registered before the move, because the watcher can fire on it
             // the instant it exists.
             _ngPost->ignoreMonitorPath(obfuscatedName);
-            renamed = moveWithoutCopying(fileName, obfuscatedName);
+            renamed = renameNoReplace(fileName, obfuscatedName);
             if (!renamed) {
                 _ngPost->stopIgnoringMonitorPath(obfuscatedName);
                 _log(tr("'%1' cannot be moved into the temporary folder without copying it "
@@ -1681,19 +1698,151 @@ void PostingJob::_obfuscateInputFileNames(QString const &tmpFolder, QString cons
             // Same folder, so this one is a plain rename whatever the layout.
             obfuscatedName = QString("%1/%2").arg(fileInfo.absolutePath(), randomBase);
             _ngPost->ignoreMonitorPath(obfuscatedName);
-            renamed = QFile::rename(fileName, obfuscatedName);
+            renamed = renameNoReplace(fileName, obfuscatedName);
             if (!renamed)
                 _ngPost->stopIgnoringMonitorPath(obfuscatedName);
         }
 
-        if (renamed) {
-            _obfuscatedFileNames.insert(obfuscatedName, fileName);
-            _files << QFileInfo(obfuscatedName);
-        } else {
-            _files << fileInfo;
-            _error(tr("Couldn't rename file %1").arg(fileName));
+        if (!renamed) {
+            // Never posted under its real name: the post stops, what moved
+            // comes back.
+            const QString failure = tr("Couldn't rename %1 without copying it or replacing another "
+                                       "file: nothing is posted, so that it never goes out under "
+                                       "its real name.")
+                                        .arg(fileName);
+            _error(failure);
+            return failure;
         }
+        _obfuscatedFileNames.insert(obfuscatedName, fileName);
+        _files << QFileInfo(obfuscatedName);
     }
+    return {};
+}
+
+//! False when the sources could not all be moved aside (queue runtime only):
+//! no tool ran yet, so what moved goes back, through its journal.
+bool PostingJob::_obfuscateBeforeCompression(QString const &tmpFolder, QString const &archiveName)
+{
+    const QString failure = _obfuscateInputFileNames(tmpFolder, archiveName);
+    if (failure.isEmpty())
+        return true;
+    _stepFailure = failure;
+    if (!_restoreObfuscatedFileNames())
+        _error(tr("Some source files are still under their obfuscated name; ngPost will try "
+                  "again when the job ends."));
+    _cleanCompressDir();
+    return false;
+}
+
+//! Queue runtime (lot C5.7): each move journaled before and after it, through
+//! the history worker; a staging folder on another file system falls back to
+//! a rename in place, journaled too, once the first failure is recorded.
+//! Empty, or why the source could not be moved aside: it is never posted
+//! under its real name.
+QString PostingJob::_obfuscateQueuedSource(const QFileInfo &fileInfo, const QString &randomBase)
+{
+    using sourcemoves::Outcome;
+    PostHistoryService *history = _ngPost->historyService();
+    const QString source = fileInfo.absoluteFilePath();
+    if (!history)
+        return queue::stepError(queue::kStepStoreFailed, QStringLiteral("no history"));
+    const sourcemoves::Run run{ _context.postId, _context.runId, _context.setId };
+    QStringList targets;
+    if (!_obfuscationStagingPath.isEmpty())
+        targets << _obfuscationStagingPath + QLatin1Char('/') + randomBase;
+    targets << fileInfo.absolutePath() + QLatin1Char('/') + randomBase;
+    for (const QString &target : std::as_const(targets)) {
+        const int sequence = _nextMoveSequence++;
+        // Whatever appears there is us: registered before the move.
+        _ngPost->ignoreMonitorPath(target);
+        const sourcemoves::Result result = history->moveSourceOut(run, sequence, source, target);
+        const bool aside = result.outcome == Outcome::Moved
+            || (result.outcome == Outcome::Unrecorded
+                && result.where == sourcemoves::Where::Staged);
+        if (aside) {
+            _obfuscatedFileNames.insert(target, source);
+            _moveSequences.insert(target, sequence);
+            _files << QFileInfo(target);
+        } else {
+            _ngPost->stopIgnoringMonitorPath(target);
+        }
+        // Every journaled move is held until it is recorded as restored.
+        if (result.planned && result.outcome != Outcome::NotMoved)
+            _unsettledMoves.insert(sequence);
+        if (result.outcome == Outcome::Moved)
+            return {};
+        if (result.outcome == Outcome::NotMoved) {
+            if (target != targets.last())
+                _log(tr("'%1' cannot be moved into the temporary folder without copying it "
+                        "(they are on different filesystems): renaming it where it is instead")
+                         .arg(source));
+            continue; // its failure is recorded: the next place may be tried
+        }
+        if (result.outcome == Outcome::Unrecorded) {
+            _error(tr("History database error: %1").arg(result.error));
+            return queue::stepError(queue::kStepStoreFailed, result.error);
+        }
+        break; // refused or blocked: nothing else is tried
+    }
+    const QString failure = tr("Couldn't rename file %1").arg(source);
+    _error(failure);
+    return failure;
+}
+
+//! Queue runtime (lot C5.7): each source back through its journal; every move
+//! not recorded as restored stays held (blocked ones are looked at again next
+//! time), and a refused record fails the step (_moveRecordFailed).
+bool PostingJob::_restoreQueuedSources()
+{
+    using sourcemoves::Outcome;
+    PostHistoryService *history = _ngPost->historyService();
+    if (!history)
+        return false;
+    // Moves without a path of ours: never left, already back, or ambiguous.
+    const QList<int> mapped = _moveSequences.values();
+    for (const int sequence : QSet<int>(_unsettledMoves)) {
+        if (mapped.contains(sequence))
+            continue; // settled with its file below
+        const sourcemoves::Result result = history->moveSourceBack(_context.postId,
+                                                                   _context.runId,
+                                                                   sequence);
+        if (result.outcome == Outcome::Restored)
+            _unsettledMoves.remove(sequence);
+        _moveRecordFailed = _moveRecordFailed || result.outcome == Outcome::Unrecorded;
+    }
+    auto it = _obfuscatedFileNames.begin();
+    while (it != _obfuscatedFileNames.end()) {
+        const QString staged = it.key();
+        const QString original = it.value();
+        const int sequence = _moveSequences.value(staged, -1);
+        _ngPost->ignoreMonitorPath(original);
+        const sourcemoves::Result result = history->moveSourceBack(_context.postId,
+                                                                   _context.runId,
+                                                                   sequence);
+        const bool back = result.outcome == Outcome::Restored
+            || (result.outcome == Outcome::Unrecorded
+                && result.where == sourcemoves::Where::Source);
+        if (result.outcome == Outcome::Restored)
+            _unsettledMoves.remove(sequence);
+        _moveRecordFailed = _moveRecordFailed || result.outcome == Outcome::Unrecorded;
+        if (back) {
+            _ngPost->stopIgnoringMonitorPath(staged);
+            _moveSequences.remove(staged);
+            it = _obfuscatedFileNames.erase(it);
+            continue;
+        }
+        _ngPost->stopIgnoringMonitorPath(original);
+        _error(tr("Couldn't restore %1 to its original name %2").arg(staged, original));
+        ++it;
+    }
+    // The staging folder stays while a move is unsettled: making a later
+    // return durable syncs it.
+    if (_obfuscatedFileNames.isEmpty() && _unsettledMoves.isEmpty()
+        && !_obfuscationStagingPath.isEmpty()
+        && (!QFileInfo::exists(_obfuscationStagingPath) || QDir().rmdir(_obfuscationStagingPath)))
+        _obfuscationStagingPath.clear();
+    return _obfuscatedFileNames.isEmpty() && _obfuscationStagingPath.isEmpty()
+        && _unsettledMoves.isEmpty();
 }
 
 //! Put every obfuscated input back under its real name and location. Failed
@@ -1704,7 +1853,16 @@ bool PostingJob::_restoreObfuscatedFileNames()
     // Only once nothing it started can still use them, and that is recorded:
     // otherwise the journal of lot C5.7 brings them back.
     if (!_toolStopProven())
-        return _obfuscatedFileNames.isEmpty() && _obfuscationStagingPath.isEmpty();
+        return _obfuscatedFileNames.isEmpty() && _obfuscationStagingPath.isEmpty()
+            && _unsettledMoves.isEmpty();
+    if (_queueRuntime) {
+        const bool back = _restoreQueuedSources();
+        if (!_obfuscationStagingPath.isEmpty())
+            _error(tr("The staging folder '%1' is not empty: some obfuscated files could not be "
+                      "put back")
+                       .arg(_obfuscationStagingPath));
+        return back;
+    }
     QList<QPair<QString, QString>> failedRestores;
     const bool restored = restoreObfuscatedPaths(_obfuscatedFileNames,
                                                   _obfuscationStagingPath,
@@ -2748,8 +2906,8 @@ bool PostingJob::startCompressFiles(const QString &cmdRar,
 #endif
     args << QString("%1/%2.%3").arg(archiveTmpFolder, archiveName, _use7z ? "7z" : "rar");
 
-    if (_obfuscateFileName)
-        _obfuscateInputFileNames(tmpFolder, archiveName);
+    if (_obfuscateFileName && !_obfuscateBeforeCompression(tmpFolder, archiveName))
+        return false;
 
     bool hasDir = false;
     if (_files.size()
@@ -2834,14 +2992,19 @@ void PostingJob::onCompressionFinished(int exitCode, QProcess::ExitStatus exitSt
     if (_stepDriven) {
         // The queue decides what comes next: PAR2, collection or a retry.
         QString error;
-        if (failed) {
+        if (_moveRecordFailed) {
+            // A source is back but the history does not hold it (lot C5.7):
+            // that comes first, the archive and the journal stay as they are.
+            error = queue::stepError(queue::kStepStoreFailed,
+                                     QStringLiteral("source move not recorded"));
+        } else if (failed) {
             error = tr("Error during compression: %1").arg(exitCode);
             _error(error);
             _cleanCompressDir();
         } else
             _compressedThisRun = true;
         _cleanExtProc();
-        _finishStep(queue::PrepStep::Compress, !failed, error);
+        _finishStep(queue::PrepStep::Compress, error.isEmpty(), error);
         return;
     }
     if (failed) {
@@ -3063,6 +3226,13 @@ void PostingJob::_cleanExtProc()
 
 // --- supervised tools (queue runtime, plan_queue.md lot C5.6) -------------------------
 
+bool PostingJob::settleSources()
+{
+    if (hasUnrestoredSources() || !_obfuscationStagingPath.isEmpty())
+        _restoreObfuscatedFileNames();
+    return !hasUnrestoredSources();
+}
+
 bool PostingJob::holdsUnprovenTool() const
 {
     return !_toolStopProven();
@@ -3259,7 +3429,9 @@ void PostingJob::_failToolStep(queue::PrepStep step, const QString &error)
 
 void PostingJob::_cleanCompressDir()
 {
-    if (!_compressDir)
+    // Nothing is deleted while a source move is not recorded: its record
+    // comes first (lot C5.7).
+    if (!_compressDir || _moveRecordFailed)
         return;
     if (!_toolStopProven()) {
         _log(tr("The temporary files of %1 are kept: their tool may still write in them.")

@@ -167,6 +167,10 @@ void NgPost::_connectQueueEvents()
                           "(%1). Its files are left as they are until ngPost restarts.")
                            .arg(reason),
                        ERROR_CODE::ERR_HISTORY); // the exit code it always had
+            else if (reason == QLatin1String("sources_pending_recovery"))
+                _error(tr("The queue waits: some source files are still under their obfuscated "
+                          "name. They are left as they are until ngPost restarts."),
+                       ERROR_CODE::ERR_HISTORY);
             else
                 _error(tr("History database error: %1").arg(reason), ERROR_CODE::ERR_HISTORY);
             // A stop that could not be written: Cancel and Resume must stay

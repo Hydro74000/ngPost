@@ -834,7 +834,8 @@ namespace
 void clearUnprovenStop(QueueEntry &entry)
 {
     if (entry.blocked.code == QLatin1String("quiesce_failed")
-        || entry.blocked.code == QLatin1String(kStepToolUnproven))
+        || entry.blocked.code == QLatin1String(kStepToolUnproven)
+        || entry.blocked.code == QLatin1String("sources_pending_recovery"))
         entry.blocked = {};
 }
 } // namespace

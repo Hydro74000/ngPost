@@ -65,8 +65,9 @@ tst_PostingJobOptionsCodec    27  Linux
 tst_QueuePanel                10  Linux
 tst_QueueScheduler            41  Linux
 tst_QueueStoreSqlite          41  Linux
-tst_PostingJobExecutor        26  Linux
+tst_PostingJobExecutor        36  Linux
 tst_PreparationWorkspace      12  Linux
+tst_SourceMoves               23  Linux
 tst_ExternalToolProcess       18  Linux
 tst_NgPostQueue               20  Linux
 tst_RandomToken                3  Linux
@@ -106,8 +107,9 @@ tst_PostingJobOptionsCodec    27  Darwin
 tst_QueuePanel                10  Darwin
 tst_QueueScheduler            41  Darwin
 tst_QueueStoreSqlite          41  Darwin
-tst_PostingJobExecutor        24  Darwin
+tst_PostingJobExecutor        28  Darwin
 tst_PreparationWorkspace      12  Darwin
+tst_SourceMoves               23  Darwin
 tst_ExternalToolProcess       10  Darwin
 tst_NgPostQueue               20  Darwin
 tst_RandomToken                3  Darwin
@@ -127,7 +129,8 @@ tst_Yenc                      30  Darwin
 # The Windows-only suites run here and only here; tst_PathHelper and
 # tst_PostInfoTemplate skip the cases that need a symlink privilege, and
 # tst_MainWindow skips the tool-path cases that need a POSIX file mode.
-# tst_PostingJobExecutor skips the case that needs a stop a job object cannot lose.
+# tst_PostingJobExecutor skips the case that needs a stop a job object cannot lose
+# and the one built on a symbolic link; tst_SourceMoves, its symbolic link case.
 tst_CliParser                 65  Windows
 tst_FoldersMonitor            10  Windows
 tst_GoldenNzb                  4  Windows
@@ -145,8 +148,9 @@ tst_PostingJobOptionsCodec    27  Windows
 tst_QueuePanel                10  Windows
 tst_QueueScheduler            41  Windows
 tst_QueueStoreSqlite          41  Windows
-tst_PostingJobExecutor        25  Windows
+tst_PostingJobExecutor        34  Windows
 tst_PreparationWorkspace      12  Windows
+tst_SourceMoves               22  Windows
 tst_ExternalToolProcess       17  Windows
 tst_NgPostQueue               20  Windows
 tst_RandomToken                3  Windows

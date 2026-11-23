@@ -490,6 +490,51 @@ QList<PostHistoryStore::SourceMove> PostHistoryStore::unsettledSourceMoves(qint6
     return moves;
 }
 
+std::optional<PostHistoryStore::SourceMove> PostHistoryStore::ownedSourceMove(qint64 postId,
+                                                                              const QString &runId,
+                                                                              int sequence,
+                                                                              QString *error)
+{
+    if (_ownerId.isEmpty()) {
+        fail(error, QStringLiteral("not_owner: no session"));
+        return std::nullopt;
+    }
+    if (!initialize(error))
+        return std::nullopt;
+    QSqlDatabase db = _database(error);
+    if (!db.isOpen())
+        return std::nullopt;
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT m.source_path, m.staged_path, m.native_identity_json, "
+                             "m.state, COALESCE(m.artifact_set_id, ''), p.owner_id FROM "
+                             "post_source_moves m JOIN posts p ON p.id = m.post_id WHERE "
+                             "m.post_id=? AND m.run_id=? AND m.sequence=?"));
+    q.addBindValue(postId);
+    q.addBindValue(runId);
+    q.addBindValue(sequence);
+    if (!q.exec()) {
+        fail(error, q.lastError().text());
+        return std::nullopt;
+    }
+    if (!q.next()) {
+        fail(error, QStringLiteral("source_move_unknown: %1").arg(sequence));
+        return std::nullopt;
+    }
+    if (q.value(5).toString() != _ownerId) {
+        fail(error, QStringLiteral("not_owner: post %1").arg(postId));
+        return std::nullopt;
+    }
+    SourceMove move;
+    move.sequence = sequence;
+    move.sourcePath = q.value(0).toString();
+    move.stagedPath = q.value(1).toString();
+    move.identityJson = q.value(2).toString();
+    move.state = q.value(3).toString();
+    move.runId = runId;
+    move.setId = q.value(4).toString();
+    return move;
+}
+
 bool PostHistoryStore::recordPreparedArtifacts(qint64 postId,
                                                const QString &runId,
                                                const QString &setId,

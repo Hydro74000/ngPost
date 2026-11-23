@@ -25,6 +25,16 @@ struct NativeFileIdentity
     bool directory = false;
     bool link = false; //!< a symbolic link, a junction or another reparse point
 
+    //! What a path names (lot C5.7): Absent only when the system says there is
+    //! no such file; any other failure (access refused...) is Unknown, never
+    //! taken for an absence.
+    enum class Presence {
+        Absent,
+        Present,
+        Unknown
+    };
+    //! The identity of @p path itself, a link never followed, in @p identity.
+    static Presence probe(const QString &path, NativeFileIdentity *identity = nullptr);
     //! The identity of @p path itself, a link never followed.
     static std::optional<NativeFileIdentity> of(const QString &path);
     static std::optional<NativeFileIdentity> fromJson(const QString &json);

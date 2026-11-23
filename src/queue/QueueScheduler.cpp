@@ -291,20 +291,9 @@ void QueueScheduler::onStepFinished(qint64 postId,
         _stepRunning = 0;
     if (_pendingStops.contains(postId))
         return; // its quiescence decides
-    if (!ok && stepErrorIs(error, kStepToolUnproven)) {
-        holdUnprovenStop(postId, runId, PendingStop::Technical, QLatin1String(kStepToolUnproven));
+    if (!ok && holdsWhatOnlyItsRuntimeSettles(postId, runId, error))
         return;
-    }
     if (!ok && stepErrorIs(error, kStepStoreFailed)) {
-        // Its runtime still holds what only it can settle (renamed sources, a
-        // stop the history does not hold): no new run, the queue waits.
-        if (_executor->holdsUnsettledWork(postId)) {
-            holdUnprovenStop(postId,
-                             runId,
-                             PendingStop::Technical,
-                             QLatin1String(kStepStoreFailed));
-            return;
-        }
         // Refused by the history, not by the post: it is kept for a new
         // attempt, and the queue waits for the history.
         applyInOrder([this, postId, runId] {
@@ -479,6 +468,28 @@ void QueueScheduler::onQuiesced(qint64 postId,
     if (_stuck.remove(postId) && _stuck.isEmpty())
         retryAfterTechnicalPause(); // the stop is proven after all
     scheduleReevaluate();
+}
+
+//! A failed step whose runtime still holds what only it can settle (a tool
+//! not proven stopped, a source aside, a record the history refused), or
+//! says so: held like an unproven stop, with its slot, set and runtime, so
+//! that neither a removal, a retirement nor a close lets go of it (lot C5.7).
+bool QueueScheduler::holdsWhatOnlyItsRuntimeSettles(qint64 postId,
+                                                    const QString &runId,
+                                                    const QString &error)
+{
+    QString reason;
+    if (stepErrorIs(error, kStepToolUnproven))
+        reason = QLatin1String(kStepToolUnproven);
+    else if (stepErrorIs(error, kStepSourcesPending))
+        reason = QStringLiteral("sources_pending_recovery");
+    else if (_executor->holdsUnsettledWork(postId))
+        reason = stepErrorIs(error, kStepStoreFailed) ? QLatin1String(kStepStoreFailed)
+                                                      : QStringLiteral("sources_pending_recovery");
+    if (reason.isEmpty())
+        return false;
+    holdUnprovenStop(postId, runId, PendingStop::Technical, reason);
+    return true;
 }
 
 //! Stop not proven: the runtime may still write. It keeps its slot, nothing

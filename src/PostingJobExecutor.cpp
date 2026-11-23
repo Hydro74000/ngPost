@@ -297,7 +297,10 @@ void PostingJobExecutor::completeLocalWork(qint64 postId, const QString &runId)
     job->runPostFinalizationWork(job->hasTransferStarted());
     const bool queued = job->postActionsQueued();
     emit runtimeEnded(postId, job);
-    releaseRuntime(postId);
+    // Its sources not settled, the runtime stays: it holds the way back, and
+    // the journal its moves (lot C5.7).
+    if (job->settleSources())
+        releaseRuntime(postId);
     emit localWorkQueued(postId, runId, queued);
 }
 
@@ -389,10 +392,14 @@ void PostingJobExecutor::keepTransfer(qint64 postId, const QString &runId)
     const PostingJob::TransferOutcome outcome = job->finishTransfer();
     const bool manifest = job->transferManifestEngaged();
     emit runtimeKept(postId, job);
-    releaseRuntime(postId); // its archives stay: no cleanup was allowed
+    // A source whose move is not settled keeps its runtime, and the stop is
+    // not proven: no new run while the journal says it is aside (lot C5.7).
+    const bool settled = job->settleSources();
+    if (settled)
+        releaseRuntime(postId); // its archives stay: no cleanup was allowed
     const qint64 activeMs = outcome.activeMs;
-    later([this, postId, runId, manifest, activeMs] {
-        emit quiesced(postId, runId, true, manifest, activeMs);
+    later([this, postId, runId, settled, manifest, activeMs] {
+        emit quiesced(postId, runId, settled, manifest, activeMs);
     });
 }
 
@@ -413,9 +420,11 @@ void PostingJobExecutor::abandonPlanning(qint64 postId, const QString &runId)
 {
     const auto it = _runtimes.constFind(postId);
     if (it != _runtimes.cend() && it->runId == runId && it->job) {
-        // No deliverable, no post action, archives kept for a resume.
+        // No deliverable, no post action, archives kept for a resume. Never
+        // reached with a source aside (Collect refuses), checked all the same.
         emit runtimeEnded(postId, it->job);
-        releaseRuntime(postId);
+        if (it->job->settleSources())
+            releaseRuntime(postId);
     }
     emit localWorkQueued(postId, runId, false);
 }

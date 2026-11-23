@@ -18,13 +18,23 @@
 #endif
 #include <windows.h>
 #else
+#include <cerrno>
 #include <sys/stat.h>
 #endif
 
 std::optional<NativeFileIdentity> NativeFileIdentity::of(const QString &path)
 {
-    if (path.isEmpty())
+    NativeFileIdentity id;
+    if (probe(path, &id) != Presence::Present)
         return std::nullopt;
+    return id;
+}
+
+NativeFileIdentity::Presence NativeFileIdentity::probe(const QString &path,
+                                                       NativeFileIdentity *identity)
+{
+    if (path.isEmpty())
+        return Presence::Unknown;
     NativeFileIdentity id;
 #if defined(Q_OS_WIN)
     // FILE_FLAG_OPEN_REPARSE_POINT: the junction or link itself, not its target;
@@ -37,13 +47,16 @@ std::optional<NativeFileIdentity> NativeFileIdentity::of(const QString &path)
                                   OPEN_EXISTING,
                                   FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
                                   nullptr);
-    if (handle == INVALID_HANDLE_VALUE)
-        return std::nullopt;
+    if (handle == INVALID_HANDLE_VALUE) {
+        const DWORD error = ::GetLastError();
+        return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND ? Presence::Absent
+                                                                              : Presence::Unknown;
+    }
     BY_HANDLE_FILE_INFORMATION info = {};
     const BOOL ok = ::GetFileInformationByHandle(handle, &info);
     ::CloseHandle(handle);
     if (!ok)
-        return std::nullopt;
+        return Presence::Unknown;
     id.device = info.dwVolumeSerialNumber;
     id.file = (static_cast<quint64>(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
     id.size = static_cast<qint64>((static_cast<quint64>(info.nFileSizeHigh) << 32)
@@ -57,7 +70,7 @@ std::optional<NativeFileIdentity> NativeFileIdentity::of(const QString &path)
 #else
     struct stat st = {};
     if (::lstat(QFile::encodeName(path).constData(), &st) != 0)
-        return std::nullopt;
+        return errno == ENOENT || errno == ENOTDIR ? Presence::Absent : Presence::Unknown;
     id.device = static_cast<quint64>(st.st_dev);
     id.file = static_cast<quint64>(st.st_ino);
     id.size = static_cast<qint64>(st.st_size);
@@ -70,7 +83,9 @@ std::optional<NativeFileIdentity> NativeFileIdentity::of(const QString &path)
     id.directory = S_ISDIR(st.st_mode);
     id.link = S_ISLNK(st.st_mode);
 #endif
-    return id;
+    if (identity)
+        *identity = id;
+    return Presence::Present;
 }
 
 QString NativeFileIdentity::toJson() const

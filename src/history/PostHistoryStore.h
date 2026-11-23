@@ -532,6 +532,13 @@ public:
                             QString *error = nullptr);
     //! Moves not settled yet (planned, moved or blocked), oldest first.
     QList<SourceMove> unsettledSourceMoves(qint64 postId, QString *error = nullptr);
+    //! Move @p sequence of @p runId, any state, once this store's session is
+    //! checked to own its post (lot C5.7): what a rollback checks before it
+    //! touches the disk.
+    std::optional<SourceMove> ownedSourceMove(qint64 postId,
+                                              const QString &runId,
+                                              int sequence,
+                                              QString *error = nullptr);
     //! The complete list of what a set prepared: the set becomes verified and
     //! the entry's current one. A partial list is refused.
     bool recordPreparedArtifacts(qint64 postId,

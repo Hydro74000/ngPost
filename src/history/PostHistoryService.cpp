@@ -795,6 +795,29 @@ bool PostHistoryService::recordToolSupervision(qint64 postId,
     return ok;
 }
 
+sourcemoves::Result PostHistoryService::moveSourceOut(const sourcemoves::Run &run,
+                                                      int sequence,
+                                                      const QString &source,
+                                                      const QString &target)
+{
+    sourcemoves::Result result;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        result = sourcemoves::moveOut(worker->store(), run, sequence, source, target);
+    });
+    return result;
+}
+
+sourcemoves::Result PostHistoryService::moveSourceBack(qint64 postId,
+                                                       const QString &runId,
+                                                       int sequence)
+{
+    sourcemoves::Result result;
+    _invokeBlocking([&](PostHistoryWorker *worker) {
+        result = sourcemoves::moveBack(worker->store(), postId, runId, sequence);
+    });
+    return result;
+}
+
 std::optional<PostHistoryStore::ArtifactSetRecord> PostHistoryService::artifactSet(
     const QString &setId,
     QString *error)

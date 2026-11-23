@@ -219,6 +219,14 @@ private:
 
     QMap<QString, QString> _obfuscatedFileNames; //!< obfuscated path -> real path, undone after compression
     QString _obfuscationStagingPath;              //!< folder the obfuscated inputs were moved to (empty if none)
+    //! Queue runtime (lot C5.7): the journal sequence of each obfuscated path,
+    //! and every journaled move not recorded as restored yet (moved, blocked,
+    //! or whose outcome the history refused): held until it is.
+    QMap<QString, int> _moveSequences;
+    QSet<int> _unsettledMoves;
+    bool _moveRecordFailed = false; //!< the history refused an outcome: the step fails
+    int _nextMoveSequence = 0;
+    QString _stepFailure; //!< why the step being started could not start
 
     const QList<QString>
         _grpList; //!< Newsgroup where we're posting in a list format to write in the nzb file
@@ -400,7 +408,13 @@ public:
     void quiescePreparation();
     //! Source files are still under an obfuscated name: the runtime holds the
     //! only map back and must stay alive.
-    bool hasUnrestoredSources() const { return !_obfuscatedFileNames.isEmpty(); }
+    bool hasUnrestoredSources() const
+    {
+        return !_obfuscatedFileNames.isEmpty() || !_unsettledMoves.isEmpty();
+    }
+    //! Tries once more to put its sources back (lot C5.7): true once none is
+    //! left to settle, every move recorded as restored.
+    bool settleSources();
     //! What its tool started may still write (running, ended without proof,
     //! only "exited", or a proof the history does not hold yet): the runtime
     //! keeps its files, names and slot, after its preparation too.
@@ -498,7 +512,7 @@ private:
     void _chooseTmpPath(bool par2Only);
     //! Reports the end of a preparation step, queued so the caller's decision
     //! is never re-entered.
-    void _finishStep(queue::PrepStep step, bool ok, const QString &error);
+    void _finishStep(queue::PrepStep step, bool ok, const QString &reported);
     qint64 _compressDirBytes() const;
     void _log(const QString &aMsg, bool newline = true) const; //!< log function for QString
     void _error(const QString &error) const;
@@ -533,7 +547,11 @@ private:
     //! name, and which _delOriginalFiles() must therefore leave alone.
     static QSet<QString> _unrestoredOriginals(QMap<QString, QString> const &stillObfuscated);
 
-    void _obfuscateInputFileNames(QString const &tmpFolder, QString const &archiveName);
+    //! Empty, or why the queue runtime's sources could not all be moved aside.
+    QString _obfuscateInputFileNames(QString const &tmpFolder, QString const &archiveName);
+    QString _obfuscateQueuedSource(const QFileInfo &fileInfo, const QString &randomBase);
+    bool _obfuscateBeforeCompression(QString const &tmpFolder, QString const &archiveName);
+    bool _restoreQueuedSources();
     bool _restoreObfuscatedFileNames();
 
     void _resolveNfoSource();

@@ -582,8 +582,14 @@ private slots:
         f.executor.setUnsettled(a); // sources still renamed
         QVERIFY(f.executor.ackStep(a, false));
         settle();
+        // Whatever failed, its runtime still holds the way back (lot C5.7):
+        // kept with its slot and set, like a stop not proven.
         QVERIFY(f.queue.find(a));
-        QCOMPARE(f.queue.find(a)->blocked.code, QStringLiteral("preparation_failed"));
+        QCOMPARE(f.queue.find(a)->blocked.code, QStringLiteral("sources_pending_recovery"));
+        QCOMPARE(f.state(a), Lifecycle::Preparing);
+        QCOMPARE(f.queue.find(a)->slot, Slot::Preparation);
+        QVERIFY(!f.queue.find(a)->artifacts.isNull());
+        QVERIFY(f.scheduler->isTechnicallyPaused());
     }
 
     void aToolEndedUnprovenKeepsItsSlotAndPausesTheQueue()

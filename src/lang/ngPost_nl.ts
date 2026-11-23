@@ -4727,6 +4727,10 @@ Eén ding verandert wel voor zo&apos;n script: het oude configuratiebestand heef
         <source>The queue waits: ngPost could not make sure that a post stopped (%1). Its files are left as they are until ngPost restarts.</source>
         <translation>De wachtrij wacht: ngPost kon niet nagaan of een post gestopt is (%1). De bestanden blijven zoals ze zijn tot ngPost opnieuw start.</translation>
     </message>
+    <message>
+        <source>The queue waits: some source files are still under their obfuscated name. They are left as they are until ngPost restarts.</source>
+        <translation>De wachtrij wacht: sommige bronbestanden dragen nog hun versluierde naam. Ze blijven zoals ze zijn tot ngPost opnieuw start.</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -6979,6 +6983,14 @@ Stel PAR2_SOURCE = custom in en corrigeer PAR2_PATH in de configuratie (PAR2-ins
     <message>
         <source>Not deleting the posted files: nothing proves that their archive or PAR2 tool, and everything it started, stopped using them.</source>
         <translation>De geposte bestanden worden niet verwijderd: niets bewijst dat hun archief- of PAR2-hulpprogramma, en alles wat het startte, ze niet meer gebruikt.</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t rename %1 without copying it or replacing another file: nothing is posted, so that it never goes out under its real name.</source>
+        <translation>%1 kan niet worden hernoemd zonder het te kopiëren of een ander bestand te vervangen: er wordt niets gepost, zodat het nooit onder zijn echte naam vertrekt.</translation>
+    </message>
+    <message>
+        <source>Some source files are still under their obfuscated name: nothing is posted before they are back.</source>
+        <translation>Sommige bronbestanden dragen nog hun versluierde naam: er wordt niets gepost voordat ze terug zijn.</translation>
     </message>
 </context>
 <context>

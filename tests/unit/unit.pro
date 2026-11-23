@@ -29,5 +29,6 @@ SUBDIRS = \
     tst_QueueStoreSqlite \
     tst_PostingJobExecutor \
     tst_PreparationWorkspace \
+    tst_SourceMoves \
     tst_ExternalToolProcess \
     tst_NgPostQueue

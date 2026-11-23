@@ -136,7 +136,9 @@ SOURCES += \
         $$PWD/tools/PreparationWorkspace.cpp \
         $$PWD/tools/ExternalToolProcess.cpp \
         $$PWD/tools/ToolSupervisor.cpp \
+        $$PWD/tools/SourceMoves.cpp \
         $$PWD/utils/NativeFileIdentity.cpp \
+        $$PWD/utils/NoReplaceRename.cpp \
         $$PWD/history/ServiceQueueStore.cpp \
         $$PWD/history/ResumePlanner.cpp \
         $$PWD/NgPost.cpp \
@@ -186,7 +188,9 @@ HEADERS += \
     $$PWD/tools/PreparationWorkspace.h \
     $$PWD/tools/ExternalToolProcess.h \
     $$PWD/tools/ToolSupervisor.h \
+    $$PWD/tools/SourceMoves.h \
     $$PWD/utils/NativeFileIdentity.h \
+    $$PWD/utils/NoReplaceRename.h \
     $$PWD/history/ResumePlanner.h \
     $$PWD/NgPost.h \
     $$PWD/tools/ExternalToolResolver.h \

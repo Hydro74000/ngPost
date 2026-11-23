@@ -4723,6 +4723,10 @@ Your active configuration file is:
         <source>The queue waits: ngPost could not make sure that a post stopped (%1). Its files are left as they are until ngPost restarts.</source>
         <translation>队列正在等待：ngPost 无法确认某个发布已停止（%1）。在 ngPost 重新启动之前，其文件保持原样。</translation>
     </message>
+    <message>
+        <source>The queue waits: some source files are still under their obfuscated name. They are left as they are until ngPost restarts.</source>
+        <translation>队列正在等待：部分源文件仍使用混淆后的名称。在 ngPost 重新启动之前，它们保持原样。</translation>
+    </message>
 </context>
 <context>
     <name>NntpCheckCon</name>
@@ -6975,6 +6979,14 @@ Set PAR2_SOURCE = custom and fix PAR2_PATH in the configuration (PAR2 Settings i
     <message>
         <source>Not deleting the posted files: nothing proves that their archive or PAR2 tool, and everything it started, stopped using them.</source>
         <translation>不删除已发布的文件：无法证明其归档或 PAR2 工具及其启动的所有进程已停止使用它们。</translation>
+    </message>
+    <message>
+        <source>Couldn&apos;t rename %1 without copying it or replacing another file: nothing is posted, so that it never goes out under its real name.</source>
+        <translation>无法在不复制或替换其他文件的情况下重命名 %1：不发布任何内容，以确保它绝不会以真实名称发布。</translation>
+    </message>
+    <message>
+        <source>Some source files are still under their obfuscated name: nothing is posted before they are back.</source>
+        <translation>部分源文件仍使用混淆后的名称：在它们恢复之前不会发布任何内容。</translation>
     </message>
 </context>
 <context>

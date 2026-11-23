@@ -72,6 +72,8 @@ enum class PrepStep {
 constexpr const char *kStepToolUnproven = "tool_unproven";
 //! Its supervision could not be recorded: no tool runs without it.
 constexpr const char *kStepStoreFailed = "store_failed";
+//! A source is still aside (lot C5.7): nothing is published before it is back.
+constexpr const char *kStepSourcesPending = "sources_pending";
 QString stepError(const char *code, const QString &text);
 bool stepErrorIs(const QString &error, const char *code);
 

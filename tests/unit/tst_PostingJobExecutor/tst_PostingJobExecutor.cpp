@@ -376,6 +376,49 @@ struct Env
         return QTest::qWaitFor([&] { return set(setId).toolState == state; }, ms);
     }
 
+    //! A statement on a connection of its own (a trigger).
+    bool exec(const QString &sql) const
+    {
+        const QString name = QUuid::createUuid().toString();
+        bool done = false;
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+            db.setDatabaseName(dbPath());
+            QSqlQuery q(db);
+            done = db.open() && q.exec(sql);
+        }
+        QSqlDatabase::removeDatabase(name);
+        return done;
+    }
+    //! The history refuses to record any source as restored, or accepts again.
+    bool refuseReturns(bool refuse) const
+    {
+        return exec(refuse ? QStringLiteral("CREATE TRIGGER refuse_returns BEFORE UPDATE OF state "
+                                            "ON post_source_moves WHEN NEW.state='restored' BEGIN "
+                                            "SELECT RAISE(ABORT, 'injected'); END")
+                           : QStringLiteral("DROP TRIGGER refuse_returns"));
+    }
+
+    //! The states of the journaled moves of @p postId, in order (lot C5.7).
+    QStringList moveStates(qint64 postId) const
+    {
+        QStringList states;
+        const QString name = QUuid::createUuid().toString();
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+            db.setDatabaseName(dbPath());
+            QSqlQuery q(db);
+            if (db.open()
+                && q.exec(QStringLiteral("SELECT state FROM post_source_moves WHERE post_id=%1 "
+                                         "ORDER BY sequence")
+                              .arg(postId)))
+                while (q.next())
+                    states << q.value(0).toString();
+        }
+        QSqlDatabase::removeDatabase(name);
+        return states;
+    }
+
     //! The pid of the supervisor recorded for @p setId.
     qint64 supervisorPid(const QString &setId) const
     {
@@ -811,7 +854,13 @@ private slots:
         const qint64 id = env.submit(env.post(QStringLiteral("held"), true, true, 64000, true));
         const QString run = env.queue->find(id)->runId;
         const QString set = env.beginSet(id);
+#ifdef PROVEN_SUPERVISION
         QVERIFY2(env.prepare(id, run, set, &error), qPrintable(error));
+#else
+        // Its sources never come back: the collection refuses to go on.
+        QVERIFY(!env.prepare(id, run, set, &error));
+        QVERIFY2(error.contains(QLatin1String(kStepSourcesPending)), qPrintable(error));
+#endif
         QSignalSpy quiesced(env.executor.get(), &QueueExecutor::quiesced);
 #ifdef PROVEN_SUPERVISION
         QTRY_VERIFY(!env.executor->runtime(id));
@@ -922,6 +971,323 @@ private slots:
 #endif
         QTest::qWait(1500);
         QVERIFY(!QFileInfo::exists(late));
+    }
+
+    // --- journaled obfuscation (lot C5.7) -------------------------------------------------
+
+    void obfuscatedSourcesAreJournaled()
+    {
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        const qint64 id = env.submit(
+            env.post(QStringLiteral("journaled"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, env.beginSet(id), PrepStep::Compress);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(steps.first().at(4).toBool());
+#ifdef PROVEN_SUPERVISION
+        QCOMPARE(env.moveStates(id), QStringList{ QStringLiteral("restored") });
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("journaled"))));
+#else
+        // Only "exited": still aside, and the journal says where.
+        QCOMPARE(env.moveStates(id), QStringList{ QStringLiteral("moved") });
+        QVERIFY(!QFileInfo::exists(env.source(QStringLiteral("journaled"))));
+#endif
+    }
+
+    void aRefusedJournalMovesNoSource()
+    {
+        Env env;
+        QString error;
+        const QString ran = env.sandbox.rootPath() + QStringLiteral("/rar-ran");
+        QVERIFY2(env.start(&error, QStringLiteral("touch=%1;write=40000").arg(ran)),
+                 qPrintable(error));
+        const QString connection = QUuid::createUuid().toString();
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+            db.setDatabaseName(env.dbPath());
+            QSqlQuery q(db);
+            QVERIFY(db.open()
+                    && q.exec(QStringLiteral("CREATE TRIGGER refuse_moves BEFORE INSERT ON "
+                                             "post_source_moves BEGIN SELECT RAISE(ABORT, "
+                                             "'injected'); END")));
+        }
+        QSqlDatabase::removeDatabase(connection);
+        const qint64 id = env.submit(
+            env.post(QStringLiteral("unjournaled"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, env.beginSet(id), PrepStep::Compress);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(!steps.first().at(4).toBool());
+        const QString stepErr = steps.first().at(5).toString();
+        QVERIFY2(stepErrorIs(stepErr, kStepStoreFailed), qPrintable(stepErr));
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("unjournaled")))); // never moved
+        QTest::qWait(300);
+        QVERIFY(!QFileInfo::exists(ran)); // nor any tool started
+        QTRY_VERIFY(!env.executor->runtime(id));
+    }
+
+    void withoutAnAtomicRenameNoSourceIsPostedUnderItsName()
+    {
+        Env env;
+        QString error;
+        const QString ran = env.sandbox.rootPath() + QStringLiteral("/rar-ran");
+        QVERIFY2(env.start(&error, QStringLiteral("touch=%1;write=40000").arg(ran)),
+                 qPrintable(error));
+        const qint64 id = env.submit(
+            env.post(QStringLiteral("unrenamed"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        qputenv("NGPOST_TEST_NO_ATOMIC_RENAME", "1");
+        env.executor->prepareStep(id, run, env.beginSet(id), PrepStep::Compress);
+        qunsetenv("NGPOST_TEST_NO_ATOMIC_RENAME");
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(!steps.first().at(4).toBool());
+        QVERIFY2(steps.first().at(5).toString().contains(QStringLiteral("Couldn't rename file")),
+                 qPrintable(steps.first().at(5).toString()));
+        // The staging folder, then in place: each attempt with its own intent.
+        QCOMPARE(env.moveStates(id),
+                 (QStringList{ QStringLiteral("restored"), QStringLiteral("restored") }));
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("unrenamed"))));
+        QTest::qWait(300);
+        QVERIFY(!QFileInfo::exists(ran));
+    }
+
+    void aRefusedReturnRecordFailsTheStep()
+    {
+#ifndef PROVEN_SUPERVISION
+        QSKIP("nothing is ever proven here: sources are never put back");
+#else
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error), qPrintable(error));
+        QVERIFY(env.refuseReturns(true));
+        const qint64 id = env.submit(env.post(QStringLiteral("unheld"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, env.beginSet(id), PrepStep::Compress);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        // Its name is back, the history does not hold it: the step does not go on.
+        QVERIFY(!steps.first().at(4).toBool());
+        const QString stepErr = steps.first().at(5).toString();
+        QVERIFY2(stepErrorIs(stepErr, kStepStoreFailed), qPrintable(stepErr));
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("unheld"))));
+        QCOMPARE(env.moveStates(id), QStringList{ QStringLiteral("moved") });
+        QVERIFY(env.executor->runtime(id)); // the work stays held
+        // Once the history accepts again, the next stop settles it.
+        QVERIFY(env.refuseReturns(false));
+        QSignalSpy quiesced(env.executor.get(), &QueueExecutor::quiesced);
+        env.executor->interrupt(id, run, Disposition::Keep);
+        QTRY_COMPARE_WITH_TIMEOUT(quiesced.size(), 1, 10000);
+        QVERIFY(quiesced.first().at(2).toBool());
+        QCOMPARE(env.moveStates(id), QStringList{ QStringLiteral("restored") });
+        QVERIFY(!QFileInfo::exists(env.root + QStringLiteral("/tmp/.ngPost_src_unheld-arch")));
+#endif
+    }
+
+    void anUnrecordedReturnComesBeforeAFailedTool()
+    {
+#ifndef PROVEN_SUPERVISION
+        QSKIP("nothing is ever proven here: sources are never put back");
+#else
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, QStringLiteral("write=40000;exit=3")), qPrintable(error));
+        QVERIFY(env.refuseReturns(true));
+        const qint64 id = env.submit(env.post(QStringLiteral("twice"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, env.beginSet(id), PrepStep::Compress);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        const QString stepErr = steps.first().at(5).toString();
+        QVERIFY2(stepErrorIs(stepErr, kStepStoreFailed), qPrintable(stepErr));
+        QVERIFY(QDir(env.archiveDir(QStringLiteral("twice"))).exists()); // nothing deleted
+        QVERIFY(env.executor->runtime(id));
+#endif
+    }
+
+    void anUnrecordedRollbackComesBeforeAFailedObfuscation()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("a source that cannot be moved aside is a symbolic link here");
+#else
+        Env env;
+        QString error;
+        const QString ran = env.sandbox.rootPath() + QStringLiteral("/rar-ran");
+        QVERIFY2(env.start(&error, QStringLiteral("touch=%1;write=40000").arg(ran)),
+                 qPrintable(error));
+        PersistedQueueOptions options = env.post(QStringLiteral("rolled"),
+                                                 true,
+                                                 false,
+                                                 64000,
+                                                 true);
+        // A second source that is a link: never moved aside, so the post stops
+        // and the first one comes back, whose return the history refuses.
+        const QString link = env.root + QStringLiteral("/rolled-link.bin");
+        QVERIFY(QFile::link(env.source(QStringLiteral("rolled")), link));
+        options.job.files << QFileInfo(link);
+        options.job.inputPaths << link;
+        QVERIFY(env.refuseReturns(true));
+        const qint64 id = env.submit(options);
+        const QString run = env.queue->find(id)->runId;
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, env.beginSet(id), PrepStep::Compress);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        const QString stepErr = steps.first().at(5).toString();
+        QVERIFY2(stepErrorIs(stepErr, kStepStoreFailed), qPrintable(stepErr));
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("rolled")))); // back, unrecorded
+        QCOMPARE(env.moveStates(id).value(0), QStringLiteral("moved"));
+        QVERIFY(env.executor->runtime(id));
+        QVERIFY(!QFileInfo::exists(ran));
+#endif
+    }
+
+    void aBlockedReturnIsLookedAtAgain()
+    {
+#ifndef PROVEN_SUPERVISION
+        QSKIP("nothing is ever proven here: sources are never put back");
+#else
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, QStringLiteral("sleep=1500;write=40000")), qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("taken"), true, false, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        QSignalSpy quiesced(env.executor.get(), &QueueExecutor::quiesced);
+        env.executor->prepareStep(id, run, set, PrepStep::Compress);
+        QVERIFY(env.waitToolState(set, QStringLiteral("running")));
+        // While it runs, another file takes the real name of its source.
+        QFile intruder(env.source(QStringLiteral("taken")));
+        QVERIFY(intruder.open(QIODevice::WriteOnly));
+        intruder.write("not ours");
+        intruder.close();
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(steps.first().at(4).toBool()); // the archive is fine
+        QCOMPARE(env.moveStates(id), QStringList{ QStringLiteral("blocked") });
+        QVERIFY(env.executor->runtime(id)); // still holding the way back
+        QVERIFY(QFile::remove(env.source(QStringLiteral("taken"))));
+        env.executor->interrupt(id, run, Disposition::Keep);
+        QTRY_COMPARE_WITH_TIMEOUT(quiesced.size(), 1, 10000);
+        QVERIFY(quiesced.first().at(2).toBool());
+        QCOMPARE(env.moveStates(id), QStringList{ QStringLiteral("restored") });
+        QFile back(env.source(QStringLiteral("taken")));
+        QVERIFY(back.open(QIODevice::ReadOnly));
+        QCOMPARE(back.readAll(), QByteArray(64000, 'a'));
+#endif
+    }
+
+    //! Another file takes the real name of a source while its tool runs.
+    static bool intrudeWhileRunning(Env &env, const QString &set, const QString &name)
+    {
+        if (!env.waitToolState(set, QStringLiteral("running")))
+            return false;
+        QFile intruder(env.source(name));
+        if (!intruder.open(QIODevice::WriteOnly))
+            return false;
+        intruder.write("not ours");
+        return true;
+    }
+
+    void aBlockedReturnHoldsThePostBeforeItsTransfer()
+    {
+#ifndef PROVEN_SUPERVISION
+        QSKIP("nothing is ever proven here: sources are never put back");
+#else
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, QStringLiteral("sleep=1500;write=40000")), qPrintable(error));
+        const qint64 id = env.submit(env.post(QStringLiteral("carried"), true, true, 64000, true));
+        const QString run = env.queue->find(id)->runId;
+        const QString set = env.beginSet(id);
+        QSignalSpy steps(env.executor.get(), &QueueExecutor::stepFinished);
+        env.executor->prepareStep(id, run, set, PrepStep::Compress);
+        QVERIFY(intrudeWhileRunning(env, set, QStringLiteral("carried")));
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 1, 15000);
+        QVERIFY(steps.first().at(4).toBool()); // the archive is fine
+        env.executor->prepareStep(id, run, set, PrepStep::Par2);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 2, 15000);
+        env.executor->prepareStep(id, run, set, PrepStep::Collect);
+        QTRY_COMPARE_WITH_TIMEOUT(steps.size(), 3, 15000);
+        // Nothing is published while its source is aside: no transfer follows.
+        QVERIFY(!steps.last().at(4).toBool());
+        const QString stepErr = steps.last().at(5).toString();
+        QVERIFY2(stepErrorIs(stepErr, kStepSourcesPending), qPrintable(stepErr));
+        QVERIFY(env.executor->runtime(id));
+        QCOMPARE(env.moveStates(id), QStringList{ QStringLiteral("blocked") });
+        QVERIFY(!env.executor->manifest(id, run, set).isValid());
+#endif
+    }
+
+    void aPostWaitingForItsSourcesStaysInTheQueue_data()
+    {
+        QTest::addColumn<QString>("rar");
+        QTest::newRow("the collection refuses") << QStringLiteral("sleep=1500;write=40000");
+        QTest::newRow("the compressor fails") << QStringLiteral("sleep=1500;exit=3");
+    }
+
+    void aPostWaitingForItsSourcesStaysInTheQueue()
+    {
+#ifndef PROVEN_SUPERVISION
+        QSKIP("nothing is ever proven here: sources are never put back");
+#else
+        QFETCH(QString, rar);
+        Env env;
+        QString error;
+        QVERIFY2(env.start(&error, rar), qPrintable(error));
+        QueueScheduler::Budget budget;
+        budget.rootFor = [&env](const QueueEntry &) { return env.root + QStringLiteral("/tmp"); };
+        QueueScheduler scheduler(env.queue.get(), env.executor.get(), budget);
+        // Even where a failed preparation retires its post (the command line).
+        scheduler.setPreparationFailurePolicy(QueueScheduler::PreparationFailure::Retire);
+        const qint64 id = env.submit(env.post(QStringLiteral("carried"), true, false, 64000, true));
+        QTRY_VERIFY_WITH_TIMEOUT(!env.queue->find(id)->artifacts.isNull(), 10000);
+        const QString set = env.queue->find(id)->artifacts.id;
+        QVERIFY(intrudeWhileRunning(env, set, QStringLiteral("carried")));
+        QTRY_VERIFY_WITH_TIMEOUT(scheduler.isTechnicallyPaused(), 20000);
+        QCOMPARE(scheduler.technicalPauseReason(), QStringLiteral("sources_pending_recovery"));
+        const QueueEntry *entry = env.queue->find(id);
+        QVERIFY(entry);
+        QCOMPARE(entry->blocked.code, QStringLiteral("sources_pending_recovery"));
+        // Held as a stop not proven: its slot, its set and its runtime stay.
+        QCOMPARE(entry->lifecycle, Lifecycle::Preparing);
+        QCOMPARE(entry->slot, Slot::Preparation);
+        QCOMPARE(entry->artifacts.id, set);
+        QVERIFY(env.executor->runtime(id));
+        // Neither a removal nor a close lets go of it.
+        env.queue->remove({ id }, RemovePolicy::Default, env.queue->view());
+        scheduler.keepRunningForClose(false);
+        QTest::qWait(500);
+        QVERIFY(env.queue->find(id));
+        QVERIFY(env.executor->runtime(id));
+        QCOMPARE(env.mock.receivedArticles().size(), 0);
+        // At the exit its last return is refused: the journal still says so,
+        // and the post stays this session's (lot C6 takes it from there).
+        QVERIFY(QFile::remove(env.source(QStringLiteral("carried"))));
+        QVERIFY(env.refuseReturns(true));
+        env.executor.reset();
+        QVERIFY(QFileInfo::exists(env.source(QStringLiteral("carried")))); // back on disk
+        QCOMPARE(env.moveStates(id), QStringList{ QStringLiteral("blocked") });
+        QString owner;
+        {
+            const QString name = QUuid::createUuid().toString();
+            {
+                QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+                db.setDatabaseName(env.dbPath());
+                QSqlQuery q(db);
+                if (db.open()
+                    && q.exec(QStringLiteral("SELECT owner_id FROM posts WHERE id=%1").arg(id))
+                    && q.next())
+                    owner = q.value(0).toString();
+            }
+            QSqlDatabase::removeDatabase(name);
+        }
+        QCOMPARE(owner, QStringLiteral("owner-test"));
+        QVERIFY(env.refuseReturns(false));
+#endif
     }
 
     void archivesAndSourcesGoOnlyOnceTheirToolIsProvenStopped()
