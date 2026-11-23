@@ -14,6 +14,8 @@
 #include <QHash>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLocalServer>
+#include <QLocalSocket>
 #include <QSocketNotifier>
 #include <QUuid>
 
@@ -26,6 +28,11 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <unistd.h>
+#elif defined(Q_OS_WIN)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #endif
 
 namespace
@@ -75,12 +82,49 @@ std::optional<int> provenStatus(const QJsonObject &identity)
     return ok ? std::optional<int>(status) : std::nullopt;
 }
 
+//! The supervisor of @p identity is still alive: the same process, not one
+//! that got its pid since.
+bool supervisorAlive(const QJsonObject &identity)
+{
+#if defined(Q_OS_LINUX)
+    const qint64 pid = identity.value(QStringLiteral("pid")).toString().toLongLong();
+    return pid > 0
+        && readSmall(QStringLiteral("/proc/sys/kernel/random/boot_id"))
+        == identity.value(QStringLiteral("boot")).toString()
+        && startTimeOf(pid) == identity.value(QStringLiteral("starttime")).toString();
+#elif defined(Q_OS_WIN)
+    const auto pid = static_cast<DWORD>(identity.value(QStringLiteral("pid")).toString().toULong());
+    HANDLE process = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!process)
+        return false;
+    FILETIME created = {};
+    FILETIME exited = {};
+    FILETIME kernel = {};
+    FILETIME user = {};
+    DWORD code = 0;
+    const bool live = ::GetProcessTimes(process, &created, &exited, &kernel, &user)
+        && ::GetExitCodeProcess(process, &code) && code == STILL_ACTIVE;
+    ::CloseHandle(process);
+    ULARGE_INTEGER start = {};
+    start.LowPart = created.dwLowDateTime;
+    start.HighPart = created.dwHighDateTime;
+    return live
+        && QString::number(start.QuadPart)
+        == identity.value(QStringLiteral("starttime")).toString();
+#else
+    Q_UNUSED(identity)
+    return false;
+#endif
+}
+
 } // namespace
 
 QString ExternalToolProcess::capability()
 {
 #if defined(Q_OS_LINUX)
     return QStringLiteral("linux_subreaper");
+#elif defined(Q_OS_WIN)
+    return QStringLiteral("windows_job");
 #else
     return QStringLiteral("unavailable");
 #endif
@@ -119,9 +163,30 @@ bool ExternalToolProcess::start(const QString &program,
                                 const QString &workingDirectory,
                                 const QString &proofPath)
 {
-#if defined(Q_OS_LINUX)
-    if (_state != State::Idle || program.isEmpty() || proofPath.isEmpty())
+    if (_state != State::Idle || program.isEmpty() || proofPath.isEmpty() || !openChannels())
         return false;
+    _proofPath = proofPath;
+    _supervisor->setWorkingDirectory(workingDirectory);
+    _state = State::Launching;
+    _supervisor->start(_supervisorProgram,
+                       QStringList{ QString::fromLatin1(toolsupervisor::kSwitch),
+                                    proofPath,
+                                    _nonce,
+                                    QStringLiteral("--"),
+                                    program }
+                           + arguments);
+    if (!_supervisor->waitForStarted(5000)) {
+        closeChannels();
+        _state = State::Idle;
+        return false;
+    }
+    listenToSupervisor();
+    return true;
+}
+
+#if defined(Q_OS_LINUX)
+bool ExternalToolProcess::openChannels()
+{
     int fromSupervisor[2];
     int toSupervisor[2];
     if (::pipe2(fromSupervisor, O_CLOEXEC) != 0)
@@ -131,8 +196,10 @@ bool ExternalToolProcess::start(const QString &program,
         ::close(fromSupervisor[1]);
         return false;
     }
-    const int childWrite = fromSupervisor[1];
-    const int childRead = toSupervisor[0];
+    _childWrite = fromSupervisor[1];
+    _childRead = toSupervisor[0];
+    const int childWrite = _childWrite;
+    const int childRead = _childRead;
     // In the child, between fork and exec: async-signal-safe calls only. The
     // ends are first moved above 3 and 4 so that placing one never closes the
     // other; dup2() clears close-on-exec on 3 and 4 only. The controller's ends
@@ -145,35 +212,75 @@ bool ExternalToolProcess::start(const QString &program,
     });
     _fromSupervisor = fromSupervisor[0];
     _toSupervisor = toSupervisor[1];
-    _proofPath = proofPath;
     _nonce = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    _supervisor->setWorkingDirectory(workingDirectory);
-    _state = State::Launching;
-    _supervisor->start(_supervisorProgram,
-                       QStringList{ QString::fromLatin1(toolsupervisor::kSwitch),
-                                    proofPath,
-                                    _nonce,
-                                    QStringLiteral("--"),
-                                    program }
-                           + arguments);
+    return true;
+}
+
+void ExternalToolProcess::listenToSupervisor()
+{
     // The child holds its own copies by now.
-    ::close(childWrite);
-    ::close(childRead);
-    if (!_supervisor->waitForStarted(5000)) {
-        closeChannels();
-        _state = State::Idle;
-        return false;
-    }
+    ::close(_childWrite);
+    ::close(_childRead);
+    _childWrite = -1;
+    _childRead = -1;
     ::fcntl(_fromSupervisor, F_SETFL, ::fcntl(_fromSupervisor, F_GETFL) | O_NONBLOCK);
     _notifier = new QSocketNotifier(_fromSupervisor, QSocketNotifier::Read, this);
     connect(_notifier, &QSocketNotifier::activated, this, &ExternalToolProcess::onProtocol);
+}
+#elif defined(Q_OS_WIN)
+bool ExternalToolProcess::openChannels()
+{
+    _nonce = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    // Its name carries the nonce; only the supervisor's own pid is accepted.
+    _server = new QLocalServer(this);
+    _server->setSocketOptions(QLocalServer::UserAccessOption);
+    _server->setMaxPendingConnections(1);
+    if (!_server->listen(QStringLiteral("ngpost-tool-") + _nonce)) {
+        closeChannels();
+        return false;
+    }
+    connect(_server, &QLocalServer::newConnection, this, &ExternalToolProcess::onConnection);
     return true;
+}
+
+void ExternalToolProcess::listenToSupervisor()
+{
+    // The supervisor connects to the server opened by openChannels().
+}
 #else
-    Q_UNUSED(program)
-    Q_UNUSED(arguments)
-    Q_UNUSED(workingDirectory)
-    Q_UNUSED(proofPath)
-    return false; // no proven supervision here yet (lots C5.4, C5.5)
+bool ExternalToolProcess::openChannels()
+{
+    return false; // no proven supervision here yet (lot C5.5)
+}
+
+void ExternalToolProcess::listenToSupervisor()
+{
+}
+#endif
+
+void ExternalToolProcess::onConnection()
+{
+#if defined(Q_OS_WIN)
+    while (QLocalSocket *socket = _server ? _server->nextPendingConnection() : nullptr) {
+        ULONG client = 0;
+        const auto pipe = reinterpret_cast<HANDLE>(socket->socketDescriptor());
+        if (_socket || !::GetNamedPipeClientProcessId(pipe, &client)
+            || static_cast<qint64>(client) != _supervisor->processId()) {
+            socket->abort(); // not our supervisor: never listened to
+            socket->deleteLater();
+            continue;
+        }
+        _socket = socket;
+        connect(_socket, &QLocalSocket::readyRead, this, &ExternalToolProcess::onProtocol);
+        _server->close(); // nobody else gets in
+        // What was asked before it connected (a stop) is not lost.
+        if (!_queuedCommands.isEmpty()) {
+            _socket->write(_queuedCommands);
+            _socket->flush();
+            _queuedCommands.clear();
+        }
+        onProtocol();
+    }
 #endif
 }
 
@@ -207,6 +314,9 @@ void ExternalToolProcess::onProtocol()
             _notifier->setEnabled(false); // the supervisor closed it, or ended
         break;
     }
+#elif defined(Q_OS_WIN)
+    if (_socket)
+        _pending += _socket->readAll();
 #endif
     qsizetype eol = 0;
     while ((eol = _pending.indexOf('\n')) >= 0) {
@@ -270,23 +380,24 @@ ExternalToolProcess::State ExternalToolProcess::proofState(const QString &identi
         return State::Unproven;
     if (provenStatus(identity))
         return State::StoppedVerified;
-#if defined(Q_OS_LINUX)
-    // The same supervisor still alive: same boot, same pid, same start time.
-    const qint64 pid = identity.value(QStringLiteral("pid")).toString().toLongLong();
-    if (pid > 0
-        && readSmall(QStringLiteral("/proc/sys/kernel/random/boot_id"))
-            == identity.value(QStringLiteral("boot")).toString()
-        && startTimeOf(pid) == identity.value(QStringLiteral("starttime")).toString())
-        return State::Running;
-#endif
-    return State::Unproven;
+    return supervisorAlive(identity) ? State::Running : State::Unproven;
 }
 
 void ExternalToolProcess::closeChannels()
 {
     delete _notifier;
     _notifier = nullptr;
+    // Windows: the end of the connection is the end of the lifeline.
+    if (_socket)
+        _socket->abort();
+    delete _socket;
+    _socket = nullptr;
+    delete _server;
+    _server = nullptr;
 #if defined(Q_OS_LINUX)
+    for (const int end : { _childWrite, _childRead })
+        if (end >= 0)
+            ::close(end);
     if (_fromSupervisor >= 0)
         ::close(_fromSupervisor);
     if (_toSupervisor >= 0)
@@ -294,6 +405,9 @@ void ExternalToolProcess::closeChannels()
 #endif
     _fromSupervisor = -1;
     _toSupervisor = -1;
+    _childWrite = -1;
+    _childRead = -1;
+    _queuedCommands.clear();
 }
 
 void ExternalToolProcess::sendCommand(const QByteArray &line)
@@ -313,6 +427,13 @@ void ExternalToolProcess::sendCommand(const QByteArray &line)
         ::sigtimedwait(&pipeSignal, nullptr, &none);
     }
     ::pthread_sigmask(SIG_SETMASK, &previous, nullptr);
+#elif defined(Q_OS_WIN)
+    if (_socket) {
+        _socket->write(line);
+        _socket->flush();
+    } else {
+        _queuedCommands += line; // sent once the supervisor connects
+    }
 #else
     Q_UNUSED(line)
 #endif
@@ -327,6 +448,9 @@ void ExternalToolProcess::dropProtocolForTest()
     if (_fromSupervisor >= 0)
         ::close(_fromSupervisor);
     _fromSupervisor = -1;
+#elif defined(Q_OS_WIN)
+    if (_socket) // its messages now go unread; commands and the lifeline stay
+        disconnect(_socket, nullptr, this, nullptr);
 #endif
 }
 #endif

@@ -17,6 +17,8 @@
 #include <QString>
 #include <QStringList>
 
+class QLocalServer;
+class QLocalSocket;
 class QSocketNotifier;
 
 class ExternalToolProcess : public QObject
@@ -83,7 +85,11 @@ signals:
     void stopped(bool verified, int toolStatus);
 
 private:
+    //! Platform channels before the supervisor starts; their use once it runs.
+    bool openChannels();
+    void listenToSupervisor();
     void onProtocol();
+    void onConnection();
     void onSupervisorFinished();
     void handleLine(const QByteArray &line);
     void closeChannels();
@@ -94,8 +100,13 @@ private:
     //! (QProcess would kill it), until the supervisor has proven its stop.
     QProcess *_supervisor = nullptr;
     QSocketNotifier *_notifier = nullptr;
-    int _fromSupervisor = -1; //!< read end of its fd 3
-    int _toSupervisor = -1;   //!< write end of its fd 4: the lifeline
+    int _fromSupervisor = -1;        //!< Linux: read end of its fd 3
+    int _toSupervisor = -1;          //!< Linux: write end of its fd 4, the lifeline
+    QLocalServer *_server = nullptr; //!< Windows: the named pipe it connects to
+    QLocalSocket *_socket = nullptr; //!< Windows: both ways, and the lifeline
+    int _childWrite = -1;            //!< Linux: its fd 3, until it holds its own copy
+    int _childRead = -1;             //!< Linux: its fd 4, likewise
+    QByteArray _queuedCommands;      //!< Windows: asked before it connected
     QByteArray _pending;
     QString _proofPath;
     QString _nonce;

@@ -67,7 +67,7 @@ tst_QueueScheduler            38  Linux
 tst_QueueStoreSqlite          39  Linux
 tst_PostingJobExecutor        13  Linux
 tst_PreparationWorkspace      12  Linux
-tst_ExternalToolProcess       17  Linux
+tst_ExternalToolProcess       18  Linux
 tst_NgPostQueue               20  Linux
 tst_RandomToken                3  Linux
 tst_SecretMasker              22  Linux
@@ -147,7 +147,7 @@ tst_QueueScheduler            38  Windows
 tst_QueueStoreSqlite          39  Windows
 tst_PostingJobExecutor        10  Windows
 tst_PreparationWorkspace      12  Windows
-tst_ExternalToolProcess        3  Windows
+tst_ExternalToolProcess       17  Windows
 tst_NgPostQueue               20  Windows
 tst_RandomToken                3  Windows
 tst_SecretMasker              22  Windows

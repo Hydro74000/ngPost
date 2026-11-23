@@ -97,7 +97,7 @@ TRANSLATIONS = $$PWD/lang/ngPost_en.ts $$PWD/lang/ngPost_fr.ts $$PWD/lang/ngPost
 
 win32: {
     # ws2_32 is needed by the Windows VPN bind helper.
-    LIBS += -luser32 -ladvapi32 -lws2_32
+    LIBS += -luser32 -ladvapi32 -lws2_32 -lshell32
 }
 
 CONFIG(debug, debug|release) :{

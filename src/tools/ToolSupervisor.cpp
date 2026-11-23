@@ -415,11 +415,332 @@ int toolsupervisor::run(int argc, char **argv)
     return kProven;
 }
 
-#else // not Linux
+#elif defined(_WIN32) // ------------------------------------------------------------------
+
+// Windows (lot C5.4): the tool is created suspended, put in a job object
+// before its first instruction, then resumed. The job lets nothing break
+// away and kills everything in it when its last handle closes; the proof is
+// written once the job has no active process left. The controller speaks
+// through a named pipe whose name carries the nonce; its end is the lifeline.
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include "utils/WindowsCommandLine.h"
+
+#include <QString>
+#include <QStringList>
+
+#include <algorithm>
+#include <string>
+#include <vector>
+#include <windows.h>
+#include <shellapi.h>
+
+namespace
+{
+
+constexpr DWORD kTickMs = 50;
+constexpr UINT kStoppedCode = 128 + 15; // what a stopped tool reports, as SIGTERM would
+
+HANDLE sPipe = INVALID_HANDLE_VALUE;
+
+void say(const std::string &line)
+{
+    if (sPipe == INVALID_HANDLE_VALUE)
+        return;
+    const std::string text = line + "\n";
+    DWORD written = 0;
+    ::WriteFile(sPipe, text.data(), static_cast<DWORD>(text.size()), &written, nullptr);
+}
+
+//! Creation time of a process: with its pid, it names one process.
+std::string creationTime(HANDLE process)
+{
+    FILETIME created = {};
+    FILETIME exited = {};
+    FILETIME kernel = {};
+    FILETIME user = {};
+    if (!::GetProcessTimes(process, &created, &exited, &kernel, &user))
+        return {};
+    ULARGE_INTEGER value = {};
+    value.LowPart = created.dwLowDateTime;
+    value.HighPart = created.dwHighDateTime;
+    return std::to_string(value.QuadPart);
+}
+
+struct Tool
+{
+    HANDLE process = nullptr;
+    DWORD pid = 0;
+    int status = -1;
+    bool launched = false;
+    bool exited = false;
+};
+
+//! False once the controller is gone (pipe broken).
+bool readCommands(std::string &buffer, bool &go, bool &stop)
+{
+    DWORD available = 0;
+    if (!::PeekNamedPipe(sPipe, nullptr, 0, nullptr, &available, nullptr))
+        return false;
+    if (available == 0)
+        return true;
+    char chunk[64];
+    DWORD n = 0;
+    if (!::ReadFile(sPipe, chunk, std::min<DWORD>(available, sizeof chunk), &n, nullptr))
+        return false;
+    buffer.append(chunk, n);
+    std::size_t eol = 0;
+    while ((eol = buffer.find('\n')) != std::string::npos) {
+        const std::string line = buffer.substr(0, eol);
+        buffer.erase(0, eol + 1);
+        go = go || line == "go";
+        stop = stop || line == "stop";
+    }
+    return true;
+}
+
+//! Only the standard handles are inherited: never the pipe to the controller.
+std::vector<HANDLE> inheritedHandles()
+{
+    std::vector<HANDLE> handles;
+    for (const DWORD which : { STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE }) {
+        const HANDLE h = ::GetStdHandle(which);
+        if (h == nullptr || h == INVALID_HANDLE_VALUE
+            || std::find(handles.begin(), handles.end(), h) != handles.end())
+            continue;
+        ::SetHandleInformation(h, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+        handles.push_back(h);
+    }
+    return handles;
+}
+
+void failLaunch(Tool &tool, DWORD error)
+{
+    say("exec_failed " + std::to_string(error));
+    tool.status = 127;
+}
+
+void launch(Tool &tool, HANDLE job, const QStringList &toolArgs)
+{
+    tool.launched = true; // one attempt, whatever happens
+    std::wstring command = WindowsCommandLine::serialize(toolArgs).toStdWString();
+    std::vector<HANDLE> handles = inheritedHandles();
+    SIZE_T size = 0;
+    ::InitializeProcThreadAttributeList(nullptr, 1, 0, &size);
+    std::vector<char> storage(size);
+    auto *attributes = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
+    if (!::InitializeProcThreadAttributeList(attributes, 1, 0, &size)
+        || (!handles.empty()
+            && !::UpdateProcThreadAttribute(attributes,
+                                            0,
+                                            PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+                                            handles.data(),
+                                            handles.size() * sizeof(HANDLE),
+                                            nullptr,
+                                            nullptr))) {
+        failLaunch(tool, ::GetLastError());
+        return;
+    }
+    STARTUPINFOEXW startup = {};
+    startup.StartupInfo.cb = sizeof startup;
+    startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    startup.StartupInfo.hStdInput = ::GetStdHandle(STD_INPUT_HANDLE);
+    startup.StartupInfo.hStdOutput = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    startup.StartupInfo.hStdError = ::GetStdHandle(STD_ERROR_HANDLE);
+    startup.lpAttributeList = attributes;
+    PROCESS_INFORMATION info = {};
+    const BOOL created = ::CreateProcessW(nullptr,
+                                          command.data(),
+                                          nullptr,
+                                          nullptr,
+                                          handles.empty() ? FALSE : TRUE,
+                                          CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT
+                                              | CREATE_NEW_PROCESS_GROUP,
+                                          nullptr,
+                                          nullptr,
+                                          &startup.StartupInfo,
+                                          &info);
+    const DWORD createError = ::GetLastError();
+    ::DeleteProcThreadAttributeList(attributes);
+    if (!created) {
+        failLaunch(tool, createError);
+        return;
+    }
+    // In the job before its first instruction: nothing of it runs outside.
+    if (!::AssignProcessToJobObject(job, info.hProcess)) {
+        const DWORD error = ::GetLastError();
+        ::TerminateProcess(info.hProcess, 127);
+        ::WaitForSingleObject(info.hProcess, INFINITE);
+        ::CloseHandle(info.hThread);
+        ::CloseHandle(info.hProcess);
+        failLaunch(tool, error);
+        return;
+    }
+    tool.process = info.hProcess;
+    tool.pid = info.dwProcessId;
+    if (::ResumeThread(info.hThread) == static_cast<DWORD>(-1)) {
+        const DWORD error = ::GetLastError();
+        ::TerminateJobObject(job, 127); // never left suspended
+        ::CloseHandle(info.hThread);
+        failLaunch(tool, error);
+        return;
+    }
+    ::CloseHandle(info.hThread);
+    say("started " + std::to_string(tool.pid));
+}
+
+DWORD activeProcesses(HANDLE job)
+{
+    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION info = {};
+    if (!::QueryInformationJobObject(job,
+                                     JobObjectBasicAccountingInformation,
+                                     &info,
+                                     sizeof info,
+                                     nullptr))
+        return 1; // not known: never taken for none
+    return info.ActiveProcesses;
+}
+
+void noteToolExit(Tool &tool)
+{
+    if (!tool.process || tool.exited || ::WaitForSingleObject(tool.process, 0) != WAIT_OBJECT_0)
+        return;
+    DWORD code = 0;
+    ::GetExitCodeProcess(tool.process, &code);
+    tool.exited = true;
+    if (tool.status < 0)
+        tool.status = static_cast<int>(code);
+    say("tool_exited " + std::to_string(tool.status));
+}
+
+bool writeProof(const QString &path,
+                const std::string &nonce,
+                const std::string &start,
+                const Tool &tool)
+{
+    const std::string text = "ngpost-tool-proof 1\nnonce " + nonce + "\nboot -\npid "
+        + std::to_string(::GetCurrentProcessId()) + "\nstarttime " + start + "\ntool_status "
+        + std::to_string(tool.status) + "\n";
+    const std::wstring target = path.toStdWString();
+    const std::wstring temporary = target + L".tmp";
+    const HANDLE file = ::CreateFileW(temporary.c_str(),
+                                      GENERIC_WRITE,
+                                      0,
+                                      nullptr,
+                                      CREATE_ALWAYS,
+                                      FILE_ATTRIBUTE_NORMAL,
+                                      nullptr);
+    if (file == INVALID_HANDLE_VALUE)
+        return false;
+    DWORD written = 0;
+    const bool ok = ::WriteFile(file,
+                                text.data(),
+                                static_cast<DWORD>(text.size()),
+                                &written,
+                                nullptr)
+        && written == text.size() && ::FlushFileBuffers(file);
+    ::CloseHandle(file);
+    if (!ok
+        || !::MoveFileExW(temporary.c_str(),
+                          target.c_str(),
+                          MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        ::DeleteFileW(temporary.c_str());
+        return false;
+    }
+    return true;
+}
+
+bool connectToController(const QString &nonce)
+{
+    const std::wstring name = (QStringLiteral("\\\\.\\pipe\\ngpost-tool-") + nonce).toStdWString();
+    for (int attempt = 0; attempt < 100; ++attempt) {
+        sPipe = ::CreateFileW(name.c_str(),
+                              GENERIC_READ | GENERIC_WRITE,
+                              0,
+                              nullptr,
+                              OPEN_EXISTING,
+                              0,
+                              nullptr);
+        if (sPipe != INVALID_HANDLE_VALUE)
+            return true;
+        if (!::WaitNamedPipeW(name.c_str(), kTickMs))
+            ::Sleep(kTickMs);
+    }
+    return false;
+}
+
+} // namespace
 
 int toolsupervisor::run(int, char **)
 {
-    return kSetupFailed; // no proven supervision here (lots C5.4, C5.5)
+    int count = 0;
+    LPWSTR *wide = ::CommandLineToArgvW(::GetCommandLineW(), &count);
+    QStringList args;
+    for (int i = 0; wide && i < count; ++i)
+        args << QString::fromWCharArray(wide[i]);
+    ::LocalFree(wide);
+    if (args.size() < 6 || args.at(4) != QStringLiteral("--"))
+        return kSetupFailed;
+    const QString proof = args.at(2);
+    const std::string nonce = args.at(3).toStdString();
+    const QStringList toolArgs = args.mid(5);
+    if (!connectToController(args.at(3)))
+        return kSetupFailed;
+    const HANDLE job = ::CreateJobObjectW(nullptr, nullptr);
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {};
+    // No breakaway allowed; everything in it dies with its last handle.
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if (!job
+        || !::SetInformationJobObject(job,
+                                      JobObjectExtendedLimitInformation,
+                                      &limits,
+                                      sizeof limits)) {
+        say("setup_failed job " + std::to_string(::GetLastError()));
+        return kSetupFailed;
+    }
+    const std::string start = creationTime(::GetCurrentProcess());
+    say("ready " + std::to_string(::GetCurrentProcessId()) + " " + start + " -");
+
+    Tool tool;
+    std::string commands;
+    bool go = false;
+    bool stop = false;
+    bool lifeline = true;
+    for (;;) {
+        if (lifeline && !readCommands(commands, go, stop))
+            lifeline = false; // the controller is gone: its tree goes too
+        stop = stop || !lifeline;
+        if (go && !stop && !tool.launched)
+            launch(tool, job, toolArgs);
+        if (stop && activeProcesses(job) > 0) {
+            if (tool.status < 0 && tool.process && !tool.exited)
+                tool.status = static_cast<int>(kStoppedCode);
+            ::TerminateJobObject(job, kStoppedCode);
+        }
+        noteToolExit(tool);
+        // Only an empty job is a proof; without a "go", nothing was started.
+        if ((stop || tool.launched) && activeProcesses(job) == 0 && (!tool.process || tool.exited))
+            break;
+        ::Sleep(kTickMs);
+    }
+    if (!writeProof(proof, nonce, start, tool)) {
+        say("proof_failed " + std::to_string(::GetLastError()));
+        return kProofFailed;
+    }
+    say("finished " + std::to_string(tool.status));
+    if (tool.process)
+        ::CloseHandle(tool.process);
+    ::CloseHandle(job);
+    return kProven;
+}
+
+#else // neither Linux nor Windows
+
+int toolsupervisor::run(int, char **)
+{
+    return kSetupFailed; // no proven supervision here (lot C5.5)
 }
 
 #endif
