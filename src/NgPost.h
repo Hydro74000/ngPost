@@ -446,6 +446,7 @@ private:
     bool _queueClosing = false;     //!< closeQueueKeeping() under way
     bool _queueClosed = false;      //!< kept by a close: nothing new until the end
     bool _queueExitRequested = false; //!< a fatal exit already closed the queue
+    bool _stopRequested = false;      //!< requestGracefulExit() ran
     void _checkQueueClosed();
     void _connectQueueExecutor(); //!< runtimes and post actions, for _ensureQueueEngine()
     void _connectQueueEvents();   //!< scheduler and queue, for _ensureQueueEngine()
@@ -1026,6 +1027,8 @@ public:
     //! engine quits at once as it always did; with a queue, it is kept first
     //! (closeQueueKeeping()), then the post actions end, as for a fatal exit.
     void requestGracefulExit();
+    //! A stop signal, a session end or a fatal error is ending the run.
+    bool isExiting() const { return _pendingExitCode >= 0 || _stopRequested; }
     bool isClosingQueue() const { return _queueClosing; }
     //! The session queue holds some entry: a close has something to keep.
     bool queueHasEntries() const;

@@ -24,8 +24,15 @@
 #include <csignal>
 #include <iostream>
 
-#if defined(__USE_HMI__) && defined(Q_OS_WIN)
+#if defined(Q_OS_WIN)
+#include <QWinEventNotifier>
+#include <atomic>
+#include <cstring>
 #include <windows.h>
+#ifdef __USE_HMI__
+#include <QGuiApplication>
+#include <QSessionManager>
+#endif
 #endif
 
 #if defined(Q_OS_UNIX)
@@ -260,18 +267,216 @@ void dispatchSignal(int sig)
     }
 }
 
+//! Once NgPost exists: the self-pipe is read on its thread.
+void attachPosixSignalRouter(NgPost *ngPost)
+{
+    // Plug the read end of the self-pipe into a QSocketNotifier owned by the
+    // NgPost object. The notifier lives in the main thread, so its slot runs
+    // in main-thread context — making it safe to call std::cout, quit() and
+    // QWidget methods from there.
+    if (sSigPipe[0] >= 0) {
+        auto *sn = new QSocketNotifier(sSigPipe[0], QSocketNotifier::Read, ngPost);
+        QObject::connect(sn,
+                         &QSocketNotifier::activated,
+                         ngPost,
+                         [](QSocketDescriptor fd, QSocketNotifier::Type) {
+            // Drain the pipe — several signals can pile up between two
+            // event-loop ticks — with one bounded read rather than an
+            // open-ended byte-at-a-time loop. read() never returns more
+            // than sizeof(buf), so the dispatch below is bounded by
+            // construction; the notifier is level-triggered, so anything
+            // still queued comes back on the next tick. That bound is what
+            // keeps a signal flood (a process spamming SIGUSR1, a user
+            // leaning on Ctrl-C) from starving the event loop — each byte
+            // costs a cout + flush, so an unbounded loop can be fed faster
+            // than it drains. A negative or zero return leaves the loop
+            // body unexecuted, which is the wanted behaviour for both
+            // EAGAIN (pipe empty) and EOF (write end gone).
+            unsigned char buf[32];
+            ssize_t const n = ::read(int(fd), buf, sizeof buf); // flawfinder: ignore
+            for (ssize_t i = 0; i < n; ++i)
+                dispatchSignal(static_cast<int>(buf[i]));
+        });
+        // Safe to unblock on the main thread now: the kernel will deliver
+        // signals here (workers have them blocked), the handler writes a byte
+        // to the pipe, the notifier fires on the next event-loop iteration.
+        unblockSignalsOnMainThread();
+    }
+}
+
 #else // Q_OS_WIN
 
-// Windows note: signal() under the MSVC CRT runs the handler on a *fresh*
-// Win32 thread, not by preempting the main thread mid-mutex. The cout/quit()
-// race is therefore much less severe than on POSIX — we keep the simple form
-// here. A future hardening pass could switch to SetConsoleCtrlHandler if
-// needed.
-extern "C" void handleShutdownWin(int)
+// Stopping on Ctrl+C / Ctrl+Break, console close and session end (plan_queue.md,
+// lot C4.9), the POSIX protocol: the first request runs the graceful exit on
+// the main thread (an event a QWinEventNotifier watches) and arms a native
+// watchdog; a second Ctrl+C/Break, or the watchdog, ends the process with
+// TerminateProcess() -- no CRT or DLL teardown, nothing a blocked main thread
+// could hold up. Console close and session end wait at most 4 s for the end
+// of main(), then let Windows end the process.
+std::atomic<int> sInterrupts{ 0 };
+std::atomic<bool> sStopRequested{ false };
+HANDLE sStopRequest = nullptr;   //!< auto reset: the main thread runs the protocol
+HANDLE sWatchdogArmed = nullptr; //!< manual reset: the countdown has started
+HANDLE sExitDone = nullptr;      //!< manual reset: main() is over, app deleted
+DWORD sExitWatchdogMs = 30000;   //!< NGPOST_EXIT_WATCHDOG_SECONDS
+constexpr DWORD kSystemStopBudgetMs = 4000;
+
+DWORD WINAPI writeDiagnosticThread(LPVOID message)
 {
-    std::cout << "Closing the application...\n";
-    std::cout.flush();
-    QCoreApplication::quit();
+    const char *text = static_cast<const char *>(message);
+    DWORD written = 0;
+    ::WriteFile(::GetStdHandle(STD_ERROR_HANDLE),
+                text,
+                static_cast<DWORD>(std::strlen(text)),
+                &written,
+                nullptr);
+    return 0;
+}
+
+//! Ends the process now. The diagnostic is tried on the side and waited for a
+//! moment only: a full pipe on stderr never holds the exit.
+[[noreturn]] void forceExit(const char *message, UINT code)
+{
+    if (HANDLE writer = ::CreateThread(nullptr,
+                                       0,
+                                       &writeDiagnosticThread,
+                                       const_cast<char *>(message),
+                                       0,
+                                       nullptr)) {
+        ::WaitForSingleObject(writer, 200);
+        ::CloseHandle(writer);
+    }
+    ::TerminateProcess(::GetCurrentProcess(), code);
+    ::_exit(static_cast<int>(code)); // not reached
+}
+
+DWORD WINAPI exitWatchdogThread(LPVOID)
+{
+    ::WaitForSingleObject(sWatchdogArmed, INFINITE);
+    if (::WaitForSingleObject(sExitDone, sExitWatchdogMs) == WAIT_TIMEOUT)
+        forceExit("ngPost: not stopped in time after the stop request: forced exit\n", 142);
+    return 0;
+}
+
+//! Any thread: the first request starts the protocol and the watchdog.
+void requestStop()
+{
+    if (sStopRequested.exchange(true))
+        return;
+    ::SetEvent(sWatchdogArmed);
+    ::SetEvent(sStopRequest);
+}
+
+BOOL WINAPI consoleControlHandler(DWORD type)
+{
+    switch (type) {
+    case CTRL_C_EVENT:
+    case CTRL_BREAK_EVENT:
+        if (sInterrupts.fetch_add(1) > 0)
+            forceExit("ngPost: second stop signal: forced exit\n", 130);
+        requestStop();
+        return TRUE;
+    case CTRL_CLOSE_EVENT:
+    case CTRL_LOGOFF_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        // Windows ends the process when this returns: the protocol gets its
+        // budget. Not a second interruption.
+        requestStop();
+        ::WaitForSingleObject(sExitDone, kSystemStopBudgetMs);
+        return TRUE;
+    default: return FALSE;
+    }
+}
+
+LRESULT CALLBACK sessionEndWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message) {
+    case WM_QUERYENDSESSION: requestStop(); return TRUE;
+    case WM_ENDSESSION:
+        if (wParam)
+            ::WaitForSingleObject(sExitDone, kSystemStopBudgetMs);
+        return 0;
+    default: return ::DefWindowProcW(window, message, wParam, lParam);
+    }
+}
+
+//! A command line run has no top-level window, and only those hear of the end
+//! of the session (a process with user32 gets no CTRL_LOGOFF/SHUTDOWN). A
+//! hidden one, on its own thread: waiting in it never blocks main().
+DWORD WINAPI sessionEndThread(LPVOID)
+{
+    WNDCLASSW windowClass = {};
+    windowClass.lpfnWndProc = &sessionEndWindowProc;
+    windowClass.hInstance = ::GetModuleHandleW(nullptr);
+    windowClass.lpszClassName = L"ngPostSessionEnd";
+    if (!::RegisterClassW(&windowClass)
+        || !::CreateWindowExW(0,
+                              windowClass.lpszClassName,
+                              L"ngPost",
+                              WS_OVERLAPPED,
+                              0,
+                              0,
+                              0,
+                              0,
+                              nullptr,
+                              nullptr,
+                              windowClass.hInstance,
+                              nullptr))
+        return 1;
+    MSG message;
+    while (::GetMessageW(&message, nullptr, 0, 0) > 0) {
+        ::TranslateMessage(&message);
+        ::DispatchMessageW(&message);
+    }
+    return 0;
+}
+
+//! Before NgPost exists: events and watchdog first, then the handler.
+bool installWindowsStopRouter()
+{
+    bool set = false;
+    const int seconds = qEnvironmentVariableIntValue("NGPOST_EXIT_WATCHDOG_SECONDS", &set);
+    if (set && seconds > 0 && seconds <= 3600)
+        sExitWatchdogMs = static_cast<DWORD>(seconds) * 1000;
+    sStopRequest = ::CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    sWatchdogArmed = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    sExitDone = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (!sStopRequest || !sWatchdogArmed || !sExitDone)
+        return false;
+    HANDLE watchdog = ::CreateThread(nullptr, 0, &exitWatchdogThread, nullptr, 0, nullptr);
+    if (!watchdog)
+        return false;
+    ::CloseHandle(watchdog);
+    return ::SetConsoleCtrlHandler(&consoleControlHandler, TRUE) != 0;
+}
+
+//! Once NgPost exists: the protocol on its thread, and the end of session.
+void attachWindowsStopRouter(NgPost *ngPost)
+{
+    if (!sStopRequest)
+        return;
+    auto *notifier = new QWinEventNotifier(sStopRequest, ngPost);
+    QObject::connect(notifier, &QWinEventNotifier::activated, ngPost, [ngPost] {
+        std::cout << "Closing the application...\n";
+        std::cout.flush();
+        ngPost->requestGracefulExit();
+    });
+#ifdef __USE_HMI__
+    if (ngPost->useHMI()) {
+        // Qt hears the end of a GUI session: no dialog, the protocol starts.
+        QObject::connect(qGuiApp,
+                         &QGuiApplication::commitDataRequest,
+                         ngPost,
+                         [ngPost](QSessionManager &) {
+            requestStop();
+            ngPost->requestGracefulExit();
+        },
+                         Qt::DirectConnection);
+        return;
+    }
+#endif
+    if (HANDLE thread = ::CreateThread(nullptr, 0, &sessionEndThread, nullptr, 0, nullptr))
+        ::CloseHandle(thread);
 }
 
 #endif // Q_OS_UNIX vs Q_OS_WIN
@@ -302,44 +507,17 @@ int main(int argc, char* argv[])
     if (!installPosixSignalRouter())
         std::cerr << "warning: failed to install POSIX signal router\n";
 #else
-    ::signal(SIGINT,  &handleShutdownWin); // shut down on ctrl-c
-    ::signal(SIGTERM, &handleShutdownWin); // shut down on killall
+    if (!installWindowsStopRouter())
+        std::cerr << "warning: failed to install the Windows stop handler\n";
 #endif
 
     //    qDebug() << "argc: " << argc;
     app = new NgPost(argc, argv);
 
 #if defined(Q_OS_UNIX)
-    // Plug the read end of the self-pipe into a QSocketNotifier owned by the
-    // NgPost object. The notifier lives in the main thread, so its slot runs
-    // in main-thread context — making it safe to call std::cout, quit() and
-    // QWidget methods from there.
-    if (sSigPipe[0] >= 0) {
-        auto *sn = new QSocketNotifier(sSigPipe[0], QSocketNotifier::Read, app);
-        QObject::connect(sn, &QSocketNotifier::activated, app,
-            [](QSocketDescriptor fd, QSocketNotifier::Type) {
-                // Drain the pipe — several signals can pile up between two
-                // event-loop ticks — with one bounded read rather than an
-                // open-ended byte-at-a-time loop. read() never returns more
-                // than sizeof(buf), so the dispatch below is bounded by
-                // construction; the notifier is level-triggered, so anything
-                // still queued comes back on the next tick. That bound is what
-                // keeps a signal flood (a process spamming SIGUSR1, a user
-                // leaning on Ctrl-C) from starving the event loop — each byte
-                // costs a cout + flush, so an unbounded loop can be fed faster
-                // than it drains. A negative or zero return leaves the loop
-                // body unexecuted, which is the wanted behaviour for both
-                // EAGAIN (pipe empty) and EOF (write end gone).
-                unsigned char buf[32];
-                ssize_t const n = ::read(int(fd), buf, sizeof buf); // flawfinder: ignore
-                for (ssize_t i = 0; i < n; ++i)
-                    dispatchSignal(static_cast<int>(buf[i]));
-            });
-        // Safe to unblock on the main thread now: the kernel will deliver
-        // signals here (workers have them blocked), the handler writes a byte
-        // to the pipe, the notifier fires on the next event-loop iteration.
-        unblockSignalsOnMainThread();
-    }
+    attachPosixSignalRouter(app);
+#else
+    attachWindowsStopRouter(app);
 #endif
 
     int exitCode = 0;
@@ -408,5 +586,9 @@ int main(int argc, char* argv[])
 #endif
 
     delete app;
+#if defined(Q_OS_WIN)
+    if (sExitDone)
+        ::SetEvent(sExitDone); // what a console close or session end waits for
+#endif
     return exitCode;
 }

@@ -578,8 +578,10 @@ void NgPost::closeQueueKeeping(bool letTransferFinish)
 
 void NgPost::requestGracefulExit()
 {
-    if (_pendingExitCode >= 0)
+    if (isExiting())
         return; // already leaving: only a second signal forces it, natively
+    // Before quit(): a GUI closes its windows on it, and must not ask.
+    _stopRequested = true;
     if (!_postQueue) {
         QCoreApplication::quit();
         return;

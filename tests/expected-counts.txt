@@ -51,7 +51,7 @@
 tst_CliParser                 68  Linux
 tst_FoldersMonitor            10  Linux
 tst_GoldenNzb                  4  Linux
-tst_MainWindow               251  Linux
+tst_MainWindow               252  Linux
 tst_MockNntp                   8  Linux
 tst_NntpFile                  29  Linux
 tst_OpenVpnConfigPolicy       74  Linux
@@ -90,7 +90,7 @@ tst_Yenc                      30  Linux
 tst_CliParser                 63  Darwin
 tst_FoldersMonitor            10  Darwin
 tst_GoldenNzb                  4  Darwin
-tst_MainWindow               204  Darwin
+tst_MainWindow               205  Darwin
 tst_MockNntp                   8  Darwin
 tst_NntpFile                  29  Darwin
 tst_OpenVpnConfigPolicy       74  Darwin
@@ -127,13 +127,13 @@ tst_Yenc                      30  Darwin
 tst_CliParser                 65  Windows
 tst_FoldersMonitor            10  Windows
 tst_GoldenNzb                  4  Windows
-tst_MainWindow               228  Windows
+tst_MainWindow               229  Windows
 tst_MockNntp                   8  Windows
 tst_NntpFile                  29  Windows
 tst_OpenVpnConfigPolicy       74  Windows
 tst_Par2Settings              18  Windows
 tst_PathHelper                38  Windows
-tst_PostFlow                  18  Windows
+tst_PostFlow                  29  Windows
 tst_PostHistory               48  Windows
 tst_PostInfoTemplate          35  Windows
 tst_PostQueue                 27  Windows

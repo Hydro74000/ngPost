@@ -262,6 +262,9 @@ private slots:
     void global_post_controls_pause_resume_and_cancel();
     //! Queue engine: closing keeps the queue; the window goes only once it is kept.
     void closing_keeps_the_queue_before_the_window_goes();
+    //! A stop signal or the end of the session: Qt then closes the windows,
+    //! which must not ask whether to quit while a post is being sent.
+    void stop_request_closes_a_posting_window_without_asking();
     void shutdown_waits_for_every_post_data();
     void shutdown_waits_for_every_post();
     void shutdown_requires_new_completed_post_data();
@@ -5543,6 +5546,64 @@ void TestMainWindow::closing_keeps_the_queue_before_the_window_goes()
     const int received = mock.receivedArticles().size();
     QTest::qWait(300);
     QCOMPARE(mock.receivedArticles().size(), received);
+}
+
+void TestMainWindow::stop_request_closes_a_posting_window_without_asking()
+{
+    HomeSandbox sandbox;
+    ngpost::tests::MockNntpServer mock;
+    QVERIFY(mock.start({ "--slow-mode-ms", "20" }));
+    int argc = 1;
+    QByteArray arg0("tst_MainWindow");
+    char *argv[] = { arg0.data(), nullptr };
+    NgPost ngPost(argc, argv);
+    const auto root = sandbox.rootPath();
+    QString error;
+    auto *window = bootWindow(ngPost,
+                              QString("GROUPS = alt.binaries.test\nthread = 1\nnzbPath = %1\n"
+                                      "[server]\nhost = 127.0.0.1\nport = %2\nssl = false\n"
+                                      "connection = 1\n")
+                                  .arg(root)
+                                  .arg(mock.port()),
+                              &error);
+    QVERIFY2(window, qPrintable(error));
+    window->show();
+    auto *tabs = window->findChild<QTabWidget *>("postTabWidget");
+    auto *post = qobject_cast<PostingWidget *>(tabs->widget(2));
+    QFile source(root + "/source.bin");
+    QVERIFY(source.open(QIODevice::WriteOnly));
+    QVERIFY(source.resize(8 * 1024 * 1024));
+    source.close();
+    PostingJobOptions options;
+    options.files = { QFileInfo(source) };
+    options.inputPaths = { source.fileName() };
+    options.nzbFilePath = root + "/stopped.nzb";
+    options.grpList = { "alt.binaries.test" };
+    options.from = "poster@example.invalid";
+    options.articleSizeBytes = 4096;
+    // A post of the historical engine, being sent.
+    QPointer<PostingJob> job = new PostingJob(&ngPost, options, post);
+    post->attachResumeJob(job, options.files, true);
+    QVERIFY(ngPost.startPostingJob(job));
+    QTRY_VERIFY_WITH_TIMEOUT(job && job->nbArticlesUploaded() > 0, 15000);
+
+    bool asked = false;
+    QTimer watch;
+    connect(&watch, &QTimer::timeout, window, [&] {
+        for (auto *widget : QApplication::topLevelWidgets())
+            if (auto *box = qobject_cast<QMessageBox *>(widget)) {
+                asked = true;
+                box->done(QMessageBox::No);
+            }
+    });
+    watch.start(5);
+    ngPost.requestGracefulExit(); // what a stop signal does on the event loop
+    QVERIFY(ngPost.isExiting());
+    QVERIFY(window->close()); // what Qt does on quit() and at the end of a session
+    watch.stop();
+    QVERIFY(!asked);
+    QVERIFY(!window->isVisible());
+    QTRY_VERIFY_WITH_TIMEOUT(job.isNull(), 15000); // stopped as a "Yes" would have
 }
 
 void TestMainWindow::shutdown_waits_for_every_post()

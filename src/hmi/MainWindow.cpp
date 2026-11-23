@@ -800,7 +800,11 @@ void MainWindow::closeEvent(QCloseEvent *event)
         event->ignore(); // the queue is being saved: the window closes after
         return;
     }
-    if (!_closeApproved && _ngPost->hasPostingJobs()) {
+    // Already leaving (a stop signal, the end of the session): no question.
+    const bool exiting = _ngPost->isExiting();
+    if (exiting && !_ngPost->queueHasEntries())
+        _ngPost->closeAllPostingJobs(); // what answering Yes did; a queue is kept
+    if (!_closeApproved && !exiting && _ngPost->hasPostingJobs()) {
         int res = QMessageBox::question(this,
                                         tr("close while still posting?"),
                                         tr("ngPost is currently posting.\nAre you sure you want to quit?"),
