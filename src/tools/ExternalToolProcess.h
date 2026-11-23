@@ -33,11 +33,16 @@ public:
         Running,         //!< the tool (or one of its descendants) may write
         Quiescing,       //!< asked to stop
         StoppedVerified, //!< nothing it started can write any more
-        Unproven         //!< ended without proof: its files are left alone
+        Unproven,        //!< ended without proof: its files are left alone
+        //! Capability "unavailable" (macOS): the tool ended on its own, with
+        //! status 0, no stop asked. Its outputs may be used; nothing proves its
+        //! descendants gone, so nothing is renamed back or deleted on that basis.
+        Exited
     };
     Q_ENUM(State)
 
-    //! How this platform proves a stop: "linux_subreaper", or "unavailable".
+    //! How this platform proves a stop: "linux_subreaper", "windows_job", or
+    //! "unavailable" (macOS: tools run, nothing is ever proven, see Exited).
     static QString capability();
 
     explicit ExternalToolProcess(QObject *parent = nullptr);
@@ -114,6 +119,8 @@ private:
     State _state = State::Idle;
     int _toolStatus = -1;
     bool _readyReceived = false;
+    bool _stopAsked = false;
+    bool _toolExitedSeen = false;
 };
 
 #endif // TOOLS_EXTERNALTOOLPROCESS_H

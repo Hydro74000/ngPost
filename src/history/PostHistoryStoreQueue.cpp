@@ -75,7 +75,7 @@ QStringList v6QueueStatements()
             "retained INTEGER NOT NULL DEFAULT 0 CHECK(retained IN (0,1)),"
             "root TEXT NOT NULL, archive_dir TEXT, staging_dir TEXT, marker_identity_json TEXT,"
             "supervision TEXT, tool_state TEXT NOT NULL DEFAULT 'idle' CHECK(tool_state IN "
-            "('idle','starting','running','quiescing','stopped_verified','unproven')),"
+            "('idle','starting','running','quiescing','stopped_verified','unproven','exited')),"
             "tool_identity_json TEXT,"
             "bytes INTEGER NOT NULL DEFAULT 0 CHECK(bytes >= 0),"
             "created_at TEXT NOT NULL,"
@@ -262,7 +262,7 @@ bool PostHistoryStore::_migrateToV6(QSqlDatabase &db, QString *error)
           "tool_state",
           "ALTER TABLE post_artifact_sets ADD COLUMN tool_state TEXT NOT NULL DEFAULT 'idle' "
           "CHECK(tool_state IN ('idle','starting','running','quiescing','stopped_verified',"
-          "'unproven'))" },
+          "'unproven','exited'))" },
         { "post_artifact_sets",
           "tool_identity_json",
           "ALTER TABLE post_artifact_sets ADD COLUMN tool_identity_json TEXT" },
@@ -281,10 +281,48 @@ bool PostHistoryStore::_migrateToV6(QSqlDatabase &db, QString *error)
         if (!present && !run(db, QLatin1String(c.ddl), {}, error))
             return false;
     }
+    _widenToolStates(db);
     return run(db,
                QStringLiteral("CREATE INDEX IF NOT EXISTS idx_posts_owner ON posts(owner_id)"),
                {},
                error);
+}
+
+//! Lot C5.5 adds 'exited' to the tool states. A database written by an
+//! earlier build of this unreleased schema has a CHECK without it, which
+//! every row satisfies with the wider one: its text is widened in place
+//! (SQLite's documented procedure for changing a CHECK constraint; a rebuild
+//! would fire the foreign key actions of the tables pointing at this one).
+//! Should SQLite refuse it (defensive mode), the narrower CHECK stays: only
+//! macOS ever writes 'exited'.
+void PostHistoryStore::_widenToolStates(QSqlDatabase &db)
+{
+    QSqlQuery ddl(db);
+    if (!ddl.exec(QStringLiteral("SELECT sql FROM sqlite_master WHERE type='table' AND "
+                                 "name='post_artifact_sets'"))
+        || !ddl.next())
+        return;
+    const QString narrow = ddl.value(0).toString();
+    const QString states = QStringLiteral("'stopped_verified','unproven'");
+    if (narrow.contains(QStringLiteral("'exited'")) || !narrow.contains(states))
+        return;
+    QString wide = narrow;
+    wide.replace(states, states + QStringLiteral(",'exited'"));
+    QSqlQuery version(db);
+    if (!version.exec(QStringLiteral("PRAGMA schema_version")) || !version.next())
+        return;
+    const qint64 next = version.value(0).toLongLong() + 1;
+    version.finish();
+    QString ignored;
+    if (run(db, QStringLiteral("PRAGMA writable_schema=ON"), {}, &ignored)) {
+        if (run(db,
+                QStringLiteral("UPDATE sqlite_master SET sql=? WHERE type='table' AND "
+                               "name='post_artifact_sets'"),
+                { wide },
+                &ignored))
+            run(db, QStringLiteral("PRAGMA schema_version=%1").arg(next), {}, &ignored);
+        run(db, QStringLiteral("PRAGMA writable_schema=OFF"), {}, &ignored);
+    }
 }
 
 bool PostHistoryStore::_refuseFutureSchema(QSqlDatabase &db, QString *error)

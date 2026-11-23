@@ -15,11 +15,13 @@
 #include <QLockFile>
 
 #include <QSqlDatabase>
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QtTest>
 
 #include <memory>
+#include <tuple>
 
 using namespace queue;
 using queuetest::makeOptions;
@@ -805,6 +807,141 @@ private slots:
         QVERIFY(error.startsWith(QStringLiteral("source_move_conflict")));
         QVERIFY(!f.store->planSourceMoves(a, run, {}, move, &error));
         QVERIFY(error.startsWith(QStringLiteral("source_move_conflict")));
+    }
+
+    void exitedIsOnlyForAnUnprovableSupervision()
+    {
+        Fixture f;
+        QString error;
+        auto prepare = [&](const QString &name, const QString &capability) {
+            const qint64 post = f.add(name, true);
+            const QString run = f.queue->find(post)->runId;
+            const QString set = QStringLiteral("set-") + name;
+            bool ok = f.store->createArtifactSet(
+                { set, post, run, 1, 0, QStringLiteral("/r"), QStringLiteral("/r/") + name, {} },
+                &error);
+            for (const char *state : { "starting", "running" })
+                ok = ok
+                    && f.store->recordToolSupervision(post,
+                                                      run,
+                                                      set,
+                                                      QLatin1String(state) == "starting"
+                                                          ? capability
+                                                          : QString(),
+                                                      QLatin1String(state),
+                                                      {},
+                                                      &error);
+            return std::make_tuple(ok, post, run, set);
+        };
+        // Where a stop can be proven, "exited" is never enough.
+        const auto [linuxOk,
+                    linuxPost,
+                    linuxRun,
+                    linuxSet] = prepare(QStringLiteral("l"), QStringLiteral("linux_subreaper"));
+        QVERIFY2(linuxOk, qPrintable(error));
+        QVERIFY(!f.store->recordToolSupervision(linuxPost,
+                                                linuxRun,
+                                                linuxSet,
+                                                {},
+                                                QStringLiteral("exited"),
+                                                {},
+                                                &error));
+        QCOMPARE(error, QStringLiteral("exited_needs_unavailable"));
+
+        // macOS: the outputs of a tool that ended on its own may be used...
+        const auto [macOk, macPost, macRun, macSet] = prepare(QStringLiteral("m"),
+                                                              QStringLiteral("unavailable"));
+        QVERIFY2(macOk, qPrintable(error));
+        QVERIFY2(f.store->recordToolSupervision(macPost,
+                                                macRun,
+                                                macSet,
+                                                {},
+                                                QStringLiteral("exited"),
+                                                {},
+                                                &error),
+                 qPrintable(error));
+        QVERIFY2(f.store->recordPreparedArtifacts(macPost,
+                                                  macRun,
+                                                  macSet,
+                                                  { { 0,
+                                                      QStringLiteral("/r/m/m.rar"),
+                                                      10,
+                                                      QStringLiteral("2026-11-23T10:00:00Z"),
+                                                      QStringLiteral("{\"ino\":3}"),
+                                                      QStringLiteral("archive"),
+                                                      true,
+                                                      {} } },
+                                                  &error),
+                 qPrintable(error));
+        // ...but nothing is ever renamed back or deleted on that basis, even
+        // read again after a restart, manifest recorded.
+        PostHistoryStore reopened(f.dir.filePath(QStringLiteral("history.sqlite")), true);
+        const auto set = reopened.artifactSet(macSet);
+        QCOMPARE(set->state, QStringLiteral("verified"));
+        QCOMPARE(set->toolState, QStringLiteral("exited"));
+        QVERIFY(!PostHistoryStore::toolStopProven(*set));
+        // A proven stop does qualify.
+        QVERIFY(f.store->recordToolSupervision(linuxPost,
+                                               linuxRun,
+                                               linuxSet,
+                                               {},
+                                               QStringLiteral("stopped_verified"),
+                                               {},
+                                               &error));
+        QVERIFY(PostHistoryStore::toolStopProven(*reopened.artifactSet(linuxSet)));
+    }
+
+    void anEarlierC51DatabaseGainsTheExitedState()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath(QStringLiteral("history.sqlite"));
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                                        QStringLiteral("c51"));
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("CREATE TABLE schema_meta(key TEXT PRIMARY KEY, value "
+                                          "TEXT)")));
+            QVERIFY(q.exec(QStringLiteral("INSERT INTO schema_meta VALUES('version', '6')")));
+            QVERIFY(q.exec(QStringLiteral(
+                "CREATE TABLE post_artifact_sets (artifact_set_id TEXT PRIMARY KEY NOT NULL, "
+                "post_id INTEGER NOT NULL, created_by_run TEXT NOT NULL, generation INTEGER NOT "
+                "NULL, recipe_revision INTEGER NOT NULL, state TEXT NOT NULL, retained INTEGER NOT "
+                "NULL DEFAULT 0, root TEXT NOT NULL, archive_dir TEXT, staging_dir TEXT, "
+                "marker_identity_json TEXT, supervision TEXT, tool_state TEXT NOT NULL DEFAULT "
+                "'idle' CHECK(tool_state IN "
+                "('idle','starting','running','quiescing','stopped_verified','unproven')), "
+                "tool_identity_json TEXT, bytes INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT "
+                "NULL, UNIQUE(post_id, generation), UNIQUE(post_id, artifact_set_id))")));
+            QVERIFY(q.exec(QStringLiteral(
+                "INSERT INTO post_artifact_sets(artifact_set_id, post_id, created_by_run, "
+                "generation, recipe_revision, state, root, created_at) VALUES('kept', 1, 'r', 1, "
+                "0, 'preparing', '/r', 'now')")));
+            QVERIFY(!q.exec(QStringLiteral("UPDATE post_artifact_sets SET tool_state='exited'")));
+            q.finish();
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("c51"));
+        PostHistoryStore store(path, true);
+        QString error;
+        QVERIFY2(store.initialize(&error), qPrintable(error));
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                                        QStringLiteral("c51-check"));
+            db.setDatabaseName(path);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM post_artifact_sets")));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toInt(), 1); // its row kept
+            QVERIFY2(q.exec(QStringLiteral("UPDATE post_artifact_sets SET tool_state='exited'")),
+                     qPrintable(q.lastError().text()));
+            QVERIFY(!q.exec(QStringLiteral("UPDATE post_artifact_sets SET tool_state='other'")));
+            q.finish();
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("c51-check"));
     }
 
     void anEarlierV6DatabaseGainsTheSupervisionColumns()

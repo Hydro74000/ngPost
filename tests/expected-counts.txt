@@ -64,7 +64,7 @@ tst_PostQueue                 27  Linux
 tst_PostingJobOptionsCodec    27  Linux
 tst_QueuePanel                10  Linux
 tst_QueueScheduler            38  Linux
-tst_QueueStoreSqlite          39  Linux
+tst_QueueStoreSqlite          41  Linux
 tst_PostingJobExecutor        13  Linux
 tst_PreparationWorkspace      12  Linux
 tst_ExternalToolProcess       18  Linux
@@ -105,10 +105,10 @@ tst_PostQueue                 27  Darwin
 tst_PostingJobOptionsCodec    27  Darwin
 tst_QueuePanel                10  Darwin
 tst_QueueScheduler            38  Darwin
-tst_QueueStoreSqlite          39  Darwin
+tst_QueueStoreSqlite          41  Darwin
 tst_PostingJobExecutor        13  Darwin
 tst_PreparationWorkspace      12  Darwin
-tst_ExternalToolProcess        3  Darwin
+tst_ExternalToolProcess        8  Darwin
 tst_NgPostQueue               20  Darwin
 tst_RandomToken                3  Darwin
 tst_SecretMasker              22  Darwin
@@ -144,7 +144,7 @@ tst_PostQueue                 27  Windows
 tst_PostingJobOptionsCodec    27  Windows
 tst_QueuePanel                10  Windows
 tst_QueueScheduler            38  Windows
-tst_QueueStoreSqlite          39  Windows
+tst_QueueStoreSqlite          41  Windows
 tst_PostingJobExecutor        10  Windows
 tst_PreparationWorkspace      12  Windows
 tst_ExternalToolProcess       17  Windows

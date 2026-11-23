@@ -10,7 +10,8 @@
 // It adopts every orphaned descendant of the tool (PR_SET_CHILD_SUBREAPER),
 // runs the tool only once told to ("go"), and writes its proof file only once
 // no descendant is left (waitpid() answering ECHILD): from then on, nothing
-// it started can still write. Linux only; elsewhere it refuses to run.
+// it started can still write. Windows uses a job object instead. On macOS it
+// runs the tool in a group of its own but never writes a proof (no subreaper).
 //
 // Channels: fd 3, lines to the controller (ready, started, exec_failed,
 // tool_exited, finished, proof_failed); fd 4, lines from it (go, stop), whose
@@ -30,6 +31,8 @@ constexpr const char *kSwitch = "--ngpost-tool-supervisor";
 constexpr int kProven = 0;
 constexpr int kSetupFailed = 2;
 constexpr int kProofFailed = 3;
+//! macOS (lot C5.5): ended, but nothing proves its descendants are gone.
+constexpr int kUnproven = 4;
 
 //! Runs the supervisor for argv = { self, kSwitch, proof, nonce, "--", tool, args... }.
 int run(int argc, char **argv);

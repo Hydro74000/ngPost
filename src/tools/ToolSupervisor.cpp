@@ -9,7 +9,7 @@
 
 #include "tools/ToolSupervisor.h"
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 
 #include <cerrno>
 #include <csignal>
@@ -21,7 +21,11 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <string>
+#if defined(__linux__)
 #include <sys/prctl.h>
+#else
+#include <sys/sysctl.h>
+#endif
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -58,6 +62,7 @@ void say(const std::string &line)
     }
 }
 
+#if defined(__linux__)
 std::string readSmallFile(const char *path)
 {
     std::string text;
@@ -118,6 +123,23 @@ pid_t parentOf(const char *pidDir)
     return field == std::string::npos ? -1 : toPid(stat.c_str() + field + 1);
 }
 
+#else
+//! Start time of @p pid from the kernel, to the microsecond: with the boot
+//! time it names one process.
+std::string startTime(pid_t pid)
+{
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, pid };
+    struct kinfo_proc info = {};
+    size_t size = sizeof info;
+    if (::sysctl(mib, 4, &info, &size, nullptr, 0) != 0 || size == 0)
+        return {};
+    const timeval &t = info.kp_proc.p_starttime;
+    return std::to_string(t.tv_sec) + "." + std::to_string(t.tv_usec);
+}
+
+#endif
+
+#if defined(__linux__)
 //! Our direct children, adopted orphans included. /proc may miss one that
 //! changes at the same time: the caller keeps looping until ECHILD.
 std::vector<pid_t> children()
@@ -137,6 +159,36 @@ std::vector<pid_t> children()
     ::closedir(proc);
     return found;
 }
+#endif
+
+//! The boot this process belongs to: with a pid and a start time, one process.
+std::string bootIdentity()
+{
+#if defined(__linux__)
+    return readSmallFile("/proc/sys/kernel/random/boot_id");
+#else
+    int mib[2] = { CTL_KERN, KERN_BOOTTIME };
+    timeval boot = {};
+    size_t size = sizeof boot;
+    if (::sysctl(mib, 2, &boot, &size, nullptr, 0) != 0)
+        return {};
+    return std::to_string(boot.tv_sec) + "." + std::to_string(boot.tv_usec);
+#endif
+}
+
+//! A pipe whose ends are not inherited by the tool.
+bool makePipe(int fds[2])
+{
+#if defined(__linux__)
+    return ::pipe2(fds, O_CLOEXEC) == 0;
+#else
+    if (::pipe(fds) != 0)
+        return false;
+    for (int i = 0; i < 2; ++i)
+        ::fcntl(fds[i], F_SETFD, FD_CLOEXEC);
+    return true;
+#endif
+}
 
 struct Tool
 {
@@ -149,6 +201,27 @@ struct Tool
     pid_t launchedPid = -1;
 };
 
+#if !defined(__linux__)
+//! macOS: whether the tool has ended, seen without reaping it. Unreaped, its
+//! zombie keeps its pid, hence its group id: the group may be signalled
+//! without ever reaching a group that took the same number since.
+bool leaderEnded(Tool &tool)
+{
+    if (tool.pid < 0)
+        return true; // never forked
+    siginfo_t info = {};
+    if (::waitid(P_PID, static_cast<id_t>(tool.pid), &info, WEXITED | WNOHANG | WNOWAIT) != 0
+        || info.si_pid != tool.pid)
+        return false;
+    if (tool.status < 0) {
+        tool.status = info.si_code == CLD_EXITED ? info.si_status : 128 + info.si_status;
+        say("tool_exited " + std::to_string(tool.status));
+    }
+    return true;
+}
+#endif
+
+#if defined(__linux__)
 int decodeStatus(int status)
 {
     if (WIFEXITED(status))
@@ -157,7 +230,9 @@ int decodeStatus(int status)
         return 128 + WTERMSIG(status);
     return -1;
 }
+#endif
 
+#if defined(__linux__)
 //! Reaps whatever ended. False once no child is left at all (ECHILD).
 bool reap(Tool &tool)
 {
@@ -167,7 +242,9 @@ bool reap(Tool &tool)
         if (pid > 0) {
             if (pid == tool.pid) {
                 tool.status = decodeStatus(status);
-                tool.pid = -1; // its group may now be recycled: no longer signalled
+                tool.pid = -1;
+                // Its group may now be recycled: no longer signalled. Every
+                // descendant is ours anyway (subreaper).
                 tool.group = -1;
                 say("tool_exited " + std::to_string(tool.status));
             }
@@ -180,7 +257,9 @@ bool reap(Tool &tool)
         return errno != ECHILD;
     }
 }
+#endif
 
+#if defined(__linux__)
 void signalTree(const Tool &tool, int sig)
 {
     if (tool.group > 0)
@@ -188,6 +267,7 @@ void signalTree(const Tool &tool, int sig)
     for (const pid_t child : children())
         ::kill(child, sig);
 }
+#endif
 
 //! Forks and execs the tool, its success confirmed by a pipe closed on exec.
 void launch(Tool &tool, char **toolArgv)
@@ -195,7 +275,7 @@ void launch(Tool &tool, char **toolArgv)
     // The one attempt is spent whatever happens: never retried, never late.
     tool.launched = true;
     int status[2];
-    int failed = ::pipe2(status, O_CLOEXEC) != 0 ? errno : 0;
+    int failed = makePipe(status) ? 0 : errno;
 #ifdef NGPOST_TESTING
     if (!failed && ::getenv("NGPOST_TEST_FAIL_EXEC_PIPE")) {
         ::close(status[0]);
@@ -276,6 +356,7 @@ void readExecResult(Tool &tool, bool stopping)
     say("started " + std::to_string(tool.launchedPid));
 }
 
+#if defined(__linux__)
 //! The proof, published atomically and durably: no descendant is left.
 bool writeProof(const std::string &path,
                 const std::string &nonce,
@@ -305,6 +386,7 @@ bool writeProof(const std::string &path,
     ::close(dirFd);
     return synced;
 }
+#endif
 
 //! Reads "go" / "stop" lines; false once the controller is gone (end of file).
 bool readCommands(std::string &buffer, bool &go, bool &stop)
@@ -351,13 +433,17 @@ int toolsupervisor::run(int argc, char **argv)
     ::sigaction(SIGTERM, &sa, nullptr);
     ::sigaction(SIGINT, &sa, nullptr);
     const pid_t controller = ::getppid();
+#if defined(__linux__)
     ::prctl(PR_SET_PDEATHSIG, SIGTERM);
+#endif
     bool lifeline = ::getppid() == controller;
+#if defined(__linux__)
     if (::prctl(PR_SET_CHILD_SUBREAPER, 1) != 0) {
         say("setup_failed subreaper " + std::to_string(errno));
         return kSetupFailed;
     }
-    const std::string boot = readSmallFile("/proc/sys/kernel/random/boot_id");
+#endif
+    const std::string boot = bootIdentity();
     const std::string start = startTime(::getpid());
     if (boot.empty() || start.empty()) {
         say("setup_failed identity");
@@ -390,29 +476,53 @@ int toolsupervisor::run(int argc, char **argv)
         stop = stop || sStopSignal != 0 || !lifeline;
         if (go && !stop && !tool.launched)
             launch(tool, toolArgv);
-        if (stop && stoppingSince < 0) {
+        if (stop && stoppingSince < 0)
             stoppingSince = nowMs();
-            signalTree(tool, SIGTERM);
-        } else if (stop) {
-            // Repeated: a child adopted meanwhile, or one that ignores TERM.
-            signalTree(tool, nowMs() - stoppingSince < kTermGraceMs ? SIGTERM : SIGKILL);
-        }
+        const int sig = nowMs() - stoppingSince < kTermGraceMs ? SIGTERM : SIGKILL;
+#if defined(__linux__)
+        if (stop) // repeated: a child adopted meanwhile, or one that ignores TERM
+            signalTree(tool, sig);
         // Only no child at all is a proof; an empty listing never is. Without a
         // "go", no tool was ever started.
         const bool childrenLeft = reap(tool);
         if (!childrenLeft && (stop || tool.launched))
             break;
+#else
+        const bool ended = leaderEnded(tool);
+        if (stop && tool.group > 0) {
+            // Its zombie still holds the group: one last KILL reaches what is
+            // left in it, and nothing else.
+            ::kill(-tool.group, ended ? SIGKILL : sig);
+            if (ended)
+                break;
+        } else if (stop || (tool.launched && ended)) {
+            break;
+        }
+#endif
     }
+#if !defined(__linux__)
+    int reaped = 0;
+    if (tool.pid > 0)
+        ::waitpid(tool.pid, &reaped, 0); // ended already: only now its pid goes
+#endif
     // The child is gone: its answer is there to read. Only a stop makes an
     // end of file ambiguous; a tool that ran and ended is announced as started.
     if (tool.execPipe >= 0)
         readExecResult(tool, stop);
+#if !defined(__linux__)
+    // Nothing proves that what the tool started is gone: never a proof here.
+    (void)proof;
+    (void)nonce;
+    say("unproven " + std::to_string(tool.status));
+    return kUnproven;
+#else
     if (!writeProof(proof, nonce, boot, start, tool)) {
         say("proof_failed " + std::to_string(errno));
         return kProofFailed;
     }
     say("finished " + std::to_string(tool.status));
     return kProven;
+#endif
 }
 
 #elif defined(_WIN32) // ------------------------------------------------------------------
@@ -736,11 +846,11 @@ int toolsupervisor::run(int, char **)
     return kProven;
 }
 
-#else // neither Linux nor Windows
+#else // neither POSIX supported here nor Windows
 
 int toolsupervisor::run(int, char **)
 {
-    return kSetupFailed; // no proven supervision here (lot C5.5)
+    return kSetupFailed;
 }
 
 #endif

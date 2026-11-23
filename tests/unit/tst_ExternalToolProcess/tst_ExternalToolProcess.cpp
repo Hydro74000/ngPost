@@ -38,6 +38,9 @@
 #if defined(Q_OS_LINUX) || defined(Q_OS_WIN)
 #define PROVEN_SUPERVISION 1
 #endif
+#if defined(PROVEN_SUPERVISION) || defined(Q_OS_MACOS)
+#define TOOLS_RUN 1 // tools run here, proven or not (macOS: never proven)
+#endif
 
 #if defined(Q_OS_UNIX)
 #include <cerrno>
@@ -52,7 +55,7 @@
 namespace
 {
 
-#ifdef PROVEN_SUPERVISION
+#ifdef TOOLS_RUN
 QString python()
 {
 #ifdef Q_OS_WIN
@@ -143,6 +146,9 @@ void killQuietly(qint64 pid)
 #endif
 }
 
+#endif // TOOLS_RUN
+
+#ifdef PROVEN_SUPERVISION
 //! The start time a supervision records for the process @p pid.
 QString startTimeOfSelf()
 {
@@ -200,7 +206,7 @@ class tst_ExternalToolProcess : public QObject
 {
     Q_OBJECT
 
-#ifdef PROVEN_SUPERVISION
+#ifdef TOOLS_RUN
 private:
     struct Run
     {
@@ -230,7 +236,7 @@ private:
 private slots:
     void initTestCase()
     {
-#ifdef PROVEN_SUPERVISION
+#ifdef TOOLS_RUN
         if (python().isEmpty())
             QSKIP("the fixture tools are Python scripts: no python on PATH");
 #endif
@@ -243,10 +249,8 @@ private slots:
 #elif defined(Q_OS_WIN)
         QCOMPARE(ExternalToolProcess::capability(), QStringLiteral("windows_job"));
 #else
-        // No proven supervision here yet: nothing is ever started.
+        // Tools run, nothing is ever proven (lot C5.5).
         QCOMPARE(ExternalToolProcess::capability(), QStringLiteral("unavailable"));
-        ExternalToolProcess tool;
-        QVERIFY(!tool.start(QStringLiteral("tool"), {}, QDir::tempPath(), QStringLiteral("proof")));
         QCOMPARE(ExternalToolProcess::proofState(QStringLiteral("{}")),
                  ExternalToolProcess::State::Unproven);
 #endif
@@ -270,6 +274,8 @@ private slots:
         QCOMPARE(r.tool.toolStatus(), 0);
         QCOMPARE(ExternalToolProcess::proofState(r.tool.identityJson()),
                  ExternalToolProcess::State::StoppedVerified);
+        r.tool.stop(); // over already: changes nothing
+        QCOMPARE(r.tool.state(), ExternalToolProcess::State::StoppedVerified);
     }
 
     void aStopBeforeGoRunsNothing()
@@ -623,6 +629,105 @@ private slots:
 #endif
     }
 #endif // PROVEN_SUPERVISION
+
+#ifdef Q_OS_MACOS
+    // --- capability "unavailable" (lot C5.5): tools run, nothing is proven ------------
+
+    void macToolEndedOnItsOwnHasExited()
+    {
+        Run r;
+        QVERIFY(r.script(QStringLiteral("touch.py"), kTouch));
+        QVERIFY(r.start({ r.path(QStringLiteral("touch.py")), r.path(QStringLiteral("ran")) }));
+        QTRY_COMPARE_WITH_TIMEOUT(r.ready.size(), 1, 5000);
+        QTest::qWait(300);
+        QVERIFY(!QFile::exists(r.path(QStringLiteral("ran")))); // not before "go" either
+        r.tool.allowExecution();
+        QTRY_COMPARE_WITH_TIMEOUT(r.stopped.size(), 1, 10000);
+        QVERIFY(!r.verified());
+        QCOMPARE(r.tool.state(), ExternalToolProcess::State::Exited); // outputs usable
+        QCOMPARE(r.tool.toolStatus(), 0);
+        QVERIFY(QFile::exists(r.path(QStringLiteral("ran"))));
+        QVERIFY(!QFile::exists(r.path(QStringLiteral("proof")))); // never a proof
+        QVERIFY(ExternalToolProcess::proofState(r.tool.identityJson())
+                != ExternalToolProcess::State::StoppedVerified);
+        r.tool.stop(); // over already: still Exited
+        QCOMPARE(r.tool.state(), ExternalToolProcess::State::Exited);
+        QTest::qWait(200);
+        QCOMPARE(r.stopped.size(), 1);
+    }
+
+    void macFailedToolIsUnproven()
+    {
+        Run r;
+        QVERIFY(r.script(QStringLiteral("fail.py"), "import sys\nsys.exit(3)\n"));
+        QVERIFY(r.start({ r.path(QStringLiteral("fail.py")) }));
+        QTRY_COMPARE_WITH_TIMEOUT(r.ready.size(), 1, 5000);
+        r.tool.allowExecution();
+        QTRY_COMPARE_WITH_TIMEOUT(r.stopped.size(), 1, 10000);
+        QCOMPARE(r.tool.state(), ExternalToolProcess::State::Unproven);
+        QCOMPARE(r.tool.toolStatus(), 3);
+    }
+
+    void macStoppedToolIsUnprovenAndItsGroupKilled()
+    {
+        Run r;
+        // Stays in its group and ignores TERM: KILL after the grace.
+        QVERIFY(r.script(QStringLiteral("stubborn.py"),
+                         "import os, signal, sys, time\n"
+                         "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                         "open(sys.argv[1], 'w').write(str(os.getpid()))\n"
+                         "time.sleep(60)\n"));
+        QVERIFY(
+            r.start({ r.path(QStringLiteral("stubborn.py")), r.path(QStringLiteral("tool.pid")) }));
+        QTRY_COMPARE_WITH_TIMEOUT(r.ready.size(), 1, 5000);
+        r.tool.allowExecution();
+        QTRY_VERIFY_WITH_TIMEOUT(readPid(r.path(QStringLiteral("tool.pid"))) > 0, 10000);
+        const qint64 toolPid = readPid(r.path(QStringLiteral("tool.pid")));
+        r.tool.stop();
+        QTRY_COMPARE_WITH_TIMEOUT(r.stopped.size(), 1, 10000);
+        QCOMPARE(r.tool.state(), ExternalToolProcess::State::Unproven); // never Exited after a stop
+        QVERIFY(!alive(toolPid));
+        QCOMPARE(r.tool.toolStatus(), 128 + SIGKILL);
+    }
+
+    void macDescendantOutOfTheGroupIsNeverAProof()
+    {
+        Run r;
+        QVERIFY(r.script(QStringLiteral("writer.py"), kWriter));
+        QVERIFY(r.start(writerArgs(r.dir.path(), false)));
+        QTRY_COMPARE_WITH_TIMEOUT(r.ready.size(), 1, 5000);
+        r.tool.allowExecution();
+        QTRY_VERIFY_WITH_TIMEOUT(r.grandchild() > 0, 10000);
+        const qint64 grandchild = r.grandchild();
+        QTRY_COMPARE_WITH_TIMEOUT(r.stopped.size(), 1, 10000);
+        // The tool itself ended well: usable, but nothing says its writer is gone.
+        QCOMPARE(r.tool.state(), ExternalToolProcess::State::Exited);
+        QVERIFY(!QFile::exists(r.path(QStringLiteral("proof"))));
+        killQuietly(grandchild); // out of our sight: the test ends it
+        QTRY_VERIFY_WITH_TIMEOUT(!alive(grandchild), 5000);
+    }
+
+    void macForgedProofIsNeverTaken()
+    {
+        Run r;
+        QVERIFY(r.script(QStringLiteral("true.py"), kTrue));
+        QVERIFY(r.start({ r.path(QStringLiteral("true.py")) }));
+        QTRY_COMPARE_WITH_TIMEOUT(r.ready.size(), 1, 5000);
+        r.tool.allowExecution();
+        QTRY_COMPARE_WITH_TIMEOUT(r.stopped.size(), 1, 10000);
+        const QJsonObject identity = QJsonDocument::fromJson(r.tool.identityJson().toUtf8())
+                                         .object();
+        QFile proof(r.path(QStringLiteral("proof")));
+        QVERIFY(proof.open(QIODevice::WriteOnly));
+        proof.write("ngpost-tool-proof 1\nnonce " + identity.value("nonce").toString().toUtf8()
+                    + "\nboot " + identity.value("boot").toString().toUtf8() + "\npid "
+                    + identity.value("pid").toString().toUtf8() + "\nstarttime "
+                    + identity.value("starttime").toString().toUtf8() + "\ntool_status 0\n");
+        proof.close();
+        QCOMPARE(ExternalToolProcess::proofState(r.tool.identityJson()),
+                 ExternalToolProcess::State::Unproven);
+    }
+#endif // Q_OS_MACOS
 };
 
 int main(int argc, char **argv)

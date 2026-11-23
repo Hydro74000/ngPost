@@ -21,13 +21,17 @@
 
 #include <optional>
 
-#if defined(Q_OS_LINUX)
+#if defined(Q_OS_LINUX) || defined(Q_OS_MACOS)
+#define NGPOST_POSIX_TOOLS 1
 #include <cerrno>
 #include <csignal>
 #include <ctime>
 #include <fcntl.h>
 #include <pthread.h>
 #include <unistd.h>
+#if defined(Q_OS_MACOS)
+#include <sys/sysctl.h>
+#endif
 #elif defined(Q_OS_WIN)
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -92,6 +96,24 @@ bool supervisorAlive(const QJsonObject &identity)
         && readSmall(QStringLiteral("/proc/sys/kernel/random/boot_id"))
         == identity.value(QStringLiteral("boot")).toString()
         && startTimeOf(pid) == identity.value(QStringLiteral("starttime")).toString();
+#elif defined(Q_OS_MACOS)
+    // As the supervisor names itself (ToolSupervisor.cpp): kernel start time
+    // and boot time, to the microsecond.
+    const int pid = identity.value(QStringLiteral("pid")).toString().toInt();
+    int procMib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, pid };
+    struct kinfo_proc info = {};
+    size_t size = sizeof info;
+    int bootMib[2] = { CTL_KERN, KERN_BOOTTIME };
+    timeval boot = {};
+    size_t bootSize = sizeof boot;
+    if (pid <= 0 || ::sysctl(procMib, 4, &info, &size, nullptr, 0) != 0 || size == 0
+        || ::sysctl(bootMib, 2, &boot, &bootSize, nullptr, 0) != 0)
+        return false;
+    const timeval &start = info.kp_proc.p_starttime;
+    return QStringLiteral("%1.%2").arg(start.tv_sec).arg(start.tv_usec)
+        == identity.value(QStringLiteral("starttime")).toString()
+        && QStringLiteral("%1.%2").arg(boot.tv_sec).arg(boot.tv_usec)
+        == identity.value(QStringLiteral("boot")).toString();
 #elif defined(Q_OS_WIN)
     const auto pid = static_cast<DWORD>(identity.value(QStringLiteral("pid")).toString().toULong());
     HANDLE process = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
@@ -184,14 +206,31 @@ bool ExternalToolProcess::start(const QString &program,
     return true;
 }
 
+#if defined(NGPOST_POSIX_TOOLS)
+namespace
+{
+//! Not inherited by anything else this process starts.
+bool closeOnExecPipe(int fds[2])
+{
 #if defined(Q_OS_LINUX)
+    return ::pipe2(fds, O_CLOEXEC) == 0;
+#else
+    if (::pipe(fds) != 0)
+        return false;
+    ::fcntl(fds[0], F_SETFD, FD_CLOEXEC);
+    ::fcntl(fds[1], F_SETFD, FD_CLOEXEC);
+    return true;
+#endif
+}
+} // namespace
+
 bool ExternalToolProcess::openChannels()
 {
     int fromSupervisor[2];
     int toSupervisor[2];
-    if (::pipe2(fromSupervisor, O_CLOEXEC) != 0)
+    if (!closeOnExecPipe(fromSupervisor))
         return false;
-    if (::pipe2(toSupervisor, O_CLOEXEC) != 0) {
+    if (!closeOnExecPipe(toSupervisor)) {
         ::close(fromSupervisor[0]);
         ::close(fromSupervisor[1]);
         return false;
@@ -212,6 +251,10 @@ bool ExternalToolProcess::openChannels()
     });
     _fromSupervisor = fromSupervisor[0];
     _toSupervisor = toSupervisor[1];
+#if defined(F_SETNOSIGPIPE)
+    // macOS: a supervisor already gone answers EPIPE, never a SIGPIPE.
+    ::fcntl(_toSupervisor, F_SETNOSIGPIPE, 1);
+#endif
     _nonce = QUuid::createUuid().toString(QUuid::WithoutBraces);
     return true;
 }
@@ -250,7 +293,7 @@ void ExternalToolProcess::listenToSupervisor()
 #else
 bool ExternalToolProcess::openChannels()
 {
-    return false; // no proven supervision here yet (lot C5.5)
+    return false; // no supervisor on this platform
 }
 
 void ExternalToolProcess::listenToSupervisor()
@@ -292,15 +335,17 @@ void ExternalToolProcess::allowExecution()
 
 void ExternalToolProcess::stop()
 {
-    if (_state == State::Idle || _state == State::StoppedVerified || _state == State::Unproven)
-        return;
+    if (_state == State::Idle || _state == State::StoppedVerified || _state == State::Unproven
+        || _state == State::Exited)
+        return; // over already
     _state = State::Quiescing;
+    _stopAsked = true;
     sendCommand("stop\n");
 }
 
 void ExternalToolProcess::onProtocol()
 {
-#if defined(Q_OS_LINUX)
+#if defined(NGPOST_POSIX_TOOLS)
     char buffer[512];
     for (;;) {
         const ssize_t n = _fromSupervisor < 0
@@ -350,8 +395,10 @@ void ExternalToolProcess::handleLine(const QByteArray &line)
         emit execFailed(words.at(1).toInt());
     } else if ((verb == "tool_exited" || verb == "finished") && words.size() >= 2) {
         _toolStatus = words.at(1).toInt();
-        if (verb == "tool_exited")
+        if (verb == "tool_exited") {
+            _toolExitedSeen = true;
             emit toolExited(_toolStatus);
+        }
     }
 }
 
@@ -363,6 +410,16 @@ void ExternalToolProcess::onSupervisorFinished()
     if (!_readyReceived) {
         // It ended before being able to run anything: the tool never existed.
         verified = true;
+    } else if (capability() == QStringLiteral("unavailable")) {
+        // No proof here (macOS, lot C5.5). A tool that ended on its own and
+        // successfully, untouched by any stop, may hand over its outputs;
+        // nothing about its descendants is ever concluded.
+        const bool exited = !_stopAsked && _toolExitedSeen && _toolStatus == 0
+            && _supervisor->exitStatus() == QProcess::NormalExit
+            && _supervisor->exitCode() == toolsupervisor::kUnproven;
+        _state = exited ? State::Exited : State::Unproven;
+        emit stopped(false, _toolStatus);
+        return;
     } else {
         const auto status = provenStatus(QJsonDocument::fromJson(_identityJson.toUtf8()).object());
         verified = status.has_value();
@@ -378,7 +435,9 @@ ExternalToolProcess::State ExternalToolProcess::proofState(const QString &identi
     const QJsonObject identity = QJsonDocument::fromJson(identityJson.toUtf8()).object();
     if (identity.isEmpty())
         return State::Unproven;
-    if (provenStatus(identity))
+    // A supervision that cannot prove anything is never proven by a file.
+    if (identity.value(QStringLiteral("capability")).toString() != QStringLiteral("unavailable")
+        && provenStatus(identity))
         return State::StoppedVerified;
     return supervisorAlive(identity) ? State::Running : State::Unproven;
 }
@@ -394,7 +453,7 @@ void ExternalToolProcess::closeChannels()
     _socket = nullptr;
     delete _server;
     _server = nullptr;
-#if defined(Q_OS_LINUX)
+#if defined(NGPOST_POSIX_TOOLS)
     for (const int end : { _childWrite, _childRead })
         if (end >= 0)
             ::close(end);
@@ -427,6 +486,9 @@ void ExternalToolProcess::sendCommand(const QByteArray &line)
         ::sigtimedwait(&pipeSignal, nullptr, &none);
     }
     ::pthread_sigmask(SIG_SETMASK, &previous, nullptr);
+#elif defined(Q_OS_MACOS)
+    if (_toSupervisor >= 0) // EPIPE without a signal (F_SETNOSIGPIPE)
+        (void)::write(_toSupervisor, line.constData(), static_cast<size_t>(line.size()));
 #elif defined(Q_OS_WIN)
     if (_socket) {
         _socket->write(line);
@@ -442,7 +504,7 @@ void ExternalToolProcess::sendCommand(const QByteArray &line)
 #ifdef NGPOST_TESTING
 void ExternalToolProcess::dropProtocolForTest()
 {
-#if defined(Q_OS_LINUX)
+#if defined(NGPOST_POSIX_TOOLS)
     delete _notifier;
     _notifier = nullptr;
     if (_fromSupervisor >= 0)

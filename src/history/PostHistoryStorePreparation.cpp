@@ -43,11 +43,14 @@ bool toolStepAllowed(const QString &from, const QString &to)
         { QStringLiteral("running"),
           { QStringLiteral("quiescing"),
             QStringLiteral("stopped_verified"),
-            QStringLiteral("unproven") } },
+            QStringLiteral("unproven"),
+            QStringLiteral("exited") } },
         { QStringLiteral("quiescing"),
           { QStringLiteral("stopped_verified"), QStringLiteral("unproven") } },
         { QStringLiteral("stopped_verified"),
           { QStringLiteral("starting"), QStringLiteral("idle") } },
+        // Capability "unavailable" only: ended on its own, nothing proven.
+        { QStringLiteral("exited"), { QStringLiteral("starting"), QStringLiteral("idle") } },
         // Only a later proof settles a stop that could not be proven.
         { QStringLiteral("unproven"), { QStringLiteral("stopped_verified") } },
     };
@@ -117,6 +120,17 @@ QList<PostHistoryStore::ArtifactRecord> readArtifacts(QSqlDatabase &db, const QS
         artifacts << a;
     }
     return artifacts;
+}
+
+//! The supervision a set records, or @p given when it says one.
+QString supervisionOf(QSqlDatabase &db, const QString &setId, const QString &given)
+{
+    if (!given.isEmpty())
+        return given;
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT supervision FROM post_artifact_sets WHERE artifact_set_id=?"));
+    q.addBindValue(setId);
+    return q.exec() && q.next() ? q.value(0).toString() : QString();
 }
 
 //! The recipe revision the entry of @p postId has now.
@@ -327,6 +341,12 @@ bool PostHistoryStore::recordToolSupervision(qint64 postId,
                 return false;
             }
         }
+        // "exited" says nothing of descendants: only where nothing can be proven.
+        if (toolState == QStringLiteral("exited")
+            && supervisionOf(db, setId, capability) != QStringLiteral("unavailable")) {
+            fail(err, QStringLiteral("exited_needs_unavailable"));
+            return false;
+        }
         return run(db,
                    QStringLiteral("UPDATE post_artifact_sets SET supervision=COALESCE(?, "
                                   "supervision), tool_state=?, tool_identity_json=? WHERE "
@@ -512,7 +532,12 @@ bool PostHistoryStore::recordPreparedArtifacts(qint64 postId,
             fail(err, QStringLiteral("artifact_set_state: %1").arg(state));
             return false;
         }
-        if (tool != QStringLiteral("idle") && tool != QStringLiteral("stopped_verified")) {
+        // A proven stop, or (capability "unavailable") a tool that ended on
+        // its own: its outputs may be used, nothing more is concluded.
+        const bool exited = tool == QStringLiteral("exited")
+            && supervisionOf(db, setId, {}) == QStringLiteral("unavailable");
+        if (tool != QStringLiteral("idle") && tool != QStringLiteral("stopped_verified")
+            && !exited) {
             fail(err, QStringLiteral("tool_not_stopped: %1").arg(tool));
             return false;
         }

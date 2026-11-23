@@ -540,6 +540,14 @@ public:
                                  const QList<ArtifactRecord> &artifacts,
                                  QString *error = nullptr);
     std::optional<ArtifactSetRecord> artifactSet(const QString &setId, QString *error = nullptr);
+    //! What may be renamed back or deleted for a set: only what its tool is
+    //! proven not to touch any more (no tool ran, or its stop is proven). A tool
+    //! that only "exited" (capability unavailable) never qualifies.
+    static bool toolStopProven(const ArtifactSetRecord &set)
+    {
+        return set.toolState == QStringLiteral("idle")
+            || set.toolState == QStringLiteral("stopped_verified");
+    }
 
 private:
     QString _dbPath;
@@ -564,6 +572,7 @@ private:
 
     // Queue manager (PostHistoryStoreQueue.cpp).
     QString _ownerId;
+    void _widenToolStates(QSqlDatabase &db);
     // Recoverable preparation (PostHistoryStorePreparation.cpp).
     //! Runs @p work in one SQL transaction, or changes nothing.
     bool _preparationWrite(const std::function<bool(QSqlDatabase &, QString *)> &work,
